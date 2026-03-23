@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { ReactNode } from "react";
 
-const ALLOWED_USER_AGENTS = ["Exambro", "ExamBrowser", "ExambroAndroid"]; // Configure strings
+const ALLOWED_USER_AGENTS = ["Exambro", "ExamBrowser", "ExambroAndroid", "wv"]; // Configure strings
 
 interface ExambroGuardProps {
   children: ReactNode;
