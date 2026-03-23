@@ -1,0 +1,86 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Light theme - Basic Tailwind Colors */
+  --background: 0 0% 100%; /* white */
+  --foreground: 0 0% 3.9%; /* gray-950 */
+  --card: 0 0% 100%; /* white */
+  --card-foreground: 0 0% 3.9%; /* gray-950 */
+  --popover: 0 0% 100%; /* white */
+  --popover-foreground: 0 0% 3.9%; /* gray-950 */
+  --primary: 221.2 83.2% 53.3%; /* blue-600 */
+  --primary-foreground: 210 40% 98%; /* white */
+  --secondary: 210 40% 96%; /* gray-100 */
+  --secondary-foreground: 222.2 84% 4.9%; /* gray-900 */
+  --muted: 210 40% 96%; /* gray-100 */
+  --muted-foreground: 215.4 16.3% 46.9%; /* gray-500 */
+  --accent: 210 40% 96%; /* gray-100 */
+  --accent-foreground: 222.2 84% 4.9%; /* gray-900 */
+  --destructive: 0 84.2% 60.2%; /* red-500 */
+  --destructive-foreground: 210 40% 98%; /* white */
+  --border: 214.3 31.8% 91.4%; /* gray-200 */
+  --input: 214.3 31.8% 91.4%; /* gray-200 */
+  --ring: 221.2 83.2% 53.3%; /* blue-600 */
+  --radius: 0.75rem;
+}
+
+/***** Dark theme *****/
+.dark {
+  --background: 222.2 84% 4.9%;
+  --foreground: 210 40% 98%;
+
+  --card: 222.2 84% 4.9%;
+  --card-foreground: 210 40% 98%;
+
+  --popover: 222.2 84% 4.9%;
+  --popover-foreground: 210 40% 98%;
+
+  /* Keep brand blue for both themes */
+  --primary: 212 96% 51%;
+  --primary-foreground: 210 40% 98%;
+
+  --secondary: 217.2 32.6% 17.5%;
+  --secondary-foreground: 210 40% 98%;
+
+  --muted: 217.2 32.6% 17.5%;
+  --muted-foreground: 215 20% 65%;
+
+  --accent: 210 75% 60%;
+  --accent-foreground: 0 0% 100%;
+
+  --destructive: 0 62.8% 30.6%;
+  --destructive-foreground: 0 0% 98%;
+
+  --border: 217.2 32.6% 17.5%;
+  --input: 217.2 32.6% 17.5%;
+  --ring: 212 96% 51%;
+}
+
+html {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+  overflow: hidden;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+#root {
+  height: 100%;
+  overflow: hidden;
+}
+
+* {
+  @apply border-border;
+}
+
+a {
+  color: inherit;
+}

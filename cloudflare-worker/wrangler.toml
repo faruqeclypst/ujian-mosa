@@ -1,0 +1,13 @@
+name = "r2-delete-worker"
+main = "r2-delete.js"
+compatibility_date = "2024-01-01"
+workers_dev = true
+
+# R2 bucket binding for direct R2 API access
+[[r2_buckets]]
+binding = "INVENTORY_BUCKET"
+bucket_name = "tu-mosa"
+
+# Environment variables (can be overridden via wrangler secrets)
+[vars]
+ENVIRONMENT = "development"

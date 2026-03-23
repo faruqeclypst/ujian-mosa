@@ -1,0 +1,1 @@
+﻿src/pages/admin/ExamRoomsPage.tsx(394,37): error TS2322: Type '"xs"' is not assignable to type '"default" | "sm" | "lg" | "icon" | null | undefined'.

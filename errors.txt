@@ -1,0 +1,33 @@
+﻿src/components/piket/PermissionList.tsx(8,15): error TS2305: Module '"../../types/piket"' has no exported member 'StudentPermission'.
+src/components/piket/PermissionList.tsx(17,11): error TS2339: Property 'updatePermissionStatus' does not exist on type 'PiketContextType'.
+src/components/piket/PermissionList.tsx(17,35): error TS2339: Property 'deletePermission' does not exist on type 'PiketContextType'.
+src/components/piket/PermissionList.tsx(108,51): error TS7006: Parameter 's' implicitly has an 'any' type.
+src/components/piket/PermissionList.tsx(108,54): error TS7006: Parameter 'i' implicitly has an 'any' type.
+src/components/piket/PermissionList.tsx(137,109): error TS7053: Element implicitly has an 'any' type because expression of type 'any' can't be used to index type '{ menunggu: string; diterima: string; ditolak: string; }'.
+src/components/piket/PermissionList.tsx(146,41): error TS7006: Parameter 's' implicitly has an 'any' type.
+src/components/piket/PermissionList.tsx(146,44): error TS7006: Parameter 'idx' implicitly has an 'any' type.
+src/components/piket/PiketBulkScheduleForm.tsx(31,38): error TS2339: Property 'schedules' does not exist on type 'PiketContextType'.
+src/components/piket/PiketBulkScheduleForm.tsx(31,49): error TS2339: Property 'createSchedule' does not exist on type 'PiketContextType'.
+src/components/piket/PiketBulkScheduleForm.tsx(31,65): error TS2339: Property 'updateSchedule' does not exist on type 'PiketContextType'.
+src/components/piket/PiketBulkScheduleForm.tsx(31,81): error TS2339: Property 'deleteSchedule' does not exist on type 'PiketContextType'.
+src/components/piket/PiketBulkScheduleForm.tsx(88,43): error TS7006: Parameter 's' implicitly has an 'any' type.
+src/components/piket/PiketBulkScheduleForm.tsx(95,52): error TS7006: Parameter 's' implicitly has an 'any' type.
+src/components/piket/PiketBulkScheduleForm.tsx(99,34): error TS7006: Parameter 'ts' implicitly has an 'any' type.
+src/components/piket/PiketBulkScheduleForm.tsx(262,45): error TS7006: Parameter 's' implicitly has an 'any' type.
+src/components/piket/PiketTable.tsx(7,15): error TS2305: Module '"../../types/piket"' has no exported member 'PiketSchedule'.
+src/components/piket/PiketTable.tsx(7,30): error TS2305: Module '"../../types/piket"' has no exported member 'PiketAttendance'.
+src/components/piket/PiketTable.tsx(47,21): error TS2339: Property 'updateAttendanceNotes' does not exist on type 'PiketContextType'.
+src/components/piket/PiketTable.tsx(79,49): error TS2345: Argument of type 'unknown' is not assignable to parameter of type 'string | boolean'.
+src/pages/PiketPage.tsx(20,15): error TS2305: Module '"../types/piket"' has no exported member 'PiketSchedule'.
+src/pages/PiketPage.tsx(20,30): error TS2305: Module '"../types/piket"' has no exported member 'StudentPermissionPayload'.
+src/pages/PiketPage.tsx(26,5): error TS2339: Property 'schedules' does not exist on type 'PiketContextType'.
+src/pages/PiketPage.tsx(26,16): error TS2339: Property 'attendances' does not exist on type 'PiketContextType'.
+src/pages/PiketPage.tsx(26,29): error TS2339: Property 'permissions' does not exist on type 'PiketContextType'.
+src/pages/PiketPage.tsx(27,5): error TS2339: Property 'createSchedule' does not exist on type 'PiketContextType'.
+src/pages/PiketPage.tsx(27,21): error TS2339: Property 'updateSchedule' does not exist on type 'PiketContextType'.
+src/pages/PiketPage.tsx(27,37): error TS2339: Property 'deleteSchedule' does not exist on type 'PiketContextType'.
+src/pages/PiketPage.tsx(28,5): error TS2339: Property 'updateAttendance' does not exist on type 'PiketContextType'.
+src/pages/PiketPage.tsx(28,23): error TS2339: Property 'resetAttendance' does not exist on type 'PiketContextType'.
+src/pages/PiketPage.tsx(28,40): error TS2339: Property 'fetchAttendancesForDate' does not exist on type 'PiketContextType'.
+src/pages/PiketPage.tsx(29,5): error TS2339: Property 'createPermission' does not exist on type 'PiketContextType'.
+src/pages/PiketPage.tsx(29,23): error TS2339: Property 'fetchPermissionsForDate' does not exist on type 'PiketContextType'.
