@@ -90,40 +90,44 @@ export const parseQuestionsFromWord = async (file: File): Promise<ParsedQuestion
       }
     }
 
-    // C. Detect Answer Key ("Kunci: A")
-    const answerMatch = textOnly.match(/^(Kunci|Answer|Kunci Jawaban)[.\s:]+([A-Ea-e])/i);
+    // C. Detect Answer Key ("Kunci: A" - bisa di mana saja dalam baris/cell)
+    const answerMatch = textOnly.match(/(Kunci|Answer|Kunci Jawaban)[.\s:]+([A-Ea-e])/i);
     if (answerMatch && currentQuestion) {
       currentAnswerKey = answerMatch[2].toLowerCase();
       return;
     }
 
-    // D. Fragment Handling (Filling pending fields)
+    // D. Fragment Handling (Greedy capture for fragmented text/images)
     if (currentQuestion) {
+        // Greedy Image Capture
+        if (imageSrc) {
+            const letters = Object.keys(currentChoices);
+            if (letters.length > 0) {
+                // Assign to last choice if it doesn't have an image
+                const lastLetter = letters[letters.length - 1];
+                if (!currentChoices[lastLetter].imageUrl) {
+                    currentChoices[lastLetter].imageUrl = imageSrc;
+                }
+            } else if (!currentQuestion.imageUrl) {
+                // Assign to question if no choices yet
+                currentQuestion.imageUrl = imageSrc;
+            }
+        }
+
         if (pendingNumber && !currentQuestion.text) {
             currentQuestion.text = line;
-            if (imageSrc) currentQuestion.imageUrl = imageSrc;
             pendingNumber = null;
         } else if (pendingLetter && currentChoices[pendingLetter]) {
             currentChoices[pendingLetter].text = line;
-            if (imageSrc) currentChoices[pendingLetter].imageUrl = imageSrc;
-            
-            // Check color in fragment too
-            if (line.includes("color: #ff0000") || line.includes("color:#ff0000") || line.includes("rgb(255, 0, 0)")) {
-                currentAnswerKey = pendingLetter;
-            }
             pendingLetter = null;
         } else {
-            // Continuation or Literasi
-            if (!currentChoices["a"] && !currentAnswerKey) {
-                currentQuestion.text += "\n\n" + line;
-                if (imageSrc && !currentQuestion.imageUrl) {
-                    currentQuestion.imageUrl = imageSrc;
-                }
-            } else if (imageSrc) {
-                // If it's choice-related image but letter was already processed
-                const lastLetter = Object.keys(currentChoices).pop();
-                if (lastLetter && !currentChoices[lastLetter].imageUrl) {
-                    currentChoices[lastLetter].imageUrl = imageSrc;
+            // Continuation or Literasi or separate image cell
+            if (line) {
+                if (!currentChoices["a"] && !currentAnswerKey) {
+                    currentQuestion.text += "\n\n" + line;
+                } else {
+                    // This could be text continuation for a choice if pendingLetter was null?
+                    // Actually, mammoth usually combines paragraphs in a cell.
                 }
             }
         }

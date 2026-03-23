@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { Plus, Trash, Edit, RefreshCw, Users, Archive, RotateCw, FileSpreadsheet, BookOpen } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import * as XLSX from "xlsx-js-style";
@@ -14,6 +14,7 @@ import { usePiket } from "../../context/PiketContext";
 import { ConfirmationDialog } from "../../components/ui/confirmation-dialog";
 
 import { DataTable } from "../../components/ui/data-table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../components/ui/table";
 
 export interface ExamRoomData {
   id: string;
@@ -88,6 +89,8 @@ const ExamRoomsPage = () => {
   const [answersList, setAnswersList] = useState<Record<string, any>>({}); // { nisn: answers }
   const [monitorSortBy, setMonitorSortBy] = useState<"default" | "nilai" | "login" | "nama">("default");
   const [monitorClassFilter, setMonitorClassFilter] = useState<string>("all");
+  const [monitorPage, setMonitorPage] = useState(1);
+  const [monitorPageSize, setMonitorPageSize] = useState(10);
 
   const [universalToken, setUniversalToken] = useState("");
 
@@ -583,6 +586,7 @@ const ExamRoomsPage = () => {
 
   const handleMonitorClick = (room: ExamRoomData) => {
     setMonitorRoom(room);
+    setMonitorPage(1);
     setIsMonitorOpen(true);
   };
 
@@ -600,30 +604,47 @@ const ExamRoomsPage = () => {
     }
   };
 
-  const handleResetCheatCount = async (nisn: string) => {
-    if (!monitorRoom) return;
-    try {
-      const attemptId = `${nisn}_${monitorRoom.id}`;
-      await update(ref(database, `attempts/${attemptId}`), {
-        cheatCount: 0
-      });
-      showAlert("Berhasil", "Pelanggaran siswa berhasil direset.", "success");
-    } catch (error) {
-       showAlert("Gagal", "Gagal mereset cheat count.", "danger");
-    }
+  const handleResetSession = (nisn: string) => {
+     if (!monitorRoom) return;
+     setConfirmDialog({
+       isOpen: true,
+       title: "Reset Total Sesi",
+       description: "Apakah anda yakin ingin RESET TOTAL sesi siswa ini? Seluruh jawaban dan progres mereka akan DIHAPUS PERMANEN.",
+       type: "danger",
+       confirmLabel: "Ya, Reset Total",
+       onConfirm: async () => {
+         try {
+           const attemptId = `${nisn}_${monitorRoom.id}`;
+           await remove(ref(database, `attempts/${attemptId}`));
+           await remove(ref(database, `answers/${attemptId}`));
+           showAlert("Berhasil", "Sesi siswa berhasil direset total.", "success");
+         } catch (error) {
+           showAlert("Gagal", "Gagal mereset sesi.", "danger");
+         }
+       }
+     });
   };
 
-  const handleResetSession = async (nisn: string) => {
-     if (!monitorRoom) return;
-     if (!window.confirm("Apakah anda yakin ingin RESET TOTAL sesi siswa ini? Jawaban mereka akan hilang.")) return;
-     try {
-       const attemptId = `${nisn}_${monitorRoom.id}`;
-       await remove(ref(database, `attempts/${attemptId}`));
-       await remove(ref(database, `answers/${attemptId}`));
-       showAlert("Berhasil", "Sesi siswa berhasil direset.", "success");
-     } catch (error) {
-        showAlert("Gagal", "Gagal mereset sesi.", "danger");
-     }
+  const handleResetCheatCount = (nisn: string) => {
+    if (!monitorRoom) return;
+    setConfirmDialog({
+      isOpen: true,
+      title: "Reset Pelanggaran",
+      description: "Hapus catatan deteksi kecurangan untuk siswa ini?",
+      type: "warning",
+      confirmLabel: "Ya, Reset",
+      onConfirm: async () => {
+       try {
+         const attemptId = `${nisn}_${monitorRoom.id}`;
+         await update(ref(database, `attempts/${attemptId}`), {
+           cheatCount: 0
+         });
+         showAlert("Berhasil", "Pelanggaran siswa berhasil direset.", "success");
+       } catch (error) {
+          showAlert("Gagal", "Gagal mereset cheat count.", "danger");
+       }
+      }
+    });
   };
 
   const handleConfirmDelete = async () => {
@@ -880,7 +901,7 @@ const ExamRoomsPage = () => {
 
       {/* Monitoring Dialog */}
       <Dialog open={isMonitorOpen} onOpenChange={setIsMonitorOpen}>
-        <DialogContent className="max-w-4xl bg-white max-h-[85h] overflow-y-auto">
+        <DialogContent className="max-w-[95vw] lg:max-w-6xl w-full bg-white max-h-[95vh] flex flex-col p-4 sm:p-6 overflow-hidden">
           <DialogHeader>
             <DialogTitle>Monitor Ujian: {monitorRoom?.examTitle}</DialogTitle>
           </DialogHeader>
@@ -892,7 +913,10 @@ const ExamRoomsPage = () => {
                   <span className="text-slate-600 font-medium">Filter Kelas:</span>
                   <select 
                     value={monitorClassFilter} 
-                    onChange={(e) => setMonitorClassFilter(e.target.value)} 
+                    onChange={(e) => {
+                      setMonitorClassFilter(e.target.value);
+                      setMonitorPage(1);
+                    }} 
                     className="p-1 border rounded bg-white"
                   >
                     <option value="all">Semua Terdaftar</option>
@@ -906,7 +930,10 @@ const ExamRoomsPage = () => {
               <span className="text-slate-600 font-medium ml-2">Urutkan:</span>
               <select 
                 value={monitorSortBy} 
-                onChange={(e) => setMonitorSortBy(e.target.value as any)} 
+                onChange={(e) => {
+                  setMonitorSortBy(e.target.value as any);
+                  setMonitorPage(1);
+                }} 
                 className="p-1 border rounded bg-white"
               >
                 <option value="default">Default (Absen)</option>
@@ -923,25 +950,9 @@ const ExamRoomsPage = () => {
             </div>
           </div>
 
-          <div className="border rounded-lg overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="bg-slate-50 border-b">
-                <tr>
-                  <th className="p-3 text-left font-semibold w-12">No</th>
-                  <th className="p-3 text-left font-semibold">NISN</th>
-                  <th className="p-3 text-left font-semibold">Nama Siswa</th>
-                  <th className="p-3 text-left font-semibold">Kelas</th>
-                  <th className="p-3 text-left font-semibold">Waktu Login</th>
-                  <th className="p-3 text-left font-semibold">Status</th>
-                  <th className="p-3 text-left font-semibold">Nilai</th>
-                  <th className="p-3 text-left font-semibold">Dikerjakan</th>
-                  <th className="p-3 text-left font-semibold">Pelanggaran</th>
-                  <th className="p-3 text-right font-semibold">Aksi</th>
-                </tr>
-              </thead>
-              <tbody>
-                {students
-                  .filter((s) => {
+          <div className="flex justify-between items-center mb-2 px-1">
+             <div className="text-[11px] text-slate-500">
+                Menampilkan {Math.min((monitorPage - 1) * monitorPageSize + 1, students.filter(s => {
                     if (monitorRoom?.allClasses) {
                       if (monitorClassFilter !== "all" && s.classId !== monitorClassFilter) return false;
                       return true;
@@ -949,148 +960,349 @@ const ExamRoomsPage = () => {
                     if (!monitorRoom?.classId) return false;
                     const allowedIds = monitorRoom.classId.split(",");
                     if (!allowedIds.includes(s.classId)) return false;
-                    
                     if (monitorClassFilter !== "all" && s.classId !== monitorClassFilter) return false;
                     return true;
-                  })
-                  .sort((a, b) => {
-                    const attA = attempts.find((at) => at.id === `${a.nisn}_${monitorRoom?.id}`);
-                    const attB = attempts.find((at) => at.id === `${b.nisn}_${monitorRoom?.id}`);
+                  }).length)} - {Math.min(monitorPage * monitorPageSize, students.filter(s => {
+                    if (monitorRoom?.allClasses) {
+                      if (monitorClassFilter !== "all" && s.classId !== monitorClassFilter) return false;
+                      return true;
+                    }
+                    if (!monitorRoom?.classId) return false;
+                    const allowedIds = monitorRoom.classId.split(",");
+                    if (!allowedIds.includes(s.classId)) return false;
+                    if (monitorClassFilter !== "all" && s.classId !== monitorClassFilter) return false;
+                    return true;
+                  }).length)} dari {students.filter(s => {
+                    if (monitorRoom?.allClasses) {
+                      if (monitorClassFilter !== "all" && s.classId !== monitorClassFilter) return false;
+                      return true;
+                    }
+                    if (!monitorRoom?.classId) return false;
+                    const allowedIds = monitorRoom.classId.split(",");
+                    if (!allowedIds.includes(s.classId)) return false;
+                    if (monitorClassFilter !== "all" && s.classId !== monitorClassFilter) return false;
+                    return true;
+                  }).length} Siswa
+             </div>
+             <div className="flex items-center gap-2">
+                <span className="text-[11px] text-slate-500">Baris:</span>
+                <select 
+                  value={monitorPageSize} 
+                  onChange={(e) => {
+                    setMonitorPageSize(Number(e.target.value));
+                    setMonitorPage(1);
+                  }}
+                  className="p-1 text-[11px] border rounded bg-white"
+                >
+                  <option value={10}>10</option>
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                </select>
+             </div>
+          </div>
 
-                    if (monitorSortBy === "nilai") {
-                      const scoreA = attA?.score || 0;
-                      const scoreB = attB?.score || 0;
-                      return scoreB - scoreA;
-                    }
-                    if (monitorSortBy === "login") {
-                      const timeA = attA?.startTime || 0;
-                      const timeB = attB?.startTime || 0;
-                      return timeB - timeA; // terbaru di atas
-                    }
-                    if (monitorSortBy === "nama") {
-                      return a.name.localeCompare(b.name);
-                    }
-                    return 0; // default
-                  })
-                  .map((siswa, index) => {
-                    const attempt = attempts.find((a) => a.id === `${siswa.nisn}_${monitorRoom?.id}`);
-                    const sisAnswers = answersList[siswa.nisn] || {};
-                    const answeredCount = Object.keys(sisAnswers).length;
-                    
-                    let statusLabel = <span className="text-slate-400">Belum Masuk</span>;
-                    let actions = null;
+          <div className="rounded-md border bg-white shadow-sm flex flex-col overflow-hidden">
+            {/* Desktop View */}
+            <div className="hidden md:block overflow-auto max-h-[65vh] scrollbar-thin">
+              <Table>
+                <TableHeader className="sticky top-0 z-20 bg-slate-50 shadow-sm">
+                  <TableRow className="hover:bg-transparent border-b bg-slate-50">
+                    <TableHead className="w-12 text-center sticky top-0 bg-slate-50 z-20">No</TableHead>
+                    <TableHead className="sticky top-0 bg-slate-50 z-20">NISN</TableHead>
+                    <TableHead className="sticky top-0 bg-slate-50 z-20">Nama Siswa</TableHead>
+                    <TableHead className="sticky top-0 bg-slate-50 z-20">Kelas</TableHead>
+                    <TableHead className="sticky top-0 bg-slate-50 z-20">Login</TableHead>
+                    <TableHead className="sticky top-0 bg-slate-50 z-20">Status</TableHead>
+                    <TableHead className="text-center sticky top-0 bg-slate-50 z-20">Nilai</TableHead>
+                    <TableHead className="text-center sticky top-0 bg-slate-50 z-20">Prog.</TableHead>
+                    <TableHead className="text-center sticky top-0 bg-slate-50 z-20">Warn</TableHead>
+                    <TableHead className="text-right sticky top-0 bg-slate-50 z-20">Aksi</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {(() => {
+                    const filtered = students
+                      .filter((s) => {
+                        if (monitorRoom?.allClasses) {
+                          if (monitorClassFilter !== "all" && s.classId !== monitorClassFilter) return false;
+                          return true;
+                        }
+                        if (!monitorRoom?.classId) return false;
+                        const allowedIds = monitorRoom.classId.split(",");
+                        if (!allowedIds.includes(s.classId)) return false;
+                        if (monitorClassFilter !== "all" && s.classId !== monitorClassFilter) return false;
+                        return true;
+                      })
+                      .sort((a, b) => {
+                        const attA = attempts.find((at) => at.id === `${a.nisn}_${monitorRoom?.id}`);
+                        const attB = attempts.find((at) => at.id === `${b.nisn}_${monitorRoom?.id}`);
+                        if (monitorSortBy === "nilai") return (attB?.score || 0) - (attA?.score || 0);
+                        if (monitorSortBy === "login") return (attB?.startTime || 0) - (attA?.startTime || 0);
+                        if (monitorSortBy === "nama") return a.name.localeCompare(b.name);
+                        return 0;
+                      });
 
-                    if (attempt) {
-                      if (attempt.status === "submitted") {
-                        statusLabel = <span className="text-green-600 font-semibold">Selesai</span>;
-                      } else if (attempt.status === "LOCKED") {
-                        statusLabel = <span className="text-red-500 font-bold">TERKUNCI</span>;
-                        actions = (
-                            <Button size="sm" variant="secondary" className="bg-green-100 text-green-700 hover:bg-green-200 border-green-200 dark:bg-green-950 dark:text-green-400" onClick={() => handleUnlockStudent(siswa.nisn)}>Buka Kunci</Button>
-                        );
-                      } else {
-                        statusLabel = <span className="text-yellow-600 font-semibold">Mengerjakan</span>;
+                    const startIndex = (monitorPage - 1) * monitorPageSize;
+                    const currentData = filtered.slice(startIndex, startIndex + monitorPageSize);
+
+                    if (currentData.length === 0) {
+                      return (
+                        <TableRow>
+                          <TableCell colSpan={10} className="h-24 text-center text-slate-400">
+                             Tidak ada siswa ditemukan.
+                          </TableCell>
+                        </TableRow>
+                      );
+                    }
+
+                    return currentData.map((siswa, localIndex) => {
+                      const index = startIndex + localIndex;
+                      const attempt = attempts.find((a) => a.id === `${siswa.nisn}_${monitorRoom?.id}`);
+                      const sisAnswers = answersList[siswa.nisn] || {};
+                      const answeredCount = Object.keys(sisAnswers).length;
+                      
+                      let statusLabel = <span className="text-slate-400">Belum Masuk</span>;
+                      if (attempt) {
+                        if (attempt.status === "submitted") {
+                          statusLabel = <span className="text-green-600 font-semibold px-2 py-0.5 bg-green-50 rounded-full border border-green-100">Selesai</span>;
+                        } else if (attempt.status === "LOCKED") {
+                          statusLabel = <span className="text-red-500 font-bold px-2 py-0.5 bg-red-50 rounded-full border border-red-100 italic">TERKUNCI</span>;
+                        } else {
+                          statusLabel = <span className="text-amber-600 font-semibold px-2 py-0.5 bg-amber-50 rounded-full border border-amber-100 animate-pulse">Ujian...</span>;
+                        }
                       }
-                    }
 
-                    const loginTime = attempt?.startTime ? new Date(attempt.startTime).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) : "-";
+                      const loginTime = attempt?.startTime ? new Date(attempt.startTime).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) : "-";
 
-                    return (
-                      <>
-                        <tr key={siswa.id} className="border-b hover:bg-slate-50">
-                          <td className="p-3 font-medium text-slate-500">{index + 1}</td>
-                          <td className="p-3">{siswa.nisn}</td>
-                          <td className="p-3 font-medium">{siswa.name}</td>
-                          <td className="p-3 text-xs font-semibold text-slate-500 whitespace-nowrap">
-                            {piketClasses.find(c => c.id === siswa.classId)?.name || "-"}
-                          </td>
-                          <td className="p-3 text-slate-500">{loginTime}</td>
-                          <td className="p-3">{statusLabel}</td>
-                          <td className="p-3 font-semibold text-blue-600">{attempt?.score !== undefined ? attempt.score : "-"}</td>
-                          <td className="p-3 text-slate-500">{answeredCount} / {monitorQuestions.length}</td>
-                          <td className="p-3 text-slate-500">{attempt?.cheatCount || 0} Kali</td>
-                          <td className="p-3 text-right flex justify-end gap-1 items-center whitespace-nowrap">
-                            {actions}
-                            {attempt && (
-                              <>
-                                <Button 
-                                  size="sm" 
-                                  variant="secondary" 
-                                  className="bg-amber-50 text-amber-700 hover:bg-amber-100 border-amber-200 dark:bg-amber-950 dark:text-amber-400 font-medium" 
-                                  onClick={() => handleResetCheatCount(siswa.nisn)}
-                                >
-                                  Reset Cheat
-                                </Button>
-                                <Button 
-                                  size="sm" 
-                                  variant="destructive" 
-                                  className="bg-red-50 text-red-600 hover:bg-red-100 border-red-200 font-semibold" 
-                                  onClick={() => handleResetSession(siswa.nisn)}
-                                >
-                                  Reset Sesi
-                                </Button>
-                                <Button 
-                                  size="sm" 
-                                  variant="secondary" 
-                                  className="bg-sky-50 text-sky-700 hover:bg-sky-100 border-sky-200 font-medium" 
-                                  onClick={() => setExpandedSiswa(expandedSiswa === siswa.nisn ? null : siswa.nisn)}
-                                >
-                                  {expandedSiswa === siswa.nisn ? "Tutup" : "Details"}
-                                </Button>
-                              </>
-                            )}
-                          </td>
-                        </tr>
-                        {expandedSiswa === siswa.nisn && (
-                          <tr>
-                            <td colSpan={10} className="bg-slate-50 p-4 border-b">
-                              <h4 className="text-xs font-bold text-slate-600 mb-2">Jawaban Siswa ({monitorQuestions.length} Soal)</h4>
-                              <div className="max-h-80 overflow-y-auto pr-2">
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                                  {monitorQuestions.map((q, idx) => {
+                      return (
+                        <React.Fragment key={siswa.id}>
+                          <TableRow className="group transition-colors hover:bg-slate-50/50">
+                            <TableCell className="text-center text-slate-400 font-medium">{index + 1}</TableCell>
+                            <TableCell className="font-mono text-[11px] text-slate-500">{siswa.nisn}</TableCell>
+                            <TableCell className="font-semibold text-slate-700">{siswa.name}</TableCell>
+                            <TableCell className="text-xs font-semibold text-slate-500">{piketClasses.find(c => c.id === siswa.classId)?.name || "-"}</TableCell>
+                            <TableCell className="text-slate-500 tabular-nums">{loginTime}</TableCell>
+                            <TableCell>{statusLabel}</TableCell>
+                            <TableCell className="text-center font-bold text-indigo-600 tabular-nums">{attempt?.score !== undefined ? attempt.score : "-"}</TableCell>
+                            <TableCell className="text-center text-xs text-slate-500 font-medium tabular-nums">{answeredCount}/{monitorQuestions.length}</TableCell>
+                            <TableCell className="text-center">
+                               {attempt?.cheatCount ? <span className="font-bold text-red-500">{attempt.cheatCount}</span> : <span className="text-slate-300">0</span>}
+                            </TableCell>
+                            <TableCell className="text-right">
+                               <div className="flex justify-end gap-1.5 items-center whitespace-nowrap">
+                                  {attempt?.status === "LOCKED" && (
+                                    <Button size="sm" variant="secondary" className="bg-emerald-100 text-emerald-700 hover:bg-emerald-200 border-emerald-200 h-7 text-[10px]" onClick={() => handleUnlockStudent(siswa.nisn)}>Buka Kunci</Button>
+                                  )}
+                                  {attempt && (
+                                    <>
+                                      <Button size="sm" variant="secondary" className="bg-amber-100 text-amber-700 hover:bg-amber-200 border-amber-200 h-7 text-[10px]" onClick={() => handleResetCheatCount(siswa.nisn)}>Reset Cheat</Button>
+                                      <Button size="sm" variant="destructive" className="bg-rose-50 text-rose-600 hover:bg-rose-100 border-rose-200 h-7 text-[10px]" onClick={() => handleResetSession(siswa.nisn)}>Reset Sesi</Button>
+                                      <Button size="sm" variant="secondary" className="bg-sky-100 text-sky-700 hover:bg-sky-200 border-sky-200 h-7 text-[10px]" onClick={() => setExpandedSiswa(expandedSiswa === siswa.nisn ? null : siswa.nisn)}>
+                                        {expandedSiswa === siswa.nisn ? "Tutup" : "Logs"}
+                                      </Button>
+                                    </>
+                                  )}
+                               </div>
+                            </TableCell>
+                          </TableRow>
+                          {expandedSiswa === siswa.nisn && (
+                            <TableRow className="bg-slate-50/30 border-l-2 border-l-indigo-500">
+                              <TableCell colSpan={10} className="p-4">
+                                <div className="flex items-center gap-2 mb-3">
+                                   <div className="h-1 w-1 rounded-full bg-indigo-500"></div>
+                                   <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Detail Jawaban & Sesi</h4>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-h-[400px] overflow-y-auto pr-2 scrollbar-thin">
+                                  {monitorQuestions.map((q, qIdx) => {
                                      const ansId = sisAnswers[q.id];
                                      const isCorrect = ansId && q.choices[ansId]?.isCorrect === true;
-                                     const choiceText = ansId ? q.choices[ansId]?.text : <span className="text-slate-400 italic">Belum dijawab</span>;
-                                     
                                      return (
-                                        <div key={q.id} className="bg-white p-3 rounded-lg border text-xs shadow-sm flex flex-col gap-1">
-                                           <div>
-                                             <span className="font-bold text-slate-700">No {idx + 1}. </span>
-                                             <span className="font-semibold text-slate-700 [&_p]:inline" dangerouslySetInnerHTML={{ __html: q.text }} />
+                                        <div key={q.id} className="bg-white p-3 rounded-xl border border-slate-200 shadow-[0_2px_4px_rgba(0,0,0,0.02)] flex flex-col gap-2">
+                                           <div className="flex gap-2">
+                                             <span className="text-slate-400 font-bold shrink-0">#{qIdx + 1}</span>
+                                             <div className="text-xs font-medium text-slate-700 leading-relaxed truncate-3-lines" dangerouslySetInnerHTML={{ __html: q.text }} />
                                            </div>
-                                            {q.imageUrl && (
-                                              <div className="my-1">
-                                                <img 
-                                                  src={q.imageUrl} 
-                                                  alt="Gambar Soal" 
-                                                  className="h-16 max-w-[120px] object-contain rounded border bg-slate-50 p-1 hover:h-40 hover:max-w-[240px] transition-all duration-200 cursor-zoom-in" 
-                                                />
+                                           <div className={`mt-auto p-2 rounded-lg flex items-center justify-between transition-colors ${isCorrect ? "bg-emerald-50 text-emerald-700 border border-emerald-100" : ansId ? "bg-rose-50 text-rose-700 border border-rose-100" : "bg-slate-50 text-slate-400 border border-slate-100"}`}>
+                                              <div className="flex flex-col">
+                                                 <span className="text-[10px] uppercase font-bold opacity-70">Jawaban</span>
+                                                 <span className="text-xs font-bold leading-none">{ansId ? ansId.toUpperCase() : "Kosong"}</span>
                                               </div>
-                                            )}
-                                           <div className={`p-2 rounded flex justify-between ${isCorrect ? "bg-green-50 text-green-700 border border-green-200" : ansId ? "bg-red-50 text-red-700 border border-red-200" : "bg-slate-50 text-slate-500"}`}>
-                                              {ansId ? (
-                                                 <span className="inline [&_p]:inline" dangerouslySetInnerHTML={{ __html: `<b>Pilihan (${ansId.toUpperCase()}):</b> ${q.choices[ansId]?.text || ""}` }} />
-                                              ) : (
-                                                 <span><b>Pilihan:</b> <span className="text-slate-400 italic">Belum dijawab</span></span>
-                                              )}
                                               {ansId && (
-                                                 <span className="font-bold shrink-0 ml-2">{isCorrect ? "Benar" : "Salah"}</span>
+                                                <div className={`px-2 py-1 rounded-md text-[10px] font-bold ${isCorrect ? "bg-emerald-100/50" : "bg-rose-100/50"}`}>
+                                                   {isCorrect ? "BENAR" : "SALAH"}
+                                                </div>
                                               )}
                                            </div>
                                         </div>
                                      );
                                   })}
                                 </div>
-                              </div>
-                            </td>
-                          </tr>
-                        )}
-                      </>
-                    );
-                  })}
-              </tbody>
-            </table>
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </React.Fragment>
+                      );
+                    });
+                  })()}
+                </TableBody>
+              </Table>
+            </div>
+
+            {/* Mobile View */}
+            <div className="md:hidden space-y-4 p-4 bg-slate-50/30 overflow-y-auto max-h-[65vh]">
+               {(() => {
+                    const filtered = students
+                      .filter((s) => {
+                        if (monitorRoom?.allClasses) {
+                          if (monitorClassFilter !== "all" && s.classId !== monitorClassFilter) return false;
+                          return true;
+                        }
+                        if (!monitorRoom?.classId) return false;
+                        const allowedIds = monitorRoom.classId.split(",");
+                        if (!allowedIds.includes(s.classId)) return false;
+                        if (monitorClassFilter !== "all" && s.classId !== monitorClassFilter) return false;
+                        return true;
+                      })
+                      .sort((a, b) => {
+                        const attA = attempts.find((at) => at.id === `${a.nisn}_${monitorRoom?.id}`);
+                        const attB = attempts.find((at) => at.id === `${b.nisn}_${monitorRoom?.id}`);
+                        if (monitorSortBy === "nilai") return (attB?.score || 0) - (attA?.score || 0);
+                        if (monitorSortBy === "login") return (attB?.startTime || 0) - (attA?.startTime || 0);
+                        if (monitorSortBy === "nama") return a.name.localeCompare(b.name);
+                        return 0;
+                      });
+
+                    const startIndex = (monitorPage - 1) * monitorPageSize;
+                    const currentData = filtered.slice(startIndex, startIndex + monitorPageSize);
+
+                    if (currentData.length === 0) return <div className="text-center p-8 text-slate-400 text-sm">Tidak ada siswa ditemukan.</div>;
+
+                    return currentData.map((siswa, localIndex) => {
+                      const attempt = attempts.find((a) => a.id === `${siswa.nisn}_${monitorRoom?.id}`);
+                      const sisAnswers = answersList[siswa.nisn] || {};
+                      const status = attempt ? (attempt.status === "submitted" ? "Selesai" : attempt.status === "LOCKED" ? "Terkunci" : "Mengerjakan") : "Belum Masuk";
+                      const statusColor = attempt ? (attempt.status === "submitted" ? "bg-emerald-100 text-emerald-700 border-emerald-200" : attempt.status === "LOCKED" ? "bg-rose-100 text-rose-700 border-rose-200" : "bg-amber-100 text-amber-700 border-amber-200 animate-pulse") : "bg-slate-100 text-slate-400 border-slate-200";
+
+                      return (
+                        <div key={siswa.id} className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3 shadow-sm relative overflow-hidden">
+                          <div className="flex justify-between items-start">
+                            <div className="space-y-1">
+                               <p className="text-[10px] text-slate-400 font-bold uppercase tracking-vibrant">#{startIndex + localIndex + 1} • {siswa.nisn}</p>
+                               <h4 className="font-bold text-slate-800 leading-tight">{siswa.name}</h4>
+                               <p className="text-xs font-semibold text-slate-500 bg-slate-100 inline-block px-2 py-0.5 rounded-md">{piketClasses.find(c => c.id === siswa.classId)?.name}</p>
+                            </div>
+                            <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border ${statusColor}`}>{status.toUpperCase()}</span>
+                          </div>
+                          
+                          <div className="grid grid-cols-3 gap-2 py-3 border-y border-slate-100">
+                             <div className="text-center">
+                                <p className="text-[9px] uppercase font-bold text-slate-400 mb-0.5">Nilai</p>
+                                <p className="text-sm font-bold text-indigo-600 tabular-nums">{attempt?.score ?? "-"}</p>
+                             </div>
+                             <div className="text-center border-x border-slate-100">
+                                <p className="text-[9px] uppercase font-bold text-slate-400 mb-0.5">Prog.</p>
+                                <p className="text-sm font-bold text-slate-700 tabular-nums">{Object.keys(sisAnswers).length}/{monitorQuestions.length}</p>
+                             </div>
+                             <div className="text-center">
+                                <p className="text-[9px] uppercase font-bold text-slate-400 mb-0.5">Warn</p>
+                                <p className="text-sm font-bold text-rose-500 tabular-nums">{attempt?.cheatCount || 0}</p>
+                             </div>
+                          </div>
+
+                          <div className="flex justify-end gap-2 pt-1">
+                             {attempt?.status === "LOCKED" && (
+                               <Button size="sm" variant="outline" className="h-8 text-[11px] font-bold border-green-200 text-green-700 hover:bg-green-50 rounded-xl px-4" onClick={() => handleUnlockStudent(siswa.nisn)}>Unlock</Button>
+                             )}
+                             <Button size="sm" variant="secondary" className="h-8 text-[11px] font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-xl px-4" onClick={() => setExpandedSiswa(expandedSiswa === siswa.nisn ? null : siswa.nisn)}>
+                                {expandedSiswa === siswa.nisn ? "Tutup" : "Details"}
+                             </Button>
+                          </div>
+
+                          {expandedSiswa === siswa.nisn && (
+                             <div className="mt-3 pt-3 border-t border-slate-100 bg-slate-50/50 rounded-b-2xl space-y-2 p-2">
+                               {monitorQuestions.map((q, qIdx) => {
+                                  const ansId = sisAnswers[q.id];
+                                  const isCorrect = ansId && q.choices[ansId]?.isCorrect === true;
+                                  return (
+                                     <div key={q.id} className="bg-white p-3 rounded-xl border border-slate-200 text-[11px] shadow-sm">
+                                        <div className="flex gap-2 mb-2">
+                                           <span className="font-bold text-slate-400 shrink-0">#{qIdx+1}</span>
+                                           <div className="text-slate-700 leading-snug font-medium" dangerouslySetInnerHTML={{ __html: q.text }} />
+                                        </div>
+                                        <div className={`p-2 rounded-lg flex justify-between items-center ${isCorrect ? "bg-emerald-50 text-emerald-700 border border-emerald-100" : ansId ? "bg-rose-50 text-rose-700 border border-rose-100" : "bg-slate-50 text-slate-400"}`}>
+                                           <span className="font-bold">Jawaban: {ansId ? ansId.toUpperCase() : "KOSONG"}</span>
+                                           {ansId && <span className="text-[10px] font-black">{isCorrect ? "✓ BENAR" : "✗ SALAH"}</span>}
+                                        </div>
+                                     </div>
+                                  )
+                               })}
+                             </div>
+                          )}
+                        </div>
+                      )
+                    })
+               })()}
+            </div>
           </div>
+
+          {/* Pagination Controls */}
+          {(() => {
+             const filtered = students.filter((s) => {
+                if (monitorRoom?.allClasses) {
+                  if (monitorClassFilter !== "all" && s.classId !== monitorClassFilter) return false;
+                  return true;
+                }
+                if (!monitorRoom?.classId) return false;
+                const allowedIds = monitorRoom.classId.split(",");
+                if (!allowedIds.includes(s.classId)) return false;
+                if (monitorClassFilter !== "all" && s.classId !== monitorClassFilter) return false;
+                return true;
+              });
+             const totalPages = Math.ceil(filtered.length / monitorPageSize);
+             if (totalPages <= 1) return null;
+
+             return (
+                <div className="flex flex-col md:flex-row justify-between items-center gap-4 mt-6 bg-slate-100/50 p-3 sm:p-4 rounded-2xl border border-slate-200/60">
+                   <div className="text-xs font-bold text-slate-500 bg-white px-3 py-1.5 rounded-full border border-slate-200 shadow-sm">
+                      Menampilkan {Math.min((monitorPage - 1) * monitorPageSize + 1, filtered.length)} - {Math.min(monitorPage * monitorPageSize, filtered.length)} dari {filtered.length} Siswa
+                   </div>
+                   <div className="flex items-center gap-1.5 bg-white p-1 rounded-xl border border-slate-200 shadow-sm">
+                      <Button variant="ghost" size="sm" onClick={() => setMonitorPage(1)} disabled={monitorPage === 1} className="h-8 w-8 p-0 rounded-lg hover:bg-slate-100 disabled:opacity-30">
+                         <span className="sr-only">First</span>
+                         {"<<"}
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => setMonitorPage(prev => Math.max(1, prev - 1))} disabled={monitorPage === 1} className="h-8 w-8 p-0 rounded-lg hover:bg-slate-100 disabled:opacity-30">
+                         <span className="sr-only">Previous</span>
+                         {"<"}
+                      </Button>
+                      
+                      <div className="flex items-center gap-2 px-3 h-8 bg-slate-50 rounded-lg border border-inner shadow-inner">
+                         <span className="text-[10px] uppercase font-black text-slate-400">Hal</span>
+                         <input 
+                            type="number" 
+                            className="w-8 text-center text-xs font-black bg-transparent border-none focus:outline-none focus:ring-0 p-0 text-slate-800" 
+                            value={monitorPage}
+                            onChange={(e) => {
+                               const v = parseInt(e.target.value);
+                               if (v >= 1 && v <= totalPages) setMonitorPage(v);
+                            }}
+                         />
+                         <span className="text-[10px] font-bold text-slate-300">/ {totalPages}</span>
+                      </div>
+
+                      <Button variant="ghost" size="sm" onClick={() => setMonitorPage(prev => Math.min(totalPages, prev + 1))} disabled={monitorPage === totalPages} className="h-8 w-8 p-0 rounded-lg hover:bg-slate-100 disabled:opacity-30">
+                         <span className="sr-only">Next</span>
+                         {">"}
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => setMonitorPage(totalPages)} disabled={monitorPage === totalPages} className="h-8 w-8 p-0 rounded-lg hover:bg-slate-100 disabled:opacity-30">
+                         <span className="sr-only">Last</span>
+                         {">>"}
+                      </Button>
+                   </div>
+                </div>
+             );
+          })()}
         </DialogContent>
       </Dialog>
 
