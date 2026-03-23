@@ -334,6 +334,22 @@ const CBTPage = () => {
     }
   };
 
+  const getProxiedUrl = (url?: string) => {
+    if (!url) return "";
+    if (url.startsWith("https://pub-a1193e163fef41c9afc15d1334b8740b.r2.dev/")) {
+      return url.replace("https://pub-a1193e163fef41c9afc15d1334b8740b.r2.dev/", "/r2-proxy/");
+    }
+    return url;
+  };
+
+  const proxifyHtml = (html?: string) => {
+    if (!html) return "";
+    return html.replace(
+      /https:\/\/pub-a1193e163fef41c9afc15d1334b8740b\.r2\.dev\//g,
+      "/r2-proxy/"
+    );
+  };
+
   const formatTime = (seconds: number) => {
     const h = Math.floor(seconds / 3600);
     const m = Math.floor((seconds % 3600) / 60);
@@ -396,16 +412,16 @@ const CBTPage = () => {
                 {currentQuestion.imageUrl && (
                   <div className="mt-2">
                     <img 
-                      src={currentQuestion.imageUrl} 
+                      src={getProxiedUrl(currentQuestion.imageUrl)} 
                       alt="Gambar Soal" 
                       className="max-w-full md:max-w-xl h-auto mx-auto block rounded-xl border border-slate-200 shadow-sm cursor-zoom-in hover:opacity-90 transition-opacity" 
-                      onClick={() => setPreviewImage(currentQuestion.imageUrl!)}
+                      onClick={() => setPreviewImage(getProxiedUrl(currentQuestion.imageUrl))}
                     />
                   </div>
                 )}
                 <div 
                   className="text-base sm:text-lg font-semibold leading-relaxed text-slate-800 dark:text-white mt-2 [&_img]:max-w-full [&_img]:h-auto [&_img]:rounded-xl [&_img]:mt-2 [&_img]:border [&_img]:shadow-sm break-words" 
-                  dangerouslySetInnerHTML={{ __html: currentQuestion.text }}
+                  dangerouslySetInnerHTML={{ __html: proxifyHtml(currentQuestion.text) }}
                 />
               </CardHeader>
               <CardContent className="p-4 pt-0 space-y-2.5">
@@ -429,15 +445,15 @@ const CBTPage = () => {
                         {choiceId.toUpperCase()}
                       </div>
                       <div className="flex-1 text-sm font-medium">
-                        <div className="break-words [&_img]:max-w-[200px] [&_img]:h-auto [&_img]:rounded-lg [&_img]:mt-1" dangerouslySetInnerHTML={{ __html: choice.text }} />
+                        <div className="break-words [&_img]:max-w-[200px] [&_img]:h-auto [&_img]:rounded-lg [&_img]:mt-1" dangerouslySetInnerHTML={{ __html: proxifyHtml(choice.text) }} />
                         {choice.imageUrl && (
                           <img 
-                            src={choice.imageUrl} 
+                            src={getProxiedUrl(choice.imageUrl)} 
                             alt={`Pilihan ${choiceId.toUpperCase()}`} 
                             className="max-w-[180px] h-auto rounded-lg border border-slate-200/60 shadow-sm mt-1 cursor-zoom-in hover:opacity-90 transition-opacity" 
                             onClick={(e) => {
                               e.stopPropagation(); // Mencegah klik terhubung dengan tombol jawaban
-                              setPreviewImage(choice.imageUrl!);
+                              setPreviewImage(getProxiedUrl(choice.imageUrl));
                             }}
                           />
                         )}
