@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { ReactNode } from "react";
 
-const ALLOWED_USER_AGENTS = ["Exambro", "ExamBrowser", "ExambroAndroid", "wv"]; // Configure strings
+const ALLOWED_USER_AGENTS = ["exambro", "exambrowser", "exambroandroid", "wv", "protected_exambro"]; // Configure strings
 
 interface ExambroGuardProps {
   children: ReactNode;
@@ -11,8 +11,8 @@ const ExambroGuard = ({ children }: ExambroGuardProps) => {
   const [isExambro, setIsExambro] = useState<boolean | null>(null);
 
   useEffect(() => {
-    const ua = navigator.userAgent;
-    const isValid = ALLOWED_USER_AGENTS.some((agent) => ua.includes(agent));
+    const ua = navigator.userAgent.toLowerCase();
+    const isValid = ALLOWED_USER_AGENTS.some((agent) => ua.includes(agent.toLowerCase()));
     
     // For development, allow bypass with simple condition or override flag
     const isDev = import.meta.env.MODE === "development";
