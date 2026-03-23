@@ -405,16 +405,45 @@ const QuestionsPage = () => {
     }
 
     try {
-      let imageUrl = formValues.imageUrl || "";
+      const uploadBase64ToR2 = async (base64Data: string, prefix: string) => {
+        try {
+          const blob = await (await fetch(base64Data)).blob();
+          const ext = blob.type.split("/")[1] || "png";
+          const fileToUpload = new File([blob], `${prefix}_${Date.now()}.${ext}`, { type: blob.type });
+          const uploadSnap = await uploadInventoryImage(`questions/${examId}`, fileToUpload);
+          return uploadSnap.url;
+        } catch (e) {
+          console.error(`Gagal upload base64 image (${prefix}) to R2`, e);
+          return base64Data;
+        }
+      };
 
-      // 1. Upload file Soal Manual ke R2
+      let imageUrl = formValues.imageUrl || "";
+      let textToSave = formValues.text;
+
+      // 🖼️ 1. Upload file Cover Soal (dari tombol input file)
       if (questionFile) {
         const res = await uploadInventoryImage(`questions/${examId}`, questionFile);
         imageUrl = res.url;
+      } else if (imageUrl.startsWith("data:image/")) {
+        // Jika dari pratinjau tapi belum diupload
+        imageUrl = await uploadBase64ToR2(imageUrl, "cover_manual");
       }
 
-      // 2. Upload file Pilihan Manual ke R2
-      const updatedChoices = { ...formValues.choices };
+      // 🖼️ 2. Scan teks Soal untuk base64
+      if (textToSave.includes("data:image/")) {
+        const doc = new DOMParser().parseFromString(textToSave, "text/html");
+        const ims = doc.querySelectorAll("img[src^='data:image/']");
+        for (let i = 0; i < ims.length; i++) {
+          const base64 = ims[i].getAttribute("src")!;
+          const url = await uploadBase64ToR2(base64, "text_manual");
+          ims[i].setAttribute("src", url);
+        }
+        textToSave = doc.body.innerHTML;
+      }
+
+      // 🖼️ 3. Upload file Pilihan Manual ke R2
+      const updatedChoices = JSON.parse(JSON.stringify(formValues.choices));
       for (const key in choiceFiles) {
         const file = choiceFiles[key];
         if (file) {
@@ -423,16 +452,32 @@ const QuestionsPage = () => {
         }
       }
 
-      // 🧹 Bersihkan undefined dari updatedChoices sebelum upload
-      Object.keys(updatedChoices).forEach((key) => {
-        if (!updatedChoices[key].imageUrl) {
-          delete updatedChoices[key].imageUrl;
+      // 🖼️ 4. Scan teks Pilihan untuk base64 (terutama jika ada paste)
+      for (const key in updatedChoices) {
+        const choice = updatedChoices[key];
+        // Cek properti imageUrl (jika ada data URL sisa)
+        if (choice.imageUrl && choice.imageUrl.startsWith("data:image/")) {
+          choice.imageUrl = await uploadBase64ToR2(choice.imageUrl, `choice_manual_${key}`);
+        } else if (!choice.imageUrl) {
+          delete choice.imageUrl;
         }
-      });
+
+        // Cek teks pilihan
+        if (choice.text && choice.text.includes("data:image/")) {
+          const cDoc = new DOMParser().parseFromString(choice.text, "text/html");
+          const cIms = cDoc.querySelectorAll("img[src^='data:image/']");
+          for (let i = 0; i < cIms.length; i++) {
+            const b64 = cIms[i].getAttribute("src")!;
+            const url = await uploadBase64ToR2(b64, `choice_text_manual_${key}`);
+            cIms[i].setAttribute("src", url);
+          }
+          choice.text = cDoc.body.innerHTML;
+        }
+      }
 
       const payload: any = {
         examId,
-        text: formValues.text,
+        text: textToSave,
         choices: updatedChoices,
         createdAt: Date.now(),
       };
@@ -518,39 +563,65 @@ const QuestionsPage = () => {
         }
 
         let imageUrlToSave = q.imageUrl || "";
-        const choicesToSave = { ...q.choices };
+        let textToSave = q.text;
+        const choicesToSave = JSON.parse(JSON.stringify(q.choices)); // Deep copy
 
-        // 🖼️ Upload gambar Soal jika ada base64 inline (R2 Storage)
-        if (imageUrlToSave && imageUrlToSave.startsWith("data:image/")) {
+        const uploadBase64ToR2 = async (base64Data: string, prefix: string) => {
           try {
-            const blob = await (await fetch(imageUrlToSave)).blob();
-            const fileToUpload = new File([blob], `question_${i}.png`, { type: blob.type || "image/png" });
+            const blob = await (await fetch(base64Data)).blob();
+            const ext = blob.type.split("/")[1] || "png";
+            const fileToUpload = new File([blob], `${prefix}_${Date.now()}.${ext}`, { type: blob.type });
             const uploadSnap = await uploadInventoryImage(`questions/${examId}`, fileToUpload);
-            imageUrlToSave = uploadSnap.url;
+            return uploadSnap.url;
           } catch (e) {
-            console.error("Gagal upload gambar soal ke R2", e);
+            console.error(`Gagal upload base64 image (${prefix}) to R2`, e);
+            return base64Data;
           }
+        };
+
+        // 🖼️ 1. Upload Gambar Cover Soal (dari q.imageUrl)
+        if (imageUrlToSave && imageUrlToSave.startsWith("data:image/")) {
+          imageUrlToSave = await uploadBase64ToR2(imageUrlToSave, `cover_${i}`);
         }
 
-        // 🖼️ Upload gambar Pilihan jika ada base64 inline (R2 Storage)
+        // 🖼️ 2. Scan Teks Soal untuk base64 gambar
+        const doc = new DOMParser().parseFromString(textToSave, "text/html");
+        const imagesInText = doc.querySelectorAll("img[src^='data:image/']");
+        for (let j = 0; j < imagesInText.length; j++) {
+            const imgEl = imagesInText[j];
+            const base64 = imgEl.getAttribute("src")!;
+            const r2Url = await uploadBase64ToR2(base64, `text_${i}_${j}`);
+            imgEl.setAttribute("src", r2Url);
+        }
+        textToSave = doc.body.innerHTML;
+
+        // 🖼️ 3. Upload gambar Pilihan (dari data attribute atau text)
         for (const cKey in choicesToSave) {
-          if (choicesToSave[cKey].imageUrl && choicesToSave[cKey].imageUrl.startsWith("data:image/")) {
-            try {
-              const blob = await (await fetch(choicesToSave[cKey].imageUrl!)).blob();
-              const fileToUpload = new File([blob], `choice_${i}_${cKey}.png`, { type: blob.type || "image/png" });
-              const uploadSnap = await uploadInventoryImage(`questions/${examId}`, fileToUpload);
-              choicesToSave[cKey].imageUrl = uploadSnap.url;
-            } catch (e) {
-              console.error("Gagal upload gambar pilihan ke R2", e);
+          const choice = choicesToSave[cKey];
+          // a. Cek imageUrl properti
+          if (choice.imageUrl && choice.imageUrl.startsWith("data:image/")) {
+            choice.imageUrl = await uploadBase64ToR2(choice.imageUrl, `choice_${i}_${cKey}`);
+          } else if (!choice.imageUrl) {
+            delete choice.imageUrl;
+          }
+
+          // b. Cek teks pilihan untuk base64
+          if (choice.text && choice.text.includes("data:image/")) {
+            const cDoc = new DOMParser().parseFromString(choice.text, "text/html");
+            const cImgs = cDoc.querySelectorAll("img[src^='data:image/']");
+            for (let k = 0; k < cImgs.length; k++) {
+              const imgEl = cImgs[k];
+              const base64 = imgEl.getAttribute("src")!;
+              const r2Url = await uploadBase64ToR2(base64, `choice_text_${i}_${cKey}_${k}`);
+              imgEl.setAttribute("src", r2Url);
             }
-          } else if (!choicesToSave[cKey].imageUrl) {
-            delete choicesToSave[cKey].imageUrl; // <--- Hapus undefined untuk kompatibilitas Firebase
+            choice.text = cDoc.body.innerHTML;
           }
         }
 
         const payload: any = {
           examId,
-          text: q.text,
+          text: textToSave,
           choices: choicesToSave,
           createdAt: Date.now(),
         };

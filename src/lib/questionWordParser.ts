@@ -29,7 +29,7 @@ export const parseQuestionsFromWord = async (file: File): Promise<ParsedQuestion
     const imageSrc = img ? img.getAttribute("src") : undefined;
     const textOnly = p.textContent?.trim() || "";
     let line = p.innerHTML?.trim() || "";
-    line = line.replace(/<img[^>]*>/g, ""); // Cleanup line for storage
+    // line = line.replace(/<img[^>]*>/g, ""); // Cleanup line for storage
 
     // Ignore Headers
     if (textOnly.match(/^(Nama Guru|Kelas|Mapel|Mata Pelajaran)\s*[:]/i)) return;

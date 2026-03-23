@@ -61,49 +61,59 @@ const CBTPage = () => {
         const rData = roomSnap.val();
         setRoomData(rData);
 
-        // Calculate Time Left
-        const endTime = new Date(rData.end_time).getTime();
-        const now = Date.now();
-        const diff = Math.floor((endTime - now) / 1000); // to seconds
-        if (diff <= 0) {
-          setIsExamOver(true);
-          setLoading(false);
-          return;
-        }
-        // Take duration if time limits exceed
-        setTimeLeft(Math.min(diff, rData.duration * 60));
-
         // 2. Load Attempt
         const attemptRef = ref(database, `attempts/${siswa.nisn}_${roomId}`);
         const attemptSnap = await get(attemptRef);
         
         let initialCheatCount = 0;
-        let initialAnswers = {};
+        let startTime = Date.now();
+        let currentStatus = "ongoing";
 
         if (attemptSnap.exists()) {
           const aData = attemptSnap.val();
           if (aData.status === "LOCKED") {
-            setAttempt(aData);
             setIsLocked(true);
-            // Lanjutkan load agar data soal siap saat kelak di-unlock
           }
           if (aData.status === "submitted") {
               navigate(`/cbt/${roomId}/result`);
               return;
           }
           initialCheatCount = aData.cheatCount || 0;
+          startTime = aData.startTime || Date.now();
+          currentStatus = aData.status;
         } else {
           // Create initial attempt
           await set(attemptRef, {
             status: "ongoing",
             cheatCount: 0,
-            startTime: Date.now(),
+            startTime: startTime,
           });
         }
 
-        setAttempt({ status: "ongoing", cheatCount: initialCheatCount });
+        // Calculate Time Left based on personal START TIME
+        const now = Date.now();
+        const roomEndTime = new Date(rData.end_time).getTime();
+        const personalEndTime = startTime + (rData.duration * 60 * 1000);
+        
+        // Final end time is the EARLIEST of personal duration vs room global end time
+        const finalEndTime = Math.min(personalEndTime, roomEndTime);
+        const diff = Math.floor((finalEndTime - now) / 1000);
+        
+        if (diff <= 0) {
+          setIsExamOver(true);
+          setLoading(false);
+          // Auto-submit if time's up and it wasn't already
+          if (currentStatus === "ongoing") {
+             // we can't call handleSubmit here because questions aren't loaded yet
+             // but setIsExamOver will trigger auto-submit via useEffect once loading is false
+          }
+        }
+        
+        setTimeLeft(Math.max(0, diff));
+        setAttempt({ status: currentStatus as any, cheatCount: initialCheatCount });
 
         // 3. Load Answers
+        let initialAnswers = {};
         const answersRef = ref(database, `answers/${siswa.nisn}_${roomId}`);
         const answersSnap = await get(answersRef);
         if (answersSnap.exists()) {
@@ -393,8 +403,8 @@ const CBTPage = () => {
                     />
                   </div>
                 )}
-                <CardTitle 
-                  className="text-base sm:text-lg font-semibold leading-relaxed text-slate-800 dark:text-white mt-2 whitespace-pre-line" 
+                <div 
+                  className="text-base sm:text-lg font-semibold leading-relaxed text-slate-800 dark:text-white mt-2 [&_img]:max-w-full [&_img]:h-auto [&_img]:rounded-xl [&_img]:mt-2 [&_img]:border [&_img]:shadow-sm break-words" 
                   dangerouslySetInnerHTML={{ __html: currentQuestion.text }}
                 />
               </CardHeader>
@@ -419,7 +429,7 @@ const CBTPage = () => {
                         {choiceId.toUpperCase()}
                       </div>
                       <div className="flex-1 text-sm font-medium">
-                        <div className="whitespace-pre-line" dangerouslySetInnerHTML={{ __html: choice.text }} />
+                        <div className="break-words [&_img]:max-w-[200px] [&_img]:h-auto [&_img]:rounded-lg [&_img]:mt-1" dangerouslySetInnerHTML={{ __html: choice.text }} />
                         {choice.imageUrl && (
                           <img 
                             src={choice.imageUrl} 
