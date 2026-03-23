@@ -5,11 +5,15 @@ import * as XLSX from "xlsx-js-style";
 import { Button } from "../../components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../../components/ui/dialog";
 import { DeleteConfirmationDialog } from "../../components/ui/delete-confirmation-dialog";
+import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
 import { ref, onValue, push, update, remove, get } from "firebase/database";
 import { database } from "../../lib/firebase";
 import { Input } from "../../components/ui/input";
 import FormField from "../../components/forms/FormField";
 import { usePiket } from "../../context/PiketContext";
+import { ConfirmationDialog } from "../../components/ui/confirmation-dialog";
+
+import { DataTable } from "../../components/ui/data-table";
 
 export interface ExamRoomData {
   id: string;
@@ -36,6 +40,7 @@ const ExamRoomsPage = () => {
   const [exams, setExams] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"aktif" | "arsip">("aktif"); // <--- Active tab filter
+  const [showAdvanced, setShowAdvanced] = useState(false); // <--- Advanced settings dialog collapsible
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [dialogMode, setDialogMode] = useState<"create" | "edit">("create");
@@ -58,6 +63,22 @@ const ExamRoomsPage = () => {
   const [roomToDelete, setRoomToDelete] = useState<ExamRoomData | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    description: string;
+    type: "info" | "warning" | "danger" | "success";
+    confirmLabel: string;
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: "",
+    description: "",
+    type: "info",
+    confirmLabel: "Konfirmasi",
+    onConfirm: () => {}
+  });
+
   // Monitoring States
   const [isMonitorOpen, setIsMonitorOpen] = useState(false);
   const [monitorRoom, setMonitorRoom] = useState<ExamRoomData | null>(null);
@@ -67,17 +88,89 @@ const ExamRoomsPage = () => {
   const [answersList, setAnswersList] = useState<Record<string, any>>({}); // { nisn: answers }
   const [monitorSortBy, setMonitorSortBy] = useState<"default" | "nilai" | "login" | "nama">("default");
 
-  const handleArchiveRoom = async (room: ExamRoomData) => {
-    if (!window.confirm("Apakah Anda yakin ingin mengarsipkan ruang ujian ini?")) return;
+  const [universalToken, setUniversalToken] = useState("");
+
+  useEffect(() => {
+    return onValue(ref(database, "settings/universal_token"), (snap) => {
+      setUniversalToken(snap.exists() ? snap.val() : "");
+    });
+  }, []);
+
+  const handleRefreshToken = async () => {
     try {
-      await update(ref(database, `exam_rooms/${room.id}`), { status: "archive" });
-    } catch (error) { alert("Gagal mengarsipkan."); }
+      const newToken = generateNewToken();
+      await update(ref(database, "settings"), {
+        universal_token: newToken,
+        universal_token_updated_at: Date.now()
+      });
+    } catch (e) {
+      alert("Gagal memperbarui token.");
+    }
   };
 
-  const handleRestoreRoom = async (room: ExamRoomData) => {
-    try {
-      await update(ref(database, `exam_rooms/${room.id}`), { status: null });
-    } catch (error) { alert("Gagal membuka arsip."); }
+  const columns = [
+    {
+      key: "index",
+      label: "No",
+      render: (v: any, item: any, index?: number) => (index !== undefined ? index + 1 : 1),
+    },
+    {
+      key: "examTitle",
+      label: "Ujian",
+      sortable: true,
+      render: (v: string) => <span className="font-medium text-slate-800 dark:text-slate-100">{v}</span>
+    },
+    {
+      key: "className",
+      label: "Kelas",
+      sortable: true,
+    },
+    {
+      key: "duration",
+      label: "Durasi",
+      render: (v: number) => <span className="text-slate-500 font-medium">{v} Menit</span>
+    },
+    {
+      key: "start_time",
+      label: "Waktu Mulai - Selesai",
+      render: (v: any, item: ExamRoomData) => (
+        <span className="text-slate-500 text-xs">
+           {new Date(item.start_time).toLocaleDateString("id-ID")} {new Date(item.start_time).toLocaleTimeString("id-ID", {hour:'2-digit', minute:'2-digit'})} 
+           <span className="mx-1">-</span>
+           {new Date(item.end_time).toLocaleTimeString("id-ID", {hour:'2-digit', minute:'2-digit'})}
+        </span>
+      )
+    }
+  ];
+
+  const handleArchiveRoom = (room: ExamRoomData) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: "Arsipkan Ruang Ujian",
+      description: `Apakah Anda yakin ingin mengarsipkan ruang ujian ${room.examTitle || ""}?`,
+      type: "warning",
+      confirmLabel: "Arsipkan",
+      onConfirm: async () => {
+        try {
+          await update(ref(database, `exam_rooms/${room.id}`), { status: "archive" });
+        } catch (error) { alert("Gagal mengarsipkan."); }
+      }
+    });
+  };
+
+  const handleRestoreRoom = (room: ExamRoomData) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: "Buka Ruang Ujian",
+      description: `Apakah Anda yakin ingin membuka/mengaktifkan kembali ruang ujian ${room.examTitle || ""}?`,
+      type: "info",
+      confirmLabel: "Buka Ruang",
+      onConfirm: async () => {
+        try {
+          await update(ref(database, `exam_rooms/${room.id}`), { status: null });
+        } catch (error) { alert("Gagal membuka arsip."); }
+      }
+    });
   };
 
   const handleExportExcel = () => {
@@ -206,28 +299,43 @@ const ExamRoomsPage = () => {
     XLSX.writeFile(workbook, `Nilai_Ujian_${monitorRoom.examTitle || "Ruang"}.xlsx`);
   };
 
-  const handleForceSubmitAll = async () => {
+  const handleForceSubmitAll = () => {
     if (!monitorRoom) return;
-    if (!window.confirm("Apakah Anda yakin ingin MENYELESAIKAN PAKSA ujian untuk seluruh siswa yang masih aktif mengerjakan? Tindakan ini akan mengunci jawaban mereka.")) return;
-    
+
     const ongoing = attempts.filter((att) => att.status === "ongoing");
     if (ongoing.length === 0) {
-      alert("Tidak ada siswa yang sedang aktif mengerjakan.");
+      setConfirmDialog({
+        isOpen: true,
+        title: "Sesi Aktif Kosong",
+        description: "Tidak ada siswa yang sedang aktif mengerjakan ujian di ruangan ini saat ini.",
+        type: "info",
+        confirmLabel: "Ok",
+        onConfirm: () => {}
+      });
       return;
     }
 
-    try {
-      const updates: any = {};
-      const now = Date.now();
-      ongoing.forEach((att) => {
-        updates[`attempts/${att.id}/status`] = "submitted";
-        updates[`attempts/${att.id}/submit_time`] = now;
-      });
-      await update(ref(database), updates);
-      alert(`${ongoing.length} siswa berhasil diselesaikan secara paksa.`);
-    } catch (error) {
-      alert("Gagal menyelesaikan paksa ujian siswa.");
-    }
+    setConfirmDialog({
+      isOpen: true,
+      title: "Selesaikan Paksa Sesi",
+      description: `Tindakan ini akan mengakhiri paksa sesi ujian untuk ${ongoing.length} siswa yang sedang aktif. Anda yakin?`,
+      type: "danger",
+      confirmLabel: "Selesaikan",
+      onConfirm: async () => {
+        try {
+          const updates: any = {};
+          const now = Date.now();
+          ongoing.forEach((att) => {
+            updates[`attempts/${att.id}/status`] = "submitted";
+            updates[`attempts/${att.id}/submit_time`] = now;
+          });
+          await update(ref(database), updates);
+          alert(`${ongoing.length} siswa berhasil diselesaikan secara paksa.`);
+        } catch (error) {
+          alert("Gagal menyelesaikan paksa ujian siswa.");
+        }
+      }
+    });
   };
 
   const generateNewToken = () => {
@@ -241,28 +349,29 @@ const ExamRoomsPage = () => {
 
   // 🔄 LOOP AUTO ROTATE TOKEN (Setiap 5 Menit)
   useEffect(() => {
-    if (rooms.length === 0) return;
-
-    const timer = setInterval(() => {
-      const now = Date.now();
-      rooms.forEach(async (r) => {
-        const lastUpdated = r.token_updated_at || Date.now(); // fallback
+    const timer = setInterval(async () => {
+      try {
+        const globalTimeRef = ref(database, "settings/universal_token_updated_at");
+        const snap = await get(globalTimeRef);
+        const lastUpdated = snap.exists() ? snap.val() : Date.now();
+        const now = Date.now();
         const diff = now - lastUpdated;
-        
-        // Cek jika sudah lewat 5 menit (5 * 60 * 1000 milidetik)
+
         if (diff > 5 * 60 * 1000) {
           const newToken = generateNewToken();
-          await update(ref(database, `exam_rooms/${r.id}`), {
-            token: newToken,
-            token_updated_at: now
+          await update(ref(database, "settings"), {
+            universal_token: newToken,
+            universal_token_updated_at: now
           });
-          console.log(`[Token rotated] Room ${r.examTitle} -> ${newToken}`);
+          console.log(`[Universal Token rotated] -> ${newToken}`);
         }
-      });
-    }, 15000); // Cek setiap 15 detik
+      } catch (e) {
+         console.error("Token rotate err", e);
+      }
+    }, 15000);
 
     return () => clearInterval(timer);
-  }, [rooms]);
+  }, []);
 
   useEffect(() => {
     if (!monitorRoom || !isMonitorOpen) return;
@@ -536,6 +645,14 @@ const ExamRoomsPage = () => {
               Arsip
             </button>
           </div>
+          <div className="bg-white border text-sm font-semibold rounded-xl px-3 py-1.5 flex items-center gap-2 shadow-sm border-slate-200/60 dark:bg-slate-800 dark:border-slate-700">
+             <span className="text-slate-500 dark:text-slate-400 text-xs">Token Universal:</span>
+             <code className="font-mono font-bold bg-slate-100 dark:bg-slate-700 text-slate-800 dark:text-slate-100 px-2 py-0.5 rounded text-sm">{universalToken || "---"}</code>
+             <Button variant="ghost" size="icon" className="h-6 w-6 text-slate-400 hover:text-slate-600 rounded-md p-0" onClick={handleRefreshToken}>
+                <RefreshCw className="h-3 w-3" />
+             </Button>
+          </div>
+
           <Button onClick={handleCreateClick} size="lg" className="rounded-xl">
             <Plus className="mr-2 h-4 w-4" /> Buka Ruang Ujian
           </Button>
@@ -547,71 +664,77 @@ const ExamRoomsPage = () => {
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
         </div>
       ) : (
-        <div className="border rounded-lg bg-white overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-slate-50 border-b">
-              <tr>
-                <th className="p-4 text-center font-semibold w-12">No</th>
-                <th className="p-4 text-left font-semibold">Ujian</th>
-                <th className="p-4 text-left font-semibold">Kelas</th>
-                <th className="p-4 text-left font-semibold">Token</th>
-                <th className="p-4 text-left font-semibold">Durasi</th>
-                <th className="p-4 text-left font-semibold">Waktu Mulai - Selesai</th>
-                <th className="p-4 text-right font-semibold">Aksi</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rooms.filter(r => activeTab === "arsip" ? r.status === "archive" : r.status !== "archive").length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="p-8 text-center text-slate-400">Belum ada ruang ujian {activeTab}.</td>
-                </tr>
-              ) : (
-                rooms
-                  .filter(r => activeTab === "arsip" ? r.status === "archive" : r.status !== "archive")
-                  .map((room, index) => (
-                  <tr key={room.id} className="border-b hover:bg-slate-50">
-                    <td className="p-4 text-center font-medium text-slate-400">{index + 1}</td>
-                    <td className="p-4 font-medium">{room.examTitle}</td>
-                    <td className="p-4 text-slate-500">{room.className}</td>
-                    <td className="p-4"><code className="bg-slate-100 text-slate-800 px-2 py-1 rounded font-bold">{room.token}</code></td>
-                    <td className="p-4 text-slate-500 font-medium">{room.duration} Menit</td>
-                    <td className="p-4 text-slate-500">
-                        {new Date(room.start_time).toLocaleDateString("id-ID")} {new Date(room.start_time).toLocaleTimeString("id-ID", {hour:'2-digit', minute:'2-digit'})} 
-                        <span className="mx-2">-</span>
-                        {new Date(room.end_time).toLocaleTimeString("id-ID", {hour:'2-digit', minute:'2-digit'})}
-                    </td>
-                    <td className="p-4 text-right flex justify-end gap-2">
-                        <Button variant="outline" size="sm" onClick={() => handleMonitorClick(room)}>
-                            <Users className="h-4 w-4 mr-1" /> Monitor
-                        </Button>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base font-semibold">Data Ruang Ujian</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <DataTable
+              data={rooms.filter(r => activeTab === "arsip" ? r.status === "archive" : r.status !== "archive")}
+              columns={columns}
+              searchPlaceholder="Cari ruang..."
+              emptyMessage={`Belum ada ruang ujian ${activeTab}.`}
+              actions={(room: ExamRoomData) => (
+                <div className="flex justify-end gap-1.5 items-center whitespace-nowrap">
+                  <Button 
+                    variant="secondary" 
+                    size="sm" 
+                    className="bg-blue-50 text-blue-700 hover:bg-blue-100 border-blue-100 dark:bg-blue-950 dark:text-blue-400" 
+                    onClick={() => handleMonitorClick(room)}
+                  >
+                    <Users className="h-4 w-4 mr-1" /> Monitor
+                  </Button>
 
-                        <Button variant="outline" size="sm" onClick={() => navigate(`/admin/bank-soal/${room.examId}/questions`)} className="text-purple-600 border-purple-200 hover:bg-purple-50">
-                            <BookOpen className="h-4 w-4 mr-1" /> Lihat Soal
-                        </Button>
-                        
-                        {activeTab === "aktif" ? (
-                          <Button variant="outline" size="sm" className="text-amber-600 border-amber-200 hover:bg-amber-50" onClick={() => handleArchiveRoom(room)}>
-                              <Archive className="h-4 w-4 mr-1" /> Arsipkan
-                          </Button>
-                        ) : (
-                          <Button variant="outline" size="sm" className="text-indigo-600 border-indigo-200 hover:bg-indigo-50" onClick={() => handleRestoreRoom(room)}>
-                              <RotateCw className="h-4 w-4 mr-1" /> Buka
-                          </Button>
-                        )}
+                  <Button 
+                    variant="secondary" 
+                    size="sm" 
+                    className="bg-purple-50 text-purple-700 hover:bg-purple-100 border-purple-200" 
+                    onClick={() => navigate(`/admin/bank-soal/${room.examId}/questions`)}
+                  >
+                    <BookOpen className="h-4 w-4 mr-1" /> Soal
+                  </Button>
+                  
+                  {activeTab === "aktif" ? (
+                    <Button 
+                      variant="secondary" 
+                      size="sm" 
+                      className="bg-amber-50 text-amber-700 hover:bg-amber-100 border-amber-200 dark:bg-amber-950 dark:text-amber-400" 
+                      onClick={() => handleArchiveRoom(room)}
+                    >
+                      <Archive className="h-4 w-4 mr-1" /> Arsip
+                    </Button>
+                  ) : (
+                    <Button 
+                      variant="secondary" 
+                      size="sm" 
+                      className="bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border-indigo-200 dark:bg-indigo-950 dark:text-indigo-400" 
+                      onClick={() => handleRestoreRoom(room)}
+                    >
+                      <RotateCw className="h-4 w-4 mr-1" /> Buka
+                    </Button>
+                  )}
 
-                        <Button variant="ghost" size="icon" onClick={() => handleEditClick(room)}>
-                            <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="text-red-500" onClick={() => handleDeleteClick(room)}>
-                            <Trash className="h-4 w-4" />
-                        </Button>
-                    </td>
-                  </tr>
-                ))
+                  <Button 
+                    variant="secondary" 
+                    size="sm" 
+                    className="bg-green-100 text-green-700 hover:bg-green-200 border-green-200 dark:bg-green-950 dark:text-green-400" 
+                    onClick={() => handleEditClick(room)}
+                  >
+                    Edit
+                  </Button>
+                  <Button 
+                    variant="destructive" 
+                    size="sm" 
+                    className="bg-red-50 text-red-600 hover:bg-red-100 border-red-200" 
+                    onClick={() => handleDeleteClick(room)}
+                  >
+                    Hapus
+                  </Button>
+                </div>
               )}
-            </tbody>
-          </table>
-        </div>
+            />
+          </CardContent>
+        </Card>
       )}
 
       {/* Dialog Create/Edit */}
@@ -681,14 +804,6 @@ const ExamRoomsPage = () => {
               )}
             </div>
 
-            <div className="flex gap-2 items-end">
-                <div className="flex-1">
-                  <FormField id="token" label="Token (6 Digit)" error={undefined}>
-                    <Input value={formValues.token} onChange={(e) => setFormValues({ ...formValues, token: e.target.value.toUpperCase() })} required maxLength={6} className="font-bold text-center" />
-                  </FormField>
-                </div>
-                <Button type="button" variant="outline" onClick={generateToken}><RefreshCw className="h-4 w-4" /></Button>
-            </div>
 
             <div className="grid grid-cols-2 gap-3">
               <FormField id="start_time" label="Waktu Mulai" error={undefined}>
@@ -698,24 +813,37 @@ const ExamRoomsPage = () => {
                 <Input type="datetime-local" value={formValues.end_time} onChange={(e) => setFormValues({ ...formValues, end_time: e.target.value })} required />
               </FormField>
             </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <FormField id="duration" label="Durasi (Menit)" error={undefined}>
-                <Input type="number" value={formValues.duration} onChange={(e) => setFormValues({ ...formValues, duration: Number(e.target.value) })} required />
-              </FormField>
-              <FormField id="cheat_limit" label="Batas Cheat" error={undefined}>
-                <Input type="number" value={formValues.cheat_limit} onChange={(e) => setFormValues({ ...formValues, cheat_limit: Number(e.target.value) })} required />
-              </FormField>
-            </div>
-            <FormField id="submit_window" label="Kumpul Dibuka (Sisa Menit)" error={undefined}>
-                <Input type="number" placeholder="Contoh: 10 (Tombol kumpul aktif 10 menit sebelum ujian berakhir)" value={formValues.submit_window || ""} onChange={(e) => setFormValues({ ...formValues, submit_window: Number(e.target.value) })} />
-                <p className="text-slate-400 text-xs mt-1">Siswa tidak bisa klik "Kumpulkan" kecuali waktu sisa sama atau kurang dari angka ini. Isi 0 jika selalu diijinkan.</p>
-            </FormField>
-
             <FormField id="room_code" label="Kode Ruang Ujian" error={undefined}>
                 <Input type="text" placeholder="Contoh: MTK atau MTK-NISN" value={formValues.room_code || ""} onChange={(e) => setFormValues({ ...formValues, room_code: e.target.value.toUpperCase() })} required />
                 <p className="text-slate-400 text-xs mt-1">Siswa akan mencari ruang ujian menggunakan kode ini.</p>
             </FormField>
+
+            <div className="pt-2 border-t mt-4">
+              <button 
+                type="button" 
+                onClick={() => setShowAdvanced(!showAdvanced)} 
+                className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1 focus:outline-none"
+              >
+                 {showAdvanced ? "Sembunyikan Pengaturan Lanjutan -" : "Tampilkan Pengaturan Lanjutan +"}
+              </button>
+            </div>
+
+            {showAdvanced && (
+               <div className="space-y-4 pt-1">
+                  <div className="grid grid-cols-2 gap-3">
+                    <FormField id="duration" label="Durasi (Menit)" error={undefined}>
+                      <Input type="number" value={formValues.duration} onChange={(e) => setFormValues({ ...formValues, duration: Number(e.target.value) })} required />
+                    </FormField>
+                    <FormField id="cheat_limit" label="Batas Cheat" error={undefined}>
+                      <Input type="number" value={formValues.cheat_limit} onChange={(e) => setFormValues({ ...formValues, cheat_limit: Number(e.target.value) })} required />
+                    </FormField>
+                  </div>
+                  <FormField id="submit_window" label="Kumpul Dibuka (Sisa Menit)" error={undefined}>
+                      <Input type="number" placeholder="Contoh: 10 (Tombol kumpul aktif 10 menit sebelum berakhir)" value={formValues.submit_window || ""} onChange={(e) => setFormValues({ ...formValues, submit_window: Number(e.target.value) })} />
+                      <p className="text-slate-400 text-xs mt-1">Isi 0 jika selalu diijinkan.</p>
+                  </FormField>
+               </div>
+            )}
 
             <DialogFooter className="pt-2">
               <Button type="submit" className="w-full">{dialogMode === "edit" ? "Perbarui" : "Simpan"}</Button>
@@ -814,7 +942,7 @@ const ExamRoomsPage = () => {
                       } else if (attempt.status === "LOCKED") {
                         statusLabel = <span className="text-red-500 font-bold">TERKUNCI</span>;
                         actions = (
-                            <Button size="sm" variant="destructive" onClick={() => handleUnlockStudent(siswa.nisn)}>Buka Kunci</Button>
+                            <Button size="sm" variant="secondary" className="bg-green-100 text-green-700 hover:bg-green-200 border-green-200 dark:bg-green-950 dark:text-green-400" onClick={() => handleUnlockStudent(siswa.nisn)}>Buka Kunci</Button>
                         );
                       } else {
                         statusLabel = <span className="text-yellow-600 font-semibold">Mengerjakan</span>;
@@ -834,13 +962,32 @@ const ExamRoomsPage = () => {
                           <td className="p-3 font-semibold text-blue-600">{attempt?.score !== undefined ? attempt.score : "-"}</td>
                           <td className="p-3 text-slate-500">{answeredCount} / {monitorQuestions.length}</td>
                           <td className="p-3 text-slate-500">{attempt?.cheatCount || 0} Kali</td>
-                          <td className="p-3 text-right flex justify-end gap-1">
+                          <td className="p-3 text-right flex justify-end gap-1 items-center whitespace-nowrap">
                             {actions}
                             {attempt && (
                               <>
-                                <Button size="sm" variant="outline" onClick={() => handleResetCheatCount(siswa.nisn)}>Reset Cheat</Button>
-                                <Button size="sm" variant="ghost" className="text-red-500" onClick={() => handleResetSession(siswa.nisn)}>Reset Sesi</Button>
-                                <Button size="sm" variant="outline" onClick={() => setExpandedSiswa(expandedSiswa === siswa.nisn ? null : siswa.nisn)}>
+                                <Button 
+                                  size="sm" 
+                                  variant="secondary" 
+                                  className="bg-amber-50 text-amber-700 hover:bg-amber-100 border-amber-200 dark:bg-amber-950 dark:text-amber-400 font-medium" 
+                                  onClick={() => handleResetCheatCount(siswa.nisn)}
+                                >
+                                  Reset Cheat
+                                </Button>
+                                <Button 
+                                  size="sm" 
+                                  variant="destructive" 
+                                  className="bg-red-50 text-red-600 hover:bg-red-100 border-red-200 font-semibold" 
+                                  onClick={() => handleResetSession(siswa.nisn)}
+                                >
+                                  Reset Sesi
+                                </Button>
+                                <Button 
+                                  size="sm" 
+                                  variant="secondary" 
+                                  className="bg-sky-50 text-sky-700 hover:bg-sky-100 border-sky-200 font-medium" 
+                                  onClick={() => setExpandedSiswa(expandedSiswa === siswa.nisn ? null : siswa.nisn)}
+                                >
                                   {expandedSiswa === siswa.nisn ? "Tutup" : "Details"}
                                 </Button>
                               </>
@@ -864,6 +1011,15 @@ const ExamRoomsPage = () => {
                                              <span className="font-bold text-slate-700">No {idx + 1}. </span>
                                              <span className="font-semibold text-slate-700 [&_p]:inline" dangerouslySetInnerHTML={{ __html: q.text }} />
                                            </div>
+                                            {q.imageUrl && (
+                                              <div className="my-1">
+                                                <img 
+                                                  src={q.imageUrl} 
+                                                  alt="Gambar Soal" 
+                                                  className="h-16 max-w-[120px] object-contain rounded border bg-slate-50 p-1 hover:h-40 hover:max-w-[240px] transition-all duration-200 cursor-zoom-in" 
+                                                />
+                                              </div>
+                                            )}
                                            <div className={`p-2 rounded flex justify-between ${isCorrect ? "bg-green-50 text-green-700 border border-green-200" : ansId ? "bg-red-50 text-red-700 border border-red-200" : "bg-slate-50 text-slate-500"}`}>
                                               {ansId ? (
                                                  <span className="inline [&_p]:inline" dangerouslySetInnerHTML={{ __html: `<b>Pilihan (${ansId.toUpperCase()}):</b> ${q.choices[ansId]?.text || ""}` }} />
@@ -890,6 +1046,19 @@ const ExamRoomsPage = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      <ConfirmationDialog
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={async () => {
+          await confirmDialog.onConfirm();
+          setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+        }}
+        title={confirmDialog.title}
+        description={confirmDialog.description}
+        type={confirmDialog.type}
+        confirmLabel={confirmDialog.confirmLabel}
+      />
     </div>
   );
 };

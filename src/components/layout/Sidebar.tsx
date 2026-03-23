@@ -72,7 +72,7 @@ const Sidebar = () => {
 
       {/* Desktop Sidebar */}
       <aside className={cn(
-        "hidden lg:flex h-full flex-col bg-gradient-to-b from-slate-50 to-white dark:from-slate-900 dark:to-slate-800 border-r border-slate-200/60 dark:border-slate-700/60 shadow-2xl backdrop-blur-sm transition-all duration-300 ease-in-out",
+        "hidden lg:flex h-full flex-col bg-gradient-to-b from-slate-50 to-white dark:from-slate-900 dark:to-slate-800 border-r border-slate-200/60 dark:border-slate-700/60 shadow-2xl backdrop-blur-sm transition-all duration-300 ease-in-out z-20",
         // Width transitions - responsive widths
         isCollapsed ? "w-16 lg:w-16" : "w-64 md:w-72 lg:w-80"
       )}>

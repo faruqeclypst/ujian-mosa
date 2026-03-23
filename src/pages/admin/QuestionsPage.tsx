@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Plus, Edit, Trash, Check, Image, ChevronDown, FileText, Download } from "lucide-react";
+import { ArrowLeft, Plus, Edit, Trash, Check, Image, ChevronDown, FileText, Download, Eye } from "lucide-react";
 import { Button } from "../../components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../../components/ui/dialog";
 import { DeleteConfirmationDialog } from "../../components/ui/delete-confirmation-dialog";
@@ -15,6 +15,7 @@ import { parseQuestionsFromWord } from "../../lib/questionWordParser";
 import ReactQuill from "react-quill";
 import "react-quill/dist/quill.snow.css";
 import { usePiket } from "../../context/PiketContext";
+import { DataTable } from "../../components/ui/data-table";
 export interface QuestionData {
   id: string;
   examId: string;
@@ -22,6 +23,49 @@ export interface QuestionData {
   imageUrl?: string;
   choices: Record<string, { text: string; imageUrl?: string; isCorrect?: boolean }>;
 }
+
+const columns = [
+  {
+    key: "index",
+    label: "No",
+    render: (v: any, item: any, index?: number) => (index !== undefined ? index + 1 : 1),
+  },
+  {
+    key: "text",
+    label: "Teks Pertanyaan",
+    sortable: true,
+    render: (v: string, item: QuestionData) => (
+      <div className="max-w-lg min-w-[250px]">
+        <div className="line-clamp-2 text-sm font-medium text-slate-800 dark:text-slate-200 leading-relaxed" dangerouslySetInnerHTML={{ __html: item.text }} />
+        {item.imageUrl && (
+           <div className="flex items-center gap-1 text-xs text-blue-500 mt-1">
+              <span className="p-1 rounded-md bg-blue-50 text-blue-600 flex items-center gap-1 font-semibold text-[10px] border border-blue-200">
+                 🖼️ Bergambar
+              </span>
+           </div>
+        )}
+      </div>
+    ),
+  },
+  {
+    key: "choices",
+    label: "Detil Pilihan",
+    render: (v: any, item: QuestionData) => {
+       const keys = Object.keys(item.choices || {});
+       const correctKey = keys.find(k => item.choices[k].isCorrect);
+       return (
+         <div className="flex items-center gap-1.5 flex-wrap">
+           <span className="p-1 px-2 rounded-md bg-slate-100 text-slate-600 text-xs border border-slate-200">{keys.length} Pilihan</span>
+           {correctKey && (
+              <span className="p-1 px-2 text-[11px] font-bold rounded-md bg-green-50 text-green-600 border border-green-200">
+                 Kunci {correctKey.toUpperCase()}
+              </span>
+           )}
+         </div>
+       )
+    }
+  }
+];
 
 const QuestionsPage = () => {
   const { examId } = useParams<{ examId: string }>();
@@ -36,6 +80,8 @@ const QuestionsPage = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [dialogMode, setDialogMode] = useState<"create" | "edit">("create");
   const [selectedQuestion, setSelectedQuestion] = useState<QuestionData | null>(null);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [previewQuestion, setPreviewQuestion] = useState<QuestionData | null>(null);
 
   const [formValues, setFormValues] = useState<{
     text: string;
@@ -147,7 +193,7 @@ const QuestionsPage = () => {
     setFormValues({
       text: "",
       choices: {
-        a: { text: "", isCorrect: true }, // default A correct
+        a: { text: "", isCorrect: false },
         b: { text: "", isCorrect: false },
         c: { text: "", isCorrect: false },
         d: { text: "", isCorrect: false },
@@ -194,6 +240,37 @@ const QuestionsPage = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // 1. Validasi Teks Pertanyaan
+    const isQuestionEmpty = !formValues.text || formValues.text.replace(/<[^>]*>/g, '').trim() === "";
+    if (isQuestionEmpty) {
+      alert("Gagal menyimpan! Teks pertanyaan tidak boleh kosong.");
+      return;
+    }
+
+    // 2. Validasi Harus Ada Kunci Jawaban
+    const hasCorrectAnswer = Object.values(formValues.choices).some((c) => c.isCorrect);
+    if (!hasCorrectAnswer) {
+      alert("Gagal menyimpan! Soal wajib memiliki minimal satu kunci jawaban.");
+      return;
+    }
+
+    // 3. Validasi Teks Pilihan yang terpilih (Kunci Jawaban)
+    const correctChoicesKeys = Object.keys(formValues.choices).filter(key => formValues.choices[key].isCorrect);
+    const correctChoiceKey = correctChoicesKeys[0];
+    const isCorrectChoiceEmpty = !formValues.choices[correctChoiceKey].text || formValues.choices[correctChoiceKey].text.replace(/<[^>]*>/g, '').trim() === "";
+    if (isCorrectChoiceEmpty) {
+       alert("Gagal menyimpan! Pilihan jawaban yang dipilih sebagai kunci jawaban tidak boleh kosong.");
+       return;
+    }
+
+    // 4. Validasi Jumlah Pilihan yang Terisi (Minimal 2 pilihan)
+    const filledChoicesCount = Object.values(formValues.choices).filter(c => c.text && c.text.replace(/<[^>]*>/g, '').trim() !== "").length;
+    if (filledChoicesCount < 2) {
+       alert("Gagal menyimpan! Minimal harus mengisi atau membuat 2 pilihan jawaban.");
+       return;
+    }
+
     try {
       let imageUrl = formValues.imageUrl || "";
 
@@ -451,52 +528,47 @@ const QuestionsPage = () => {
           {questions.length === 0 ? (
             <div className="text-center p-12 border bg-white rounded-xl text-slate-400">Belum ada soal untuk ujian ini.</div>
           ) : (
-            questions.map((q, index) => (
-              <Card key={q.id} className="rounded-xl border shadow-sm">
-                <CardHeader className="pb-3 flex-row justify-between items-start">
-                  <span className="font-semibold text-sm text-slate-400">No. {index + 1}</span>
-                  <div className="flex gap-1">
-                    <Button variant="ghost" size="icon" onClick={() => handleEditClick(q)}>
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="text-red-500" onClick={() => handleDeleteClick(q)}>
-                      <Trash className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div>
-                    <p className="font-medium text-slate-800 dark:text-white inline whitespace-pre-line" dangerouslySetInnerHTML={{ __html: q.text }} />
-                    {q.imageUrl && (
-                      <div className="mt-2">
-                        <img src={q.imageUrl} alt="Gambar Soal" className="max-w-md h-auto rounded-xl border border-slate-200 shadow-sm" />
-                      </div>
-                    )}
-                  </div>
-                  <div className="grid gap-2 text-sm max-w-xl">
-                    {Object.keys(q.choices || {}).map((cKey) => {
-                      const choice = q.choices[cKey];
-                      return (
-                        <div key={cKey} className={`p-3 rounded-xl border flex items-center justify-between ${
-                            choice.isCorrect ? "bg-green-50/80 border-green-200 text-green-800 font-medium" : "bg-slate-50 border-slate-100 text-slate-700"
-                        }`}>
-                          <div className="flex items-start gap-3 flex-1 min-w-0">
-                            <span className="font-bold text-slate-400 mt-0.5">{cKey.toUpperCase()}.</span>
-                            <div className="flex flex-col gap-2 flex-1 min-w-0">
-                              <span className="break-words leading-relaxed whitespace-pre-line" dangerouslySetInnerHTML={{ __html: choice.text }} />
-                              {choice.imageUrl && (
-                                <img src={choice.imageUrl} alt={`Pilihan ${cKey.toUpperCase()}`} className="max-w-[180px] h-auto rounded-lg border border-slate-200/60 shadow-sm" />
-                              )}
-                            </div>
-                          </div>
-                          {choice.isCorrect && <Check className="h-4 w-4 text-green-600 shrink-0 ml-2" />}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </CardContent>
-              </Card>
-            ))
+            <Card>
+              <CardContent>
+                <DataTable
+                  data={questions}
+                  columns={columns}
+                  searchPlaceholder="Cari soal..."
+                  emptyMessage="Tidak ada soal ditemukan."
+                  actions={(q: QuestionData) => (
+                    <div className="flex justify-end items-center gap-1.5 whitespace-nowrap">
+                      <Button 
+                        variant="secondary" 
+                        size="sm" 
+                        className="bg-sky-50 text-sky-700 hover:bg-sky-100 border-sky-200 dark:bg-sky-950 dark:text-sky-400" 
+                        onClick={() => {
+                          setPreviewQuestion(q);
+                          setIsPreviewOpen(true);
+                        }}
+                      >
+                        Pratinjau
+                      </Button>
+                      <Button 
+                        variant="secondary" 
+                        size="sm" 
+                        className="bg-green-100 text-green-700 hover:bg-green-200 border-green-200 dark:bg-green-950 dark:text-green-400 dark:hover:bg-green-900" 
+                        onClick={() => handleEditClick(q)}
+                      >
+                        Edit
+                      </Button>
+                      <Button 
+                        variant="destructive" 
+                        size="sm" 
+                        className="bg-red-50 text-red-600 hover:bg-red-100 border-red-200" 
+                        onClick={() => handleDeleteClick(q)}
+                      >
+                        Hapus
+                      </Button>
+                    </div>
+                  )}
+                />
+              </CardContent>
+            </Card>
           )}
         </div>
       )}
@@ -612,6 +684,48 @@ const QuestionsPage = () => {
               <Button type="submit" className="w-full">{dialogMode === "edit" ? "Perbarui" : "Simpan"}</Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog Preview Soal */}
+      <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
+        <DialogContent className="max-w-2xl bg-white max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Pratinjau Soal</DialogTitle>
+          </DialogHeader>
+          {previewQuestion && (
+            <div className="space-y-4 pt-2">
+              <div>
+                <p className="font-medium text-slate-800 dark:text-white inline whitespace-pre-line" dangerouslySetInnerHTML={{ __html: previewQuestion.text }} />
+                {previewQuestion.imageUrl && (
+                  <div className="mt-2">
+                    <img src={previewQuestion.imageUrl} alt="Gambar Soal" className="max-w-md h-auto rounded-xl border border-slate-200 shadow-sm" />
+                  </div>
+                )}
+              </div>
+              <div className="grid gap-2 text-sm max-w-xl">
+                {Object.keys(previewQuestion.choices || {}).map((cKey) => {
+                  const choice = previewQuestion.choices[cKey];
+                  return (
+                    <div key={cKey} className={`p-3 rounded-xl border flex items-center justify-between ${
+                        choice.isCorrect ? "bg-green-50/80 border-green-200 text-green-800 font-medium" : "bg-slate-50 border-slate-100 text-slate-700"
+                    }`}>
+                      <div className="flex items-start gap-3 flex-1 min-w-0">
+                        <span className="font-bold text-slate-400 mt-0.5">{cKey.toUpperCase()}.</span>
+                        <div className="flex flex-col gap-2 flex-1 min-w-0">
+                          <span className="break-words leading-relaxed whitespace-pre-line" dangerouslySetInnerHTML={{ __html: choice.text }} />
+                          {choice.imageUrl && (
+                            <img src={choice.imageUrl} alt={`Pilihan ${cKey.toUpperCase()}`} className="max-w-[180px] h-auto rounded-lg border border-slate-200/60 shadow-sm" />
+                          )}
+                        </div>
+                      </div>
+                      {choice.isCorrect && <Check className="h-4 w-4 text-green-600 shrink-0 ml-2" />}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 

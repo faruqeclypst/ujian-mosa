@@ -38,6 +38,7 @@ const CBTPage = () => {
   const [timeLeft, setTimeLeft] = useState<number>(0); // seconds
   const [isExamOver, setIsExamOver] = useState(false);
   const [isResetModalOpen, setIsResetModalOpen] = useState(false); // <--- modal state untuk reset sesi
+  const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false); // <--- modal state kumpul ujian
   const [previewImage, setPreviewImage] = useState<string | null>(null); // <--- Preview gambar siswa zoom clicks
   // Anti-Cheat State
   const [isLocked, setIsLocked] = useState(false);
@@ -450,12 +451,8 @@ const CBTPage = () => {
             {currentQuestionIndex === questions.length - 1 ? (
               <Button 
                 disabled={!isSubmitAllowed}
-                onClick={() => {
-                  if (window.confirm("Apakah Anda yakin ingin mengumpulkan ujian?")) {
-                    handleSubmitExam();
-                  }
-                }} 
-                className={`text-white transition-all font-semibold ${
+                onClick={() => setIsSubmitModalOpen(true)} 
+               className={`text-white transition-all font-semibold ${
                   !isSubmitAllowed ? "bg-slate-300 pointer-events-none" : "bg-green-600 hover:bg-green-700"
                 }`}
               >
@@ -533,6 +530,28 @@ const CBTPage = () => {
               className="max-w-full max-h-[85vh] object-contain rounded-2xl shadow-2xl border border-slate-800/20" 
             />
           )}
+        </DialogContent>
+      </Dialog>
+      {/* Dialog Konfirmasi Kumpul Ujian */}
+      <Dialog open={isSubmitModalOpen} onOpenChange={setIsSubmitModalOpen}>
+        <DialogContent className="max-w-md bg-white rounded-2xl p-6 pointer-events-auto">
+          <DialogHeader className="text-center">
+            <div className="mx-auto w-12 h-12 bg-green-50 rounded-full flex items-center justify-center mb-2">
+              <CheckCircle2 className="w-6 h-6 text-green-600" />
+            </div>
+            <DialogTitle className="text-lg font-bold text-slate-800">Kumpulkan Ujian?</DialogTitle>
+            <DialogDescription className="text-slate-500 text-sm mt-1">
+              Apakah Anda yakin ingin mengakhiri sesi ujian dan mengumpulkan jawaban sekarang?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="mt-4 flex flex-row gap-2 sm:justify-center">
+             <Button variant="outline" onClick={() => setIsSubmitModalOpen(false)} className="rounded-xl flex-1">
+                Batal
+             </Button>
+             <Button onClick={() => { setIsSubmitModalOpen(false); handleSubmitExam(); }} className="flex-1 bg-green-600 hover:bg-green-700 font-bold text-white rounded-xl">
+                Kumpulkan
+             </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

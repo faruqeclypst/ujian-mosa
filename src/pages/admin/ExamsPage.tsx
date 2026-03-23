@@ -3,12 +3,16 @@ import { Plus, BookOpen, Trash, Edit, Archive, RotateCw } from "lucide-react";
 import { Button } from "../../components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../../components/ui/dialog";
 import { DeleteConfirmationDialog } from "../../components/ui/delete-confirmation-dialog";
+import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
 import { ref, onValue, push, update, remove } from "firebase/database";
 import { database } from "../../lib/firebase";
 import { Input } from "../../components/ui/input";
 import FormField from "../../components/forms/FormField";
 import { useNavigate } from "react-router-dom";
 import { usePiket } from "../../context/PiketContext";
+import { ConfirmationDialog } from "../../components/ui/confirmation-dialog";
+
+import { DataTable } from "../../components/ui/data-table";
 
 export interface ExamData {
   id: string;
@@ -17,6 +21,30 @@ export interface ExamData {
   teacherId: string;
   createdAt: number;
 }
+
+const columns = [
+  {
+    key: "index",
+    label: "No",
+    render: (v: any, item: any, index?: number) => (index !== undefined ? index + 1 : 1),
+  },
+  {
+    key: "title",
+    label: "Judul Ujian",
+    sortable: true,
+    render: (v: string) => <span className="font-medium text-slate-800 dark:text-slate-100">{v}</span>
+  },
+  {
+    key: "subjectName",
+    label: "Mata Pelajaran",
+    sortable: true,
+  },
+  {
+    key: "teacherName",
+    label: "Guru Pengampu",
+    sortable: true,
+  }
+];
 
 const ExamsPage = () => {
   const navigate = useNavigate();
@@ -35,17 +63,50 @@ const ExamsPage = () => {
   const [examToDelete, setExamToDelete] = useState<ExamData | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const handleArchiveExam = async (exam: any) => {
-    if (!window.confirm("Apakah Anda yakin ingin mengarsipkan bank soal ini?")) return;
-    try {
-      await update(ref(database, `exams/${exam.id}`), { status: "archive" });
-    } catch (e) { alert("Gagal mengarsipkan."); }
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    description: string;
+    type: "info" | "warning" | "danger" | "success";
+    confirmLabel: string;
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: "",
+    description: "",
+    type: "info",
+    confirmLabel: "Konfirmasi",
+    onConfirm: () => {}
+  });
+
+  const handleArchiveExam = (exam: any) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: "Arsipkan Bank Soal",
+      description: `Apakah Anda yakin ingin mengarsipkan bank soal "${exam.title}"?`,
+      type: "warning",
+      confirmLabel: "Arsipkan",
+      onConfirm: async () => {
+        try {
+          await update(ref(database, `exams/${exam.id}`), { status: "archive" });
+        } catch (e) { alert("Gagal mengarsipkan."); }
+      }
+    });
   };
 
-  const handleRestoreExam = async (exam: any) => {
-    try {
-      await update(ref(database, `exams/${exam.id}`), { status: null });
-    } catch (e) { alert("Gagal memulihkan."); }
+  const handleRestoreExam = (exam: any) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: "Pulihkan Bank Soal",
+      description: `Apakah Anda yakin ingin memulihkan bank soal "${exam.title}"?`,
+      type: "info",
+      confirmLabel: "Pulihkan",
+      onConfirm: async () => {
+        try {
+          await update(ref(database, `exams/${exam.id}`), { status: null });
+        } catch (e) { alert("Gagal memulihkan."); }
+      }
+    });
   };
 
   useEffect(() => {
@@ -158,59 +219,68 @@ const ExamsPage = () => {
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
         </div>
       ) : (
-        <div className="border rounded-lg bg-white overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-slate-50 border-b">
-              <tr>
-                <th className="p-4 text-center font-semibold w-12">No</th>
-                <th className="p-4 text-left font-semibold">Judul Ujian</th>
-                <th className="p-4 text-left font-semibold">Mata Pelajaran</th>
-                <th className="p-4 text-left font-semibold">Guru Pengampu</th>
-                <th className="p-4 text-right font-semibold">Aksi</th>
-              </tr>
-            </thead>
-            <tbody>
-              {exams.filter(e => activeTab === "arsip" ? e.status === "archive" : e.status !== "archive").length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="p-8 text-center text-slate-400">Belum ada bank soal {activeTab}.</td>
-                </tr>
-              ) : (
-                exams
-                  .filter(e => activeTab === "arsip" ? e.status === "archive" : e.status !== "archive")
-                  .map((exam, index) => (
-                  <tr key={exam.id} className="border-b hover:bg-slate-50">
-                    <td className="p-4 text-center font-medium text-slate-400">{index + 1}</td>
-                    <td className="p-4 font-medium">{exam.title}</td>
-                    <td className="p-4 text-slate-500">{exam.subjectName}</td>
-                    <td className="p-4 text-slate-500">{exam.teacherName}</td>
-                    <td className="p-4 text-right flex justify-end gap-2">
-                        <Button variant="outline" size="sm" onClick={() => navigate(`/admin/bank-soal/${exam.id}/questions`)}>
-                          <BookOpen className="h-4 w-4 mr-1" /> Soal
-                        </Button>
-                        
-                        {activeTab === "aktif" ? (
-                          <Button variant="outline" size="sm" className="text-amber-600 border-amber-200 hover:bg-amber-50" onClick={() => handleArchiveExam(exam)}>
-                              <Archive className="h-4 w-4 mr-1" /> Arsipkan
-                          </Button>
-                        ) : (
-                          <Button variant="outline" size="sm" className="text-indigo-600 border-indigo-200 hover:bg-indigo-50" onClick={() => handleRestoreExam(exam)}>
-                              <RotateCw className="h-4 w-4 mr-1" /> Buka
-                          </Button>
-                        )}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base font-semibold">Data Bank Soal</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <DataTable
+              data={exams.filter(e => activeTab === "arsip" ? e.status === "archive" : e.status !== "archive")}
+              columns={columns}
+              searchPlaceholder="Cari ujian..."
+              emptyMessage={`Belum ada bank soal ${activeTab}.`}
+              actions={(exam: any) => (
+                <div className="flex justify-end gap-1.5 items-center whitespace-nowrap">
+                  <Button 
+                    variant="secondary" 
+                    size="sm" 
+                    className="bg-blue-50 text-blue-700 hover:bg-blue-100 border-blue-200" 
+                    onClick={() => navigate(`/admin/bank-soal/${exam.id}/questions`)}
+                  >
+                    <BookOpen className="h-4 w-4 mr-1" /> Soal
+                  </Button>
+                  
+                  {activeTab === "aktif" ? (
+                    <Button 
+                      variant="secondary" 
+                      size="sm" 
+                      className="bg-amber-50 text-amber-700 hover:bg-amber-100 border-amber-200 dark:bg-amber-950 dark:text-amber-400" 
+                      onClick={() => handleArchiveExam(exam)}
+                    >
+                          <Archive className="h-4 w-4 mr-1" /> Arsip
+                    </Button>
+                  ) : (
+                    <Button 
+                      variant="secondary" 
+                      size="sm" 
+                      className="bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border-indigo-200 dark:bg-indigo-950 dark:text-indigo-400" 
+                      onClick={() => handleRestoreExam(exam)}
+                    >
+                          <RotateCw className="h-4 w-4 mr-1" /> Buka
+                    </Button>
+                  )}
 
-                        <Button variant="ghost" size="icon" onClick={() => handleEditClick(exam)}>
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="text-red-500" onClick={() => handleDeleteClick(exam)}>
-                        <Trash className="h-4 w-4" />
-                      </Button>
-                    </td>
-                  </tr>
-                ))
+                  <Button 
+                    variant="secondary" 
+                    size="sm" 
+                    className="bg-green-100 text-green-700 hover:bg-green-200 border-green-200 dark:bg-green-950 dark:text-green-400" 
+                    onClick={() => handleEditClick(exam)}
+                  >
+                    Edit
+                  </Button>
+                  <Button 
+                    variant="destructive" 
+                    size="sm" 
+                    className="bg-red-50 text-red-600 hover:bg-red-100 border-red-200" 
+                    onClick={() => handleDeleteClick(exam)}
+                  >
+                    Hapus
+                  </Button>
+                </div>
               )}
-            </tbody>
-          </table>
-        </div>
+            />
+          </CardContent>
+        </Card>
       )}
 
       {/* Dialog Create/Edit */}
@@ -261,6 +331,19 @@ const ExamsPage = () => {
         description="Apakah Anda yakin ingin menghapus ujian ini? Seluruh soal di dalamnya juga akan hilang."
         itemName={examToDelete?.title || ""}
         isLoading={isDeleting}
+      />
+
+      <ConfirmationDialog
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={async () => {
+          await confirmDialog.onConfirm();
+          setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+        }}
+        title={confirmDialog.title}
+        description={confirmDialog.description}
+        type={confirmDialog.type}
+        confirmLabel={confirmDialog.confirmLabel}
       />
     </div>
   );
