@@ -335,19 +335,11 @@ const CBTPage = () => {
   };
 
   const getProxiedUrl = (url?: string) => {
-    if (!url) return "";
-    if (url.startsWith("https://pub-a1193e163fef41c9afc15d1334b8740b.r2.dev/")) {
-      return url.replace("https://pub-a1193e163fef41c9afc15d1334b8740b.r2.dev/", "/r2-proxy/");
-    }
-    return url;
+    return url || "";
   };
 
   const proxifyHtml = (html?: string) => {
-    if (!html) return "";
-    return html.replace(
-      /https:\/\/pub-a1193e163fef41c9afc15d1334b8740b\.r2\.dev\//g,
-      "/r2-proxy/"
-    );
+    return html || "";
   };
 
   const formatTime = (seconds: number) => {

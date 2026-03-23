@@ -84,19 +84,17 @@ const blobToDataUrl = (blob: Blob): Promise<string> =>
   });
 
 export async function uploadInventoryImage(folder: string, file: File): Promise<UploadResult> {
-  // Dev fallback: allow inlining image as data URL when R2 is not configured
-  if (!isR2Configured()) {
-    if (import.meta.env.VITE_R2_DEV_INLINE_BASE64 === "true") {
-      const dataUrl = await blobToDataUrl(file);
-      const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-      const safeName = sanitizeFileName(file.name);
-      const key = `${folder}/${timestamp}-${safeName}`;
-      console.warn(
-        "R2 tidak dikonfigurasi. Menggunakan fallback data URL untuk pengembangan. Jangan gunakan di produksi."
-      );
-      return { key, url: dataUrl };
-    }
+  // Offline fallback: force inline base64 images if configured (very useful for local tests / isolated networks)
+  if (import.meta.env.VITE_R2_DEV_INLINE_BASE64 === "true") {
+    const dataUrl = await blobToDataUrl(file);
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const safeName = sanitizeFileName(file.name);
+    const key = `${folder}/${timestamp}-${safeName}`;
+    console.warn("Menggunakan mode offline base64 untuk gambar.");
+    return { key, url: dataUrl };
+  }
 
+  if (!isR2Configured()) {
     throw new Error(
       "Konfigurasi R2 belum lengkap. Set env VITE_R2_* atau aktifkan fallback dev dengan VITE_R2_DEV_INLINE_BASE64=true."
     );
@@ -146,18 +144,17 @@ export async function uploadInventoryImage(folder: string, file: File): Promise<
 }
 
 export async function uploadFixedAssetImage(folder: string, file: File): Promise<UploadResult> {
-  // Same logic as uploadInventoryImage
+  // Offline fallback: force inline base64 if configured
+  if (import.meta.env.VITE_R2_DEV_INLINE_BASE64 === "true") {
+    const dataUrl = await blobToDataUrl(file);
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const safeName = sanitizeFileName(file.name);
+    const key = `${folder}/${timestamp}-${safeName}`;
+    console.warn("Menggunakan mode offline base64 untuk fixed asset.");
+    return { key, url: dataUrl };
+  }
+
   if (!isR2Configured()) {
-    if (import.meta.env.VITE_R2_DEV_INLINE_BASE64 === "true") {
-      const dataUrl = await blobToDataUrl(file);
-      const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-      const safeName = sanitizeFileName(file.name);
-      const key = `${folder}/${timestamp}-${safeName}`;
-      console.warn(
-        "R2 tidak dikonfigurasi. Menggunakan fallback data URL untuk pengembangan."
-      );
-      return { key, url: dataUrl };
-    }
     throw new Error(
       "Konfigurasi R2 belum lengkap. Set env VITE_R2_* atau aktifkan fallback dev."
     );
