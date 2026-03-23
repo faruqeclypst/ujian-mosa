@@ -20,19 +20,19 @@ interface SiswaAuthContextValue {
 
 const SiswaAuthContext = createContext<SiswaAuthContextValue | undefined>(undefined);
 
-const LOCAL_STORAGE_KEY = "siswa_auth_session";
+const SESSION_STORAGE_KEY = "siswa_auth_session";
 
 export const SiswaAuthProvider = ({ children }: { children: ReactNode }) => {
   const [siswa, setSiswa] = useState<SiswaUser | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const savedSession = localStorage.getItem(LOCAL_STORAGE_KEY);
+    const savedSession = sessionStorage.getItem(SESSION_STORAGE_KEY);
     if (savedSession) {
       try {
         setSiswa(JSON.parse(savedSession));
       } catch (err) {
-        localStorage.removeItem(LOCAL_STORAGE_KEY);
+        sessionStorage.removeItem(SESSION_STORAGE_KEY);
       }
     }
     setLoading(false);
@@ -98,7 +98,7 @@ export const SiswaAuthProvider = ({ children }: { children: ReactNode }) => {
     };
 
     setSiswa(siswaData);
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(siswaData));
+    sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(siswaData));
   }, []);
 
   const changePassword = useCallback(async (newPassword: string) => {
@@ -112,12 +112,12 @@ export const SiswaAuthProvider = ({ children }: { children: ReactNode }) => {
 
     const updatedSiswa = { ...siswa, hasChangedPassword: true };
     setSiswa(updatedSiswa);
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updatedSiswa));
+    sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(updatedSiswa));
   }, [siswa]);
 
   const logoutSiswa = useCallback(() => {
     setSiswa(null);
-    localStorage.removeItem(LOCAL_STORAGE_KEY);
+    sessionStorage.removeItem(SESSION_STORAGE_KEY);
   }, []);
 
   return (

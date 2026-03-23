@@ -126,7 +126,7 @@ const CBTPage = () => {
 
           // Handle Shuffling/Saves
           const orderKey = `order_${siswa.nisn}_${roomId}`;
-          let savedOrder = localStorage.getItem(orderKey);
+          let savedOrder = sessionStorage.getItem(orderKey);
           let order: string[] = [];
 
           const currentIds = loadedQuestions.map((q) => q.id);
@@ -144,7 +144,7 @@ const CBTPage = () => {
                 order = [...order, ...newIds.sort(() => Math.random() - 0.5)];
               }
 
-              localStorage.setItem(orderKey, JSON.stringify(order));
+              sessionStorage.setItem(orderKey, JSON.stringify(order));
             } catch (e) {
               order = [];
             }
@@ -153,7 +153,7 @@ const CBTPage = () => {
           if (order.length === 0) {
             // Shuffle
             order = currentIds.sort(() => Math.random() - 0.5);
-            localStorage.setItem(orderKey, JSON.stringify(order));
+            sessionStorage.setItem(orderKey, JSON.stringify(order));
           }
 
           setQuestionOrder(order);
@@ -272,8 +272,8 @@ const CBTPage = () => {
       saveTimeoutRef.current[questionId] = setTimeout(async () => {
         const answersRef = ref(database, `answers/${siswa?.nisn}_${roomId}`);
         await update(answersRef, { [questionId]: choiceId });
-        // Backup to LocalStorage
-        localStorage.setItem(`ans_${siswa?.nisn}_${roomId}`, JSON.stringify(updated));
+        // Backup to SessionStorage
+        sessionStorage.setItem(`ans_${siswa?.nisn}_${roomId}`, JSON.stringify(updated));
       }, 300);
 
       return updated;
@@ -312,8 +312,8 @@ const CBTPage = () => {
       });
 
       // Clear layout triggers
-      localStorage.removeItem(`order_${siswa.nisn}_${roomId}`);
-      localStorage.removeItem(`ans_${siswa.nisn}_${roomId}`);
+      sessionStorage.removeItem(`order_${siswa.nisn}_${roomId}`);
+      sessionStorage.removeItem(`ans_${siswa.nisn}_${roomId}`);
 
       navigate(`/cbt/${roomId}/result`);
     } catch (err) {
