@@ -358,7 +358,7 @@ const CBTPage = () => {
   const isSubmitAllowed = submitWindowSeconds === 0 || timeLeft <= submitWindowSeconds;
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex flex-col">
+    <div className="h-screen h-[100dvh] bg-slate-50 dark:bg-slate-900 flex flex-col overflow-hidden">
       {/* Top Header Panel */}
       <header className="sticky top-0 z-10 bg-white/80 dark:bg-slate-900/80 border-b shadow-sm h-14 px-6 flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -373,9 +373,9 @@ const CBTPage = () => {
       </header>
 
       {/* Main Grid: Question View & Nav Panel */}
-      <div className="flex-1 flex flex-col md:flex-row md:overflow-hidden">
+      <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
         {/* Left: Questions View */}
-        <div className="flex-1 md:overflow-y-auto p-4 md:p-5 space-y-4">
+        <div className="flex-1 min-h-0 overflow-y-auto p-4 md:p-5 space-y-4">
           {currentQuestion && (
             <Card className="rounded-xl border shadow-sm">
               <CardHeader className="p-4 pb-2">
