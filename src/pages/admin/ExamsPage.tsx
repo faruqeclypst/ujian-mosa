@@ -89,8 +89,21 @@ const ExamsPage = () => {
       onConfirm: async () => {
         try {
           await update(ref(database, `exams/${exam.id}`), { status: "archive" });
-        } catch (e) { alert("Gagal mengarsipkan."); }
+        } catch (e) { 
+          showAlert("Gagal", "Gagal mengarsipkan bank soal.", "danger");
+        }
       }
+    });
+  };
+
+  const showAlert = (title: string, description: string, type: "success" | "danger" | "warning" | "info" = "info") => {
+    setConfirmDialog({
+      isOpen: true,
+      title,
+      description,
+      type,
+      confirmLabel: "OK",
+      onConfirm: () => {}
     });
   };
 
@@ -104,7 +117,9 @@ const ExamsPage = () => {
       onConfirm: async () => {
         try {
           await update(ref(database, `exams/${exam.id}`), { status: null });
-        } catch (e) { alert("Gagal memulihkan."); }
+        } catch (e) { 
+          showAlert("Gagal", "Gagal memulihkan bank soal.", "danger");
+        }
       }
     });
   };
@@ -169,7 +184,7 @@ const ExamsPage = () => {
       }
       setIsDialogOpen(false);
     } catch (error) {
-      alert("Gagal menyimpan data ujian.");
+      showAlert("Gagal", "Gagal menyimpan data ujian.", "danger");
     }
   };
 
@@ -179,7 +194,7 @@ const ExamsPage = () => {
     try {
       await remove(ref(database, `exams/${examToDelete.id}`));
     } catch (error) {
-      alert("Gagal menghapus ujian.");
+      showAlert("Gagal", "Gagal menghapus bank soal.", "danger");
     } finally {
       setIsDeleting(false);
       setDeleteDialogOpen(false);

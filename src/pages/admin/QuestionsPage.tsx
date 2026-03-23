@@ -112,6 +112,18 @@ const QuestionsPage = () => {
   const [isBatchModalOpen, setIsBatchModalOpen] = useState(false);
   const [isSavingBatch, setIsSavingBatch] = useState(false);
   const [confirmModal, setConfirmModal] = useState<any>({ isOpen: false, title: "", description: "", type: "info", confirmLabel: "Ok", onConfirm: () => { } });
+  
+  const showAlert = (title: string, description: string, type: "success" | "danger" | "warning" | "info" = "info", onConfirm?: () => void, showCancel: boolean = false, confirmLabel: string = "OK") => {
+    setConfirmModal({
+      isOpen: true,
+      title,
+      description,
+      type,
+      confirmLabel,
+      onConfirm: onConfirm || (() => { }),
+      showCancel
+    });
+  };
   const [batchQuestions, setBatchQuestions] = useState<any[]>([
     { text: "", choices: { a: { text: "" }, b: { text: "" }, c: { text: "" }, d: { text: "" }, e: { text: "" } }, correctKey: "a", imageFile: null }
   ]);
@@ -156,7 +168,7 @@ const QuestionsPage = () => {
   const handleSaveBatch = async () => {
     let validQuestions = batchQuestions.filter(q => q.text.trim() !== "");
     if (validQuestions.length === 0) {
-      alert("Gagal! Tidak ada soal yang diisi teks pertanyaannya.");
+      showAlert("Gagal", "Tidak ada soal yang diisi teks pertanyaannya.", "danger");
       return;
     }
 
@@ -167,7 +179,7 @@ const QuestionsPage = () => {
     });
 
     if (hasEmptyKeys) {
-      alert("Gagal! Kunci jawaban dari soal yang Anda ketik tidak boleh kosong teksnya.");
+      showAlert("Gagal", "Kunci jawaban dari soal yang Anda ketik tidak boleh kosong teksnya.", "danger");
       return;
     }
 
@@ -365,14 +377,14 @@ const QuestionsPage = () => {
     // 1. Validasi Teks Pertanyaan
     const isQuestionEmpty = !formValues.text || formValues.text.replace(/<[^>]*>/g, '').trim() === "";
     if (isQuestionEmpty) {
-      alert("Gagal menyimpan! Teks pertanyaan tidak boleh kosong.");
+      showAlert("Gagal", "Teks pertanyaan tidak boleh kosong.", "danger");
       return;
     }
 
     // 2. Validasi Harus Ada Kunci Jawaban
     const hasCorrectAnswer = Object.values(formValues.choices).some((c) => c.isCorrect);
     if (!hasCorrectAnswer) {
-      alert("Gagal menyimpan! Soal wajib memiliki minimal satu kunci jawaban.");
+      showAlert("Gagal", "Soal wajib memiliki minimal satu kunci jawaban.", "danger");
       return;
     }
 
@@ -381,14 +393,14 @@ const QuestionsPage = () => {
     const correctChoiceKey = correctChoicesKeys[0];
     const isCorrectChoiceEmpty = !formValues.choices[correctChoiceKey].text || formValues.choices[correctChoiceKey].text.replace(/<[^>]*>/g, '').trim() === "";
     if (isCorrectChoiceEmpty) {
-      alert("Gagal menyimpan! Pilihan jawaban yang dipilih sebagai kunci jawaban tidak boleh kosong.");
+      showAlert("Gagal", "Pilihan jawaban yang dipilih sebagai kunci jawaban tidak boleh kosong.", "danger");
       return;
     }
 
     // 4. Validasi Jumlah Pilihan yang Terisi (Minimal 2 pilihan)
     const filledChoicesCount = Object.values(formValues.choices).filter(c => c.text && c.text.replace(/<[^>]*>/g, '').trim() !== "").length;
     if (filledChoicesCount < 2) {
-      alert("Gagal menyimpan! Minimal harus mengisi atau membuat 2 pilihan jawaban.");
+      showAlert("Gagal", "Minimal harus mengisi atau membuat 2 pilihan jawaban.", "danger");
       return;
     }
 
@@ -438,7 +450,7 @@ const QuestionsPage = () => {
       }
       setIsDialogOpen(false);
     } catch (error) {
-      alert("Gagal menyimpan soal.");
+      showAlert("Gagal", "Gagal menyimpan soal.", "danger");
     }
   };
 
@@ -453,7 +465,7 @@ const QuestionsPage = () => {
     try {
       await remove(ref(database, `questions/${questionToDelete.id}`));
     } catch (error) {
-      alert("Gagal menghapus soal.");
+      showAlert("Gagal", "Gagal menghapus soal.", "danger");
     } finally {
       setIsDeleting(false);
       setDeleteDialogOpen(false);
@@ -476,7 +488,7 @@ const QuestionsPage = () => {
         await update(qRef, updates);
       }
     } catch (error) {
-      alert("Gagal menghapus semua soal.");
+      showAlert("Gagal", "Gagal menghapus semua soal.", "danger");
     } finally {
       setIsDeleting(false);
       setDeleteAllDialogOpen(false);
@@ -556,9 +568,9 @@ const QuestionsPage = () => {
         message += `\n\n⚠️ Soal nomor [${duplicates.join(", ")}] dilewati karena sudah ada (Duplikat).`;
       }
 
-      alert(message);
+      showAlert("Import Berhasil", message, "success");
     } catch (err: any) {
-      alert(err.message || "Gagal mengimport Word.");
+      showAlert("Gagal Import", err.message || "Gagal mengimport Word.", "danger");
     } finally {
       setIsImporting(false);
     }
@@ -617,6 +629,14 @@ const QuestionsPage = () => {
                     className="flex items-center gap-2 p-2 hover:bg-slate-50 text-slate-700 text-sm rounded-lg transition-all"
                   >
                     <Download className="h-4 w-4 text-indigo-600" /> Download Template
+                  </a>
+                  <a
+                    href="/templates/Template_Soal_Tabel.docx"
+                    download="Template_Soal_Tabel.docx"
+                    onClick={() => setIsImportMenuOpen(false)}
+                    className="flex items-center gap-2 p-2 hover:bg-slate-50 text-slate-700 text-sm rounded-lg transition-all"
+                  >
+                    <Download className="h-4 w-4 text-emerald-600" /> Download Template (Menu Tabel)
                   </a>
                 </div>
               </>

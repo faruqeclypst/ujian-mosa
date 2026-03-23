@@ -87,6 +87,7 @@ const ExamRoomsPage = () => {
   const [expandedSiswa, setExpandedSiswa] = useState<string | null>(null); // NISN
   const [answersList, setAnswersList] = useState<Record<string, any>>({}); // { nisn: answers }
   const [monitorSortBy, setMonitorSortBy] = useState<"default" | "nilai" | "login" | "nama">("default");
+  const [monitorClassFilter, setMonitorClassFilter] = useState<string>("all");
 
   const [universalToken, setUniversalToken] = useState("");
 
@@ -104,8 +105,19 @@ const ExamRoomsPage = () => {
         universal_token_updated_at: Date.now()
       });
     } catch (e) {
-      alert("Gagal memperbarui token.");
+      showAlert("Gagal", "Gagal memperbarui token universal.", "danger");
     }
+  };
+
+  const showAlert = (title: string, description: string, type: "success" | "danger" | "warning" | "info" = "info") => {
+    setConfirmDialog({
+      isOpen: true,
+      title,
+      description,
+      type,
+      confirmLabel: "OK",
+      onConfirm: () => {}
+    });
   };
 
   const columns = [
@@ -153,7 +165,9 @@ const ExamRoomsPage = () => {
       onConfirm: async () => {
         try {
           await update(ref(database, `exam_rooms/${room.id}`), { status: "archive" });
-        } catch (error) { alert("Gagal mengarsipkan."); }
+        } catch (error) { 
+          showAlert("Gagal", "Gagal mengarsipkan ruang ujian.", "danger");
+        }
       }
     });
   };
@@ -168,7 +182,9 @@ const ExamRoomsPage = () => {
       onConfirm: async () => {
         try {
           await update(ref(database, `exam_rooms/${room.id}`), { status: null });
-        } catch (error) { alert("Gagal membuka arsip."); }
+        } catch (error) { 
+          showAlert("Gagal", "Gagal membuka arsip ruang ujian.", "danger");
+        }
       }
     });
   };
@@ -176,15 +192,28 @@ const ExamRoomsPage = () => {
   const handleExportExcel = () => {
     if (!monitorRoom) return;
 
-    // 1. Headers array
+    const workbook = XLSX.utils.book_new();
     const header = ["No", "NISN", "Nama Siswa", "Kelas", "Jam Login", "Jam Submit", "Cheat Count", "Benar", "Salah", "Nilai"];
     monitorQuestions.forEach((q, idx) => header.push(`Soal ${idx + 1}`));
 
-    // 2. Rows array
-    const rows = attempts.map((att, idx) => {
+    const headerStyle = {
+      font: { bold: true, color: { rgb: "FFFFFF" } },
+      fill: { patternType: "solid", fgColor: { rgb: "16A34A" } },
+      alignment: { horizontal: "center", vertical: "center" },
+      border: {
+        top: { style: "thin", color: { rgb: "E2E8F0" } },
+        bottom: { style: "thin", color: { rgb: "E2E8F0" } }
+      }
+    };
+
+    const colsWidths = [
+      { wch: 4 }, { wch: 15 }, { wch: 25 }, { wch: 12 }, { wch: 11 }, { wch: 11 }, { wch: 11 }, { wch: 7 }, { wch: 7 }, { wch: 7 }
+    ];
+    monitorQuestions.forEach(() => colsWidths.push({ wch: 8 }));
+
+    const generateRowData = (att: any, idx: number) => {
       const siswa = students.find((s) => String(s.nisn).trim() === String(att.nisn).trim());
       const sisAnswers = answersList[att.nisn] || {};
-
       const kelasObj = piketClasses.find(c => c.id === (siswa ? siswa.classId : ""));
       const className = kelasObj ? kelasObj.name : "-";
 
@@ -197,107 +226,94 @@ const ExamRoomsPage = () => {
       });
       const score = monitorQuestions.length > 0 ? (correct / monitorQuestions.length) * 100 : 0;
 
-      const rowData = [
-        idx + 1,
-        att.nisn,
-        siswa ? siswa.name : "Siswa Tidak Ditemukan",
-        className,
-        att.start_time ? new Date(att.start_time).toLocaleTimeString("id-ID") : "-",
-        att.submit_time ? new Date(att.submit_time).toLocaleTimeString("id-ID") : (att.status === "submitted" || att.status === "graded" ? "Selesai" : "-"),
-        att.cheatCount || 0,
-        correct,
-        wrong,
-        score.toFixed(1)
+      const row = [
+        idx + 1, att.nisn, siswa ? siswa.name : "N/A", className,
+        att.startTime ? new Date(att.startTime).toLocaleTimeString("id-ID") : "-",
+        att.submit_time ? new Date(att.submit_time).toLocaleTimeString("id-ID") : (att.status === "submitted" ? "Selesai" : "-"),
+        att.cheatCount || 0, correct, wrong, score.toFixed(1)
       ];
-
       monitorQuestions.forEach((q) => {
         const ans = sisAnswers[q.id];
-        rowData.push(ans ? ans.toUpperCase() : "-");
+        row.push(ans ? ans.toUpperCase() : "-");
       });
-
-      return rowData;
-    });
-
-    const worksheet = XLSX.utils.aoa_to_sheet([header, ...rows]);
-    
-    // 🎨 STYLING HEADER (Sheet 1)
-    const headerStyle = {
-      font: { bold: true, color: { rgb: "FFFFFF" } },
-      fill: { patternType: "solid", fgColor: { rgb: "16A34A" } }, // Hijau rapi
-      alignment: { horizontal: "center", vertical: "center" },
-      border: {
-        top: { style: "thin", color: { rgb: "E2E8F0" } },
-        bottom: { style: "thin", color: { rgb: "E2E8F0" } }
-      }
+      return row;
     };
 
-    for (let c = 0; c < header.length; c++) {
-      const addr = XLSX.utils.encode_cell({ r: 0, c: c });
-      if (worksheet[addr]) (worksheet[addr] as any).s = headerStyle;
-    }
-
-    // 🔴 MEWARNAI JAWABAN SALAH (Highlight Red)
-    attempts.forEach((att, rIdx) => {
-      const sisAnswers = answersList[att.nisn] || {};
-      
-      monitorQuestions.forEach((q, qIdx) => {
-        const ans = sisAnswers[q.id];
-        const isCorrect = ans && q.choices[ans]?.isCorrect === true;
-        const colIdx = 10 + qIdx; // Kolom Soal dimulai dari indeks 10
-        const cellAddress = XLSX.utils.encode_cell({ r: rIdx + 1, c: colIdx });
-
-        if (!isCorrect && ans && worksheet[cellAddress]) {
-            worksheet[cellAddress].s = {
-                fill: { patternType: "solid", fgColor: { rgb: "FCA5A5" } }, // Merah Merona
-                font: { color: { rgb: "991B1B" } } // Tulisan Merah Gelap
-            };
-        }
+    const applyStyles = (ws: XLSX.WorkSheet, rowsCount: number, atts: any[]) => {
+      // Style header
+      for (let c = 0; c < header.length; c++) {
+        const addr = XLSX.utils.encode_cell({ r: 0, c: c });
+        if (ws[addr]) (ws[addr] as any).s = headerStyle;
+      }
+      // Style wrong answers
+      atts.forEach((att: any, rIdx: number) => {
+        const sisAnswers = answersList[att.nisn] || {};
+        monitorQuestions.forEach((q, qIdx) => {
+          const ans = sisAnswers[q.id];
+          const isCorrect = ans && q.choices[ans]?.isCorrect === true;
+          if (!isCorrect && ans) {
+            const cellAddr = XLSX.utils.encode_cell({ r: rIdx + 1, c: 10 + qIdx });
+            if (ws[cellAddr]) {
+              (ws[cellAddr] as any).s = {
+                fill: { patternType: "solid", fgColor: { rgb: "FCA5A5" } },
+                font: { color: { rgb: "991B1B" } }
+              };
+            }
+          }
+        });
       });
+      (ws as any)["!cols"] = colsWidths;
+    };
+
+    // 1. OVERALL SHEET
+    const overallRows = attempts.map((att, idx) => generateRowData(att, idx));
+    const wsOverall = XLSX.utils.aoa_to_sheet([header, ...overallRows]);
+    applyStyles(wsOverall, overallRows.length, attempts);
+    XLSX.utils.book_append_sheet(workbook, wsOverall, "Overall");
+
+    // 2. PER-CLASS SHEETS
+    // Get unique classes from attempts
+    const classIdsInAttempts = Array.from(new Set(attempts.map(att => {
+      const s = students.find(siswa => siswa.nisn === att.nisn);
+      return s ? s.classId : null;
+    }).filter(Boolean)));
+
+    classIdsInAttempts.forEach(cId => {
+      const classAttempts = attempts.filter(att => {
+        const s = students.find(siswa => siswa.nisn === att.nisn);
+        return s?.classId === cId;
+      });
+      const className = piketClasses.find(c => c.id === cId)?.name || "Lainnya";
+      const classRows = classAttempts.map((att, idx) => generateRowData(att, idx));
+      const wsClass = XLSX.utils.aoa_to_sheet([header, ...classRows]);
+      applyStyles(wsClass, classRows.length, classAttempts);
+      // Sheet name limit is 31 chars
+      XLSX.utils.book_append_sheet(workbook, wsClass, className.substring(0, 31));
     });
 
-    // 📏 SET LEBAR KOLOM (Column Widths)
-    const colsWidths: any[] = [
-      { wch: 4 },  // No
-      { wch: 15 }, // NISN
-      { wch: 25 }, // Nama Siswa
-      { wch: 12 }, // Kelas
-      { wch: 11 }, // Jam Login
-      { wch: 11 }, // Jam Submit
-      { wch: 11 }, // Cheat Count
-      { wch: 7 },  // Benar
-      { wch: 7 },  // Salah
-      { wch: 7 },  // Nilai
-    ];
-    monitorQuestions.forEach(() => colsWidths.push({ wch: 8 }));
-    (worksheet as any)["!cols"] = colsWidths;
-
-    // 📄 SHEET 2: Siswa Yang Belum Mengerjakan
+    // 3. BELUM MENGERJAKAN SHEET
     const allowedIds = monitorRoom.allClasses ? [] : monitorRoom.classId ? monitorRoom.classId.split(",") : [];
     const classStudents = students.filter(s => monitorRoom.allClasses || allowedIds.includes(s.classId));
     const takenNisns = attempts.map(att => att.nisn);
     const notTakenStudents = classStudents.filter(s => !takenNisns.includes(s.nisn));
 
-    const notTakenHeader = ["No", "NISN", "Nama Siswa", "Kelas", "Keterangan"];
-    const notTakenRows = notTakenStudents.map((s, idx) => {
-      const kelasObj = piketClasses.find(c => c.id === s.classId);
-      return [
-        idx + 1, s.nisn, s.name, kelasObj ? kelasObj.name : "-", "Belum Mengerjakan"
-      ];
+    const ntHeader = ["No", "NISN", "Nama Siswa", "Kelas", "Keterangan"];
+    const ntRows = notTakenStudents.map((s, idx) => {
+      const cObj = piketClasses.find(c => c.id === s.classId);
+      return [idx + 1, s.nisn, s.name, cObj ? cObj.name : "-", "Belum Mengerjakan"];
     });
-
-    const worksheetNotTaken = XLSX.utils.aoa_to_sheet([notTakenHeader, ...notTakenRows]);
-    
-    for (let c = 0; c < notTakenHeader.length; c++) {
+    const wsNT = XLSX.utils.aoa_to_sheet([ntHeader, ...ntRows]);
+    for (let c = 0; c < ntHeader.length; c++) {
       const addr = XLSX.utils.encode_cell({ r: 0, c: c });
-      if (worksheetNotTaken[addr]) (worksheetNotTaken[addr] as any).s = headerStyle;
+      if (wsNT[addr]) (wsNT[addr] as any).s = headerStyle;
     }
-    (worksheetNotTaken as any)["!cols"] = [{ wch: 4 }, { wch: 15 }, { wch: 25 }, { wch: 12 }, { wch: 20 }];
+    (wsNT as any)["!cols"] = [{ wch: 4 }, { wch: 15 }, { wch: 25 }, { wch: 12 }, { wch: 20 }];
+    XLSX.utils.book_append_sheet(workbook, wsNT, "Belum Mengerjakan");
 
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Nilai Siswa");
-    XLSX.utils.book_append_sheet(workbook, worksheetNotTaken, "Belum Mengerjakan");
     XLSX.writeFile(workbook, `Nilai_Ujian_${monitorRoom.examTitle || "Ruang"}.xlsx`);
   };
+
+
 
   const handleForceSubmitAll = () => {
     if (!monitorRoom) return;
@@ -330,9 +346,9 @@ const ExamRoomsPage = () => {
             updates[`attempts/${att.id}/submit_time`] = now;
           });
           await update(ref(database), updates);
-          alert(`${ongoing.length} siswa berhasil diselesaikan secara paksa.`);
+          showAlert("Berhasil", `${ongoing.length} siswa berhasil diselesaikan secara paksa.`, "success");
         } catch (error) {
-          alert("Gagal menyelesaikan paksa ujian siswa.");
+          showAlert("Gagal", "Gagal menyelesaikan paksa ujian siswa.", "danger");
         }
       }
     });
@@ -556,7 +572,7 @@ const ExamRoomsPage = () => {
       }
       setIsDialogOpen(false);
     } catch (error) {
-      alert("Gagal menyimpan ruang ujian.");
+      showAlert("Gagal", "Gagal menyimpan ruang ujian.", "danger");
     }
   };
 
@@ -578,9 +594,9 @@ const ExamRoomsPage = () => {
         status: "ongoing",
         cheatCount: 0
       });
-      alert("Siswa berhasil diunlock.");
+      showAlert("Berhasil", "Siswa berhasil diunlock.", "success");
     } catch (error) {
-      alert("Gagal mengunlock siswa.");
+      showAlert("Gagal", "Gagal mengunlock siswa.", "danger");
     }
   };
 
@@ -591,9 +607,9 @@ const ExamRoomsPage = () => {
       await update(ref(database, `attempts/${attemptId}`), {
         cheatCount: 0
       });
-      alert("Pelanggaran siswa berhasil direset.");
+      showAlert("Berhasil", "Pelanggaran siswa berhasil direset.", "success");
     } catch (error) {
-       alert("Gagal mereset cheat count.");
+       showAlert("Gagal", "Gagal mereset cheat count.", "danger");
     }
   };
 
@@ -604,9 +620,9 @@ const ExamRoomsPage = () => {
        const attemptId = `${nisn}_${monitorRoom.id}`;
        await remove(ref(database, `attempts/${attemptId}`));
        await remove(ref(database, `answers/${attemptId}`));
-       alert("Sesi siswa berhasil direset.");
+       showAlert("Berhasil", "Sesi siswa berhasil direset.", "success");
      } catch (error) {
-        alert("Gagal mereset sesi.");
+        showAlert("Gagal", "Gagal mereset sesi.", "danger");
      }
   };
 
@@ -616,7 +632,7 @@ const ExamRoomsPage = () => {
     try {
       await remove(ref(database, `exam_rooms/${roomToDelete.id}`));
     } catch (error) {
-      alert("Gagal menghapus ruang ujian.");
+      showAlert("Gagal", "Gagal menghapus ruang ujian.", "danger");
     } finally {
       setIsDeleting(false);
       setDeleteDialogOpen(false);
@@ -870,8 +886,24 @@ const ExamRoomsPage = () => {
           </DialogHeader>
           <div className="flex justify-between items-center mb-2">
             <p className="text-xs text-slate-500">Kelas: {monitorRoom?.className}</p>
-            <div className="flex items-center gap-2 text-xs">
-              <span className="text-slate-600 font-medium">Urutkan:</span>
+            <div className="flex items-center gap-2 text-xs flex-wrap">
+              {(monitorRoom?.allClasses || (monitorRoom?.classId && monitorRoom.classId.includes(","))) && (
+                <>
+                  <span className="text-slate-600 font-medium">Filter Kelas:</span>
+                  <select 
+                    value={monitorClassFilter} 
+                    onChange={(e) => setMonitorClassFilter(e.target.value)} 
+                    className="p-1 border rounded bg-white"
+                  >
+                    <option value="all">Semua Terdaftar</option>
+                    {piketClasses
+                      .filter(c => monitorRoom?.allClasses || monitorRoom?.classId?.split(",").includes(c.id))
+                      .map(c => <option key={c.id} value={c.id}>{c.name}</option>)
+                    }
+                  </select>
+                </>
+              )}
+              <span className="text-slate-600 font-medium ml-2">Urutkan:</span>
               <select 
                 value={monitorSortBy} 
                 onChange={(e) => setMonitorSortBy(e.target.value as any)} 
@@ -898,6 +930,7 @@ const ExamRoomsPage = () => {
                   <th className="p-3 text-left font-semibold w-12">No</th>
                   <th className="p-3 text-left font-semibold">NISN</th>
                   <th className="p-3 text-left font-semibold">Nama Siswa</th>
+                  <th className="p-3 text-left font-semibold">Kelas</th>
                   <th className="p-3 text-left font-semibold">Waktu Login</th>
                   <th className="p-3 text-left font-semibold">Status</th>
                   <th className="p-3 text-left font-semibold">Nilai</th>
@@ -908,7 +941,18 @@ const ExamRoomsPage = () => {
               </thead>
               <tbody>
                 {students
-                  .filter((s) => monitorRoom?.allClasses || s.classId === monitorRoom?.classId)
+                  .filter((s) => {
+                    if (monitorRoom?.allClasses) {
+                      if (monitorClassFilter !== "all" && s.classId !== monitorClassFilter) return false;
+                      return true;
+                    }
+                    if (!monitorRoom?.classId) return false;
+                    const allowedIds = monitorRoom.classId.split(",");
+                    if (!allowedIds.includes(s.classId)) return false;
+                    
+                    if (monitorClassFilter !== "all" && s.classId !== monitorClassFilter) return false;
+                    return true;
+                  })
                   .sort((a, b) => {
                     const attA = attempts.find((at) => at.id === `${a.nisn}_${monitorRoom?.id}`);
                     const attB = attempts.find((at) => at.id === `${b.nisn}_${monitorRoom?.id}`);
@@ -957,6 +1001,9 @@ const ExamRoomsPage = () => {
                           <td className="p-3 font-medium text-slate-500">{index + 1}</td>
                           <td className="p-3">{siswa.nisn}</td>
                           <td className="p-3 font-medium">{siswa.name}</td>
+                          <td className="p-3 text-xs font-semibold text-slate-500 whitespace-nowrap">
+                            {piketClasses.find(c => c.id === siswa.classId)?.name || "-"}
+                          </td>
                           <td className="p-3 text-slate-500">{loginTime}</td>
                           <td className="p-3">{statusLabel}</td>
                           <td className="p-3 font-semibold text-blue-600">{attempt?.score !== undefined ? attempt.score : "-"}</td>
@@ -996,7 +1043,7 @@ const ExamRoomsPage = () => {
                         </tr>
                         {expandedSiswa === siswa.nisn && (
                           <tr>
-                            <td colSpan={9} className="bg-slate-50 p-4 border-b">
+                            <td colSpan={10} className="bg-slate-50 p-4 border-b">
                               <h4 className="text-xs font-bold text-slate-600 mb-2">Jawaban Siswa ({monitorQuestions.length} Soal)</h4>
                               <div className="max-h-80 overflow-y-auto pr-2">
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2">

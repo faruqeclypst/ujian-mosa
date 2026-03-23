@@ -8,6 +8,7 @@ import GuruForm, { GuruSubmitPayload } from "../components/piket/GuruForm";
 import GuruTable from "../components/tables/GuruTable";
 import { ImportButton } from "../components/ui/import-button";
 import { ExportButton } from "../components/ui/export-button";
+import { ConfirmationDialog } from "../components/ui/confirmation-dialog";
 import { downloadGuruImportTemplate, exportGuruToExcel, parseGuruImportExcel } from "../lib/guruExcel";
 import type { Teacher } from "../types/piket";
 
@@ -22,6 +23,22 @@ const GuruPage = () => {
   const [teacherToDelete, setTeacherToDelete] = useState<Teacher | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
+
+  const [alertDialog, setAlertDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    description: string;
+    type: "success" | "danger" | "warning" | "info";
+  }>({
+    isOpen: false,
+    title: "",
+    description: "",
+    type: "info",
+  });
+
+  const showAlert = (title: string, description: string, type: "success" | "danger" | "warning" | "info" = "info") => {
+    setAlertDialog({ isOpen: true, title, description, type });
+  };
 
   const handleCreateClick = () => {
     setDialogMode("create");
@@ -55,7 +72,7 @@ const GuruPage = () => {
       closeDialog();
     } catch (error) {
       console.error("Gagal menyimpan data guru", error);
-      alert("Gagal menyimpan data guru.");
+      showAlert("Gagal", "Gagal menyimpan data guru.", "danger");
     }
   };
 
@@ -66,7 +83,7 @@ const GuruPage = () => {
       await deleteTeacher(teacherToDelete.id);
     } catch (error) {
       console.error("Gagal menghapus guru", error);
-      alert("Gagal menghapus guru.");
+      showAlert("Gagal", "Gagal menghapus data guru.", "danger");
     } finally {
       setIsDeleting(false);
       setDeleteDialogOpen(false);
@@ -78,7 +95,7 @@ const GuruPage = () => {
     setIsImporting(true);
     try {
       const parsed = await parseGuruImportExcel(file);
-      if (parsed.length === 0) return alert("File kosong!");
+      if (parsed.length === 0) return showAlert("File Kosong", "File yang Anda upload kosong atau tidak valid.", "warning");
       for (const row of parsed) {
         await createTeacher({
           name: row.name,
@@ -86,9 +103,9 @@ const GuruPage = () => {
           subjects: row.subjects,
         });
       }
-      alert(`${parsed.length} guru berhasil diimport.`);
+      showAlert("Import Berhasil", `${parsed.length} guru berhasil diimport.`, "success");
     } catch (err: any) {
-      alert(err.message || "Gagal mengimport data guru.");
+      showAlert("Gagal Import", err.message || "Gagal mengimport data guru.", "danger");
     } finally {
       setIsImporting(false);
     }
@@ -156,6 +173,17 @@ const GuruPage = () => {
         description="Apakah Anda yakin ingin menghapus data guru ini? Data jadwal yang sudah dibuat menggunakan guru ini mungkin akan kehilangan referensi."
         itemName={`Guru ${teacherToDelete?.name || ""}`}
         isLoading={isDeleting}
+      />
+
+      <ConfirmationDialog
+        isOpen={alertDialog.isOpen}
+        onClose={() => setAlertDialog({ ...alertDialog, isOpen: false })}
+        onConfirm={() => setAlertDialog({ ...alertDialog, isOpen: false })}
+        title={alertDialog.title}
+        description={alertDialog.description}
+        type={alertDialog.type}
+        confirmLabel="OK"
+        showCancel={false}
       />
     </div>
   );

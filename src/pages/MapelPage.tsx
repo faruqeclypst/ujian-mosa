@@ -8,6 +8,7 @@ import MapelForm, { MapelFormValues } from "../components/piket/MapelForm";
 import MapelTable from "../components/tables/MapelTable";
 import { ImportButton } from "../components/ui/import-button";
 import { ExportButton } from "../components/ui/export-button";
+import { ConfirmationDialog } from "../components/ui/confirmation-dialog";
 import { downloadMapelImportTemplate, exportMapelToExcel, parseMapelImportExcel } from "../lib/mapelExcel";
 import type { SubjectData } from "../types/piket";
 
@@ -21,7 +22,23 @@ const MapelPage = () => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [mapelToDelete, setMapelToDelete] = useState<SubjectData | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [isImporting, setIsImporting] = useState(false); // <--- added
+  const [isImporting, setIsImporting] = useState(false);
+
+  const [alertDialog, setAlertDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    description: string;
+    type: "success" | "danger" | "warning" | "info";
+  }>({
+    isOpen: false,
+    title: "",
+    description: "",
+    type: "info",
+  });
+
+  const showAlert = (title: string, description: string, type: "success" | "danger" | "warning" | "info" = "info") => {
+    setAlertDialog({ isOpen: true, title, description, type });
+  };
 
   const handleCreateClick = () => {
     setDialogMode("create");
@@ -55,7 +72,7 @@ const MapelPage = () => {
       closeDialog();
     } catch (error) {
       console.error("Gagal menyimpan data mapel", error);
-      alert("Gagal menyimpan data mata pelajaran.");
+      showAlert("Gagal", "Gagal menyimpan data mata pelajaran.", "danger");
     }
   };
 
@@ -66,7 +83,7 @@ const MapelPage = () => {
       await deleteMapel(mapelToDelete.id);
     } catch (error) {
       console.error("Gagal menghapus mapel", error);
-      alert("Gagal menghapus mata pelajaran.");
+      showAlert("Gagal", "Gagal menghapus mata pelajaran.", "danger");
     } finally {
       setIsDeleting(false);
       setDeleteDialogOpen(false);
@@ -78,13 +95,13 @@ const MapelPage = () => {
     setIsImporting(true);
     try {
       const parsed = await parseMapelImportExcel(file);
-      if (parsed.length === 0) return alert("File kosong!");
+      if (parsed.length === 0) return showAlert("File Kosong", "File yang Anda upload kosong atau tidak valid.", "warning");
       for (const row of parsed) {
         await createMapel({ name: row.name });
       }
-      alert(`${parsed.length} mata pelajaran berhasil diimport.`);
+      showAlert("Import Berhasil", `${parsed.length} mata pelajaran berhasil diimport.`, "success");
     } catch (err: any) {
-      alert(err.message || "Gagal mengimport mapel.");
+      showAlert("Gagal Import", err.message || "Gagal mengimport mapel.", "danger");
     } finally {
       setIsImporting(false);
     }
@@ -146,6 +163,17 @@ const MapelPage = () => {
         description="Apakah Anda yakin ingin menghapus data mata pelajaran ini?"
         itemName={`Mapel ${mapelToDelete?.name || ""}`}
         isLoading={isDeleting}
+      />
+
+      <ConfirmationDialog
+        isOpen={alertDialog.isOpen}
+        onClose={() => setAlertDialog({ ...alertDialog, isOpen: false })}
+        onConfirm={() => setAlertDialog({ ...alertDialog, isOpen: false })}
+        title={alertDialog.title}
+        description={alertDialog.description}
+        type={alertDialog.type}
+        confirmLabel="OK"
+        showCancel={false}
       />
     </div>
   );

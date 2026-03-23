@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { usePiket } from "../context/PiketContext";
 import { Button } from "../components/ui/button";
 import { DeleteConfirmationDialog } from "../components/ui/delete-confirmation-dialog";
+import { ConfirmationDialog } from "../components/ui/confirmation-dialog";
 import SiswaTable from "../components/tables/SiswaTable";
 import { ExportButton } from "../components/ui/export-button";
 import { exportSiswaToExcel } from "../lib/siswaExcel";
@@ -20,6 +21,25 @@ const AlumniPage = () => {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isBatchOpen, setIsBatchOpen] = useState(false);
   const [targetClassId, setTargetClassId] = useState<string>("");
+
+  const [alertDialog, setAlertDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    description: string;
+    type: "success" | "danger" | "warning" | "info";
+    onConfirm?: () => void;
+    showCancel?: boolean;
+    confirmLabel?: string;
+  }>({
+    isOpen: false,
+    title: "",
+    description: "",
+    type: "info",
+  });
+
+  const showAlert = (title: string, description: string, type: "success" | "danger" | "warning" | "info" = "info", onConfirm?: () => void, showCancel: boolean = false, confirmLabel: string = "OK") => {
+    setAlertDialog({ isOpen: true, title, description, type, onConfirm, showCancel, confirmLabel });
+  };
 
   const mappedStudents = useMemo(() => {
     return students
@@ -53,12 +73,21 @@ const AlumniPage = () => {
   };
 
   const handleRestore = async (id: string) => {
-    if (!window.confirm("Kembalikan siswa ini ke status Aktif (Tanpa Kelas)?")) return;
-    try {
-      await updateStudent(id, { classId: "" });
-    } catch (err) {
-      console.error(err);
-    }
+    showAlert(
+      "Pulihkan Siswa",
+      "Kembalikan siswa ini ke status Aktif (Tanpa Kelas)?",
+      "warning",
+      async () => {
+        try {
+          await updateStudent(id, { classId: "" });
+        } catch (err) {
+          console.error(err);
+          showAlert("Gagal", "Gagal memulihkan siswa.", "danger");
+        }
+      },
+      true,
+      "Ya, Pulihkan"
+    );
   };
 
   const handleBatchUpdateClass = async () => {
@@ -70,19 +99,28 @@ const AlumniPage = () => {
       setTargetClassId("");
     } catch (error) {
       console.error("Gagal memindahkan alumni", error);
-      alert("Gagal memindahkan alumni.");
+      showAlert("Gagal", "Gagal memindahkan alumni.", "danger");
     }
   };
 
   const handleBatchRestore = async () => {
     if (selectedIds.length === 0) return;
-    if (!window.confirm(`Kembalikan ${selectedIds.length} alumni ini ke status Aktif (Tanpa Kelas)?`)) return;
-    try {
-      await updateStudentClassBatch(selectedIds, "");
-      setSelectedIds([]);
-    } catch (error) {
-      console.error("Gagal memulihkan alumni", error);
-    }
+    showAlert(
+      "Pulihkan Alumni Massal",
+      `Kembalikan ${selectedIds.length} alumni ini ke status Aktif (Tanpa Kelas)?`,
+      "warning",
+      async () => {
+        try {
+          await updateStudentClassBatch(selectedIds, "");
+          setSelectedIds([]);
+        } catch (error) {
+          console.error("Gagal memulihkan alumni", error);
+          showAlert("Gagal", "Gagal memulihkan alumni.", "danger");
+        }
+      },
+      true,
+      "Ya, Pulihkan"
+    );
   };
 
   return (
@@ -191,6 +229,20 @@ const AlumniPage = () => {
         description="Apakah Anda yakin ingin menghapus data alumni ini?" 
         itemName={studentToDelete?.name || ""} 
         isLoading={isDeleting} 
+      />
+
+      <ConfirmationDialog
+        isOpen={alertDialog.isOpen}
+        onClose={() => setAlertDialog({ ...alertDialog, isOpen: false })}
+        onConfirm={() => {
+          if (alertDialog.onConfirm) alertDialog.onConfirm();
+          setAlertDialog({ ...alertDialog, isOpen: false });
+        }}
+        title={alertDialog.title}
+        description={alertDialog.description}
+        type={alertDialog.type}
+        confirmLabel={alertDialog.confirmLabel || "OK"}
+        showCancel={alertDialog.showCancel}
       />
     </div>
   );

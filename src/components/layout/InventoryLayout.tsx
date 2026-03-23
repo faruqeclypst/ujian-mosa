@@ -32,10 +32,7 @@ const InventoryLayout = ({ children }: InventoryLayoutProps) => {
           )}
           style={{ zIndex: 1 }}
         >
-          <div className={cn(
-            "w-full mx-auto transition-all duration-300 ease-in-out",
-            isCollapsed ? "max-w-none" : "max-w-7xl"
-          )}>
+          <div className="w-full mx-auto transition-all duration-300 ease-in-out">
             {children ?? <Outlet />}
           </div>
         </motion.main>

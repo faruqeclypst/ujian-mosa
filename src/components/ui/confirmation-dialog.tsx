@@ -13,6 +13,7 @@ export interface ConfirmationDialogProps {
   cancelLabel?: string;
   type?: "danger" | "warning" | "info" | "success";
   isLoading?: boolean;
+  showCancel?: boolean;
 }
 
 export const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
@@ -25,6 +26,7 @@ export const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
   cancelLabel = "Batal",
   type = "info",
   isLoading = false,
+  showCancel = true,
 }) => {
   const icons = {
     danger: <AlertOctagon className="h-5 w-5 text-red-600" />,
@@ -34,10 +36,10 @@ export const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
   };
 
   const bgColors = {
-    danger: "bg-red-100",
-    warning: "bg-amber-100",
-    info: "bg-blue-100",
-    success: "bg-green-100",
+    danger: "bg-red-100 dark:bg-red-900/20",
+    warning: "bg-amber-100 dark:bg-amber-900/20",
+    info: "bg-blue-100 dark:bg-blue-900/20",
+    success: "bg-green-100 dark:bg-green-900/20",
   };
 
   const btnVariants = {
@@ -54,40 +56,59 @@ export const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
     success: "bg-green-600 hover:bg-green-700 text-white",
   };
 
+  const iconColors = {
+    danger: "text-red-600",
+    warning: "text-amber-600",
+    info: "text-blue-600",
+    success: "text-green-600",
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md bg-white">
-        <DialogHeader>
-          <div className="flex items-center gap-3">
-            <div className={`flex h-10 w-10 items-center justify-center rounded-full ${bgColors[type]}`}>
-              {icons[type]}
+      <DialogContent className="sm:max-w-md bg-white dark:bg-slate-900 !p-7 sm:!p-8">
+        <DialogHeader className="space-y-4">
+          <div className="flex items-center gap-4 text-left">
+            <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${bgColors[type]}`}>
+              {React.cloneElement(icons[type] as React.ReactElement, { 
+                className: `h-6 w-6 ${iconColors[type]}` 
+              })}
             </div>
             <div>
-              <DialogTitle className="text-lg font-semibold text-gray-900">
+              <DialogTitle className="text-xl font-bold text-gray-900 dark:text-gray-100">
                 {title}
               </DialogTitle>
             </div>
           </div>
-          <DialogDescription className="mt-2 text-sm text-gray-600">
+          <DialogDescription className="text-base text-gray-600 dark:text-gray-400 text-left leading-relaxed pt-2">
             {description}
           </DialogDescription>
         </DialogHeader>
 
-        <DialogFooter className="flex gap-2 sm:justify-end mt-4">
-          <Button type="button" variant="outline" onClick={onClose} disabled={isLoading}>
-            {cancelLabel}
-          </Button>
+        <DialogFooter className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end mt-10">
+          {showCancel && (
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={onClose} 
+              disabled={isLoading}
+              className="h-11 px-6 text-sm font-medium"
+            >
+              {cancelLabel}
+            </Button>
+          )}
           <Button
             type="button"
             variant={btnVariants[type]}
             onClick={onConfirm}
             disabled={isLoading}
-            className={btnClasses[type]}
+            className={`${btnClasses[type]} h-11 px-6 text-sm font-medium ${!showCancel ? "w-full" : ""}`}
           >
             {isLoading ? "Memuat..." : confirmLabel}
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
   );
 };
+

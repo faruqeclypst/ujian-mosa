@@ -8,6 +8,7 @@ import SiswaForm, { SiswaFormValues } from "../components/piket/SiswaForm";
 import SiswaTable from "../components/tables/SiswaTable";
 import { ImportButton } from "../components/ui/import-button";
 import { ExportButton } from "../components/ui/export-button";
+import { ConfirmationDialog } from "../components/ui/confirmation-dialog";
 import { downloadSiswaImportTemplate, exportSiswaToExcel, parseSiswaImportExcel } from "../lib/siswaExcel";
 import type { StudentData } from "../types/piket";
 import { Select } from "../components/ui/select";
@@ -39,6 +40,22 @@ const SiswaPage = () => {
   const [filterClassId, setFilterClassId] = useState<string>("");
 
   const [isImporting, setIsImporting] = useState(false);
+
+  const [alertDialog, setAlertDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    description: string;
+    type: "success" | "danger" | "warning" | "info";
+  }>({
+    isOpen: false,
+    title: "",
+    description: "",
+    type: "info",
+  });
+
+  const showAlert = (title: string, description: string, type: "success" | "danger" | "warning" | "info" = "info") => {
+    setAlertDialog({ isOpen: true, title, description, type });
+  };
 
   const mappedStudents = useMemo(() => {
     const filtered = filterClassId 
@@ -95,7 +112,7 @@ const SiswaPage = () => {
       closeDialog();
     } catch (error) {
       console.error("Gagal menyimpan data siswa", error);
-      alert("Gagal menyimpan data siswa.");
+      showAlert("Gagal", "Gagal menyimpan data siswa.", "danger");
     }
   };
 
@@ -106,7 +123,7 @@ const SiswaPage = () => {
       await deleteStudent(studentToDelete.id);
     } catch (error) {
       console.error("Gagal menghapus siswa", error);
-      alert("Gagal menghapus siswa.");
+      showAlert("Gagal", "Gagal menghapus data siswa.", "danger");
     } finally {
       setIsDeleting(false);
       setDeleteDialogOpen(false);
@@ -123,7 +140,7 @@ const SiswaPage = () => {
       setTargetClassId("");
     } catch (error) {
       console.error("Gagal melakukan pemindahan siswa", error);
-      alert("Gagal melakukan pemindahan siswa.");
+      showAlert("Gagal", "Gagal melakukan pemindahan siswa.", "danger");
     }
   };
 
@@ -131,18 +148,18 @@ const SiswaPage = () => {
     setIsImporting(true);
     try {
       const parsed = await parseSiswaImportExcel(file, classes);
-      if (parsed.length === 0) return alert("File kosong atau format kelas tidak sesuai!");
+      if (parsed.length === 0) return showAlert("File Kosong", "File kosong atau format kelas tidak sesuai!", "warning");
       
       const fileNisns = parsed.map((p) => p.nisn);
       const hasDuplicateInFile = fileNisns.some((n, i) => fileNisns.indexOf(n) !== i);
       if (hasDuplicateInFile) {
-        return alert("Import Gagal: Terdapat NISN ganda di dalam file Excel!");
+        return showAlert("Import Gagal", "Terdapat NISN ganda di dalam file Excel!", "danger");
       }
 
       const existingNisns = students.map((s) => s.nisn);
       const duplicateWithDB = parsed.filter((p) => existingNisns.includes(p.nisn));
       if (duplicateWithDB.length > 0) {
-        return alert(`Import Gagal: NISN berikut sudah terdaftar di sistem:\n${duplicateWithDB.map((d) => d.nisn).join(", ")}`);
+        return showAlert("Import Gagal", `NISN berikut sudah terdaftar di sistem: ${duplicateWithDB.map((d) => d.nisn).join(", ")}`, "danger");
       }
 
       for (const row of parsed) {
@@ -153,9 +170,9 @@ const SiswaPage = () => {
           classId: row.classId,
         });
       }
-      alert(`${parsed.length} siswa berhasil diimport.`);
+      showAlert("Import Berhasil", `${parsed.length} siswa berhasil diimport.`, "success");
     } catch (err: any) {
-      alert(err.message || "Gagal mengimport siswa.");
+      showAlert("Gagal Import", err.message || "Gagal mengimport siswa.", "danger");
     } finally {
       setIsImporting(false);
     }
@@ -299,6 +316,17 @@ const SiswaPage = () => {
         description="Apakah Anda yakin ingin menghapus data siswa ini?"
         itemName={`Siswa ${studentToDelete?.name || ""}`}
         isLoading={isDeleting}
+      />
+
+      <ConfirmationDialog
+        isOpen={alertDialog.isOpen}
+        onClose={() => setAlertDialog({ ...alertDialog, isOpen: false })}
+        onConfirm={() => setAlertDialog({ ...alertDialog, isOpen: false })}
+        title={alertDialog.title}
+        description={alertDialog.description}
+        type={alertDialog.type}
+        confirmLabel="OK"
+        showCancel={false}
       />
     </div>
   );

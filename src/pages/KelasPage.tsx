@@ -8,6 +8,7 @@ import KelasForm, { KelasFormValues } from "../components/piket/KelasForm";
 import KelasTable from "../components/tables/KelasTable";
 import { ImportButton } from "../components/ui/import-button";
 import { ExportButton } from "../components/ui/export-button";
+import { ConfirmationDialog } from "../components/ui/confirmation-dialog";
 import { downloadKelasImportTemplate, exportKelasToExcel, parseKelasImportExcel } from "../lib/kelasExcel";
 import type { ClassData } from "../types/piket";
 
@@ -28,6 +29,22 @@ const KelasPage = () => {
   const [classToDelete, setClassToDelete] = useState<ClassData | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
+
+  const [alertDialog, setAlertDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    description: string;
+    type: "success" | "danger" | "warning" | "info";
+  }>({
+    isOpen: false,
+    title: "",
+    description: "",
+    type: "info",
+  });
+
+  const showAlert = (title: string, description: string, type: "success" | "danger" | "warning" | "info" = "info") => {
+    setAlertDialog({ isOpen: true, title, description, type });
+  };
 
   const handleCreateClick = () => {
     setDialogMode("create");
@@ -61,7 +78,7 @@ const KelasPage = () => {
       closeDialog();
     } catch (error) {
       console.error("Gagal menyimpan data kelas", error);
-      alert("Gagal menyimpan data kelas.");
+      showAlert("Gagal", "Gagal menyimpan data kelas.", "danger");
     }
   };
 
@@ -72,7 +89,7 @@ const KelasPage = () => {
       await deleteClass(classToDelete.id);
     } catch (error) {
       console.error("Gagal menghapus kelas", error);
-      alert("Gagal menghapus kelas.");
+      showAlert("Gagal", "Gagal menghapus data kelas.", "danger");
     } finally {
       setIsDeleting(false);
       setDeleteDialogOpen(false);
@@ -84,13 +101,13 @@ const KelasPage = () => {
     setIsImporting(true);
     try {
       const parsed = await parseKelasImportExcel(file);
-      if (parsed.length === 0) return alert("File kosong!");
+      if (parsed.length === 0) return showAlert("File Kosong", "File yang Anda upload kosong atau tidak valid.", "warning");
       for (const row of parsed) {
         await createClass({ name: row.name });
       }
-      alert(`${parsed.length} kelas berhasil diimport.`);
+      showAlert("Import Berhasil", `${parsed.length} kelas berhasil diimport.`, "success");
     } catch (err: any) {
-      alert(err.message || "Gagal mengimport kelas.");
+      showAlert("Gagal Import", err.message || "Gagal mengimport kelas.", "danger");
     } finally {
       setIsImporting(false);
     }
@@ -152,6 +169,17 @@ const KelasPage = () => {
         description="Apakah Anda yakin ingin menghapus data kelas ini?"
         itemName={`Kelas ${classToDelete?.name || ""}`}
         isLoading={isDeleting}
+      />
+
+      <ConfirmationDialog
+        isOpen={alertDialog.isOpen}
+        onClose={() => setAlertDialog({ ...alertDialog, isOpen: false })}
+        onConfirm={() => setAlertDialog({ ...alertDialog, isOpen: false })}
+        title={alertDialog.title}
+        description={alertDialog.description}
+        type={alertDialog.type}
+        confirmLabel="OK"
+        showCancel={false}
       />
     </div>
   );
