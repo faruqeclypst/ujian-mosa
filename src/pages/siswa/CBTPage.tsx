@@ -373,9 +373,9 @@ const CBTPage = () => {
       </header>
 
       {/* Main Grid: Question View & Nav Panel */}
-      <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
+      <div className="flex-1 flex flex-col md:flex-row md:overflow-hidden">
         {/* Left: Questions View */}
-        <div className="flex-1 overflow-y-auto p-4 md:p-5 space-y-4">
+        <div className="flex-1 md:overflow-y-auto p-4 md:p-5 space-y-4">
           {currentQuestion && (
             <Card className="rounded-xl border shadow-sm">
               <CardHeader className="p-4 pb-2">
@@ -387,7 +387,7 @@ const CBTPage = () => {
                     <img 
                       src={currentQuestion.imageUrl} 
                       alt="Gambar Soal" 
-                      className="w-full max-w-full md:max-w-xl h-auto rounded-xl border border-slate-200 shadow-sm cursor-zoom-in hover:opacity-90 transition-opacity" 
+                      className="max-w-full md:max-w-xl h-auto mx-auto block rounded-xl border border-slate-200 shadow-sm cursor-zoom-in hover:opacity-90 transition-opacity" 
                       onClick={() => setPreviewImage(currentQuestion.imageUrl!)}
                     />
                   </div>
