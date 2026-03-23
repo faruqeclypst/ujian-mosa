@@ -16,7 +16,8 @@ const ExambroGuard = ({ children }: ExambroGuardProps) => {
     
     // For development, allow bypass with simple condition or override flag
     const isDev = import.meta.env.MODE === "development";
-    setIsExambro(isValid || isDev); 
+    const bypassGuard = import.meta.env.VITE_DISABLE_EXAMBRO_GUARD === "true";
+    setIsExambro(isValid || isDev || bypassGuard); 
   }, []);
 
   if (isExambro === null) {
