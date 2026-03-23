@@ -625,6 +625,31 @@ const ExamRoomsPage = () => {
      });
   };
 
+  const handleAddCheatLimit = async (nisn: string) => {
+    if (!monitorRoom) return;
+    const value = window.prompt("Tambahkan batas toleransi pelanggaran (angka) untuk siswa ini berapa kali?:", "1");
+    if (!value) return;
+    const added = parseInt(value);
+    if (isNaN(added) || added <= 0) return alert("Masukkan angka yang valid.");
+
+    try {
+      const attemptId = `${nisn}_${monitorRoom.id}`;
+      const attemptRef = ref(database, `attempts/${attemptId}`);
+      const snap = await get(attemptRef);
+      const currentExtra = snap.exists() ? (snap.val().extraCheatLimit || 0) : 0;
+      const currentStatus = snap.exists() ? snap.val().status : "ongoing";
+
+      await update(attemptRef, {
+        extraCheatLimit: currentExtra + added,
+        status: currentStatus === "LOCKED" ? "ongoing" : currentStatus, // Auto Unlock
+      });
+      
+      showAlert("Berhasil", `Berhasil menambah +${added} batas pelanggaran untuk siswa.`, "success");
+    } catch {
+      showAlert("Gagal", "Gagal memperbarui batas.", "danger");
+    }
+  };
+
   const handleResetCheatCount = (nisn: string) => {
     if (!monitorRoom) return;
     setConfirmDialog({
@@ -1069,7 +1094,12 @@ const ExamRoomsPage = () => {
                         } else if (attempt.status === "LOCKED") {
                           statusLabel = <span className="text-red-500 font-bold px-2 py-0.5 bg-red-50 rounded-full border border-red-100 italic">TERKUNCI</span>;
                         } else {
-                          statusLabel = <span className="text-amber-600 font-semibold px-2 py-0.5 bg-amber-50 rounded-full border border-amber-100 animate-pulse">Ujian...</span>;
+                          const isOnline = attempt.isOnline === true;
+                          statusLabel = (
+                            <span className={`font-semibold px-2 py-0.5 rounded-full border whitespace-nowrap ${isOnline ? "text-amber-600 bg-amber-50 border-amber-100 animate-pulse" : "text-slate-500 bg-slate-50 border-slate-100"}`}>
+                              Ujian ({isOnline ? "Online" : "Offline"})
+                            </span>
+                          );
                         }
                       }
 
@@ -1086,9 +1116,17 @@ const ExamRoomsPage = () => {
                             <TableCell>{statusLabel}</TableCell>
                             <TableCell className="text-center font-bold text-indigo-600 tabular-nums">{attempt?.score !== undefined ? attempt.score : "-"}</TableCell>
                             <TableCell className="text-center text-xs text-slate-500 font-medium tabular-nums">{answeredCount}/{monitorQuestions.length}</TableCell>
-                            <TableCell className="text-center">
-                               {attempt?.cheatCount ? <span className="font-bold text-red-500">{attempt.cheatCount}</span> : <span className="text-slate-300">0</span>}
-                            </TableCell>
+                             <TableCell className="text-center">
+                                {(() => {
+                                  const totalAllowed = (monitorRoom?.cheat_limit || 3) + (attempt?.extraCheatLimit || 0);
+                                  const currentCount = attempt?.cheatCount || 0;
+                                  return (
+                                     <span className={`font-bold tabular-nums ${currentCount > 0 ? "text-red-500" : "text-slate-400"}`}>
+                                        {currentCount} / {totalAllowed}
+                                     </span>
+                                  )
+                                })()}
+                             </TableCell>
                             <TableCell className="text-right">
                                <div className="flex justify-end gap-1.5 items-center whitespace-nowrap">
                                   {attempt?.status === "LOCKED" && (
@@ -1096,6 +1134,7 @@ const ExamRoomsPage = () => {
                                   )}
                                   {attempt && (
                                     <>
+                                      <Button size="sm" variant="secondary" className="bg-blue-100 text-blue-700 hover:bg-blue-200 border-blue-200 h-7 text-[10px]" onClick={() => handleAddCheatLimit(siswa.nisn)}>+ Limit</Button>
                                       <Button size="sm" variant="secondary" className="bg-amber-100 text-amber-700 hover:bg-amber-200 border-amber-200 h-7 text-[10px]" onClick={() => handleResetCheatCount(siswa.nisn)}>Reset Cheat</Button>
                                       <Button size="sm" variant="destructive" className="bg-rose-50 text-rose-600 hover:bg-rose-100 border-rose-200 h-7 text-[10px]" onClick={() => handleResetSession(siswa.nisn)}>Reset Sesi</Button>
                                       <Button size="sm" variant="secondary" className="bg-sky-100 text-sky-700 hover:bg-sky-200 border-sky-200 h-7 text-[10px]" onClick={() => setExpandedSiswa(expandedSiswa === siswa.nisn ? null : siswa.nisn)}>
@@ -1181,8 +1220,9 @@ const ExamRoomsPage = () => {
                     return currentData.map((siswa, localIndex) => {
                       const attempt = attempts.find((a) => a.id === `${siswa.nisn}_${monitorRoom?.id}`);
                       const sisAnswers = answersList[siswa.nisn] || {};
-                      const status = attempt ? (attempt.status === "submitted" ? "Selesai" : attempt.status === "LOCKED" ? "Terkunci" : "Mengerjakan") : "Belum Masuk";
-                      const statusColor = attempt ? (attempt.status === "submitted" ? "bg-emerald-100 text-emerald-700 border-emerald-200" : attempt.status === "LOCKED" ? "bg-rose-100 text-rose-700 border-rose-200" : "bg-amber-100 text-amber-700 border-amber-200 animate-pulse") : "bg-slate-100 text-slate-400 border-slate-200";
+                      const isOnline = attempt?.isOnline === true;
+                      const status = attempt ? (attempt.status === "submitted" ? "Selesai" : attempt.status === "LOCKED" ? "Terkunci" : `Ujian (${isOnline ? "Online" : "Offline"})`) : "Belum Masuk";
+                      const statusColor = attempt ? (attempt.status === "submitted" ? "bg-emerald-100 text-emerald-700 border-emerald-200" : attempt.status === "LOCKED" ? "bg-rose-100 text-rose-700 border-rose-200" : isOnline ? "bg-amber-100 text-amber-700 border-amber-200 animate-pulse" : "bg-slate-100 text-slate-500 border-slate-200") : "bg-slate-100 text-slate-400 border-slate-200";
 
                       return (
                         <div key={siswa.id} className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3 shadow-sm relative overflow-hidden">
@@ -1192,7 +1232,7 @@ const ExamRoomsPage = () => {
                                <h4 className="font-bold text-slate-800 leading-tight">{siswa.name}</h4>
                                <p className="text-xs font-semibold text-slate-500 bg-slate-100 inline-block px-2 py-0.5 rounded-md">{piketClasses.find(c => c.id === siswa.classId)?.name}</p>
                             </div>
-                            <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border ${statusColor}`}>{status.toUpperCase()}</span>
+                             <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border whitespace-nowrap ${statusColor}`}>{status.toUpperCase()}</span>
                           </div>
                           
                           <div className="grid grid-cols-3 gap-2 py-3 border-y border-slate-100">
@@ -1206,7 +1246,9 @@ const ExamRoomsPage = () => {
                              </div>
                              <div className="text-center">
                                 <p className="text-[9px] uppercase font-bold text-slate-400 mb-0.5">Warn</p>
-                                <p className="text-sm font-bold text-rose-500 tabular-nums">{attempt?.cheatCount || 0}</p>
+                                 <p className="text-sm font-bold text-rose-500 tabular-nums">
+                                    {attempt?.cheatCount || 0} / {(monitorRoom?.cheat_limit || 3) + (attempt?.extraCheatLimit || 0)}
+                                 </p>
                              </div>
                           </div>
 
