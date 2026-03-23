@@ -101,7 +101,6 @@ const CBTPage = () => {
         
         if (diff <= 0) {
           setIsExamOver(true);
-          setLoading(false);
           // Auto-submit if time's up and it wasn't already
           if (currentStatus === "ongoing") {
              // we can't call handleSubmit here because questions aren't loaded yet
@@ -267,6 +266,13 @@ const CBTPage = () => {
       window.removeEventListener("beforeunload", handleBeforeUnload);
     };
   }, [loading, isLocked, isExamOver, attempt, roomData]);
+
+  // Auto-submit effect when time is up on load OR timer ends
+  useEffect(() => {
+    if (!loading && isExamOver && attempt?.status === "ongoing") {
+      handleSubmitExam();
+    }
+  }, [loading, isExamOver, attempt?.status]);
 
   const handleAnswerSelect = (questionId: string, choiceId: string) => {
     if (isExamOver || isLocked) return;
@@ -457,29 +463,7 @@ const CBTPage = () => {
             </Card>
           )}
 
-          {/* Navs buttons inside view */}
-          <div className="flex justify-between items-center">
-            <Button 
-                variant="outline" 
-                disabled={currentQuestionIndex === 0} 
-                onClick={() => setCurrentQuestionIndex(prev => prev - 1)}
-            >
-              Sebelumnya
-            </Button>
-            {currentQuestionIndex === questions.length - 1 ? (
-              <Button 
-                disabled={!isSubmitAllowed}
-                onClick={() => setIsSubmitModalOpen(true)} 
-               className={`text-white transition-all font-semibold ${
-                  !isSubmitAllowed ? "bg-slate-300 pointer-events-none" : "bg-green-600 hover:bg-green-700"
-                }`}
-              >
-                {isSubmitAllowed ? "Kumpulkan" : `Kumpul (${formatTime(timeLeft - submitWindowSeconds)})`}
-              </Button>
-            ) : (
-              <Button onClick={() => setCurrentQuestionIndex(prev => prev + 1)}> Selanjutnya </Button>
-            )}
-          </div>
+          {/* Navs buttons moved to sidebar */}
         </div>
 
         {/* Right: Sidebar Navigation boxes */}
@@ -507,6 +491,37 @@ const CBTPage = () => {
               );
             })}
           </div>
+
+          {/* Action Buttons */}
+          <div className="pt-3 border-t grid grid-cols-2 gap-2">
+            <Button 
+                variant="outline" 
+                disabled={currentQuestionIndex === 0} 
+                onClick={() => setCurrentQuestionIndex(prev => prev - 1)}
+                className="w-full text-slate-700 font-semibold rounded-xl"
+            >
+              Sebelumnya
+            </Button>
+            {currentQuestionIndex === questions.length - 1 ? (
+              <Button 
+                disabled={!isSubmitAllowed}
+                onClick={() => setIsSubmitModalOpen(true)} 
+                className={`w-full text-white font-semibold rounded-xl ${
+                  !isSubmitAllowed ? "bg-slate-300 pointer-events-none" : "bg-green-600 hover:bg-green-700"
+                }`}
+              >
+                {isSubmitAllowed ? "Kumpulkan" : `Kumpul (${formatTime(timeLeft - submitWindowSeconds)})`}
+              </Button>
+            ) : (
+              <Button 
+                onClick={() => setCurrentQuestionIndex(prev => prev + 1)}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl"
+              > 
+                Selanjutnya 
+              </Button>
+            )}
+          </div>
+
           <div className="pt-2 border-t flex flex-col gap-2">
               <div className="flex items-center gap-2 text-xs text-slate-500">
                   <div className="w-3 h-3 bg-blue-600 rounded"></div> Posisi Aktif
