@@ -130,6 +130,12 @@ const KelasPage = () => {
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Kelola daftar kelas untuk perizinan dan jadwal ujian.</p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <ImportButton onImport={handleImportKelas} isLoading={isImporting} />
+          <ExportButton onExport={handleExportKelas} />
+          <Button onClick={() => downloadKelasImportTemplate()} variant="secondary" size="sm" className="rounded-xl border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300">
+            Template
+          </Button>
+
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
               <Button onClick={handleCreateClick} className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-700 text-white shadow-md shadow-blue-500/10 rounded-xl" size="sm">
@@ -149,11 +155,6 @@ const KelasPage = () => {
               />
             </DialogContent>
           </Dialog>
-          <ImportButton onImport={handleImportKelas} isLoading={isImporting} />
-          <ExportButton onExport={handleExportKelas} />
-          <Button onClick={() => downloadKelasImportTemplate()} variant="outline" size="sm" className="rounded-xl border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300">
-            Template
-          </Button>
         </div>
       </div>
 

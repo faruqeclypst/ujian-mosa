@@ -124,6 +124,12 @@ const MapelPage = () => {
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Kelola daftar mata pelajaran untuk jadwal ujian.</p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <ImportButton onImport={handleImportMapels} isLoading={isImporting} />
+          <ExportButton onExport={handleExportMapels} />
+          <Button onClick={() => downloadMapelImportTemplate()} variant="secondary" size="sm" className="rounded-xl border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300">
+            Template
+          </Button>
+
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
               <Button onClick={handleCreateClick} className="bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-600 dark:hover:bg-indigo-700 text-white shadow-md shadow-indigo-500/10 rounded-xl" size="sm">
@@ -143,11 +149,6 @@ const MapelPage = () => {
               />
             </DialogContent>
           </Dialog>
-          <ImportButton onImport={handleImportMapels} isLoading={isImporting} />
-          <ExportButton onExport={handleExportMapels} />
-          <Button onClick={() => downloadMapelImportTemplate()} variant="outline" size="sm" className="rounded-xl border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300">
-            Template
-          </Button>
         </div>
       </div>
 

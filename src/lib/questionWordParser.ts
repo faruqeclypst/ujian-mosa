@@ -57,7 +57,7 @@ export const parseQuestionsFromWord = async (file: File): Promise<ParsedQuestion
       const num = questionMatch ? questionMatch[1] : isJustNumber![1];
       const text = questionMatch ? questionMatch[2] : ""; // Text might come in next paragraph
 
-      currentQuestion = { text, imageUrl: imageSrc || undefined };
+      currentQuestion = { text, imageUrl: undefined };
       currentChoices = {};
       currentAnswerKey = "";
       pendingNumber = questionMatch ? null : num;
@@ -108,9 +108,6 @@ export const parseQuestionsFromWord = async (file: File): Promise<ParsedQuestion
                 if (!currentChoices[lastLetter].imageUrl) {
                     currentChoices[lastLetter].imageUrl = imageSrc;
                 }
-            } else if (!currentQuestion.imageUrl) {
-                // Assign to question if no choices yet
-                currentQuestion.imageUrl = imageSrc;
             }
         }
 

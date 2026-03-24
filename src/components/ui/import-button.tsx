@@ -10,6 +10,7 @@ export interface ImportButtonProps {
   label?: string;
   className?: string;
   accept?: string;
+  variant?: "default" | "item";
 }
 
 export const ImportButton: React.FC<ImportButtonProps> = ({
@@ -18,6 +19,7 @@ export const ImportButton: React.FC<ImportButtonProps> = ({
   label = "Import Excel",
   className,
   accept = ".xlsx,.xls",
+  variant = "default",
 }) => {
   const { addToast } = useToast();
   const inputRef = React.useRef<HTMLInputElement | null>(null);
@@ -58,14 +60,16 @@ export const ImportButton: React.FC<ImportButtonProps> = ({
       <Button
         onClick={handleClick}
         disabled={isLoading}
-        variant="outline"
+        variant="secondary"
         size="sm"
         className={cn(
-          "bg-blue-50 text-blue-600 hover:bg-blue-100 border-blue-100 dark:bg-blue-900/10 dark:text-blue-400 dark:hover:bg-blue-900/30 dark:border-slate-800 rounded-xl font-semibold shadow-sm",
+          variant === "item" 
+            ? "w-full justify-start bg-transparent hover:bg-slate-50 dark:hover:bg-slate-800 text-blue-600 dark:text-blue-400 border-none shadow-none font-bold rounded-lg text-sm p-2 gap-2 h-auto"
+            : "bg-blue-50 text-blue-600 hover:bg-blue-100 border-blue-100 dark:bg-blue-900/10 dark:text-blue-400 dark:hover:bg-blue-900/30 dark:border-slate-800 rounded-xl font-semibold shadow-sm",
           className
         )}
       >
-        <Upload className="mr-1 h-3.5 w-3.5" />
+        {variant !== "item" && <Upload className="mr-1 h-3.5 w-3.5" />}
         {isLoading ? "Mengimpor..." : label}
       </Button>
     </>

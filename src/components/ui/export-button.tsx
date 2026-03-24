@@ -41,7 +41,7 @@ export const ExportButton: React.FC<ExportButtonProps> = ({
     <Button
       onClick={handleExport}
       disabled={isLoading}
-      variant="outline"
+      variant="secondary"
       size="sm"
       className={cn(
         "bg-green-50 text-green-600 hover:bg-green-100 border-green-100 dark:bg-green-900/10 dark:text-green-400 dark:hover:bg-green-900/30 dark:border-slate-800 rounded-xl font-semibold shadow-sm",

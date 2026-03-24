@@ -13,8 +13,11 @@ import { Card, CardHeader, CardContent, CardTitle } from "../../components/ui/ca
 import { uploadInventoryImage, deleteImageFromStorage } from "../../lib/storage";
 import { ImportButton } from "../../components/ui/import-button";
 import { parseQuestionsFromWord } from "../../lib/questionWordParser";
-import ReactQuill from "react-quill";
+import ReactQuill, { Quill } from "react-quill";
+import ImageResize from "quill-image-resize-module-react";
 import "react-quill/dist/quill.snow.css";
+
+Quill.register("modules/imageResize", ImageResize);
 import { usePiket } from "../../context/PiketContext";
 import { DataTable } from "../../components/ui/data-table";
 export interface QuestionData {
@@ -22,6 +25,8 @@ export interface QuestionData {
   examId: string;
   text: string;
   imageUrl?: string;
+  groupId?: string; // ID Kelompok/Literasi (Opsional)
+  groupText?: string; // Teks khusus Literasi (Opsional)
   choices: Record<string, { text: string; imageUrl?: string; isCorrect?: boolean }>;
 }
 
@@ -89,14 +94,19 @@ const columns = [
     sortable: true,
     render: (v: string, item: QuestionData) => (
       <div className="max-w-lg min-w-[250px]">
-        <div className="line-clamp-2 text-sm font-medium text-slate-800 dark:text-slate-200 leading-relaxed" dangerouslySetInnerHTML={{ __html: item.text }} />
-        {item.imageUrl && (
-          <div className="flex items-center gap-1 text-xs text-blue-500 mt-1">
+        <div className="line-clamp-2 text-sm font-medium text-slate-800 dark:text-slate-200 leading-relaxed [&_ol]:list-decimal [&_ul]:list-disc [&_ol]:pl-4 [&_ul]:pl-4" dangerouslySetInnerHTML={{ __html: item.text }} />
+        <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+          {(item.imageUrl || item.text.includes("<img")) && (
             <span className="p-1 rounded-md bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400 flex items-center gap-1 font-semibold text-[10px] border border-blue-200 dark:border-blue-800/40">
               🖼️ Bergambar
             </span>
-          </div>
-        )}
+          )}
+          {item.groupId && (
+            <span className="p-1 rounded-md bg-amber-50 text-amber-600 dark:bg-amber-950/20 dark:text-amber-400 flex items-center gap-1 font-semibold text-[10px] border border-amber-200 dark:border-amber-800/40">
+              🔖 Grup: {item.groupId}
+            </span>
+          )}
+        </div>
       </div>
     ),
   },
@@ -139,9 +149,13 @@ const QuestionsPage = () => {
   const [formValues, setFormValues] = useState<{
     text: string;
     imageUrl?: string;
+    groupId?: string;
+    groupText?: string;
     choices: Record<string, { text: string; imageUrl?: string; isCorrect: boolean }>;
   }>({
     text: "",
+    groupId: "",
+    groupText: "",
     choices: {
       a: { text: "", isCorrect: false },
       b: { text: "", isCorrect: false },
@@ -151,9 +165,22 @@ const QuestionsPage = () => {
     }
   });
 
+  const [isLiterasiActive, setIsLiterasiActive] = useState(false);
+  const [literasiMode, setLiterasiMode] = useState<"select" | "create">("select");
+
+  const existingLiteracies = useMemo(() => {
+    const map: Record<string, string> = {};
+    questions.forEach((q) => {
+      if (q.groupId && q.groupText) {
+        map[q.groupId] = q.groupText;
+      }
+    });
+    return map;
+  }, [questions]);
+
   const [questionFile, setQuestionFile] = useState<File | null>(null);
   const [choiceFiles, setChoiceFiles] = useState<Record<string, File | null>>({});
-  
+
   const [coverSizeInfo, setCoverSizeInfo] = useState<string>("");
   const [choicesSizeInfo, setChoicesSizeInfo] = useState<Record<string, string>>({});
 
@@ -202,7 +229,7 @@ const QuestionsPage = () => {
       updateBatchItem(galleryTarget.index, "imageUrl", url);
       updateBatchItem(galleryTarget.index, "imageFile", null); // Reset file jika ada
     }
-    
+
     setIsGalleryOpen(false);
   };
 
@@ -230,12 +257,12 @@ const QuestionsPage = () => {
 
     if (galleryTarget.type === "cover") {
       setQuestionFile(fileToUpload);
-      setFormValues((prev) => ({ ...prev, imageUrl: "" })); 
+      setFormValues((prev) => ({ ...prev, imageUrl: "" }));
       setCoverSizeInfo(file.size > 200 * 1024 ? `${origSize} ➔ ${formatSize(fileToUpload.size)}` : `${origSize} (Hemat)`);
     } else if (galleryTarget.type === "choice" && galleryTarget.letter) {
       const letter = galleryTarget.letter;
       setChoiceFiles((prev) => ({ ...prev, [letter]: fileToUpload }));
-      handleChoiceChange(letter, "imageUrl", ""); 
+      handleChoiceChange(letter, "imageUrl", "");
       setChoicesSizeInfo((prev) => ({ ...prev, [letter]: file.size > 100 * 1024 ? `${origSize} ➔ ${formatSize(fileToUpload.size)}` : `${origSize} (Hemat)` }));
     } else if (galleryTarget.type === "batch" && galleryTarget.index !== undefined) {
       updateBatchItem(galleryTarget.index, "imageFile", fileToUpload);
@@ -243,16 +270,37 @@ const QuestionsPage = () => {
     }
 
     setIsPickerOpen(false);
-    if (globalFileInputRef.current) globalFileInputRef.current.value = ""; 
+    if (globalFileInputRef.current) globalFileInputRef.current.value = "";
   };
 
   const [isImportMenuOpen, setIsImportMenuOpen] = useState(false); // <--- Dropdown state
+  const [isTambahMenuOpen, setIsTambahMenuOpen] = useState(false); // <--- Tambah Dropdown state
   const [deleteAllDialogOpen, setDeleteAllDialogOpen] = useState(false); // <--- Delete All State
+
+  const importRef = useRef<HTMLDivElement | null>(null);
+  const tambahRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (importRef.current && !importRef.current.contains(event.target as Node)) {
+        setIsImportMenuOpen(false);
+      }
+      if (tambahRef.current && !tambahRef.current.contains(event.target as Node)) {
+        setIsTambahMenuOpen(false);
+      }
+    };
+    if (isImportMenuOpen || isTambahMenuOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    } else {
+      document.removeEventListener("mousedown", handleClickOutside);
+    }
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [isImportMenuOpen, isTambahMenuOpen]);
 
   const [isBatchModalOpen, setIsBatchModalOpen] = useState(false);
   const [isSavingBatch, setIsSavingBatch] = useState(false);
   const [confirmModal, setConfirmModal] = useState<any>({ isOpen: false, title: "", description: "", type: "info", confirmLabel: "Ok", onConfirm: () => { } });
-  
+
   const showAlert = (title: string, description: string, type: "success" | "danger" | "warning" | "info" = "info", onConfirm?: () => void, showCancel: boolean = false, confirmLabel: string = "OK") => {
     setConfirmModal({
       isOpen: true,
@@ -422,6 +470,7 @@ const QuestionsPage = () => {
     toolbar: {
       container: [
         ['bold', 'italic', 'underline', 'strike'],
+        [{ 'align': [] }],
         [{ 'color': [] }, { 'background': [] }],
         [{ 'list': 'ordered' }, { 'list': 'bullet' }],
         ['image', 'clean']
@@ -429,6 +478,10 @@ const QuestionsPage = () => {
       handlers: {
         image: imageHandler
       }
+    },
+    imageResize: {
+      parchment: Quill.import('parchment'),
+      modules: ['Resize', 'DisplaySize', 'Toolbar']
     }
   }), [imageHandler]);
 
@@ -476,6 +529,8 @@ const QuestionsPage = () => {
     setSelectedQuestion(null);
     setFormValues({
       text: "",
+      groupId: "",
+      groupText: "",
       choices: {
         a: { text: "", isCorrect: false },
         b: { text: "", isCorrect: false },
@@ -484,6 +539,8 @@ const QuestionsPage = () => {
         e: { text: "", isCorrect: false },
       }
     });
+    setIsLiterasiActive(false);
+    setLiterasiMode("select");
     setIsDialogOpen(true);
   };
 
@@ -495,6 +552,8 @@ const QuestionsPage = () => {
     setFormValues({
       text: q.text,
       imageUrl: q.imageUrl,
+      groupId: q.groupId || "",
+      groupText: q.groupText || "",
       choices: {
         a: { text: q.choices?.a?.text || "", imageUrl: q.choices?.a?.imageUrl, isCorrect: !!q.choices?.a?.isCorrect },
         b: { text: q.choices?.b?.text || "", imageUrl: q.choices?.b?.imageUrl, isCorrect: !!q.choices?.b?.isCorrect },
@@ -503,6 +562,14 @@ const QuestionsPage = () => {
         e: { text: q.choices?.e?.text || "", imageUrl: q.choices?.e?.imageUrl, isCorrect: !!q.choices?.e?.isCorrect },
       }
     });
+    // 🔒 Deteksi apakah ini soal pertama di grupnya agar hanya soal #1 yang bisa edit teks wacana
+    const groupItems = questions.filter(item => q.groupId && item.groupId === q.groupId);
+    const isFirstInGroup = groupItems.length > 0 
+      ? groupItems[0].id === q.id 
+      : true;
+
+    setIsLiterasiActive(!!q.groupId);
+    setLiterasiMode(isFirstInGroup && q.groupText ? "create" : "select");
     setIsDialogOpen(true);
   };
 
@@ -655,6 +722,14 @@ const QuestionsPage = () => {
         payload.imageUrl = imageUrl;
       }
 
+      if (formValues.groupId) {
+        payload.groupId = formValues.groupId;
+        payload.groupText = formValues.groupText || null; // Simpan teks wacana
+      } else {
+        payload.groupId = null; 
+        payload.groupText = null;
+      }
+
       if (dialogMode === "edit" && selectedQuestion) {
         const qRef = ref(database, `questions/${selectedQuestion.id}`);
         await update(qRef, payload);
@@ -735,7 +810,7 @@ const QuestionsPage = () => {
         const data = snapshot.val();
         const updates: any = {};
         const keysToDelete = Object.keys(data).filter((k) => data[k].examId === examId);
-        
+
         for (const key of keysToDelete) {
           await cleanupQuestionImages({ ...data[key], id: key });
           updates[key] = null; // Set null untuk menghapus
@@ -798,10 +873,10 @@ const QuestionsPage = () => {
         const doc = new DOMParser().parseFromString(textToSave, "text/html");
         const imagesInText = doc.querySelectorAll("img[src^='data:image/']");
         for (let j = 0; j < imagesInText.length; j++) {
-            const imgEl = imagesInText[j];
-            const base64 = imgEl.getAttribute("src")!;
-            const r2Url = await uploadBase64ToR2(base64, `text_${i}_${j}`);
-            imgEl.setAttribute("src", r2Url);
+          const imgEl = imagesInText[j];
+          const base64 = imgEl.getAttribute("src")!;
+          const r2Url = await uploadBase64ToR2(base64, `text_${i}_${j}`);
+          imgEl.setAttribute("src", r2Url);
         }
         textToSave = doc.body.innerHTML;
 
@@ -859,7 +934,7 @@ const QuestionsPage = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
+      <div className="relative z-20 flex flex-col gap-4 md:flex-row md:items-center md:justify-between bg-card p-5 rounded-2xl border border-slate-200/60 dark:border-slate-800/40 shadow-sm backdrop-blur-sm">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={() => navigate("/admin/bank-soal")}>
             <ArrowLeft className="h-5 w-5" />
@@ -875,52 +950,45 @@ const QuestionsPage = () => {
           </div>
         </div>
         <div className="flex gap-2">
-          <div className="relative">
+          <div className="relative" ref={importRef}>
             <Button
               onClick={() => setIsImportMenuOpen(!isImportMenuOpen)}
               variant="secondary"
               size="lg"
-              className="rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 dark:bg-slate-800/40 dark:text-slate-300 dark:hover:bg-slate-800/60 dark:border-slate-800/40 text-slate-700 shadow-sm"
+              className="rounded-xl bg-indigo-50 text-indigo-600 hover:bg-indigo-100 border border-indigo-100 dark:bg-indigo-900/30 dark:text-indigo-400 dark:hover:bg-indigo-900/50 dark:border-indigo-800/30 shadow-sm font-semibold"
             >
               Import <ChevronDown className={`ml-1 h-4 w-4 transition-transform ${isImportMenuOpen ? "rotate-180" : ""}`} />
             </Button>
 
             {isImportMenuOpen && (
-              <>
-                <div
-                  className="fixed inset-0 z-10"
-                  onClick={() => setIsImportMenuOpen(false)}
+              <div className="absolute right-0 mt-2 w-64 bg-card border border-slate-200 dark:border-slate-800 rounded-xl shadow-lg z-20 p-1 flex flex-col gap-1 animate-in fade-in duration-150">
+                <ImportButton
+                  onImport={(file) => {
+                    setIsImportMenuOpen(false);
+                    handleImportWord(file);
+                  }}
+                  isLoading={isImporting}
+                  label="Upload file Word"
+                  accept=".docx"
+                  variant="item"
                 />
-                <div className="absolute right-0 mt-2 w-52 bg-card border border-slate-200 dark:border-slate-800 rounded-xl shadow-lg z-20 p-1 flex flex-col gap-1 animate-in fade-in duration-150">
-                  <div className="relative flex items-center">
-                    <ImportButton
-                      onImport={(file) => {
-                        setIsImportMenuOpen(false);
-                        handleImportWord(file);
-                      }}
-                      isLoading={isImporting}
-                      label="Upload file Word"
-                      accept=".docx"
-                    />
-                  </div>
-                  <a
-                    href="/templates/Template_Soal.docx"
-                    download="Template_Soal.docx"
-                    onClick={() => setIsImportMenuOpen(false)}
-                    className="flex items-center gap-2 p-2 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-sm rounded-lg transition-all"
-                  >
-                    <Download className="h-4 w-4 text-indigo-600" /> Download Template
-                  </a>
-                  <a
-                    href="/templates/Template_Soal_Tabel.docx"
-                    download="Template_Soal_Tabel.docx"
-                    onClick={() => setIsImportMenuOpen(false)}
-                    className="flex items-center gap-2 p-2 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-sm rounded-lg transition-all"
-                  >
-                    <Download className="h-4 w-4 text-emerald-600" /> Download Template (Menu Tabel)
-                  </a>
-                </div>
-              </>
+                <a
+                  href="/templates/Template_Soal.docx"
+                  download="Template_Soal.docx"
+                  onClick={() => setIsImportMenuOpen(false)}
+                  className="flex items-center gap-2 p-2 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-sm rounded-lg transition-all"
+                >
+                  Download Template
+                </a>
+                <a
+                  href="/templates/Template_Soal_Tabel.docx"
+                  download="Template_Soal_Tabel.docx"
+                  onClick={() => setIsImportMenuOpen(false)}
+                  className="flex items-center gap-2 p-2 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-sm rounded-lg transition-all"
+                >
+                  Download Template (Format Tabel)
+                </a>
+              </div>
             )}
           </div>
 
@@ -935,13 +1003,41 @@ const QuestionsPage = () => {
             </Button>
           )}
 
-          <Button onClick={handleBatchCreateClick} variant="secondary" size="lg" className="rounded-xl bg-purple-50 hover:bg-purple-100 border border-purple-100 dark:bg-purple-900/30 dark:text-purple-400 dark:hover:bg-purple-900/50 dark:border-purple-800/30 text-purple-700 shadow-sm font-semibold">
-            <Plus className="mr-2 h-4 w-4" /> Tambah Batch
-          </Button>
+          <div className="relative" ref={tambahRef}>
+            <Button
+              onClick={() => setIsTambahMenuOpen(!isTambahMenuOpen)}
+              variant="secondary"
+              size="lg"
+              className="rounded-xl bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 dark:border-blue-800/20 shadow-sm font-semibold flex items-center gap-1"
+            >
+              Tambah <ChevronDown className={`h-4 w-4 transition-transform ${isTambahMenuOpen ? "rotate-180" : ""}`} />
+            </Button>
 
-          <Button onClick={handleCreateClick} size="lg" className="rounded-xl bg-blue-50 hover:bg-blue-100 border border-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 dark:border-blue-800/20 text-blue-700 shadow-sm font-semibold">
-            <Plus className="mr-2 h-4 w-4" /> Tambah Soal
-          </Button>
+            {isTambahMenuOpen && (
+              <div className="absolute right-0 mt-2 w-48 bg-card border border-slate-200 dark:border-slate-800 rounded-xl shadow-lg z-20 p-1 flex flex-col gap-0.5 animate-in fade-in duration-150">
+                <button
+                  onClick={() => {
+                    setIsTambahMenuOpen(false);
+                    handleCreateClick();
+                  }}
+                  className="flex items-center gap-2.5 p-2 px-3 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 text-sm rounded-lg transition-all font-medium text-left"
+                >
+                  <Plus className="h-4 w-4 text-blue-500" />
+                  Tambah Soal
+                </button>
+                <button
+                  onClick={() => {
+                    setIsTambahMenuOpen(false);
+                    handleBatchCreateClick();
+                  }}
+                  className="flex items-center gap-2.5 p-2 px-3 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 text-sm rounded-lg transition-all font-medium text-left"
+                >
+                  <Plus className="h-4 w-4 text-purple-500" />
+                  Tambah Batch
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -980,7 +1076,7 @@ const QuestionsPage = () => {
                         className="bg-green-50 text-green-700 hover:bg-green-100 border border-green-100 dark:bg-green-900/10 dark:text-green-400 dark:hover:bg-green-900/30 dark:border-green-800/40 h-7 text-xs"
                         onClick={() => handleEditClick(q)}
                       >
-                        Edit
+                        <Edit className="h-4 w-4 mr-1" /> Edit
                       </Button>
                       <Button
                         variant="destructive"
@@ -988,7 +1084,7 @@ const QuestionsPage = () => {
                         className="bg-rose-50 text-rose-600 hover:bg-rose-100 border border-rose-100 dark:bg-rose-900/10 dark:text-rose-400 dark:hover:bg-rose-900/30 dark:border-rose-800/40 h-7 text-xs"
                         onClick={() => handleDeleteClick(q)}
                       >
-                        Hapus
+                        <Trash className="h-4 w-4 mr-1" /> Hapus
                       </Button>
                     </div>
                   )}
@@ -1021,6 +1117,98 @@ const QuestionsPage = () => {
                 />
               </div>
             </FormField>
+
+            {/* 🏷️ Pengaturan Wacana Literasi */}
+            <div className="bg-blue-50/40 dark:bg-blue-950/20 p-3 rounded-xl border border-blue-100 dark:border-blue-900/40 space-y-3">
+              <div className="flex items-center space-x-2">
+                <input 
+                  type="checkbox" 
+                  id="literasi-active" 
+                  checked={isLiterasiActive} 
+                  onChange={(e) => {
+                    setIsLiterasiActive(e.target.checked);
+                    if (!e.target.checked) {
+                      setFormValues({ ...formValues, groupId: "", groupText: "" });
+                    }
+                  }} 
+                  className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
+                />
+                <label htmlFor="literasi-active" className="text-sm font-semibold text-blue-700 dark:text-blue-400 cursor-pointer">
+                  Aktifkan Soal Literasi
+                </label>
+              </div>
+
+              {isLiterasiActive && (
+                <div className="space-y-2.5 pt-2 border-t border-blue-100/60 dark:border-blue-900/40">
+                  <FormField id="groupId" label="Pilih / Hubungkan Literasi" error={undefined}>
+                    <select
+                      value={formValues.groupId === "NEW_LITERASI" ? "NEW_LITERASI" : (literasiMode === "create" ? "NEW_LITERASI" : formValues.groupId)}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val === "NEW_LITERASI") {
+                          setLiterasiMode("create");
+                          setFormValues({ ...formValues, groupId: "", groupText: "" });
+                        } else {
+                          setLiterasiMode("select");
+                          setFormValues({ 
+                            ...formValues, 
+                            groupId: val, 
+                            groupText: existingLiteracies[val] || "" 
+                          });
+                        }
+                      }}
+                      className="bg-card w-full rounded-md border text-sm h-9 px-2 cursor-pointer text-slate-700 dark:text-slate-200"
+                    >
+                      <option value="">-- Pilih Paket Literasi --</option>
+                      {Object.keys(existingLiteracies).map((key) => (
+                        <option key={key} value={key}>{key}</option>
+                      ))}
+                      <option value="NEW_LITERASI" className="font-bold text-blue-600">+ Buat Literasi Baru</option>
+                    </select>
+                    
+                    {/* 🔒 Pratinjau Terkunci (Read-Only) untuk Pilih Mode */}
+                    {literasiMode === "select" && formValues.groupId && existingLiteracies[formValues.groupId] && (
+                      <div className="mt-2 bg-slate-50 dark:bg-slate-900/40 p-2.5 rounded-lg border border-slate-100 dark:border-slate-800 flex flex-col gap-1">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide flex items-center gap-1">
+                          🔒 Wacana Terkunci (Hanya Edit di Soal #1 grup ini)
+                        </span>
+                        <div 
+                          className="text-[11px] text-slate-600 dark:text-slate-400 [&_img]:max-w-[30px] line-clamp-2 leading-relaxed" 
+                          dangerouslySetInnerHTML={{ __html: existingLiteracies[formValues.groupId] }} 
+                        />
+                      </div>
+                    )}
+                  </FormField>
+
+                  {literasiMode === "create" && (
+                    <div className="space-y-2 mt-2">
+                      <FormField id="newGroupId" label="Kode / Nama Literasi Baru" error={undefined}>
+                        <Input
+                          placeholder="Contoh: literasi1"
+                          value={formValues.groupId === "NEW_LITERASI" ? "" : formValues.groupId}
+                          onChange={(e) => setFormValues({ ...formValues, groupId: e.target.value })}
+                          className="bg-card rounded-md border text-sm h-9"
+                        />
+                      </FormField>
+
+                      <FormField id="groupText" label="Teks Wacana / Cerita Literasi Baru" error={undefined}>
+                        <div className="bg-card rounded-md border flex flex-col mt-1">
+                          <ReactQuill
+                            key={`group-create`}
+                            theme="snow"
+                            value={formValues.groupText || ""}
+                            onChange={(content) => setFormValues({ ...formValues, groupText: content })}
+                            placeholder="Ketikkan teks wacana literasi di sini..."
+                            modules={quillModules}
+                            className="[&_.ql-editor]:min-h-[100px] [&_.ql-container]:border-none [&_.ql-toolbar]:border-none [&_.ql-toolbar]:border-b"
+                          />
+                        </div>
+                      </FormField>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
 
             <FormField id="image" label="Gambar Cover Soal (Opsional)" error={undefined}>
               <div className="flex flex-col gap-2">
@@ -1127,21 +1315,41 @@ const QuestionsPage = () => {
 
       {/* Dialog Preview Soal */}
       <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
-        <DialogContent className="max-w-2xl bg-card max-h-[85vh] overflow-y-auto">
+        <DialogContent className="max-w-3xl bg-card max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Pratinjau Soal</DialogTitle>
           </DialogHeader>
           {previewQuestion && (
             <div className="space-y-4 pt-2">
               <div>
-                <div className="font-medium text-slate-800 dark:text-white break-words [&_p]:mb-1" dangerouslySetInnerHTML={{ __html: previewQuestion.text }} />
+                {/* 🔖 Render Literasi Jika Tergabung dalam Grup (Seperti di CBT Siswa) */}
+                {previewQuestion.groupId && (() => {
+                  const firstInGroup = questions.find(q => q.groupId === previewQuestion.groupId);
+                  if (firstInGroup) {
+                    const textToShow = firstInGroup.groupText || firstInGroup.text;
+                    if (!textToShow) return null;
+
+                    return (
+                      <div className="bg-blue-50/20 dark:bg-blue-950/10 p-4 rounded-xl border border-dashed border-blue-200 dark:border-blue-800/40 mb-3 space-y-2">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 bg-blue-50/80 dark:bg-blue-900/20 px-2 py-0.5 rounded-md border border-blue-200 dark:border-blue-800/40 w-fit block">Wacana Literasi</span>
+                        <div 
+                          className="text-sm leading-relaxed text-slate-700 dark:text-slate-300 [&_img]:max-w-sm [&_img]:mx-auto [&_img]:block font-medium p-0 [&_ol]:list-decimal [&_ul]:list-disc [&_ol]:pl-5 [&_ul]:pl-5 ql-editor" 
+                          dangerouslySetInnerHTML={{ __html: textToShow }} 
+                        />
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
+
+                <div className={`ql-editor font-normal text-slate-800 dark:text-white break-words [&_p]:mb-1 [&_ol]:list-decimal [&_ul]:list-disc [&_ol]:pl-5 [&_ul]:pl-5 ${previewQuestion.imageUrl ? "[&_img]:hidden" : ""}`} dangerouslySetInnerHTML={{ __html: previewQuestion.text }} />
                 {previewQuestion.imageUrl && (
                   <div className="mt-2">
                     <img src={previewQuestion.imageUrl} alt="Gambar Soal" className="max-w-md h-auto rounded-xl border border-slate-200 shadow-sm" />
                   </div>
                 )}
               </div>
-              <div className="grid gap-2 text-sm max-w-xl">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
                 {Object.keys(previewQuestion.choices || {}).map((cKey) => {
                   const choice = previewQuestion.choices[cKey];
                   return (
@@ -1150,7 +1358,7 @@ const QuestionsPage = () => {
                       <div className="flex items-start gap-3 flex-1 min-w-0">
                         <span className="font-bold text-slate-400 mt-0.5">{cKey.toUpperCase()}.</span>
                         <div className="flex flex-col gap-2 flex-1 min-w-0">
-                          <div className="break-words leading-relaxed [&_p]:m-0" dangerouslySetInnerHTML={{ __html: choice.text }} />
+                          <div className="break-words leading-relaxed [&_p]:m-0 ql-editor p-0 font-normal text-inherit" dangerouslySetInnerHTML={{ __html: choice.text }} />
                           {choice.imageUrl && (
                             <img src={choice.imageUrl} alt={`Pilihan ${cKey.toUpperCase()}`} className="max-w-[180px] h-auto rounded-lg border border-slate-200/60 shadow-sm" />
                           )}
@@ -1289,6 +1497,7 @@ const QuestionsPage = () => {
         description={confirmModal.description}
         type={confirmModal.type}
         confirmLabel={confirmModal.confirmLabel}
+        showCancel={confirmModal.showCancel}
       />
       <Dialog open={isGalleryOpen} onOpenChange={setIsGalleryOpen}>
         <DialogContent className="max-w-3xl bg-card max-h-[80vh] overflow-y-auto">
@@ -1332,8 +1541,8 @@ const QuestionsPage = () => {
                 <Image className="h-4 w-4" />
               </div>
               <div className="flex flex-col items-start">
-                  <span className="font-semibold text-xs">Unggah Dari Komputer</span>
-                  <span className="text-[10px] text-slate-400">File foto maksimal 2MB</span>
+                <span className="font-semibold text-xs">Unggah Dari Komputer</span>
+                <span className="text-[10px] text-slate-400">File foto maksimal 2MB</span>
               </div>
             </button>
             <button
@@ -1345,8 +1554,8 @@ const QuestionsPage = () => {
                 <FolderOpen className="h-4 w-4" />
               </div>
               <div className="flex flex-col items-start">
-                  <span className="font-semibold text-xs">Ambil Dari Galeri</span>
-                  <span className="text-[10px] text-slate-400">Gunakan file yang sudah di-upload</span>
+                <span className="font-semibold text-xs">Ambil Dari Galeri</span>
+                <span className="text-[10px] text-slate-400">Gunakan file yang sudah di-upload</span>
               </div>
             </button>
           </div>

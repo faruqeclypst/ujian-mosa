@@ -134,6 +134,12 @@ const GuruPage = () => {
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Kelola daftar guru dan mata pelajaran pengampu.</p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <ImportButton onImport={handleImportGuru} isLoading={isImporting} />
+          <ExportButton onExport={handleExportGuru} />
+          <Button onClick={() => downloadGuruImportTemplate()} variant="secondary" size="sm" className="rounded-xl border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300">
+            Template
+          </Button>
+
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
               <Button onClick={handleCreateClick} className="bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-700 text-white shadow-md shadow-emerald-500/10 rounded-xl" size="sm">
@@ -153,11 +159,6 @@ const GuruPage = () => {
               />
             </DialogContent>
           </Dialog>
-          <ImportButton onImport={handleImportGuru} isLoading={isImporting} />
-          <ExportButton onExport={handleExportGuru} />
-          <Button onClick={() => downloadGuruImportTemplate()} variant="outline" size="sm" className="rounded-xl border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300">
-            Template
-          </Button>
         </div>
       </div>
 

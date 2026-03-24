@@ -6,7 +6,7 @@ import { ConfirmationDialog } from "../components/ui/confirmation-dialog";
 import SiswaTable from "../components/tables/SiswaTable";
 import { ExportButton } from "../components/ui/export-button";
 import { exportSiswaToExcel } from "../lib/siswaExcel";
-import { ArrowLeftRight, Check, X } from "lucide-react";
+import { ArrowLeftRight, Check, X, RotateCw, Trash, Users } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "../components/ui/dialog";
 import FormField from "../components/forms/FormField";
 import { Select } from "../components/ui/select";
@@ -125,12 +125,15 @@ const AlumniPage = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between bg-card p-5 rounded-2xl border border-slate-200/60 dark:border-slate-800/40 shadow-sm backdrop-blur-sm">
         <div>
-          <h2 className="text-2xl font-semibold text-foreground">Data Alumni</h2>
-          <p className="text-sm text-muted-foreground">Daftar siswa yang sudah lulus atau menyelesaikan pendidikan.</p>
+          <h2 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
+            <Users className="h-5 w-5 text-blue-500" />
+            Data Alumni
+          </h2>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Daftar siswa yang sudah lulus atau menyelesaikan pendidikan.</p>
         </div>
-        <div>
+        <div className="flex flex-wrap gap-2">
           <ExportButton onExport={() => exportSiswaToExcel({ students: mappedStudents, filename: "data-alumni.xlsx" })} />
         </div>
       </div>
@@ -201,20 +204,20 @@ const AlumniPage = () => {
           customActions={(student) => (
             <div className="flex justify-end gap-2">
               <Button 
-                variant="outline" 
+                variant="secondary" 
                 size="sm" 
-                className="hover:bg-green-50 hover:text-green-600 h-8 text-xs font-medium"
+                className="bg-green-50 text-green-700 hover:bg-green-100 border border-green-100 dark:bg-green-900/10 dark:text-green-400 dark:hover:bg-green-900/30 dark:border-green-800/40 h-7 text-xs rounded-lg"
                 onClick={() => handleRestore(student.id)}
               >
-                Pulihkan
+                <RotateCw className="h-3.5 w-3.5 mr-1" /> Pulihkan
               </Button>
               <Button 
-                variant="destructive" 
+                variant="secondary" 
                 size="sm" 
-                className="bg-red-50 text-red-600 hover:bg-red-100 border-red-200 h-8 text-xs font-medium"
+                className="bg-rose-50 text-rose-600 hover:bg-rose-100 border border-rose-100 dark:bg-rose-900/10 dark:text-rose-400 dark:hover:bg-rose-900/30 dark:border-green-800/40 h-7 text-xs rounded-lg"
                 onClick={() => handleDeleteClick(student)}
               >
-                Hapus
+                <Trash className="h-3.5 w-3.5 mr-1" /> Hapus
               </Button>
             </div>
           )}

@@ -360,7 +360,7 @@ const ExamsPage = () => {
                     className="bg-green-50 text-green-700 hover:bg-green-100 border border-green-100 dark:bg-green-900/10 dark:text-green-400 dark:hover:bg-green-900/30 dark:border-green-800/40 h-7 text-xs" 
                     onClick={() => handleEditClick(exam)}
                   >
-                    Edit
+                    <Edit className="h-4 w-4 mr-1" /> Edit
                   </Button>
                   {activeTab === "arsip" && (
                     <Button 
@@ -369,7 +369,7 @@ const ExamsPage = () => {
                       className="bg-rose-50 text-rose-600 hover:bg-rose-100 border border-rose-100 dark:bg-rose-900/10 dark:text-rose-400 dark:hover:bg-rose-900/30 dark:border-rose-800/40 h-7 text-xs" 
                       onClick={() => handleDeleteClick(exam)}
                     >
-                      Hapus
+                      <Trash className="h-4 w-4 mr-1" /> Hapus
                     </Button>
                   )}
                 </div>

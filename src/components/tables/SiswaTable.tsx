@@ -2,6 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { DataTable } from "../ui/data-table";
 import { Button } from "../ui/button";
 import type { StudentData } from "../../types/piket";
+import { Edit, Trash } from "lucide-react";
 
 interface SiswaTableProps {
   students: Array<StudentData & { className?: string }>;
@@ -24,10 +25,14 @@ const SiswaTable = ({
 }: SiswaTableProps) => {
 
   const handleSelectAll = (checked: boolean) => {
+    const currentIds = students.map((s) => s.id);
     if (checked) {
-      onSelectChange(students.map((s) => s.id));
+      // Gabungkan: Tambahkan ID tabel sekarang ke pilihan yang ada tanpa duplikasi
+      const merged = Array.from(new Set([...selectedIds, ...currentIds]));
+      onSelectChange(merged);
     } else {
-      onSelectChange([]);
+      // Lepaskan: Buang ID tabel sekarang saja dari pilihan
+      onSelectChange(selectedIds.filter((id) => !currentIds.includes(id)));
     }
   };
 
@@ -39,7 +44,7 @@ const SiswaTable = ({
     }
   };
 
-  const isAllSelected = students.length > 0 && selectedIds.length === students.length;
+  const isAllSelected = students.length > 0 && students.every(s => selectedIds.includes(s.id));
 
   const columns = [
     {
@@ -76,20 +81,20 @@ const SiswaTable = ({
     customActions ? customActions(student) : (
       <div className="flex justify-end gap-2">
         <Button 
-          variant="outline" 
+          variant="secondary" 
           size="sm" 
           className="bg-green-50 text-green-700 hover:bg-green-100 border border-green-100 dark:bg-green-900/10 dark:text-green-400 dark:hover:bg-green-900/30 dark:border-green-800/40 h-7 text-xs rounded-lg" 
           onClick={() => onEdit(student)}
         >
-          Edit
+          <Edit className="h-3.5 w-3.5 mr-1" /> Edit
         </Button>
         <Button 
-          variant="outline" 
+          variant="secondary" 
           size="sm" 
           className="bg-rose-50 text-rose-600 hover:bg-rose-100 border border-rose-100 dark:bg-rose-900/10 dark:text-rose-400 dark:hover:bg-rose-900/30 dark:border-rose-800/40 h-7 text-xs rounded-lg" 
           onClick={() => onDelete(student)}
         >
-          Hapus
+          <Trash className="h-3.5 w-3.5 mr-1" /> Hapus
         </Button>
       </div>
     )

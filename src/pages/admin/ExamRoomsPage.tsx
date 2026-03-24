@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Plus, Trash, Edit, RefreshCw, Users, Archive, RotateCw, FileSpreadsheet, BookOpen, ClipboardList, Lock } from "lucide-react";
+import { Plus, Trash, Edit, RefreshCw, Users, Archive, RotateCw, FileSpreadsheet, BookOpen, ClipboardList, Lock, ChevronDown } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import * as XLSX from "xlsx-js-style";
 import { Button } from "../../components/ui/button";
@@ -32,6 +32,7 @@ export interface ExamRoomData {
   room_code?: string;
   token_updated_at?: number;
   status?: "archive" | null; // <--- Status Arsip
+  room_name?: string;
 }
 
 const ExamRoomsPage = () => {
@@ -48,6 +49,7 @@ const ExamRoomsPage = () => {
   const [selectedRoom, setSelectedRoom] = useState<ExamRoomData | null>(null);
 
   const [formValues, setFormValues] = useState({
+    room_name: "",
     examId: "",
     classId: "all", // "all" or specific classId
     allClasses: true,
@@ -91,14 +93,23 @@ const ExamRoomsPage = () => {
   const [monitorClassFilter, setMonitorClassFilter] = useState<string>("all");
   const [monitorPage, setMonitorPage] = useState(1);
   const [monitorPageSize, setMonitorPageSize] = useState(10);
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null); // <--- Kontrol Dropdown Aksis
 
   const [limitDialogOpen, setLimitDialogOpen] = useState(false);
   const [limitNisn, setLimitNisn] = useState("");
   const [limitValue, setLimitValue] = useState("1");
+  const [previewImage, setPreviewImage] = useState<string | null>(null); // <--- Pratinjau Zoom Gambar Logs
 
   const [universalToken, setUniversalToken] = useState("");
-  const [tokenUpdatedAt, setTokenUpdatedAt] = useState<number>(Date.now());
-  const [timeLeft, setTimeLeft] = useState<string>("05:00");
+  const [tokenUpdatedAt, setTokenUpdatedAt] = useState<number>(0);
+  const [timeLeft, setTimeLeft] = useState<string>("--:--");
+
+  // 🖱️ Menarik/Menutup Dropdown Menu otomatis saat Klik di Luar kontainer
+  useEffect(() => {
+    const handleGlobalClick = () => setOpenMenuId(null);
+    document.addEventListener("click", handleGlobalClick);
+    return () => document.removeEventListener("click", handleGlobalClick);
+  }, []);
 
   useEffect(() => {
     return onValue(ref(database, "settings"), (snap) => {
@@ -111,6 +122,8 @@ const ExamRoomsPage = () => {
   }, []);
 
   useEffect(() => {
+    if (!tokenUpdatedAt) return;
+
     const timer = setInterval(() => {
       const now = Date.now();
       const nextUpdate = tokenUpdatedAt + 5 * 60 * 1000;
@@ -225,14 +238,39 @@ const ExamRoomsPage = () => {
     },
     {
       key: "examTitle",
-      label: "Ujian",
+      label: "Ruang / Bank Soal",
       sortable: true,
-      render: (v: string) => <span className="font-medium text-slate-800 dark:text-slate-100">{v}</span>
+      render: (v: string, item: ExamRoomData) => (
+        <div className="flex flex-col gap-0.5">
+          <span className="font-bold text-slate-800 dark:text-slate-100 text-sm">{item.room_name || "Tanpa Nama"}</span>
+          <span className="text-[10px] text-slate-400 font-medium tracking-wide">{v}</span>
+        </div>
+      )
     },
     {
       key: "className",
       label: "Kelas",
       sortable: true,
+      render: (v: string, item: ExamRoomData) => {
+        if (item.allClasses) {
+          return (
+            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-100 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800/40 shadow-sm">
+              Semua Kelas
+            </span>
+          );
+        }
+        if (!v) return <span className="text-slate-400 text-xs">-</span>;
+        
+        return (
+          <div className="flex flex-wrap gap-1 max-w-[120px]">
+            {v.split(", ").map((cls, idx) => (
+              <span key={idx} className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-700 border border-slate-200 dark:bg-slate-800/80 dark:text-slate-300 dark:border-slate-700">
+                {cls}
+              </span>
+            ))}
+          </div>
+        );
+      }
     },
     {
       key: "duration",
@@ -241,13 +279,20 @@ const ExamRoomsPage = () => {
     },
     {
       key: "start_time",
-      label: "Waktu Mulai - Selesai",
+      label: "Waktu",
       render: (v: any, item: ExamRoomData) => (
-        <span className="text-slate-500 text-xs">
-          {new Date(item.start_time).toLocaleDateString("id-ID")} {new Date(item.start_time).toLocaleTimeString("id-ID", { hour: '2-digit', minute: '2-digit' })}
-          <span className="mx-1">-</span>
-          {new Date(item.end_time).toLocaleTimeString("id-ID", { hour: '2-digit', minute: '2-digit' })}
-        </span>
+        <div className="flex flex-col gap-0.5 text-xs text-slate-600 dark:text-slate-300 font-medium whitespace-nowrap">
+          <div className="flex items-center">
+            <span className="w-14">Mulai</span>
+            <span className="mr-1.5">:</span>
+            <span>{new Date(item.start_time).toLocaleDateString("id-ID", { day: '2-digit', month: '2-digit' })} {new Date(item.start_time).toLocaleTimeString("id-ID", { hour: '2-digit', minute: '2-digit' })}</span>
+          </div>
+          <div className="flex items-center">
+            <span className="w-14">Selesai</span>
+            <span className="mr-1.5">:</span>
+            <span>{new Date(item.end_time).toLocaleDateString("id-ID", { day: '2-digit', month: '2-digit' })} {new Date(item.end_time).toLocaleTimeString("id-ID", { hour: '2-digit', minute: '2-digit' })}</span>
+          </div>
+        </div>
       )
     },
     {
@@ -275,7 +320,7 @@ const ExamRoomsPage = () => {
         } else if (now > end) {
           return (
             <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold tracking-wide bg-red-50 text-red-600 border border-red-100 dark:bg-red-950/20 dark:text-red-400 dark:border-red-900/40">
-              Waktu Habis
+              Selesai
             </span>
           );
         } else {
@@ -488,6 +533,7 @@ const ExamRoomsPage = () => {
             updates[`attempts/${att.id}/submit_time`] = now;
           });
           await update(ref(database), updates);
+          setAttempts(prev => prev.map(a => a.status === "ongoing" ? { ...a, status: "submitted", submit_time: now } : a));
           showAlert("Berhasil", `${ongoing.length} siswa berhasil diselesaikan secara paksa.`, "success");
         } catch (error) {
           showAlert("Gagal", "Gagal menyelesaikan paksa ujian siswa.", "danger");
@@ -633,6 +679,7 @@ const ExamRoomsPage = () => {
     setDialogMode("create");
     setSelectedRoom(null);
     setFormValues({
+      room_name: "",
       examId: exams[0]?.id || "",
       classId: "all",
       allClasses: true,
@@ -652,6 +699,7 @@ const ExamRoomsPage = () => {
     setDialogMode("edit");
     setSelectedRoom(room);
     setFormValues({
+      room_name: room.room_name || "",
       examId: room.examId,
       classId: room.allClasses ? "all" : room.classId || "",
       allClasses: room.allClasses || false,
@@ -670,6 +718,7 @@ const ExamRoomsPage = () => {
     e.preventDefault();
     try {
       const payload = {
+        room_name: formValues.room_name,
         examId: formValues.examId,
         classId: formValues.classId === "all" ? null : formValues.classId,
         allClasses: formValues.classId === "all",
@@ -713,6 +762,7 @@ const ExamRoomsPage = () => {
         status: "ongoing",
         cheatCount: 0
       });
+      setAttempts(prev => prev.map(a => a.id === attemptId ? { ...a, status: "ongoing", cheatCount: 0 } : a));
       showAlert("Berhasil", "Siswa berhasil diunlock.", "success");
     } catch (error) {
       showAlert("Gagal", "Gagal mengunlock siswa.", "danger");
@@ -732,6 +782,7 @@ const ExamRoomsPage = () => {
           const attemptId = `${nisn}_${monitorRoom.id}`;
           await remove(ref(database, `attempts/${attemptId}`));
           await remove(ref(database, `answers/${attemptId}`));
+          setAttempts(prev => prev.filter(att => att.id !== attemptId));
           showAlert("Berhasil", "Sesi siswa berhasil direset total.", "success");
         } catch (error) {
           showAlert("Gagal", "Gagal mereset sesi.", "danger");
@@ -764,6 +815,8 @@ const ExamRoomsPage = () => {
         status: currentStatus === "LOCKED" ? "ongoing" : currentStatus, // Auto Unlock
       });
 
+      setAttempts(prev => prev.map(a => a.id === attemptId ? { ...a, extraCheatLimit: (currentExtra + added), status: (currentStatus === "LOCKED" ? "ongoing" : currentStatus) } : a));
+
       showAlert("Berhasil", `Berhasil menambah +${added} batas pelanggaran untuk siswa.`, "success");
     } catch {
       showAlert("Gagal", "Gagal memperbarui batas.", "danger");
@@ -784,6 +837,7 @@ const ExamRoomsPage = () => {
           await update(ref(database, `attempts/${attemptId}`), {
             cheatCount: 0
           });
+          setAttempts(prev => prev.map(a => a.id === attemptId ? { ...a, cheatCount: 0 } : a));
           showAlert("Berhasil", "Pelanggaran siswa berhasil direset.", "success");
         } catch (error) {
           showAlert("Gagal", "Gagal mereset cheat count.", "danger");
@@ -938,7 +992,7 @@ const ExamRoomsPage = () => {
                     className="bg-green-50 text-green-700 hover:bg-green-100 border border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:hover:bg-green-900/50 dark:border-green-800/40"
                     onClick={() => handleEditClick(room)}
                   >
-                    Edit
+                    <Edit className="h-4 w-4 mr-1" /> Edit
                   </Button>
                   {activeTab === "arsip" && (
                     <Button
@@ -947,7 +1001,7 @@ const ExamRoomsPage = () => {
                       className="bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-900/50 dark:border-red-800/40"
                       onClick={() => handleDeleteClick(room)}
                     >
-                      Hapus
+                      <Trash className="h-4 w-4 mr-1" /> Hapus
                     </Button>
                   )}
                 </div>
@@ -965,14 +1019,24 @@ const ExamRoomsPage = () => {
           </DialogHeader>
 
           <form onSubmit={handleSubmit} className="space-y-4 pt-2">
-            <FormField id="examId" label="Pilih Ujian" error={undefined}>
+            <FormField id="room_name" label="Nama Ruang Ujian" error={undefined}>
+              <Input
+                placeholder="Contoh: Tryout UTBK - Gelombang 1"
+                value={formValues.room_name}
+                onChange={(e) => setFormValues({ ...formValues, room_name: e.target.value })}
+                required
+              />
+              <p className="text-[10px] text-slate-400 mt-1">Nama ini yang akan ditampilkan di layar dashboard dashboard siswa Anda.</p>
+            </FormField>
+
+            <FormField id="examId" label="Pilih Bank Soal" error={undefined}>
               <select
                 value={formValues.examId}
                 onChange={(e) => setFormValues({ ...formValues, examId: e.target.value })}
                 required
                 className="w-full rounded-md border border-slate-200 dark:border-slate-800 bg-card text-sm p-2"
               >
-                <option value="">-- Pilih Ujian --</option>
+                <option value="">-- Pilih Bank Soal --</option>
                 {exams.map((e) => <option key={e.id} value={e.id}>{e.title}</option>)}
               </select>
             </FormField>
@@ -1334,17 +1398,46 @@ const ExamRoomsPage = () => {
                             </TableCell>
                             <TableCell className="text-right">
                               <div className="flex justify-end gap-1.5 items-center whitespace-nowrap">
-                                {attempt?.status === "LOCKED" && (
-                                  <Button size="sm" variant="secondary" className="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-400 dark:hover:bg-emerald-900/50 dark:border-emerald-800/40 h-7 text-[10px]" onClick={() => handleUnlockStudent(siswa.nisn)}>Buka Kunci</Button>
-                                )}
                                 {attempt && (
                                   <>
-                                    <Button size="sm" variant="secondary" className="bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 dark:border-blue-800/40 h-7 text-[10px]" onClick={() => openLimitDialog(siswa.nisn)}>+ Limit</Button>
+                                    {/* 1. Logs & Reset Cheat tetap Standalone */}
                                     <Button size="sm" variant="secondary" className="bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-100 dark:bg-amber-900/30 dark:text-amber-400 dark:hover:bg-amber-900/50 dark:border-amber-800/40 h-7 text-[10px]" onClick={() => handleResetCheatCount(siswa.nisn)}>Reset Cheat</Button>
-                                    <Button size="sm" variant="destructive" className="bg-rose-50 text-rose-600 hover:bg-rose-100 border border-rose-100 dark:bg-rose-900/30 dark:text-rose-400 dark:hover:bg-rose-900/50 dark:border-rose-800/40 h-7 text-[10px]" onClick={() => handleResetSession(siswa.nisn)}>Reset Sesi</Button>
+
                                     <Button size="sm" variant="secondary" className="bg-sky-50 text-sky-700 hover:bg-sky-100 border border-sky-100 dark:bg-sky-900/30 dark:text-sky-400 dark:hover:bg-sky-900/50 dark:border-sky-800/40 h-7 text-[10px]" onClick={() => setExpandedSiswa(expandedSiswa === siswa.nisn ? null : siswa.nisn)}>
                                       {expandedSiswa === siswa.nisn ? "Tutup" : "Logs"}
                                     </Button>
+
+                                    {/* 2. Tombol Lainnya masuk ke Dropdown Menu */}
+                                    <div className="relative">
+                                      <Button
+                                        size="sm"
+                                        variant="secondary"
+                                        className="h-7 px-2 text-[10px] bg-slate-100/80 text-slate-700 hover:bg-slate-200 border border-slate-200 dark:bg-slate-800/60 dark:text-slate-300 dark:hover:bg-slate-700/80 dark:border-slate-700/60 font-medium flex items-center gap-1 rounded-md shadow-sm transition-colors"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setOpenMenuId(openMenuId === siswa.nisn ? null : siswa.nisn);
+                                        }}
+                                      >
+                                        Menu
+                                        <ChevronDown className="w-3 h-3 opacity-60 ml-0.5" />
+                                      </Button>
+
+                                      {openMenuId === siswa.nisn && (
+                                        <div className="absolute right-0 mt-1 w-32 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg z-30 py-1 overflow-hidden">
+                                          {attempt?.status === "LOCKED" && (
+                                            <button onClick={(e) => { e.stopPropagation(); handleUnlockStudent(siswa.nisn); setOpenMenuId(null); }} className="w-full text-left px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-700 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5 border-b border-slate-100 dark:border-slate-700/60">
+                                              <Lock className="w-3.5 h-3.5 opacity-80" /> Buka Kunci
+                                            </button>
+                                          )}
+                                          <button onClick={(e) => { e.stopPropagation(); openLimitDialog(siswa.nisn); setOpenMenuId(null); }} className="w-full text-left px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-700 text-[10px] font-semibold text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
+                                            <Plus className="w-3.5 h-3.5 opacity-70 text-slate-400" /> + Limit
+                                          </button>
+                                          <button onClick={(e) => { e.stopPropagation(); handleResetSession(siswa.nisn); setOpenMenuId(null); }} className="w-full text-left px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-700 text-[10px] font-semibold text-rose-600 dark:text-rose-400 flex items-center gap-1.5">
+                                            <RefreshCw className="w-3.5 h-3.5 opacity-70 text-rose-400" /> Reset Sesi
+                                          </button>
+                                        </div>
+                                      )}
+                                    </div>
                                   </>
                                 )}
                               </div>
@@ -1361,11 +1454,41 @@ const ExamRoomsPage = () => {
                                   {monitorQuestions.map((q, qIdx) => {
                                     const ansId = sisAnswers[q.id];
                                     const isCorrect = ansId && q.choices[ansId]?.isCorrect === true;
+
+                                    // 📸 Ekstrak Semua Gambar dari Teks & Cover (untuk ditaruh di bawah)
+                                    const extractedImages: string[] = [];
+                                    if (q.imageUrl) extractedImages.push(q.imageUrl);
+                                    if (q.text && q.text.includes("<img")) {
+                                      const doc = new DOMParser().parseFromString(q.text, "text/html");
+                                      doc.querySelectorAll("img").forEach(img => {
+                                        const src = img.getAttribute("src");
+                                        if (src) extractedImages.push(src);
+                                      });
+                                    }
+
                                     return (
                                       <div key={q.id} className="bg-card p-3 rounded-xl border border-slate-200 dark:border-slate-800 shadow-[0_2px_4px_rgba(0,0,0,0.02)] flex flex-col gap-2">
-                                        <div className="flex gap-2">
-                                          <span className="text-slate-400 font-bold shrink-0">#{qIdx + 1}</span>
-                                          <div className="text-xs font-medium text-slate-700 dark:text-slate-300 leading-relaxed truncate-3-lines" dangerouslySetInnerHTML={{ __html: q.text }} />
+                                        <div className="flex flex-col gap-1.5 flex-1">
+                                          <div className="flex gap-2">
+                                            <span className="text-slate-400 font-bold shrink-0 text-xs">#{qIdx + 1}</span>
+                                            <div
+                                              className="text-xs font-medium text-slate-700 dark:text-slate-300 leading-relaxed [&_img]:hidden"
+                                              dangerouslySetInnerHTML={{ __html: q.text }}
+                                            />
+                                          </div>
+
+                                          {extractedImages.length > 0 && (
+                                            <div className="flex items-center gap-1 mt-1 flex-wrap pl-6">
+                                              {extractedImages.map((src, idx) => (
+                                                <img
+                                                  key={idx}
+                                                  src={src}
+                                                  className="max-w-[45px] max-h-[45px] object-cover rounded-md cursor-pointer hover:opacity-80 border border-slate-200 dark:border-slate-700 shadow-sm"
+                                                  onClick={() => setPreviewImage(src)}
+                                                />
+                                              ))}
+                                            </div>
+                                          )}
                                         </div>
                                         <div className={`mt-auto p-2 rounded-lg flex items-center justify-between transition-colors ${isCorrect ? "bg-emerald-50 text-emerald-700 border border-emerald-100 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-800/40" : ansId ? "bg-rose-50 text-rose-700 border border-rose-100 dark:bg-rose-950/20 dark:text-rose-400 dark:border-rose-800/40" : "bg-slate-50 text-slate-400 border border-slate-100 dark:bg-slate-800/60 dark:text-slate-500 dark:border-slate-700"}`}>
                                           <div className="flex flex-col">
@@ -1550,6 +1673,19 @@ const ExamRoomsPage = () => {
               </div>
             );
           })()}
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog Preview Gambar Zoom Logs */}
+      <Dialog open={!!previewImage} onOpenChange={() => setPreviewImage(null)}>
+        <DialogContent className="max-w-xl bg-transparent border-none p-0 flex items-center justify-center pointer-events-auto z-50">
+          {previewImage && (
+            <img
+              src={previewImage}
+              alt="Pratinjau Zoom"
+              className="max-w-full max-h-[80vh] object-contain rounded-xl shadow-2xl border border-slate-800/20"
+            />
+          )}
         </DialogContent>
       </Dialog>
 

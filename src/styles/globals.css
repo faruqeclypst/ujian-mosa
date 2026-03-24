@@ -97,3 +97,39 @@ body {
     background: #94a3b8;
   }
 }
+
+@layer base {
+  img {
+    max-width: 100%;
+    height: auto;
+  }
+}
+
+/* 📸 Force All images inside rich text content/editor to center by default */
+.ql-editor img {
+  display: block !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+}
+
+/* 📝 Quill Alignment Utilities untuk Pratinjau */
+.ql-align-center {
+  text-align: center !important;
+}
+.ql-align-right {
+  text-align: right !important;
+}
+.ql-align-justify {
+  text-align: justify !important;
+}
+
+/* Render alignment untuk gambar di Quill */
+.ql-align-center img {
+  display: block !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+}
+.ql-align-right img {
+  display: block !important;
+  margin-left: auto !important;
+}

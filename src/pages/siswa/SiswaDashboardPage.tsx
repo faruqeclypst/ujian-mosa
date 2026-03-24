@@ -22,7 +22,6 @@ interface ExamRoom {
 
 const SiswaDashboardPage = () => {
   const { siswa, logoutSiswa } = useSiswaAuth();
-  const [rooms, setRooms] = useState<ExamRoom[]>([]);
   const [loading, setLoading] = useState(true);
 
   // For token dialog
@@ -31,62 +30,59 @@ const SiswaDashboardPage = () => {
   const [tokenError, setTokenError] = useState("");
   const [isValidating, setIsValidating] = useState(false);
 
-  // Search Room Code States
-  const [searchCode, setSearchCode] = useState("");
-  const [searchError, setSearchError] = useState("");
-  const [activeRoom, setActiveRoom] = useState<any>(null);
+  const [activeRooms, setActiveRooms] = useState<any[]>([]);
 
-  const handleSearchRoom = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSearchError("");
-    setActiveRoom(null);
+  useEffect(() => {
+    if (!siswa?.classId) return;
 
-    const code = searchCode.trim().toUpperCase();
-    if (!code) return;
+    // 1. Tarik Data Ujian (Exams) terlebih dahulu untuk caching
+    const examsRef = ref(database, "exams");
+    get(examsRef).then((examsSnap) => {
+      const examsData = examsSnap.exists() ? examsSnap.val() : {};
 
-    try {
+      // 2. Monitoring Real-Time Ruang Ujian
       const roomsRef = ref(database, "exam_rooms");
-      const snapshot = await get(roomsRef);
-      
-      if (snapshot.exists()) {
-        const roomsData = snapshot.val();
-        const matchedKey = Object.keys(roomsData).find(
-          (k) => roomsData[k].room_code && roomsData[k].room_code.toUpperCase() === code
-        );
+      return onValue(roomsRef, (snapshot) => {
+        setLoading(true);
+        if (snapshot.exists()) {
+          const roomsData = snapshot.val();
+          const now = Date.now();
+          const validRooms: any[] = [];
 
-        if (!matchedKey) {
-          throw new Error("Kode ruang ujian tidak terdaftar!");
+          Object.keys(roomsData).forEach((key) => {
+            const room = roomsData[key];
+
+            if (room.status === "archive") return;
+
+            // ✔️ Validasi Kelas Siswa
+            const hasClassAccess = room.allClasses || 
+              (room.classId && room.classId.split(",").includes(siswa.classId));
+            
+            if (!hasClassAccess) return;
+
+            // ✔️ Validasi Jam / Periode Ujian
+            const start = new Date(room.start_time).getTime();
+            const end = new Date(room.end_time).getTime();
+            if (now < start || now > end) return;
+
+            // ➕ Join Judul Ujian
+            const exam = examsData[room.examId];
+            validRooms.push({
+              id: key,
+              ...room,
+              examTitle: room.room_name || exam?.title || "Ujian Tanpa Judul",
+              subject: exam?.subject || "Mata Pelajaran"
+            });
+          });
+
+          setActiveRooms(validRooms);
+        } else {
+          setActiveRooms([]);
         }
-
-        const room = roomsData[matchedKey];
-
-        // Validasi Kelas Siswa
-        if (!room.allClasses && (!room.classId || !room.classId.split(",").includes(siswa?.classId))) {
-          throw new Error("Ruang ujian ini bukan diperuntukkan kelas Anda!");
-        }
-
-        // Load Exam Title
-        let examTitle = "Ujian Tanpa Judul";
-        let subject = "Mapel";
-        if (room.examId) {
-          const examSnap = await get(ref(database, `exams/${room.examId}`));
-          if (examSnap.exists()) {
-            examTitle = examSnap.val().title || examTitle;
-            subject = examSnap.val().subject || subject;
-          }
-        }
-
-        setActiveRoom({ id: matchedKey, ...room, examTitle, subject });
-        setSelectedRoom({ id: matchedKey, ...room, examTitle }); // Buka dialog token auto
-        setTokenInput("");
-        setTokenError("");
-      } else {
-        throw new Error("Belum ada ruang ujian aktif.");
-      }
-    } catch (err: any) {
-      setSearchError(err.message || "Gagal memuat ruang ujian.");
-    }
-  };
+        setLoading(false);
+      });
+    });
+  }, [siswa?.classId]);
 
   const handleValidateToken = async () => {
     if (!selectedRoom) return;
@@ -163,37 +159,38 @@ const SiswaDashboardPage = () => {
       <main className="max-w-4xl mx-auto p-6 flex items-center justify-center min-h-[calc(100vh-4rem)]">
         <div className="w-full max-w-md bg-card dark:bg-slate-800 p-8 rounded-3xl border dark:border-slate-800 shadow-sm space-y-5">
            <div className="text-center space-y-1">
-              <h2 className="text-xl font-bold text-slate-900 dark:text-white">Cari Ruang Ujian</h2>
-              <p className="text-xs text-slate-500">Masukkan Kode Ruang untuk memulai pengerjaan.</p>
+              <h2 className="text-xl font-bold text-slate-900 dark:text-white">Ujian Berlangsung</h2>
+              <p className="text-xs text-slate-500">Pilih ruang ujian Anda di bawah untuk memulai.</p>
            </div>
 
-           {searchError && (
-              <div className="bg-red-50 border border-red-100 text-red-600 text-xs px-3 py-2.5 rounded-xl text-center font-medium">
-                 {searchError}
-              </div>
-           )}
-
-           <form onSubmit={handleSearchRoom} className="space-y-4">
-              <Input 
-                 value={searchCode}
-                 onChange={(e) => setSearchCode(e.target.value)}
-                 placeholder="Kode Ruang (Contoh: MTK)"
-                 className="text-center font-bold text-lg h-12 uppercase tracking-wide rounded-xl"
-                 maxLength={20}
-              />
-              <Button type="submit" className="w-full h-12 bg-gradient-to-r from-blue-600 to-indigo-600 hover:opacity-90 font-bold rounded-xl text-white shadow-md">
-                 Masuk Ruangan
-              </Button>
-           </form>
-           
-           {activeRoom && (
-              <div className="mt-4 p-3 bg-slate-50 rounded-xl border border-dashed flex justify-between items-center text-xs">
-                 <div>
-                    <p className="font-semibold text-slate-700">{activeRoom.examTitle}</p>
-                    <p className="text-slate-500">{activeRoom.subject}</p>
+           {loading ? (
+             <div className="text-center py-6 text-slate-400 text-sm">Memuat ruang ujian...</div>
+           ) : activeRooms.length === 0 ? (
+             <div className="bg-slate-50 dark:bg-slate-900/30 border border-dashed text-slate-400 text-xs px-3 py-6 rounded-xl text-center font-medium">
+                Belum ada ujian aktif yang tersedia untuk kelas Anda saat ini.
+             </div>
+           ) : (
+             <div className="space-y-3">
+               {activeRooms.map((room) => (
+                 <div key={room.id} className="p-4 bg-slate-50 dark:bg-slate-900/30 rounded-2xl border border-slate-100 dark:border-slate-800 flex justify-between items-center transition-all hover:bg-slate-100/50 dark:hover:bg-slate-800/50 shadow-[0_2px_4px_rgba(0,0,0,0.01)]">
+                    <div className="space-y-0.5">
+                       <p className="font-bold text-slate-800 dark:text-slate-100 text-sm">{room.examTitle}</p>
+                       <p className="text-[11px] font-medium text-indigo-500">{room.subject}</p>
+                    </div>
+                    <Button 
+                      size="sm" 
+                      onClick={() => {
+                        setSelectedRoom(room);
+                        setTokenInput("");
+                        setTokenError("");
+                      }}
+                      className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:opacity-90 font-bold h-8 text-xs rounded-xl text-white px-4"
+                    >
+                      Masuk
+                    </Button>
                  </div>
-                 <Button size="sm" onClick={() => setSelectedRoom(activeRoom)}>Validasi Token</Button>
-              </div>
+               ))}
+             </div>
            )}
         </div>
       </main>

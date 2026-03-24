@@ -12,6 +12,8 @@ interface Question {
   id: string;
   text: string;
   imageUrl?: string;
+  groupId?: string; // <--- Sesuai literasi
+  groupText?: string; // <--- Teks wacana
   choices: Record<string, { text: string; imageUrl?: string }>;
 }
 
@@ -163,7 +165,24 @@ const CBTPage = () => {
             }
           });
 
-          // Handle Shuffling/Saves
+          // ⚡ Helper Acak Soal Berkelompok (Literasi)
+          const clusterShuffleIds = (list: string[]): string[] => {
+            const grouped: Record<string, string[]> = {};
+            const standalone: string[] = [];
+            list.forEach((id) => {
+              const q = loadedQuestions.find((item) => item.id === id);
+              if (q?.groupId) {
+                if (!grouped[q.groupId]) grouped[q.groupId] = [];
+                grouped[q.groupId].push(id);
+              } else {
+                standalone.push(id);
+              }
+            });
+            const collection: (string | string[])[] = [...standalone, ...Object.values(grouped)];
+            const shuffledCollection = collection.sort(() => Math.random() - 0.5);
+            return shuffledCollection.flat();
+          };
+
           const orderKey = `order_${siswa.nisn}_${roomId}`;
           let savedOrder = sessionStorage.getItem(orderKey);
           let order: string[] = [];
@@ -173,25 +192,19 @@ const CBTPage = () => {
           if (savedOrder) {
             try {
               order = JSON.parse(savedOrder);
-              // 🧹 Bersihkan ID yang sudah dihapus oleh Admin
               order = order.filter((id) => currentIds.includes(id));
-              
-              // ➕ Tambahkan ID baru (jika Admin baru menambahkan soal) agar tidak hilang
               const newIds = currentIds.filter((id) => !order.includes(id));
               if (newIds.length > 0) {
-                // acak soal baru lalu gabung di belakang
-                order = [...order, ...newIds.sort(() => Math.random() - 0.5)];
+                 // acak soal baru dengan metode cluster, gabung di belakang
+                 order = [...order, ...clusterShuffleIds(newIds)];
               }
-
               sessionStorage.setItem(orderKey, JSON.stringify(order));
-            } catch (e) {
-              order = [];
-            }
+            } catch (e) { order = []; }
           } 
           
           if (order.length === 0) {
             // Shuffle
-            order = currentIds.sort(() => Math.random() - 0.5);
+            order = clusterShuffleIds(currentIds);
             sessionStorage.setItem(orderKey, JSON.stringify(order));
           }
 
@@ -510,7 +523,7 @@ const CBTPage = () => {
         {/* Center: Subject & Exam */}
         <div className="flex flex-col items-center text-center">
           <p className="font-bold text-slate-800 dark:text-slate-100 line-clamp-1">{roomData?.subject || "Ujian"}</p>
-          <p className="text-[10px] text-slate-500 font-medium">{roomData?.examTitle || "CBT"}</p>
+          <p className="text-[10px] text-slate-500 font-medium">{roomData?.room_name || roomData?.examTitle || "CBT"}</p>
         </div>
 
         {/* Right: Student Info */}
@@ -551,8 +564,36 @@ const CBTPage = () => {
                     />
                   </div>
                 )}
+
+                {/* 🔖 Render Literasi dari Soal Pertama di Grup ini */}
+                {currentQuestion.groupId && (() => {
+                  const firstInGroup = questions.find(q => q.groupId === currentQuestion.groupId);
+                  if (firstInGroup) {
+                    // Prioritaskan groupText (Wacana Terpisah)
+                    const textToShow = firstInGroup.groupText || firstInGroup.text;
+                    if (!textToShow) return null;
+
+                    const hasCover = firstInGroup.imageUrl;
+                    return (
+                      <div className="bg-blue-50/20 dark:bg-blue-950/10 p-4 rounded-xl border border-dashed border-blue-200 dark:border-blue-800/40 mb-3 space-y-2">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 bg-blue-50/80 dark:bg-blue-900/20 px-2 py-0.5 rounded-md border border-blue-200 dark:border-blue-800/40 w-fit block">Wacana Literasi</span>
+                        {hasCover && (
+                          <div className="mt-2">
+                            <img src={getProxiedUrl(firstInGroup.imageUrl)} className="max-w-sm h-auto mx-auto block rounded-lg border shadow-sm" alt="Cover Literasi" />
+                          </div>
+                        )}
+                        <div 
+                          className={`text-sm sm:text-base leading-relaxed text-slate-700 dark:text-slate-300 [&_img]:max-w-sm [&_img]:mx-auto [&_img]:block font-medium p-0 [&_ol]:list-decimal [&_ul]:list-disc [&_ol]:pl-5 [&_ul]:pl-5 [&_ol]:my-2 [&_ul]:my-2 ql-editor ${hasCover ? "[&_img]:hidden" : ""}`} 
+                          dangerouslySetInnerHTML={{ __html: proxifyHtml(textToShow) }} 
+                        />
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
+
                 <div 
-                  className="text-base sm:text-lg font-semibold leading-relaxed text-slate-800 dark:text-white mt-2 [&_img]:max-w-full [&_img]:h-auto [&_img]:rounded-xl [&_img]:mt-2 [&_img]:border [&_img]:shadow-sm break-words" 
+                  className="text-base sm:text-lg font-normal leading-relaxed text-slate-800 dark:text-white mt-2 [&_img]:max-w-full [&_img]:h-auto [&_img]:rounded-xl [&_img]:mt-2 [&_img]:border [&_img]:shadow-sm break-words [&_ol]:list-decimal [&_ul]:list-disc [&_ol]:pl-5 [&_ul]:pl-5 [&_ol]:my-2 [&_ul]:my-2 ql-editor p-0" 
                   dangerouslySetInnerHTML={{ __html: proxifyHtml(currentQuestion.text) }}
                 />
               </CardHeader>

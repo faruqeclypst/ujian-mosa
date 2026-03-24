@@ -202,6 +202,12 @@ const SiswaPage = () => {
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Kelola daftar siswa pada aktif untuk perizinan dan ujian.</p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <ImportButton onImport={handleImportSiswa} isLoading={isImporting} />
+          <ExportButton onExport={handleExportSiswa} />
+          <Button onClick={() => downloadSiswaImportTemplate()} variant="secondary" size="sm" className="rounded-xl border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300">
+            Template
+          </Button>
+
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
               <Button onClick={handleCreateClick} className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-700 text-white shadow-md shadow-blue-500/10 rounded-xl" size="sm">
@@ -222,12 +228,6 @@ const SiswaPage = () => {
               />
             </DialogContent>
           </Dialog>
-
-          <ImportButton onImport={handleImportSiswa} isLoading={isImporting} />
-          <ExportButton onExport={handleExportSiswa} />
-          <Button onClick={() => downloadSiswaImportTemplate()} variant="outline" size="sm" className="rounded-xl border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300">
-            Template
-          </Button>
         </div>
       </div>
 
@@ -290,7 +290,10 @@ const SiswaPage = () => {
             <div className="relative">
               <select 
                 value={filterClassId} 
-                onChange={(e) => setFilterClassId(e.target.value)} 
+                onChange={(e) => {
+                  setFilterClassId(e.target.value);
+                  setSelectedIds([]); // 🌟 Reset seleksi dari awal saat ganti rombel
+                }} 
                 className="absolute inset-0 opacity-0 cursor-pointer z-10 w-full h-full"
               >
                 <option value="">Semua Rombel</option>
