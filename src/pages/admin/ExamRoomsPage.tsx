@@ -161,7 +161,7 @@ const ExamRoomsPage = () => {
     return () => clearInterval(timer);
   }, [tokenUpdatedAt]);
 
-  const [monitorTimeLeft, setMonitorTimeLeft] = useState(300);
+  const [monitorTimeLeft, setMonitorTimeLeft] = useState(0);
   const [isMonitorRefreshing, setIsMonitorRefreshing] = useState(false);
 
   const handleManualRefreshMonitor = () => {
@@ -198,26 +198,32 @@ const ExamRoomsPage = () => {
     }
   };
 
+  // 🔒 Algoritma Token Otomatis Matematikal (Sama dengan Siswa)
+  const generateTimeToken = (timestamp: number) => {
+    const coeff = 5 * 60 * 1000;
+    const bucket = Math.floor(timestamp / coeff);
+    const seed = bucket * 3317 + 51233; // Harus Sama persis dengan siswa
+    const hash = Math.abs(seed % 233280);
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    let t = "";
+    let val = hash;
+    for (let i = 0; i < 5; i++) {
+      t += chars[val % chars.length];
+      val = Math.floor(val / chars.length);
+    }
+    return t;
+  };
+
+
+
   useEffect(() => {
-    if (!isMonitorOpen) return;
-    setMonitorTimeLeft(300); // reset counter 5 menit saat buka
     const timer = setInterval(() => {
-      setMonitorTimeLeft(prev => prev <= 1 ? 300 : prev - 1);
+      const now = Date.now();
+      const nextBucket = Math.ceil(now / 300000) * 300000;
+      setMonitorTimeLeft(Math.floor((nextBucket - now) / 1000));
     }, 1000);
     return () => clearInterval(timer);
-  }, [isMonitorOpen]);
-
-  const handleRefreshToken = async () => {
-    try {
-      const newToken = generateNewToken();
-      await update(ref(database, "settings"), {
-        universal_token: newToken,
-        universal_token_updated_at: Date.now()
-      });
-    } catch (e) {
-      showAlert("Gagal", "Gagal memperbarui token universal.", "danger");
-    }
-  };
+  }, []);
 
   const showAlert = (title: string, description: string, type: "success" | "danger" | "warning" | "info" = "info") => {
     setConfirmDialog({
@@ -905,9 +911,6 @@ const ExamRoomsPage = () => {
               </div>
             </div>
           </div>
-          <Button variant="outline" size="icon" className="h-8 w-8 rounded-xl border-slate-200 dark:border-slate-800 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200" onClick={handleRefreshToken}>
-            <RefreshCw className="h-3.5 w-3.5" />
-          </Button>
         </div>
 
         <div className="bg-card p-4 rounded-2xl border border-slate-200/60 dark:border-slate-800/40 shadow-sm flex items-center gap-3 backdrop-blur-sm">
@@ -1097,9 +1100,30 @@ const ExamRoomsPage = () => {
                 <Input type="datetime-local" value={formValues.end_time} onChange={(e) => setFormValues({ ...formValues, end_time: e.target.value })} required />
               </FormField>
             </div>
-            <FormField id="room_code" label="Kode Ruang Ujian" error={undefined}>
-              <Input type="text" placeholder="Contoh: MTK atau MTK-NISN" value={formValues.room_code || ""} onChange={(e) => setFormValues({ ...formValues, room_code: e.target.value.toUpperCase() })} required />
-              <p className="text-slate-400 text-xs mt-1">Siswa akan mencari ruang ujian menggunakan kode ini.</p>
+            <FormField id="token" label="Token Ujian (Akses Masuk)" error={undefined}>
+              <div className="flex gap-1.5 focus-within:z-10">
+                <Input 
+                  type="text" 
+                  placeholder="Contoh: ABS12" 
+                  value={formValues.token || ""} 
+                  onChange={(e) => setFormValues({ ...formValues, token: e.target.value.toUpperCase() })} 
+                  required 
+                  className="font-bold tracking-widest text-center"
+                  maxLength={10}
+                />
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  className="shrink-0 h-10 px-3 cursor-pointer bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-800 text-xs font-bold"
+                  onClick={() => {
+                    const newToken = Math.random().toString(36).substring(2, 7).toUpperCase();
+                    setFormValues({ ...formValues, token: newToken });
+                  }}
+                >
+                  Acak Token
+                </Button>
+              </div>
+              <p className="text-slate-400 text-[10px] mt-1">Siswa membutuhkan token baku ini untuk masuk ke dalam ruang ujian Anda.</p>
             </FormField>
 
             <div className="pt-2 border-t mt-4">

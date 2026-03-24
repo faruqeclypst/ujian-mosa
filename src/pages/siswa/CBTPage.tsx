@@ -24,6 +24,7 @@ interface ExamAttempt {
   correct?: number;
   total?: number;
   extraCheatLimit?: number;
+  startTime?: number;
 }
 
 const CBTPage = () => {
@@ -91,7 +92,14 @@ const CBTPage = () => {
 
         if (attemptSnap.exists()) {
           const aData = attemptSnap.val();
-          attemptDataToStore = aData; // <--- maintain full state (including extraCheatLimit)
+          
+          // 🛡️ Backfill startTime jika absen di database (mencegah reset saat refresh)
+          if (!aData.startTime) {
+            aData.startTime = Date.now();
+            await update(attemptRef, { startTime: aData.startTime });
+          }
+
+          attemptDataToStore = { ...aData, startTime: aData.startTime }; 
           if (aData.status === "LOCKED") {
             setIsLocked(true);
           }
@@ -100,7 +108,7 @@ const CBTPage = () => {
               return;
           }
           initialCheatCount = aData.cheatCount || 0;
-          startTime = aData.startTime || Date.now();
+          startTime = aData.startTime;
           currentStatus = aData.status;
         } else {
           // Create initial attempt
@@ -277,21 +285,27 @@ const CBTPage = () => {
 
   // Timer Countdown Logic
   useEffect(() => {
-    if (loading || isLocked || isExamOver || timeLeft <= 0) return;
+    if (loading || isLocked || isExamOver || !roomData || !attempt) return;
 
     const timer = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          handleAutoSubmit();
-          return 0;
-        }
-        return prev - 1;
-      });
+      const now = Date.now();
+      const roomEndTime = new Date(roomData.end_time).getTime();
+      const personalEndTime = (attempt.startTime || now) + (roomData.duration * 60 * 1000);
+      
+      const finalEndTime = Math.min(personalEndTime, roomEndTime);
+      const diff = Math.floor((finalEndTime - now) / 1000);
+
+      if (diff <= 0) {
+        clearInterval(timer);
+        setTimeLeft(0);
+        handleAutoSubmit();
+      } else {
+        setTimeLeft(diff);
+      }
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [loading, isLocked, isExamOver, timeLeft]);
+  }, [loading, isLocked, isExamOver, roomData, attempt]);
 
   // Anti-Cheat (Visibility Change)
   useEffect(() => {

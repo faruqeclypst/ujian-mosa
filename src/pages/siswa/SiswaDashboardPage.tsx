@@ -100,12 +100,16 @@ const SiswaDashboardPage = () => {
 
       const roomData = snapshot.val();
       
+      // 🔒 Validasi Token dari Database (Hasil rotasi dari sisi Admin)
       const globalTokenRef = ref(database, "settings/universal_token");
       const globalTokenSnap = await get(globalTokenRef);
-      const checkToken = globalTokenSnap.exists() ? globalTokenSnap.val() : roomData.token; // fallback
+      const checkToken = globalTokenSnap.exists() ? globalTokenSnap.val() : roomData.token;
 
-      if (String(checkToken).toUpperCase() !== tokenInput.trim().toUpperCase()) {
-        throw new Error("Token salah atau sudah kadaluarsa (token berganti tiap 5 menit)!");
+      const input = tokenInput.trim().toUpperCase();
+      const isValid = checkToken && input === String(checkToken).toUpperCase();
+
+      if (!isValid) {
+        throw new Error("Token salah atau sudah kadaluarsa!");
       }
       // Validate Time
       const now = Date.now();
