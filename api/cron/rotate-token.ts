@@ -2,9 +2,16 @@ const DB_URL = "https://ujian-mosa-default-rtdb.asia-southeast1.firebasedatabase
 
 export default async function handler(req: any, res: any) {
   const authHeader = req.headers['authorization'];
+  
+  // Ambil api_key dari URL query params (dukungan trigger luar)
+  const url = new URL(req.url, `http://${req.headers.host}`);
+  const apiKey = url.searchParams.get("api_key");
 
-  // 🛡️ Pastikan request berasal dari Vercel Cron
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  // 🛡️ Pastikan request berasal dari Vercel Cron ATAU Trigger Luar yang valid
+  const isValidVercel = authHeader === `Bearer ${process.env.CRON_SECRET}`;
+  const isValidExternal = apiKey && process.env.CRON_SECRET && apiKey === process.env.CRON_SECRET;
+
+  if (!isValidVercel && !isValidExternal) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
