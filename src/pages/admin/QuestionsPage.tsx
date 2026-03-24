@@ -435,7 +435,8 @@ const QuestionsPage = () => {
 
   const quillRef = useRef<any>(null); // <--- Reference to Question Quill
 
-  const imageHandler = useCallback(() => {
+  const imageHandler = useCallback(function (this: any) {
+    const quill = this.quill; // <--- Instance editor yang sedang diklik toolbar-nya
     const input = document.createElement("input");
     input.setAttribute("type", "file");
     input.setAttribute("accept", "image/*");
@@ -453,7 +454,6 @@ const QuestionsPage = () => {
           reader.readAsDataURL(fileToUpload);
           reader.onload = () => {
             const base64 = reader.result as string;
-            const quill = quillRef.current?.getEditor();
             if (quill) {
               const range = quill.getSelection() || { index: 0 };
               quill.insertEmbed(range.index, "image", base64);

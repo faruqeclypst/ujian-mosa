@@ -52,6 +52,7 @@ const CBTPage = () => {
   // For debounce saving
   const saveTimeoutRef = useRef<Record<string, any>>({});
   const lastCheatTimeRef = useRef<number>(0); // <--- Jeda deteksi cheat
+  const isIndexRestored = useRef(false);
 
   // Fix order randomizer on reload
   const [questionOrder, setQuestionOrder] = useState<string[]>([]);
@@ -259,6 +260,7 @@ const CBTPage = () => {
               setCurrentQuestionIndex(idx);
             }
           }
+          isIndexRestored.current = true; // <--- Tandai sudah dipulihkan
         }
 
       } catch (err) {
@@ -421,7 +423,7 @@ const CBTPage = () => {
 
   // 🛡️ Simpan currentQuestionIndex ke sessionStorage setiap kali berganti soal
   useEffect(() => {
-    if (siswa && roomId) {
+    if (siswa && roomId && isIndexRestored.current) {
       const indexKey = `currentIndex_${siswa.nisn}_${roomId}`;
       sessionStorage.setItem(indexKey, currentQuestionIndex.toString());
     }
@@ -582,7 +584,17 @@ const CBTPage = () => {
             <Card className="rounded-xl border shadow-sm">
               <CardHeader className="p-4 pb-2">
                 <div className="flex justify-between items-center">
-                  <div className="text-sm font-semibold text-slate-400"></div>
+                  <div className="text-sm font-semibold text-slate-400">
+                    {currentQuestion.groupId && (() => {
+                      const groupQuestions = questions.filter(q => q.groupId === currentQuestion.groupId);
+                      const indexInGroup = groupQuestions.findIndex(q => q.id === currentQuestion.id) + 1;
+                      return (
+                        <span className="text-blue-600 dark:text-blue-400 font-bold text-xs">
+                          {currentQuestion.groupId} - Soal {indexInGroup}
+                        </span>
+                      );
+                    })()}
+                  </div>
                   {currentQuestion && (
                     <Button 
                       variant="ghost" 
@@ -661,7 +673,7 @@ const CBTPage = () => {
                           {String.fromCharCode(65 + idx)}
                         </div>
                         <div className="flex-1 text-sm font-medium">
-                          <div className="break-words [&_img]:max-w-[200px] [&_img]:h-auto [&_img]:rounded-lg [&_img]:mt-1" dangerouslySetInnerHTML={{ __html: proxifyHtml(choice.text) }} />
+                          <div className="break-words ql-editor p-0 [&_img]:max-w-[200px] [&_img]:h-auto [&_img]:rounded-lg [&_img]:mt-1" dangerouslySetInnerHTML={{ __html: proxifyHtml(choice.text) }} />
                           {choice.imageUrl && (
                             <img 
                               src={getProxiedUrl(choice.imageUrl)} 
@@ -701,10 +713,10 @@ const CBTPage = () => {
                   className={`w-full aspect-square md:w-9 md:h-9 shrink-0 rounded-xl flex items-center justify-center font-bold text-xs border transition-all ${
                     isActive
                       ? "bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-500/30"
-                      : isFlagged
-                      ? "bg-amber-100 border-amber-200 text-amber-700 font-bold"
                       : isAnswered
                       ? "bg-green-100 border-green-200 text-green-700 dark:bg-green-900/30 dark:text-green-300"
+                      : isFlagged
+                      ? "bg-amber-100 border-amber-200 text-amber-700 font-bold"
                       : "bg-slate-100 border-slate-200 text-slate-600 dark:bg-slate-700 dark:border-slate-600"
                   }`}
                 >
@@ -819,10 +831,10 @@ const CBTPage = () => {
                    className={`w-full aspect-square rounded-xl flex items-center justify-center font-bold text-xs border transition-all ${
                      isActive
                        ? "bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-500/30"
-                       : isFlagged
-                       ? "bg-amber-100 border-amber-200 text-amber-700 font-bold"
                        : isAnswered
                        ? "bg-green-100 border-green-200 text-green-700 dark:bg-green-900/30 dark:text-green-300"
+                       : isFlagged
+                       ? "bg-amber-100 border-amber-200 text-amber-700 font-bold"
                        : "bg-slate-100 border-slate-200 text-slate-600 dark:bg-slate-700 dark:border-slate-600"
                    }`}
                  >

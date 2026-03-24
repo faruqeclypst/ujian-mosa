@@ -133,3 +133,8 @@ body {
   display: block !important;
   margin-left: auto !important;
 }
+
+/* 📝 Perkuat cetak tebal (Bold) pada soal & pilihan jawaban agar terbaca jelas di mobile */
+.ql-editor strong, .ql-editor b {
+  font-weight: 800 !important;
+}
