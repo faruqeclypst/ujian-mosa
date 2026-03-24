@@ -35,8 +35,6 @@ const SiswaDashboardPage = () => {
   useEffect(() => {
     if (!siswa?.classId) return;
 
-    let unsubscribe: () => void;
-
     // 1. Tarik Data Ujian (Exams) terlebih dahulu untuk caching
     const examsRef = ref(database, "exams");
     get(examsRef).then((examsSnap) => {
@@ -44,7 +42,7 @@ const SiswaDashboardPage = () => {
 
       // 2. Monitoring Real-Time Ruang Ujian
       const roomsRef = ref(database, "exam_rooms");
-      unsubscribe = onValue(roomsRef, (snapshot) => {
+      return onValue(roomsRef, (snapshot) => {
         setLoading(true);
         if (snapshot.exists()) {
           const roomsData = snapshot.val();
@@ -84,10 +82,6 @@ const SiswaDashboardPage = () => {
         setLoading(false);
       });
     });
-
-    return () => {
-      if (unsubscribe) unsubscribe();
-    };
   }, [siswa?.classId]);
 
   const handleValidateToken = async () => {
