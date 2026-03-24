@@ -196,8 +196,12 @@ const CBTPage = () => {
               }
             });
             const collection: (string | string[])[] = [...standalone, ...Object.values(grouped)];
-            const shuffledCollection = collection.sort(() => Math.random() - 0.5);
-            return shuffledCollection.flat();
+            // 🛡️ Gunakan Fisher-Yates Shuffle agar stabil & adil
+            for (let i = collection.length - 1; i > 0; i--) {
+              const j = Math.floor(Math.random() * (i + 1));
+              [collection[i], collection[j]] = [collection[j], collection[i]];
+            }
+            return collection.flat();
           };
 
           const orderKey = `order_${siswa.nisn}_${roomId}`;
@@ -238,10 +242,15 @@ const CBTPage = () => {
           }
           
           loadedQuestions.forEach((q) => {
-             const keys = Object.keys(q.choices || {});
-             if (!cOrder[q.id] || cOrder[q.id].length !== keys.length) {
-                cOrder[q.id] = [...keys].sort(() => Math.random() - 0.5);
-             }
+              const keys = Object.keys(q.choices || {});
+              if (!cOrder[q.id] || cOrder[q.id].length !== keys.length) {
+                 const arr = [...keys];
+                 for (let i = arr.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [arr[i], arr[j]] = [arr[j], arr[i]];
+                 }
+                 cOrder[q.id] = arr;
+              }
           });
           sessionStorage.setItem(choiceOrderKey, JSON.stringify(cOrder));
           setChoicesOrder(cOrder);
