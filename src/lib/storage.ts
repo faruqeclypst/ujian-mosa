@@ -1,4 +1,18 @@
-import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { DeleteObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+
+export async function deleteImageFromStorage(key: string): Promise<void> {
+  const config = getConfig();
+  if (import.meta.env.VITE_R2_DEV_INLINE_BASE64 === "true") return; // offline skips
+  if (!isR2Configured()) return;
+
+  const client = ensureClient();
+  await client.send(
+    new DeleteObjectCommand({
+      Bucket: config.bucket,
+      Key: key,
+    })
+  );
+}
 
 export interface UploadResult {
   key: string;

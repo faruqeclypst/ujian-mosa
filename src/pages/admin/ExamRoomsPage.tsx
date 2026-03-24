@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Plus, Trash, Edit, RefreshCw, Users, Archive, RotateCw, FileSpreadsheet, BookOpen } from "lucide-react";
+import { Plus, Trash, Edit, RefreshCw, Users, Archive, RotateCw, FileSpreadsheet, BookOpen, ClipboardList, Lock } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import * as XLSX from "xlsx-js-style";
 import { Button } from "../../components/ui/button";
@@ -77,7 +77,7 @@ const ExamRoomsPage = () => {
     description: "",
     type: "info",
     confirmLabel: "Konfirmasi",
-    onConfirm: () => {}
+    onConfirm: () => { }
   });
 
   // Monitoring States
@@ -92,13 +92,107 @@ const ExamRoomsPage = () => {
   const [monitorPage, setMonitorPage] = useState(1);
   const [monitorPageSize, setMonitorPageSize] = useState(10);
 
+  const [limitDialogOpen, setLimitDialogOpen] = useState(false);
+  const [limitNisn, setLimitNisn] = useState("");
+  const [limitValue, setLimitValue] = useState("1");
+
   const [universalToken, setUniversalToken] = useState("");
+  const [tokenUpdatedAt, setTokenUpdatedAt] = useState<number>(Date.now());
+  const [timeLeft, setTimeLeft] = useState<string>("05:00");
 
   useEffect(() => {
-    return onValue(ref(database, "settings/universal_token"), (snap) => {
-      setUniversalToken(snap.exists() ? snap.val() : "");
+    return onValue(ref(database, "settings"), (snap) => {
+      if (snap.exists()) {
+        const data = snap.val();
+        setUniversalToken(data.universal_token || "");
+        setTokenUpdatedAt(data.universal_token_updated_at || Date.now());
+      }
     });
   }, []);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const now = Date.now();
+      const nextUpdate = tokenUpdatedAt + 5 * 60 * 1000;
+      const diff = nextUpdate - now;
+
+      if (diff <= 0) {
+        setTimeLeft("00:00");
+        const rotateToken = async () => {
+          try {
+            const snap = await get(ref(database, "settings/universal_token_updated_at"));
+            const lastFirebaseUpdate = snap.exists() ? snap.val() : 0;
+            const nowCheck = Date.now();
+
+            if (nowCheck - lastFirebaseUpdate >= 5 * 60 * 1000) {
+              const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+              let token = "";
+              for (let i = 0; i < 6; i++) {
+                token += chars.charAt(Math.floor(Math.random() * chars.length));
+              }
+              await update(ref(database, "settings"), {
+                universal_token: token,
+                universal_token_updated_at: nowCheck
+              });
+            }
+          } catch (e) { }
+        };
+        rotateToken();
+      } else {
+        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+        setTimeLeft(`${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`);
+      }
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [tokenUpdatedAt]);
+
+  const [monitorTimeLeft, setMonitorTimeLeft] = useState(300);
+  const [isMonitorRefreshing, setIsMonitorRefreshing] = useState(false);
+
+  const handleManualRefreshMonitor = () => {
+    setMonitorTimeLeft(300);
+    // Trigger reload manual
+    if (monitorRoom && isMonitorOpen) {
+      const attemptsRef = ref(database, "attempts");
+      get(attemptsRef).then((snap) => {
+        const data = snap.val();
+        if (data) {
+          const loaded = Object.keys(data)
+            .filter((key) => key.includes(monitorRoom.id))
+            .map((key) => {
+              const [nisn] = key.split("_");
+              return { id: key, nisn, ...data[key] };
+            });
+          setAttempts(loaded);
+        }
+      });
+      const answersRef = ref(database, "answers");
+      get(answersRef).then((snap) => {
+        const data = snap.val();
+        if (data) {
+          const mapped: Record<string, any> = {};
+          Object.keys(data).forEach((key) => {
+            if (key.includes(monitorRoom.id)) {
+              const nisn = key.split("_")[0];
+              mapped[nisn] = data[key];
+            }
+          });
+          setAnswersList(mapped);
+        }
+      });
+    }
+  };
+
+  useEffect(() => {
+    if (!isMonitorOpen) return;
+    setMonitorTimeLeft(300); // reset counter 5 menit saat buka
+    const timer = setInterval(() => {
+      setMonitorTimeLeft(prev => prev <= 1 ? 300 : prev - 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [isMonitorOpen]);
 
   const handleRefreshToken = async () => {
     try {
@@ -119,7 +213,7 @@ const ExamRoomsPage = () => {
       description,
       type,
       confirmLabel: "OK",
-      onConfirm: () => {}
+      onConfirm: () => { }
     });
   };
 
@@ -150,15 +244,60 @@ const ExamRoomsPage = () => {
       label: "Waktu Mulai - Selesai",
       render: (v: any, item: ExamRoomData) => (
         <span className="text-slate-500 text-xs">
-           {new Date(item.start_time).toLocaleDateString("id-ID")} {new Date(item.start_time).toLocaleTimeString("id-ID", {hour:'2-digit', minute:'2-digit'})} 
-           <span className="mx-1">-</span>
-           {new Date(item.end_time).toLocaleTimeString("id-ID", {hour:'2-digit', minute:'2-digit'})}
+          {new Date(item.start_time).toLocaleDateString("id-ID")} {new Date(item.start_time).toLocaleTimeString("id-ID", { hour: '2-digit', minute: '2-digit' })}
+          <span className="mx-1">-</span>
+          {new Date(item.end_time).toLocaleTimeString("id-ID", { hour: '2-digit', minute: '2-digit' })}
         </span>
       )
+    },
+    {
+      key: "status_label",
+      label: "Status",
+      render: (_: any, item: ExamRoomData) => {
+        const now = Date.now();
+        const start = new Date(item.start_time).getTime();
+        const end = new Date(item.end_time).getTime();
+
+        if (item.status === "archive") {
+          return (
+            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold tracking-wide bg-slate-100 text-slate-600 border border-slate-200/60 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-800">
+              Arsip
+            </span>
+          );
+        }
+
+        if (now < start) {
+          return (
+            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold tracking-wide bg-slate-50 text-slate-500 border border-slate-200/80 dark:bg-slate-900 dark:text-slate-500 dark:border-slate-800/40">
+              Belum Dimulai
+            </span>
+          );
+        } else if (now > end) {
+          return (
+            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold tracking-wide bg-red-50 text-red-600 border border-red-100 dark:bg-red-950/20 dark:text-red-400 dark:border-red-900/40">
+              Waktu Habis
+            </span>
+          );
+        } else {
+          return (
+            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold tracking-wide bg-emerald-50 text-emerald-600 border border-emerald-100 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-900/40 animate-pulse-slow">
+              Berjalan
+            </span>
+          );
+        }
+      }
     }
   ];
 
   const handleArchiveRoom = (room: ExamRoomData) => {
+    const now = Date.now();
+    const start = new Date(room.start_time).getTime();
+    const end = new Date(room.end_time).getTime();
+    if (now >= start && now <= end) {
+      showAlert("Peringatan", "Tidak dapat di arsipkan karena Ruang Ujian sedang aktif / berjalan.", "warning");
+      return;
+    }
+
     setConfirmDialog({
       isOpen: true,
       title: "Arsipkan Ruang Ujian",
@@ -168,7 +307,7 @@ const ExamRoomsPage = () => {
       onConfirm: async () => {
         try {
           await update(ref(database, `exam_rooms/${room.id}`), { status: "archive" });
-        } catch (error) { 
+        } catch (error) {
           showAlert("Gagal", "Gagal mengarsipkan ruang ujian.", "danger");
         }
       }
@@ -185,7 +324,7 @@ const ExamRoomsPage = () => {
       onConfirm: async () => {
         try {
           await update(ref(database, `exam_rooms/${room.id}`), { status: null });
-        } catch (error) { 
+        } catch (error) {
           showAlert("Gagal", "Gagal membuka arsip ruang ujian.", "danger");
         }
       }
@@ -329,7 +468,7 @@ const ExamRoomsPage = () => {
         description: "Tidak ada siswa yang sedang aktif mengerjakan ujian di ruangan ini saat ini.",
         type: "info",
         confirmLabel: "Ok",
-        onConfirm: () => {}
+        onConfirm: () => { }
       });
       return;
     }
@@ -366,35 +505,11 @@ const ExamRoomsPage = () => {
     return token;
   };
 
-  // 🔄 LOOP AUTO ROTATE TOKEN (Setiap 5 Menit)
-  useEffect(() => {
-    const timer = setInterval(async () => {
-      try {
-        const globalTimeRef = ref(database, "settings/universal_token_updated_at");
-        const snap = await get(globalTimeRef);
-        const lastUpdated = snap.exists() ? snap.val() : Date.now();
-        const now = Date.now();
-        const diff = now - lastUpdated;
-
-        if (diff > 5 * 60 * 1000) {
-          const newToken = generateNewToken();
-          await update(ref(database, "settings"), {
-            universal_token: newToken,
-            universal_token_updated_at: now
-          });
-          console.log(`[Universal Token rotated] -> ${newToken}`);
-        }
-      } catch (e) {
-         console.error("Token rotate err", e);
-      }
-    }, 15000);
-
-    return () => clearInterval(timer);
-  }, []);
+  // 🔄 Loop auto rotate dipindahkan ke countdown ticker utama untuk rotasi instan.
 
   useEffect(() => {
     if (!monitorRoom || !isMonitorOpen) return;
-    
+
     // 1. Load Attempts (Throttled 5s)
     const attemptsRef = ref(database, "attempts");
     let attemptsThrottle = false;
@@ -405,8 +520,8 @@ const ExamRoomsPage = () => {
       const loaded = Object.keys(data)
         .filter((key) => key.includes(monitorRoom.id))
         .map((key) => {
-           const [nisn] = key.split("_");
-           return { id: key, nisn, ...data[key] };
+          const [nisn] = key.split("_");
+          return { id: key, nisn, ...data[key] };
         });
       setAttempts(loaded);
     };
@@ -419,7 +534,7 @@ const ExamRoomsPage = () => {
         setTimeout(() => {
           attemptsThrottle = false;
           if (latestAttempts) processAttempts(latestAttempts);
-        }, 5000);
+        }, 300000);
       }
     });
 
@@ -429,38 +544,38 @@ const ExamRoomsPage = () => {
     let latestAnswers: any = null;
 
     const processAnswers = (data: any) => {
-       if (!data) { setAnswersList({}); return; }
-       const mapped: Record<string, any> = {};
-       Object.keys(data).forEach((key) => {
-          if (key.includes(monitorRoom.id)) {
-             const nisn = key.split("_")[0];
-             mapped[nisn] = data[key];
-          }
-       });
-       setAnswersList(mapped);
+      if (!data) { setAnswersList({}); return; }
+      const mapped: Record<string, any> = {};
+      Object.keys(data).forEach((key) => {
+        if (key.includes(monitorRoom.id)) {
+          const nisn = key.split("_")[0];
+          mapped[nisn] = data[key];
+        }
+      });
+      setAnswersList(mapped);
     };
 
     const unsubAnswers = onValue(answersRef, (snapshot) => {
-       latestAnswers = snapshot.val();
-       if (!answersThrottle) {
-         processAnswers(latestAnswers);
-         answersThrottle = true;
-         setTimeout(() => {
-            answersThrottle = false;
-            if (latestAnswers) processAnswers(latestAnswers);
-         }, 5000);
-       }
+      latestAnswers = snapshot.val();
+      if (!answersThrottle) {
+        processAnswers(latestAnswers);
+        answersThrottle = true;
+        setTimeout(() => {
+          answersThrottle = false;
+          if (latestAnswers) processAnswers(latestAnswers);
+        }, 300000);
+      }
     });
 
     // 3. Load Questions of Exam
     get(ref(database, "questions")).then((snap) => {
-       if (snap.exists()) {
-          const data = snap.val();
-          const loaded = Object.keys(data)
-            .filter((id) => data[id].examId === monitorRoom.examId)
-            .map((id) => ({ id, ...data[id] }));
-          setMonitorQuestions(loaded);
-       }
+      if (snap.exists()) {
+        const data = snap.val();
+        const loaded = Object.keys(data)
+          .filter((id) => data[id].examId === monitorRoom.examId)
+          .map((id) => ({ id, ...data[id] }));
+        setMonitorQuestions(loaded);
+      }
     });
 
     return () => {
@@ -481,10 +596,10 @@ const ExamRoomsPage = () => {
       if (snapshot.exists()) {
         const data = snapshot.val();
         const loaded: ExamRoomData[] = [];
-        
+
         for (const key of Object.keys(data)) {
           const room = data[key];
-          
+
           // Get Exam Title
           const examSnap = await get(ref(database, `exams/${room.examId}`));
           const examTitle = examSnap.exists() ? examSnap.val().title : "Ujian Tidak Diketahui";
@@ -492,16 +607,16 @@ const ExamRoomsPage = () => {
           // Get Class Name from usePiket
           let className = "Semua Kelas";
           if (room.classId && !room.allClasses) {
-             const ids = room.classId.split(",");
-             const names = ids.map((id: string) => piketClasses.find(c => c.id === id)?.name).filter(Boolean);
-             if (names.length > 0) className = names.join(", ");
+            const ids = room.classId.split(",");
+            const names = ids.map((id: string) => piketClasses.find(c => c.id === id)?.name).filter(Boolean);
+            if (names.length > 0) className = names.join(", ");
           }
 
           loaded.push({ id: key, ...room, examTitle, className });
         }
         setRooms(loaded);
       } else {
-         setRooms([]);
+        setRooms([]);
       }
       setLoading(false);
     });
@@ -605,35 +720,40 @@ const ExamRoomsPage = () => {
   };
 
   const handleResetSession = (nisn: string) => {
-     if (!monitorRoom) return;
-     setConfirmDialog({
-       isOpen: true,
-       title: "Reset Total Sesi",
-       description: "Apakah anda yakin ingin RESET TOTAL sesi siswa ini? Seluruh jawaban dan progres mereka akan DIHAPUS PERMANEN.",
-       type: "danger",
-       confirmLabel: "Ya, Reset Total",
-       onConfirm: async () => {
-         try {
-           const attemptId = `${nisn}_${monitorRoom.id}`;
-           await remove(ref(database, `attempts/${attemptId}`));
-           await remove(ref(database, `answers/${attemptId}`));
-           showAlert("Berhasil", "Sesi siswa berhasil direset total.", "success");
-         } catch (error) {
-           showAlert("Gagal", "Gagal mereset sesi.", "danger");
-         }
-       }
-     });
+    if (!monitorRoom) return;
+    setConfirmDialog({
+      isOpen: true,
+      title: "Reset Total Sesi",
+      description: "Apakah anda yakin ingin RESET TOTAL sesi siswa ini? Seluruh jawaban dan progres mereka akan DIHAPUS PERMANEN.",
+      type: "danger",
+      confirmLabel: "Ya, Reset Total",
+      onConfirm: async () => {
+        try {
+          const attemptId = `${nisn}_${monitorRoom.id}`;
+          await remove(ref(database, `attempts/${attemptId}`));
+          await remove(ref(database, `answers/${attemptId}`));
+          showAlert("Berhasil", "Sesi siswa berhasil direset total.", "success");
+        } catch (error) {
+          showAlert("Gagal", "Gagal mereset sesi.", "danger");
+        }
+      }
+    });
   };
 
-  const handleAddCheatLimit = async (nisn: string) => {
-    if (!monitorRoom) return;
-    const value = window.prompt("Tambahkan batas toleransi pelanggaran (angka) untuk siswa ini berapa kali?:", "1");
-    if (!value) return;
-    const added = parseInt(value);
+  const openLimitDialog = (nisn: string) => {
+    setLimitNisn(nisn);
+    setLimitValue("1");
+    setLimitDialogOpen(true);
+  };
+
+  const handleConfirmAddLimit = async () => {
+    if (!monitorRoom || !limitNisn) return;
+    const added = parseInt(limitValue);
     if (isNaN(added) || added <= 0) return alert("Masukkan angka yang valid.");
 
+    setLimitDialogOpen(false);
     try {
-      const attemptId = `${nisn}_${monitorRoom.id}`;
+      const attemptId = `${limitNisn}_${monitorRoom.id}`;
       const attemptRef = ref(database, `attempts/${attemptId}`);
       const snap = await get(attemptRef);
       const currentExtra = snap.exists() ? (snap.val().extraCheatLimit || 0) : 0;
@@ -643,7 +763,7 @@ const ExamRoomsPage = () => {
         extraCheatLimit: currentExtra + added,
         status: currentStatus === "LOCKED" ? "ongoing" : currentStatus, // Auto Unlock
       });
-      
+
       showAlert("Berhasil", `Berhasil menambah +${added} batas pelanggaran untuk siswa.`, "success");
     } catch {
       showAlert("Gagal", "Gagal memperbarui batas.", "danger");
@@ -659,15 +779,15 @@ const ExamRoomsPage = () => {
       type: "warning",
       confirmLabel: "Ya, Reset",
       onConfirm: async () => {
-       try {
-         const attemptId = `${nisn}_${monitorRoom.id}`;
-         await update(ref(database, `attempts/${attemptId}`), {
-           cheatCount: 0
-         });
-         showAlert("Berhasil", "Pelanggaran siswa berhasil direset.", "success");
-       } catch (error) {
+        try {
+          const attemptId = `${nisn}_${monitorRoom.id}`;
+          await update(ref(database, `attempts/${attemptId}`), {
+            cheatCount: 0
+          });
+          showAlert("Berhasil", "Pelanggaran siswa berhasil direset.", "success");
+        } catch (error) {
           showAlert("Gagal", "Gagal mereset cheat count.", "danger");
-       }
+        }
       }
     });
   };
@@ -687,37 +807,73 @@ const ExamRoomsPage = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between bg-card p-5 rounded-2xl border border-slate-200/60 dark:border-slate-800/40 shadow-sm backdrop-blur-sm">
         <div>
-          <h2 className="text-2xl font-semibold text-foreground">Ruang Ujian</h2>
-          <p className="text-sm text-muted-foreground">Aktifkan sesi ujian untuk siswa.</p>
+          <h2 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
+            <ClipboardList className="h-5 w-5 text-blue-500" />
+            Ruang Ujian
+          </h2>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Aktifkan dan kelola sesi ujian untuk siswa.</p>
         </div>
-        <div className="flex gap-3 items-center">
-          <div className="flex bg-slate-100 p-1 rounded-xl text-xs font-semibold">
-            <button 
-              onClick={() => setActiveTab("aktif")} 
-              className={`px-3 py-1.5 rounded-lg transition-all ${activeTab === "aktif" ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex bg-slate-100 dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-800/80 p-1 rounded-xl text-xs font-semibold">
+            <button
+              onClick={() => setActiveTab("aktif")}
+              className={`px-3 py-1.5 rounded-lg transition-all ${activeTab === "aktif" ? "bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 shadow-sm" : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"}`}
             >
               Aktif
             </button>
-            <button 
-              onClick={() => setActiveTab("arsip")} 
-              className={`px-3 py-1.5 rounded-lg transition-all ${activeTab === "arsip" ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+            <button
+              onClick={() => setActiveTab("arsip")}
+              className={`px-3 py-1.5 rounded-lg transition-all ${activeTab === "arsip" ? "bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 shadow-sm" : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"}`}
             >
               Arsip
             </button>
           </div>
-          <div className="bg-white border text-sm font-semibold rounded-xl px-3 py-1.5 flex items-center gap-2 shadow-sm border-slate-200/60 dark:bg-slate-800 dark:border-slate-700">
-             <span className="text-slate-500 dark:text-slate-400 text-xs">Token Universal:</span>
-             <code className="font-mono font-bold bg-slate-100 dark:bg-slate-700 text-slate-800 dark:text-slate-100 px-2 py-0.5 rounded text-sm">{universalToken || "---"}</code>
-             <Button variant="ghost" size="icon" className="h-6 w-6 text-slate-400 hover:text-slate-600 rounded-md p-0" onClick={handleRefreshToken}>
-                <RefreshCw className="h-3 w-3" />
-             </Button>
-          </div>
 
-          <Button onClick={handleCreateClick} size="lg" className="rounded-xl">
-            <Plus className="mr-2 h-4 w-4" /> Buka Ruang Ujian
+          <Button onClick={handleCreateClick} size="sm" className="rounded-xl bg-blue-50 hover:bg-blue-100 border border-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 dark:border-blue-800/40 text-blue-700 font-semibold shadow-sm">
+            <Plus className="mr-1 h-3.5 w-3.5" /> Buka Ruang
           </Button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+        <div className="bg-card p-4 rounded-2xl border border-slate-200/60 dark:border-slate-800/40 shadow-sm flex items-center justify-between backdrop-blur-sm">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-blue-50 dark:bg-blue-900/10 text-blue-600 dark:text-blue-400">
+              <Lock className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Token Universal</p>
+              <div className="flex items-baseline gap-2 mt-0.5">
+                <code className="text-lg font-mono font-bold text-slate-800 dark:text-slate-100">{universalToken || "---"}</code>
+                <span className="text-[11px] text-amber-500 dark:text-amber-400 font-medium tracking-wide">({timeLeft})</span>
+              </div>
+            </div>
+          </div>
+          <Button variant="outline" size="icon" className="h-8 w-8 rounded-xl border-slate-200 dark:border-slate-800 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200" onClick={handleRefreshToken}>
+            <RefreshCw className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+
+        <div className="bg-card p-4 rounded-2xl border border-slate-200/60 dark:border-slate-800/40 shadow-sm flex items-center gap-3 backdrop-blur-sm">
+          <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-900/10 text-emerald-600 dark:text-emerald-400">
+            <Users className="h-5 w-5" />
+          </div>
+          <div>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Siswa Aktif</p>
+            <p className="text-lg font-bold text-slate-800 dark:text-slate-100 mt-0.5">{attempts.filter(a => a.status === "ongoing").length || 0}</p>
+          </div>
+        </div>
+
+        <div className="bg-card p-4 rounded-2xl border border-slate-200/60 dark:border-slate-800/40 shadow-sm flex items-center gap-3 backdrop-blur-sm">
+          <div className="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-900/10 text-amber-600 dark:text-amber-400">
+            <ClipboardList className="h-5 w-5" />
+          </div>
+          <div>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Total Ruang</p>
+            <p className="text-lg font-bold text-slate-800 dark:text-slate-100 mt-0.5">{rooms.length}</p>
+          </div>
         </div>
       </div>
 
@@ -738,60 +894,62 @@ const ExamRoomsPage = () => {
               emptyMessage={`Belum ada ruang ujian ${activeTab}.`}
               actions={(room: ExamRoomData) => (
                 <div className="flex justify-end gap-1.5 items-center whitespace-nowrap">
-                  <Button 
-                    variant="secondary" 
-                    size="sm" 
-                    className="bg-blue-50 text-blue-700 hover:bg-blue-100 border-blue-100 dark:bg-blue-950 dark:text-blue-400" 
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 dark:border-blue-800/40"
                     onClick={() => handleMonitorClick(room)}
                   >
                     <Users className="h-4 w-4 mr-1" /> Monitor
                   </Button>
 
-                  <Button 
-                    variant="secondary" 
-                    size="sm" 
-                    className="bg-purple-50 text-purple-700 hover:bg-purple-100 border-purple-200" 
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-100 dark:bg-purple-900/30 dark:text-purple-400 dark:hover:bg-purple-900/50 dark:border-purple-800/40"
                     onClick={() => navigate(`/admin/bank-soal/${room.examId}/questions`)}
                   >
                     <BookOpen className="h-4 w-4 mr-1" /> Soal
                   </Button>
-                  
+
                   {activeTab === "aktif" ? (
-                    <Button 
-                      variant="secondary" 
-                      size="sm" 
-                      className="bg-amber-50 text-amber-700 hover:bg-amber-100 border-amber-200 dark:bg-amber-950 dark:text-amber-400" 
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      className="bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:hover:bg-amber-900/50 dark:border-amber-800/40"
                       onClick={() => handleArchiveRoom(room)}
                     >
                       <Archive className="h-4 w-4 mr-1" /> Arsip
                     </Button>
                   ) : (
-                    <Button 
-                      variant="secondary" 
-                      size="sm" 
-                      className="bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border-indigo-200 dark:bg-indigo-950 dark:text-indigo-400" 
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      className="bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-400 dark:hover:bg-indigo-900/50 dark:border-indigo-800/40"
                       onClick={() => handleRestoreRoom(room)}
                     >
                       <RotateCw className="h-4 w-4 mr-1" /> Buka
                     </Button>
                   )}
 
-                  <Button 
-                    variant="secondary" 
-                    size="sm" 
-                    className="bg-green-100 text-green-700 hover:bg-green-200 border-green-200 dark:bg-green-950 dark:text-green-400" 
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="bg-green-50 text-green-700 hover:bg-green-100 border border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:hover:bg-green-900/50 dark:border-green-800/40"
                     onClick={() => handleEditClick(room)}
                   >
                     Edit
                   </Button>
-                  <Button 
-                    variant="destructive" 
-                    size="sm" 
-                    className="bg-red-50 text-red-600 hover:bg-red-100 border-red-200" 
-                    onClick={() => handleDeleteClick(room)}
-                  >
-                    Hapus
-                  </Button>
+                  {activeTab === "arsip" && (
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      className="bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-900/50 dark:border-red-800/40"
+                      onClick={() => handleDeleteClick(room)}
+                    >
+                      Hapus
+                    </Button>
+                  )}
                 </div>
               )}
             />
@@ -801,18 +959,18 @@ const ExamRoomsPage = () => {
 
       {/* Dialog Create/Edit */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-md bg-white">
+        <DialogContent className="max-w-md bg-card">
           <DialogHeader>
             <DialogTitle>{dialogMode === "edit" ? "Edit Ruang Ujian" : "Buka Ruang Ujian"}</DialogTitle>
           </DialogHeader>
 
           <form onSubmit={handleSubmit} className="space-y-4 pt-2">
             <FormField id="examId" label="Pilih Ujian" error={undefined}>
-              <select 
-                value={formValues.examId} 
-                onChange={(e) => setFormValues({ ...formValues, examId: e.target.value })} 
+              <select
+                value={formValues.examId}
+                onChange={(e) => setFormValues({ ...formValues, examId: e.target.value })}
                 required
-                className="w-full rounded-md border text-sm p-2"
+                className="w-full rounded-md border border-slate-200 dark:border-slate-800 bg-card text-sm p-2"
               >
                 <option value="">-- Pilih Ujian --</option>
                 {exams.map((e) => <option key={e.id} value={e.id}>{e.title}</option>)}
@@ -820,48 +978,48 @@ const ExamRoomsPage = () => {
             </FormField>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-700">Pilih Kelas</label>
+              <label className="text-sm font-medium text-slate-700 dark:text-slate-200">Pilih Kelas</label>
               <div className="flex gap-2 mb-2">
-                <button 
-                  type="button" 
+                <button
+                  type="button"
                   onClick={() => setFormValues({ ...formValues, allClasses: true, classId: "" })}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${formValues.allClasses ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-600"}`}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${formValues.allClasses ? "bg-blue-50 text-blue-700 border border-blue-100 dark:bg-blue-900/40 dark:text-blue-400 dark:border-blue-800/40" : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300"}`}
                 >
                   Semua Kelas
                 </button>
-                <button 
-                  type="button" 
+                <button
+                  type="button"
                   onClick={() => setFormValues({ ...formValues, allClasses: false })}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${!formValues.allClasses ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-600"}`}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${!formValues.allClasses ? "bg-blue-50 text-blue-700 border border-blue-100 dark:bg-blue-900/40 dark:text-blue-400 dark:border-blue-800/40" : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300"}`}
                 >
                   Pilih Parsial (Multiple)
                 </button>
               </div>
 
               {!formValues.allClasses && (
-                <div className="grid grid-cols-2 gap-2 border rounded-xl p-2 max-h-40 overflow-y-auto">
-                    {piketClasses.map((c) => {
-                       const isChecked = formValues.classId ? formValues.classId.split(",").includes(c.id) : false;
-                       return (
-                          <label key={c.id} className="flex items-center gap-2 text-xs p-1 hover:bg-slate-50 rounded cursor-pointer">
-                             <input 
-                               type="checkbox" 
-                               checked={isChecked}
-                               onChange={(e) => {
-                                   let current = formValues.classId ? formValues.classId.split(",") : [];
-                                   if (e.target.checked) {
-                                       current.push(c.id);
-                                   } else {
-                                       current = current.filter(id => id !== c.id);
-                                   }
-                                   current = current.filter(Boolean);
-                                   setFormValues({ ...formValues, classId: current.join(",") });
-                               }}
-                             />
-                             <span className="truncate">{c.name}</span>
-                          </label>
-                       )
-                    })}
+                <div className="grid grid-cols-2 gap-2 border border-slate-200 dark:border-slate-800 rounded-xl p-2 max-h-40 overflow-y-auto bg-card">
+                  {piketClasses.map((c) => {
+                    const isChecked = formValues.classId ? formValues.classId.split(",").includes(c.id) : false;
+                    return (
+                      <label key={c.id} className="flex items-center gap-2 text-xs p-1 hover:bg-slate-50 dark:hover:bg-slate-800 rounded cursor-pointer text-slate-700 dark:text-slate-200">
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={(e) => {
+                            let current = formValues.classId ? formValues.classId.split(",") : [];
+                            if (e.target.checked) {
+                              current.push(c.id);
+                            } else {
+                              current = current.filter(id => id !== c.id);
+                            }
+                            current = current.filter(Boolean);
+                            setFormValues({ ...formValues, classId: current.join(",") });
+                          }}
+                        />
+                        <span className="truncate">{c.name}</span>
+                      </label>
+                    )
+                  })}
                 </div>
               )}
             </div>
@@ -876,39 +1034,39 @@ const ExamRoomsPage = () => {
               </FormField>
             </div>
             <FormField id="room_code" label="Kode Ruang Ujian" error={undefined}>
-                <Input type="text" placeholder="Contoh: MTK atau MTK-NISN" value={formValues.room_code || ""} onChange={(e) => setFormValues({ ...formValues, room_code: e.target.value.toUpperCase() })} required />
-                <p className="text-slate-400 text-xs mt-1">Siswa akan mencari ruang ujian menggunakan kode ini.</p>
+              <Input type="text" placeholder="Contoh: MTK atau MTK-NISN" value={formValues.room_code || ""} onChange={(e) => setFormValues({ ...formValues, room_code: e.target.value.toUpperCase() })} required />
+              <p className="text-slate-400 text-xs mt-1">Siswa akan mencari ruang ujian menggunakan kode ini.</p>
             </FormField>
 
             <div className="pt-2 border-t mt-4">
-              <button 
-                type="button" 
-                onClick={() => setShowAdvanced(!showAdvanced)} 
+              <button
+                type="button"
+                onClick={() => setShowAdvanced(!showAdvanced)}
                 className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1 focus:outline-none"
               >
-                 {showAdvanced ? "Sembunyikan Pengaturan Lanjutan -" : "Tampilkan Pengaturan Lanjutan +"}
+                {showAdvanced ? "Sembunyikan Pengaturan Lanjutan -" : "Tampilkan Pengaturan Lanjutan +"}
               </button>
             </div>
 
             {showAdvanced && (
-               <div className="space-y-4 pt-1">
-                  <div className="grid grid-cols-2 gap-3">
-                    <FormField id="duration" label="Durasi (Menit)" error={undefined}>
-                      <Input type="number" value={formValues.duration} onChange={(e) => setFormValues({ ...formValues, duration: Number(e.target.value) })} required />
-                    </FormField>
-                    <FormField id="cheat_limit" label="Batas Cheat" error={undefined}>
-                      <Input type="number" value={formValues.cheat_limit} onChange={(e) => setFormValues({ ...formValues, cheat_limit: Number(e.target.value) })} required />
-                    </FormField>
-                  </div>
-                  <FormField id="submit_window" label="Kumpul Dibuka (Sisa Menit)" error={undefined}>
-                      <Input type="number" placeholder="Contoh: 10 (Tombol kumpul aktif 10 menit sebelum berakhir)" value={formValues.submit_window || ""} onChange={(e) => setFormValues({ ...formValues, submit_window: Number(e.target.value) })} />
-                      <p className="text-slate-400 text-xs mt-1">Isi 0 jika selalu diijinkan.</p>
+              <div className="space-y-4 pt-1">
+                <div className="grid grid-cols-2 gap-3">
+                  <FormField id="duration" label="Durasi (Menit)" error={undefined}>
+                    <Input type="number" value={formValues.duration} onChange={(e) => setFormValues({ ...formValues, duration: Number(e.target.value) })} required />
                   </FormField>
-               </div>
+                  <FormField id="cheat_limit" label="Batas Cheat" error={undefined}>
+                    <Input type="number" value={formValues.cheat_limit} onChange={(e) => setFormValues({ ...formValues, cheat_limit: Number(e.target.value) })} required />
+                  </FormField>
+                </div>
+                <FormField id="submit_window" label="Kumpul Dibuka (Sisa Menit)" error={undefined}>
+                  <Input type="number" placeholder="Contoh: 10 (Tombol kumpul aktif 10 menit sebelum berakhir)" value={formValues.submit_window || ""} onChange={(e) => setFormValues({ ...formValues, submit_window: Number(e.target.value) })} />
+                  <p className="text-slate-400 text-xs mt-1">Isi 0 jika selalu diijinkan.</p>
+                </FormField>
+              </div>
             )}
 
             <DialogFooter className="pt-2">
-              <Button type="submit" className="w-full">{dialogMode === "edit" ? "Perbarui" : "Simpan"}</Button>
+              <Button type="submit" className="w-full bg-blue-50 hover:bg-blue-100 border border-blue-100 dark:bg-blue-900/40 dark:text-blue-400 dark:hover:bg-blue-900/60 dark:border-blue-800/40 text-blue-700">{dialogMode === "edit" ? "Perbarui" : "Simpan"}</Button>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -924,25 +1082,70 @@ const ExamRoomsPage = () => {
         isLoading={isDeleting}
       />
 
+      <Dialog open={limitDialogOpen} onOpenChange={setLimitDialogOpen}>
+        <DialogContent className="max-w-sm bg-card">
+          <DialogHeader>
+            <DialogTitle>Tambah Batas Toleransi</DialogTitle>
+          </DialogHeader>
+          <div className="py-3 space-y-3">
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Tambahkan extra toleransi pelanggaran/kecurangan untuk siswa ini (dalam angka):
+            </p>
+            <Input
+              type="number"
+              value={limitValue}
+              onChange={(e) => setLimitValue(e.target.value)}
+              min="1"
+              placeholder="Contoh: 1"
+              className="bg-slate-50 dark:bg-slate-800"
+            />
+          </div>
+          <DialogFooter className="flex w-full gap-2">
+            <Button variant="outline" className="flex-1 border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800" onClick={() => setLimitDialogOpen(false)}>Batal</Button>
+            <Button className="flex-1 bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-100 dark:bg-blue-900/40 dark:text-blue-400 dark:hover:bg-blue-900/60 dark:border-blue-800/20 font-semibold" onClick={handleConfirmAddLimit}>Tambahkan</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Monitoring Dialog */}
       <Dialog open={isMonitorOpen} onOpenChange={setIsMonitorOpen}>
-        <DialogContent className="max-w-[95vw] lg:max-w-6xl w-full bg-white max-h-[95vh] flex flex-col p-4 sm:p-6 overflow-hidden">
-          <DialogHeader>
-            <DialogTitle>Monitor Ujian: {monitorRoom?.examTitle}</DialogTitle>
+        <DialogContent className="max-w-[95vw] lg:max-w-6xl w-full bg-card max-h-[95vh] flex flex-col p-4 sm:p-6 overflow-hidden">
+          <DialogHeader className="flex flex-row items-center justify-between border-b pb-3 border-slate-200/50 dark:border-slate-800/40">
+            <DialogTitle className="flex items-center gap-2 text-base font-bold text-slate-800 dark:text-slate-100">
+              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse-slow"></span>
+              Monitor Ujian: {monitorRoom?.examTitle}
+            </DialogTitle>
+            <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-900/60 px-2 py-1 rounded-xl border border-slate-200/60 dark:border-slate-800/40">
+              <span className="text-xs text-slate-600 dark:text-slate-400 font-mono font-bold">
+                {Math.floor(monitorTimeLeft / 60).toString().padStart(2, '0')}:{(monitorTimeLeft % 60).toString().padStart(2, '0')}
+              </span>
+              <Button
+                onClick={() => {
+                  setIsMonitorRefreshing(true);
+                  handleManualRefreshMonitor();
+                  setTimeout(() => setIsMonitorRefreshing(false), 600);
+                }}
+                size="icon"
+                variant="ghost"
+                className="h-5 w-5 p-0 rounded-lg hover:bg-white dark:hover:bg-slate-800 text-slate-400 hover:text-slate-700 dark:hover:text-slate-100"
+              >
+                <RefreshCw className={`h-3 w-3 ${isMonitorRefreshing ? "animate-spin" : ""}`} />
+              </Button>
+            </div>
           </DialogHeader>
           <div className="flex justify-between items-center mb-2">
             <p className="text-xs text-slate-500">Kelas: {monitorRoom?.className}</p>
             <div className="flex items-center gap-2 text-xs flex-wrap">
               {(monitorRoom?.allClasses || (monitorRoom?.classId && monitorRoom.classId.includes(","))) && (
                 <>
-                  <span className="text-slate-600 font-medium">Filter Kelas:</span>
-                  <select 
-                    value={monitorClassFilter} 
+                  <span className="text-slate-500 dark:text-slate-400 font-semibold text-xs">Filter Kelas:</span>
+                  <select
+                    value={monitorClassFilter}
                     onChange={(e) => {
                       setMonitorClassFilter(e.target.value);
                       setMonitorPage(1);
-                    }} 
-                    className="p-1 border rounded bg-white"
+                    }}
+                    className="h-8 text-[11px] font-bold rounded-lg border border-slate-200 dark:border-slate-800 bg-card px-2 hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors focus:outline-none focus:ring-1 focus:ring-slate-300 dark:focus:ring-slate-700"
                   >
                     <option value="all">Semua Terdaftar</option>
                     {piketClasses
@@ -952,97 +1155,99 @@ const ExamRoomsPage = () => {
                   </select>
                 </>
               )}
-              <span className="text-slate-600 font-medium ml-2">Urutkan:</span>
-              <select 
-                value={monitorSortBy} 
+              <span className="text-slate-500 dark:text-slate-400 font-semibold text-xs ml-2">Urutkan:</span>
+              <select
+                value={monitorSortBy}
                 onChange={(e) => {
                   setMonitorSortBy(e.target.value as any);
                   setMonitorPage(1);
-                }} 
-                className="p-1 border rounded bg-white"
+                }}
+                className="h-8 text-[11px] font-bold rounded-lg border border-slate-200 dark:border-slate-800 bg-card px-2 hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors focus:outline-none focus:ring-1 focus:ring-slate-300 dark:focus:ring-slate-700"
               >
                 <option value="default">Default (Absen)</option>
                 <option value="nama">Abjad Nama (A-Z)</option>
                 <option value="nilai">Nilai Tertinggi</option>
                 <option value="login">Waktu Login Terbaru</option>
               </select>
-              <Button onClick={handleExportExcel} size="sm" variant="outline" className="h-7 text-xs border-green-200 text-green-700 hover:bg-green-50 flex items-center gap-1 rounded-lg shadow-sm">
+
+
+              <Button onClick={handleExportExcel} size="sm" variant="outline" className="h-7 text-xs border-green-200 dark:border-green-800/40 text-green-700 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-950/50 flex items-center gap-1 rounded-lg shadow-sm">
                 <FileSpreadsheet className="h-3.5 w-3.5" /> Export Excel
               </Button>
-              <Button onClick={handleForceSubmitAll} size="sm" variant="outline" className="h-7 text-xs border-orange-200 text-orange-700 hover:bg-orange-50 flex items-center gap-1 rounded-lg shadow-sm">
+              <Button onClick={handleForceSubmitAll} size="sm" variant="outline" className="h-7 text-xs border-orange-200 dark:border-orange-800/40 text-orange-700 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-950/50 flex items-center gap-1 rounded-lg shadow-sm">
                 <Users className="h-3.5 w-3.5" /> Selesaikan Semua
               </Button>
             </div>
           </div>
 
           <div className="flex justify-between items-center mb-2 px-1">
-             <div className="text-[11px] text-slate-500">
-                Menampilkan {Math.min((monitorPage - 1) * monitorPageSize + 1, students.filter(s => {
-                    if (monitorRoom?.allClasses) {
-                      if (monitorClassFilter !== "all" && s.classId !== monitorClassFilter) return false;
-                      return true;
-                    }
-                    if (!monitorRoom?.classId) return false;
-                    const allowedIds = monitorRoom.classId.split(",");
-                    if (!allowedIds.includes(s.classId)) return false;
-                    if (monitorClassFilter !== "all" && s.classId !== monitorClassFilter) return false;
-                    return true;
-                  }).length)} - {Math.min(monitorPage * monitorPageSize, students.filter(s => {
-                    if (monitorRoom?.allClasses) {
-                      if (monitorClassFilter !== "all" && s.classId !== monitorClassFilter) return false;
-                      return true;
-                    }
-                    if (!monitorRoom?.classId) return false;
-                    const allowedIds = monitorRoom.classId.split(",");
-                    if (!allowedIds.includes(s.classId)) return false;
-                    if (monitorClassFilter !== "all" && s.classId !== monitorClassFilter) return false;
-                    return true;
-                  }).length)} dari {students.filter(s => {
-                    if (monitorRoom?.allClasses) {
-                      if (monitorClassFilter !== "all" && s.classId !== monitorClassFilter) return false;
-                      return true;
-                    }
-                    if (!monitorRoom?.classId) return false;
-                    const allowedIds = monitorRoom.classId.split(",");
-                    if (!allowedIds.includes(s.classId)) return false;
-                    if (monitorClassFilter !== "all" && s.classId !== monitorClassFilter) return false;
-                    return true;
-                  }).length} Siswa
-             </div>
-             <div className="flex items-center gap-2">
-                <span className="text-[11px] text-slate-500">Baris:</span>
-                <select 
-                  value={monitorPageSize} 
-                  onChange={(e) => {
-                    setMonitorPageSize(Number(e.target.value));
-                    setMonitorPage(1);
-                  }}
-                  className="p-1 text-[11px] border rounded bg-white"
-                >
-                  <option value={10}>10</option>
-                  <option value={25}>25</option>
-                  <option value={50}>50</option>
-                  <option value={100}>100</option>
-                </select>
-             </div>
+            <div className="text-[11px] text-slate-500">
+              Menampilkan {Math.min((monitorPage - 1) * monitorPageSize + 1, students.filter(s => {
+                if (monitorRoom?.allClasses) {
+                  if (monitorClassFilter !== "all" && s.classId !== monitorClassFilter) return false;
+                  return true;
+                }
+                if (!monitorRoom?.classId) return false;
+                const allowedIds = monitorRoom.classId.split(",");
+                if (!allowedIds.includes(s.classId)) return false;
+                if (monitorClassFilter !== "all" && s.classId !== monitorClassFilter) return false;
+                return true;
+              }).length)} - {Math.min(monitorPage * monitorPageSize, students.filter(s => {
+                if (monitorRoom?.allClasses) {
+                  if (monitorClassFilter !== "all" && s.classId !== monitorClassFilter) return false;
+                  return true;
+                }
+                if (!monitorRoom?.classId) return false;
+                const allowedIds = monitorRoom.classId.split(",");
+                if (!allowedIds.includes(s.classId)) return false;
+                if (monitorClassFilter !== "all" && s.classId !== monitorClassFilter) return false;
+                return true;
+              }).length)} dari {students.filter(s => {
+                if (monitorRoom?.allClasses) {
+                  if (monitorClassFilter !== "all" && s.classId !== monitorClassFilter) return false;
+                  return true;
+                }
+                if (!monitorRoom?.classId) return false;
+                const allowedIds = monitorRoom.classId.split(",");
+                if (!allowedIds.includes(s.classId)) return false;
+                if (monitorClassFilter !== "all" && s.classId !== monitorClassFilter) return false;
+                return true;
+              }).length} Siswa
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] text-slate-500">Baris:</span>
+              <select
+                value={monitorPageSize}
+                onChange={(e) => {
+                  setMonitorPageSize(Number(e.target.value));
+                  setMonitorPage(1);
+                }}
+                className="p-1 text-[11px] border rounded bg-card"
+              >
+                <option value={10}>10</option>
+                <option value={25}>25</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+              </select>
+            </div>
           </div>
 
-          <div className="rounded-md border bg-white shadow-sm flex flex-col overflow-hidden">
+          <div className="rounded-md border bg-card shadow-sm flex flex-col overflow-hidden">
             {/* Desktop View */}
             <div className="hidden md:block overflow-auto max-h-[65vh] scrollbar-thin">
               <Table>
-                <TableHeader className="sticky top-0 z-20 bg-slate-50 shadow-sm">
-                  <TableRow className="hover:bg-transparent border-b bg-slate-50">
-                    <TableHead className="w-12 text-center sticky top-0 bg-slate-50 z-20">No</TableHead>
-                    <TableHead className="sticky top-0 bg-slate-50 z-20">NISN</TableHead>
-                    <TableHead className="sticky top-0 bg-slate-50 z-20">Nama Siswa</TableHead>
-                    <TableHead className="sticky top-0 bg-slate-50 z-20">Kelas</TableHead>
-                    <TableHead className="sticky top-0 bg-slate-50 z-20">Login</TableHead>
-                    <TableHead className="sticky top-0 bg-slate-50 z-20">Status</TableHead>
-                    <TableHead className="text-center sticky top-0 bg-slate-50 z-20">Nilai</TableHead>
-                    <TableHead className="text-center sticky top-0 bg-slate-50 z-20">Prog.</TableHead>
-                    <TableHead className="text-center sticky top-0 bg-slate-50 z-20">Warn</TableHead>
-                    <TableHead className="text-right sticky top-0 bg-slate-50 z-20">Aksi</TableHead>
+                <TableHeader className="sticky top-0 z-20 bg-slate-50 dark:bg-slate-900 shadow-sm">
+                  <TableRow className="hover:bg-transparent border-b bg-slate-50 dark:bg-slate-900 dark:border-slate-800">
+                    <TableHead className="w-12 text-center sticky top-0 bg-slate-50 dark:bg-slate-900 z-20">No</TableHead>
+                    <TableHead className="sticky top-0 bg-slate-50 dark:bg-slate-900 z-20">NISN</TableHead>
+                    <TableHead className="sticky top-0 bg-slate-50 dark:bg-slate-900 z-20">Nama Siswa</TableHead>
+                    <TableHead className="sticky top-0 bg-slate-50 dark:bg-slate-900 z-20">Kelas</TableHead>
+                    <TableHead className="sticky top-0 bg-slate-50 dark:bg-slate-900 z-20">Login</TableHead>
+                    <TableHead className="sticky top-0 bg-slate-50 dark:bg-slate-900 z-20">Status</TableHead>
+                    <TableHead className="text-center sticky top-0 bg-slate-50 dark:bg-slate-900 z-20">Nilai</TableHead>
+                    <TableHead className="text-center sticky top-0 bg-slate-50 dark:bg-slate-900 z-20">Prog.</TableHead>
+                    <TableHead className="text-center sticky top-0 bg-slate-50 dark:bg-slate-900 z-20">Warn</TableHead>
+                    <TableHead className="text-right sticky top-0 bg-slate-50 dark:bg-slate-900 z-20">Aksi</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1075,7 +1280,7 @@ const ExamRoomsPage = () => {
                       return (
                         <TableRow>
                           <TableCell colSpan={10} className="h-24 text-center text-slate-400">
-                             Tidak ada siswa ditemukan.
+                            Tidak ada siswa ditemukan.
                           </TableCell>
                         </TableRow>
                       );
@@ -1086,17 +1291,17 @@ const ExamRoomsPage = () => {
                       const attempt = attempts.find((a) => a.id === `${siswa.nisn}_${monitorRoom?.id}`);
                       const sisAnswers = answersList[siswa.nisn] || {};
                       const answeredCount = Object.keys(sisAnswers).length;
-                      
+
                       let statusLabel = <span className="text-slate-400">Belum Masuk</span>;
                       if (attempt) {
                         if (attempt.status === "submitted") {
-                          statusLabel = <span className="text-green-600 font-semibold px-2 py-0.5 bg-green-50 rounded-full border border-green-100">Selesai</span>;
+                          statusLabel = <span className="text-green-600 font-semibold px-2 py-0.5 bg-green-50 dark:bg-green-950/40 rounded-full border border-green-100 dark:border-green-900">Selesai</span>;
                         } else if (attempt.status === "LOCKED") {
-                          statusLabel = <span className="text-red-500 font-bold px-2 py-0.5 bg-red-50 rounded-full border border-red-100 italic">TERKUNCI</span>;
+                          statusLabel = <span className="text-red-500 font-bold px-2 py-0.5 bg-red-50 dark:bg-red-950/40 rounded-full border border-red-100 dark:border-red-900 italic">TERKUNCI</span>;
                         } else {
                           const isOnline = attempt.isOnline === true;
                           statusLabel = (
-                            <span className={`font-semibold px-2 py-0.5 rounded-full border whitespace-nowrap ${isOnline ? "text-amber-600 bg-amber-50 border-amber-100 animate-pulse" : "text-slate-500 bg-slate-50 border-slate-100"}`}>
+                            <span className={`font-semibold px-2 py-0.5 rounded-full border whitespace-nowrap ${isOnline ? "text-amber-600 bg-amber-50 dark:bg-amber-950/40 border-amber-100 dark:border-amber-900 animate-pulse" : "text-slate-500 bg-slate-50 dark:bg-slate-800 border-slate-100 dark:border-slate-700"}`}>
                               Ujian ({isOnline ? "Online" : "Offline"})
                             </span>
                           );
@@ -1107,74 +1312,74 @@ const ExamRoomsPage = () => {
 
                       return (
                         <React.Fragment key={siswa.id}>
-                          <TableRow className="group transition-colors hover:bg-slate-50/50">
+                          <TableRow className="group transition-colors hover:bg-slate-100 dark:hover:bg-slate-800/40">
                             <TableCell className="text-center text-slate-400 font-medium">{index + 1}</TableCell>
                             <TableCell className="font-mono text-[11px] text-slate-500">{siswa.nisn}</TableCell>
-                            <TableCell className="font-semibold text-slate-700">{siswa.name}</TableCell>
+                            <TableCell className="font-semibold text-slate-700 dark:text-slate-200">{siswa.name}</TableCell>
                             <TableCell className="text-xs font-semibold text-slate-500">{piketClasses.find(c => c.id === siswa.classId)?.name || "-"}</TableCell>
                             <TableCell className="text-slate-500 tabular-nums">{loginTime}</TableCell>
                             <TableCell>{statusLabel}</TableCell>
                             <TableCell className="text-center font-bold text-indigo-600 tabular-nums">{attempt?.score !== undefined ? attempt.score : "-"}</TableCell>
                             <TableCell className="text-center text-xs text-slate-500 font-medium tabular-nums">{answeredCount}/{monitorQuestions.length}</TableCell>
-                             <TableCell className="text-center">
-                                {(() => {
-                                  const totalAllowed = (monitorRoom?.cheat_limit || 3) + (attempt?.extraCheatLimit || 0);
-                                  const currentCount = attempt?.cheatCount || 0;
-                                  return (
-                                     <span className={`font-bold tabular-nums ${currentCount > 0 ? "text-red-500" : "text-slate-400"}`}>
-                                        {currentCount} / {totalAllowed}
-                                     </span>
-                                  )
-                                })()}
-                             </TableCell>
+                            <TableCell className="text-center">
+                              {(() => {
+                                const totalAllowed = (monitorRoom?.cheat_limit || 3) + (attempt?.extraCheatLimit || 0);
+                                const currentCount = attempt?.cheatCount || 0;
+                                return (
+                                  <span className={`font-bold tabular-nums ${currentCount > 0 ? "text-red-500" : "text-slate-400"}`}>
+                                    {currentCount} / {totalAllowed}
+                                  </span>
+                                )
+                              })()}
+                            </TableCell>
                             <TableCell className="text-right">
-                               <div className="flex justify-end gap-1.5 items-center whitespace-nowrap">
-                                  {attempt?.status === "LOCKED" && (
-                                    <Button size="sm" variant="secondary" className="bg-emerald-100 text-emerald-700 hover:bg-emerald-200 border-emerald-200 h-7 text-[10px]" onClick={() => handleUnlockStudent(siswa.nisn)}>Buka Kunci</Button>
-                                  )}
-                                  {attempt && (
-                                    <>
-                                      <Button size="sm" variant="secondary" className="bg-blue-100 text-blue-700 hover:bg-blue-200 border-blue-200 h-7 text-[10px]" onClick={() => handleAddCheatLimit(siswa.nisn)}>+ Limit</Button>
-                                      <Button size="sm" variant="secondary" className="bg-amber-100 text-amber-700 hover:bg-amber-200 border-amber-200 h-7 text-[10px]" onClick={() => handleResetCheatCount(siswa.nisn)}>Reset Cheat</Button>
-                                      <Button size="sm" variant="destructive" className="bg-rose-50 text-rose-600 hover:bg-rose-100 border-rose-200 h-7 text-[10px]" onClick={() => handleResetSession(siswa.nisn)}>Reset Sesi</Button>
-                                      <Button size="sm" variant="secondary" className="bg-sky-100 text-sky-700 hover:bg-sky-200 border-sky-200 h-7 text-[10px]" onClick={() => setExpandedSiswa(expandedSiswa === siswa.nisn ? null : siswa.nisn)}>
-                                        {expandedSiswa === siswa.nisn ? "Tutup" : "Logs"}
-                                      </Button>
-                                    </>
-                                  )}
-                               </div>
+                              <div className="flex justify-end gap-1.5 items-center whitespace-nowrap">
+                                {attempt?.status === "LOCKED" && (
+                                  <Button size="sm" variant="secondary" className="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-400 dark:hover:bg-emerald-900/50 dark:border-emerald-800/40 h-7 text-[10px]" onClick={() => handleUnlockStudent(siswa.nisn)}>Buka Kunci</Button>
+                                )}
+                                {attempt && (
+                                  <>
+                                    <Button size="sm" variant="secondary" className="bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 dark:border-blue-800/40 h-7 text-[10px]" onClick={() => openLimitDialog(siswa.nisn)}>+ Limit</Button>
+                                    <Button size="sm" variant="secondary" className="bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-100 dark:bg-amber-900/30 dark:text-amber-400 dark:hover:bg-amber-900/50 dark:border-amber-800/40 h-7 text-[10px]" onClick={() => handleResetCheatCount(siswa.nisn)}>Reset Cheat</Button>
+                                    <Button size="sm" variant="destructive" className="bg-rose-50 text-rose-600 hover:bg-rose-100 border border-rose-100 dark:bg-rose-900/30 dark:text-rose-400 dark:hover:bg-rose-900/50 dark:border-rose-800/40 h-7 text-[10px]" onClick={() => handleResetSession(siswa.nisn)}>Reset Sesi</Button>
+                                    <Button size="sm" variant="secondary" className="bg-sky-50 text-sky-700 hover:bg-sky-100 border border-sky-100 dark:bg-sky-900/30 dark:text-sky-400 dark:hover:bg-sky-900/50 dark:border-sky-800/40 h-7 text-[10px]" onClick={() => setExpandedSiswa(expandedSiswa === siswa.nisn ? null : siswa.nisn)}>
+                                      {expandedSiswa === siswa.nisn ? "Tutup" : "Logs"}
+                                    </Button>
+                                  </>
+                                )}
+                              </div>
                             </TableCell>
                           </TableRow>
                           {expandedSiswa === siswa.nisn && (
-                            <TableRow className="bg-slate-50/30 border-l-2 border-l-indigo-500">
+                            <TableRow className="bg-slate-50/30 dark:bg-slate-800/30 border-l-2 border-l-indigo-500">
                               <TableCell colSpan={10} className="p-4">
                                 <div className="flex items-center gap-2 mb-3">
-                                   <div className="h-1 w-1 rounded-full bg-indigo-500"></div>
-                                   <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Detail Jawaban & Sesi</h4>
+                                  <div className="h-1 w-1 rounded-full bg-indigo-500"></div>
+                                  <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">Detail Jawaban & Sesi</h4>
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-h-[400px] overflow-y-auto pr-2 scrollbar-thin">
                                   {monitorQuestions.map((q, qIdx) => {
-                                     const ansId = sisAnswers[q.id];
-                                     const isCorrect = ansId && q.choices[ansId]?.isCorrect === true;
-                                     return (
-                                        <div key={q.id} className="bg-white p-3 rounded-xl border border-slate-200 shadow-[0_2px_4px_rgba(0,0,0,0.02)] flex flex-col gap-2">
-                                           <div className="flex gap-2">
-                                             <span className="text-slate-400 font-bold shrink-0">#{qIdx + 1}</span>
-                                             <div className="text-xs font-medium text-slate-700 leading-relaxed truncate-3-lines" dangerouslySetInnerHTML={{ __html: q.text }} />
-                                           </div>
-                                           <div className={`mt-auto p-2 rounded-lg flex items-center justify-between transition-colors ${isCorrect ? "bg-emerald-50 text-emerald-700 border border-emerald-100" : ansId ? "bg-rose-50 text-rose-700 border border-rose-100" : "bg-slate-50 text-slate-400 border border-slate-100"}`}>
-                                              <div className="flex flex-col">
-                                                 <span className="text-[10px] uppercase font-bold opacity-70">Jawaban</span>
-                                                 <span className="text-xs font-bold leading-none">{ansId ? ansId.toUpperCase() : "Kosong"}</span>
-                                              </div>
-                                              {ansId && (
-                                                <div className={`px-2 py-1 rounded-md text-[10px] font-bold ${isCorrect ? "bg-emerald-100/50" : "bg-rose-100/50"}`}>
-                                                   {isCorrect ? "BENAR" : "SALAH"}
-                                                </div>
-                                              )}
-                                           </div>
+                                    const ansId = sisAnswers[q.id];
+                                    const isCorrect = ansId && q.choices[ansId]?.isCorrect === true;
+                                    return (
+                                      <div key={q.id} className="bg-card p-3 rounded-xl border border-slate-200 dark:border-slate-800 shadow-[0_2px_4px_rgba(0,0,0,0.02)] flex flex-col gap-2">
+                                        <div className="flex gap-2">
+                                          <span className="text-slate-400 font-bold shrink-0">#{qIdx + 1}</span>
+                                          <div className="text-xs font-medium text-slate-700 dark:text-slate-300 leading-relaxed truncate-3-lines" dangerouslySetInnerHTML={{ __html: q.text }} />
                                         </div>
-                                     );
+                                        <div className={`mt-auto p-2 rounded-lg flex items-center justify-between transition-colors ${isCorrect ? "bg-emerald-50 text-emerald-700 border border-emerald-100 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-800/40" : ansId ? "bg-rose-50 text-rose-700 border border-rose-100 dark:bg-rose-950/20 dark:text-rose-400 dark:border-rose-800/40" : "bg-slate-50 text-slate-400 border border-slate-100 dark:bg-slate-800/60 dark:text-slate-500 dark:border-slate-700"}`}>
+                                          <div className="flex flex-col">
+                                            <span className="text-[10px] uppercase font-bold opacity-70">Jawaban</span>
+                                            <span className="text-xs font-bold leading-none">{ansId ? ansId.toUpperCase() : "Kosong"}</span>
+                                          </div>
+                                          {ansId && (
+                                            <div className={`px-2 py-1 rounded-md text-[10px] font-bold ${isCorrect ? "bg-emerald-100/30 dark:bg-emerald-800/20 text-emerald-700 dark:text-emerald-400" : "bg-rose-100/30 dark:bg-rose-800/20 text-rose-700 dark:text-rose-400"}`}>
+                                              {isCorrect ? "BENAR" : "SALAH"}
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+                                    );
                                   })}
                                 </div>
                               </TableCell>
@@ -1189,161 +1394,161 @@ const ExamRoomsPage = () => {
             </div>
 
             {/* Mobile View */}
-            <div className="md:hidden space-y-4 p-4 bg-slate-50/30 overflow-y-auto max-h-[65vh]">
-               {(() => {
-                    const filtered = students
-                      .filter((s) => {
-                        if (monitorRoom?.allClasses) {
-                          if (monitorClassFilter !== "all" && s.classId !== monitorClassFilter) return false;
-                          return true;
-                        }
-                        if (!monitorRoom?.classId) return false;
-                        const allowedIds = monitorRoom.classId.split(",");
-                        if (!allowedIds.includes(s.classId)) return false;
-                        if (monitorClassFilter !== "all" && s.classId !== monitorClassFilter) return false;
-                        return true;
-                      })
-                      .sort((a, b) => {
-                        const attA = attempts.find((at) => at.id === `${a.nisn}_${monitorRoom?.id}`);
-                        const attB = attempts.find((at) => at.id === `${b.nisn}_${monitorRoom?.id}`);
-                        if (monitorSortBy === "nilai") return (attB?.score || 0) - (attA?.score || 0);
-                        if (monitorSortBy === "login") return (attB?.startTime || 0) - (attA?.startTime || 0);
-                        if (monitorSortBy === "nama") return a.name.localeCompare(b.name);
-                        return 0;
-                      });
+            <div className="md:hidden space-y-4 p-4 bg-slate-50/30 dark:bg-slate-900/30 overflow-y-auto max-h-[65vh]">
+              {(() => {
+                const filtered = students
+                  .filter((s) => {
+                    if (monitorRoom?.allClasses) {
+                      if (monitorClassFilter !== "all" && s.classId !== monitorClassFilter) return false;
+                      return true;
+                    }
+                    if (!monitorRoom?.classId) return false;
+                    const allowedIds = monitorRoom.classId.split(",");
+                    if (!allowedIds.includes(s.classId)) return false;
+                    if (monitorClassFilter !== "all" && s.classId !== monitorClassFilter) return false;
+                    return true;
+                  })
+                  .sort((a, b) => {
+                    const attA = attempts.find((at) => at.id === `${a.nisn}_${monitorRoom?.id}`);
+                    const attB = attempts.find((at) => at.id === `${b.nisn}_${monitorRoom?.id}`);
+                    if (monitorSortBy === "nilai") return (attB?.score || 0) - (attA?.score || 0);
+                    if (monitorSortBy === "login") return (attB?.startTime || 0) - (attA?.startTime || 0);
+                    if (monitorSortBy === "nama") return a.name.localeCompare(b.name);
+                    return 0;
+                  });
 
-                    const startIndex = (monitorPage - 1) * monitorPageSize;
-                    const currentData = filtered.slice(startIndex, startIndex + monitorPageSize);
+                const startIndex = (monitorPage - 1) * monitorPageSize;
+                const currentData = filtered.slice(startIndex, startIndex + monitorPageSize);
 
-                    if (currentData.length === 0) return <div className="text-center p-8 text-slate-400 text-sm">Tidak ada siswa ditemukan.</div>;
+                if (currentData.length === 0) return <div className="text-center p-8 text-slate-400 text-sm">Tidak ada siswa ditemukan.</div>;
 
-                    return currentData.map((siswa, localIndex) => {
-                      const attempt = attempts.find((a) => a.id === `${siswa.nisn}_${monitorRoom?.id}`);
-                      const sisAnswers = answersList[siswa.nisn] || {};
-                      const isOnline = attempt?.isOnline === true;
-                      const status = attempt ? (attempt.status === "submitted" ? "Selesai" : attempt.status === "LOCKED" ? "Terkunci" : `Ujian (${isOnline ? "Online" : "Offline"})`) : "Belum Masuk";
-                      const statusColor = attempt ? (attempt.status === "submitted" ? "bg-emerald-100 text-emerald-700 border-emerald-200" : attempt.status === "LOCKED" ? "bg-rose-100 text-rose-700 border-rose-200" : isOnline ? "bg-amber-100 text-amber-700 border-amber-200 animate-pulse" : "bg-slate-100 text-slate-500 border-slate-200") : "bg-slate-100 text-slate-400 border-slate-200";
+                return currentData.map((siswa, localIndex) => {
+                  const attempt = attempts.find((a) => a.id === `${siswa.nisn}_${monitorRoom?.id}`);
+                  const sisAnswers = answersList[siswa.nisn] || {};
+                  const isOnline = attempt?.isOnline === true;
+                  const status = attempt ? (attempt.status === "submitted" ? "Selesai" : attempt.status === "LOCKED" ? "Terkunci" : `Ujian (${isOnline ? "Online" : "Offline"})`) : "Belum Masuk";
+                  const statusColor = attempt ? (attempt.status === "submitted" ? "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-400 dark:border-emerald-900" : attempt.status === "LOCKED" ? "bg-rose-100 text-rose-700 border-rose-200 dark:bg-rose-950/50 dark:text-rose-400 dark:border-rose-900" : isOnline ? "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-950/50 dark:text-amber-400 dark:border-amber-900 animate-pulse" : "bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700") : "bg-slate-100 text-slate-400 border-slate-200 dark:bg-slate-800 dark:text-slate-500 dark:border-slate-700";
 
-                      return (
-                        <div key={siswa.id} className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3 shadow-sm relative overflow-hidden">
-                          <div className="flex justify-between items-start">
-                            <div className="space-y-1">
-                               <p className="text-[10px] text-slate-400 font-bold uppercase tracking-vibrant">#{startIndex + localIndex + 1} • {siswa.nisn}</p>
-                               <h4 className="font-bold text-slate-800 leading-tight">{siswa.name}</h4>
-                               <p className="text-xs font-semibold text-slate-500 bg-slate-100 inline-block px-2 py-0.5 rounded-md">{piketClasses.find(c => c.id === siswa.classId)?.name}</p>
-                            </div>
-                             <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border whitespace-nowrap ${statusColor}`}>{status.toUpperCase()}</span>
-                          </div>
-                          
-                          <div className="grid grid-cols-3 gap-2 py-3 border-y border-slate-100">
-                             <div className="text-center">
-                                <p className="text-[9px] uppercase font-bold text-slate-400 mb-0.5">Nilai</p>
-                                <p className="text-sm font-bold text-indigo-600 tabular-nums">{attempt?.score ?? "-"}</p>
-                             </div>
-                             <div className="text-center border-x border-slate-100">
-                                <p className="text-[9px] uppercase font-bold text-slate-400 mb-0.5">Prog.</p>
-                                <p className="text-sm font-bold text-slate-700 tabular-nums">{Object.keys(sisAnswers).length}/{monitorQuestions.length}</p>
-                             </div>
-                             <div className="text-center">
-                                <p className="text-[9px] uppercase font-bold text-slate-400 mb-0.5">Warn</p>
-                                 <p className="text-sm font-bold text-rose-500 tabular-nums">
-                                    {attempt?.cheatCount || 0} / {(monitorRoom?.cheat_limit || 3) + (attempt?.extraCheatLimit || 0)}
-                                 </p>
-                             </div>
-                          </div>
-
-                          <div className="flex justify-end gap-2 pt-1">
-                             {attempt?.status === "LOCKED" && (
-                               <Button size="sm" variant="outline" className="h-8 text-[11px] font-bold border-green-200 text-green-700 hover:bg-green-50 rounded-xl px-4" onClick={() => handleUnlockStudent(siswa.nisn)}>Unlock</Button>
-                             )}
-                             <Button size="sm" variant="secondary" className="h-8 text-[11px] font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-xl px-4" onClick={() => setExpandedSiswa(expandedSiswa === siswa.nisn ? null : siswa.nisn)}>
-                                {expandedSiswa === siswa.nisn ? "Tutup" : "Details"}
-                             </Button>
-                          </div>
-
-                          {expandedSiswa === siswa.nisn && (
-                             <div className="mt-3 pt-3 border-t border-slate-100 bg-slate-50/50 rounded-b-2xl space-y-2 p-2">
-                               {monitorQuestions.map((q, qIdx) => {
-                                  const ansId = sisAnswers[q.id];
-                                  const isCorrect = ansId && q.choices[ansId]?.isCorrect === true;
-                                  return (
-                                     <div key={q.id} className="bg-white p-3 rounded-xl border border-slate-200 text-[11px] shadow-sm">
-                                        <div className="flex gap-2 mb-2">
-                                           <span className="font-bold text-slate-400 shrink-0">#{qIdx+1}</span>
-                                           <div className="text-slate-700 leading-snug font-medium" dangerouslySetInnerHTML={{ __html: q.text }} />
-                                        </div>
-                                        <div className={`p-2 rounded-lg flex justify-between items-center ${isCorrect ? "bg-emerald-50 text-emerald-700 border border-emerald-100" : ansId ? "bg-rose-50 text-rose-700 border border-rose-100" : "bg-slate-50 text-slate-400"}`}>
-                                           <span className="font-bold">Jawaban: {ansId ? ansId.toUpperCase() : "KOSONG"}</span>
-                                           {ansId && <span className="text-[10px] font-black">{isCorrect ? "✓ BENAR" : "✗ SALAH"}</span>}
-                                        </div>
-                                     </div>
-                                  )
-                               })}
-                             </div>
-                          )}
+                  return (
+                    <div key={siswa.id} className="bg-card border border-slate-200 dark:border-slate-800 rounded-2xl p-4 space-y-3 shadow-sm relative overflow-hidden">
+                      <div className="flex justify-between items-start">
+                        <div className="space-y-1">
+                          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-vibrant">#{startIndex + localIndex + 1} • {siswa.nisn}</p>
+                          <h4 className="font-bold text-slate-800 leading-tight">{siswa.name}</h4>
+                          <p className="text-xs font-semibold text-slate-500 bg-slate-100 inline-block px-2 py-0.5 rounded-md">{piketClasses.find(c => c.id === siswa.classId)?.name}</p>
                         </div>
-                      )
-                    })
-               })()}
+                        <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border whitespace-nowrap ${statusColor}`}>{status.toUpperCase()}</span>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-2 py-3 border-y border-slate-100 dark:border-slate-800">
+                        <div className="text-center">
+                          <p className="text-[9px] uppercase font-bold text-slate-400 mb-0.5">Nilai</p>
+                          <p className="text-sm font-bold text-indigo-600 tabular-nums">{attempt?.score ?? "-"}</p>
+                        </div>
+                        <div className="text-center border-x border-slate-100">
+                          <p className="text-[9px] uppercase font-bold text-slate-400 mb-0.5">Prog.</p>
+                          <p className="text-sm font-bold text-slate-700 tabular-nums">{Object.keys(sisAnswers).length}/{monitorQuestions.length}</p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-[9px] uppercase font-bold text-slate-400 mb-0.5">Warn</p>
+                          <p className="text-sm font-bold text-rose-500 tabular-nums">
+                            {attempt?.cheatCount || 0} / {(monitorRoom?.cheat_limit || 3) + (attempt?.extraCheatLimit || 0)}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex justify-end gap-2 pt-1">
+                        {attempt?.status === "LOCKED" && (
+                          <Button size="sm" variant="outline" className="h-8 text-[11px] font-bold border-green-200 text-green-700 hover:bg-green-50 rounded-xl px-4" onClick={() => handleUnlockStudent(siswa.nisn)}>Unlock</Button>
+                        )}
+                        <Button size="sm" variant="secondary" className="h-8 text-[11px] font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-xl px-4" onClick={() => setExpandedSiswa(expandedSiswa === siswa.nisn ? null : siswa.nisn)}>
+                          {expandedSiswa === siswa.nisn ? "Tutup" : "Details"}
+                        </Button>
+                      </div>
+
+                      {expandedSiswa === siswa.nisn && (
+                        <div className="mt-3 pt-3 border-t border-slate-100 bg-slate-50/50 rounded-b-2xl space-y-2 p-2">
+                          {monitorQuestions.map((q, qIdx) => {
+                            const ansId = sisAnswers[q.id];
+                            const isCorrect = ansId && q.choices[ansId]?.isCorrect === true;
+                            return (
+                              <div key={q.id} className="bg-card p-3 rounded-xl border border-slate-200 text-[11px] shadow-sm">
+                                <div className="flex gap-2 mb-2">
+                                  <span className="font-bold text-slate-400 shrink-0">#{qIdx + 1}</span>
+                                  <div className="text-slate-700 leading-snug font-medium" dangerouslySetInnerHTML={{ __html: q.text }} />
+                                </div>
+                                <div className={`p-2 rounded-lg flex justify-between items-center ${isCorrect ? "bg-emerald-50 text-emerald-700 border border-emerald-100" : ansId ? "bg-rose-50 text-rose-700 border border-rose-100" : "bg-slate-50 text-slate-400"}`}>
+                                  <span className="font-bold">Jawaban: {ansId ? ansId.toUpperCase() : "KOSONG"}</span>
+                                  {ansId && <span className="text-[10px] font-black">{isCorrect ? "✓ BENAR" : "✗ SALAH"}</span>}
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })
+              })()}
             </div>
           </div>
 
           {/* Pagination Controls */}
           {(() => {
-             const filtered = students.filter((s) => {
-                if (monitorRoom?.allClasses) {
-                  if (monitorClassFilter !== "all" && s.classId !== monitorClassFilter) return false;
-                  return true;
-                }
-                if (!monitorRoom?.classId) return false;
-                const allowedIds = monitorRoom.classId.split(",");
-                if (!allowedIds.includes(s.classId)) return false;
+            const filtered = students.filter((s) => {
+              if (monitorRoom?.allClasses) {
                 if (monitorClassFilter !== "all" && s.classId !== monitorClassFilter) return false;
                 return true;
-              });
-             const totalPages = Math.ceil(filtered.length / monitorPageSize);
-             if (totalPages <= 1) return null;
+              }
+              if (!monitorRoom?.classId) return false;
+              const allowedIds = monitorRoom.classId.split(",");
+              if (!allowedIds.includes(s.classId)) return false;
+              if (monitorClassFilter !== "all" && s.classId !== monitorClassFilter) return false;
+              return true;
+            });
+            const totalPages = Math.ceil(filtered.length / monitorPageSize);
+            if (totalPages <= 1) return null;
 
-             return (
-                <div className="flex flex-col md:flex-row justify-between items-center gap-4 mt-6 bg-slate-100/50 p-3 sm:p-4 rounded-2xl border border-slate-200/60">
-                   <div className="text-xs font-bold text-slate-500 bg-white px-3 py-1.5 rounded-full border border-slate-200 shadow-sm">
-                      Menampilkan {Math.min((monitorPage - 1) * monitorPageSize + 1, filtered.length)} - {Math.min(monitorPage * monitorPageSize, filtered.length)} dari {filtered.length} Siswa
-                   </div>
-                   <div className="flex items-center gap-1.5 bg-white p-1 rounded-xl border border-slate-200 shadow-sm">
-                      <Button variant="ghost" size="sm" onClick={() => setMonitorPage(1)} disabled={monitorPage === 1} className="h-8 w-8 p-0 rounded-lg hover:bg-slate-100 disabled:opacity-30">
-                         <span className="sr-only">First</span>
-                         {"<<"}
-                      </Button>
-                      <Button variant="ghost" size="sm" onClick={() => setMonitorPage(prev => Math.max(1, prev - 1))} disabled={monitorPage === 1} className="h-8 w-8 p-0 rounded-lg hover:bg-slate-100 disabled:opacity-30">
-                         <span className="sr-only">Previous</span>
-                         {"<"}
-                      </Button>
-                      
-                      <div className="flex items-center gap-2 px-3 h-8 bg-slate-50 rounded-lg border border-inner shadow-inner">
-                         <span className="text-[10px] uppercase font-black text-slate-400">Hal</span>
-                         <input 
-                            type="number" 
-                            className="w-8 text-center text-xs font-black bg-transparent border-none focus:outline-none focus:ring-0 p-0 text-slate-800" 
-                            value={monitorPage}
-                            onChange={(e) => {
-                               const v = parseInt(e.target.value);
-                               if (v >= 1 && v <= totalPages) setMonitorPage(v);
-                            }}
-                         />
-                         <span className="text-[10px] font-bold text-slate-300">/ {totalPages}</span>
-                      </div>
-
-                      <Button variant="ghost" size="sm" onClick={() => setMonitorPage(prev => Math.min(totalPages, prev + 1))} disabled={monitorPage === totalPages} className="h-8 w-8 p-0 rounded-lg hover:bg-slate-100 disabled:opacity-30">
-                         <span className="sr-only">Next</span>
-                         {">"}
-                      </Button>
-                      <Button variant="ghost" size="sm" onClick={() => setMonitorPage(totalPages)} disabled={monitorPage === totalPages} className="h-8 w-8 p-0 rounded-lg hover:bg-slate-100 disabled:opacity-30">
-                         <span className="sr-only">Last</span>
-                         {">>"}
-                      </Button>
-                   </div>
+            return (
+              <div className="flex flex-col md:flex-row justify-between items-center gap-4 mt-6 bg-slate-100/30 dark:bg-slate-800/50 p-3 sm:p-4 rounded-2xl border border-slate-200/60 dark:border-slate-800">
+                <div className="text-xs font-bold text-slate-500 dark:text-slate-400 bg-card px-3 py-1.5 rounded-full border border-slate-200 dark:border-slate-800 shadow-sm">
+                  Menampilkan {Math.min((monitorPage - 1) * monitorPageSize + 1, filtered.length)} - {Math.min(monitorPage * monitorPageSize, filtered.length)} dari {filtered.length} Siswa
                 </div>
-             );
+                <div className="flex items-center gap-1.5 bg-card p-1 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                  <Button variant="ghost" size="sm" onClick={() => setMonitorPage(1)} disabled={monitorPage === 1} className="h-8 w-8 p-0 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30">
+                    <span className="sr-only">First</span>
+                    {"<<"}
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => setMonitorPage(prev => Math.max(1, prev - 1))} disabled={monitorPage === 1} className="h-8 w-8 p-0 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30">
+                    <span className="sr-only">Previous</span>
+                    {"<"}
+                  </Button>
+
+                  <div className="flex items-center gap-2 px-3 h-8 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-inner dark:border-slate-700 shadow-inner">
+                    <span className="text-[10px] uppercase font-black text-slate-400">Hal</span>
+                    <input
+                      type="number"
+                      className="w-8 text-center text-xs font-black bg-transparent border-none focus:outline-none focus:ring-0 p-0 text-slate-800 dark:text-slate-100"
+                      value={monitorPage}
+                      onChange={(e) => {
+                        const v = parseInt(e.target.value);
+                        if (v >= 1 && v <= totalPages) setMonitorPage(v);
+                      }}
+                    />
+                    <span className="text-[10px] font-bold text-slate-300">/ {totalPages}</span>
+                  </div>
+
+                  <Button variant="ghost" size="sm" onClick={() => setMonitorPage(prev => Math.min(totalPages, prev + 1))} disabled={monitorPage === totalPages} className="h-8 w-8 p-0 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30">
+                    <span className="sr-only">Next</span>
+                    {">"}
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => setMonitorPage(totalPages)} disabled={monitorPage === totalPages} className="h-8 w-8 p-0 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30">
+                    <span className="sr-only">Last</span>
+                    {">>"}
+                  </Button>
+                </div>
+              </div>
+            );
           })()}
         </DialogContent>
       </Dialog>

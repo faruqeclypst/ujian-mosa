@@ -476,7 +476,7 @@ const CBTPage = () => {
   if (isLocked) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-slate-50 p-4">
-        <div className="bg-white p-6 rounded-2xl shadow-md max-w-md text-center">
+        <div className="bg-card p-6 rounded-2xl shadow-md max-w-md text-center">
           <AlertCircle className="h-12 w-12 text-red-600 mx-auto mb-2" />
           <h2 className="text-xl font-bold text-red-600 mb-2">Ujian Terkunci!</h2>
           <p className="text-slate-600 text-sm mb-4">
@@ -492,10 +492,13 @@ const CBTPage = () => {
   const submitWindowSeconds = (roomData?.submit_window || 0) * 60;
   const isSubmitAllowed = submitWindowSeconds === 0 || timeLeft <= submitWindowSeconds;
 
+  const unansweredCount = questions.filter((q) => answers[q.id] === undefined).length;
+  const isAllAnswered = unansweredCount === 0;
+
   return (
     <div className="h-screen h-[100dvh] bg-slate-50 dark:bg-slate-900 flex flex-col overflow-hidden select-none">
       {/* Top Header Panel (Ultra Compact) */}
-      <header className="sticky top-0 z-10 bg-white/95 dark:bg-slate-900/95 border-b shadow-sm h-12 px-4 flex items-center justify-between text-xs sm:text-sm">
+      <header className="sticky top-0 z-10 bg-card/95 dark:bg-slate-900/95 border-b shadow-sm h-12 px-4 flex items-center justify-between text-xs sm:text-sm">
         {/* Left: Timer */}
         <div className="flex items-center gap-1.5 bg-amber-50 dark:bg-amber-950/30 px-2.5 py-1 rounded-lg border border-amber-200/50 dark:border-amber-800/30">
           <Clock className="h-3.5 w-3.5 text-amber-600" />
@@ -567,7 +570,7 @@ const CBTPage = () => {
                         className={`w-full text-left p-3 rounded-xl border flex items-center gap-3 transition-all ${
                           isSelected 
                             ? "bg-blue-50 border-blue-500 shadow-sm text-blue-700" 
-                            : "bg-white border-slate-200 hover:bg-slate-50 text-slate-700"
+                            : "bg-card border-slate-200 hover:bg-slate-50 text-slate-700"
                         }`}
                       >
                         <div className={`w-6 h-6 rounded-full border flex items-center justify-center font-bold text-sm ${
@@ -601,7 +604,7 @@ const CBTPage = () => {
         </div>
 
         {/* Right: Sidebar Navigation boxes */}
-        <div className="hidden md:flex w-full md:w-72 bg-white dark:bg-slate-800 border-l p-4 flex-col space-y-4">
+        <div className="hidden md:flex w-full md:w-72 bg-card dark:bg-slate-800 border-l p-4 flex-col space-y-4">
           <h3 className="text-sm font-semibold text-slate-500">Navigasi Soal</h3>
           <div className="grid grid-cols-5 md:flex md:flex-wrap gap-1 overflow-y-auto max-h-72 md:max-h-none flex-1">
             {questions.map((q, index) => {
@@ -674,7 +677,7 @@ const CBTPage = () => {
       </div>
 
       {/* Mobile Bottom Navigation Bar */}
-      <div className="sticky bottom-0 left-0 right-0 bg-white dark:bg-slate-900 border-t p-3 md:hidden flex justify-between items-center z-20 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+      <div className="sticky bottom-0 left-0 right-0 bg-card dark:bg-slate-900 border-t p-3 md:hidden flex justify-between items-center z-20 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
         <Button 
             variant="outline" 
             disabled={currentQuestionIndex === 0} 
@@ -713,7 +716,7 @@ const CBTPage = () => {
 
       {/* Mobile Nav Numbers Modal */}
       <Dialog open={isNavModalOpen} onOpenChange={setIsNavModalOpen}>
-        <DialogContent className="max-w-[calc(100%-2rem)] sm:max-w-md bg-white rounded-2xl p-6 pointer-events-auto">
+        <DialogContent className="max-w-[calc(100%-2rem)] sm:max-w-md bg-card rounded-2xl p-6 pointer-events-auto">
           <DialogHeader className="text-left">
             <DialogTitle className="text-base font-bold text-slate-800">Navigasi Soal</DialogTitle>
           </DialogHeader>
@@ -752,6 +755,9 @@ const CBTPage = () => {
                   <div className="w-3 h-3 bg-blue-600 rounded"></div> Posisi Aktif
               </div>
               <div className="flex items-center gap-2 text-xs text-slate-500">
+                  <div className="w-3 h-3 bg-amber-100 border border-amber-200 rounded"></div> Tandai Soal
+              </div>
+              <div className="flex items-center gap-2 text-xs text-slate-500">
                   <div className="w-3 h-3 bg-green-100 border border-green-200 rounded"></div> Terjawab
               </div>
           </div>
@@ -760,7 +766,7 @@ const CBTPage = () => {
 
       {/* Dialog Sesi Di-Reset */}
       <Dialog open={isResetModalOpen} onOpenChange={() => {}}>
-        <DialogContent className="max-w-md bg-white rounded-2xl p-6 pointer-events-auto">
+        <DialogContent className="max-w-md bg-card rounded-2xl p-6 pointer-events-auto">
           <DialogHeader className="text-center">
             <div className="mx-auto w-12 h-12 bg-red-50 rounded-full flex items-center justify-center mb-2 animate-bounce">
               <AlertCircle className="w-6 h-6 text-red-600" />
@@ -792,30 +798,51 @@ const CBTPage = () => {
       </Dialog>
       {/* Dialog Konfirmasi Kumpul Ujian */}
       <Dialog open={isSubmitModalOpen} onOpenChange={setIsSubmitModalOpen}>
-        <DialogContent className="max-w-md bg-white rounded-2xl p-6 pointer-events-auto">
-          <DialogHeader className="text-center">
-            <div className="mx-auto w-12 h-12 bg-green-50 rounded-full flex items-center justify-center mb-2">
-              <CheckCircle2 className="w-6 h-6 text-green-600" />
-            </div>
-            <DialogTitle className="text-lg font-bold text-slate-800">Kumpulkan Ujian?</DialogTitle>
-            <DialogDescription className="text-slate-500 text-sm mt-1">
-              Apakah Anda yakin ingin mengakhiri sesi ujian dan mengumpulkan jawaban sekarang?
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="mt-4 flex flex-row gap-2 sm:justify-center">
-             <Button variant="outline" onClick={() => setIsSubmitModalOpen(false)} className="rounded-xl flex-1">
-                Batal
-             </Button>
-             <Button onClick={() => { setIsSubmitModalOpen(false); handleSubmitExam(); }} className="flex-1 bg-green-600 hover:bg-green-700 font-bold text-white rounded-xl">
-                Kumpulkan
-             </Button>
-          </DialogFooter>
+        <DialogContent className="max-w-md bg-card rounded-2xl p-6 pointer-events-auto">
+          {isAllAnswered ? (
+            <>
+              <DialogHeader className="text-center">
+                <div className="mx-auto w-12 h-12 bg-green-50 rounded-full flex items-center justify-center mb-2">
+                  <CheckCircle2 className="w-6 h-6 text-green-600" />
+                </div>
+                <DialogTitle className="text-lg font-bold text-slate-800">Kumpulkan Ujian?</DialogTitle>
+                <DialogDescription className="text-slate-500 text-sm mt-1">
+                  Apakah Anda yakin ingin mengakhiri sesi ujian dan mengumpulkan jawaban sekarang?
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter className="mt-4 flex flex-row gap-2 sm:justify-center">
+                 <Button variant="outline" onClick={() => setIsSubmitModalOpen(false)} className="rounded-xl flex-1">
+                    Batal
+                 </Button>
+                 <Button onClick={() => { setIsSubmitModalOpen(false); handleSubmitExam(); }} className="flex-1 bg-green-600 hover:bg-green-700 font-bold text-white rounded-xl">
+                    Kumpulkan
+                 </Button>
+              </DialogFooter>
+            </>
+          ) : (
+            <>
+              <DialogHeader className="text-center">
+                <div className="mx-auto w-12 h-12 bg-amber-50 rounded-full flex items-center justify-center mb-2">
+                  <AlertCircle className="w-6 h-6 text-amber-600" />
+                </div>
+                <DialogTitle className="text-lg font-bold text-slate-800">Belum Selesai</DialogTitle>
+                <DialogDescription className="text-slate-500 text-sm mt-1">
+                  Anda belum menjawab semua soal. Ada <span className="font-bold text-amber-600">{unansweredCount}</span> soal yang belum dijawab. Semua soal wajib dijawab sebelum mengumpulkan.
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter className="mt-4 flex flex-row gap-2 sm:justify-center">
+                 <Button onClick={() => setIsSubmitModalOpen(false)} className="flex-1 bg-amber-600 hover:bg-amber-700 font-bold text-white rounded-xl">
+                    Kembali Mengerjakan
+                 </Button>
+              </DialogFooter>
+            </>
+          )}
         </DialogContent>
       </Dialog>
 
       {/* Dialog Peringatan Anti-Cheat */}
       <Dialog open={isCheatWarningOpen} onOpenChange={setIsCheatWarningOpen}>
-        <DialogContent className="max-w-md bg-white rounded-2xl p-6 pointer-events-auto">
+        <DialogContent className="max-w-md bg-card rounded-2xl p-6 pointer-events-auto">
           <DialogHeader className="text-center">
             <div className="mx-auto w-12 h-12 bg-amber-50 rounded-full flex items-center justify-center mb-2 animate-bounce">
               <AlertCircle className="w-6 h-6 text-amber-600" />

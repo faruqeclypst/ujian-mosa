@@ -45,10 +45,20 @@ const GuruTable = ({ teachers, onEdit, onDelete }: GuruTableProps) => {
 
   const renderActions = (teacher: Teacher) => (
     <div className="flex justify-end gap-2">
-      <Button variant="secondary" size="sm" className="bg-green-100 text-green-700 hover:bg-green-200 border-green-200 dark:bg-green-950 dark:text-green-400 dark:hover:bg-green-900" onClick={() => onEdit(teacher)}>
+      <Button 
+        variant="outline" 
+        size="sm" 
+        className="bg-green-50 text-green-700 hover:bg-green-100 border border-green-100 dark:bg-green-900/10 dark:text-green-400 dark:hover:bg-green-900/30 dark:border-green-800/40 h-7 text-xs rounded-lg" 
+        onClick={() => onEdit(teacher)}
+      >
         Edit
       </Button>
-      <Button variant="destructive" size="sm" className="bg-red-50 text-red-600 hover:bg-red-100 border-red-200" onClick={() => onDelete(teacher)}>
+      <Button 
+        variant="outline" 
+        size="sm" 
+        className="bg-rose-50 text-rose-600 hover:bg-rose-100 border border-rose-100 dark:bg-rose-900/10 dark:text-rose-400 dark:hover:bg-rose-900/30 dark:border-green-800/40 h-7 text-xs rounded-lg" 
+        onClick={() => onDelete(teacher)}
+      >
         Hapus
       </Button>
     </div>

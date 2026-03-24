@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { FirebaseError } from "firebase/app";
 import { Lock, User, Eye, EyeOff, Sparkles, Shield } from "lucide-react";
@@ -13,6 +13,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../co
 import { Input } from "../components/ui/input";
 import { ThemeToggle } from "../components/ui/theme-toggle";
 import { useAuth } from "../context/AuthContext";
+import { database } from "../lib/firebase";
+import { ref, get } from "firebase/database";
 
 const loginSchema = z.object({
   username: z.string().min(3, "Username minimal 3 karakter"),
@@ -45,6 +47,20 @@ const LoginPage = () => {
   const { signInWithUsername } = useAuth();
   const [formError, setFormError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+
+  const [schoolName, setSchoolName] = useState("");
+  const [schoolLogo, setSchoolLogo] = useState("");
+
+  useEffect(() => {
+    const r = ref(database, "settings/school");
+    get(r).then((snap) => {
+      if (snap.exists()) {
+        const d = snap.val();
+        setSchoolName(d.name || "");
+        setSchoolLogo(d.logoUrl || "");
+      }
+    });
+  }, []);
 
   const {
     register,
@@ -151,7 +167,6 @@ const LoginPage = () => {
           <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-blue-500 via-blue-600 to-blue-700" />
 
           <CardHeader className="relative space-y-4 pb-8 pt-8 text-center">
-            {/* Icon Animation */}
             <motion.div
               initial={{ scale: 0, rotate: -180 }}
               animate={{ scale: 1, rotate: 0 }}
@@ -161,9 +176,15 @@ const LoginPage = () => {
                 stiffness: 200,
                 damping: 15
               }}
-              className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-blue-700 shadow-lg"
+              className="mx-auto flex h-24 w-24 items-center justify-center relative overflow-hidden"
             >
-              <Lock className="h-8 w-8 text-white" />
+              {schoolLogo ? (
+                <img src={schoolLogo} alt="Logo Sekolah" className="h-full w-full object-contain" />
+              ) : (
+                <div className="flex items-center justify-center h-full w-full bg-gradient-to-br from-blue-500 to-blue-700 rounded-2xl">
+                  <Lock className="h-8 w-8 text-white" />
+                </div>
+              )}
             </motion.div>
 
             <motion.div

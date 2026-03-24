@@ -1,9 +1,9 @@
 import { NavLink } from "react-router-dom";
-import { 
-  ClipboardList, 
-  Home, 
-  X, 
-  Lock, 
+import {
+  ClipboardList,
+  Home,
+  X,
+  Lock,
   ChevronLeft,
   ChevronRight,
   HelpCircle,
@@ -14,7 +14,8 @@ import {
   BookOpen,
   ShieldAlert,
   GraduationCap,
-  Award
+  Award,
+  ChevronDown
 } from "lucide-react";
 import * as React from "react";
 
@@ -31,14 +32,36 @@ import { useSidebar } from "../../context/SidebarContext";
 
 const navigation = [
   { to: "/admin", label: "Dashboard", icon: Home, badge: null },
-  { to: "/admin/bank-soal", label: "Bank Soal", icon: BookOpen, badge: null },
-  { to: "/admin/ruang-ujian", label: "Ruang Ujian", icon: ClipboardList, badge: null },
-  { to: "/admin/mapel", label: "Data Mapel", icon: LayoutTemplate, badge: null }, 
-  { to: "/admin/guru", label: "Data Guru", icon: Users, badge: null },
-  { to: "/admin/siswa", label: "Data Siswa", icon: GraduationCap, badge: null },
-  { to: "/admin/alumni", label: "Data Alumni", icon: Award, badge: null },
-  { to: "/admin/kelas", label: "Data Kelas", icon: LayoutTemplate, badge: null },
-  { to: "/admin/kelola-akun", label: "Kelola Akun", icon: ShieldAlert, badge: null },
+  { 
+    label: "Ujian", 
+    icon: ClipboardList, 
+    badge: null,
+    children: [
+      { to: "/admin/bank-soal", label: "Bank Soal", icon: BookOpen },
+      { to: "/admin/ruang-ujian", label: "Ruang Ujian", icon: ClipboardList }
+    ]
+  },
+  { 
+    label: "Master Data", 
+    icon: LayoutTemplate, 
+    badge: null,
+    children: [
+      { to: "/admin/kelas", label: "Data Kelas", icon: LayoutTemplate },
+      { to: "/admin/mapel", label: "Data Mapel", icon: LayoutTemplate },
+      { to: "/admin/guru", label: "Data Guru", icon: Users },
+      { to: "/admin/siswa", label: "Data Siswa", icon: GraduationCap },
+      { to: "/admin/alumni", label: "Data Alumni", icon: Award }
+    ]
+  },
+  { 
+    label: "Sistem", 
+    icon: Settings, 
+    badge: null,
+    children: [
+      { to: "/admin/kelola-akun", label: "Kelola Akun", icon: ShieldAlert },
+      { to: "/admin/pengaturan", label: "Pengaturan", icon: Settings }
+    ]
+  }
 ];
 
 // Remove the old interface since we're using context now
@@ -47,6 +70,12 @@ const Sidebar = () => {
   const [showGuide, setShowGuide] = React.useState(false);
   const { user, role, usernameFromEmail } = useAuth(); // <--- added role
   const { isCollapsed, isMobileOpen, toggleCollapsed, closeMobile } = useSidebar();
+  
+  const [expandedMenus, setExpandedMenus] = React.useState<Record<string, boolean>>({});
+
+  const toggleSubmenu = (label: string) => {
+    setExpandedMenus(prev => ({ ...prev, [label]: !prev[label] }));
+  };
 
   const filteredNavigation = React.useMemo(() => {
     return navigation; // No more role filter for piket
@@ -87,7 +116,7 @@ const Sidebar = () => {
           )}>
             <Logo />
           </div>
-          
+
           {/* Desktop collapse toggle */}
           <Button
             variant="ghost"
@@ -102,12 +131,12 @@ const Sidebar = () => {
             )}
             <span className="sr-only">Toggle sidebar</span>
           </Button>
-          
+
           {/* Decorative line */}
           <div className="absolute bottom-0 left-4 right-4 h-px bg-gradient-to-r from-transparent via-slate-200 dark:via-slate-600 to-transparent"></div>
         </div>
         {/* Navigation */}
-        <nav className={cn("flex-1 py-3 sm:py-4 md:py-6 space-y-2", isCollapsed ? "px-2" : "px-3 sm:px-4 md:px-5 lg:px-6") }>
+        <nav className={cn("flex-1 py-3 sm:py-4 md:py-6 space-y-2", isCollapsed ? "px-2" : "px-3 sm:px-4 md:px-5 lg:px-6")}>
           <div className={cn(
             "transition-all duration-300",
             isCollapsed ? "lg:hidden" : "mb-3 sm:mb-4 md:mb-6"
@@ -120,120 +149,137 @@ const Sidebar = () => {
               <div className="flex-1 h-px bg-gradient-to-r from-slate-200 dark:from-slate-600 to-transparent"></div>
             </div>
           </div>
-          
+
           {filteredNavigation.map((item) => {
+            const hasChildren = item.children && item.children.length > 0;
+            const isMenuExpanded = !!expandedMenus[item.label];
+
             if (isCollapsed) {
               return (
-                <Tooltip key={item.to}>
+                <Tooltip key={item.label}>
                   <TooltipTrigger asChild>
-                    <NavLink to={item.to} end>
-                      {({ isActive }) => (
-                        <div
-                          className={cn(
-                            "flex items-center justify-center rounded-xl p-2 sm:p-2.5 h-10 w-10 sm:h-12 sm:w-12 mx-auto transition-all duration-300 group-hover:scale-105",
-                            isActive
-                              ? "bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-500/25"
-                              : "text-slate-600 dark:text-slate-300 hover:text-white hover:bg-gradient-to-br hover:from-blue-400 hover:to-indigo-500 dark:hover:from-blue-500 dark:hover:to-indigo-600 hover:shadow-lg"
-                          )}
-                        >
-                          <item.icon className="h-4 w-4 sm:h-5 sm:w-5 transition-transform group-hover:scale-110" />
-                        </div>
-                      )}
-                    </NavLink>
+                    {hasChildren ? (
+                      <div
+                        onClick={() => toggleCollapsed()}
+                        className={cn(
+                          "flex items-center justify-center rounded-xl p-2 sm:p-2.5 h-10 w-10 sm:h-12 sm:w-12 mx-auto cursor-pointer transition-all duration-300 group-hover:scale-105",
+                          "text-slate-600 dark:text-slate-300 hover:text-white hover:bg-gradient-to-br hover:from-blue-400 hover:to-indigo-500 dark:hover:from-blue-500 dark:hover:to-indigo-600 hover:shadow-lg"
+                        )}
+                      >
+                        <item.icon className="h-4 w-4 sm:h-5 sm:w-5 transition-transform group-hover:scale-110" />
+                      </div>
+                    ) : (
+                      <NavLink to={item.to ?? "#"} end>
+                        {({ isActive }) => (
+                          <div
+                            className={cn(
+                              "flex items-center justify-center rounded-xl p-2 sm:p-2.5 h-10 w-10 sm:h-12 sm:w-12 mx-auto transition-all duration-300 group-hover:scale-105",
+                              isActive
+                                ? "bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-500/25"
+                                : "text-slate-600 dark:text-slate-300 hover:text-white hover:bg-gradient-to-br hover:from-blue-400 hover:to-indigo-500 dark:hover:from-blue-500 dark:hover:to-indigo-600 hover:shadow-lg"
+                            )}
+                          >
+                            <item.icon className="h-4 w-4 sm:h-5 sm:w-5 transition-transform group-hover:scale-110" />
+                          </div>
+                        )}
+                      </NavLink>
+                    )}
                   </TooltipTrigger>
-                  <TooltipContent side="right" className="md:block hidden">
-                    <p>{item.label}</p>
+                  <TooltipContent side="right" className="md:block hidden p-2 space-y-1 bg-white dark:bg-slate-800 border rounded-lg shadow-md">
+                    <p className="font-bold border-b pb-1 mb-1 text-[11px] text-slate-800 dark:text-slate-200">{item.label}</p>
+                    {hasChildren && item.children!.map(child => (
+                       <NavLink to={child.to} key={child.to} className="block text-xs px-2 py-1 rounded hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 font-medium">
+                          {child.label}
+                       </NavLink>
+                    ))}
                   </TooltipContent>
                 </Tooltip>
               );
             }
 
-            const NavItem = ({ isActive }: { isActive: boolean }) => (
-              <div className={cn(
-                "group relative flex items-center gap-3 sm:gap-4 rounded-xl px-3 sm:px-4 py-2.5 sm:py-3 mx-1 text-sm font-medium transition-all duration-300 hover:translate-x-1",
-                isActive
-                  ? "bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 text-blue-700 dark:text-blue-200 shadow-lg border border-blue-200/50 dark:border-blue-600/30"
-                  : "text-slate-600 dark:text-slate-200 hover:bg-white/60 dark:hover:bg-slate-700/60 hover:shadow-md hover:text-slate-800 dark:hover:text-white"
-              )}>
-                <div className={cn(
-                  "flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-lg transition-all duration-300 shrink-0 group-hover:scale-110",
-                  isActive
-                    ? "bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-500/25"
-                    : "bg-slate-100 dark:bg-slate-700/70 text-slate-600 dark:text-slate-300 group-hover:bg-gradient-to-br group-hover:from-blue-400 group-hover:to-indigo-500 dark:group-hover:from-blue-500 dark:group-hover:to-indigo-600 group-hover:text-white"
-                )}>
-                  <item.icon className="h-4 w-4 transition-transform" />
-                </div>
+            if (hasChildren) {
+              return (
+                <div key={item.label} className="space-y-1">
+                  <div
+                    onClick={() => toggleSubmenu(item.label)}
+                    className={cn(
+                      "group relative flex items-center gap-3 sm:gap-4 rounded-xl px-3 sm:px-4 py-2 sm:py-2.5 mx-1 text-sm font-medium transition-all duration-300 cursor-pointer text-slate-600 dark:text-slate-200 hover:bg-white/60 dark:hover:bg-slate-700/60 hover:shadow-md hover:text-slate-800 dark:hover:text-white"
+                    )}
+                  >
+                    <div className={cn(
+                      "flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-lg bg-slate-100 dark:bg-slate-700/70 text-slate-600 dark:text-slate-300 group-hover:bg-gradient-to-br group-hover:from-blue-400 group-hover:to-indigo-500 dark:group-hover:from-blue-500 dark:group-hover:to-indigo-600 group-hover:text-white transition-all duration-300 shrink-0 group-hover:scale-110"
+                    )}>
+                      <item.icon className="h-4 w-4 transition-transform" />
+                    </div>
+                    <div className="flex flex-1 items-center justify-between min-w-0">
+                      <span className="truncate font-medium">{item.label}</span>
+                      <ChevronDown className={cn("h-4 w-4 transition-transform text-slate-400 group-hover:text-slate-600", isMenuExpanded && "rotate-180")} />
+                    </div>
+                  </div>
 
-                <div className="flex flex-1 items-center justify-between min-w-0">
-                  <span className="truncate font-medium">{item.label}</span>
-                  {item.badge && (
-                    <Badge variant="secondary" className="ml-auto text-xs bg-gradient-to-r from-orange-100 to-orange-200 text-orange-700 dark:from-orange-900/30 dark:to-orange-800/30 dark:text-orange-300 border-0 shrink-0">
-                      {item.badge}
-                    </Badge>
+                  {isMenuExpanded && (
+                    <div className="space-y-1 animate-in slide-in-from-top-1 duration-200">
+                      {item.children!.map(child => (
+                        <NavLink key={child.to} to={child.to} onClick={closeMobile} end>
+                          {({ isActive }) => (
+                            <div className={cn(
+                              "group relative flex items-center gap-3 rounded-md px-3 py-1.5 ml-6 mr-1 text-xs font-medium transition-all duration-200 hover:bg-slate-100/50 dark:hover:bg-slate-800/50",
+                              isActive
+                                ? "bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-200 shadow-sm border border-blue-200/50 dark:border-blue-600/30"
+                                : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white"
+                            )}>
+                              <div className={cn(
+                                "flex h-5 w-5 items-center justify-center rounded-md shrink-0",
+                                isActive ? "bg-blue-600 text-white" : "bg-slate-200 dark:bg-slate-700 text-slate-400 group-hover:bg-blue-500 group-hover:text-white"
+                              )}>
+                                <child.icon className="h-3 w-3" />
+                              </div>
+                              <span className="truncate">{child.label}</span>
+                            </div>
+                          )}
+                        </NavLink>
+                      ))}
+                    </div>
                   )}
                 </div>
+              );
+            }
 
-                {isActive && (
-                  <div className="absolute left-0 top-1.5 sm:top-2 bottom-1.5 sm:bottom-2 w-1 bg-gradient-to-b from-blue-500 to-indigo-600 rounded-r-full" />
-                )}
-              </div>
-            );
-            
             return (
-              <NavLink key={item.to} to={item.to} end>
-                {({ isActive }) => <NavItem isActive={isActive} />}
+              <NavLink key={item.to} to={item.to ?? "#"} onClick={closeMobile} end>
+                {({ isActive }) => (
+                  <div className={cn(
+                    "group relative flex items-center gap-3 sm:gap-4 rounded-xl px-3 sm:px-4 py-2 sm:py-2.5 mx-1 text-sm font-medium transition-all duration-300 hover:translate-x-1",
+                    isActive
+                      ? "bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 text-blue-700 dark:text-blue-200 shadow-lg border border-blue-200/50 dark:border-blue-600/30"
+                      : "text-slate-600 dark:text-slate-200 hover:bg-white/60 dark:hover:bg-slate-700/60 hover:shadow-md hover:text-slate-800 dark:hover:text-white"
+                  )}>
+                    <div className={cn(
+                      "flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-lg transition-all duration-300 shrink-0 group-hover:scale-110",
+                      isActive
+                        ? "bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-500/25"
+                        : "bg-slate-100 dark:bg-slate-700/70 text-slate-600 dark:text-slate-300 group-hover:bg-gradient-to-br group-hover:from-blue-400 group-hover:to-indigo-500 dark:group-hover:from-blue-500 dark:group-hover:to-indigo-600 group-hover:text-white"
+                    )}>
+                      <item.icon className="h-4 w-4 transition-transform" />
+                    </div>
+                    <div className="flex flex-1 items-center justify-between min-w-0">
+                      <span className="truncate font-medium">{item.label}</span>
+                    </div>
+                    {isActive && (
+                      <div className="absolute left-0 top-1 sm:top-1.5 bottom-1 sm:bottom-1.5 w-1 bg-gradient-to-b from-blue-500 to-indigo-600 rounded-r-full" />
+                    )}
+                  </div>
+                )}
               </NavLink>
             );
           })}
         </nav>
 
         {/* Bottom section */}
-        <div className={cn("mt-auto py-3 sm:py-4 md:py-6 bg-white/30 dark:bg-slate-800/30 backdrop-blur-sm border-t border-slate-200/60 dark:border-slate-700/60", isCollapsed ? "px-2" : "px-3 sm:px-4 md:px-5 lg:px-6") }>
+        <div className={cn("mt-auto py-3 sm:py-4 md:py-6 bg-white/30 dark:bg-slate-800/30 backdrop-blur-sm border-t border-slate-200/60 dark:border-slate-700/60", isCollapsed ? "px-2" : "px-3 sm:px-4 md:px-5 lg:px-6")}>
           <div className="space-y-3">
             {/* Settings Link */}
-            {isCollapsed ? (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <NavLink to="/admin/change-password">
-                    {({ isActive }) => (
-                      <div
-                        className={cn(
-                          "flex items-center justify-center rounded-xl p-2 sm:p-2.5 h-10 w-10 sm:h-12 sm:w-12 mx-auto transition-all duration-300 group-hover:scale-105",
-                          isActive
-                            ? "bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-500/25"
-                            : "text-slate-600 dark:text-slate-300 hover:text-white hover:bg-gradient-to-br hover:from-blue-400 hover:to-indigo-500 dark:hover:from-blue-500 dark:hover:to-indigo-600 hover:shadow-lg"
-                        )}
-                      >
-                        <Settings className="h-4 w-4 sm:h-5 sm:w-5" />
-                      </div>
-                    )}
-                  </NavLink>
-                </TooltipTrigger>
-                <TooltipContent side="right" className="md:block hidden">
-                  <p>Ubah Password</p>
-                </TooltipContent>
-              </Tooltip>
-            ) : (
-              <NavLink
-                to="/admin/change-password"
-                className={({ isActive }) =>
-                  cn(
-                    "group relative flex items-center gap-4 rounded-xl px-4 py-3 mx-1 text-sm font-medium transition-all duration-300 hover:translate-x-1",
-                    isActive
-                      ? "bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 text-blue-700 dark:text-blue-200 shadow-lg border border-blue-200/50 dark:border-blue-600/30"
-                      : "text-slate-600 dark:text-slate-200 hover:bg-white/60 dark:hover:bg-slate-700/60 hover:shadow-md hover:text-slate-800 dark:hover:text-white"
-                  )
-                }
-              >
-                <div className={cn(
-                  "flex h-9 w-9 items-center justify-center rounded-lg transition-all duration-300 shrink-0 group-hover:scale-110",
-                  "bg-slate-100 dark:bg-slate-700/70 text-slate-600 dark:text-slate-300 group-hover:bg-gradient-to-br group-hover:from-blue-400 group-hover:to-indigo-500 dark:group-hover:from-blue-500 dark:group-hover:to-indigo-600 group-hover:text-white"
-                )}>
-                  <Settings className="h-4 w-4 transition-transform" />
-                </div>
-                <span className="truncate">Ubah Password</span>
-              </NavLink>
-            )}
+
 
             {/* Help Button */}
             {isCollapsed ? (
@@ -278,7 +324,7 @@ const Sidebar = () => {
             <div className="flex items-center min-w-0 flex-1">
               <Logo />
             </div>
-            
+
             {/* Mobile close button */}
             <Button
               variant="ghost"
@@ -289,7 +335,7 @@ const Sidebar = () => {
               <X className="h-4 w-4 group-hover:scale-110 transition-transform" />
               <span className="sr-only">Close menu</span>
             </Button>
-            
+
             {/* Decorative line */}
             <div className="absolute bottom-0 left-4 right-4 h-px bg-gradient-to-r from-transparent via-slate-200 dark:via-slate-600 to-transparent"></div>
           </div>
@@ -305,64 +351,91 @@ const Sidebar = () => {
                 <div className="flex-1 h-px bg-gradient-to-r from-slate-200 dark:from-slate-600 to-transparent"></div>
               </div>
             </div>
-            
-            {filteredNavigation.map((item) => (
-              <NavLink key={item.to} to={item.to} onClick={closeMobile} end>
-                {({ isActive }) => (
-                  <div className={cn(
-                    "group relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 hover:bg-accent/50",
-                    isActive
-                      ? "bg-primary/10 text-primary shadow-sm border border-primary/20"
-                      : "text-muted-foreground hover:text-foreground"
-                  )}>
-                    <div className={cn(
-                      "flex h-8 w-8 items-center justify-center rounded-md transition-colors shrink-0",
-                      isActive ? "bg-primary/20" : "bg-muted/50 group-hover:bg-accent"
-                    )}>
-                      <item.icon className="h-4 w-4" />
-                    </div>
-                    
-                    <div className="flex flex-1 items-center justify-between">
-                      <span className="truncate">{item.label}</span>
-                      {item.badge && (
-                        <Badge variant="secondary" className="ml-auto text-xs">
-                          {item.badge}
-                        </Badge>
+
+            {filteredNavigation.map((item) => {
+              const hasChildren = item.children && item.children.length > 0;
+              const isMenuExpanded = !!expandedMenus[item.label];
+
+              if (hasChildren) {
+                return (
+                  <div key={item.label} className="space-y-1">
+                    <div
+                      onClick={() => toggleSubmenu(item.label)}
+                      className={cn(
+                        "group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 hover:bg-slate-100/50 dark:hover:bg-slate-800/50 cursor-pointer text-slate-600 dark:text-slate-200"
                       )}
+                    >
+                      <div className={cn(
+                        "flex h-8 w-8 items-center justify-center rounded-md bg-slate-100 dark:bg-slate-800 text-slate-500 shrink-0"
+                      )}>
+                        <item.icon className="h-4 w-4" />
+                      </div>
+                      <div className="flex flex-1 items-center justify-between">
+                        <span className="truncate">{item.label}</span>
+                        <ChevronDown className={cn("h-4 w-4 transition-transform text-slate-400", isMenuExpanded && "rotate-180")} />
+                      </div>
                     </div>
-                    
-                    {isActive && (
-                      <div className="absolute left-0 top-0 h-full w-1 bg-primary rounded-r" />
+
+                    {isMenuExpanded && (
+                      <div className="space-y-1 pl-4 border-l ml-6 border-slate-200 dark:border-slate-700 animate-in slide-in-from-top-1">
+                        {item.children!.map((child) => (
+                          <NavLink key={child.to} to={child.to} onClick={closeMobile} end>
+                            {({ isActive }) => (
+                              <div className={cn(
+                                "flex items-center gap-2 px-3 py-2 rounded-md text-xs font-medium transition-colors",
+                                isActive 
+                                  ? "bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-300" 
+                                  : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white"
+                              )}>
+                                <child.icon className="h-3.5 w-3.5" />
+                                <span className="truncate">{child.label}</span>
+                              </div>
+                            )}
+                          </NavLink>
+                        ))}
+                      </div>
                     )}
                   </div>
-                )}
-              </NavLink>
-            ))}
+                );
+              }
+
+              return (
+                <NavLink key={item.label} to={item.to ?? "#"} onClick={closeMobile} end>
+                  {({ isActive }) => (
+                    <div className={cn(
+                      "group relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 hover:bg-slate-100/50 dark:hover:bg-slate-800/50",
+                      isActive
+                        ? "bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-300 shadow-sm border border-blue-200/50 dark:border-blue-800/30"
+                        : "text-slate-600 dark:text-slate-300 hover:text-slate-800 dark:hover:text-white"
+                    )}>
+                      <div className={cn(
+                        "flex h-8 w-8 items-center justify-center rounded-md transition-colors shrink-0",
+                        isActive ? "bg-blue-600 text-white" : "bg-slate-100 dark:bg-slate-800 text-slate-500"
+                      )}>
+                        <item.icon className="h-4 w-4" />
+                      </div>
+                      
+                      <div className="flex flex-1 items-center justify-between">
+                        <span className="truncate">{item.label}</span>
+                      </div>
+                      
+                      {isActive && (
+                        <div className="absolute left-0 top-0 h-full w-1 bg-blue-600 rounded-r" />
+                      )}
+                    </div>
+                  )}
+                </NavLink>
+              );
+            })}
           </nav>
 
           {/* Bottom section */}
           <div className="px-3 sm:px-4 md:px-5 py-3 sm:py-4 mt-auto">
             <Separator className="mb-4" />
-            
+
             <div className="space-y-2">
               {/* Settings Link */}
-              <NavLink
-                to="/admin/change-password"
-                onClick={closeMobile}
-                className={({ isActive }) =>
-                  cn(
-                    "group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 hover:bg-accent/50",
-                    isActive
-                      ? "bg-primary/10 text-primary"
-                      : "text-muted-foreground hover:text-foreground"
-                  )
-                }
-              >
-                <div className="flex h-8 w-8 items-center justify-center rounded-md bg-muted/50 group-hover:bg-accent shrink-0">
-                  <Settings className="h-4 w-4" />
-                </div>
-                <span className="truncate">Ubah Password</span>
-              </NavLink>
+
 
               {/* Help Button */}
               <Button

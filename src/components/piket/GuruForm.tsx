@@ -26,9 +26,10 @@ interface GuruFormProps {
   defaultValues?: Partial<GuruSubmitPayload>;
   onSubmit: (values: GuruSubmitPayload) => Promise<void>;
   submitLabel?: string;
+  onCancel?: () => void;
 }
 
-const GuruForm = ({ defaultValues, onSubmit, submitLabel = "Simpan" }: GuruFormProps) => {
+const GuruForm = ({ defaultValues, onSubmit, submitLabel = "Simpan", onCancel }: GuruFormProps) => {
   const { mapels } = usePiket();
   
   const {
@@ -125,11 +126,21 @@ const GuruForm = ({ defaultValues, onSubmit, submitLabel = "Simpan" }: GuruFormP
         )}
       </FormField>
       
-      <div className="pt-4 border-t">
+      <div className="flex justify-end gap-2 pt-4 border-t border-slate-200/60 dark:border-slate-800/40">
+        {onCancel && (
+          <Button 
+            type="button" 
+            variant="outline" 
+            onClick={onCancel}
+            className="border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl text-slate-600 dark:text-slate-300"
+          >
+            Batal
+          </Button>
+        )}
         <Button
           type="submit"
           disabled={isSubmitting || mapels.length === 0}
-          className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+          className="bg-blue-50 hover:bg-blue-100 border border-blue-100 dark:bg-blue-900/40 dark:text-blue-400 dark:hover:bg-blue-900/60 dark:border-blue-800/20 text-blue-700 font-semibold rounded-xl"
         >
           {isSubmitting ? "Menyimpan..." : submitLabel}
         </Button>

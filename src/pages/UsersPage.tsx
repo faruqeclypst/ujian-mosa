@@ -128,16 +128,19 @@ const UsersPage = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between bg-card p-5 rounded-2xl border border-slate-200/60 dark:border-slate-800/40 shadow-sm backdrop-blur-sm">
         <div>
-          <h2 className="text-2xl font-semibold text-foreground">Manajemen Akun Berperan</h2>
-          <p className="text-sm text-muted-foreground">Atur otorisasi Admin & Guru Piket.</p>
+          <h2 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
+            <ShieldAlert className="h-5 w-5 text-amber-500" />
+            Manajemen Akun Berperan
+          </h2>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Atur otorisasi hak akses Admin & Guru Piket.</p>
         </div>
-        <div className="flex gap-2 sm:gap-3">
+        <div className="flex flex-wrap items-center gap-2">
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
-              <Button className="w-full sm:w-auto" size="lg">
-                <Plus className="mr-2 h-4 w-4" />
+              <Button size="sm" className="rounded-xl bg-blue-50 hover:bg-blue-100 border border-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 dark:border-blue-800/40 text-blue-700 font-semibold shadow-sm">
+                <Plus className="mr-1 h-3.5 w-3.5" />
                 Tambah Akun
               </Button>
             </DialogTrigger>
@@ -182,8 +185,20 @@ const UsersPage = () => {
                   </Select>
                 </FormField>
 
-                <div className="pt-4 border-t">
-                  <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white" disabled={isSubmitting}>
+                <div className="flex justify-end gap-2 pt-4 border-t border-slate-200/60 dark:border-slate-800/40">
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => setIsDialogOpen(false)}
+                    className="border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl text-slate-600 dark:text-slate-300"
+                  >
+                    Batal
+                  </Button>
+                  <Button 
+                    type="submit" 
+                    disabled={isSubmitting}
+                    className="bg-blue-50 hover:bg-blue-100 border border-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 dark:border-blue-800/40 text-blue-700 font-semibold rounded-xl"
+                  >
                     {isSubmitting ? "Mendaftarkan..." : "Buat Akun"}
                   </Button>
                 </div>

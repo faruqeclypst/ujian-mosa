@@ -44,9 +44,14 @@ const UsersTable = ({ users, onDelete }: UsersTableProps) => {
   ];
 
   const renderActions = (user: AppUser) => (
-    <div className="flex justify-end gap-2">
-      <Button variant="destructive" size="sm" className="bg-red-50 text-red-600 hover:bg-red-100 border-red-200" onClick={() => onDelete(user.id, user.displayName)}>
-        <Trash2 className="w-4 h-4" />
+    <div className="flex justify-end gap-1.5 item-center">
+      <Button 
+        variant="outline" 
+        size="icon"
+        className="h-7 w-7 p-0 rounded-lg border-red-200/60 hover:border-red-300 dark:border-red-900/30 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30" 
+        onClick={() => onDelete(user.id, user.displayName)}
+      >
+        <Trash2 className="w-3.5 h-3.5" />
       </Button>
     </div>
   );

@@ -59,16 +59,16 @@ export const DeleteConfirmationDialog: React.FC<DeleteConfirmationDialogProps> =
             variant="outline"
             onClick={onClose}
             disabled={isLoading}
-            className="px-4 py-2"
+            className="px-4 py-2 border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800"
           >
             Batal
           </Button>
           <Button
             type="button"
-            variant="destructive"
+            variant="secondary"
             onClick={handleConfirm}
             disabled={isLoading}
-            className="px-4 py-2 bg-red-600 hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600 text-white"
+            className="px-4 py-2 bg-rose-50 text-rose-600 hover:bg-rose-100 border border-rose-100 dark:bg-rose-900/40 dark:text-rose-400 dark:hover:bg-rose-900/60 dark:border-rose-800/30 shadow-sm font-semibold text-sm"
           >
             {isLoading ? "Menghapus..." : "Hapus"}
           </Button>

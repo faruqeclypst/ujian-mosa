@@ -43,17 +43,17 @@ export const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
   };
 
   const btnVariants = {
-    danger: "destructive" as const,
-    warning: "default" as const,
-    info: "default" as const,
-    success: "default" as const,
+    danger: "secondary" as const,
+    warning: "secondary" as const,
+    info: "secondary" as const,
+    success: "secondary" as const,
   };
 
   const btnClasses = {
-    danger: "bg-red-600 hover:bg-red-700 text-white",
-    warning: "bg-amber-500 hover:bg-amber-600 text-white",
-    info: "bg-blue-600 hover:bg-blue-700 text-white",
-    success: "bg-green-600 hover:bg-green-700 text-white",
+    danger: "bg-rose-50 text-rose-600 hover:bg-rose-100 border border-rose-100 dark:bg-rose-900/40 dark:text-rose-400 dark:border-rose-800/20 dark:hover:bg-rose-900/50",
+    warning: "bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-100 dark:bg-amber-900/40 dark:text-amber-400 dark:border-amber-800/20 dark:hover:bg-amber-900/50",
+    info: "bg-blue-50 text-blue-700 !hover:bg-blue-100 border border-blue-100 dark:bg-blue-900/40 dark:text-blue-400 dark:border-blue-800/20 dark:!hover:bg-blue-900/50",
+    success: "bg-green-50 text-green-700 !hover:bg-green-100 border border-green-100 dark:bg-green-900/40 dark:text-green-400 dark:border-green-800/20 dark:!hover:bg-green-900/50",
   };
 
   const iconColors = {
@@ -91,20 +91,19 @@ export const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
               variant="outline" 
               onClick={onClose} 
               disabled={isLoading}
-              className="h-11 px-6 text-sm font-medium"
+              className="h-11 px-6 text-sm font-medium border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800"
             >
               {cancelLabel}
             </Button>
           )}
-          <Button
+          <button
             type="button"
-            variant={btnVariants[type]}
             onClick={onConfirm}
             disabled={isLoading}
-            className={`${btnClasses[type]} h-11 px-6 text-sm font-medium ${!showCancel ? "w-full" : ""}`}
+            className={`${btnClasses[type]} inline-flex items-center justify-center whitespace-nowrap h-11 px-6 text-sm font-medium rounded-xl transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 disabled:pointer-events-none disabled:opacity-50 active:scale-95 ${!showCancel ? "w-full" : ""}`}
           >
             {isLoading ? "Memuat..." : confirmLabel}
-          </Button>
+          </button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

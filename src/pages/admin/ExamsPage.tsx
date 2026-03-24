@@ -4,8 +4,9 @@ import { Button } from "../../components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../../components/ui/dialog";
 import { DeleteConfirmationDialog } from "../../components/ui/delete-confirmation-dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
-import { ref, onValue, push, update, remove } from "firebase/database";
+import { ref, onValue, push, update, remove, get } from "firebase/database";
 import { database } from "../../lib/firebase";
+import { deleteImageFromStorage } from "../../lib/storage";
 import { Input } from "../../components/ui/input";
 import FormField from "../../components/forms/FormField";
 import { useNavigate } from "react-router-dom";
@@ -56,7 +57,7 @@ const ExamsPage = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [dialogMode, setDialogMode] = useState<"create" | "edit">("create");
   const [selectedExam, setSelectedExam] = useState<ExamData | null>(null);
-
+  const [activeExamIds, setActiveExamIds] = useState<string[]>([]);
   const [formValues, setFormValues] = useState({ title: "", subjectId: "", teacherId: "" });
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -80,6 +81,11 @@ const ExamsPage = () => {
   });
 
   const handleArchiveExam = (exam: any) => {
+    if (activeExamIds.includes(exam.id)) {
+       showAlert("Peringatan", "Batal mengarsipkan karena Bank Soal ini sedang diujikan di Ruang Ujian aktif.", "warning");
+       return;
+    }
+
     setConfirmDialog({
       isOpen: true,
       title: "Arsipkan Bank Soal",
@@ -123,6 +129,26 @@ const ExamsPage = () => {
       }
     });
   };
+
+  useEffect(() => {
+    const roomsRef = ref(database, "exam_rooms");
+    const unsubscribe = onValue(roomsRef, (snapshot) => {
+      const ids: string[] = [];
+      if (snapshot.exists()) {
+         const data = snapshot.val();
+         const now = Date.now();
+         Object.values(data).forEach((room: any) => {
+             const start = new Date(room.start_time).getTime();
+             const end = new Date(room.end_time).getTime();
+             if (now >= start && now <= end && room.status !== "archive") {
+                 if (room.examId) ids.push(room.examId);
+             }
+         });
+      }
+      setActiveExamIds(ids);
+    });
+    return () => unsubscribe();
+  }, []);
 
   useEffect(() => {
     const examsRef = ref(database, "exams");
@@ -188,10 +214,60 @@ const ExamsPage = () => {
     }
   };
 
+  const cleanupQuestionImages = async (q: any) => {
+    const keysToDelete: string[] = [];
+    const extractKey = (url: string) => {
+      if (url.includes("/questions/")) return "questions/" + url.split("/questions/")[1].split("?")[0];
+      return "";
+    };
+
+    if (q.imageUrl) keysToDelete.push(extractKey(q.imageUrl));
+    if (q.choices) {
+      Object.values(q.choices).forEach((c: any) => {
+        if (c.imageUrl) keysToDelete.push(extractKey(c.imageUrl));
+        if (c.text && c.text.includes("/questions/")) {
+          const doc = new DOMParser().parseFromString(c.text, "text/html");
+          doc.querySelectorAll("img").forEach((img) => {
+            const src = img.getAttribute("src") || "";
+            if (src) keysToDelete.push(extractKey(src));
+          });
+        }
+      });
+    }
+    if (q.text && q.text.includes("/questions/")) {
+      const doc = new DOMParser().parseFromString(q.text, "text/html");
+      doc.querySelectorAll("img").forEach((img) => {
+        const src = img.getAttribute("src") || "";
+        if (src) keysToDelete.push(extractKey(src));
+      });
+    }
+
+    for (const k of keysToDelete) {
+      if (k) {
+        try {
+          await deleteImageFromStorage(k);
+        } catch (e) {
+          console.error("Gagal menghapus gambar dari storage:", k, e);
+        }
+      }
+    }
+  };
+
   const handleConfirmDelete = async () => {
     if (!examToDelete) return;
     setIsDeleting(true);
     try {
+      const qRef = ref(database, "questions");
+      const snapshot = await get(qRef);
+      if (snapshot.exists()) {
+        const data = snapshot.val();
+        const keysToDelete = Object.keys(data).filter((k) => data[k].examId === examToDelete.id);
+        
+        for (const key of keysToDelete) {
+          await cleanupQuestionImages({ ...data[key], id: key });
+          await remove(ref(database, `questions/${key}`)); // Hapus record soal
+        }
+      }
       await remove(ref(database, `exams/${examToDelete.id}`));
     } catch (error) {
       showAlert("Gagal", "Gagal menghapus bank soal.", "danger");
@@ -203,28 +279,31 @@ const ExamsPage = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between bg-card p-5 rounded-2xl border border-slate-200/60 dark:border-slate-800/40 shadow-sm backdrop-blur-sm">
         <div>
-          <h2 className="text-2xl font-semibold text-foreground">Bank Soal (Ujian)</h2>
-          <p className="text-sm text-muted-foreground">Kelola master ujian dan rincian soal.</p>
+          <h2 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
+            <BookOpen className="h-5 w-5 text-indigo-500" />
+            Bank Soal (Ujian)
+          </h2>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Kelola master ujian dan rincian soal Bank Soal.</p>
         </div>
-        <div className="flex gap-3 items-center">
-          <div className="flex bg-slate-100 p-1 rounded-xl text-xs font-semibold">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex bg-slate-100 dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-800/80 p-1 rounded-xl text-xs font-semibold">
             <button 
               onClick={() => setActiveTab("aktif")} 
-              className={`px-3 py-1.5 rounded-lg transition-all ${activeTab === "aktif" ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+              className={`px-3 py-1.5 rounded-lg transition-all ${activeTab === "aktif" ? "bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 shadow-sm" : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"}`}
             >
               Aktif
             </button>
             <button 
               onClick={() => setActiveTab("arsip")} 
-              className={`px-3 py-1.5 rounded-lg transition-all ${activeTab === "arsip" ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+              className={`px-3 py-1.5 rounded-lg transition-all ${activeTab === "arsip" ? "bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 shadow-sm" : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"}`}
             >
               Arsip
             </button>
           </div>
-          <Button onClick={handleCreateClick} size="lg" className="rounded-xl">
-            <Plus className="mr-2 h-4 w-4" /> Tambah Ujian
+          <Button onClick={handleCreateClick} size="sm" className="rounded-xl bg-blue-50 hover:bg-blue-100 border border-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 dark:border-blue-800/40 text-blue-700 font-semibold shadow-sm">
+            <Plus className="mr-1 h-3.5 w-3.5" /> Tambah Ujian
           </Button>
         </div>
       </div>
@@ -249,7 +328,7 @@ const ExamsPage = () => {
                   <Button 
                     variant="secondary" 
                     size="sm" 
-                    className="bg-blue-50 text-blue-700 hover:bg-blue-100 border-blue-200" 
+                    className="bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-100 dark:bg-purple-900/10 dark:text-purple-400 dark:hover:bg-purple-900/30 dark:border-purple-800/40 h-7 text-xs" 
                     onClick={() => navigate(`/admin/bank-soal/${exam.id}/questions`)}
                   >
                     <BookOpen className="h-4 w-4 mr-1" /> Soal
@@ -259,7 +338,7 @@ const ExamsPage = () => {
                     <Button 
                       variant="secondary" 
                       size="sm" 
-                      className="bg-amber-50 text-amber-700 hover:bg-amber-100 border-amber-200 dark:bg-amber-950 dark:text-amber-400" 
+                      className="bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-100 dark:bg-amber-900/10 dark:text-amber-400 dark:hover:bg-amber-900/30 dark:border-amber-800/40 h-7 text-xs" 
                       onClick={() => handleArchiveExam(exam)}
                     >
                           <Archive className="h-4 w-4 mr-1" /> Arsip
@@ -268,7 +347,7 @@ const ExamsPage = () => {
                     <Button 
                       variant="secondary" 
                       size="sm" 
-                      className="bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border-indigo-200 dark:bg-indigo-950 dark:text-indigo-400" 
+                      className="bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-100 dark:bg-indigo-900/10 dark:text-indigo-400 dark:hover:bg-indigo-900/30 dark:border-indigo-800/40 h-7 text-xs" 
                       onClick={() => handleRestoreExam(exam)}
                     >
                           <RotateCw className="h-4 w-4 mr-1" /> Buka
@@ -278,19 +357,21 @@ const ExamsPage = () => {
                   <Button 
                     variant="secondary" 
                     size="sm" 
-                    className="bg-green-100 text-green-700 hover:bg-green-200 border-green-200 dark:bg-green-950 dark:text-green-400" 
+                    className="bg-green-50 text-green-700 hover:bg-green-100 border border-green-100 dark:bg-green-900/10 dark:text-green-400 dark:hover:bg-green-900/30 dark:border-green-800/40 h-7 text-xs" 
                     onClick={() => handleEditClick(exam)}
                   >
                     Edit
                   </Button>
-                  <Button 
-                    variant="destructive" 
-                    size="sm" 
-                    className="bg-red-50 text-red-600 hover:bg-red-100 border-red-200" 
-                    onClick={() => handleDeleteClick(exam)}
-                  >
-                    Hapus
-                  </Button>
+                  {activeTab === "arsip" && (
+                    <Button 
+                      variant="destructive" 
+                      size="sm" 
+                      className="bg-rose-50 text-rose-600 hover:bg-rose-100 border border-rose-100 dark:bg-rose-900/10 dark:text-rose-400 dark:hover:bg-rose-900/30 dark:border-rose-800/40 h-7 text-xs" 
+                      onClick={() => handleDeleteClick(exam)}
+                    >
+                      Hapus
+                    </Button>
+                  )}
                 </div>
               )}
             />
@@ -300,7 +381,7 @@ const ExamsPage = () => {
 
       {/* Dialog Create/Edit */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-md bg-white">
+        <DialogContent className="max-w-md bg-card">
           <DialogHeader>
             <DialogTitle>{dialogMode === "edit" ? "Edit Ujian" : "Tambah Ujian"}</DialogTitle>
           </DialogHeader>
@@ -314,7 +395,7 @@ const ExamsPage = () => {
                 value={formValues.subjectId} 
                 onChange={(e) => setFormValues({ ...formValues, subjectId: e.target.value })} 
                 required
-                className="w-full rounded-md border text-sm p-2"
+                className="w-full rounded-md border border-slate-200 dark:border-slate-800 bg-card text-sm p-2"
               >
                 <option value="">-- Pilih Mapel --</option>
                 {mapels.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
@@ -326,14 +407,14 @@ const ExamsPage = () => {
                 value={formValues.teacherId} 
                 onChange={(e) => setFormValues({ ...formValues, teacherId: e.target.value })} 
                 required
-                className="w-full rounded-md border text-sm p-2"
+                className="w-full rounded-md border border-slate-200 dark:border-slate-800 bg-card text-sm p-2"
               >
                 <option value="">-- Pilih Guru --</option>
                 {teachers.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
               </select>
             </FormField>
 
-            <Button type="submit" className="w-full">{dialogMode === "edit" ? "Perbarui" : "Simpan"}</Button>
+            <Button type="submit" className="w-full bg-blue-50 hover:bg-blue-100 border border-blue-100 dark:bg-blue-900/40 dark:text-blue-400 dark:hover:bg-blue-900/60 dark:border-blue-800/20 text-blue-700 font-semibold">{dialogMode === "edit" ? "Perbarui" : "Simpan"}</Button>
           </form>
         </DialogContent>
       </Dialog>

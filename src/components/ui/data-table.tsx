@@ -417,7 +417,7 @@ export function DataTable<T>({
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex flex-col gap-3 sm:gap-4 sm:flex-row sm:items-center sm:justify-between bg-muted/30 p-3 sm:p-4 rounded-lg">
+        <div className="flex flex-col gap-3 sm:gap-4 sm:flex-row sm:items-center sm:justify-between bg-slate-50/50 dark:bg-slate-900/40 p-3 sm:p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
           <div className="text-xs sm:text-sm text-muted-foreground text-center sm:text-left">
             Menampilkan {startIndex + 1}-{Math.min(endIndex, state.filteredData.length)} dari {state.filteredData.length} data
           </div>
@@ -440,21 +440,21 @@ export function DataTable<T>({
 
             <div className="flex items-center gap-1">
               <Button
-                variant="outline"
+                variant="ghost"
                 size="sm"
                 onClick={() => handlePageChange(1)}
                 disabled={state.currentPage === 1}
-                className="h-8 w-8 sm:h-9 sm:w-9 p-0"
+                className="h-8 w-8 sm:h-9 sm:w-9 p-0 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30"
               >
                 <ChevronsLeft className="h-3 w-3 sm:h-4 sm:w-4" />
                 <span className="sr-only">First page</span>
               </Button>
               <Button
-                variant="outline"
+                variant="ghost"
                 size="sm"
                 onClick={() => handlePageChange(state.currentPage - 1)}
                 disabled={state.currentPage === 1}
-                className="h-8 w-8 sm:h-9 sm:w-9 p-0"
+                className="h-8 w-8 sm:h-9 sm:w-9 p-0 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30"
               >
                 <ChevronLeft className="h-3 w-3 sm:h-4 sm:w-4" />
                 <span className="sr-only">Previous page</span>
@@ -480,10 +480,15 @@ export function DataTable<T>({
                       return (
                         <Button
                           key={pageNum}
-                          variant={state.currentPage === pageNum ? "default" : "outline"}
+                          variant="ghost"
                           size="sm"
                           onClick={() => handlePageChange(pageNum)}
-                          className="h-8 w-8 p-0 text-xs"
+                          className={cn(
+                            "h-8 w-8 p-0 text-xs rounded-lg transition-colors border",
+                            state.currentPage === pageNum 
+                              ? "bg-blue-50 text-blue-700 border-blue-100 dark:bg-blue-900/40 dark:text-blue-400 dark:border-blue-800/40 font-bold" 
+                              : "border-transparent bg-transparent hover:bg-slate-100 dark:hover:bg-slate-800"
+                          )}
                         >
                           {pageNum}
                         </Button>
@@ -506,10 +511,15 @@ export function DataTable<T>({
                       return (
                         <Button
                           key={pageNum}
-                          variant={state.currentPage === pageNum ? "default" : "outline"}
+                          variant="ghost"
                           size="sm"
                           onClick={() => handlePageChange(pageNum)}
-                          className="h-9 w-9 p-0 text-sm"
+                          className={cn(
+                            "h-9 w-9 p-0 text-sm rounded-lg transition-colors border",
+                            state.currentPage === pageNum 
+                              ? "bg-blue-50 text-blue-700 border-blue-100 dark:bg-blue-900/40 dark:text-blue-400 dark:border-blue-800/40 font-bold" 
+                              : "border-transparent bg-transparent hover:bg-slate-100 dark:hover:bg-slate-800"
+                          )}
                         >
                           {pageNum}
                         </Button>
@@ -520,21 +530,21 @@ export function DataTable<T>({
               </div>
 
               <Button
-                variant="outline"
+                variant="ghost"
                 size="sm"
                 onClick={() => handlePageChange(state.currentPage + 1)}
                 disabled={state.currentPage === totalPages}
-                className="h-8 w-8 sm:h-9 sm:w-9 p-0"
+                className="h-8 w-8 sm:h-9 sm:w-9 p-0 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30"
               >
                 <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4" />
                 <span className="sr-only">Next page</span>
               </Button>
               <Button
-                variant="outline"
+                variant="ghost"
                 size="sm"
                 onClick={() => handlePageChange(totalPages)}
                 disabled={state.currentPage === totalPages}
-                className="h-8 w-8 sm:h-9 sm:w-9 p-0"
+                className="h-8 w-8 sm:h-9 sm:w-9 p-0 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30"
               >
                 <ChevronsRight className="h-3 w-3 sm:h-4 sm:w-4" />
                 <span className="sr-only">Last page</span>

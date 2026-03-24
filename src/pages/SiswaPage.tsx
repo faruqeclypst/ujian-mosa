@@ -193,36 +193,40 @@ const SiswaPage = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between bg-card p-5 rounded-2xl border border-slate-200/60 dark:border-slate-800/40 shadow-sm backdrop-blur-sm">
         <div>
-          <h2 className="text-2xl font-semibold text-foreground">Data Siswa</h2>
-          <p className="text-sm text-muted-foreground">Kelola daftar siswa pada sekolah untuk perizinan.</p>
+          <h2 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
+            <Users className="h-5 w-5 text-blue-500" />
+            Data Siswa
+          </h2>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Kelola daftar siswa pada aktif untuk perizinan dan ujian.</p>
         </div>
-        <div className="flex flex-wrap gap-2 sm:gap-3">
+        <div className="flex flex-wrap gap-2">
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
-              <Button onClick={handleCreateClick} className="w-full sm:w-auto" size="lg">
-                <Plus className="mr-2 h-4 w-4" />
+              <Button onClick={handleCreateClick} className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-700 text-white shadow-md shadow-blue-500/10 rounded-xl" size="sm">
+                <Plus className="mr-1 h-4 w-4" />
                 Tambah Siswa
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-md">
+            <DialogContent className="max-w-md bg-card">
               <DialogHeader>
-                <DialogTitle>{dialogMode === "edit" ? "Edit Data Siswa" : "Tambah Data Siswa"}</DialogTitle>
+                <DialogTitle className="text-base font-bold text-slate-800 dark:text-white">{dialogMode === "edit" ? "Edit Data Siswa" : "Tambah Data Siswa"}</DialogTitle>
               </DialogHeader>
               <SiswaForm
                 classes={classes}
                 defaultValues={defaultValues}
                 onSubmit={handleSubmitStudent}
                 submitLabel={dialogMode === "edit" ? "Perbarui" : "Simpan"}
+                onCancel={() => setIsDialogOpen(false)}
               />
             </DialogContent>
           </Dialog>
 
           <ImportButton onImport={handleImportSiswa} isLoading={isImporting} />
           <ExportButton onExport={handleExportSiswa} />
-          <Button onClick={() => downloadSiswaImportTemplate()} variant="outline">
-            Download Template
+          <Button onClick={() => downloadSiswaImportTemplate()} variant="outline" size="sm" className="rounded-xl border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300">
+            Template
           </Button>
         </div>
       </div>
@@ -232,9 +236,9 @@ const SiswaPage = () => {
           {selectedIds.length > 0 && (
             <Dialog open={isBatchOpen} onOpenChange={setIsBatchOpen}>
               <DialogTrigger asChild>
-                <Button variant="default" className="bg-orange-600 hover:bg-orange-700">
-                  <ArrowLeftRight className="mr-2 h-4 w-4" />
-                  Pindah / Naik Kelas ({selectedIds.length})
+                <Button variant="default" className="bg-amber-600 hover:bg-amber-700 dark:bg-amber-600 dark:hover:bg-amber-700 text-white shadow-md rounded-xl" size="sm">
+                  <ArrowLeftRight className="mr-1 h-3.5 w-3.5" />
+                  Pindah Kelas ({selectedIds.length})
                 </Button>
               </DialogTrigger>
               <DialogContent className="max-w-md">

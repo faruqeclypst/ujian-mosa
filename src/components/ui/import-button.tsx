@@ -59,12 +59,13 @@ export const ImportButton: React.FC<ImportButtonProps> = ({
         onClick={handleClick}
         disabled={isLoading}
         variant="outline"
+        size="sm"
         className={cn(
-          "bg-blue-50 text-blue-600 hover:bg-blue-100 border-blue-200 dark:bg-blue-950 dark:text-blue-400 dark:hover:bg-blue-900 dark:border-blue-600",
+          "bg-blue-50 text-blue-600 hover:bg-blue-100 border-blue-100 dark:bg-blue-900/10 dark:text-blue-400 dark:hover:bg-blue-900/30 dark:border-slate-800 rounded-xl font-semibold shadow-sm",
           className
         )}
       >
-        <Upload className="mr-2 h-4 w-4" />
+        <Upload className="mr-1 h-3.5 w-3.5" />
         {isLoading ? "Mengimpor..." : label}
       </Button>
     </>

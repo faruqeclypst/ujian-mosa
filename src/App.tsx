@@ -26,6 +26,7 @@ const KelasPage = lazy(() => import("./pages/KelasPage"));
 const SiswaPage = lazy(() => import("./pages/SiswaPage")); 
 const AlumniPage = lazy(() => import("./pages/AlumniPage"));
 const UsersPage = lazy(() => import("./pages/UsersPage"));
+const SettingsPage = lazy(() => import("./pages/SettingsPage"));
 
 import ExamsPage from "./pages/admin/ExamsPage";
 import QuestionsPage from "./pages/admin/QuestionsPage";
@@ -110,6 +111,7 @@ const AppContent = () => {
           <Route path="bank-soal" element={<ExamsPage />} />
           <Route path="bank-soal/:examId/questions" element={<QuestionsPage />} />
           <Route path="ruang-ujian" element={<ExamRoomsPage />} />
+          <Route path="pengaturan" element={<SettingsPage />} />
         </Route>
 
         {/* Fallback */}

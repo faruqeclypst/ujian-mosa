@@ -64,7 +64,7 @@ const ExamResultPage = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex items-center justify-center p-4">
-      <Card className="w-full max-w-md bg-white rounded-2xl border shadow-md overflow-hidden">
+      <Card className="w-full max-w-md bg-card rounded-2xl border shadow-md overflow-hidden">
         <CardHeader className="text-center bg-gradient-to-r from-blue-500 to-indigo-600 text-white pb-6 pt-10">
           <Award className="h-16 w-16 mx-auto mb-2 text-white/90 drop-shadow" />
           <CardTitle className="text-2xl font-bold">Hasil Ujian Selesai</CardTitle>

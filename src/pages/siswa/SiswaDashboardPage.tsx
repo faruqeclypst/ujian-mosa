@@ -144,7 +144,7 @@ const SiswaDashboardPage = () => {
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
       {/* Header */}
-      <header className="sticky top-0 z-10 backdrop-blur-md bg-white/80 dark:bg-slate-900/80 border-b border-slate-200/60 dark:border-slate-800 shadow-sm px-6 h-16 flex items-center justify-between">
+      <header className="sticky top-0 z-10 backdrop-blur-md bg-card/80 dark:bg-slate-900/80 border-b border-slate-200/60 dark:border-slate-800 shadow-sm px-6 h-16 flex items-center justify-between">
         <div>
           <h1 className="text-lg font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600">Computer Based Test</h1>
         </div>
@@ -161,7 +161,7 @@ const SiswaDashboardPage = () => {
 
       {/* Content */}
       <main className="max-w-4xl mx-auto p-6 flex items-center justify-center min-h-[calc(100vh-4rem)]">
-        <div className="w-full max-w-md bg-white dark:bg-slate-800 p-8 rounded-3xl border dark:border-slate-800 shadow-sm space-y-5">
+        <div className="w-full max-w-md bg-card dark:bg-slate-800 p-8 rounded-3xl border dark:border-slate-800 shadow-sm space-y-5">
            <div className="text-center space-y-1">
               <h2 className="text-xl font-bold text-slate-900 dark:text-white">Cari Ruang Ujian</h2>
               <p className="text-xs text-slate-500">Masukkan Kode Ruang untuk memulai pengerjaan.</p>
@@ -200,7 +200,7 @@ const SiswaDashboardPage = () => {
 
       {/* Token Verification Dialog */}
       <Dialog open={selectedRoom !== null} onOpenChange={(open) => !open && setSelectedRoom(null)}>
-        <DialogContent className="max-w-md bg-white rounded-2xl p-6">
+        <DialogContent className="max-w-md bg-card rounded-2xl p-6">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <KeyRound className="h-5 w-5 text-blue-600" />

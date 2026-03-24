@@ -23,13 +23,15 @@ interface SiswaFormProps {
   defaultValues?: Partial<SiswaFormValues>;
   onSubmit: (values: SiswaFormValues) => Promise<void>;
   submitLabel?: string;
+  onCancel?: () => void;
 }
 
 const SiswaForm = ({ 
   classes, 
   defaultValues, 
   onSubmit, 
-  submitLabel = "Simpan" 
+  submitLabel = "Simpan",
+  onCancel
 }: SiswaFormProps) => {
   const {
     register,
@@ -107,11 +109,21 @@ const SiswaForm = ({
         </Select>
       </FormField>
       
-      <div className="pt-4 border-t">
+      <div className="flex justify-end gap-2 pt-4 border-t border-slate-200/60 dark:border-slate-800/40">
+        {onCancel && (
+          <Button 
+            type="button" 
+            variant="outline" 
+            onClick={onCancel}
+            className="border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl text-slate-600 dark:text-slate-300"
+          >
+            Batal
+          </Button>
+        )}
         <Button
           type="submit"
           disabled={isSubmitting}
-          className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+          className="bg-blue-50 hover:bg-blue-100 border border-blue-100 dark:bg-blue-900/40 dark:text-blue-400 dark:hover:bg-blue-900/60 dark:border-blue-800/20 text-blue-700 font-semibold rounded-xl"
         >
           {isSubmitting ? "Menyimpan..." : submitLabel}
         </Button>

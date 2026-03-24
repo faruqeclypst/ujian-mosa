@@ -1,10 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useSiswaAuth } from "../../context/SiswaAuthContext";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import FormField from "../../components/forms/FormField";
 import { Card, CardHeader, CardTitle, CardContent } from "../../components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../../components/ui/dialog";
+import { database } from "../../lib/firebase";
+import { ref, get } from "firebase/database";
 
 const SiswaLoginPage = () => {
   const { loginSiswa, siswa, changePassword } = useSiswaAuth();
@@ -19,6 +21,20 @@ const SiswaLoginPage = () => {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [changePassError, setChangePassError] = useState("");
   const [isChangingPass, setIsChangingPass] = useState(false);
+
+  const [schoolName, setSchoolName] = useState("");
+  const [schoolLogo, setSchoolLogo] = useState("");
+
+  useEffect(() => {
+    const r = ref(database, "settings/school");
+    get(r).then((snap) => {
+      if (snap.exists()) {
+        const d = snap.val();
+        setSchoolName(d.name || "");
+        setSchoolLogo(d.logoUrl || "");
+      }
+    });
+  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,24 +77,30 @@ const SiswaLoginPage = () => {
   const showChangePassModal = !!(siswa && !siswa.hasChangedPassword);
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-indigo-900 via-slate-900 to-blue-900 overflow-hidden relative">
+    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 via-slate-50 to-indigo-50 overflow-hidden relative">
       {/* Decorative Blur Spheres */}
-      <div className="absolute top-0 -left-4 w-72 h-72 bg-purple-500 rounded-full mix-blend-multiply filter blur-2xl opacity-20 animate-blob"></div>
-      <div className="absolute top-0 -right-4 w-72 h-72 bg-blue-500 rounded-full mix-blend-multiply filter blur-2xl opacity-20 animate-blob animation-delay-2000"></div>
-      <div className="absolute -bottom-8 left-20 w-72 h-72 bg-pink-500 rounded-full mix-blend-multiply filter blur-2xl opacity-20 animate-blob animation-delay-4000"></div>
+      <div className="absolute top-0 -left-10 w-80 h-80 bg-blue-200 rounded-full mix-blend-multiply filter blur-2xl opacity-40 animate-blob"></div>
+      <div className="absolute top-0 -right-10 w-80 h-80 bg-indigo-200 rounded-full mix-blend-multiply filter blur-2xl opacity-40 animate-blob animation-delay-2000"></div>
+      <div className="absolute -bottom-10 left-20 w-80 h-80 bg-pink-100 rounded-full mix-blend-multiply filter blur-2xl opacity-30 animate-blob animation-delay-4000"></div>
 
-      <Card className="w-full max-w-md mx-4 bg-white/10 dark:bg-slate-900/40 backdrop-blur-xl border border-white/10 dark:border-slate-700/30 shadow-2xl rounded-3xl p-2">
+      <Card className="w-full max-w-md mx-4 bg-white/80 backdrop-blur-xl border border-slate-200/60 shadow-xl rounded-3xl p-2">
         <CardHeader className="text-center pb-2">
-          <div className="mx-auto w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center mb-4 shadow-lg shadow-blue-500/30">
-            <span className="text-2xl font-black text-white">CBT</span>
+          <div className="mx-auto w-24 h-24 flex items-center justify-center mb-4 overflow-hidden relative">
+            {schoolLogo ? (
+              <img src={schoolLogo} alt="Logo Sekolah" className="h-full w-full object-contain" />
+            ) : (
+              <div className="h-full w-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/30 rounded-2xl">
+                <span className="text-3xl font-black text-white">CBT</span>
+              </div>
+            )}
           </div>
-          <CardTitle className="text-xl sm:text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-200 to-white">Login Siswa</CardTitle>
-          <p className="text-slate-300 text-xs sm:text-sm">Ujian Computer Based Test</p>
+          <CardTitle className="text-xl sm:text-2xl font-bold text-slate-800">Login Siswa</CardTitle>
+          <p className="text-slate-500 text-xs sm:text-sm">{schoolName || "Ujian Computer Based Test"}</p>
         </CardHeader>
         <CardContent className="pt-4">
           <form onSubmit={handleLogin} className="space-y-4">
             {error && (
-              <div className="bg-red-500/10 border border-red-500/30 text-red-200 text-xs px-3 py-2 rounded-xl">
+              <div className="bg-red-50 border border-red-200 text-red-600 text-xs px-3 py-2 rounded-xl">
                 {error}
               </div>
             )}
@@ -88,7 +110,7 @@ const SiswaLoginPage = () => {
                 value={nisn}
                 onChange={(e) => setNisn(e.target.value.replace(/\D/g, ''))} // only numbers
                 placeholder="Masukkan NISN Anda"
-                className="bg-white/5 border-white/10 text-white placeholder:text-slate-400 hover:bg-white/10 focus:bg-white/10 rounded-xl px-4 h-11 transition-all"
+                className="bg-slate-50 border-slate-200 text-slate-800 placeholder:text-slate-400 hover:bg-slate-100/50 focus:bg-white rounded-xl px-4 h-11 transition-all"
                 disabled={loading}
               />
             </FormField>
@@ -99,7 +121,7 @@ const SiswaLoginPage = () => {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Masukkan Password"
-                className="bg-white/5 border-white/10 text-white placeholder:text-slate-400 hover:bg-white/10 focus:bg-white/10 rounded-xl px-4 h-11 transition-all"
+                className="bg-slate-50 border-slate-200 text-slate-800 placeholder:text-slate-400 hover:bg-slate-100/50 focus:bg-white rounded-xl px-4 h-11 transition-all"
                 disabled={loading}
               />
             </FormField>

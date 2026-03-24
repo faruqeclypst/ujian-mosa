@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Plus, Edit, Trash, Check, Image, ChevronDown, FileText, Download, Eye } from "lucide-react";
+import { ArrowLeft, Plus, Edit, Trash, Check, Image, ChevronDown, FileText, Download, Eye, FolderOpen } from "lucide-react";
 import { Button } from "../../components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../../components/ui/dialog";
 import { DeleteConfirmationDialog } from "../../components/ui/delete-confirmation-dialog";
@@ -10,7 +10,7 @@ import { database } from "../../lib/firebase";
 import { Input } from "../../components/ui/input";
 import FormField from "../../components/forms/FormField";
 import { Card, CardHeader, CardContent, CardTitle } from "../../components/ui/card";
-import { uploadInventoryImage } from "../../lib/storage";
+import { uploadInventoryImage, deleteImageFromStorage } from "../../lib/storage";
 import { ImportButton } from "../../components/ui/import-button";
 import { parseQuestionsFromWord } from "../../lib/questionWordParser";
 import ReactQuill from "react-quill";
@@ -24,6 +24,58 @@ export interface QuestionData {
   imageUrl?: string;
   choices: Record<string, { text: string; imageUrl?: string; isCorrect?: boolean }>;
 }
+
+const compressImage = (file: File): Promise<File> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (event) => {
+      const img = new window.Image();
+      img.src = event.target?.result as string;
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        let width = img.width;
+        let height = img.height;
+        const MAX_WIDTH = 1200; // Resolusi max agar tetap tajam tapi ringan
+        const MAX_HEIGHT = 1200;
+
+        if (width > height) {
+          if (width > MAX_WIDTH) {
+            height *= MAX_WIDTH / width;
+            width = MAX_WIDTH;
+          }
+        } else {
+          if (height > MAX_HEIGHT) {
+            width *= MAX_HEIGHT / height;
+            height = MAX_HEIGHT;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        ctx?.drawImage(img, 0, 0, width, height);
+
+        canvas.toBlob(
+          (blob) => {
+            if (blob) {
+              const compressedFile = new File([blob], file.name.replace(/\.[^/.]+$/, "") + ".jpg", {
+                type: "image/jpeg",
+                lastModified: Date.now(),
+              });
+              resolve(compressedFile);
+            } else {
+              reject(new Error("Gagal mengompresi gambar"));
+            }
+          },
+          "image/jpeg",
+          0.75 // 75% kualitas sangat tinggi untuk visual tp hemat bytes
+        );
+      };
+    };
+    reader.onerror = (e) => reject(e);
+  });
+};
 
 const columns = [
   {
@@ -40,7 +92,7 @@ const columns = [
         <div className="line-clamp-2 text-sm font-medium text-slate-800 dark:text-slate-200 leading-relaxed" dangerouslySetInnerHTML={{ __html: item.text }} />
         {item.imageUrl && (
           <div className="flex items-center gap-1 text-xs text-blue-500 mt-1">
-            <span className="p-1 rounded-md bg-blue-50 text-blue-600 flex items-center gap-1 font-semibold text-[10px] border border-blue-200">
+            <span className="p-1 rounded-md bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400 flex items-center gap-1 font-semibold text-[10px] border border-blue-200 dark:border-blue-800/40">
               🖼️ Bergambar
             </span>
           </div>
@@ -56,9 +108,9 @@ const columns = [
       const correctKey = keys.find(k => item.choices[k].isCorrect);
       return (
         <div className="flex items-center gap-1.5 flex-wrap">
-          <span className="p-1 px-2 rounded-md bg-slate-100 text-slate-600 text-xs border border-slate-200">{keys.length} Pilihan</span>
+          <span className="p-1 px-2 rounded-md bg-slate-50 text-slate-600 dark:bg-slate-800/60 dark:text-slate-300 text-xs border border-slate-200 dark:border-slate-800">{keys.length} Pilihan</span>
           {correctKey && (
-            <span className="p-1 px-2 text-[11px] font-bold rounded-md bg-green-50 text-green-600 border border-green-200">
+            <span className="p-1 px-2 text-[11px] font-bold rounded-md bg-green-50 text-green-600 dark:bg-green-950/40 dark:text-green-400 border border-green-200 dark:border-green-800/40">
               Kunci {correctKey.toUpperCase()}
             </span>
           )}
@@ -101,10 +153,98 @@ const QuestionsPage = () => {
 
   const [questionFile, setQuestionFile] = useState<File | null>(null);
   const [choiceFiles, setChoiceFiles] = useState<Record<string, File | null>>({});
+  
+  const [coverSizeInfo, setCoverSizeInfo] = useState<string>("");
+  const [choicesSizeInfo, setChoicesSizeInfo] = useState<Record<string, string>>({});
+
+  const formatSize = (bytes: number) => {
+    if (bytes === 0) return "0 B";
+    const k = 1024;
+    const sizes = ["B", "KB", "MB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
+  };
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [questionToDelete, setQuestionToDelete] = useState<QuestionData | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  const [isGalleryOpen, setIsGalleryOpen] = useState(false);
+  const [galleryImages, setGalleryImages] = useState<string[]>([]);
+  const [galleryTarget, setGalleryTarget] = useState<{ type: "cover" | "choice" | "batch"; letter?: string; index?: number } | null>(null);
+
+  const loadGalleryImages = () => {
+    const images = new Set<string>();
+    questions.forEach((q) => {
+      if (q.imageUrl) images.add(q.imageUrl);
+      if (q.choices) {
+        Object.values(q.choices).forEach((c) => {
+          if (c.imageUrl) images.add(c.imageUrl);
+        });
+      }
+    });
+    setGalleryImages(Array.from(images));
+  };
+
+  const handlePickGallery = (url: string) => {
+    if (!galleryTarget) return;
+
+    if (galleryTarget.type === "cover") {
+      setFormValues((prev) => ({ ...prev, imageUrl: url }));
+      setQuestionFile(null); // Reset file picker
+      setCoverSizeInfo("(Dari Galeri)");
+    } else if (galleryTarget.type === "choice" && galleryTarget.letter) {
+      const letter = galleryTarget.letter;
+      handleChoiceChange(letter, "imageUrl", url);
+      setChoiceFiles((prev) => ({ ...prev, [letter]: null }));
+      setChoicesSizeInfo((prev) => ({ ...prev, [letter]: "(Dari Galeri)" }));
+    } else if (galleryTarget.type === "batch" && galleryTarget.index !== undefined) {
+      updateBatchItem(galleryTarget.index, "imageUrl", url);
+      updateBatchItem(galleryTarget.index, "imageFile", null); // Reset file jika ada
+    }
+    
+    setIsGalleryOpen(false);
+  };
+
+  const [isPickerOpen, setIsPickerOpen] = useState(false);
+  const globalFileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleGlobalFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] || null;
+    if (!file) return;
+
+    const maxSize = 2 * 1024 * 1024;
+    if (file.size > maxSize) {
+      showAlert("Gagal", "Ukuran file gambar maksimal adalah 2MB.", "danger");
+      return;
+    }
+
+    let fileToUpload = file;
+    const origSize = formatSize(file.size);
+
+    if (file.size > 200 * 1024) {
+      fileToUpload = await compressImage(file);
+    }
+
+    if (!galleryTarget) return;
+
+    if (galleryTarget.type === "cover") {
+      setQuestionFile(fileToUpload);
+      setFormValues((prev) => ({ ...prev, imageUrl: "" })); 
+      setCoverSizeInfo(file.size > 200 * 1024 ? `${origSize} ➔ ${formatSize(fileToUpload.size)}` : `${origSize} (Hemat)`);
+    } else if (galleryTarget.type === "choice" && galleryTarget.letter) {
+      const letter = galleryTarget.letter;
+      setChoiceFiles((prev) => ({ ...prev, [letter]: fileToUpload }));
+      handleChoiceChange(letter, "imageUrl", ""); 
+      setChoicesSizeInfo((prev) => ({ ...prev, [letter]: file.size > 100 * 1024 ? `${origSize} ➔ ${formatSize(fileToUpload.size)}` : `${origSize} (Hemat)` }));
+    } else if (galleryTarget.type === "batch" && galleryTarget.index !== undefined) {
+      updateBatchItem(galleryTarget.index, "imageFile", fileToUpload);
+      updateBatchItem(galleryTarget.index, "imageUrl", "");
+    }
+
+    setIsPickerOpen(false);
+    if (globalFileInputRef.current) globalFileInputRef.current.value = ""; 
+  };
 
   const [isImportMenuOpen, setIsImportMenuOpen] = useState(false); // <--- Dropdown state
   const [deleteAllDialogOpen, setDeleteAllDialogOpen] = useState(false); // <--- Delete All State
@@ -187,10 +327,14 @@ const QuestionsPage = () => {
     try {
       const qRef = ref(database, "questions");
       for (const q of validQuestions) {
-        let imageUrl = "";
+        let imageUrl = q.imageUrl || "";
         if (q.imageFile) {
           try {
-            const uploadSnap = await uploadInventoryImage(`questions/${examId}`, q.imageFile);
+            let fileToUpload = q.imageFile;
+            if (q.imageFile.size > 200 * 1024) {
+              fileToUpload = await compressImage(q.imageFile);
+            }
+            const uploadSnap = await uploadInventoryImage(`questions/${examId}`, fileToUpload);
             imageUrl = uploadSnap.url;
           } catch (e) {
             console.error("Gagal mengunggah gambar batch", e);
@@ -253,13 +397,20 @@ const QuestionsPage = () => {
       const file = input.files?.[0];
       if (file) {
         try {
-          // Upload berkas ke R2 Storage
-          const res = await uploadInventoryImage(`questions/${examId || "general"}`, file);
-          const quill = quillRef.current?.getEditor();
-          if (quill) {
-            const range = quill.getSelection();
-            quill.insertEmbed(range.index, "image", res.url);
+          let fileToUpload = file;
+          if (file.size > 200 * 1024) { // Compress jika > 200KB
+            fileToUpload = await compressImage(file);
           }
+          const reader = new FileReader();
+          reader.readAsDataURL(fileToUpload);
+          reader.onload = () => {
+            const base64 = reader.result as string;
+            const quill = quillRef.current?.getEditor();
+            if (quill) {
+              const range = quill.getSelection() || { index: 0 };
+              quill.insertEmbed(range.index, "image", base64);
+            }
+          };
         } catch (e) {
           alert("Gagal mengunggah gambar ke editor.");
         }
@@ -423,7 +574,16 @@ const QuestionsPage = () => {
 
       // 🖼️ 1. Upload file Cover Soal (dari tombol input file)
       if (questionFile) {
-        const res = await uploadInventoryImage(`questions/${examId}`, questionFile);
+        let fileToUpload = questionFile;
+        if (questionFile.size > 200 * 1024) { // kompress > 200KB
+          fileToUpload = await compressImage(questionFile);
+        }
+        if (dialogMode === "edit" && selectedQuestion?.imageUrl) {
+          const extractKey = (url: string) => url.includes("/questions/") ? "questions/" + url.split("/questions/")[1].split("?")[0] : "";
+          const oldKey = extractKey(selectedQuestion.imageUrl);
+          if (oldKey) await deleteImageFromStorage(oldKey);
+        }
+        const res = await uploadInventoryImage(`questions/${examId}`, fileToUpload);
         imageUrl = res.url;
       } else if (imageUrl.startsWith("data:image/")) {
         // Jika dari pratinjau tapi belum diupload
@@ -447,7 +607,16 @@ const QuestionsPage = () => {
       for (const key in choiceFiles) {
         const file = choiceFiles[key];
         if (file) {
-          const res = await uploadInventoryImage(`questions/${examId}`, file);
+          let fileToUpload = file;
+          if (file.size > 200 * 1024) {
+            fileToUpload = await compressImage(file);
+          }
+          if (dialogMode === "edit" && selectedQuestion?.choices?.[key]?.imageUrl) {
+            const extractKey = (url: string) => url.includes("/questions/") ? "questions/" + url.split("/questions/")[1].split("?")[0] : "";
+            const oldKey = extractKey(selectedQuestion.choices[key].imageUrl);
+            if (oldKey) await deleteImageFromStorage(oldKey);
+          }
+          const res = await uploadInventoryImage(`questions/${examId}`, fileToUpload);
           updatedChoices[key].imageUrl = res.url;
         }
       }
@@ -499,6 +668,45 @@ const QuestionsPage = () => {
     }
   };
 
+  const cleanupQuestionImages = async (q: QuestionData) => {
+    const keysToDelete: string[] = [];
+    const extractKey = (url: string) => {
+      if (url.includes("/questions/")) return "questions/" + url.split("/questions/")[1].split("?")[0];
+      return "";
+    };
+
+    if (q.imageUrl) keysToDelete.push(extractKey(q.imageUrl));
+    if (q.choices) {
+      Object.values(q.choices).forEach((c) => {
+        if (c.imageUrl) keysToDelete.push(extractKey(c.imageUrl));
+        if (c.text && c.text.includes("/questions/")) {
+          const doc = new DOMParser().parseFromString(c.text, "text/html");
+          doc.querySelectorAll("img").forEach((img) => {
+            const src = img.getAttribute("src") || "";
+            if (src) keysToDelete.push(extractKey(src));
+          });
+        }
+      });
+    }
+    if (q.text && q.text.includes("/questions/")) {
+      const doc = new DOMParser().parseFromString(q.text, "text/html");
+      doc.querySelectorAll("img").forEach((img) => {
+        const src = img.getAttribute("src") || "";
+        if (src) keysToDelete.push(extractKey(src));
+      });
+    }
+
+    for (const k of keysToDelete) {
+      if (k) {
+        try {
+          await deleteImageFromStorage(k);
+        } catch (e) {
+          console.error("Gagal menghapus gambar dari storage:", k, e);
+        }
+      }
+    }
+  };
+
   const handleDeleteClick = (q: QuestionData) => {
     setQuestionToDelete(q);
     setDeleteDialogOpen(true);
@@ -508,6 +716,7 @@ const QuestionsPage = () => {
     if (!questionToDelete) return;
     setIsDeleting(true);
     try {
+      await cleanupQuestionImages(questionToDelete);
       await remove(ref(database, `questions/${questionToDelete.id}`));
     } catch (error) {
       showAlert("Gagal", "Gagal menghapus soal.", "danger");
@@ -525,11 +734,12 @@ const QuestionsPage = () => {
       if (snapshot.exists()) {
         const data = snapshot.val();
         const updates: any = {};
-        Object.keys(data).forEach((key) => {
-          if (data[key].examId === examId) {
-            updates[key] = null; // Set null untuk menghapus
-          }
-        });
+        const keysToDelete = Object.keys(data).filter((k) => data[k].examId === examId);
+        
+        for (const key of keysToDelete) {
+          await cleanupQuestionImages({ ...data[key], id: key });
+          updates[key] = null; // Set null untuk menghapus
+        }
         await update(qRef, updates);
       }
     } catch (error) {
@@ -668,9 +878,9 @@ const QuestionsPage = () => {
           <div className="relative">
             <Button
               onClick={() => setIsImportMenuOpen(!isImportMenuOpen)}
-              variant="outline"
+              variant="secondary"
               size="lg"
-              className="rounded-xl"
+              className="rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 dark:bg-slate-800/40 dark:text-slate-300 dark:hover:bg-slate-800/60 dark:border-slate-800/40 text-slate-700 shadow-sm"
             >
               Import <ChevronDown className={`ml-1 h-4 w-4 transition-transform ${isImportMenuOpen ? "rotate-180" : ""}`} />
             </Button>
@@ -681,7 +891,7 @@ const QuestionsPage = () => {
                   className="fixed inset-0 z-10"
                   onClick={() => setIsImportMenuOpen(false)}
                 />
-                <div className="absolute right-0 mt-2 w-52 bg-white border border-slate-200 rounded-xl shadow-lg z-20 p-1 flex flex-col gap-1 animate-in fade-in duration-150">
+                <div className="absolute right-0 mt-2 w-52 bg-card border border-slate-200 dark:border-slate-800 rounded-xl shadow-lg z-20 p-1 flex flex-col gap-1 animate-in fade-in duration-150">
                   <div className="relative flex items-center">
                     <ImportButton
                       onImport={(file) => {
@@ -697,7 +907,7 @@ const QuestionsPage = () => {
                     href="/templates/Template_Soal.docx"
                     download="Template_Soal.docx"
                     onClick={() => setIsImportMenuOpen(false)}
-                    className="flex items-center gap-2 p-2 hover:bg-slate-50 text-slate-700 text-sm rounded-lg transition-all"
+                    className="flex items-center gap-2 p-2 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-sm rounded-lg transition-all"
                   >
                     <Download className="h-4 w-4 text-indigo-600" /> Download Template
                   </a>
@@ -705,7 +915,7 @@ const QuestionsPage = () => {
                     href="/templates/Template_Soal_Tabel.docx"
                     download="Template_Soal_Tabel.docx"
                     onClick={() => setIsImportMenuOpen(false)}
-                    className="flex items-center gap-2 p-2 hover:bg-slate-50 text-slate-700 text-sm rounded-lg transition-all"
+                    className="flex items-center gap-2 p-2 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-sm rounded-lg transition-all"
                   >
                     <Download className="h-4 w-4 text-emerald-600" /> Download Template (Menu Tabel)
                   </a>
@@ -717,19 +927,19 @@ const QuestionsPage = () => {
           {questions.length > 0 && (
             <Button
               onClick={() => setDeleteAllDialogOpen(true)}
-              variant="destructive"
+              variant="secondary"
               size="lg"
-              className="rounded-xl"
+              className="rounded-xl bg-rose-50 text-rose-600 hover:bg-rose-100 border border-rose-100 dark:bg-rose-900/30 dark:text-rose-400 dark:hover:bg-rose-900/50 dark:border-rose-800/30 shadow-sm font-semibold"
             >
               <Trash className="mr-2 h-4 w-4" /> Hapus Semua
             </Button>
           )}
 
-          <Button onClick={handleBatchCreateClick} variant="outline" size="lg" className="rounded-xl">
+          <Button onClick={handleBatchCreateClick} variant="secondary" size="lg" className="rounded-xl bg-purple-50 hover:bg-purple-100 border border-purple-100 dark:bg-purple-900/30 dark:text-purple-400 dark:hover:bg-purple-900/50 dark:border-purple-800/30 text-purple-700 shadow-sm font-semibold">
             <Plus className="mr-2 h-4 w-4" /> Tambah Batch
           </Button>
 
-          <Button onClick={handleCreateClick} size="lg" className="rounded-xl">
+          <Button onClick={handleCreateClick} size="lg" className="rounded-xl bg-blue-50 hover:bg-blue-100 border border-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 dark:border-blue-800/20 text-blue-700 shadow-sm font-semibold">
             <Plus className="mr-2 h-4 w-4" /> Tambah Soal
           </Button>
         </div>
@@ -742,10 +952,10 @@ const QuestionsPage = () => {
       ) : (
         <div className="space-y-4">
           {questions.length === 0 ? (
-            <div className="text-center p-12 border bg-white rounded-xl text-slate-400">Belum ada soal untuk ujian ini.</div>
+            <div className="text-center p-12 border bg-card rounded-xl text-slate-400">Belum ada soal untuk ujian ini.</div>
           ) : (
             <div className="space-y-2 mt-4">
-              <div className="bg-white border rounded-xl p-4 shadow-sm border-slate-200/60">
+              <div className="bg-card border rounded-xl p-4 shadow-sm border-slate-200/60">
                 <DataTable
                   data={questions}
                   columns={columns}
@@ -756,7 +966,7 @@ const QuestionsPage = () => {
                       <Button
                         variant="secondary"
                         size="sm"
-                        className="bg-sky-50 text-sky-700 hover:bg-sky-100 border-sky-200 dark:bg-sky-950 dark:text-sky-400"
+                        className="bg-sky-50 text-sky-700 hover:bg-sky-100 border border-sky-100 dark:bg-sky-900/10 dark:text-sky-400 dark:hover:bg-sky-900/30 dark:border-sky-800/40 h-7 text-xs"
                         onClick={() => {
                           setPreviewQuestion(q);
                           setIsPreviewOpen(true);
@@ -767,7 +977,7 @@ const QuestionsPage = () => {
                       <Button
                         variant="secondary"
                         size="sm"
-                        className="bg-green-100 text-green-700 hover:bg-green-200 border-green-200 dark:bg-green-950 dark:text-green-400 dark:hover:bg-green-900"
+                        className="bg-green-50 text-green-700 hover:bg-green-100 border border-green-100 dark:bg-green-900/10 dark:text-green-400 dark:hover:bg-green-900/30 dark:border-green-800/40 h-7 text-xs"
                         onClick={() => handleEditClick(q)}
                       >
                         Edit
@@ -775,7 +985,7 @@ const QuestionsPage = () => {
                       <Button
                         variant="destructive"
                         size="sm"
-                        className="bg-red-50 text-red-600 hover:bg-red-100 border-red-200"
+                        className="bg-rose-50 text-rose-600 hover:bg-rose-100 border border-rose-100 dark:bg-rose-900/10 dark:text-rose-400 dark:hover:bg-rose-900/30 dark:border-rose-800/40 h-7 text-xs"
                         onClick={() => handleDeleteClick(q)}
                       >
                         Hapus
@@ -791,15 +1001,16 @@ const QuestionsPage = () => {
 
       {/* Dialog for Create/Edit Question */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-2xl bg-white max-h-[85vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl bg-card max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{dialogMode === "edit" ? "Edit Soal" : "Tambah Soal"}</DialogTitle>
           </DialogHeader>
 
           <form onSubmit={handleSubmit} className="space-y-4 pt-2">
             <FormField id="text" label="Pertanyaan" error={undefined}>
-              <div className="bg-white rounded-md border flex flex-col">
+              <div className="bg-card rounded-md border flex flex-col">
                 <ReactQuill
+                  key={selectedQuestion ? `edit-${selectedQuestion.id}` : "create-main"}
                   ref={quillRef}
                   theme="snow"
                   value={formValues.text}
@@ -815,22 +1026,30 @@ const QuestionsPage = () => {
               <div className="flex flex-col gap-2">
                 <p className="text-[11px] text-slate-400 -mt-1 mb-1">Gambar ini akan ditampilkan tepat di atas teks pertanyaan utama pada lembar ujian siswa.</p>
                 <div className="flex items-center gap-3">
-                  <label className="flex items-center justify-center gap-1.5 cursor-pointer bg-white hover:bg-slate-50 text-slate-700 rounded-lg h-9 text-xs px-3 border border-slate-200 transition-all font-medium w-fit shadow-sm">
+                  <button
+                    type="button"
+                    className="flex items-center justify-center gap-1.5 cursor-pointer bg-card hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-lg h-9 text-xs px-3 border border-slate-200 dark:border-slate-800 transition-all font-medium w-fit shadow-sm"
+                    onClick={() => {
+                      setGalleryTarget({ type: "cover" });
+                      setIsPickerOpen(true);
+                    }}
+                  >
                     <Image className="w-4 h-4 text-slate-400" />
-                    <span>{questionFile || formValues.imageUrl ? "Ganti Gambar" : "Unggah Gambar"}</span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={(e) => setQuestionFile(e.target.files?.[0] || null)}
-                    />
-                  </label>
+                    <span>{questionFile || formValues.imageUrl ? "Ganti Gambar" : "Tambah Gambar"}</span>
+                  </button>
                   {(questionFile || formValues.imageUrl) && (
-                    <img
-                      src={questionFile ? URL.createObjectURL(questionFile) : formValues.imageUrl}
-                      alt="Pratinjau Soal"
-                      className="max-h-16 w-auto rounded-lg border border-slate-200/80 shadow-sm"
-                    />
+                    <div className="flex flex-col items-center gap-1">
+                      <img
+                        src={questionFile ? URL.createObjectURL(questionFile) : formValues.imageUrl}
+                        alt="Pratinjau Soal"
+                        className="max-h-16 w-auto rounded-lg border border-slate-200/80 shadow-sm"
+                      />
+                      {coverSizeInfo && (
+                        <span className="text-[9px] text-green-600 font-semibold bg-green-50/80 px-1 py-0.5 rounded border border-green-200 dark:bg-green-950/40 dark:text-green-400 dark:border-green-800/40 shadow-sm">
+                          ⚡ {coverSizeInfo}
+                        </span>
+                      )}
+                    </div>
                   )}
                 </div>
               </div>
@@ -839,11 +1058,12 @@ const QuestionsPage = () => {
             <div className="space-y-4">
               <label className="text-xs font-semibold text-slate-500 block">Pilihan Jawaban</label>
               {['a', 'b', 'c', 'd', 'e'].map((letter) => (
-                <div key={letter} className="p-3 border rounded-xl space-y-2 bg-slate-50/50">
+                <div key={letter} className="p-3 border border-slate-200 dark:border-slate-800 rounded-xl space-y-2 bg-slate-50/50 dark:bg-slate-900/30">
                   <div className="flex gap-3 items-center">
                     <div className="font-bold text-sm w-4">{letter.toUpperCase()}.</div>
-                    <div className="bg-white rounded-md border flex-1">
+                    <div className="bg-card rounded-md border flex-1">
                       <ReactQuill
+                        key={selectedQuestion ? `edit-${selectedQuestion.id}-${letter}` : `create-${letter}`}
                         theme="snow"
                         value={formValues.choices[letter].text}
                         onChange={(content) => handleChoiceChange(letter, 'text', content)}
@@ -861,35 +1081,37 @@ const QuestionsPage = () => {
                     <div className="flex flex-col gap-1.5 shrink-0">
                       <Button
                         type="button"
-                        variant={formValues.choices[letter].isCorrect ? "default" : "outline"}
-                        className={formValues.choices[letter].isCorrect ? "bg-green-600 hover:bg-green-700 h-9 text-xs" : "h-9 text-xs"}
+                        className={formValues.choices[letter].isCorrect ? "bg-green-50 text-green-700 border border-green-100 dark:bg-green-950/40 dark:text-green-400 dark:border-green-800/40 hover:bg-green-100 h-8 text-xs font-bold" : "h-8 text-xs border border-slate-200 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-800/60 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 font-medium"}
                         size="sm"
                         onClick={() => handleChoiceChange(letter, 'isCorrect', true)}
                       >
                         Benar
                       </Button>
-                      <label className="flex items-center justify-center gap-1 cursor-pointer bg-white hover:bg-slate-50 text-slate-600 rounded-md h-8 text-[11px] px-2 border border-slate-200 transition-all font-medium">
-                        <Image className="w-3 h-3 text-slate-400" />
+                      <button
+                        type="button"
+                        className="flex items-center justify-center gap-1 cursor-pointer bg-card hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-md h-8 text-[11px] px-2 border border-slate-200 dark:border-slate-800 transition-all font-medium"
+                        onClick={() => {
+                          setGalleryTarget({ type: "choice", letter });
+                          setIsPickerOpen(true);
+                        }}
+                      >
+                        <Image className="w-3.5 h-3.5 text-slate-400" />
                         <span>{choiceFiles[letter] || formValues.choices[letter].imageUrl ? "Ganti" : "Gambar"}</span>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0] || null;
-                            setChoiceFiles(prev => ({ ...prev, [letter]: file }));
-                          }}
-                        />
-                      </label>
+                      </button>
                     </div>
                   </div>
                   {(choiceFiles[letter] || formValues.choices[letter].imageUrl) && (
-                    <div className="pl-7 pt-1">
+                    <div className="pl-7 pt-1 flex items-center gap-2">
                       <img
                         src={choiceFiles[letter] ? URL.createObjectURL(choiceFiles[letter]!) : formValues.choices[letter].imageUrl}
                         alt={`Pratinjau ${letter}`}
                         className="max-h-16 w-auto rounded-lg border border-slate-200/80 shadow-sm"
                       />
+                      {choicesSizeInfo[letter] && (
+                        <span className="text-[9px] text-green-600 font-semibold bg-green-50/80 px-1 py-0.5 rounded border border-green-200 dark:bg-green-950/40 dark:text-green-400 dark:border-green-800/40 shadow-sm">
+                          ⚡ {choicesSizeInfo[letter]}
+                        </span>
+                      )}
                     </div>
                   )}
                 </div>
@@ -897,7 +1119,7 @@ const QuestionsPage = () => {
             </div>
 
             <DialogFooter className="pt-2">
-              <Button type="submit" className="w-full">{dialogMode === "edit" ? "Perbarui" : "Simpan"}</Button>
+              <Button type="submit" className="w-full bg-blue-50 hover:bg-blue-100 border border-blue-100 dark:bg-blue-900/40 dark:text-blue-400 dark:hover:bg-blue-900/60 dark:border-blue-800/20 text-blue-700 font-semibold">{dialogMode === "edit" ? "Perbarui" : "Simpan"}</Button>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -905,7 +1127,7 @@ const QuestionsPage = () => {
 
       {/* Dialog Preview Soal */}
       <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
-        <DialogContent className="max-w-2xl bg-white max-h-[85vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl bg-card max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Pratinjau Soal</DialogTitle>
           </DialogHeader>
@@ -923,7 +1145,7 @@ const QuestionsPage = () => {
                 {Object.keys(previewQuestion.choices || {}).map((cKey) => {
                   const choice = previewQuestion.choices[cKey];
                   return (
-                    <div key={cKey} className={`p-3 rounded-xl border flex items-center justify-between ${choice.isCorrect ? "bg-green-50/80 border-green-200 text-green-800 font-medium" : "bg-slate-50 border-slate-100 text-slate-700"
+                    <div key={cKey} className={`p-3 rounded-xl border flex items-center justify-between ${choice.isCorrect ? "bg-green-50/80 dark:bg-green-950/40 border-green-200 dark:border-green-800/40 text-green-800 dark:text-green-400 font-medium" : "bg-slate-50/50 dark:bg-slate-900/40 border-slate-100 dark:border-slate-800/40 text-slate-700 dark:text-slate-300"
                       }`}>
                       <div className="flex items-start gap-3 flex-1 min-w-0">
                         <span className="font-bold text-slate-400 mt-0.5">{cKey.toUpperCase()}.</span>
@@ -946,22 +1168,22 @@ const QuestionsPage = () => {
 
       {/* Dialog for Batch Create Questions */}
       <Dialog open={isBatchModalOpen} onOpenChange={setIsBatchModalOpen}>
-        <DialogContent className="max-w-4xl bg-slate-50 max-h-[85vh] overflow-y-auto">
+        <DialogContent className="max-w-4xl bg-slate-50 dark:bg-slate-900 max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Tambah Soal Manual (Batch)</DialogTitle>
           </DialogHeader>
 
           <div className="space-y-4 pt-3">
             {batchQuestions.map((q, index) => (
-              <div key={index} className="bg-white border rounded-xl p-3 shadow-sm relative space-y-2">
+              <div key={index} className="bg-card border rounded-xl p-3 shadow-sm relative space-y-2">
                 <div className="flex justify-between items-center">
                   <span className="font-bold text-slate-400 text-xs">Soal #{index + 1}</span>
                   {batchQuestions.length > 1 && (
-                    <Button variant="ghost" size="icon" onClick={() => handleRemoveBatchRow(index)} className="h-6 w-6 text-red-400 hover:bg-red-50 hover:text-red-600 rounded-lg"><Trash className="h-3 w-3" /></Button>
+                    <Button variant="ghost" size="icon" onClick={() => handleRemoveBatchRow(index)} className="h-6 w-6 text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 hover:text-red-600 rounded-lg"><Trash className="h-3 w-3" /></Button>
                   )}
                 </div>
 
-                <div className="bg-white rounded-lg border flex flex-col flex-1">
+                <div className="bg-card rounded-lg border flex flex-col flex-1">
                   <ReactQuill
                     theme="snow"
                     value={q.text}
@@ -978,20 +1200,21 @@ const QuestionsPage = () => {
                   />
                 </div>
                 <div className="flex items-center gap-2 mt-1">
-                  <label className="flex items-center gap-1 cursor-pointer bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg h-7 text-[11px] px-2 border font-medium transition-all">
+                  <button
+                    type="button"
+                    className="flex items-center gap-1 cursor-pointer bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-lg h-7 text-[11px] px-2 border border-slate-200 dark:border-slate-800 font-medium transition-all"
+                    onClick={() => {
+                      setGalleryTarget({ type: "batch", index });
+                      setIsPickerOpen(true);
+                    }}
+                  >
                     <Image className="h-3.5 w-3.5" />
-                    <span>{q.imageFile ? "Ganti Gambar" : "Tambah Gambar"}</span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={(e) => updateBatchItem(index, 'imageFile', e.target.files?.[0] || null)}
-                    />
-                  </label>
-                  {q.imageFile && (
+                    <span>{q.imageFile || q.imageUrl ? "Ganti Gambar" : "Tambah Gambar"}</span>
+                  </button>
+                  {(q.imageFile || q.imageUrl) && (
                     <div className="flex items-center gap-1.5 border l-2 pl-2">
-                      <img src={URL.createObjectURL(q.imageFile)} className="h-7 w-auto rounded border" alt="Preview" />
-                      <Button variant="ghost" size="icon" onClick={() => updateBatchItem(index, 'imageFile', null)} className="h-5 w-5 text-red-400 hover:text-red-500 hover:bg-red-50 p-0"><Trash className="h-3 w-3" /></Button>
+                      <img src={q.imageFile ? URL.createObjectURL(q.imageFile) : q.imageUrl} className="h-7 w-auto rounded border" alt="Preview" />
+                      <Button variant="ghost" size="icon" onClick={() => { updateBatchItem(index, 'imageFile', null); updateBatchItem(index, 'imageUrl', ''); }} className="h-5 w-5 text-red-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 p-0"><Trash className="h-3 w-3" /></Button>
                     </div>
                   )}
                 </div>
@@ -1004,12 +1227,12 @@ const QuestionsPage = () => {
                         placeholder={`Pil ${letter.toUpperCase()}`}
                         value={q.choices[letter].text}
                         onChange={(e) => updateBatchChoice(index, letter, e.target.value)}
-                        className={`w-full text-xs p-2 rounded-lg border border-slate-200/80 focus:outline-none focus:ring-1 focus:ring-blue-600 pr-8 ${q.correctKey === letter ? "bg-green-50/80 border-green-200 font-medium text-green-800" : ""}`}
+                        className={`w-full text-xs p-2 rounded-lg border border-slate-200/80 dark:border-slate-800/80 focus:outline-none focus:ring-1 focus:ring-blue-600 pr-8 ${q.correctKey === letter ? "bg-green-50/80 dark:bg-green-950/40 border-green-200 dark:border-green-800 font-medium text-green-800 dark:text-green-400" : "bg-card dark:bg-slate-900 text-slate-700 dark:text-slate-200"}`}
                       />
                       <button
                         type="button"
                         onClick={() => updateBatchItem(index, 'correctKey', letter)}
-                        className={`absolute right-1.5 top-1.5 h-5 w-5 rounded-full flex items-center justify-center border text-[10px] font-bold ${q.correctKey === letter ? "bg-green-600 text-white border-transparent" : "bg-white text-slate-400 border-slate-200"}`}
+                        className={`absolute right-1.5 top-1.5 h-5 w-5 rounded-full flex items-center justify-center border text-[10px] font-bold transition-all ${q.correctKey === letter ? "bg-green-600 text-white border-transparent" : "bg-card dark:bg-slate-800 text-slate-400 dark:text-slate-500 border-slate-200 dark:border-slate-800"}`}
                       >
                         {letter.toUpperCase()}
                       </button>
@@ -1027,8 +1250,8 @@ const QuestionsPage = () => {
           </div>
 
           <DialogFooter className="pt-2">
-            <Button variant="outline" onClick={() => setIsBatchModalOpen(false)}>Batal</Button>
-            <Button onClick={handleSaveBatch} disabled={isSavingBatch} className="bg-blue-600 hover:bg-blue-700">
+            <Button variant="outline" onClick={() => setIsBatchModalOpen(false)} className="border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800">Batal</Button>
+            <Button onClick={handleSaveBatch} disabled={isSavingBatch} className="bg-blue-50 hover:bg-blue-100 border border-blue-100 dark:bg-blue-900/40 dark:text-blue-400 dark:hover:bg-blue-900/60 dark:border-blue-800/20 text-blue-700 font-semibold">
               {isSavingBatch ? "Menyimpan..." : `Simpan ${batchQuestions.length} Soal`}
             </Button>
           </DialogFooter>
@@ -1066,6 +1289,76 @@ const QuestionsPage = () => {
         description={confirmModal.description}
         type={confirmModal.type}
         confirmLabel={confirmModal.confirmLabel}
+      />
+      <Dialog open={isGalleryOpen} onOpenChange={setIsGalleryOpen}>
+        <DialogContent className="max-w-3xl bg-card max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Galeri Media Ujian</DialogTitle>
+          </DialogHeader>
+          <div className="pt-2">
+            {galleryImages.length === 0 ? (
+              <div className="text-center p-8 text-slate-400 text-sm">Belum ada gambar yang bisa digunakan di ujian ini.</div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {galleryImages.map((src, idx) => (
+                  <div
+                    key={idx}
+                    onClick={() => handlePickGallery(src)}
+                    className="group relative border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden cursor-pointer hover:border-blue-500 dark:hover:border-blue-400 transition-all bg-slate-50 dark:bg-slate-900 flex items-center justify-center p-2 h-28"
+                  >
+                    <img src={src} alt="Media" className="max-h-full max-w-full object-contain transition-transform group-hover:scale-105" />
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all">
+                      <span className="text-white text-xs font-semibold bg-blue-600 px-2 py-1 rounded-md">Gunakan</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={isPickerOpen} onOpenChange={setIsPickerOpen}>
+        <DialogContent className="max-w-sm bg-card p-4">
+          <DialogHeader>
+            <DialogTitle className="text-sm font-bold">Pilih Sumber Gambar</DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col gap-2 pt-2">
+            <button
+              type="button"
+              className="flex items-center gap-2.5 justify-start p-3 w-full rounded-xl bg-slate-50/80 hover:bg-slate-100 dark:bg-slate-900/50 dark:hover:bg-slate-800 border border-slate-200/80 dark:border-slate-800 transition-all text-slate-700 dark:text-slate-200"
+              onClick={() => globalFileInputRef.current?.click()}
+            >
+              <div className="p-2 rounded-lg bg-purple-50 dark:bg-purple-950/40 border border-purple-100 dark:border-purple-800/40 text-purple-600 dark:text-purple-400">
+                <Image className="h-4 w-4" />
+              </div>
+              <div className="flex flex-col items-start">
+                  <span className="font-semibold text-xs">Unggah Dari Komputer</span>
+                  <span className="text-[10px] text-slate-400">File foto maksimal 2MB</span>
+              </div>
+            </button>
+            <button
+              type="button"
+              className="flex items-center gap-2.5 justify-start p-3 w-full rounded-xl bg-slate-50/80 hover:bg-slate-100 dark:bg-slate-900/50 dark:hover:bg-slate-800 border border-slate-200/80 dark:border-slate-800 transition-all text-slate-700 dark:text-slate-200"
+              onClick={() => { setIsPickerOpen(false); setIsGalleryOpen(true); loadGalleryImages(); }}
+            >
+              <div className="p-2 rounded-lg bg-blue-50 dark:bg-blue-950/40 border border-blue-100 dark:border-blue-800/40 text-blue-600 dark:text-blue-400">
+                <FolderOpen className="h-4 w-4" />
+              </div>
+              <div className="flex flex-col items-start">
+                  <span className="font-semibold text-xs">Ambil Dari Galeri</span>
+                  <span className="text-[10px] text-slate-400">Gunakan file yang sudah di-upload</span>
+              </div>
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <input
+        type="file"
+        ref={globalFileInputRef}
+        accept="image/*"
+        className="hidden"
+        onChange={handleGlobalFileSelect}
       />
     </div>
   );

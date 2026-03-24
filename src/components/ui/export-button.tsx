@@ -42,12 +42,13 @@ export const ExportButton: React.FC<ExportButtonProps> = ({
       onClick={handleExport}
       disabled={isLoading}
       variant="outline"
+      size="sm"
       className={cn(
-        "bg-green-50 text-green-600 hover:bg-green-100 border-green-200 dark:bg-green-950 dark:text-green-400 dark:hover:bg-green-900 dark:border-green-600",
+        "bg-green-50 text-green-600 hover:bg-green-100 border-green-100 dark:bg-green-900/10 dark:text-green-400 dark:hover:bg-green-900/30 dark:border-slate-800 rounded-xl font-semibold shadow-sm",
         className
       )}
     >
-      <Download className="mr-2 h-4 w-4" />
+      <Download className="mr-1 h-3.5 w-3.5" />
       {isLoading ? "Mengekspor..." : label}
     </Button>
   );
