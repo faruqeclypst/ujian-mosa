@@ -173,6 +173,14 @@ const CBTPage = () => {
             }
           });
 
+          // 🛡️ Urutkan loadedQuestions berdasarkan createdAt & ID agar stabil di cluster
+          loadedQuestions.sort((a: any, b: any) => {
+            const timeA = a.createdAt || 0;
+            const timeB = b.createdAt || 0;
+            if (timeA !== timeB) return timeA - timeB;
+            return a.id.localeCompare(b.id);
+          });
+
           // ⚡ Helper Acak Soal Berkelompok (Literasi)
           const clusterShuffleIds = (list: string[]): string[] => {
             const grouped: Record<string, string[]> = {};
@@ -241,6 +249,16 @@ const CBTPage = () => {
           // Sort loadedQuestions based on order SAFELY
           const sorted = order.map((id) => loadedQuestions.find((q) => q.id === id)).filter((q): q is Question => !!q);
           setQuestions(sorted);
+
+          // 🛡️ Load currentQuestionIndex dari sessionStorage
+          const indexKey = `currentIndex_${siswa?.nisn}_${roomId}`;
+          const savedIndex = sessionStorage.getItem(indexKey);
+          if (savedIndex) {
+            const idx = parseInt(savedIndex, 10);
+            if (idx >= 0 && idx < sorted.length) {
+              setCurrentQuestionIndex(idx);
+            }
+          }
         }
 
       } catch (err) {
@@ -401,6 +419,14 @@ const CBTPage = () => {
     };
   }, []);
 
+  // 🛡️ Simpan currentQuestionIndex ke sessionStorage setiap kali berganti soal
+  useEffect(() => {
+    if (siswa && roomId) {
+      const indexKey = `currentIndex_${siswa.nisn}_${roomId}`;
+      sessionStorage.setItem(indexKey, currentQuestionIndex.toString());
+    }
+  }, [currentQuestionIndex, siswa, roomId]);
+
   const toggleFlag = (qId: string) => {
     const flagKey = `flags_${siswa?.nisn}_${roomId}`;
     setFlaggedQuestions((prev) => {
@@ -467,6 +493,7 @@ const CBTPage = () => {
       // Clear layout triggers
       sessionStorage.removeItem(`order_${siswa.nisn}_${roomId}`);
       sessionStorage.removeItem(`ans_${siswa.nisn}_${roomId}`);
+      sessionStorage.removeItem(`currentIndex_${siswa.nisn}_${roomId}`);
 
       navigate(`/cbt/${roomId}/result`);
     } catch (err) {
@@ -555,7 +582,7 @@ const CBTPage = () => {
             <Card className="rounded-xl border shadow-sm">
               <CardHeader className="p-4 pb-2">
                 <div className="flex justify-between items-center">
-                  <span className="text-sm font-semibold text-slate-400">Soal No. {currentQuestionIndex + 1} / {questions.length}</span>
+                  <div className="text-sm font-semibold text-slate-400"></div>
                   {currentQuestion && (
                     <Button 
                       variant="ghost" 

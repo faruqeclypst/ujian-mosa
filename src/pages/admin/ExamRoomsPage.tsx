@@ -216,14 +216,24 @@ const ExamRoomsPage = () => {
 
 
 
+  const [currentBucket, setCurrentBucket] = useState<number>(Math.floor(Date.now() / 300000));
+
   useEffect(() => {
     const timer = setInterval(() => {
       const now = Date.now();
-      const nextBucket = Math.ceil(now / 300000) * 300000;
-      setMonitorTimeLeft(Math.floor((nextBucket - now) / 1000));
+      const bucket = Math.floor(now / 300000);
+      setCurrentBucket(bucket);
+      setMonitorTimeLeft(Math.floor(((bucket + 1) * 300000 - now) / 1000));
     }, 1000);
     return () => clearInterval(timer);
   }, []);
+
+  // 🔄 Automated refresh saat bucket (5-menit) berganti
+  useEffect(() => {
+    if (isMonitorOpen && monitorRoom) {
+      handleManualRefreshMonitor();
+    }
+  }, [currentBucket]);
 
   const showAlert = (title: string, description: string, type: "success" | "danger" | "warning" | "info" = "info") => {
     setConfirmDialog({
