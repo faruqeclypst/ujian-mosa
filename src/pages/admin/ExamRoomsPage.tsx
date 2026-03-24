@@ -1110,58 +1110,49 @@ const ExamRoomsPage = () => {
                 <Input type="datetime-local" value={formValues.end_time} onChange={(e) => setFormValues({ ...formValues, end_time: e.target.value })} required />
               </FormField>
             </div>
-            <FormField id="token" label="Token Ujian (Akses Masuk)" error={undefined}>
-              <div className="flex gap-1.5 focus-within:z-10">
-                <Input 
-                  type="text" 
-                  placeholder="Contoh: ABS12" 
-                  value={formValues.token || ""} 
-                  onChange={(e) => setFormValues({ ...formValues, token: e.target.value.toUpperCase() })} 
-                  required 
-                  className="font-bold tracking-widest text-center"
-                  maxLength={10}
-                />
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  className="shrink-0 h-10 px-3 cursor-pointer bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-800 text-xs font-bold"
-                  onClick={() => {
-                    const newToken = Math.random().toString(36).substring(2, 7).toUpperCase();
-                    setFormValues({ ...formValues, token: newToken });
-                  }}
-                >
-                  Acak Token
-                </Button>
-              </div>
-              <p className="text-slate-400 text-[10px] mt-1">Siswa membutuhkan token baku ini untuk masuk ke dalam ruang ujian Anda.</p>
-            </FormField>
 
-            <div className="pt-2 border-t mt-4">
-              <button
-                type="button"
-                onClick={() => setShowAdvanced(!showAdvanced)}
-                className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1 focus:outline-none"
-              >
-                {showAdvanced ? "Sembunyikan Pengaturan Lanjutan -" : "Tampilkan Pengaturan Lanjutan +"}
-              </button>
-            </div>
-
-            {showAdvanced && (
-              <div className="space-y-4 pt-1">
-                <div className="grid grid-cols-2 gap-3">
-                  <FormField id="duration" label="Durasi (Menit)" error={undefined}>
-                    <Input type="number" value={formValues.duration} onChange={(e) => setFormValues({ ...formValues, duration: Number(e.target.value) })} required />
-                  </FormField>
-                  <FormField id="cheat_limit" label="Batas Cheat" error={undefined}>
-                    <Input type="number" value={formValues.cheat_limit} onChange={(e) => setFormValues({ ...formValues, cheat_limit: Number(e.target.value) })} required />
-                  </FormField>
+            {dialogMode === "create" && (
+              <FormField id="token" label="Token Ujian (Akses Masuk)" error={undefined}>
+                <div className="flex gap-1.5 focus-within:z-10">
+                  <Input 
+                    type="text" 
+                    placeholder="Contoh: ABS12" 
+                    value={formValues.token || ""} 
+                    onChange={(e) => setFormValues({ ...formValues, token: e.target.value.toUpperCase() })} 
+                    required 
+                    className="font-bold tracking-widest text-center"
+                    maxLength={10}
+                  />
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    className="shrink-0 h-10 px-3 cursor-pointer bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-800 text-xs font-bold"
+                    onClick={() => {
+                      const newToken = Math.random().toString(36).substring(2, 7).toUpperCase();
+                      setFormValues({ ...formValues, token: newToken });
+                    }}
+                  >
+                    Acak Token
+                  </Button>
                 </div>
-                <FormField id="submit_window" label="Kumpul Dibuka (Sisa Menit)" error={undefined}>
-                  <Input type="number" placeholder="Contoh: 10 (Tombol kumpul aktif 10 menit sebelum berakhir)" value={formValues.submit_window || ""} onChange={(e) => setFormValues({ ...formValues, submit_window: Number(e.target.value) })} />
-                  <p className="text-slate-400 text-xs mt-1">Isi 0 jika selalu diijinkan.</p>
+                <p className="text-slate-400 text-[10px] mt-1">Siswa membutuhkan token baku ini untuk masuk ke dalam ruang ujian Anda.</p>
+              </FormField>
+            )}
+
+            <div className="space-y-4 pt-1 border-t mt-4">
+              <div className="grid grid-cols-2 gap-3 mt-2">
+                <FormField id="duration" label="Durasi (Menit)" error={undefined}>
+                  <Input type="number" value={formValues.duration} onChange={(e) => setFormValues({ ...formValues, duration: Number(e.target.value) })} required />
+                </FormField>
+                <FormField id="cheat_limit" label="Batas Cheat" error={undefined}>
+                  <Input type="number" value={formValues.cheat_limit} onChange={(e) => setFormValues({ ...formValues, cheat_limit: Number(e.target.value) })} required />
                 </FormField>
               </div>
-            )}
+              <FormField id="submit_window" label="Kumpul Dibuka (Sisa Menit)" error={undefined}>
+                <Input type="number" placeholder="Contoh: 10 (Tombol kumpul aktif 10 menit sebelum berakhir)" value={formValues.submit_window || ""} onChange={(e) => setFormValues({ ...formValues, submit_window: Number(e.target.value) })} />
+                <p className="text-slate-400 text-xs mt-1">biarkan kosong agar siswa dapat mengumpulkan selama ujian berjalan</p>
+              </FormField>
+            </div>
 
             <DialogFooter className="pt-2">
               <Button type="submit" className="w-full bg-blue-50 hover:bg-blue-100 border border-blue-100 dark:bg-blue-900/40 dark:text-blue-400 dark:hover:bg-blue-900/60 dark:border-blue-800/40 text-blue-700">{dialogMode === "edit" ? "Perbarui" : "Simpan"}</Button>

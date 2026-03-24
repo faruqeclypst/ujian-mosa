@@ -9,6 +9,8 @@ import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { ThemeToggle } from "../ui/theme-toggle";
 import { cn } from "../../lib/utils";
+import { database } from "../../lib/firebase";
+import { ref, onValue, get, update } from "firebase/database";
 
 const TopNavigation = () => {
   const { user, signOut, usernameFromEmail } = useAuth();
@@ -57,6 +59,74 @@ const TopNavigation = () => {
     };
   }, []);
 
+  const [universalToken, setUniversalToken] = useState<string>("");
+  const [tokenUpdatedAt, setTokenUpdatedAt] = useState<number | null>(null);
+  const [timeLeft, setTimeLeft] = useState<string>("");
+
+  useEffect(() => {
+    const tokenRef = ref(database, "settings/universal_token");
+    const unsub1 = onValue(tokenRef, (snapshot) => {
+      if (snapshot.exists()) {
+        setUniversalToken(snapshot.val());
+      } else {
+        setUniversalToken("");
+      }
+    });
+
+    const tokenUpdatedAtRef = ref(database, "settings/universal_token_updated_at");
+    const unsub2 = onValue(tokenUpdatedAtRef, (snapshot) => {
+      if (snapshot.exists()) {
+        setTokenUpdatedAt(snapshot.val());
+      } else {
+        setTokenUpdatedAt(null);
+      }
+    });
+
+    return () => {
+      unsub1();
+      unsub2();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!tokenUpdatedAt) return;
+
+    const timer = setInterval(() => {
+      const now = Date.now();
+      const nextUpdate = tokenUpdatedAt + 5 * 60 * 1000;
+      const diff = nextUpdate - now;
+
+      if (diff <= 0) {
+        setTimeLeft("00:00");
+        const rotateToken = async () => {
+          try {
+            const snap = await get(ref(database, "settings/universal_token_updated_at"));
+            const lastFirebaseUpdate = snap.exists() ? snap.val() : 0;
+            const nowCheck = Date.now();
+
+            if (nowCheck - lastFirebaseUpdate >= 5 * 60 * 1000) {
+              const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+              let token = "";
+              for (let i = 0; i < 6; i++) {
+                token += chars.charAt(Math.floor(Math.random() * chars.length));
+              }
+              await update(ref(database, "settings"), {
+                universal_token: token,
+                universal_token_updated_at: nowCheck
+              });
+            }
+          } catch (e) { }
+        };
+        rotateToken();
+      } else {
+        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+        setTimeLeft(`${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`);
+      }
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [tokenUpdatedAt]);
+
   return (
     <header className="flex w-full items-center gap-3 sm:gap-4 border-b bg-card/95 backdrop-blur-sm px-4 sm:px-6 py-3 sm:py-4 shadow-sm shrink-0 relative z-30">
       <Button
@@ -70,6 +140,15 @@ const TopNavigation = () => {
       </Button>
       <div className="flex-1" />
 
+      {/* Universal Token */}
+      {universalToken && (
+        <div className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/40 rounded-lg text-amber-700 dark:text-amber-400 shadow-sm">
+          {/* <span className="text-[10px] font-bold uppercase tracking-wider">Token</span> */}
+          <span className="text-xs sm:text-sm font-black font-mono tracking-widest tabular-nums">{universalToken}</span>
+          {timeLeft && <span className="text-[10px] font-medium text-amber-600 dark:text-amber-500 opacity-80 border-l pl-1.5 border-amber-200 dark:border-amber-800/40">{timeLeft}</span>}
+        </div>
+      )}
+
       {/* Live Clock */}
       {currentTime && (
         <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 rounded-lg text-slate-600 dark:text-slate-300 shadow-sm">
@@ -81,7 +160,7 @@ const TopNavigation = () => {
       <div className="flex items-center gap-2 sm:gap-3 shrink-0">
         {/* Theme Toggle */}
         <ThemeToggle />
-        
+
         <div className="hidden text-right md:flex md:flex-col min-w-0">
           <span className="text-sm font-medium text-foreground truncate">{displayName}</span>
           <span className="text-xs text-muted-foreground truncate">{user?.email ?? ""}</span>

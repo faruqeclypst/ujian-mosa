@@ -1,4 +1,4 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 
 import InventoryLayout from "./components/layout/InventoryLayout";
@@ -18,6 +18,8 @@ import SiswaLoginPage from "./pages/siswa/SiswaLoginPage";
 import SiswaDashboardPage from "./pages/siswa/SiswaDashboardPage";
 import CBTPage from "./pages/siswa/CBTPage";
 import ExamResultPage from "./pages/siswa/ExamResultPage";
+import { database } from "./lib/firebase";
+import { ref, onValue } from "firebase/database";
 
 const DashboardPage = lazy(() => import("./pages/DashboardPage"));
 const GuruPage = lazy(() => import("./pages/GuruPage"));
@@ -46,6 +48,20 @@ const AppContent = () => {
   const { user, loading } = useAuth();
   const { siswa } = useSiswaAuth();
   const location = useLocation();
+
+  useEffect(() => {
+    const configRef = ref(database, "settings/school");
+    return onValue(configRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.val();
+        if (data.name) {
+          document.title = `E-Ujian - ${data.name}`;
+        } else {
+          document.title = "E-Ujian";
+        }
+      }
+    });
+  }, []);
 
   if (loading) {
     return <LoadingScreen />;

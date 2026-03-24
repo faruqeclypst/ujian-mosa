@@ -1320,20 +1320,39 @@ const QuestionsPage = () => {
             <DialogTitle>Pratinjau Soal</DialogTitle>
           </DialogHeader>
           {previewQuestion && (
-            <div className="space-y-4 pt-2">
-              <div>
+            <Card className="rounded-xl border shadow-sm mt-3">
+              <CardHeader className="p-4 pb-2">
+                {/* 🛡️ Header Label untuk Literasi */}
+                <div className="text-sm font-semibold text-slate-400 mb-2">
+                  {previewQuestion.groupId && (() => {
+                    const groupQuestions = questions.filter(q => q.groupId === previewQuestion.groupId);
+                    const indexInGroup = groupQuestions.findIndex(q => q.id === previewQuestion.id) + 1;
+                    return (
+                      <span className="text-blue-600 dark:text-blue-400 font-bold text-xs">
+                        {previewQuestion.groupId} - Soal {indexInGroup > 0 ? indexInGroup : 1}
+                      </span>
+                    );
+                  })()}
+                </div>
+
                 {/* 🔖 Render Literasi Jika Tergabung dalam Grup (Seperti di CBT Siswa) */}
                 {previewQuestion.groupId && (() => {
                   const firstInGroup = questions.find(q => q.groupId === previewQuestion.groupId);
                   if (firstInGroup) {
                     const textToShow = firstInGroup.groupText || firstInGroup.text;
                     if (!textToShow) return null;
+                    const hasCover = firstInGroup.imageUrl;
 
                     return (
                       <div className="bg-blue-50/20 dark:bg-blue-950/10 p-4 rounded-xl border border-dashed border-blue-200 dark:border-blue-800/40 mb-3 space-y-2">
                         <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 bg-blue-50/80 dark:bg-blue-900/20 px-2 py-0.5 rounded-md border border-blue-200 dark:border-blue-800/40 w-fit block">Wacana Literasi</span>
+                        {hasCover && (
+                          <div className="mt-2">
+                            <img src={firstInGroup.imageUrl} className="max-w-sm h-auto mx-auto block rounded-lg border shadow-sm" alt="Cover Literasi" />
+                          </div>
+                        )}
                         <div 
-                          className="text-sm leading-relaxed text-slate-700 dark:text-slate-300 [&_img]:max-w-sm [&_img]:mx-auto [&_img]:block font-medium p-0 [&_ol]:list-decimal [&_ul]:list-disc [&_ol]:pl-5 [&_ul]:pl-5 ql-editor" 
+                          className={`text-sm sm:text-base leading-relaxed text-slate-700 dark:text-slate-300 [&_img]:max-w-sm [&_img]:mx-auto [&_img]:block font-medium p-0 [&_ol]:list-decimal [&_ul]:list-disc [&_ol]:pl-5 [&_ul]:pl-5 [&_ol]:my-2 [&_ul]:my-2 ql-editor ${hasCover ? "[&_img]:hidden" : ""}`} 
                           dangerouslySetInnerHTML={{ __html: textToShow }} 
                         />
                       </div>
@@ -1342,34 +1361,48 @@ const QuestionsPage = () => {
                   return null;
                 })()}
 
-                <div className={`ql-editor font-normal text-slate-800 dark:text-white break-words [&_p]:mb-1 [&_ol]:list-decimal [&_ul]:list-disc [&_ol]:pl-5 [&_ul]:pl-5 ${previewQuestion.imageUrl ? "[&_img]:hidden" : ""}`} dangerouslySetInnerHTML={{ __html: previewQuestion.text }} />
+                {/* Question Text */}
+                <div 
+                  className={`ql-editor font-normal text-slate-800 dark:text-white break-words [&_p]:mb-1 [&_ol]:list-decimal [&_ul]:list-disc [&_ol]:pl-5 [&_ul]:pl-5 ${previewQuestion.imageUrl ? "[&_img]:hidden" : ""}`} 
+                  dangerouslySetInnerHTML={{ __html: previewQuestion.text }} 
+                />
+                
                 {previewQuestion.imageUrl && (
                   <div className="mt-2">
                     <img src={previewQuestion.imageUrl} alt="Gambar Soal" className="max-w-md h-auto rounded-xl border border-slate-200 shadow-sm" />
                   </div>
                 )}
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
-                {Object.keys(previewQuestion.choices || {}).map((cKey) => {
+              </CardHeader>
+              
+              <CardContent className="p-4 pt-0 space-y-2.5">
+                {Object.keys(previewQuestion.choices || {}).map((cKey, idx) => {
                   const choice = previewQuestion.choices[cKey];
                   return (
-                    <div key={cKey} className={`p-3 rounded-xl border flex items-center justify-between ${choice.isCorrect ? "bg-green-50/80 dark:bg-green-950/40 border-green-200 dark:border-green-800/40 text-green-800 dark:text-green-400 font-medium" : "bg-slate-50/50 dark:bg-slate-900/40 border-slate-100 dark:border-slate-800/40 text-slate-700 dark:text-slate-300"
+                    <div 
+                      key={cKey} 
+                      className={`w-full text-left p-3 rounded-xl border flex items-center gap-3 transition-all ${
+                        choice.isCorrect 
+                          ? "bg-green-50/80 dark:bg-green-950/40 border-green-200 shadow-sm text-green-700 dark:text-green-400 font-bold" 
+                          : "bg-card border-slate-200 text-slate-700 dark:text-slate-200"
+                      }`}
+                    >
+                      <div className={`w-6 h-6 rounded-full border flex items-center justify-center font-bold text-sm ${
+                        choice.isCorrect ? "bg-green-600 border-green-600 text-white" : "border-slate-300 text-slate-500 dark:text-slate-400"
                       }`}>
-                      <div className="flex items-start gap-3 flex-1 min-w-0">
-                        <span className="font-bold text-slate-400 mt-0.5">{cKey.toUpperCase()}.</span>
-                        <div className="flex flex-col gap-2 flex-1 min-w-0">
-                          <div className="break-words leading-relaxed [&_p]:m-0 ql-editor p-0 font-normal text-inherit" dangerouslySetInnerHTML={{ __html: choice.text }} />
-                          {choice.imageUrl && (
-                            <img src={choice.imageUrl} alt={`Pilihan ${cKey.toUpperCase()}`} className="max-w-[180px] h-auto rounded-lg border border-slate-200/60 shadow-sm" />
-                          )}
-                        </div>
+                        {String.fromCharCode(65 + idx)}
+                      </div>
+                      <div className="flex-1 text-sm font-medium">
+                        <div className={`break-words ql-editor p-0 [&_img]:max-w-[200px] [&_img]:h-auto [&_img]:rounded-lg [&_img]:mt-1 text-inherit ${choice.isCorrect ? "font-bold" : "font-normal"}`} dangerouslySetInnerHTML={{ __html: choice.text }} />
+                        {choice.imageUrl && (
+                          <img src={choice.imageUrl} alt={`Pilihan ${cKey.toUpperCase()}`} className="max-h-[150px] w-auto rounded-lg mt-1 border" />
+                        )}
                       </div>
                       {choice.isCorrect && <Check className="h-4 w-4 text-green-600 shrink-0 ml-2" />}
                     </div>
                   );
                 })}
-              </div>
-            </div>
+              </CardContent>
+            </Card>
           )}
         </DialogContent>
       </Dialog>

@@ -134,6 +134,22 @@ body {
   margin-left: auto !important;
 }
 
+/* 📝 Quill Indentation Utilities untuk Pratinjau & Lembar Ujian */
+.ql-editor .ql-indent-1 { padding-left: 3em !important; }
+.ql-editor .ql-indent-2 { padding-left: 6em !important; }
+.ql-editor .ql-indent-3 { padding-left: 9em !important; }
+.ql-editor .ql-indent-4 { padding-left: 12em !important; }
+.ql-editor .ql-indent-5 { padding-left: 15em !important; }
+.ql-editor .ql-indent-6 { padding-left: 18em !important; }
+.ql-editor .ql-indent-7 { padding-left: 21em !important; }
+.ql-editor .ql-indent-8 { padding-left: 24em !important; }
+
+/* Menangani indentasi untuk list items */
+.ql-editor li.ql-indent-1 { padding-left: 4.5em !important; }
+.ql-editor li.ql-indent-2 { padding-left: 7.5em !important; }
+.ql-editor li.ql-indent-3 { padding-left: 10.5em !important; }
+.ql-editor li.ql-indent-4 { padding-left: 13.5em !important; }
+
 /* 📝 Perkuat cetak tebal (Bold) pada soal & pilihan jawaban agar terbaca jelas di mobile */
 .ql-editor strong, .ql-editor b {
   font-weight: 800 !important;
