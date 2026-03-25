@@ -19,6 +19,7 @@ import "react-quill/dist/quill.snow.css";
 
 Quill.register("modules/imageResize", ImageResize);
 import { usePiket } from "../../context/PiketContext";
+import { useAuth } from "../../context/AuthContext";
 import { DataTable } from "../../components/ui/data-table";
 export interface QuestionData {
   id: string;
@@ -133,6 +134,7 @@ const columns = [
 const QuestionsPage = () => {
   const { examId } = useParams<{ examId: string }>();
   const navigate = useNavigate();
+  const { role, teacherId } = useAuth();
   const { mapels, teachers } = usePiket();
 
   const [exam, setExam] = useState<any>(null);
@@ -950,49 +952,52 @@ const QuestionsPage = () => {
           </div>
         </div>
         <div className="flex gap-2">
-          <div className="relative" ref={importRef}>
-            <Button
-              onClick={() => setIsImportMenuOpen(!isImportMenuOpen)}
-              variant="secondary"
-              size="lg"
-              className="rounded-xl bg-indigo-50 text-indigo-600 hover:bg-indigo-100 border border-indigo-100 dark:bg-indigo-900/30 dark:text-indigo-400 dark:hover:bg-indigo-900/50 dark:border-indigo-800/30 shadow-sm font-semibold"
-            >
-              Import <ChevronDown className={`ml-1 h-4 w-4 transition-transform ${isImportMenuOpen ? "rotate-180" : ""}`} />
-            </Button>
+          {/* Tombol Import hanya untuk owner atau admin */}
+          {(role === "admin" || exam?.teacherId === teacherId) && (
+            <div className="relative" ref={importRef}>
+              <Button
+                onClick={() => setIsImportMenuOpen(!isImportMenuOpen)}
+                variant="secondary"
+                size="lg"
+                className="rounded-xl bg-indigo-50 text-indigo-600 hover:bg-indigo-100 border border-indigo-100 dark:bg-indigo-900/30 dark:text-indigo-400 dark:hover:bg-indigo-900/50 dark:border-indigo-800/30 shadow-sm font-semibold"
+              >
+                Import <ChevronDown className={`ml-1 h-4 w-4 transition-transform ${isImportMenuOpen ? "rotate-180" : ""}`} />
+              </Button>
 
-            {isImportMenuOpen && (
-              <div className="absolute right-0 mt-2 w-64 bg-card border border-slate-200 dark:border-slate-800 rounded-xl shadow-lg z-20 p-1 flex flex-col gap-1 animate-in fade-in duration-150">
-                <ImportButton
-                  onImport={(file) => {
-                    setIsImportMenuOpen(false);
-                    handleImportWord(file);
-                  }}
-                  isLoading={isImporting}
-                  label="Upload file Word"
-                  accept=".docx"
-                  variant="item"
-                />
-                <a
-                  href="/templates/Template_Soal.docx"
-                  download="Template_Soal.docx"
-                  onClick={() => setIsImportMenuOpen(false)}
-                  className="flex items-center gap-2 p-2 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-sm rounded-lg transition-all"
-                >
-                  Download Template
-                </a>
-                <a
-                  href="/templates/Template_Soal_Tabel.docx"
-                  download="Template_Soal_Tabel.docx"
-                  onClick={() => setIsImportMenuOpen(false)}
-                  className="flex items-center gap-2 p-2 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-sm rounded-lg transition-all"
-                >
-                  Download Template (Format Tabel)
-                </a>
-              </div>
-            )}
-          </div>
+              {isImportMenuOpen && (
+                <div className="absolute right-0 mt-2 w-64 bg-card border border-slate-200 dark:border-slate-800 rounded-xl shadow-lg z-20 p-1 flex flex-col gap-1 animate-in fade-in duration-150">
+                  <ImportButton
+                    onImport={(file) => {
+                      setIsImportMenuOpen(false);
+                      handleImportWord(file);
+                    }}
+                    isLoading={isImporting}
+                    label="Upload file Word"
+                    accept=".docx"
+                    variant="item"
+                  />
+                  <a
+                    href="/templates/Template_Soal.docx"
+                    download="Template_Soal.docx"
+                    onClick={() => setIsImportMenuOpen(false)}
+                    className="flex items-center gap-2 p-2 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-sm rounded-lg transition-all"
+                  >
+                    Download Template
+                  </a>
+                  <a
+                    href="/templates/Template_Soal_Tabel.docx"
+                    download="Template_Soal_Tabel.docx"
+                    onClick={() => setIsImportMenuOpen(false)}
+                    className="flex items-center gap-2 p-2 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-sm rounded-lg transition-all"
+                  >
+                    Download Template (Format Tabel)
+                  </a>
+                </div>
+              )}
+            </div>
+          )}
 
-          {questions.length > 0 && (
+          {questions.length > 0 && (role === "admin" || exam?.teacherId === teacherId) && (
             <Button
               onClick={() => setDeleteAllDialogOpen(true)}
               variant="secondary"
@@ -1003,41 +1008,43 @@ const QuestionsPage = () => {
             </Button>
           )}
 
-          <div className="relative" ref={tambahRef}>
-            <Button
-              onClick={() => setIsTambahMenuOpen(!isTambahMenuOpen)}
-              variant="secondary"
-              size="lg"
-              className="rounded-xl bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 dark:border-blue-800/20 shadow-sm font-semibold flex items-center gap-1"
-            >
-              Tambah <ChevronDown className={`h-4 w-4 transition-transform ${isTambahMenuOpen ? "rotate-180" : ""}`} />
-            </Button>
+          {(role === "admin" || exam?.teacherId === teacherId) && (
+            <div className="relative" ref={tambahRef}>
+              <Button
+                onClick={() => setIsTambahMenuOpen(!isTambahMenuOpen)}
+                variant="secondary"
+                size="lg"
+                className="rounded-xl bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 dark:border-blue-800/20 shadow-sm font-semibold flex items-center gap-1"
+              >
+                Tambah <ChevronDown className={`h-4 w-4 transition-transform ${isTambahMenuOpen ? "rotate-180" : ""}`} />
+              </Button>
 
-            {isTambahMenuOpen && (
-              <div className="absolute right-0 mt-2 w-48 bg-card border border-slate-200 dark:border-slate-800 rounded-xl shadow-lg z-20 p-1 flex flex-col gap-0.5 animate-in fade-in duration-150">
-                <button
-                  onClick={() => {
-                    setIsTambahMenuOpen(false);
-                    handleCreateClick();
-                  }}
-                  className="flex items-center gap-2.5 p-2 px-3 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 text-sm rounded-lg transition-all font-medium text-left"
-                >
-                  <Plus className="h-4 w-4 text-blue-500" />
-                  Tambah Soal
-                </button>
-                <button
-                  onClick={() => {
-                    setIsTambahMenuOpen(false);
-                    handleBatchCreateClick();
-                  }}
-                  className="flex items-center gap-2.5 p-2 px-3 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 text-sm rounded-lg transition-all font-medium text-left"
-                >
-                  <Plus className="h-4 w-4 text-purple-500" />
-                  Tambah Batch
-                </button>
-              </div>
-            )}
-          </div>
+              {isTambahMenuOpen && (
+                <div className="absolute right-0 mt-2 w-48 bg-card border border-slate-200 dark:border-slate-800 rounded-xl shadow-lg z-20 p-1 flex flex-col gap-0.5 animate-in fade-in duration-150">
+                  <button
+                    onClick={() => {
+                      setIsTambahMenuOpen(false);
+                      handleCreateClick();
+                    }}
+                    className="flex items-center gap-2.5 p-2 px-3 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 text-sm rounded-lg transition-all font-medium text-left"
+                  >
+                    <Plus className="h-4 w-4 text-blue-500" />
+                    Tambah Soal
+                  </button>
+                  <button
+                    onClick={() => {
+                      setIsTambahMenuOpen(false);
+                      handleBatchCreateClick();
+                    }}
+                    className="flex items-center gap-2.5 p-2 px-3 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 text-sm rounded-lg transition-all font-medium text-left"
+                  >
+                    <Plus className="h-4 w-4 text-purple-500" />
+                    Tambah Batch
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -1073,19 +1080,34 @@ const QuestionsPage = () => {
                       <Button
                         variant="secondary"
                         size="sm"
-                        className="bg-green-50 text-green-700 hover:bg-green-100 border border-green-100 dark:bg-green-900/10 dark:text-green-400 dark:hover:bg-green-900/30 dark:border-green-800/40 h-7 text-xs"
-                        onClick={() => handleEditClick(q)}
+                        className="bg-sky-50 text-sky-700 hover:bg-sky-100 border border-sky-100 dark:bg-sky-900/10 dark:text-sky-400 dark:hover:bg-sky-900/30 dark:border-sky-800/40 h-7 text-xs"
+                        onClick={() => {
+                          setPreviewQuestion(q);
+                          setIsPreviewOpen(true);
+                        }}
                       >
-                        <Edit className="h-4 w-4 mr-1" /> Edit
+                        Pratinjau
                       </Button>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        className="bg-rose-50 text-rose-600 hover:bg-rose-100 border border-rose-100 dark:bg-rose-900/10 dark:text-rose-400 dark:hover:bg-rose-900/30 dark:border-rose-800/40 h-7 text-xs"
-                        onClick={() => handleDeleteClick(q)}
-                      >
-                        <Trash className="h-4 w-4 mr-1" /> Hapus
-                      </Button>
+                      {(role === "admin" || exam?.teacherId === teacherId) && (
+                        <>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            className="bg-green-50 text-green-700 hover:bg-green-100 border border-green-100 dark:bg-green-900/10 dark:text-green-400 dark:hover:bg-green-900/30 dark:border-green-800/40 h-7 text-xs"
+                            onClick={() => handleEditClick(q)}
+                          >
+                            <Edit className="h-4 w-4 mr-1" /> Edit
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            className="bg-rose-50 text-rose-600 hover:bg-rose-100 border border-rose-100 dark:bg-rose-900/10 dark:text-rose-400 dark:hover:bg-rose-900/30 dark:border-rose-800/40 h-7 text-xs"
+                            onClick={() => handleDeleteClick(q)}
+                          >
+                            <Trash className="h-4 w-4 mr-1" /> Hapus
+                          </Button>
+                        </>
+                      )}
                     </div>
                   )}
                 />

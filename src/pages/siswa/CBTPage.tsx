@@ -72,15 +72,28 @@ const CBTPage = () => {
 
         let examTitle = "CBT";
         let subject = "Ujian";
+        let teacherName = "-";
         if (rData.examId) {
           const examSnap = await get(ref(database, `exams/${rData.examId}`));
           if (examSnap.exists()) {
             const eData = examSnap.val();
             examTitle = eData.title || "CBT";
             subject = eData.subject || "Ujian";
+            if (eData.subjectId) {
+              const subjectSnap = await get(ref(database, `piket_subjects/${eData.subjectId}`));
+              if (subjectSnap.exists()) {
+                subject = subjectSnap.val().name || subject;
+              }
+            }
+            if (eData.teacherId) {
+              const teacherSnap = await get(ref(database, `piket_teachers/${eData.teacherId}`));
+              if (teacherSnap.exists()) {
+                teacherName = teacherSnap.val().name || "-";
+              }
+            }
           }
         }
-        setRoomData({ ...rData, examTitle, subject });
+        setRoomData({ ...rData, examTitle, subject, teacherName });
 
         // 2. Load Attempt
         const attemptRef = ref(database, `attempts/${siswa.nisn}_${roomId}`);
@@ -574,7 +587,7 @@ const CBTPage = () => {
 
         {/* Center: Subject & Exam */}
         <div className="flex flex-col items-center text-center">
-          <p className="font-bold text-slate-800 dark:text-slate-100 line-clamp-1">{roomData?.subject || "Ujian"}</p>
+          <p className="font-bold text-slate-800 dark:text-slate-100 line-clamp-1">{roomData?.subject || "Ujian"} - {roomData?.teacherName || "-"}</p>
           <p className="text-[10px] text-slate-500 font-medium">{roomData?.room_name || roomData?.examTitle || "CBT"}</p>
         </div>
 

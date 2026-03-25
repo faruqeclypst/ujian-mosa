@@ -11,18 +11,21 @@ import { Input } from "../components/ui/input";
 import { Select } from "../components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "../components/ui/dialog";
 import FormField from "../components/forms/FormField";
-import UsersTable from "../components/tables/UsersTable"; // <--- added
+import UsersTable from "../components/tables/UsersTable"; 
+import { usePiket } from "../context/PiketContext";
 
 interface AppUser {
   id: string;
   username: string;
   displayName: string;
   role: "admin" | "gurupiket";
+  teacherId?: string;
   createdAt: number;
 }
 
 const UsersPage = () => {
   const { role, usernameToEmail } = useAuth();
+  const { teachers } = usePiket();
   
   const [users, setUsers] = useState<AppUser[]>([]);
   const [loading, setLoading] = useState(true);
@@ -34,6 +37,7 @@ const UsersPage = () => {
     password: "",
     displayName: "",
     role: "gurupiket" as "admin" | "gurupiket",
+    teacherId: "",
   });
 
   const [error, setError] = useState("");
@@ -91,11 +95,12 @@ const UsersPage = () => {
         username: formData.username,
         displayName: formData.displayName,
         role: formData.role,
+        teacherId: formData.role === "gurupiket" ? formData.teacherId : null,
         createdAt: Date.now(),
       });
 
       // Reset form
-      setFormData({ username: "", password: "", displayName: "", role: "gurupiket" });
+      setFormData({ username: "", password: "", displayName: "", role: "gurupiket", teacherId: "" });
       setIsDialogOpen(false);
       alert("Akun berhasil dibuat!");
     } catch (err: any) {
@@ -167,23 +172,43 @@ const UsersPage = () => {
                   />
                 </FormField>
 
-                <FormField id="displayName" label="Nama Lengkap" error={undefined}>
-                  <Input 
-                    value={formData.displayName}
-                    onChange={(e) => setFormData(prev => ({ ...prev, displayName: e.target.value }))}
-                    placeholder="Contoh: Pak Toni Syafi'i"
-                  />
-                </FormField>
+                {formData.role === "admin" && (
+                  <FormField id="displayName" label="Nama Lengkap" error={undefined}>
+                    <Input 
+                      value={formData.displayName}
+                      onChange={(e) => setFormData(prev => ({ ...prev, displayName: e.target.value }))}
+                      placeholder="Contoh: Administrator Utama"
+                    />
+                  </FormField>
+                )}
 
                 <FormField id="role" label="Role / Hak Akses" error={undefined}>
                   <Select 
                     value={formData.role}
-                    onChange={(e) => setFormData(prev => ({ ...prev, role: e.target.value as any }))}
+                    onChange={(e) => setFormData(prev => ({ ...prev, role: e.target.value as any, displayName: "", teacherId: "" }))}
                   >
-                    <option value="gurupiket">Guru Piket</option>
+                    <option value="gurupiket">Guru / Pengawas</option>
                     <option value="admin">Administrator</option>
                   </Select>
                 </FormField>
+
+                {formData.role === "gurupiket" && (
+                  <FormField id="teacherId" label="Pilih Guru Pengampu" error={undefined}>
+                    <select
+                      value={formData.teacherId}
+                      onChange={(e) => {
+                        const tid = e.target.value;
+                        const tName = teachers.find(t => t.id === tid)?.name || "";
+                        setFormData(prev => ({ ...prev, teacherId: tid, displayName: tName }));
+                      }}
+                      required
+                      className="w-full rounded-md border border-slate-200 dark:border-slate-800 bg-card text-sm p-2"
+                    >
+                      <option value="">-- Pilih Guru --</option>
+                      {teachers.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                    </select>
+                  </FormField>
+                )}
 
                 <div className="flex justify-end gap-2 pt-4 border-t border-slate-200/60 dark:border-slate-800/40">
                   <Button 

@@ -78,8 +78,22 @@ const Sidebar = () => {
   };
 
   const filteredNavigation = React.useMemo(() => {
-    return navigation; // No more role filter for piket
-  }, []);
+    if (role === "admin") return navigation;
+
+    return navigation.reduce((acc, item) => {
+      // Guru tidak dapat mengakses "Master Data"
+      if (item.label === "Master Data") return acc;
+      
+      if (item.label === "Sistem") {
+        // Guru tidak dapat mengakses "Kelola Akun" & "Pengaturan"
+        // (Berarti seluruh menu sistem bisa disembunyikan jika kosong)
+        return acc;
+      }
+
+      acc.push(item);
+      return acc;
+    }, [] as typeof navigation);
+  }, [role]);
 
   const displayName = user?.displayName?.trim() || usernameFromEmail(user?.email) || "Pengguna";
   const initials = displayName

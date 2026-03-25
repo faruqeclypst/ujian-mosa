@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Plus, Trash, Edit, RefreshCw, Users, Archive, RotateCw, FileSpreadsheet, BookOpen, ClipboardList, Lock, ChevronDown } from "lucide-react";
+import { Plus, Trash, Edit, RefreshCw, Users, Archive, RotateCw, FileSpreadsheet, BookOpen, ClipboardList, Lock, ChevronDown, Power, PowerOff, Square } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import * as XLSX from "xlsx-js-style";
 import { Button } from "../../components/ui/button";
@@ -11,6 +11,8 @@ import { database } from "../../lib/firebase";
 import { Input } from "../../components/ui/input";
 import FormField from "../../components/forms/FormField";
 import { usePiket } from "../../context/PiketContext";
+import { useAuth } from "../../context/AuthContext";
+import { getExamTypeColorClass } from "./ExamsPage";
 import { ConfirmationDialog } from "../../components/ui/confirmation-dialog";
 
 import { DataTable } from "../../components/ui/data-table";
@@ -33,13 +35,20 @@ export interface ExamRoomData {
   token_updated_at?: number;
   status?: "archive" | null; // <--- Status Arsip
   room_name?: string;
+  examTeacherId?: string;
+  examType?: string;
+  isDisabled?: boolean;
+  subjectName?: string;
+  teacherName?: string;
 }
 
 const ExamRoomsPage = () => {
   const navigate = useNavigate();
-  const { classes: piketClasses, students } = usePiket();
+  const { role, teacherId } = useAuth();
+  const { classes: piketClasses, students, mapels } = usePiket();
   const [rooms, setRooms] = useState<ExamRoomData[]>([]);
   const [exams, setExams] = useState<any[]>([]);
+  const [teachers, setTeachers] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"aktif" | "arsip">("aktif"); // <--- Active tab filter
   const [showAdvanced, setShowAdvanced] = useState(false); // <--- Advanced settings dialog collapsible
@@ -103,6 +112,9 @@ const ExamRoomsPage = () => {
   const [universalToken, setUniversalToken] = useState("");
   const [tokenUpdatedAt, setTokenUpdatedAt] = useState<number>(0);
   const [timeLeft, setTimeLeft] = useState<string>("--:--");
+  
+  const [liveBreakdown, setLiveBreakdown] = useState<Record<string, number>>({});
+  const [totalOngoing, setTotalOngoing] = useState(0);
 
   // 🖱️ Menarik/Menutup Dropdown Menu otomatis saat Klik di Luar kontainer
   useEffect(() => {
@@ -118,6 +130,32 @@ const ExamRoomsPage = () => {
         setUniversalToken(data.universal_token || "");
         setTokenUpdatedAt(data.universal_token_updated_at || Date.now());
       }
+    });
+  }, []);
+
+  useEffect(() => {
+    const attemptsRef = ref(database, "attempts");
+    return onValue(attemptsRef, (snap) => {
+      if (!snap.exists()) {
+        setLiveBreakdown({});
+        setTotalOngoing(0);
+        return;
+      }
+      const data = snap.val();
+      const stats: Record<string, number> = {};
+      let total = 0;
+      Object.keys(data).forEach(key => {
+        if (data[key].status === "ongoing") {
+          total++;
+          const parts = key.split("_");
+          if (parts.length >= 2) {
+            const roomId = parts[1];
+            stats[roomId] = (stats[roomId] || 0) + 1;
+          }
+        }
+      });
+      setLiveBreakdown(stats);
+      setTotalOngoing(total);
     });
   }, []);
 
@@ -257,9 +295,27 @@ const ExamRoomsPage = () => {
       label: "Ruang / Bank Soal",
       sortable: true,
       render: (v: string, item: ExamRoomData) => (
-        <div className="flex flex-col gap-0.5">
-          <span className="font-bold text-slate-800 dark:text-slate-100 text-sm">{item.room_name || "Tanpa Nama"}</span>
-          <span className="text-[10px] text-slate-400 font-medium tracking-wide">{v}</span>
+        <div className="flex flex-col gap-1 items-start">
+          <span className="font-bold text-slate-800 dark:text-slate-100 text-sm">
+            <span className="text-slate-400 font-medium mr-1 select-none">NR:</span>
+            {item.room_name || "Tanpa Nama"}
+          </span>
+          <div className="flex flex-col items-start gap-1 mt-0.5">
+            <span className="text-[10px] text-slate-500 font-medium tracking-wide">
+              <span className="text-slate-400/70 mr-1 select-none font-bold italic">BS:</span>
+              {v}
+            </span>
+            <div className="flex items-center gap-1.5 text-[10px] text-slate-400 font-medium italic">
+              <span>{item.subjectName}</span>
+              <span>•</span>
+              <span>{item.teacherName}</span>
+            </div>
+            {item.examType && (
+              <span className={`text-[9px] mt-1 px-1.5 py-0.5 rounded-md font-semibold border ${getExamTypeColorClass(item.examType)}`}>
+                {item.examType}
+              </span>
+            )}
+          </div>
         </div>
       )
     },
@@ -276,7 +332,7 @@ const ExamRoomsPage = () => {
           );
         }
         if (!v) return <span className="text-slate-400 text-xs">-</span>;
-        
+
         return (
           <div className="flex flex-wrap gap-1 max-w-[120px]">
             {v.split(", ").map((cls, idx) => (
@@ -327,6 +383,14 @@ const ExamRoomsPage = () => {
           );
         }
 
+        if (item.isDisabled) {
+          return (
+            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold tracking-wide bg-slate-100 text-slate-400 border border-slate-200 dark:bg-slate-900 dark:text-slate-600 dark:border-slate-800">
+              Nonaktif
+            </span>
+          );
+        }
+
         if (now < start) {
           return (
             <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold tracking-wide bg-slate-50 text-slate-500 border border-slate-200/80 dark:bg-slate-900 dark:text-slate-500 dark:border-slate-800/40">
@@ -351,11 +415,17 @@ const ExamRoomsPage = () => {
   ];
 
   const handleArchiveRoom = (room: ExamRoomData) => {
+    // 🛡️ Cek apakah ada siswa yang sedang aktif pengerjaan
+    if (liveBreakdown[room.id] > 0) {
+      showAlert("Aksi Ditolak", `Terdapat ${liveBreakdown[room.id]} siswa yang sedang aktif ujian di ruang ini. Harap selesaikan ujian terlebih dahulu sebelum mengarsipkan.`, "warning");
+      return;
+    }
+
     const now = Date.now();
     const start = new Date(room.start_time).getTime();
     const end = new Date(room.end_time).getTime();
     if (now >= start && now <= end) {
-      showAlert("Peringatan", "Tidak dapat di arsipkan karena Ruang Ujian sedang aktif / berjalan.", "warning");
+      showAlert("Peringatan", "Tidak dapat di arsipkan karena Ruang Ujian sedang dalam periode waktu aktif (Berjalan).", "warning");
       return;
     }
 
@@ -387,6 +457,53 @@ const ExamRoomsPage = () => {
           await update(ref(database, `exam_rooms/${room.id}`), { status: null });
         } catch (error) {
           showAlert("Gagal", "Gagal membuka arsip ruang ujian.", "danger");
+        }
+      }
+    });
+  };
+
+  const handleForceEndRoom = (room: ExamRoomData) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: "Selesaikan Ujian Sekarang",
+      description: `Apakah Anda yakin ingin mengakhiri sesi ujian ${room.room_name || room.examTitle || ""} saat ini juga? Semua siswa yang sedang mengerjakan tidak akan bisa melanjutkan lagi.`,
+      type: "danger",
+      confirmLabel: "Selesaikan Paksa",
+      onConfirm: async () => {
+        try {
+          // Format current time properly for input datetime-local
+          const now = new Date();
+          const offsetHours = now.getTimezoneOffset() / -60;
+          now.setHours(now.getHours() + offsetHours);
+          const nowFormatted = now.toISOString().slice(0, 16); 
+
+          await update(ref(database, `exam_rooms/${room.id}`), { end_time: nowFormatted });
+          showAlert("Berhasil", "Ujian telah dinyatakan SELESAI sekarang juga.", "success");
+        } catch (error) {
+          showAlert("Gagal", "Gagal mengakhiri ruang ujian.", "danger");
+        }
+      }
+    });
+  };
+
+  const handleToggleDisabled = (room: ExamRoomData) => {
+    const newState = !room.isDisabled;
+    setConfirmDialog({
+      isOpen: true,
+      title: newState ? "Nonaktifkan Ujian" : "Aktifkan Ujian",
+      description: `Apakah Anda yakin ingin ${newState ? "menonaktifkan" : "mengaktifkan kembali"} ruang ujian ${room.room_name || room.examTitle || ""}? ${newState ? "Siswa tidak akan bisa masuk ke ruang ini." : ""}`,
+      type: newState ? "warning" : "info",
+      confirmLabel: newState ? "Ya, Nonaktifkan" : "Ya, Aktifkan",
+      onConfirm: async () => {
+        try {
+          await update(ref(database, `exam_rooms/${room.id}`), { isDisabled: newState });
+          showAlert(
+            "Berhasil", 
+            `Ruang ujian telah ${newState ? "dinonaktifkan" : "diaktifkan kembali"}.`, 
+            newState ? "warning" : "success"
+          );
+        } catch (error) {
+          showAlert("Gagal", "Gagal mengubah status ruang ujian.", "danger");
         }
       }
     });
@@ -558,6 +675,34 @@ const ExamRoomsPage = () => {
     });
   };
 
+  const handleForceSubmitStudent = (nisn: string) => {
+    if (!monitorRoom) return;
+    const attempt = attempts.find(at => at.id === `${nisn}_${monitorRoom.id}`);
+    if (!attempt) return;
+
+    setConfirmDialog({
+      isOpen: true,
+      title: "Selesaikan Ujian Siswa",
+      description: `Apakah Anda yakin ingin mengakhiri sesi ujian siswa ini secara paksa?`,
+      type: "danger",
+      confirmLabel: "Ya, Selesaikan",
+      onConfirm: async () => {
+        try {
+          const now = Date.now();
+          const attemptId = `${nisn}_${monitorRoom.id}`;
+          await update(ref(database, `attempts/${attemptId}`), {
+            status: "submitted",
+            submit_time: now,
+          });
+          setAttempts(prev => prev.map(a => a.id === attemptId ? { ...a, status: "submitted", submit_time: now } : a));
+          showAlert("Berhasil", "Sesi siswa telah diselesaikan.", "success");
+        } catch (error) {
+          showAlert("Gagal", "Gagal menyelesaikan sesi siswa.", "danger");
+        }
+      }
+    });
+  };
+
   const generateNewToken = () => {
     const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
     let token = "";
@@ -649,7 +794,13 @@ const ExamRoomsPage = () => {
   useEffect(() => {
     // 1. Load Exams for Select
     get(ref(database, "exams")).then((snap) => {
-      setExams(snap.exists() ? Object.keys(snap.val()).map((k) => ({ id: k, ...snap.val()[k] })) : []);
+      let loadedExams = snap.exists() ? Object.keys(snap.val()).map((k) => ({ id: k, ...snap.val()[k] })) : [];
+      setExams(loadedExams);
+    });
+
+    // 1b. Load Teachers
+    get(ref(database, "piket_teachers")).then(snap => {
+      if(snap.exists()) setTeachers(snap.val());
     });
 
     // 2. Load Rooms
@@ -664,7 +815,13 @@ const ExamRoomsPage = () => {
 
           // Get Exam Title
           const examSnap = await get(ref(database, `exams/${room.examId}`));
-          const examTitle = examSnap.exists() ? examSnap.val().title : "Ujian Tidak Diketahui";
+          const eData = examSnap.exists() ? examSnap.val() : null;
+          const examTeacherId = eData ? eData.teacherId : null;
+          const examType = eData?.examType || "Latihan Biasa";
+
+          const examTitle = eData ? eData.title : "Ujian Tidak Diketahui";
+          const subjectName = mapels.find(m => m.id === eData?.subjectId)?.name || "Mapel Tidak Ada";
+          const teacherName = teachers[examTeacherId || ""]?.name || "Guru Tidak Ada";
 
           // Get Class Name from usePiket
           let className = "Semua Kelas";
@@ -674,8 +831,17 @@ const ExamRoomsPage = () => {
             if (names.length > 0) className = names.join(", ");
           }
 
-          loaded.push({ id: key, ...room, examTitle, className });
+          loaded.push({ id: key, ...room, examTitle, className, examTeacherId, examType, subjectName, teacherName });
         }
+
+        if (role !== "admin" && teacherId) {
+          loaded.sort((a, b) => {
+            const isAOwner = a.examTeacherId === teacherId ? 1 : 0;
+            const isBOwner = b.examTeacherId === teacherId ? 1 : 0;
+            return isBOwner - isAOwner;
+          });
+        }
+
         setRooms(loaded);
       } else {
         setRooms([]);
@@ -684,7 +850,7 @@ const ExamRoomsPage = () => {
     });
 
     return () => unsubscribe();
-  }, [piketClasses]);
+  }, [piketClasses, role, teacherId]);
 
   const generateToken = () => {
     const token = generateNewToken();
@@ -694,9 +860,10 @@ const ExamRoomsPage = () => {
   const handleCreateClick = () => {
     setDialogMode("create");
     setSelectedRoom(null);
+    const availableExams = exams.filter(e => role === "admin" || e.teacherId === teacherId);
     setFormValues({
       room_name: "",
-      examId: exams[0]?.id || "",
+      examId: availableExams[0]?.id || "",
       classId: "all",
       allClasses: true,
       token: "",
@@ -712,6 +879,11 @@ const ExamRoomsPage = () => {
   };
 
   const handleEditClick = (room: ExamRoomData) => {
+    // 🛡️ Cek apakah ada siswa yang sedang aktif pengerjaan
+    if (liveBreakdown[room.id] > 0) {
+      showAlert("Aksi Ditolak", `Terdapat ${liveBreakdown[room.id]} siswa yang sedang aktif di ruang ini. Kamu tidak dapat mengedit pengaturan selama ujian sedang berlangsung.`, "warning");
+      return;
+    }
     setDialogMode("edit");
     setSelectedRoom(room);
     setFormValues({
@@ -760,6 +932,11 @@ const ExamRoomsPage = () => {
   };
 
   const handleDeleteClick = (room: ExamRoomData) => {
+    // 🛡️ Cek apakah ada siswa yang sedang aktif pengerjaan
+    if (liveBreakdown[room.id] > 0) {
+      showAlert("Aksi Ditolak", `Ruang ini tidak bisa dihapus karena masih ada ${liveBreakdown[room.id]} siswa yang aktif di dalamnya.`, "danger");
+      return;
+    }
     setRoomToDelete(room);
     setDeleteDialogOpen(true);
   };
@@ -900,7 +1077,6 @@ const ExamRoomsPage = () => {
               Arsip
             </button>
           </div>
-
           <Button onClick={handleCreateClick} size="sm" className="rounded-xl bg-blue-50 hover:bg-blue-100 border border-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 dark:border-blue-800/40 text-blue-700 font-semibold shadow-sm">
             <Plus className="mr-1 h-3.5 w-3.5" /> Buka Ruang
           </Button>
@@ -923,13 +1099,42 @@ const ExamRoomsPage = () => {
           </div>
         </div>
 
-        <div className="bg-card p-4 rounded-2xl border border-slate-200/60 dark:border-slate-800/40 shadow-sm flex items-center gap-3 backdrop-blur-sm">
-          <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-900/10 text-emerald-600 dark:text-emerald-400">
+        <div className="group relative bg-card p-4 rounded-2xl border border-slate-200/60 dark:border-slate-800/40 shadow-sm flex items-center gap-3 backdrop-blur-sm cursor-help hover:border-emerald-300 dark:hover:border-emerald-800 transition-all">
+          <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-900/10 text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform">
             <Users className="h-5 w-5" />
           </div>
           <div>
             <p className="text-xs text-slate-500 dark:text-slate-400">Siswa Aktif</p>
-            <p className="text-lg font-bold text-slate-800 dark:text-slate-100 mt-0.5">{attempts.filter(a => a.status === "ongoing").length || 0}</p>
+            <p className="text-lg font-bold text-slate-800 dark:text-slate-100 mt-0.5 leading-none">{totalOngoing}</p>
+          </div>
+
+          {/* Hover Breakdown Card */}
+          <div className="absolute top-full left-0 right-0 mt-2 z-50 invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-all scale-95 group-hover:scale-100">
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl p-3 min-w-[200px] max-h-60 overflow-y-auto">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 border-b border-slate-100 dark:border-slate-800 pb-1 flex justify-between">
+                <span>Detail Ruangan Live</span>
+                <span className="text-emerald-500">{totalOngoing} Total</span>
+              </p>
+              {Object.keys(liveBreakdown).length === 0 ? (
+                <p className="text-center py-2 text-[10px] text-slate-500">Tidak ada aktifitas</p>
+              ) : (
+                <div className="space-y-1.5">
+                  {Object.keys(liveBreakdown).map(rid => {
+                    const room = rooms.find(r => r.id === rid);
+                    return (
+                      <div key={rid} className="flex justify-between items-center text-[11px]">
+                        <span className="text-slate-600 dark:text-slate-300 font-medium truncate pr-2">
+                           {room ? (room.room_name || room.examTitle) : "ID: " + rid}
+                        </span>
+                        <span className="bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 px-1.5 py-0.5 rounded font-bold min-w-[20px] text-center">
+                          {liveBreakdown[rid]}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -960,62 +1165,93 @@ const ExamRoomsPage = () => {
               searchPlaceholder="Cari ruang..."
               emptyMessage={`Belum ada ruang ujian ${activeTab}.`}
               actions={(room: ExamRoomData) => (
-                <div className="flex justify-end gap-1.5 items-center whitespace-nowrap">
+                <div className="grid grid-cols-2 gap-2 whitespace-nowrap min-w-[200px]">
                   <Button
                     variant="secondary"
                     size="sm"
-                    className="bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 dark:border-blue-800/40"
+                    className="bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 dark:border-blue-800/40 w-full justify-start"
                     onClick={() => handleMonitorClick(room)}
                   >
-                    <Users className="h-4 w-4 mr-1" /> Monitor
+                    <Users className="h-4 w-4 mr-1.5" /> Monitor
                   </Button>
 
                   <Button
                     variant="secondary"
                     size="sm"
-                    className="bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-100 dark:bg-purple-900/30 dark:text-purple-400 dark:hover:bg-purple-900/50 dark:border-purple-800/40"
+                    className="bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-100 dark:bg-purple-900/30 dark:text-purple-400 dark:hover:bg-purple-900/50 dark:border-purple-800/40 w-full justify-start"
                     onClick={() => navigate(`/admin/bank-soal/${room.examId}/questions`)}
                   >
-                    <BookOpen className="h-4 w-4 mr-1" /> Soal
+                    <BookOpen className="h-4 w-4 mr-1.5" /> Soal
                   </Button>
 
-                  {activeTab === "aktif" ? (
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      className="bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:hover:bg-amber-900/50 dark:border-amber-800/40"
-                      onClick={() => handleArchiveRoom(room)}
-                    >
-                      <Archive className="h-4 w-4 mr-1" /> Arsip
-                    </Button>
-                  ) : (
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      className="bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-400 dark:hover:bg-indigo-900/50 dark:border-indigo-800/40"
-                      onClick={() => handleRestoreRoom(room)}
-                    >
-                      <RotateCw className="h-4 w-4 mr-1" /> Buka
-                    </Button>
-                  )}
+                  {(role === "admin" || room.examTeacherId === teacherId) && (
+                    <>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        className={`border w-full justify-start ${room.isDisabled 
+                          ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:hover:bg-emerald-900/50 dark:border-emerald-800/40" 
+                          : "bg-red-50 text-red-700 hover:bg-red-100 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-900/50 dark:border-red-800/40"}`}
+                        onClick={() => handleToggleDisabled(room)}
+                      >
+                        {room.isDisabled ? (
+                          <><Power className="h-4 w-4 mr-1.5" /> Buka</>
+                        ) : (
+                          <><PowerOff className="h-4 w-4 mr-1.5" /> Tutup</>
+                        )}
+                      </Button>
 
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    className="bg-green-50 text-green-700 hover:bg-green-100 border border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:hover:bg-green-900/50 dark:border-green-800/40"
-                    onClick={() => handleEditClick(room)}
-                  >
-                    <Edit className="h-4 w-4 mr-1" /> Edit
-                  </Button>
-                  {activeTab === "arsip" && (
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      className="bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-900/50 dark:border-red-800/40"
-                      onClick={() => handleDeleteClick(room)}
-                    >
-                      <Trash className="h-4 w-4 mr-1" /> Hapus
-                    </Button>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        className="bg-green-50 text-green-700 hover:bg-green-100 border border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:hover:bg-green-900/50 dark:border-green-800/40 w-full justify-start"
+                        onClick={() => handleEditClick(room)}
+                      >
+                        <Edit className="h-4 w-4 mr-1.5" /> Edit
+                      </Button>
+
+                      <div className="col-span-2 flex gap-2 mt-0.5">
+                        {activeTab === "aktif" ? (
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            className="flex-1 bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:hover:bg-amber-900/50 dark:border-amber-800/40 py-1"
+                            onClick={() => handleArchiveRoom(room)}
+                          >
+                            <Archive className="h-3.5 w-3.5 mr-1" /> Arsipkan
+                          </Button>
+                        ) : (
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            className="flex-1 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-400 dark:hover:bg-indigo-900/50 dark:border-indigo-800/40 py-1"
+                            onClick={() => handleRestoreRoom(room)}
+                          >
+                            <RotateCw className="h-3.5 w-3.5 mr-1" /> Pulihkan
+                          </Button>
+                        )}
+                        {activeTab === "arsip" && (
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            className="flex-1 bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-900/50 dark:border-red-800/40 py-1"
+                            onClick={() => handleDeleteClick(room)}
+                          >
+                            <Trash className="h-3.5 w-3.5 mr-1" /> Hapus
+                          </Button>
+                        )}
+                        {activeTab === "aktif" && (
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            className="bg-red-50 text-red-700 hover:bg-red-100 border border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-900/50 dark:border-red-800/40 w-full justify-start mt-0.5"
+                            onClick={() => handleForceEndRoom(room)}
+                          >
+                            <Square className="h-4 w-4 mr-1.5 fill-current" /> Selesaikan
+                          </Button>
+                        )}
+                      </div>
+                    </>
                   )}
                 </div>
               )}
@@ -1050,8 +1286,19 @@ const ExamRoomsPage = () => {
                 className="w-full rounded-md border border-slate-200 dark:border-slate-800 bg-card text-sm p-2"
               >
                 <option value="">-- Pilih Bank Soal --</option>
-                {exams.map((e) => <option key={e.id} value={e.id}>{e.title}</option>)}
+                {exams
+                  .filter((e) => role === "admin" || e.teacherId === teacherId)
+                  .map((e) => (
+                    <option key={e.id} value={e.id}>{e.title}</option>
+                  ))}
               </select>
+              {formValues.examId && exams.find(e => e.id === formValues.examId) && (
+                <div className="mt-2 text-xs text-slate-500 bg-slate-50 dark:bg-slate-800/50 p-2.5 rounded-lg border border-slate-100 dark:border-slate-800 flex flex-col gap-1">
+                  <div><span className="font-semibold text-slate-700 dark:text-slate-300">Jenis:</span> {exams.find(e => e.id === formValues.examId)?.examType || "Latihan Biasa"}</div>
+                  <div><span className="font-semibold text-slate-700 dark:text-slate-300">Mapel:</span> {mapels.find(m => m.id === exams.find(e => e.id === formValues.examId)?.subjectId)?.name || "-"}</div>
+                  <div><span className="font-semibold text-slate-700 dark:text-slate-300">Guru:</span> {teachers[exams.find(e => e.id === formValues.examId)?.teacherId]?.name || "-"}</div>
+                </div>
+              )}
             </FormField>
 
             <div className="space-y-2">
@@ -1111,33 +1358,6 @@ const ExamRoomsPage = () => {
               </FormField>
             </div>
 
-            {dialogMode === "create" && (
-              <FormField id="token" label="Token Ujian (Akses Masuk)" error={undefined}>
-                <div className="flex gap-1.5 focus-within:z-10">
-                  <Input 
-                    type="text" 
-                    placeholder="Contoh: ABS12" 
-                    value={formValues.token || ""} 
-                    onChange={(e) => setFormValues({ ...formValues, token: e.target.value.toUpperCase() })} 
-                    required 
-                    className="font-bold tracking-widest text-center"
-                    maxLength={10}
-                  />
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    className="shrink-0 h-10 px-3 cursor-pointer bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-800 text-xs font-bold"
-                    onClick={() => {
-                      const newToken = Math.random().toString(36).substring(2, 7).toUpperCase();
-                      setFormValues({ ...formValues, token: newToken });
-                    }}
-                  >
-                    Acak Token
-                  </Button>
-                </div>
-                <p className="text-slate-400 text-[10px] mt-1">Siswa membutuhkan token baku ini untuk masuk ke dalam ruang ujian Anda.</p>
-              </FormField>
-            )}
 
             <div className="space-y-4 pt-1 border-t mt-4">
               <div className="grid grid-cols-2 gap-3 mt-2">
@@ -1200,9 +1420,9 @@ const ExamRoomsPage = () => {
       <Dialog open={isMonitorOpen} onOpenChange={setIsMonitorOpen}>
         <DialogContent className="max-w-[95vw] lg:max-w-6xl w-full bg-card max-h-[95vh] flex flex-col p-4 sm:p-6 overflow-hidden">
           <DialogHeader className="flex flex-row items-center justify-between border-b pb-3 border-slate-200/50 dark:border-slate-800/40">
-            <DialogTitle className="flex items-center gap-2 text-base font-bold text-slate-800 dark:text-slate-100">
-              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse-slow"></span>
-              Monitor Ujian: {monitorRoom?.examTitle}
+            <DialogTitle className="flex items-center gap-2 text-base font-bold text-slate-800 dark:text-slate-100 truncate">
+              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse-slow shrink-0"></span>
+              <span className="truncate">Monitor Ujian: {monitorRoom?.room_name || "Ruang Tanpa Nama"} — <span className="text-slate-500 font-normal">{monitorRoom?.examTitle}</span></span>
             </DialogTitle>
             <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-900/60 px-2 py-1 rounded-xl border border-slate-200/60 dark:border-slate-800/40">
               <span className="text-xs text-slate-600 dark:text-slate-400 font-mono font-bold">
@@ -1263,9 +1483,11 @@ const ExamRoomsPage = () => {
               <Button onClick={handleExportExcel} size="sm" variant="outline" className="h-7 text-xs border-green-200 dark:border-green-800/40 text-green-700 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-950/50 flex items-center gap-1 rounded-lg shadow-sm">
                 <FileSpreadsheet className="h-3.5 w-3.5" /> Export Excel
               </Button>
-              <Button onClick={handleForceSubmitAll} size="sm" variant="outline" className="h-7 text-xs border-orange-200 dark:border-orange-800/40 text-orange-700 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-950/50 flex items-center gap-1 rounded-lg shadow-sm">
-                <Users className="h-3.5 w-3.5" /> Selesaikan Semua
-              </Button>
+              {(role === "admin" || monitorRoom?.examTeacherId === teacherId) && (
+                <Button onClick={handleForceSubmitAll} size="sm" variant="outline" className="h-7 text-xs border-orange-200 dark:border-orange-800/40 text-orange-700 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-950/50 flex items-center gap-1 rounded-lg shadow-sm">
+                  <Users className="h-3.5 w-3.5" /> Selesaikan Semua
+                </Button>
+              )}
             </div>
           </div>
 
@@ -1425,44 +1647,53 @@ const ExamRoomsPage = () => {
                               <div className="flex justify-end gap-1.5 items-center whitespace-nowrap">
                                 {attempt && (
                                   <>
-                                    {/* 1. Logs & Reset Cheat tetap Standalone */}
-                                    <Button size="sm" variant="secondary" className="bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-100 dark:bg-amber-900/30 dark:text-amber-400 dark:hover:bg-amber-900/50 dark:border-amber-800/40 h-7 text-[10px]" onClick={() => handleResetCheatCount(siswa.nisn)}>Reset Cheat</Button>
+                                  {/* 1. Logs & Reset Cheat tetap Standalone */}
+                                    {(role === "admin" || monitorRoom?.examTeacherId === teacherId) && (
+                                      <Button size="sm" variant="secondary" className="bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-100 dark:bg-amber-900/30 dark:text-amber-400 dark:hover:bg-amber-900/50 dark:border-amber-800/40 h-7 text-[10px]" onClick={() => handleResetCheatCount(siswa.nisn)}>Reset Cheat</Button>
+                                    )}
 
                                     <Button size="sm" variant="secondary" className="bg-sky-50 text-sky-700 hover:bg-sky-100 border border-sky-100 dark:bg-sky-900/30 dark:text-sky-400 dark:hover:bg-sky-900/50 dark:border-sky-800/40 h-7 text-[10px]" onClick={() => setExpandedSiswa(expandedSiswa === siswa.nisn ? null : siswa.nisn)}>
                                       {expandedSiswa === siswa.nisn ? "Tutup" : "Logs"}
                                     </Button>
 
                                     {/* 2. Tombol Lainnya masuk ke Dropdown Menu */}
-                                    <div className="relative">
-                                      <Button
-                                        size="sm"
-                                        variant="secondary"
-                                        className="h-7 px-2 text-[10px] bg-slate-100/80 text-slate-700 hover:bg-slate-200 border border-slate-200 dark:bg-slate-800/60 dark:text-slate-300 dark:hover:bg-slate-700/80 dark:border-slate-700/60 font-medium flex items-center gap-1 rounded-md shadow-sm transition-colors"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setOpenMenuId(openMenuId === siswa.nisn ? null : siswa.nisn);
-                                        }}
-                                      >
-                                        Menu
-                                        <ChevronDown className="w-3 h-3 opacity-60 ml-0.5" />
-                                      </Button>
+                                    {(role === "admin" || monitorRoom?.examTeacherId === teacherId) && (
+                                      <div className="relative">
+                                        <Button
+                                          size="sm"
+                                          variant="secondary"
+                                          className="h-7 px-2 text-[10px] bg-slate-100/80 text-slate-700 hover:bg-slate-200 border border-slate-200 dark:bg-slate-800/60 dark:text-slate-300 dark:hover:bg-slate-700/80 dark:border-slate-700/60 font-medium flex items-center gap-1 rounded-md shadow-sm transition-colors"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setOpenMenuId(openMenuId === siswa.nisn ? null : siswa.nisn);
+                                          }}
+                                        >
+                                          Menu
+                                          <ChevronDown className="w-3 h-3 opacity-60 ml-0.5" />
+                                        </Button>
 
-                                      {openMenuId === siswa.nisn && (
-                                        <div className="absolute right-0 mt-1 w-32 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg z-30 py-1 overflow-hidden">
-                                          {attempt?.status === "LOCKED" && (
-                                            <button onClick={(e) => { e.stopPropagation(); handleUnlockStudent(siswa.nisn); setOpenMenuId(null); }} className="w-full text-left px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-700 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5 border-b border-slate-100 dark:border-slate-700/60">
-                                              <Lock className="w-3.5 h-3.5 opacity-80" /> Buka Kunci
+                                        {openMenuId === siswa.nisn && (
+                                          <div className="absolute right-0 mt-1 w-32 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg z-30 py-1 overflow-hidden">
+                                            {attempt?.status === "LOCKED" && (
+                                              <button onClick={(e) => { e.stopPropagation(); handleUnlockStudent(siswa.nisn); setOpenMenuId(null); }} className="w-full text-left px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-700 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5 border-b border-slate-100 dark:border-slate-700/60">
+                                                <Lock className="w-3.5 h-3.5 opacity-80" /> Buka Kunci
+                                              </button>
+                                            )}
+                                            <button onClick={(e) => { e.stopPropagation(); openLimitDialog(siswa.nisn); setOpenMenuId(null); }} className="w-full text-left px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-700 text-[10px] font-semibold text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
+                                              <Plus className="w-3.5 h-3.5 opacity-70 text-slate-400" /> + Limit
                                             </button>
-                                          )}
-                                          <button onClick={(e) => { e.stopPropagation(); openLimitDialog(siswa.nisn); setOpenMenuId(null); }} className="w-full text-left px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-700 text-[10px] font-semibold text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
-                                            <Plus className="w-3.5 h-3.5 opacity-70 text-slate-400" /> + Limit
-                                          </button>
-                                          <button onClick={(e) => { e.stopPropagation(); handleResetSession(siswa.nisn); setOpenMenuId(null); }} className="w-full text-left px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-700 text-[10px] font-semibold text-rose-600 dark:text-rose-400 flex items-center gap-1.5">
-                                            <RefreshCw className="w-3.5 h-3.5 opacity-70 text-rose-400" /> Reset Sesi
-                                          </button>
-                                        </div>
-                                      )}
-                                    </div>
+                                            {attempt?.status !== "submitted" && (
+                                              <button onClick={(e) => { e.stopPropagation(); handleForceSubmitStudent(siswa.nisn); setOpenMenuId(null); }} className="w-full text-left px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-700 text-[10px] font-semibold text-rose-600 dark:text-rose-400 flex items-center gap-1.5 border-b border-slate-100 dark:border-slate-700/60">
+                                                <Square className="w-3.5 h-3.5 opacity-70 fill-current" /> Selesaikan
+                                              </button>
+                                            )}
+                                            <button onClick={(e) => { e.stopPropagation(); handleResetSession(siswa.nisn); setOpenMenuId(null); }} className="w-full text-left px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-700 text-[10px] font-semibold text-rose-600 dark:text-rose-400 flex items-center gap-1.5">
+                                              <RefreshCw className="w-3.5 h-3.5 opacity-70 text-rose-400" /> Reset Sesi
+                                            </button>
+                                          </div>
+                                        )}
+                                      </div>
+                                    )}
                                   </>
                                 )}
                               </div>

@@ -45,11 +45,13 @@ const DashboardPage = () => {
                  const ongoing = Object.keys(attemptsData).filter((ak) => ak.includes(rk) && attemptsData[ak].status === "ongoing").length;
                  const submitted = Object.keys(attemptsData).filter((ak) => ak.includes(rk) && (attemptsData[ak].status === "submitted" || attemptsData[ak].status === "graded")).length;
                  return {
-                    name: room.room_code || "Ruang",
+                    name: room.room_name || room.room_code || "Ruang",
                     Mengerjakan: ongoing,
-                    Selesai: submitted
+                    Selesai: submitted,
+                    total: ongoing + submitted
                  }
-             });
+             })
+             .filter(r => r.total > 0); // Hanya tampilkan yang ada aktivitasnya biar gak penuh/bingung
            
            setChartData(mappedChart);
         });

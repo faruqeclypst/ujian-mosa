@@ -37,7 +37,7 @@ const UsersTable = ({ users, onDelete }: UsersTableProps) => {
       sortable: true,
       render: (v: string) => (
         <Badge variant={v === "admin" ? "default" : "secondary"}>
-          {v === "admin" ? "Admin" : "Guru Piket"}
+          {v === "admin" ? "Admin" : "Guru / Pengawas"}
         </Badge>
       ),
     },

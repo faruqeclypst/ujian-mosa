@@ -44,6 +44,14 @@ const SiswaAuthGuard = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
+// Guard for Admin Only Routes
+const AdminOnlyRoute = ({ children }: { children: React.ReactNode }) => {
+  const { role, loading } = useAuth();
+  if (loading) return <LoadingScreen />;
+  if (role !== "admin") return <Navigate to="/admin" replace />;
+  return <>{children}</>;
+};
+
 const AppContent = () => {
   const { user, loading } = useAuth();
   const { siswa } = useSiswaAuth();
@@ -118,16 +126,16 @@ const AppContent = () => {
           }
         >
           <Route index element={<DashboardPage />} />
-          <Route path="mapel" element={<MapelPage />} />
-          <Route path="guru" element={<GuruPage />} />
-          <Route path="siswa" element={<SiswaPage />} />
-          <Route path="alumni" element={<AlumniPage />} />
-          <Route path="kelas" element={<KelasPage />} />
-          <Route path="kelola-akun" element={<UsersPage />} />
+          <Route path="mapel" element={<AdminOnlyRoute><MapelPage /></AdminOnlyRoute>} />
+          <Route path="guru" element={<AdminOnlyRoute><GuruPage /></AdminOnlyRoute>} />
+          <Route path="siswa" element={<AdminOnlyRoute><SiswaPage /></AdminOnlyRoute>} />
+          <Route path="alumni" element={<AdminOnlyRoute><AlumniPage /></AdminOnlyRoute>} />
+          <Route path="kelas" element={<AdminOnlyRoute><KelasPage /></AdminOnlyRoute>} />
+          <Route path="kelola-akun" element={<AdminOnlyRoute><UsersPage /></AdminOnlyRoute>} />
           <Route path="bank-soal" element={<ExamsPage />} />
           <Route path="bank-soal/:examId/questions" element={<QuestionsPage />} />
           <Route path="ruang-ujian" element={<ExamRoomsPage />} />
-          <Route path="pengaturan" element={<SettingsPage />} />
+          <Route path="pengaturan" element={<AdminOnlyRoute><SettingsPage /></AdminOnlyRoute>} />
         </Route>
 
         {/* Fallback */}

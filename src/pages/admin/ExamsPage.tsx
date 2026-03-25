@@ -9,6 +9,7 @@ import { database } from "../../lib/firebase";
 import { deleteImageFromStorage } from "../../lib/storage";
 import { Input } from "../../components/ui/input";
 import FormField from "../../components/forms/FormField";
+import { useAuth } from "../../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { usePiket } from "../../context/PiketContext";
 import { ConfirmationDialog } from "../../components/ui/confirmation-dialog";
@@ -21,7 +22,22 @@ export interface ExamData {
   subjectId: string;
   teacherId: string;
   createdAt: number;
+  examType?: string;
 }
+
+export const getExamTypeColorClass = (type: string) => {
+  switch (type) {
+    case "Latihan Biasa": return "bg-slate-100 border-slate-200 text-slate-700 dark:bg-slate-800/60 dark:border-slate-700/60 dark:text-slate-300";
+    case "Ulangan Harian": return "bg-emerald-50 border-emerald-200/60 text-emerald-700 dark:bg-emerald-950/40 dark:border-emerald-800/60 dark:text-emerald-400";
+    case "Ujian Tengah Semester (PTS)": return "bg-amber-50 border-amber-200/60 text-amber-700 dark:bg-amber-950/40 dark:border-amber-800/60 dark:text-amber-500";
+    case "Ujian Akhir Semester (PAS / PAT)": return "bg-rose-50 border-rose-200/60 text-rose-700 dark:bg-rose-950/40 dark:border-rose-800/60 dark:text-rose-400";
+    case "Ujian Sekolah (US)": return "bg-indigo-50 border-indigo-200/60 text-indigo-700 dark:bg-indigo-950/40 dark:border-indigo-800/60 dark:text-indigo-400";
+    case "Tryout": return "bg-fuchsia-50 border-fuchsia-200/60 text-fuchsia-700 dark:bg-fuchsia-950/40 dark:border-fuchsia-800/60 dark:text-fuchsia-400";
+    case "Tugas Terstruktur": return "bg-blue-50 border-blue-200/60 text-blue-700 dark:bg-blue-950/40 dark:border-blue-800/60 dark:text-blue-400";
+    case "Ujian Praktik": return "bg-cyan-50 border-cyan-200/60 text-cyan-700 dark:bg-cyan-950/40 dark:border-cyan-800/60 dark:text-cyan-400";
+    default: return "bg-indigo-50 border-indigo-200/60 text-indigo-700 dark:bg-indigo-950/40 dark:border-indigo-800/60 dark:text-indigo-400";
+  }
+};
 
 const columns = [
   {
@@ -33,7 +49,16 @@ const columns = [
     key: "title",
     label: "Judul Ujian",
     sortable: true,
-    render: (v: string) => <span className="font-medium text-slate-800 dark:text-slate-100">{v}</span>
+    render: (v: string, item: any) => (
+      <div className="flex flex-col items-start gap-1">
+        <span className="font-medium text-slate-800 dark:text-slate-100">{v}</span>
+        {item.examType && (
+          <span className={`text-[10px] px-2 py-0.5 rounded-md font-semibold border ${getExamTypeColorClass(item.examType)}`}>
+            {item.examType}
+          </span>
+        )}
+      </div>
+    )
   },
   {
     key: "subjectName",
@@ -49,6 +74,7 @@ const columns = [
 
 const ExamsPage = () => {
   const navigate = useNavigate();
+  const { role, teacherId } = useAuth();
   const { mapels, teachers } = usePiket();
   const [exams, setExams] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -58,7 +84,7 @@ const ExamsPage = () => {
   const [dialogMode, setDialogMode] = useState<"create" | "edit">("create");
   const [selectedExam, setSelectedExam] = useState<ExamData | null>(null);
   const [activeExamIds, setActiveExamIds] = useState<string[]>([]);
-  const [formValues, setFormValues] = useState({ title: "", subjectId: "", teacherId: "" });
+  const [formValues, setFormValues] = useState({ title: "", subjectId: "", teacherId: "", examType: "Latihan Biasa" });
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [examToDelete, setExamToDelete] = useState<ExamData | null>(null);
@@ -162,10 +188,20 @@ const ExamsPage = () => {
           return {
             id: key,
             ...exam,
+            examType: exam.examType || "Latihan Biasa",
             subjectName: mapelObj ? mapelObj.name : "Mapel Tidak Ditemukan",
             teacherName: teacherObj ? teacherObj.name : "Guru Tidak Ditemukan",
           };
         });
+
+        if (role !== "admin" && teacherId) {
+          loaded.sort((a, b) => {
+            const isAOwner = a.teacherId === teacherId ? 1 : 0;
+            const isBOwner = b.teacherId === teacherId ? 1 : 0;
+            return isBOwner - isAOwner;
+          });
+        }
+
         setExams(loaded);
       } else {
         setExams([]);
@@ -179,14 +215,14 @@ const ExamsPage = () => {
   const handleCreateClick = () => {
     setDialogMode("create");
     setSelectedExam(null);
-    setFormValues({ title: "", subjectId: "", teacherId: "" });
+    setFormValues({ title: "", subjectId: "", teacherId: role === "admin" ? "" : (teacherId || ""), examType: "Latihan Biasa" });
     setIsDialogOpen(true);
   };
 
   const handleEditClick = (exam: ExamData) => {
     setDialogMode("edit");
     setSelectedExam(exam);
-    setFormValues({ title: exam.title, subjectId: exam.subjectId, teacherId: exam.teacherId || "" });
+    setFormValues({ title: exam.title, subjectId: exam.subjectId, teacherId: exam.teacherId || "", examType: exam.examType || "Latihan Biasa" });
     setIsDialogOpen(true);
   };
 
@@ -334,43 +370,47 @@ const ExamsPage = () => {
                     <BookOpen className="h-4 w-4 mr-1" /> Soal
                   </Button>
                   
-                  {activeTab === "aktif" ? (
-                    <Button 
-                      variant="secondary" 
-                      size="sm" 
-                      className="bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-100 dark:bg-amber-900/10 dark:text-amber-400 dark:hover:bg-amber-900/30 dark:border-amber-800/40 h-7 text-xs" 
-                      onClick={() => handleArchiveExam(exam)}
-                    >
-                          <Archive className="h-4 w-4 mr-1" /> Arsip
-                    </Button>
-                  ) : (
-                    <Button 
-                      variant="secondary" 
-                      size="sm" 
-                      className="bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-100 dark:bg-indigo-900/10 dark:text-indigo-400 dark:hover:bg-indigo-900/30 dark:border-indigo-800/40 h-7 text-xs" 
-                      onClick={() => handleRestoreExam(exam)}
-                    >
-                          <RotateCw className="h-4 w-4 mr-1" /> Buka
-                    </Button>
-                  )}
+                  {(role === "admin" || exam.teacherId === teacherId) && (
+                    <>
+                      {activeTab === "aktif" ? (
+                        <Button 
+                          variant="secondary" 
+                          size="sm" 
+                          className="bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-100 dark:bg-amber-900/10 dark:text-amber-400 dark:hover:bg-amber-900/30 dark:border-amber-800/40 h-7 text-xs" 
+                          onClick={() => handleArchiveExam(exam)}
+                        >
+                              <Archive className="h-4 w-4 mr-1" /> Arsip
+                        </Button>
+                      ) : (
+                        <Button 
+                          variant="secondary" 
+                          size="sm" 
+                          className="bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-100 dark:bg-indigo-900/10 dark:text-indigo-400 dark:hover:bg-indigo-900/30 dark:border-indigo-800/40 h-7 text-xs" 
+                          onClick={() => handleRestoreExam(exam)}
+                        >
+                              <RotateCw className="h-4 w-4 mr-1" /> Buka
+                        </Button>
+                      )}
 
-                  <Button 
-                    variant="secondary" 
-                    size="sm" 
-                    className="bg-green-50 text-green-700 hover:bg-green-100 border border-green-100 dark:bg-green-900/10 dark:text-green-400 dark:hover:bg-green-900/30 dark:border-green-800/40 h-7 text-xs" 
-                    onClick={() => handleEditClick(exam)}
-                  >
-                    <Edit className="h-4 w-4 mr-1" /> Edit
-                  </Button>
-                  {activeTab === "arsip" && (
-                    <Button 
-                      variant="destructive" 
-                      size="sm" 
-                      className="bg-rose-50 text-rose-600 hover:bg-rose-100 border border-rose-100 dark:bg-rose-900/10 dark:text-rose-400 dark:hover:bg-rose-900/30 dark:border-rose-800/40 h-7 text-xs" 
-                      onClick={() => handleDeleteClick(exam)}
-                    >
-                      <Trash className="h-4 w-4 mr-1" /> Hapus
-                    </Button>
+                      <Button 
+                        variant="secondary" 
+                        size="sm" 
+                        className="bg-green-50 text-green-700 hover:bg-green-100 border border-green-100 dark:bg-green-900/10 dark:text-green-400 dark:hover:bg-green-900/30 dark:border-green-800/40 h-7 text-xs" 
+                        onClick={() => handleEditClick(exam)}
+                      >
+                        <Edit className="h-4 w-4 mr-1" /> Edit
+                      </Button>
+                      {activeTab === "arsip" && (
+                        <Button 
+                          variant="destructive" 
+                          size="sm" 
+                          className="bg-rose-50 text-rose-600 hover:bg-rose-100 border border-rose-100 dark:bg-rose-900/10 dark:text-rose-400 dark:hover:bg-rose-900/30 dark:border-rose-800/40 h-7 text-xs" 
+                          onClick={() => handleDeleteClick(exam)}
+                        >
+                          <Trash className="h-4 w-4 mr-1" /> Hapus
+                        </Button>
+                      )}
+                    </>
                   )}
                 </div>
               )}
@@ -390,6 +430,25 @@ const ExamsPage = () => {
               <Input value={formValues.title} onChange={(e) => setFormValues({ ...formValues, title: e.target.value })} required />
             </FormField>
 
+            <FormField id="examType" label="Jenis Bank Soal" error={undefined}>
+              <select 
+                value={formValues.examType} 
+                onChange={(e) => setFormValues({ ...formValues, examType: e.target.value })} 
+                required
+                className="w-full rounded-md border border-slate-200 dark:border-slate-800 bg-card text-sm p-2"
+              >
+                <option value="Latihan Biasa">Latihan Biasa</option>
+                <option value="Ulangan Harian">Ulangan Harian</option>
+                <option value="Ujian Tengah Semester (PTS)">Ujian Tengah Semester (PTS)</option>
+                <option value="Ujian Akhir Semester (PAS / PAT)">Ujian Akhir Semester (PAS / PAT)</option>
+                <option value="Ujian Sekolah (US)">Ujian Sekolah (US)</option>
+                <option value="Tryout">Tryout</option>
+                <option value="Tugas Terstruktur">Tugas Terstruktur</option>
+                <option value="Ujian Praktik">Ujian Praktik</option>
+                <option value="Lainnya">Lainnya</option>
+              </select>
+            </FormField>
+
             <FormField id="subjectId" label="Mata Pelajaran" error={undefined}>
               <select 
                 value={formValues.subjectId} 
@@ -402,17 +461,19 @@ const ExamsPage = () => {
               </select>
             </FormField>
 
-            <FormField id="teacherId" label="Guru Pengampu" error={undefined}>
-              <select 
-                value={formValues.teacherId} 
-                onChange={(e) => setFormValues({ ...formValues, teacherId: e.target.value })} 
-                required
-                className="w-full rounded-md border border-slate-200 dark:border-slate-800 bg-card text-sm p-2"
-              >
-                <option value="">-- Pilih Guru --</option>
-                {teachers.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-              </select>
-            </FormField>
+            {role === "admin" && (
+              <FormField id="teacherId" label="Guru Pengampu" error={undefined}>
+                <select 
+                  value={formValues.teacherId} 
+                  onChange={(e) => setFormValues({ ...formValues, teacherId: e.target.value })} 
+                  required
+                  className="w-full rounded-md border border-slate-200 dark:border-slate-800 bg-card text-sm p-2"
+                >
+                  <option value="">-- Pilih Guru --</option>
+                  {teachers.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                </select>
+              </FormField>
+            )}
 
             <Button type="submit" className="w-full bg-blue-50 hover:bg-blue-100 border border-blue-100 dark:bg-blue-900/40 dark:text-blue-400 dark:hover:bg-blue-900/60 dark:border-blue-800/20 text-blue-700 font-semibold">{dialogMode === "edit" ? "Perbarui" : "Simpan"}</Button>
           </form>

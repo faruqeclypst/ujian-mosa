@@ -23,6 +23,7 @@ import { auth, googleProvider, database } from "../lib/firebase"; // <--- added 
 interface AuthContextValue {
   user: User | null;
   role: "admin" | "gurupiket" | null; // <--- added
+  teacherId?: string; // <--- added
   loading: boolean;
   signInWithUsername: (username: string, password: string) => Promise<void>;
   registerWithUsername: (username: string, password: string, displayName?: string) => Promise<void>;
@@ -55,7 +56,8 @@ interface AuthProviderProps {
 
 export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [user, setUser] = useState<User | null>(null);
-  const [role, setRole] = useState<"admin" | "gurupiket" | null>(null); // <--- added
+  const [role, setRole] = useState<"admin" | "gurupiket" | null>(null);
+  const [teacherId, setTeacherId] = useState<string | undefined>(undefined);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -70,14 +72,18 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         const userRef = ref(database, `piket_users/${nextUser.uid}`);
         unsubscribeRole = onValue(userRef, (snapshot) => {
           if (snapshot.exists()) {
-            setRole(snapshot.val().role || "gurupiket");
+            const data = snapshot.val();
+            setRole(data.role || "gurupiket");
+            setTeacherId(data.teacherId);
           } else {
             // Owner/Admin yang sudah login sebelum fitur ini rilis otomatis jadi Admin
             setRole("admin");
+            setTeacherId(undefined);
           }
           setLoading(false);
         });
       } else {
+        setTeacherId(undefined);
         setLoading(false);
       }
     });
@@ -119,6 +125,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     () => ({
       user,
       role, // <--- added
+      teacherId, // <--- added
       loading,
       signInWithUsername,
       registerWithUsername,
@@ -127,7 +134,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       usernameFromEmail: emailToUsername,
       usernameToEmail,
     }),
-    [loading, role, registerWithUsername, signInWithGoogle, signInWithUsername, signOut, user]
+    [loading, role, teacherId, registerWithUsername, signInWithGoogle, signInWithUsername, signOut, user]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
