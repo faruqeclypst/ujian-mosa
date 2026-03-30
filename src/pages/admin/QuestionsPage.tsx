@@ -459,6 +459,18 @@ const QuestionsPage = () => {
             if (quill) {
               const range = quill.getSelection() || { index: 0 };
               quill.insertEmbed(range.index, "image", base64);
+              
+              // ⚡ Set default size to 'Medium' (350px) & Center alignment
+              setTimeout(() => {
+                const img = quill.root.querySelector(`img[src="${base64}"]`);
+                if (img) {
+                  img.setAttribute('width', '350');
+                  img.style.display = 'block';
+                  img.style.margin = '10px auto';
+                }
+              }, 1);
+              
+              quill.setSelection(range.index + 1);
             }
           };
         } catch (e) {
@@ -1066,17 +1078,6 @@ const QuestionsPage = () => {
                   emptyMessage="Tidak ada soal ditemukan."
                   actions={(q: QuestionData) => (
                     <div className="flex justify-end items-center gap-1.5 whitespace-nowrap">
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        className="bg-sky-50 text-sky-700 hover:bg-sky-100 border border-sky-100 dark:bg-sky-900/10 dark:text-sky-400 dark:hover:bg-sky-900/30 dark:border-sky-800/40 h-7 text-xs"
-                        onClick={() => {
-                          setPreviewQuestion(q);
-                          setIsPreviewOpen(true);
-                        }}
-                      >
-                        Pratinjau
-                      </Button>
                       <Button
                         variant="secondary"
                         size="sm"

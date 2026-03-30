@@ -661,12 +661,42 @@ const ExamRoomsPage = () => {
         try {
           const updates: any = {};
           const now = Date.now();
+          
           ongoing.forEach((att) => {
+            // 🏹 Hitung Skor On-the-fly
+            const sisAnswers = answersList[att.nisn] || {};
+            let correct = 0;
+            monitorQuestions.forEach((q) => {
+              const ans = sisAnswers[q.id];
+              if (ans && q.choices[ans]?.isCorrect === true) correct++;
+            });
+            const score = monitorQuestions.length > 0 ? Math.round((correct / monitorQuestions.length) * 100) : 0;
+
             updates[`attempts/${att.id}/status`] = "submitted";
             updates[`attempts/${att.id}/submit_time`] = now;
+            updates[`attempts/${att.id}/score`] = score;
+            updates[`attempts/${att.id}/correct`] = correct;
+            updates[`attempts/${att.id}/total`] = monitorQuestions.length;
           });
+          
           await update(ref(database), updates);
-          setAttempts(prev => prev.map(a => a.status === "ongoing" ? { ...a, status: "submitted", submit_time: now } : a));
+          
+          // Update local state agar UI langsung berubah
+          setAttempts(prev => prev.map(a => {
+             const ongoingItem = ongoing.find(o => o.id === a.id);
+             if (ongoingItem) {
+                const sisAnswers = answersList[a.nisn] || {};
+                let correct = 0;
+                monitorQuestions.forEach((q) => {
+                   const ans = sisAnswers[q.id];
+                   if (ans && q.choices[ans]?.isCorrect === true) correct++;
+                });
+                const score = monitorQuestions.length > 0 ? Math.round((correct / monitorQuestions.length) * 100) : 0;
+                return { ...a, status: "submitted", submit_time: now, score, correct, total: monitorQuestions.length };
+             }
+             return a;
+          }));
+
           showAlert("Berhasil", `${ongoing.length} siswa berhasil diselesaikan secara paksa.`, "success");
         } catch (error) {
           showAlert("Gagal", "Gagal menyelesaikan paksa ujian siswa.", "danger");
@@ -690,11 +720,25 @@ const ExamRoomsPage = () => {
         try {
           const now = Date.now();
           const attemptId = `${nisn}_${monitorRoom.id}`;
+
+          // 🏹 Hitung Skor On-the-fly
+          const sisAnswers = answersList[nisn] || {};
+          let correct = 0;
+          monitorQuestions.forEach((q) => {
+            const ans = sisAnswers[q.id];
+            if (ans && q.choices[ans]?.isCorrect === true) correct++;
+          });
+          const score = monitorQuestions.length > 0 ? Math.round((correct / monitorQuestions.length) * 100) : 0;
+
           await update(ref(database, `attempts/${attemptId}`), {
             status: "submitted",
             submit_time: now,
+            score: score,
+            correct: correct,
+            total: monitorQuestions.length
           });
-          setAttempts(prev => prev.map(a => a.id === attemptId ? { ...a, status: "submitted", submit_time: now } : a));
+
+          setAttempts(prev => prev.map(a => a.id === attemptId ? { ...a, status: "submitted", submit_time: now, score, correct, total: monitorQuestions.length } : a));
           showAlert("Berhasil", "Sesi siswa telah diselesaikan.", "success");
         } catch (error) {
           showAlert("Gagal", "Gagal menyelesaikan sesi siswa.", "danger");
@@ -791,8 +835,9 @@ const ExamRoomsPage = () => {
     };
   }, [monitorRoom, isMonitorOpen]);
 
+  // 1. Load Reference Data (Exams & Teachers)
   useEffect(() => {
-    // 1. Load Exams for Select
+    // 1a. Load Exams for Select
     get(ref(database, "exams")).then((snap) => {
       let loadedExams = snap.exists() ? Object.keys(snap.val()).map((k) => ({ id: k, ...snap.val()[k] })) : [];
       setExams(loadedExams);
@@ -802,25 +847,27 @@ const ExamRoomsPage = () => {
     get(ref(database, "piket_teachers")).then(snap => {
       if(snap.exists()) setTeachers(snap.val());
     });
+  }, []);
 
-    // 2. Load Rooms
+  // 2. Load Rooms & Merge Labels (Real-time)
+  useEffect(() => {
     const roomsRef = ref(database, "exam_rooms");
-    const unsubscribe = onValue(roomsRef, async (snapshot) => {
+    const unsubscribe = onValue(roomsRef, (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.val();
         const loaded: ExamRoomData[] = [];
 
-        for (const key of Object.keys(data)) {
+        Object.keys(data).forEach((key) => {
           const room = data[key];
 
-          // Get Exam Title
-          const examSnap = await get(ref(database, `exams/${room.examId}`));
-          const eData = examSnap.exists() ? examSnap.val() : null;
-          const examTeacherId = eData ? eData.teacherId : null;
-          const examType = eData?.examType || "Latihan Biasa";
-
-          const examTitle = eData ? eData.title : "Ujian Tidak Diketahui";
-          const subjectName = mapels.find(m => m.id === eData?.subjectId)?.name || "Mapel Tidak Ada";
+          // 🏹 Cari Data Exam dari State (Cepat)
+          const examData = exams.find(e => e.id === room.examId);
+          const examTeacherId = examData ? examData.teacherId : null;
+          const examType = examData?.examType || "Latihan Biasa";
+          const examTitle = examData ? examData.title : "Ujian Tidak Diketahui";
+          
+          // 🏹 Cari Nama Mapel & Guru dari State (Cepat)
+          const subjectName = mapels.find(m => m.id === examData?.subjectId)?.name || "Mapel Tidak Ada";
           const teacherName = teachers[examTeacherId || ""]?.name || "Guru Tidak Ada";
 
           // Get Class Name from usePiket
@@ -832,7 +879,7 @@ const ExamRoomsPage = () => {
           }
 
           loaded.push({ id: key, ...room, examTitle, className, examTeacherId, examType, subjectName, teacherName });
-        }
+        });
 
         if (role !== "admin" && teacherId) {
           loaded.sort((a, b) => {
@@ -850,7 +897,7 @@ const ExamRoomsPage = () => {
     });
 
     return () => unsubscribe();
-  }, [piketClasses, role, teacherId]);
+  }, [piketClasses, role, teacherId, exams, teachers, mapels]);
 
   const generateToken = () => {
     const token = generateNewToken();
@@ -1238,16 +1285,6 @@ const ExamRoomsPage = () => {
                             onClick={() => handleDeleteClick(room)}
                           >
                             <Trash className="h-3.5 w-3.5 mr-1" /> Hapus
-                          </Button>
-                        )}
-                        {activeTab === "aktif" && (
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            className="bg-red-50 text-red-700 hover:bg-red-100 border border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-900/50 dark:border-red-800/40 w-full justify-start mt-0.5"
-                            onClick={() => handleForceEndRoom(room)}
-                          >
-                            <Square className="h-4 w-4 mr-1.5 fill-current" /> Selesaikan
                           </Button>
                         )}
                       </div>

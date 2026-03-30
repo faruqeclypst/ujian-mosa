@@ -70,6 +70,10 @@ const CBTPage = () => {
         if (!roomSnap.exists()) throw new Error("Ruang ujian tidak ditemukan");
         const rData = roomSnap.val();
 
+        if (rData.status === "archive") {
+          throw new Error("Ruang ujian ini sudah diarsipkan dan tidak lagi aktif.");
+        }
+
         let examTitle = "CBT";
         let subject = "Ujian";
         let teacherName = "-";

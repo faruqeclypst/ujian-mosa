@@ -6,7 +6,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter }
 import { Input } from "../../components/ui/input";
 import { ref, onValue, get } from "firebase/database";
 import { database } from "../../lib/firebase";
-import { LogOut, KeyRound } from "lucide-react";
+import { LogOut, KeyRound, Calendar, Clock } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../../components/ui/dialog";
 import { getExamTypeColorClass } from "../admin/ExamsPage";
 
@@ -24,6 +24,7 @@ interface ExamRoom {
 const SiswaDashboardPage = () => {
   const { siswa, logoutSiswa } = useSiswaAuth();
   const [loading, setLoading] = useState(true);
+  const [schoolName, setSchoolName] = useState("Computer Based Test");
 
   // For token dialog
   const [selectedRoom, setSelectedRoom] = useState<any>(null);
@@ -39,11 +40,16 @@ const SiswaDashboardPage = () => {
     const examsRef = ref(database, "exams");
     const teachersRef = ref(database, "piket_teachers");
     const subjectsRef = ref(database, "piket_subjects");
+    const schoolRef = ref(database, "settings/school");
     
-    Promise.all([get(examsRef), get(teachersRef), get(subjectsRef)]).then(([examsSnap, teachersSnap, subjectsSnap]) => {
+    Promise.all([get(examsRef), get(teachersRef), get(subjectsRef), get(schoolRef)]).then(([examsSnap, teachersSnap, subjectsSnap, schoolSnap]) => {
       const examsData = examsSnap.exists() ? examsSnap.val() : {};
       const teachersData = teachersSnap.exists() ? teachersSnap.val() : {};
       const subjectsData = subjectsSnap.exists() ? subjectsSnap.val() : {};
+
+      if (schoolSnap.exists()) {
+        setSchoolName(schoolSnap.val().name || "Computer Based Test");
+      }
 
       // 2. Monitoring Real-Time Ruang Ujian
       const roomsRef = ref(database, "exam_rooms");
@@ -153,16 +159,19 @@ const SiswaDashboardPage = () => {
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
       {/* Header */}
-      <header className="sticky top-0 z-10 backdrop-blur-md bg-card/80 dark:bg-slate-900/80 border-b border-slate-200/60 dark:border-slate-800 shadow-sm px-6 h-16 flex items-center justify-between">
+      <header className="sticky top-0 z-10 backdrop-blur-md bg-white/90 dark:bg-slate-900/90 border-b border-slate-200 dark:border-slate-800 shadow-sm px-6 h-16 flex items-center justify-between">
         <div>
-          <h1 className="text-lg font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600">Computer Based Test</h1>
+          <h1 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
+            <span className="w-1.5 h-6 bg-slate-800 dark:bg-slate-400 rounded-full"></span>
+            Computer Based Test - <span className="text-slate-500 font-medium">{schoolName}</span>
+          </h1>
         </div>
         <div className="flex items-center gap-4">
           <div className="text-right hidden sm:block">
-            <p className="text-sm font-medium text-slate-800 dark:text-slate-100">{siswa?.name}</p>
-            <p className="text-xs text-slate-500">{siswa?.className || "Siswa"}</p>
+            <p className="text-sm font-bold text-slate-800 dark:text-slate-100">{siswa?.name}</p>
+            <p className="text-[10px] uppercase tracking-wider font-bold text-slate-400">{siswa?.className || "Siswa"}</p>
           </div>
-          <Button variant="ghost" size="icon" onClick={logoutSiswa} className="text-red-500 hover:text-red-600 hover:bg-red-50">
+          <Button variant="ghost" size="icon" onClick={logoutSiswa} className="text-red-500 hover:text-red-600 hover:bg-red-50 transition-colors">
             <LogOut className="h-5 w-5" />
           </Button>
         </div>
@@ -171,14 +180,15 @@ const SiswaDashboardPage = () => {
       {/* Content */}
       <main className="max-w-4xl mx-auto p-6 flex items-center justify-center min-h-[calc(100vh-4rem)]">
         <div className="w-full max-w-md bg-card dark:bg-slate-800 p-8 rounded-3xl border dark:border-slate-800 shadow-sm space-y-5">
-           <div className="text-center space-y-1">
-              <div className="inline-flex flex-col items-center bg-slate-50 dark:bg-slate-900/50 px-4 py-2 rounded-xl mb-3 border border-slate-100 dark:border-slate-800">
-                <p className="text-xs text-slate-500 dark:text-slate-400">Selamat datang</p>
-                <p className="text-sm font-bold text-slate-800 dark:text-slate-200">{siswa?.name}</p>
-                <p className="text-[10px] text-slate-400 font-mono">({siswa?.nisn})</p>
+           <div className="text-center space-y-2 pb-2">
+              <div className="flex flex-col items-center">
+                <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 px-3 py-1 rounded-full uppercase tracking-[0.2em] border border-emerald-200 dark:border-emerald-800/50">DASHBOARD</span>
+                <h2 className="text-xl font-bold text-slate-900 dark:text-white mt-5 tracking-[0.1em] italic">UJIAN BERLANGSUNG</h2>
+                <div className="h-0.5 w-12 bg-slate-800 dark:bg-slate-400 rounded-full mt-1.5 mb-2 opacity-20"></div>
+                <p className="text-xs text-slate-500 max-w-[240px] mx-auto text-center leading-relaxed">
+                  Selamat datang <span className="text-slate-900 dark:text-white font-bold">{siswa?.name}</span>, silakan pilih ruang ujian aktif Anda di bawah ini.
+                </p>
               </div>
-              <h2 className="text-xl font-bold text-slate-900 dark:text-white">Ujian Berlangsung</h2>
-              <p className="text-xs text-slate-500">Pilih ruang ujian Anda di bawah untuk memulai.</p>
            </div>
 
            {loading ? (
@@ -188,52 +198,63 @@ const SiswaDashboardPage = () => {
                 Belum ada ujian aktif yang tersedia untuk kelas Anda saat ini.
              </div>
            ) : (
-             <div className="space-y-3">
-               {activeRooms.map((room) => (
-                 <div key={room.id} className="p-4 bg-slate-50 dark:bg-slate-900/30 rounded-2xl border border-slate-100 dark:border-slate-800 flex justify-between items-center transition-all hover:bg-slate-100/50 dark:hover:bg-slate-800/50 shadow-[0_2px_4px_rgba(0,0,0,0.01)]">
-                    <div className="space-y-2 flex-1 pr-3">
-                       <p className="font-bold text-slate-800 dark:text-slate-100 text-sm flex items-center gap-2 flex-wrap">
-                         <span className="truncate">{room.examTitle}</span>
-                         <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold border leading-tight whitespace-nowrap ${getExamTypeColorClass(room.examType || "")}`}>
-                           {room.examType}
-                         </span>
-                       </p>
-                       <div className="flex flex-col gap-1.5">
-                         <div className="text-[11px] font-medium text-slate-500 flex flex-wrap items-center gap-1.5">
-                           <span className="bg-slate-200/60 dark:bg-slate-800 px-1.5 py-0.5 rounded text-slate-700 dark:text-slate-300">{room.subject}</span>
-                           <span>•</span>
-                           <span>{room.teacherName}</span>
-                         </div>
-                         <div className="flex flex-col gap-1 mt-1 font-mono text-[10px] text-slate-500 bg-white dark:bg-slate-950/30 p-2 rounded-md border border-slate-100 dark:border-slate-800/60 w-fit">
-                           <div className="flex items-center gap-2">
-                             <span className="w-12 text-slate-400">Mulai</span>
-                             <span>: {new Date(room.start_time).toLocaleDateString("id-ID", { day: '2-digit', month: 'short', year: 'numeric' })} • <span className="text-slate-700 dark:text-slate-300 font-semibold">{new Date(room.start_time).toLocaleTimeString("id-ID", { hour: '2-digit', minute: '2-digit' })}</span></span>
-                           </div>
-                           <div className="flex items-center gap-2">
-                             <span className="w-12 text-slate-400">Selesai</span>
-                             <span>: {new Date(room.end_time).toLocaleDateString("id-ID", { day: '2-digit', month: 'short', year: 'numeric' })} • <span className="text-slate-700 dark:text-slate-300 font-semibold">{new Date(room.end_time).toLocaleTimeString("id-ID", { hour: '2-digit', minute: '2-digit' })}</span></span>
-                           </div>
-                           <div className="flex items-center gap-2">
-                             <span className="w-12 text-slate-400">Durasi</span>
-                             <span className="text-slate-700 dark:text-slate-300 font-bold">: {room.duration} Menit</span>
-                           </div>
-                         </div>
-                       </div>
+              <div className="space-y-4">
+                {activeRooms.map((room) => (
+                  <div key={room.id} className="group p-5 bg-white dark:bg-slate-800/40 rounded-[2rem] border border-slate-200/60 dark:border-slate-800 shadow-sm hover:shadow-md hover:border-blue-200 dark:hover:border-blue-900 transition-all">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                      <div className="space-y-3 flex-1">
+                        <div>
+                          <div className="flex items-center gap-2 mb-1.5">
+                            <span className={`text-[9px] uppercase font-bold px-2 py-0.5 rounded-full border tracking-wider ${getExamTypeColorClass(room.examType || "")}`}>
+                              {room.examType}
+                            </span>
+                            <span className="text-[9px] font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded-full border border-blue-100 dark:border-blue-800 uppercase tracking-wider">
+                              {room.duration} Menit
+                            </span>
+                          </div>
+                          <h3 className="text-lg font-bold text-slate-900 dark:text-white leading-tight group-hover:text-blue-600 transition-colors uppercase italic">{room.examTitle}</h3>
+                          <p className="text-[11px] font-medium text-slate-500 mt-1 flex items-center gap-2">
+                             <span className="px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800 rounded font-bold text-slate-700 dark:text-slate-300">{room.subject}</span>
+                             <span>•</span>
+                             <span>{room.teacherName}</span>
+                          </p>
+                        </div>
+
+                        <div className="flex items-center gap-2.5 px-3 py-1.5 bg-slate-100 dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 w-fit tabular-nums">
+                          <div className="flex items-center gap-1.5 border-r border-slate-300 dark:border-slate-700 pr-2.5">
+                            <Calendar className="w-3 h-3 text-slate-400" />
+                            <span className="text-[10px] font-bold text-slate-950 dark:text-white">
+                              {new Date(room.start_time).toLocaleDateString("id-ID", { day: '2-digit', month: '2-digit' })}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <Clock className="w-3 h-3 text-slate-400" />
+                            <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+                              {new Date(room.start_time).toLocaleTimeString("id-ID", { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                            <span className="text-slate-400 px-0.5">—</span>
+                            <span className="text-[10px] font-bold text-rose-600 dark:text-rose-400">
+                              {new Date(room.end_time).toLocaleTimeString("id-ID", { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <Button 
+                        size="sm" 
+                        onClick={() => {
+                          setSelectedRoom(room);
+                          setTokenInput("");
+                          setTokenError("");
+                        }}
+                        className="w-full sm:w-auto bg-slate-900 hover:bg-black dark:bg-blue-600 dark:hover:bg-blue-700 text-white font-bold h-11 px-8 rounded-2xl shadow-lg shadow-slate-200 dark:shadow-none transition-all active:scale-95"
+                      >
+                        Mulai
+                      </Button>
                     </div>
-                    <Button 
-                      size="sm" 
-                      onClick={() => {
-                        setSelectedRoom(room);
-                        setTokenInput("");
-                        setTokenError("");
-                      }}
-                      className="bg-slate-800 hover:bg-slate-900 border border-slate-700 dark:bg-blue-600 dark:hover:bg-blue-700 dark:border-blue-500 font-bold h-9 text-xs rounded-lg text-white px-5 shadow-sm transition-all whitespace-nowrap"
-                    >
-                      Masuk Ujian
-                    </Button>
-                 </div>
-               ))}
-             </div>
+                  </div>
+                ))}
+              </div>
            )}
         </div>
       </main>
