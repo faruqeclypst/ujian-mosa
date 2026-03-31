@@ -11,11 +11,11 @@ import { database } from "../lib/firebase";
 
 import { Card, CardHeader, CardTitle, CardContent } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
-import { usePiket } from "../context/PiketContext";
+import { useExamData } from "../context/ExamDataContext";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from "recharts";
 
 const DashboardPage = () => {
-  const { teachers, classes, mapels, students } = usePiket();
+  const { teachers, classes, subjects, students } = useExamData();
 
   const [totalExams, setTotalExams] = useState(0);
   const [activeRooms, setActiveRooms] = useState(0);
@@ -61,7 +61,7 @@ const DashboardPage = () => {
       }
     });
 
-    // 3. Siswa Sedang Aktif Ujian
+    // 3. student Sedang Aktif Ujian
     const unsubAttempts = onValue(ref(database, "attempts"), (snap) => {
       if (snap.exists()) {
         const data = snap.val();
@@ -81,7 +81,7 @@ const DashboardPage = () => {
 
   const totalTeachers = teachers.length;
   const totalClasses = classes.length;
-  const totalMapels = mapels.length;
+  const totalSubjects = subjects.length;
   const totalStudents = students.length;
 
   return (
@@ -109,7 +109,7 @@ const DashboardPage = () => {
             </div>
             <div>
                <div className="flex items-center gap-1.5">
-                  <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Siswa Sedang Ujian</p>
+                  <p className="text-xs font-medium text-slate-500 dark:text-slate-400">student Sedang Ujian</p>
                   <Badge className="bg-orange-500/10 text-orange-600 dark:text-orange-400 border-0 h-4 px-1 text-[9px] font-bold rounded">Live</Badge>
                </div>
                <p className="text-2xl font-black text-slate-800 dark:text-white mt-0.5">{ongoingStudents}</p>
@@ -195,7 +195,7 @@ const DashboardPage = () => {
              </div>
              <div>
                <p className="text-[11px] text-slate-400 dark:text-slate-500">Total Mapel</p>
-               <p className="text-lg font-bold text-slate-800 dark:text-white leading-none mt-0.5">{totalMapels}</p>
+               <p className="text-lg font-bold text-slate-800 dark:text-white leading-none mt-0.5">{totalSubjects}</p>
              </div>
            </div>
 

@@ -18,7 +18,7 @@ import ImageResize from "quill-image-resize-module-react";
 import "react-quill/dist/quill.snow.css";
 
 Quill.register("modules/imageResize", ImageResize);
-import { usePiket } from "../../context/PiketContext";
+import { useExamData } from "../../context/ExamDataContext";
 import { useAuth } from "../../context/AuthContext";
 import { DataTable } from "../../components/ui/data-table";
 export interface QuestionData {
@@ -135,7 +135,7 @@ const QuestionsPage = () => {
   const { examId } = useParams<{ examId: string }>();
   const navigate = useNavigate();
   const { role, teacherId } = useAuth();
-  const { mapels, teachers } = usePiket();
+  const { subjects, teachers } = useExamData();
 
   const [exam, setExam] = useState<any>(null);
   const [questions, setQuestions] = useState<QuestionData[]>([]);
@@ -508,12 +508,12 @@ const QuestionsPage = () => {
       if (snapshot.exists()) {
         const examData = snapshot.val();
 
-        const mapelObj = mapels.find((m) => m.id === examData.subjectId);
-        const teacherObj = teachers.find((t) => t.id === examData.teacherId);
+        const subjectObj = subjects.find((s: any) => s.id === examData.subjectId);
+        const teacherObj = teachers.find((t: any) => t.id === examData.teacherId);
 
         setExam({
           ...examData,
-          subject: mapelObj ? mapelObj.name : "",
+          subject: subjectObj ? subjectObj.name : "",
           teacherName: teacherObj ? teacherObj.name : "",
           teacherCode: teacherObj ? teacherObj.code || "" : ""
         });
@@ -536,7 +536,7 @@ const QuestionsPage = () => {
     });
 
     return () => unsubscribe();
-  }, [examId, mapels, teachers]);
+  }, [examId, subjects, teachers]);
 
   const handleCreateClick = () => {
     setDialogMode("create");
@@ -1026,7 +1026,7 @@ const QuestionsPage = () => {
                 onClick={() => setIsTambahMenuOpen(!isTambahMenuOpen)}
                 variant="secondary"
                 size="lg"
-                className="rounded-xl bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 dark:border-blue-800/20 shadow-sm font-semibold flex items-center gap-1"
+                className="rounded-xl bg-blue-50 hover:bg-blue-100 border border-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 dark:border-blue-800/40 text-blue-700 font-semibold shadow-sm flex items-center gap-1"
               >
                 Tambah <ChevronDown className={`h-4 w-4 transition-transform ${isTambahMenuOpen ? "rotate-180" : ""}`} />
               </Button>
@@ -1078,35 +1078,32 @@ const QuestionsPage = () => {
                   emptyMessage="Tidak ada soal ditemukan."
                   actions={(q: QuestionData) => (
                     <div className="flex justify-end items-center gap-1.5 whitespace-nowrap">
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        className="bg-sky-50 text-sky-700 hover:bg-sky-100 border border-sky-100 dark:bg-sky-900/10 dark:text-sky-400 dark:hover:bg-sky-900/30 dark:border-sky-800/40 h-7 text-xs"
+                      <button
+                        className="p-1.5 bg-sky-50 text-sky-600 hover:bg-sky-100 rounded-lg dark:bg-sky-900/10 dark:text-sky-400 border border-sky-100 dark:border-sky-800/40"
                         onClick={() => {
                           setPreviewQuestion(q);
                           setIsPreviewOpen(true);
                         }}
+                        title="Pratinjau Soal"
                       >
-                        Pratinjau
-                      </Button>
+                        <Eye className="h-4 w-4" />
+                      </button>
                       {(role === "admin" || exam?.teacherId === teacherId) && (
                         <>
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            className="bg-green-50 text-green-700 hover:bg-green-100 border border-green-100 dark:bg-green-900/10 dark:text-green-400 dark:hover:bg-green-900/30 dark:border-green-800/40 h-7 text-xs"
+                          <button
+                            className="p-1.5 bg-sky-50 text-sky-600 hover:bg-sky-100 rounded-lg dark:bg-sky-900/10 dark:text-sky-400 border border-sky-100 dark:border-sky-800/40"
                             onClick={() => handleEditClick(q)}
+                            title="Edit Soal"
                           >
-                            <Edit className="h-4 w-4 mr-1" /> Edit
-                          </Button>
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            className="bg-rose-50 text-rose-600 hover:bg-rose-100 border border-rose-100 dark:bg-rose-900/10 dark:text-rose-400 dark:hover:bg-rose-900/30 dark:border-rose-800/40 h-7 text-xs"
+                            <Edit className="h-4 w-4" />
+                          </button>
+                          <button
+                            className="p-1.5 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-lg dark:bg-rose-900/10 dark:text-rose-400 border border-rose-100 dark:border-rose-800/40"
                             onClick={() => handleDeleteClick(q)}
+                            title="Hapus Soal"
                           >
-                            <Trash className="h-4 w-4 mr-1" /> Hapus
-                          </Button>
+                            <Trash className="h-4 w-4" />
+                          </button>
                         </>
                       )}
                     </div>
@@ -1235,7 +1232,7 @@ const QuestionsPage = () => {
 
             <FormField id="image" label="Gambar Cover Soal (Opsional)" error={undefined}>
               <div className="flex flex-col gap-2">
-                <p className="text-[11px] text-slate-400 -mt-1 mb-1">Gambar ini akan ditampilkan tepat di atas teks pertanyaan utama pada lembar ujian siswa.</p>
+                <p className="text-[11px] text-slate-400 -mt-1 mb-1">Gambar ini akan ditampilkan tepat di atas teks pertanyaan utama pada lembar ujian Siswa.</p>
                 <div className="flex items-center gap-3">
                   <button
                     type="button"
@@ -1358,7 +1355,7 @@ const QuestionsPage = () => {
                   })()}
                 </div>
 
-                {/* 🔖 Render Literasi Jika Tergabung dalam Grup (Seperti di CBT Siswa) */}
+                {/* 🔖 Render Literasi Jika Tergabung dalam Grup (Seperti di CBT student) */}
                 {previewQuestion.groupId && (() => {
                   const firstInGroup = questions.find(q => q.groupId === previewQuestion.groupId);
                   if (firstInGroup) {
@@ -1630,3 +1627,5 @@ const QuestionsPage = () => {
 };
 
 export default QuestionsPage;
+
+

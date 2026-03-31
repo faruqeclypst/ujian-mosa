@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useSiswaAuth } from "../../context/SiswaAuthContext";
+import { useStudentAuth } from "../../context/StudentAuthContext";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import FormField from "../../components/forms/FormField";
@@ -8,8 +8,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../../componen
 import { database } from "../../lib/firebase";
 import { ref, get } from "firebase/database";
 
-const SiswaLoginPage = () => {
-  const { loginSiswa, siswa, changePassword } = useSiswaAuth();
+const studentLoginPage = () => {
+  const { loginStudent, student, changePassword } = useStudentAuth();
   
   const [nisn, setNisn] = useState("");
   const [password, setPassword] = useState("");
@@ -42,7 +42,7 @@ const SiswaLoginPage = () => {
     setLoading(true);
 
     try {
-      await loginSiswa(nisn, password);
+      await loginStudent(nisn, password);
     } catch (err: any) {
       setError(err.message || "Gagal login. Periksa kembali NISN dan password Anda.");
     } finally {
@@ -74,7 +74,7 @@ const SiswaLoginPage = () => {
     }
   };
 
-  const showChangePassModal = !!(siswa && !siswa.hasChangedPassword);
+  const showChangePassModal = !!(student && !student.hasChangedPassword);
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 via-slate-50 to-indigo-50 overflow-hidden relative">
@@ -94,7 +94,7 @@ const SiswaLoginPage = () => {
               </div>
             )}
           </div>
-          <CardTitle className="text-xl sm:text-2xl font-bold text-slate-800">Login Siswa</CardTitle>
+          <CardTitle className="text-xl sm:text-2xl font-bold text-slate-800">Login student</CardTitle>
           <p className="text-slate-500 text-xs sm:text-sm">{schoolName || "Ujian Computer Based Test"}</p>
         </CardHeader>
         <CardContent className="pt-4">
@@ -190,4 +190,5 @@ const SiswaLoginPage = () => {
   );
 };
 
-export default SiswaLoginPage;
+export default studentLoginPage;
+

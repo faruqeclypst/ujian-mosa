@@ -1,11 +1,10 @@
 import * as XLSX from "xlsx-js-style";
-import { z } from "zod";
 
-export const MAPEL_IMPORT_HEADERS = ["Mata Pelajaran"] as const;
+export const SUBJECT_IMPORT_HEADERS = ["Mata Pelajaran"] as const;
 
-export function downloadMapelImportTemplate(filename = "template-import-mapel.xlsx") {
+export function downloadSubjectImportTemplate(filename = "template-import-mapel.xlsx") {
   const ws = XLSX.utils.aoa_to_sheet([
-    [...MAPEL_IMPORT_HEADERS],
+    [...SUBJECT_IMPORT_HEADERS],
     ["Matematika"],
     ["Bahasa Indonesia"],
   ]);
@@ -30,12 +29,12 @@ export function downloadMapelImportTemplate(filename = "template-import-mapel.xl
   (wsNotes as any)["!cols"] = [{ wch: 60 }];
 
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Mapel");
+  XLSX.utils.book_append_sheet(wb, ws, "Subject");
   XLSX.utils.book_append_sheet(wb, wsNotes, "Keterangan");
   XLSX.writeFile(wb, filename);
 }
 
-export async function parseMapelImportExcel(file: File): Promise<{ name: string }[]> {
+export async function parseSubjectImportExcel(file: File): Promise<{ name: string }[]> {
   const buffer = await file.arrayBuffer();
   const wb = XLSX.read(buffer, { type: "array" });
   const ws = wb.Sheets[wb.SheetNames[0]];
@@ -49,11 +48,11 @@ export async function parseMapelImportExcel(file: File): Promise<{ name: string 
     .filter((v) => v.name.length > 1);
 }
 
-export function exportMapelToExcel(params: { mapels: Array<{ name: string }>; filename?: string }) {
+export function exportSubjectToExcel(params: { subjects: Array<{ name: string }>; filename?: string }) {
   const filename = params.filename ?? "data-mapel.xlsx";
   const ws = XLSX.utils.aoa_to_sheet([
-    [...MAPEL_IMPORT_HEADERS],
-    ...params.mapels.map((m) => [m.name]),
+    [...SUBJECT_IMPORT_HEADERS],
+    ...params.subjects.map((m) => [m.name]),
   ]);
 
   const headerStyle = {
@@ -66,6 +65,6 @@ export function exportMapelToExcel(params: { mapels: Array<{ name: string }>; fi
   (ws as any)["!cols"] = [{ wch: 30 }];
 
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Mapel");
+  XLSX.utils.book_append_sheet(wb, ws, "Subject");
   XLSX.writeFile(wb, filename);
 }

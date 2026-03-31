@@ -1,8 +1,6 @@
 import { useEffect, useState } from "react";
-import { useSiswaAuth } from "../../context/SiswaAuthContext";
-import { useAuth } from "../../context/AuthContext"; // wait, the prompt doesn't mix both but maybe just to safe check logout
+import { useStudentAuth } from "../../context/StudentAuthContext";
 import { Button } from "../../components/ui/button";
-import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from "../../components/ui/card";
 import { Input } from "../../components/ui/input";
 import { ref, onValue, get } from "firebase/database";
 import { database } from "../../lib/firebase";
@@ -10,19 +8,8 @@ import { LogOut, KeyRound, Calendar, Clock } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../../components/ui/dialog";
 import { getExamTypeColorClass } from "../admin/ExamsPage";
 
-interface ExamRoom {
-  id: string;
-  examId: string;
-  examTitle: string;
-  subject: string;
-  start_time: string; // ISO 8601 or timestamp
-  end_time: string;
-  duration: number; // minutes
-  status?: string;
-}
-
-const SiswaDashboardPage = () => {
-  const { siswa, logoutSiswa } = useSiswaAuth();
+const studentDashboardPage = () => {
+  const { student, logoutStudent } = useStudentAuth();
   const [loading, setLoading] = useState(true);
   const [schoolName, setSchoolName] = useState("Computer Based Test");
 
@@ -33,71 +20,104 @@ const SiswaDashboardPage = () => {
   const [isValidating, setIsValidating] = useState(false);
 
   const [activeRooms, setActiveRooms] = useState<any[]>([]);
+  const [userAttempts, setUserAttempts] = useState<Record<string, any>>({});
 
   useEffect(() => {
-    if (!siswa?.classId) return;
+    if (!student?.classId) return;
 
-    const examsRef = ref(database, "exams");
-    const teachersRef = ref(database, "piket_teachers");
-    const subjectsRef = ref(database, "piket_subjects");
-    const schoolRef = ref(database, "settings/school");
-    
-    Promise.all([get(examsRef), get(teachersRef), get(subjectsRef), get(schoolRef)]).then(([examsSnap, teachersSnap, subjectsSnap, schoolSnap]) => {
-      const examsData = examsSnap.exists() ? examsSnap.val() : {};
-      const teachersData = teachersSnap.exists() ? teachersSnap.val() : {};
-      const subjectsData = subjectsSnap.exists() ? subjectsSnap.val() : {};
+    let unsubRooms: (() => void) | null = null;
 
-      if (schoolSnap.exists()) {
-        setSchoolName(schoolSnap.val().name || "Computer Based Test");
-      }
+    const init = async () => {
+      try {
+        const [examsSnap, teachersSnap, subjectsSnap, schoolSnap] = await Promise.all([
+          get(ref(database, "exams")),
+          get(ref(database, "teachers")),
+          get(ref(database, "subjects")),
+          get(ref(database, "settings/school"))
+        ]);
 
-      // 2. Monitoring Real-Time Ruang Ujian
-      const roomsRef = ref(database, "exam_rooms");
-      return onValue(roomsRef, (snapshot) => {
-        setLoading(true);
-        if (snapshot.exists()) {
-          const roomsData = snapshot.val();
-          const now = Date.now();
-          const validRooms: any[] = [];
+        const examsData = examsSnap.exists() ? examsSnap.val() : {};
+        const teachersData = teachersSnap.exists() ? teachersSnap.val() : {};
+        const subjectsData = subjectsSnap.exists() ? subjectsSnap.val() : {};
 
-          Object.keys(roomsData).forEach((key) => {
-            const room = roomsData[key];
-
-            if (room.status === "archive" || room.isDisabled) return;
-
-            // ✔️ Validasi Kelas Siswa
-            const hasClassAccess = room.allClasses || 
-              (room.classId && room.classId.split(",").includes(siswa.classId));
-            
-            if (!hasClassAccess) return;
-
-            // ✔️ Validasi Jam / Periode Ujian
-            const start = new Date(room.start_time).getTime();
-            const end = new Date(room.end_time).getTime();
-            if (now < start || now > end) return;
-
-            const exam = examsData[room.examId];
-            const teacher = exam?.teacherId ? teachersData[exam.teacherId] : null;
-            const subject = exam?.subjectId ? subjectsData[exam.subjectId] : null;
-            const examType = exam?.examType || "Latihan Biasa";
-            validRooms.push({
-              id: key,
-              ...room,
-              examTitle: room.room_name || exam?.title || "Ujian Tanpa Judul",
-              subject: subject?.name || "Mata Pelajaran",
-              teacherName: teacher?.name || "-",
-              examType
-            });
-          });
-
-          setActiveRooms(validRooms);
-        } else {
-          setActiveRooms([]);
+        if (schoolSnap.exists()) {
+          setSchoolName(schoolSnap.val().name || "Computer Based Test");
         }
+
+        unsubRooms = onValue(ref(database, "exam_rooms"), (snapshot) => {
+          if (snapshot.exists()) {
+            const roomsData = snapshot.val();
+            const now = Date.now();
+            const validRooms: any[] = [];
+
+            Object.keys(roomsData).forEach((key) => {
+              const room = roomsData[key];
+              if (room.status === "archive" || room.isDisabled) return;
+
+              const hasClassAccess = room.allClasses || 
+                (room.classId && room.classId.split(",").includes(student.classId));
+              
+              if (!hasClassAccess) return;
+
+              const start = new Date(room.start_time).getTime();
+              const end = new Date(room.end_time).getTime();
+              if (now < start || now > end) return;
+
+              const exam = examsData[room.examId];
+              const teacher = exam?.teacherId ? teachersData[exam.teacherId] : null;
+              const subject = exam?.subjectId ? subjectsData[exam.subjectId] : null;
+              const examType = exam?.examType || "Latihan Biasa";
+              
+              validRooms.push({
+                id: key,
+                ...room,
+                examTitle: room.room_name || exam?.title || "Ujian Tanpa Judul",
+                subject: subject?.name || "Mata Pelajaran",
+                teacherName: teacher?.name || "-",
+                examType
+              });
+            });
+
+            setActiveRooms(validRooms);
+          } else {
+            setActiveRooms([]);
+          }
+          setLoading(false);
+        });
+      } catch (err) {
+        console.error("Failed to init dashboard", err);
         setLoading(false);
-      });
+      }
+    };
+
+    init();
+
+    return () => {
+      if (unsubRooms) unsubRooms();
+    };
+  }, [student?.classId]);
+
+  // Separate effect for attempts to keep it clean and reactive
+  useEffect(() => {
+    if (!student || activeRooms.length === 0) return;
+
+    const unsubAttempts = onValue(ref(database, "attempts"), (snap) => {
+      if (snap.exists()) {
+        const allAttempts = snap.val();
+        const myStatus: Record<string, any> = {};
+        activeRooms.forEach(room => {
+          if (allAttempts[room.id] && allAttempts[room.id][student.nisn]) {
+            myStatus[room.id] = allAttempts[room.id][student.nisn].status;
+          }
+        });
+        setUserAttempts(myStatus);
+      } else {
+        setUserAttempts({});
+      }
     });
-  }, [siswa?.classId]);
+
+    return () => unsubAttempts();
+  }, [student, activeRooms]);
 
   const handleValidateToken = async () => {
     if (!selectedRoom) return;
@@ -114,8 +134,6 @@ const SiswaDashboardPage = () => {
       }
 
       const roomData = snapshot.val();
-      
-      // 🔒 Validasi Token dari Database (Hasil rotasi dari sisi Admin)
       const globalTokenRef = ref(database, "settings/universal_token");
       const globalTokenSnap = await get(globalTokenRef);
       const checkToken = globalTokenSnap.exists() ? globalTokenSnap.val() : roomData.token;
@@ -123,30 +141,21 @@ const SiswaDashboardPage = () => {
       const input = tokenInput.trim().toUpperCase();
       const isValid = checkToken && input === String(checkToken).toUpperCase();
 
-      if (!isValid) {
-        throw new Error("Token salah atau sudah kadaluarsa!");
-      }
-      // Validate Time
+      if (!isValid) throw new Error("Token salah atau sudah kadaluarsa!");
+      
       const now = Date.now();
       const startTime = new Date(roomData.start_time).getTime();
       const endTime = new Date(roomData.end_time).getTime();
 
-      if (now < startTime) {
-        throw new Error("Ujian belum dimulai!");
-      }
+      if (now < startTime) throw new Error("Ujian belum dimulai!");
+      if (now > endTime) throw new Error("Waktu ujian telah berakhir!");
 
-      if (now > endTime) {
-        throw new Error("Waktu ujian telah berakhir!");
-      }
-
-      // Check if attempt exists and is locked
-      const attemptRef = ref(database, `attempts/${siswa?.nisn}_${selectedRoom.id}`);
+      const attemptRef = ref(database, `attempts/${selectedRoom.id}/${student?.nisn}`);
       const attemptSnap = await get(attemptRef);
       if (attemptSnap.exists() && attemptSnap.val().status === "LOCKED") {
         throw new Error("Akun Anda terkunci! Hubungi admin.");
       }
 
-      // Proceed to exam page
       window.location.href = `/cbt/${selectedRoom.id}`;
 
     } catch (err: any) {
@@ -158,7 +167,6 @@ const SiswaDashboardPage = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
-      {/* Header */}
       <header className="sticky top-0 z-10 backdrop-blur-md bg-white/90 dark:bg-slate-900/90 border-b border-slate-200 dark:border-slate-800 shadow-sm px-6 h-16 flex items-center justify-between">
         <div>
           <h1 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
@@ -168,16 +176,15 @@ const SiswaDashboardPage = () => {
         </div>
         <div className="flex items-center gap-4">
           <div className="text-right hidden sm:block">
-            <p className="text-sm font-bold text-slate-800 dark:text-slate-100">{siswa?.name}</p>
-            <p className="text-[10px] uppercase tracking-wider font-bold text-slate-400">{siswa?.className || "Siswa"}</p>
+            <p className="text-sm font-bold text-slate-800 dark:text-slate-100">{student?.name}</p>
+            <p className="text-[10px] uppercase tracking-wider font-bold text-slate-400">{student?.className || "student"}</p>
           </div>
-          <Button variant="ghost" size="icon" onClick={logoutSiswa} className="text-red-500 hover:text-red-600 hover:bg-red-50 transition-colors">
+          <Button variant="ghost" size="icon" onClick={logoutStudent} className="text-red-500 hover:text-red-600 hover:bg-red-50 transition-colors">
             <LogOut className="h-5 w-5" />
           </Button>
         </div>
       </header>
 
-      {/* Content */}
       <main className="max-w-4xl mx-auto p-6 flex items-center justify-center min-h-[calc(100vh-4rem)]">
         <div className="w-full max-w-md bg-card dark:bg-slate-800 p-8 rounded-3xl border dark:border-slate-800 shadow-sm space-y-5">
            <div className="text-center space-y-2 pb-2">
@@ -186,7 +193,7 @@ const SiswaDashboardPage = () => {
                 <h2 className="text-xl font-bold text-slate-900 dark:text-white mt-5 tracking-[0.1em] italic">UJIAN BERLANGSUNG</h2>
                 <div className="h-0.5 w-12 bg-slate-800 dark:bg-slate-400 rounded-full mt-1.5 mb-2 opacity-20"></div>
                 <p className="text-xs text-slate-500 max-w-[240px] mx-auto text-center leading-relaxed">
-                  Selamat datang <span className="text-slate-900 dark:text-white font-bold">{siswa?.name}</span>, silakan pilih ruang ujian aktif Anda di bawah ini.
+                  Selamat datang <span className="text-slate-900 dark:text-white font-bold">{student?.name}</span>, silakan pilih ruang ujian aktif Anda di bawah ini.
                 </p>
               </div>
            </div>
@@ -240,17 +247,28 @@ const SiswaDashboardPage = () => {
                         </div>
                       </div>
 
-                      <Button 
-                        size="sm" 
-                        onClick={() => {
-                          setSelectedRoom(room);
-                          setTokenInput("");
-                          setTokenError("");
-                        }}
-                        className="w-full sm:w-auto bg-slate-900 hover:bg-black dark:bg-blue-600 dark:hover:bg-blue-700 text-white font-bold h-11 px-8 rounded-2xl shadow-lg shadow-slate-200 dark:shadow-none transition-all active:scale-95"
-                      >
-                        Mulai
-                      </Button>
+                      {userAttempts[room.id] === "submitted" ? (
+                        <div className="flex flex-col items-center gap-1">
+                          <Button 
+                            disabled
+                            className="w-full sm:w-auto bg-green-100 text-green-700 dark:bg-green-950/30 dark:text-green-400 font-bold h-11 px-8 rounded-2xl border border-green-200 dark:border-green-900/50 cursor-default"
+                          >
+                            Tersimpan
+                          </Button>
+                          <span className="text-[9px] text-green-500 font-bold uppercase tracking-wider">Sudah Selesai</span>
+                        </div>
+                      ) : (
+                        <Button 
+                          onClick={() => {
+                            setSelectedRoom(room);
+                            setTokenInput("");
+                            setTokenError("");
+                          }}
+                          className="w-full sm:w-auto bg-slate-900 hover:bg-black dark:bg-blue-600 dark:hover:bg-blue-700 text-white font-bold h-11 px-8 rounded-2xl shadow-lg shadow-slate-200 dark:shadow-none transition-all active:scale-95"
+                        >
+                          Mulai
+                        </Button>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -259,7 +277,6 @@ const SiswaDashboardPage = () => {
         </div>
       </main>
 
-      {/* Token Verification Dialog */}
       <Dialog open={selectedRoom !== null} onOpenChange={(open) => !open && setSelectedRoom(null)}>
         <DialogContent className="max-w-md bg-card rounded-2xl p-6">
           <DialogHeader>
@@ -279,11 +296,11 @@ const SiswaDashboardPage = () => {
             <div className="border rounded-xl p-4 bg-slate-50 dark:bg-slate-900/50 space-y-3 text-xs sm:text-sm">
               <div className="grid grid-cols-3 gap-1">
                 <span className="text-slate-500 text-[11px] sm:text-xs">Nisn</span>
-                <span className="col-span-2 font-medium text-slate-800 dark:text-slate-200 text-[11px] sm:text-xs">: {siswa?.nisn}</span>
+                <span className="col-span-2 font-medium text-slate-800 dark:text-slate-200 text-[11px] sm:text-xs">: {student?.nisn}</span>
               </div>
               <div className="grid grid-cols-3 gap-1">
                 <span className="text-slate-500 text-[11px] sm:text-xs">Nama Lengkap</span>
-                <span className="col-span-2 font-medium text-slate-800 dark:text-slate-200 text-[11px] sm:text-xs">: {siswa?.name}</span>
+                <span className="col-span-2 font-medium text-slate-800 dark:text-slate-200 text-[11px] sm:text-xs">: {student?.name}</span>
               </div>
               <div className="grid grid-cols-3 gap-1">
                 <span className="text-slate-500 text-[11px] sm:text-xs">Guru/Mapel</span>
@@ -336,4 +353,6 @@ const SiswaDashboardPage = () => {
   );
 };
 
-export default SiswaDashboardPage;
+export default studentDashboardPage;
+
+

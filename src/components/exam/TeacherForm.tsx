@@ -3,34 +3,34 @@ import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 
-import { usePiket } from "../../context/PiketContext";
+import { useExamData } from "../../context/ExamDataContext";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import FormField from "../forms/FormField";
 
-const guruSchema = z.object({
+const teacherSchema = z.object({
   name: z.string().min(1, "Nama guru wajib diisi"),
   code: z.string().optional(),
   subjects: z.array(z.string()).min(1, "Pilih minimal 1 mata pelajaran"),
 });
 
-export type GuruFormValues = z.infer<typeof guruSchema>;
+export type TeacherFormValues = z.infer<typeof teacherSchema>;
 
-export interface GuruSubmitPayload {
+export interface TeacherSubmitPayload {
   name: string;
   code?: string;
   subjects: string[];
 }
 
-interface GuruFormProps {
-  defaultValues?: Partial<GuruSubmitPayload>;
-  onSubmit: (values: GuruSubmitPayload) => Promise<void>;
+interface TeacherFormProps {
+  defaultValues?: Partial<TeacherSubmitPayload>;
+  onSubmit: (values: TeacherSubmitPayload) => Promise<void>;
   submitLabel?: string;
   onCancel?: () => void;
 }
 
-const GuruForm = ({ defaultValues, onSubmit, submitLabel = "Simpan", onCancel }: GuruFormProps) => {
-  const { mapels } = usePiket();
+const TeacherForm = ({ defaultValues, onSubmit, submitLabel = "Simpan", onCancel }: TeacherFormProps) => {
+  const { subjects } = useExamData();
   
   const {
     register,
@@ -38,8 +38,8 @@ const GuruForm = ({ defaultValues, onSubmit, submitLabel = "Simpan", onCancel }:
     control,
     formState: { errors, isSubmitting },
     reset,
-  } = useForm<GuruFormValues>({
-    resolver: zodResolver(guruSchema),
+  } = useForm<TeacherFormValues>({
+    resolver: zodResolver(teacherSchema),
     defaultValues: {
       name: "",
       code: "",
@@ -57,7 +57,7 @@ const GuruForm = ({ defaultValues, onSubmit, submitLabel = "Simpan", onCancel }:
     }
   }, [defaultValues, reset]);
 
-  const submitHandler = async (values: GuruFormValues) => {
+  const submitHandler = async (values: TeacherFormValues) => {
     await onSubmit({
       name: values.name,
       code: values.code || "",
@@ -80,7 +80,7 @@ const GuruForm = ({ defaultValues, onSubmit, submitLabel = "Simpan", onCancel }:
       </FormField>
       
       <FormField id="subjects" label="Mata Pelajaran (Bisa pilih lebih dari satu)" error={errors.subjects as any}>
-        {mapels.length === 0 ? (
+        {subjects.length === 0 ? (
           <div className="p-3 bg-slate-50 border border-dashed rounded text-sm text-slate-500 text-center">
             Belum ada data Mapel. Silakan tambah di menu <strong>Data Mapel</strong>.
           </div>
@@ -91,7 +91,7 @@ const GuruForm = ({ defaultValues, onSubmit, submitLabel = "Simpan", onCancel }:
               name="subjects"
               render={({ field }) => (
                 <>
-                  {mapels.map((mapel) => {
+                  {subjects.map((mapel) => {
                     const isChecked = field.value.includes(mapel.name);
                     return (
                       <label 
@@ -139,7 +139,7 @@ const GuruForm = ({ defaultValues, onSubmit, submitLabel = "Simpan", onCancel }:
         )}
         <Button
           type="submit"
-          disabled={isSubmitting || mapels.length === 0}
+          disabled={isSubmitting || subjects.length === 0}
           className="bg-blue-50 hover:bg-blue-100 border border-blue-100 dark:bg-blue-900/40 dark:text-blue-400 dark:hover:bg-blue-900/60 dark:border-blue-800/20 text-blue-700 font-semibold rounded-xl"
         >
           {isSubmitting ? "Menyimpan..." : submitLabel}
@@ -149,4 +149,6 @@ const GuruForm = ({ defaultValues, onSubmit, submitLabel = "Simpan", onCancel }:
   );
 };
 
-export default GuruForm;
+export default TeacherForm;
+
+

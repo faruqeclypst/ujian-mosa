@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useSiswaAuth } from "../../context/SiswaAuthContext";
+import { useStudentAuth } from "../../context/StudentAuthContext";
 import { ref, get, set, update, onValue, onDisconnect } from "firebase/database";
 import { database } from "../../lib/firebase";
 import { Button } from "../../components/ui/button";
@@ -29,7 +29,7 @@ interface ExamAttempt {
 
 const CBTPage = () => {
   const { roomId } = useParams<{ roomId: string }>();
-  const { siswa, logoutSiswa } = useSiswaAuth();
+  const { student, logoutStudent } = useStudentAuth();
   const navigate = useNavigate();
 
   const [loading, setLoading] = useState(true);
@@ -43,7 +43,7 @@ const CBTPage = () => {
   const [isExamOver, setIsExamOver] = useState(false);
   const [isResetModalOpen, setIsResetModalOpen] = useState(false); // <--- modal state untuk reset sesi
   const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false); // <--- modal state kumpul ujian
-  const [previewImage, setPreviewImage] = useState<string | null>(null); // <--- Preview gambar siswa zoom clicks
+  const [previewImage, setPreviewImage] = useState<string | null>(null); // <--- Preview gambar student zoom clicks
   const [isNavModalOpen, setIsNavModalOpen] = useState(false); // <--- Modal navigasi soal mobile
   const [isCheatWarningOpen, setIsCheatWarningOpen] = useState(false); // <--- Modal peringatan cheat
   // Anti-Cheat State
@@ -60,7 +60,7 @@ const CBTPage = () => {
   const [flaggedQuestions, setFlaggedQuestions] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
-    if (!siswa || !roomId) return;
+    if (!student || !roomId) return;
 
     const loadExamData = async () => {
       try {
@@ -84,13 +84,13 @@ const CBTPage = () => {
             examTitle = eData.title || "CBT";
             subject = eData.subject || "Ujian";
             if (eData.subjectId) {
-              const subjectSnap = await get(ref(database, `piket_subjects/${eData.subjectId}`));
+              const subjectSnap = await get(ref(database, `subjects/${eData.subjectId}`));
               if (subjectSnap.exists()) {
                 subject = subjectSnap.val().name || subject;
               }
             }
             if (eData.teacherId) {
-              const teacherSnap = await get(ref(database, `piket_teachers/${eData.teacherId}`));
+              const teacherSnap = await get(ref(database, `teachers/${eData.teacherId}`));
               if (teacherSnap.exists()) {
                 teacherName = teacherSnap.val().name || "-";
               }
@@ -100,7 +100,7 @@ const CBTPage = () => {
         setRoomData({ ...rData, examTitle, subject, teacherName });
 
         // 2. Load Attempt
-        const attemptRef = ref(database, `attempts/${siswa.nisn}_${roomId}`);
+        const attemptRef = ref(database, `attempts/${roomId}/${student.nisn}`);
         const attemptSnap = await get(attemptRef);
         
         let initialCheatCount = 0;
@@ -131,6 +131,8 @@ const CBTPage = () => {
         } else {
           // Create initial attempt
           const initialData = {
+            nisn: student.nisn,
+            roomId: roomId,
             status: "ongoing",
             cheatCount: 0,
             startTime: startTime,
@@ -163,14 +165,14 @@ const CBTPage = () => {
 
         // 3. Load Answers
         let initialAnswers = {};
-        const answersRef = ref(database, `answers/${siswa.nisn}_${roomId}`);
+        const answersRef = ref(database, `answers/${roomId}/${student.nisn}`);
         const answersSnap = await get(answersRef);
         if (answersSnap.exists()) {
           initialAnswers = answersSnap.val();
           setAnswers(initialAnswers);
         }
 
-        const flagKey = `flags_${siswa.nisn}_${roomId}`;
+        const flagKey = `flags_${student.nisn}_${roomId}`;
         const savedFlags = sessionStorage.getItem(flagKey);
         if (savedFlags) {
           try {
@@ -221,7 +223,7 @@ const CBTPage = () => {
             return collection.flat();
           };
 
-          const orderKey = `order_${siswa.nisn}_${roomId}`;
+          const orderKey = `order_${student.nisn}_${roomId}`;
           let savedOrder = sessionStorage.getItem(orderKey);
           let order: string[] = [];
 
@@ -247,7 +249,7 @@ const CBTPage = () => {
           }
 
           // Handle Choices Randomizing 
-          const choiceOrderKey = `choices_${siswa.nisn}_${roomId}`;
+          const choiceOrderKey = `choices_${student.nisn}_${roomId}`;
           const savedChoices = sessionStorage.getItem(choiceOrderKey);
           let cOrder: Record<string, string[]> = {};
           if (savedChoices) {
@@ -278,7 +280,7 @@ const CBTPage = () => {
           setQuestions(sorted);
 
           // 🛡️ Load currentQuestionIndex dari sessionStorage
-          const indexKey = `currentIndex_${siswa?.nisn}_${roomId}`;
+          const indexKey = `currentIndex_${student?.nisn}_${roomId}`;
           const savedIndex = sessionStorage.getItem(indexKey);
           if (savedIndex) {
             const idx = parseInt(savedIndex, 10);
@@ -299,7 +301,7 @@ const CBTPage = () => {
     loadExamData();
 
     // Setup realtime unlock/reset listener from Admin
-    const attemptRefLocal = ref(database, `attempts/${siswa.nisn}_${roomId}`);
+    const attemptRefLocal = ref(database, `attempts/${roomId}/${student.nisn}`);
     let isInitialFetch = true;
 
     const unsubscribeStatus = onValue(attemptRefLocal, (snapshot) => {
@@ -327,7 +329,7 @@ const CBTPage = () => {
     });
 
     return () => unsubscribeStatus();
-  }, [siswa, roomId, isLocked]);
+  }, [student, roomId, isLocked]);
 
   // Timer Countdown Logic
   useEffect(() => {
@@ -378,7 +380,7 @@ const CBTPage = () => {
         const newCheatCount = (attempt.cheatCount || 0) + 1;
         setAttempt((prev) => prev ? { ...prev, cheatCount: newCheatCount } : null);
 
-        const attemptRef = ref(database, `attempts/${siswa?.nisn}_${roomId}`);
+        const attemptRef = ref(database, `attempts/${roomId}/${student?.nisn}`);
         
         const extraLimit = attempt?.extraCheatLimit || 0;
         const totalAllowed = (roomData?.cheat_limit || 3) + extraLimit;
@@ -409,10 +411,10 @@ const CBTPage = () => {
 
   // Online / Offline Presence Tracking using onDisconnect
   useEffect(() => {
-    if (!siswa || !roomId || loading) return;
+    if (!student || !roomId || loading) return;
 
-    const attemptId = `${siswa.nisn}_${roomId}`;
-    const attemptRefLocal = ref(database, `attempts/${attemptId}`);
+    const attemptId = `${student.nisn}`; // path simplified in local but keeps nisin reference
+    const attemptRefLocal = ref(database, `attempts/${roomId}/${student.nisn}`);
     
     // Set online
     update(attemptRefLocal, { isOnline: true });
@@ -426,7 +428,7 @@ const CBTPage = () => {
       disconnection.cancel();
       update(attemptRefLocal, { isOnline: false });
     };
-  }, [siswa, roomId, loading]);
+  }, [student, roomId, loading]);
 
   // Disable Copy, Paste, Cut, Right-Click, and Selection
   useEffect(() => {
@@ -449,14 +451,14 @@ const CBTPage = () => {
 
   // 🛡️ Simpan currentQuestionIndex ke sessionStorage setiap kali berganti soal
   useEffect(() => {
-    if (siswa && roomId && isIndexRestored.current) {
-      const indexKey = `currentIndex_${siswa.nisn}_${roomId}`;
+    if (student && roomId && isIndexRestored.current) {
+      const indexKey = `currentIndex_${student.nisn}_${roomId}`;
       sessionStorage.setItem(indexKey, currentQuestionIndex.toString());
     }
-  }, [currentQuestionIndex, siswa, roomId]);
+  }, [currentQuestionIndex, student, roomId]);
 
   const toggleFlag = (qId: string) => {
-    const flagKey = `flags_${siswa?.nisn}_${roomId}`;
+    const flagKey = `flags_${student?.nisn}_${roomId}`;
     setFlaggedQuestions((prev) => {
       const updated = { ...prev, [qId]: !prev[qId] };
       sessionStorage.setItem(flagKey, JSON.stringify(updated));
@@ -476,10 +478,10 @@ const CBTPage = () => {
       }
 
       saveTimeoutRef.current[questionId] = setTimeout(async () => {
-        const answersRef = ref(database, `answers/${siswa?.nisn}_${roomId}`);
+        const answersRef = ref(database, `answers/${roomId}/${student?.nisn}`);
         await update(answersRef, { [questionId]: choiceId });
         // Backup to SessionStorage
-        sessionStorage.setItem(`ans_${siswa?.nisn}_${roomId}`, JSON.stringify(updated));
+        sessionStorage.setItem(`ans_${student?.nisn}_${roomId}`, JSON.stringify(updated));
       }, 300);
 
       return updated;
@@ -492,7 +494,7 @@ const CBTPage = () => {
   }, [questions, answers, roomData]);
 
   const handleSubmitExam = async () => {
-    if (!siswa || !roomId || !roomData) return;
+    if (!student || !roomId || !roomData) return;
 
     setLoading(true);
     try {
@@ -508,7 +510,7 @@ const CBTPage = () => {
 
       const score = Math.round((correctCount / totalQuestions) * 100) || 0;
 
-      const attemptRef = ref(database, `attempts/${siswa.nisn}_${roomId}`);
+      const attemptRef = ref(database, `attempts/${roomId}/${student.nisn}`);
       await update(attemptRef, {
         status: "submitted",
         score: score,
@@ -519,9 +521,9 @@ const CBTPage = () => {
       });
 
       // Clear layout triggers
-      sessionStorage.removeItem(`order_${siswa.nisn}_${roomId}`);
-      sessionStorage.removeItem(`ans_${siswa.nisn}_${roomId}`);
-      sessionStorage.removeItem(`currentIndex_${siswa.nisn}_${roomId}`);
+      sessionStorage.removeItem(`order_${student.nisn}_${roomId}`);
+      sessionStorage.removeItem(`ans_${student.nisn}_${roomId}`);
+      sessionStorage.removeItem(`currentIndex_${student.nisn}_${roomId}`);
 
       navigate(`/cbt/${roomId}/result`);
     } catch (err) {
@@ -597,8 +599,8 @@ const CBTPage = () => {
 
         {/* Right: Student Info */}
         <div className="flex flex-col items-end text-right">
-          <p className="font-semibold text-slate-700 dark:text-slate-200 line-clamp-1">{siswa?.name}</p>
-          <p className="text-[10px] text-slate-400">{siswa?.className || "Siswa"}</p>
+          <p className="font-semibold text-slate-700 dark:text-slate-200 line-clamp-1">{student?.name}</p>
+          <p className="text-[10px] text-slate-400">{student?.className || "student"}</p>
         </div>
       </header>
 
@@ -897,7 +899,7 @@ const CBTPage = () => {
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="mt-4">
-             <Button onClick={() => logoutSiswa()} className="w-full bg-red-600 hover:bg-red-700 font-bold text-white rounded-xl h-11 flex items-center justify-center gap-2">
+             <Button onClick={() => logoutStudent()} className="w-full bg-red-600 hover:bg-red-700 font-bold text-white rounded-xl h-11 flex items-center justify-center gap-2">
                 <LogOut className="w-4 h-4" /> Keluar & Login Ulang
              </Button>
           </DialogFooter>
@@ -988,3 +990,5 @@ const CBTPage = () => {
 };
 
 export default CBTPage;
+
+

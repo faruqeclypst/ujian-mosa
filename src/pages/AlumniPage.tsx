@@ -1,19 +1,19 @@
 import { useState, useMemo } from "react";
-import { usePiket } from "../context/PiketContext";
+import { useExamData } from "../context/ExamDataContext";
 import { Button } from "../components/ui/button";
 import { DeleteConfirmationDialog } from "../components/ui/delete-confirmation-dialog";
 import { ConfirmationDialog } from "../components/ui/confirmation-dialog";
-import SiswaTable from "../components/tables/SiswaTable";
+import StudentTable from "../components/tables/StudentTable";
 import { ExportButton } from "../components/ui/export-button";
-import { exportSiswaToExcel } from "../lib/siswaExcel";
+import { exportStudentToExcel } from "../lib/studentExcel";
 import { ArrowLeftRight, Check, X, RotateCw, Trash, Users } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "../components/ui/dialog";
 import FormField from "../components/forms/FormField";
 import { Select } from "../components/ui/select";
-import type { StudentData } from "../types/piket";
+import type { StudentData } from "../types/exam";
 
 const AlumniPage = () => {
-  const { students, classes, loading, deleteStudent, updateStudent, updateStudentClassBatch } = usePiket();
+  const { students, classes, loading, deleteStudent, updateStudent, updateStudentClassBatch } = useExamData();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [studentToDelete, setStudentToDelete] = useState<StudentData | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -74,15 +74,15 @@ const AlumniPage = () => {
 
   const handleRestore = async (id: string) => {
     showAlert(
-      "Pulihkan Siswa",
-      "Kembalikan siswa ini ke status Aktif (Tanpa Kelas)?",
+      "Pulihkan student",
+      "Kembalikan student ini ke status Aktif (Tanpa Kelas)?",
       "warning",
       async () => {
         try {
           await updateStudent(id, { classId: "" });
         } catch (err) {
           console.error(err);
-          showAlert("Gagal", "Gagal memulihkan siswa.", "danger");
+          showAlert("Gagal", "Gagal memulihkan student.", "danger");
         }
       },
       true,
@@ -131,10 +131,10 @@ const AlumniPage = () => {
             <Users className="h-5 w-5 text-blue-500" />
             Data Alumni
           </h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Daftar siswa yang sudah lulus atau menyelesaikan pendidikan.</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Daftar Siswa yang sudah lulus atau menyelesaikan pendidikan.</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <ExportButton onExport={() => exportSiswaToExcel({ students: mappedStudents, filename: "data-alumni.xlsx" })} />
+          <ExportButton onExport={() => exportStudentToExcel({ students: mappedStudents, classes, filename: "data-alumni.xlsx" })} />
         </div>
       </div>
 
@@ -195,30 +195,29 @@ const AlumniPage = () => {
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
         </div>
       ) : (
-        <SiswaTable 
+        <StudentTable 
           students={mappedStudents} 
+          classes={classes}
           selectedIds={selectedIds} 
           onSelectChange={setSelectedIds} 
           onEdit={() => {}} 
           onDelete={handleDeleteClick} 
           customActions={(student) => (
             <div className="flex justify-end gap-2">
-              <Button 
-                variant="secondary" 
-                size="sm" 
-                className="bg-green-50 text-green-700 hover:bg-green-100 border border-green-100 dark:bg-green-900/10 dark:text-green-400 dark:hover:bg-green-900/30 dark:border-green-800/40 h-7 text-xs rounded-lg"
+              <button 
+                className="p-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-lg dark:bg-emerald-900/10 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-800/40"
                 onClick={() => handleRestore(student.id)}
+                title="Pulihkan student"
               >
-                <RotateCw className="h-3.5 w-3.5 mr-1" /> Pulihkan
-              </Button>
-              <Button 
-                variant="secondary" 
-                size="sm" 
-                className="bg-rose-50 text-rose-600 hover:bg-rose-100 border border-rose-100 dark:bg-rose-900/10 dark:text-rose-400 dark:hover:bg-rose-900/30 dark:border-green-800/40 h-7 text-xs rounded-lg"
+                <RotateCw className="h-4 w-4" />
+              </button>
+              <button 
+                className="p-1.5 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-lg dark:bg-rose-900/10 dark:text-rose-400 border border-rose-100 dark:border-rose-800/40"
                 onClick={() => handleDeleteClick(student)}
+                title="Hapus student"
               >
-                <Trash className="h-3.5 w-3.5 mr-1" /> Hapus
-              </Button>
+                <Trash className="h-4 w-4" />
+              </button>
             </div>
           )}
         />
@@ -252,3 +251,8 @@ const AlumniPage = () => {
 };
 
 export default AlumniPage;
+
+
+
+
+

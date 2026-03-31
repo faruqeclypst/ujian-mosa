@@ -1,7 +1,7 @@
 export interface Teacher {
   id: string;
   name: string;
-  code?: string; // <--- added
+  code?: string;
   subjects: string[];
   createdAt: number;
 }

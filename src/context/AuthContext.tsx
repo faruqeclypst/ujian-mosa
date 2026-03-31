@@ -22,7 +22,7 @@ import { auth, googleProvider, database } from "../lib/firebase"; // <--- added 
 
 interface AuthContextValue {
   user: User | null;
-  role: "admin" | "gurupiket" | null; // <--- added
+  role: "admin" | "teacher" | null; // <--- updated from gurupiket
   teacherId?: string; // <--- added
   loading: boolean;
   signInWithUsername: (username: string, password: string) => Promise<void>;
@@ -56,7 +56,7 @@ interface AuthProviderProps {
 
 export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [user, setUser] = useState<User | null>(null);
-  const [role, setRole] = useState<"admin" | "gurupiket" | null>(null);
+  const [role, setRole] = useState<"admin" | "teacher" | null>(null);
   const [teacherId, setTeacherId] = useState<string | undefined>(undefined);
   const [loading, setLoading] = useState(true);
 
@@ -69,11 +69,11 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
       if (nextUser) {
         // Fetch role from RTDB
-        const userRef = ref(database, `piket_users/${nextUser.uid}`);
+        const userRef = ref(database, `staff/${nextUser.uid}`);
         unsubscribeRole = onValue(userRef, (snapshot) => {
           if (snapshot.exists()) {
             const data = snapshot.val();
-            setRole(data.role || "gurupiket");
+            setRole(data.role || "teacher");
             setTeacherId(data.teacherId);
           } else {
             // Owner/Admin yang sudah login sebelum fitur ini rilis otomatis jadi Admin

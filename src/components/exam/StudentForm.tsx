@@ -7,32 +7,32 @@ import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import FormField from "../forms/FormField";
 import { Select } from "../ui/select";
-import type { ClassData } from "../../types/piket";
+import type { ClassData } from "../../types/exam";
 
-const siswaSchema = z.object({
+const studentSchema = z.object({
   nisn: z.string().min(5, "NISN minimal 5 karakter"),
-  name: z.string().min(1, "Nama siswa wajib diisi"),
+  name: z.string().min(1, "Nama student wajib diisi"),
   gender: z.enum(["L", "P"], { required_error: "Gender wajib dipilih" }),
   classId: z.string().min(1, "Kelas wajib dipilih"),
 });
 
-export type SiswaFormValues = z.infer<typeof siswaSchema>;
+export type StudentFormValues = z.infer<typeof studentSchema>;
 
-interface SiswaFormProps {
+interface StudentFormProps {
   classes: ClassData[];
-  defaultValues?: Partial<SiswaFormValues>;
-  onSubmit: (values: SiswaFormValues) => Promise<void>;
+  defaultValues?: Partial<StudentFormValues>;
+  onSubmit: (values: StudentFormValues) => Promise<void>;
   submitLabel?: string;
   onCancel?: () => void;
 }
 
-const SiswaForm = ({ 
+const StudentForm = ({ 
   classes, 
   defaultValues, 
   onSubmit, 
   submitLabel = "Simpan",
   onCancel
-}: SiswaFormProps) => {
+}: StudentFormProps) => {
   const {
     register,
     handleSubmit,
@@ -40,8 +40,8 @@ const SiswaForm = ({
     reset,
     setValue,
     watch
-  } = useForm<SiswaFormValues>({
-    resolver: zodResolver(siswaSchema),
+  } = useForm<StudentFormValues>({
+    resolver: zodResolver(studentSchema),
     defaultValues: {
       nisn: "",
       name: "",
@@ -56,7 +56,6 @@ const SiswaForm = ({
 
   useEffect(() => {
     if (defaultValues) {
-      // Set values directly due to custom Select inputs
       if (defaultValues.nisn) setValue("nisn", defaultValues.nisn);
       if (defaultValues.name) setValue("name", defaultValues.name);
       if (defaultValues.gender) setValue("gender", defaultValues.gender);
@@ -64,7 +63,7 @@ const SiswaForm = ({
     }
   }, [defaultValues, setValue]);
 
-  const submitHandler = async (values: SiswaFormValues) => {
+  const submitHandler = async (values: StudentFormValues) => {
     await onSubmit(values);
     if (!defaultValues || Object.keys(defaultValues).length === 0) {
       reset({ nisn: "", name: "", gender: "L", classId: "" });
@@ -81,8 +80,8 @@ const SiswaForm = ({
         <Input id="nisn" placeholder="Masukkan NISN" {...register("nisn")} />
       </FormField>
 
-      <FormField id="name" label="Nama Siswa" error={errors.name}>
-        <Input id="name" placeholder="Masukkan Nama Siswa" {...register("name")} />
+      <FormField id="name" label="Nama student" error={errors.name}>
+        <Input id="name" placeholder="Masukkan Nama student" {...register("name")} />
       </FormField>
 
       <FormField id="gender" label="Gender" error={errors.gender}>
@@ -132,4 +131,5 @@ const SiswaForm = ({
   );
 };
 
-export default SiswaForm;
+export default StudentForm;
+

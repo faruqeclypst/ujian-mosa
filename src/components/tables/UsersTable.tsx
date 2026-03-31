@@ -45,14 +45,13 @@ const UsersTable = ({ users, onDelete }: UsersTableProps) => {
 
   const renderActions = (user: AppUser) => (
     <div className="flex justify-end gap-1.5 item-center">
-      <Button 
-        variant="outline" 
-        size="icon"
-        className="h-7 w-7 p-0 rounded-lg border-red-200/60 hover:border-red-300 dark:border-red-900/30 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30" 
+      <button 
+        className="p-1.5 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-lg dark:bg-rose-900/10 dark:text-rose-400 border border-rose-100 dark:border-rose-800/40" 
         onClick={() => onDelete(user.id, user.displayName)}
+        title="Hapus Akun"
       >
-        <Trash2 className="w-3.5 h-3.5" />
-      </Button>
+        <Trash2 className="w-4 h-4" />
+      </button>
     </div>
   );
 

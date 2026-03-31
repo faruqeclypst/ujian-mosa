@@ -1,16 +1,16 @@
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { DataTable } from "../ui/data-table";
 import { Button } from "../ui/button";
-import type { ClassData } from "../../types/piket";
+import type { ClassData } from "../../types/exam";
 import { Edit, Trash } from "lucide-react";
 
-interface KelasTableProps {
+interface ClassTableProps {
   classes: ClassData[];
   onEdit: (cls: ClassData) => void;
   onDelete: (cls: ClassData) => void;
 }
 
-const KelasTable = ({ classes, onEdit, onDelete }: KelasTableProps) => {
+const ClassTable = ({ classes, onEdit, onDelete }: ClassTableProps) => {
   const columns = [
     {
       key: "index",
@@ -22,22 +22,20 @@ const KelasTable = ({ classes, onEdit, onDelete }: KelasTableProps) => {
 
   const renderActions = (cls: ClassData) => (
     <div className="flex justify-end gap-2">
-      <Button 
-        variant="secondary" 
-        size="sm" 
-        className="bg-green-50 text-green-700 hover:bg-green-100 border border-green-100 dark:bg-green-900/10 dark:text-green-400 dark:hover:bg-green-900/30 dark:border-green-800/40 h-7 text-xs rounded-lg" 
+      <button 
+        className="p-1.5 bg-sky-50 text-sky-600 hover:bg-sky-100 rounded-lg dark:bg-sky-900/10 dark:text-sky-400 border border-sky-100 dark:border-sky-800/40"
         onClick={() => onEdit(cls)}
+        title="Edit Kelas"
       >
-        <Edit className="h-3.5 w-3.5 mr-1" /> Edit
-      </Button>
-      <Button 
-        variant="secondary" 
-        size="sm" 
-        className="bg-rose-50 text-rose-600 hover:bg-rose-100 border border-rose-100 dark:bg-rose-900/10 dark:text-rose-400 dark:hover:bg-rose-900/30 dark:border-green-800/40 h-7 text-xs rounded-lg" 
+        <Edit className="h-4 w-4" />
+      </button>
+      <button 
+        className="p-1.5 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-lg dark:bg-rose-900/10 dark:text-rose-400 border border-rose-100 dark:border-rose-800/40"
         onClick={() => onDelete(cls)}
+        title="Hapus Kelas"
       >
-        <Trash className="h-3.5 w-3.5 mr-1" /> Hapus
-      </Button>
+        <Trash className="h-4 w-4" />
+      </button>
     </div>
   );
 
@@ -59,4 +57,6 @@ const KelasTable = ({ classes, onEdit, onDelete }: KelasTableProps) => {
   );
 };
 
-export default KelasTable;
+export default ClassTable;
+
+

@@ -1,10 +1,10 @@
 import * as XLSX from "xlsx-js-style";
 
-export const GURU_IMPORT_HEADERS = ["Nama Guru", "Kode Guru", "Mapel Utama (Pisahkan dengan koma)"] as const;
+export const TEACHER_IMPORT_HEADERS = ["Nama Guru", "Kode Guru", "Mapel Utama (Pisahkan dengan koma)"] as const;
 
-export function downloadGuruImportTemplate(filename = "template-import-guru.xlsx") {
+export function downloadTeacherImportTemplate(filename = "template-import-guru.xlsx") {
   const ws = XLSX.utils.aoa_to_sheet([
-    [...GURU_IMPORT_HEADERS],
+    [...TEACHER_IMPORT_HEADERS],
     ["Pak Toni Syafi'i", "TS", "Informatika, Matematika"],
     ["Bu Siti Aminah", "SA", "Bahasa Indonesia"],
   ]);
@@ -15,7 +15,7 @@ export function downloadGuruImportTemplate(filename = "template-import-guru.xlsx
     fill: { patternType: "solid", fgColor: { rgb: "2563EB" } },
   };
 
-  for (let c = 0; c < GURU_IMPORT_HEADERS.length; c++) {
+  for (let c = 0; c < TEACHER_IMPORT_HEADERS.length; c++) {
     const addr = XLSX.utils.encode_cell({ r: 0, c });
     if (ws[addr]) (ws[addr] as any).s = headerStyle;
   }
@@ -33,12 +33,12 @@ export function downloadGuruImportTemplate(filename = "template-import-guru.xlsx
   (wsNotes as any)["!cols"] = [{ wch: 80 }];
 
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Guru");
+  XLSX.utils.book_append_sheet(wb, ws, "Teacher");
   XLSX.utils.book_append_sheet(wb, wsNotes, "Keterangan");
   XLSX.writeFile(wb, filename);
 }
 
-export async function parseGuruImportExcel(file: File): Promise<{ name: string; code?: string; subjects: string[] }[]> {
+export async function parseTeacherImportExcel(file: File): Promise<{ name: string; code?: string; subjects: string[] }[]> {
   const buffer = await file.arrayBuffer();
   const wb = XLSX.read(buffer, { type: "array" });
   const ws = wb.Sheets[wb.SheetNames[0]];
@@ -57,10 +57,10 @@ export async function parseGuruImportExcel(file: File): Promise<{ name: string; 
     .filter((v) => v.name.length > 0);
 }
 
-export function exportGuruToExcel(params: { teachers: Array<{ name: string; code?: string; subjects?: string[] }>; filename?: string }) {
+export function exportTeacherToExcel(params: { teachers: Array<{ name: string; code?: string; subjects?: string[] }>; filename?: string }) {
   const filename = params.filename ?? "data-guru.xlsx";
   const ws = XLSX.utils.aoa_to_sheet([
-    [...GURU_IMPORT_HEADERS],
+    [...TEACHER_IMPORT_HEADERS],
     ...params.teachers.map((t) => [t.name, t.code || "", (t.subjects || []).join(", ")]),
   ]);
 
@@ -68,7 +68,7 @@ export function exportGuruToExcel(params: { teachers: Array<{ name: string; code
     font: { bold: true, color: { rgb: "FFFFFF" } },
     fill: { patternType: "solid", fgColor: { rgb: "16A34A" } },
   };
-  for (let c = 0; c < GURU_IMPORT_HEADERS.length; c++) {
+  for (let c = 0; c < TEACHER_IMPORT_HEADERS.length; c++) {
     const addr = XLSX.utils.encode_cell({ r: 0, c });
     if (ws[addr]) (ws[addr] as any).s = headerStyle;
   }
@@ -76,6 +76,6 @@ export function exportGuruToExcel(params: { teachers: Array<{ name: string; code
   (ws as any)["!cols"] = [{ wch: 25 }, { wch: 12 }, { wch: 40 }];
 
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Guru");
+  XLSX.utils.book_append_sheet(wb, ws, "Teacher");
   XLSX.writeFile(wb, filename);
 }

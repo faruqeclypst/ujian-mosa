@@ -11,7 +11,7 @@ import { Input } from "../../components/ui/input";
 import FormField from "../../components/forms/FormField";
 import { useAuth } from "../../context/AuthContext";
 import { useNavigate } from "react-router-dom";
-import { usePiket } from "../../context/PiketContext";
+import { useExamData } from "../../context/ExamDataContext";
 import { ConfirmationDialog } from "../../components/ui/confirmation-dialog";
 
 import { DataTable } from "../../components/ui/data-table";
@@ -75,7 +75,7 @@ const columns = [
 const ExamsPage = () => {
   const navigate = useNavigate();
   const { role, teacherId } = useAuth();
-  const { mapels, teachers } = usePiket();
+  const { subjects, teachers } = useExamData();
   const [exams, setExams] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"aktif" | "arsip">("aktif");
@@ -183,13 +183,13 @@ const ExamsPage = () => {
         const data = snapshot.val();
         const loaded = Object.keys(data).map((key) => {
           const exam = data[key];
-          const mapelObj = mapels.find((m) => m.id === exam.subjectId);
-          const teacherObj = teachers.find((t) => t.id === exam.teacherId);
+          const subjectObj = subjects.find((s: any) => s.id === exam.subjectId);
+          const teacherObj = teachers.find((t: any) => t.id === exam.teacherId);
           return {
             id: key,
             ...exam,
             examType: exam.examType || "Latihan Biasa",
-            subjectName: mapelObj ? mapelObj.name : "Mapel Tidak Ditemukan",
+            subjectName: subjectObj ? subjectObj.name : "Mapel Tidak Ditemukan",
             teacherName: teacherObj ? teacherObj.name : "Guru Tidak Ditemukan",
           };
         });
@@ -210,7 +210,7 @@ const ExamsPage = () => {
     });
 
     return () => unsubscribe();
-  }, [mapels, teachers]);
+  }, [subjects, teachers]);
 
   const handleCreateClick = () => {
     setDialogMode("create");
@@ -361,54 +361,49 @@ const ExamsPage = () => {
               emptyMessage={`Belum ada bank soal ${activeTab}.`}
               actions={(exam: any) => (
                 <div className="flex justify-end gap-1.5 items-center whitespace-nowrap">
-                  <Button 
-                    variant="secondary" 
-                    size="sm" 
-                    className="bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-100 dark:bg-purple-900/10 dark:text-purple-400 dark:hover:bg-purple-900/30 dark:border-purple-800/40 h-7 text-xs" 
+                  <button 
+                    className="p-1.5 bg-purple-50 text-purple-700 hover:bg-purple-100 rounded-lg dark:bg-purple-900/10 dark:text-purple-400 border border-purple-100 dark:border-purple-800/40" 
                     onClick={() => navigate(`/admin/bank-soal/${exam.id}/questions`)}
+                    title="Kelola Soal"
                   >
-                    <BookOpen className="h-4 w-4 mr-1" /> Soal
-                  </Button>
+                    <BookOpen className="h-4 w-4" />
+                  </button>
                   
                   {(role === "admin" || exam.teacherId === teacherId) && (
                     <>
                       {activeTab === "aktif" ? (
-                        <Button 
-                          variant="secondary" 
-                          size="sm" 
-                          className="bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-100 dark:bg-amber-900/10 dark:text-amber-400 dark:hover:bg-amber-900/30 dark:border-amber-800/40 h-7 text-xs" 
+                        <button 
+                          className="p-1.5 bg-amber-50 text-amber-700 hover:bg-amber-100 rounded-lg dark:bg-amber-900/10 dark:text-amber-400 border border-amber-100 dark:border-amber-800/40" 
                           onClick={() => handleArchiveExam(exam)}
+                          title="Arsipkan"
                         >
-                              <Archive className="h-4 w-4 mr-1" /> Arsip
-                        </Button>
+                          <Archive className="h-4 w-4" />
+                        </button>
                       ) : (
-                        <Button 
-                          variant="secondary" 
-                          size="sm" 
-                          className="bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-100 dark:bg-indigo-900/10 dark:text-indigo-400 dark:hover:bg-indigo-900/30 dark:border-indigo-800/40 h-7 text-xs" 
+                        <button 
+                          className="p-1.5 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-lg dark:bg-indigo-900/10 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-800/40" 
                           onClick={() => handleRestoreExam(exam)}
+                          title="Buka Arsip"
                         >
-                              <RotateCw className="h-4 w-4 mr-1" /> Buka
-                        </Button>
+                          <RotateCw className="h-4 w-4" />
+                        </button>
                       )}
 
-                      <Button 
-                        variant="secondary" 
-                        size="sm" 
-                        className="bg-green-50 text-green-700 hover:bg-green-100 border border-green-100 dark:bg-green-900/10 dark:text-green-400 dark:hover:bg-green-900/30 dark:border-green-800/40 h-7 text-xs" 
+                      <button 
+                        className="p-1.5 bg-sky-50 text-sky-600 hover:bg-sky-100 rounded-lg dark:bg-sky-900/10 dark:text-sky-400 border border-sky-100 dark:border-sky-800/40" 
                         onClick={() => handleEditClick(exam)}
+                        title="Edit Ujian"
                       >
-                        <Edit className="h-4 w-4 mr-1" /> Edit
-                      </Button>
+                        <Edit className="h-4 w-4" />
+                      </button>
                       {activeTab === "arsip" && (
-                        <Button 
-                          variant="destructive" 
-                          size="sm" 
-                          className="bg-rose-50 text-rose-600 hover:bg-rose-100 border border-rose-100 dark:bg-rose-900/10 dark:text-rose-400 dark:hover:bg-rose-900/30 dark:border-rose-800/40 h-7 text-xs" 
+                        <button 
+                          className="p-1.5 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-lg dark:bg-rose-900/10 dark:text-rose-400 border border-rose-100 dark:border-rose-800/40" 
                           onClick={() => handleDeleteClick(exam)}
+                          title="Hapus Permanen"
                         >
-                          <Trash className="h-4 w-4 mr-1" /> Hapus
-                        </Button>
+                          <Trash className="h-4 w-4" />
+                        </button>
                       )}
                     </>
                   )}
@@ -457,7 +452,7 @@ const ExamsPage = () => {
                 className="w-full rounded-md border border-slate-200 dark:border-slate-800 bg-card text-sm p-2"
               >
                 <option value="">-- Pilih Mapel --</option>
-                {mapels.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                {subjects.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
             </FormField>
 
@@ -470,7 +465,7 @@ const ExamsPage = () => {
                   className="w-full rounded-md border border-slate-200 dark:border-slate-800 bg-card text-sm p-2"
                 >
                   <option value="">-- Pilih Guru --</option>
-                  {teachers.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  {teachers.map((t: any) => <option key={t.id} value={t.id}>{t.name}</option>)}
                 </select>
               </FormField>
             )}

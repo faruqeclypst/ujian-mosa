@@ -1,11 +1,12 @@
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { DataTable } from "../ui/data-table";
 import { Button } from "../ui/button";
-import type { StudentData } from "../../types/piket";
+import type { StudentData, ClassData } from "../../types/exam";
 import { Edit, Trash } from "lucide-react";
 
-interface SiswaTableProps {
-  students: Array<StudentData & { className?: string }>;
+interface StudentTableProps {
+  students: StudentData[];
+  classes: ClassData[];
   selectedIds: string[];
   onSelectChange: (ids: string[]) => void;
   onEdit: (student: StudentData) => void;
@@ -14,24 +15,23 @@ interface SiswaTableProps {
   customActions?: (student: StudentData) => React.ReactNode;
 }
 
-const SiswaTable = ({ 
+const StudentTable = ({ 
   students, 
+  classes,
   selectedIds, 
   onSelectChange, 
   onEdit, 
   onDelete,
   filterActions,
   customActions
-}: SiswaTableProps) => {
+}: StudentTableProps) => {
 
   const handleSelectAll = (checked: boolean) => {
     const currentIds = students.map((s) => s.id);
     if (checked) {
-      // Gabungkan: Tambahkan ID tabel sekarang ke pilihan yang ada tanpa duplikasi
       const merged = Array.from(new Set([...selectedIds, ...currentIds]));
       onSelectChange(merged);
     } else {
-      // Lepaskan: Buang ID tabel sekarang saja dari pilihan
       onSelectChange(selectedIds.filter((id) => !currentIds.includes(id)));
     }
   };
@@ -50,7 +50,7 @@ const SiswaTable = ({
     {
       key: "selection",
       label: "",
-      render: (_: any, item: StudentData & { className?: string }) => (
+      render: (_: any, item: StudentData) => (
         <input
           type="checkbox"
           checked={selectedIds.includes(item.id)}
@@ -74,36 +74,39 @@ const SiswaTable = ({
       sortable: true,
       render: (v: string) => (v === "L" ? "Laki-laki" : "Perempuan")
     },
-    { key: "className", label: "Kelas", sortable: true },
+    { 
+      key: "classId", 
+      label: "Kelas", 
+      sortable: true,
+      render: (classId: string) => classes.find(c => c.id === classId)?.name || "Tanpa Kelas"
+    },
   ];
 
   const renderActions = (student: StudentData) => (
     customActions ? customActions(student) : (
       <div className="flex justify-end gap-2">
-        <Button 
-          variant="secondary" 
-          size="sm" 
-          className="bg-green-50 text-green-700 hover:bg-green-100 border border-green-100 dark:bg-green-900/10 dark:text-green-400 dark:hover:bg-green-900/30 dark:border-green-800/40 h-7 text-xs rounded-lg" 
+        <button 
+          className="p-1.5 bg-sky-50 text-sky-600 hover:bg-sky-100 rounded-lg dark:bg-sky-900/10 dark:text-sky-400 border border-sky-100 dark:border-sky-800/40"
           onClick={() => onEdit(student)}
+          title="Edit Siswa"
         >
-          <Edit className="h-3.5 w-3.5 mr-1" /> Edit
-        </Button>
-        <Button 
-          variant="secondary" 
-          size="sm" 
-          className="bg-rose-50 text-rose-600 hover:bg-rose-100 border border-rose-100 dark:bg-rose-900/10 dark:text-rose-400 dark:hover:bg-rose-900/30 dark:border-rose-800/40 h-7 text-xs rounded-lg" 
+          <Edit className="h-4 w-4" />
+        </button>
+        <button 
+          className="p-1.5 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-lg dark:bg-rose-900/10 dark:text-rose-400 border border-rose-100 dark:border-rose-800/40"
           onClick={() => onDelete(student)}
+          title="Hapus Siswa"
         >
-          <Trash className="h-3.5 w-3.5 mr-1" /> Hapus
-        </Button>
+          <Trash className="h-4 w-4" />
+        </button>
       </div>
     )
   );
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0">
-        <CardTitle className="text-base font-semibold">Data Siswa</CardTitle>
+      <CardHeader className="flex flex-row items-center justify-between pb-2 border-b mb-4">
+        <CardTitle className="text-lg font-bold text-slate-800 dark:text-slate-100">Daftar Siswa</CardTitle>
         {students.length > 0 && (
           <div className="flex items-center gap-2">
             <input
@@ -113,7 +116,7 @@ const SiswaTable = ({
               onChange={(e) => handleSelectAll(e.target.checked)}
               className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-4 w-4"
             />
-            <label htmlFor="selectAll" className="text-sm text-muted-foreground cursor-pointer">
+            <label htmlFor="selectAll" className="text-sm font-medium text-slate-600 dark:text-slate-400 cursor-pointer">
               Pilih Semua
             </label>
           </div>
@@ -123,9 +126,9 @@ const SiswaTable = ({
         <DataTable
           data={students}
           columns={columns}
-          searchPlaceholder="Cari siswa..."
+          searchPlaceholder="Cari Siswa..."
           actions={renderActions}
-          emptyMessage="Belum ada data siswa."
+          emptyMessage="Belum ada data Siswa."
           filterActions={filterActions}
         />
       </CardContent>
@@ -133,4 +136,5 @@ const SiswaTable = ({
   );
 };
 
-export default SiswaTable;
+export default StudentTable;
+

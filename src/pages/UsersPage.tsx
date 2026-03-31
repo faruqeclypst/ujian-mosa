@@ -12,7 +12,7 @@ import { Select } from "../components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "../components/ui/dialog";
 import FormField from "../components/forms/FormField";
 import UsersTable from "../components/tables/UsersTable"; 
-import { usePiket } from "../context/PiketContext";
+import { useExamData } from "../context/ExamDataContext";
 
 interface AppUser {
   id: string;
@@ -25,7 +25,7 @@ interface AppUser {
 
 const UsersPage = () => {
   const { role, usernameToEmail } = useAuth();
-  const { teachers } = usePiket();
+  const { teachers } = useExamData();
   
   const [users, setUsers] = useState<AppUser[]>([]);
   const [loading, setLoading] = useState(true);
@@ -44,7 +44,7 @@ const UsersPage = () => {
 
   // Load users from RTDB
   useEffect(() => {
-    const usersRef = ref(database, "piket_users");
+    const usersRef = ref(database, "staff");
     const unsubscribe = onValue(usersRef, (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.val();
@@ -90,7 +90,7 @@ const UsersPage = () => {
       const uid = credential.user.uid;
 
       // 3. Save role & mapping in RTDB using PRIMARY Database instance
-      const userRef = ref(database, `piket_users/${uid}`);
+      const userRef = ref(database, `staff/${uid}`);
       await set(userRef, {
         username: formData.username,
         displayName: formData.displayName,
@@ -115,7 +115,7 @@ const UsersPage = () => {
     if (!window.confirm(`Apakah Anda yakin ingin menghapus peran akses ${name}? Anda juga perlu menghapusnya manual di tab Authentication Firebase jika ingin me-reset email.`)) return;
     
     try {
-      await remove(ref(database, `piket_users/${id}`));
+      await remove(ref(database, `staff/${id}`));
     } catch (err) {
       alert("Gagal menghapus data pengguna.");
     }
@@ -245,3 +245,4 @@ const UsersPage = () => {
 };
 
 export default UsersPage;
+

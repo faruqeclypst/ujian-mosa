@@ -12,20 +12,20 @@ import ChangePasswordPage from "./pages/ChangePasswordPage";
 import ProfilePage from "./pages/ProfilePage";
 import { ToastProvider } from "./components/ui/toast";
 
-import { SiswaAuthProvider, useSiswaAuth } from "./context/SiswaAuthContext";
+import { StudentAuthProvider, useStudentAuth } from "./context/StudentAuthContext";
 import ExambroGuard from "./components/auth/ExambroGuard";
-import SiswaLoginPage from "./pages/siswa/SiswaLoginPage";
-import SiswaDashboardPage from "./pages/siswa/SiswaDashboardPage";
-import CBTPage from "./pages/siswa/CBTPage";
-import ExamResultPage from "./pages/siswa/ExamResultPage";
+import StudentLoginPage from "./pages/student/StudentLoginPage";
+import StudentDashboardPage from "./pages/student/StudentDashboardPage";
+import CBTPage from "./pages/student/CBTPage";
+import ExamResultPage from "./pages/student/ExamResultPage";
 import { database } from "./lib/firebase";
 import { ref, onValue } from "firebase/database";
 
 const DashboardPage = lazy(() => import("./pages/DashboardPage"));
-const GuruPage = lazy(() => import("./pages/GuruPage"));
-const MapelPage = lazy(() => import("./pages/MapelPage"));
-const KelasPage = lazy(() => import("./pages/KelasPage"));
-const SiswaPage = lazy(() => import("./pages/SiswaPage")); 
+const TeachersPage = lazy(() => import("./pages/TeachersPage"));
+const SubjectsPage = lazy(() => import("./pages/SubjectsPage"));
+const ClassesPage = lazy(() => import("./pages/ClassesPage"));
+const StudentsPage = lazy(() => import("./pages/StudentsPage")); 
 const AlumniPage = lazy(() => import("./pages/AlumniPage"));
 const UsersPage = lazy(() => import("./pages/UsersPage"));
 const SettingsPage = lazy(() => import("./pages/SettingsPage"));
@@ -34,13 +34,13 @@ import ExamsPage from "./pages/admin/ExamsPage";
 import QuestionsPage from "./pages/admin/QuestionsPage";
 import ExamRoomsPage from "./pages/admin/ExamRoomsPage";
 
-import { PiketProvider } from "./context/PiketContext";
+import { ExamDataProvider } from "./context/ExamDataContext";
 
-// Simple Guard for Siswa Authentications
-const SiswaAuthGuard = ({ children }: { children: React.ReactNode }) => {
-  const { siswa, loading } = useSiswaAuth();
+// Simple Guard for student Authentications
+const StudentAuthGuard = ({ children }: { children: React.ReactNode }) => {
+  const { student, loading } = useStudentAuth();
   if (loading) return <LoadingScreen />;
-  if (!siswa) return <Navigate to="/siswa/login" replace />;
+  if (!student) return <Navigate to="/student/login" replace />;
   return <>{children}</>;
 };
 
@@ -54,7 +54,7 @@ const AdminOnlyRoute = ({ children }: { children: React.ReactNode }) => {
 
 const AppContent = () => {
   const { user, loading } = useAuth();
-  const { siswa } = useSiswaAuth();
+  const { student } = useStudentAuth();
   const location = useLocation();
 
   useEffect(() => {
@@ -81,12 +81,12 @@ const AppContent = () => {
   return (
     <Suspense fallback={<LoadingScreen />}>
       <Routes>
-        {/* === SISWA ROUTES (HALAMAN UTAMA) === */}
+        {/* === student ROUTES (HALAMAN UTAMA) === */}
         <Route 
           path="/" 
           element={
             <ExambroGuard>
-              {siswa ? <SiswaDashboardPage /> : <SiswaLoginPage />}
+              {student ? <StudentDashboardPage /> : <StudentLoginPage />}
             </ExambroGuard>
           } 
         />
@@ -94,7 +94,7 @@ const AppContent = () => {
           path="/cbt/:roomId" 
           element={
             <ExambroGuard>
-              {siswa ? <CBTPage /> : <Navigate to="/" replace />}
+              {student ? <CBTPage /> : <Navigate to="/" replace />}
             </ExambroGuard>
           } 
         />
@@ -102,7 +102,7 @@ const AppContent = () => {
           path="/cbt/:roomId/result" 
           element={
             <ExambroGuard>
-              {siswa ? <ExamResultPage /> : <Navigate to="/" replace />}
+              {student ? <ExamResultPage /> : <Navigate to="/" replace />}
             </ExambroGuard>
           } 
         />
@@ -117,20 +117,20 @@ const AppContent = () => {
           path="/admin"
           element={
             user ? (
-              <PiketProvider>
+              <ExamDataProvider>
                 <InventoryLayout />
-              </PiketProvider>
+              </ExamDataProvider>
             ) : (
               <Navigate to="/admin/login" replace />
             )
           }
         >
           <Route index element={<DashboardPage />} />
-          <Route path="mapel" element={<AdminOnlyRoute><MapelPage /></AdminOnlyRoute>} />
-          <Route path="guru" element={<AdminOnlyRoute><GuruPage /></AdminOnlyRoute>} />
-          <Route path="siswa" element={<AdminOnlyRoute><SiswaPage /></AdminOnlyRoute>} />
+          <Route path="subjects" element={<AdminOnlyRoute><SubjectsPage /></AdminOnlyRoute>} />
+          <Route path="teachers" element={<AdminOnlyRoute><TeachersPage /></AdminOnlyRoute>} />
+          <Route path="student" element={<AdminOnlyRoute><StudentsPage /></AdminOnlyRoute>} />
           <Route path="alumni" element={<AdminOnlyRoute><AlumniPage /></AdminOnlyRoute>} />
-          <Route path="kelas" element={<AdminOnlyRoute><KelasPage /></AdminOnlyRoute>} />
+          <Route path="classes" element={<AdminOnlyRoute><ClassesPage /></AdminOnlyRoute>} />
           <Route path="kelola-akun" element={<AdminOnlyRoute><UsersPage /></AdminOnlyRoute>} />
           <Route path="bank-soal" element={<ExamsPage />} />
           <Route path="bank-soal/:examId/questions" element={<QuestionsPage />} />
@@ -158,9 +158,9 @@ const App = () => {
     <ThemeProvider defaultTheme="system">
       <ToastProvider>
         <SidebarProvider>
-          <SiswaAuthProvider>
+          <StudentAuthProvider>
             <AppContent />
-          </SiswaAuthProvider>
+          </StudentAuthProvider>
         </SidebarProvider>
       </ToastProvider>
     </ThemeProvider>

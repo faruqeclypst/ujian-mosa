@@ -46,10 +46,10 @@ const navigation = [
     icon: LayoutTemplate, 
     badge: null,
     children: [
-      { to: "/admin/kelas", label: "Data Kelas", icon: LayoutTemplate },
-      { to: "/admin/mapel", label: "Data Mapel", icon: LayoutTemplate },
-      { to: "/admin/guru", label: "Data Guru", icon: Users },
-      { to: "/admin/siswa", label: "Data Siswa", icon: GraduationCap },
+      { to: "/admin/classes", label: "Data Kelas", icon: LayoutTemplate },
+      { to: "/admin/subjects", label: "Data Mapel", icon: LayoutTemplate },
+      { to: "/admin/teachers", label: "Data Guru", icon: Users },
+      { to: "/admin/student", label: "Data Siswa", icon: GraduationCap },
       { to: "/admin/alumni", label: "Data Alumni", icon: Award }
     ]
   },
@@ -479,3 +479,4 @@ const Sidebar = () => {
 };
 
 export default Sidebar;
+

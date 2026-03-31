@@ -1,10 +1,10 @@
 import * as XLSX from "xlsx-js-style";
 
-export const KELAS_IMPORT_HEADERS = ["Nama Kelas"] as const;
+export const CLASS_IMPORT_HEADERS = ["Nama Kelas"] as const;
 
-export function downloadKelasImportTemplate(filename = "template-import-kelas.xlsx") {
+export function downloadClassImportTemplate(filename = "template-import-kelas.xlsx") {
   const ws = XLSX.utils.aoa_to_sheet([
-    [...KELAS_IMPORT_HEADERS],
+    [...CLASS_IMPORT_HEADERS],
     ["X MIPA 1"],
     ["XI IPS 2"],
   ]);
@@ -29,12 +29,12 @@ export function downloadKelasImportTemplate(filename = "template-import-kelas.xl
   (wsNotes as any)["!cols"] = [{ wch: 60 }];
 
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Kelas");
+  XLSX.utils.book_append_sheet(wb, ws, "Class");
   XLSX.utils.book_append_sheet(wb, wsNotes, "Keterangan");
   XLSX.writeFile(wb, filename);
 }
 
-export async function parseKelasImportExcel(file: File): Promise<{ name: string }[]> {
+export async function parseClassImportExcel(file: File): Promise<{ name: string }[]> {
   const buffer = await file.arrayBuffer();
   const wb = XLSX.read(buffer, { type: "array" });
   const ws = wb.Sheets[wb.SheetNames[0]];
@@ -46,10 +46,10 @@ export async function parseKelasImportExcel(file: File): Promise<{ name: string 
     .filter((v) => v.name.length > 0);
 }
 
-export function exportKelasToExcel(params: { classes: Array<{ name: string }>; filename?: string }) {
+export function exportClassToExcel(params: { classes: Array<{ name: string }>; filename?: string }) {
   const filename = params.filename ?? "data-kelas.xlsx";
   const ws = XLSX.utils.aoa_to_sheet([
-    [...KELAS_IMPORT_HEADERS],
+    [...CLASS_IMPORT_HEADERS],
     ...params.classes.map((c) => [c.name]),
   ]);
 
@@ -63,6 +63,6 @@ export function exportKelasToExcel(params: { classes: Array<{ name: string }>; f
   (ws as any)["!cols"] = [{ wch: 25 }];
 
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Kelas");
+  XLSX.utils.book_append_sheet(wb, ws, "Class");
   XLSX.writeFile(wb, filename);
 }

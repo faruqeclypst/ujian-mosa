@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useState, ReactNode, useCallback 
 import { ref, get, update } from "firebase/database";
 import { database } from "../lib/firebase";
 
-interface SiswaUser {
+interface StudentUser {
   nisn: string;
   name: string;
   classId: string;
@@ -10,27 +10,27 @@ interface SiswaUser {
   hasChangedPassword?: boolean;
 }
 
-interface SiswaAuthContextValue {
-  siswa: SiswaUser | null;
+interface StudentAuthContextValue {
+  student: StudentUser | null;
   loading: boolean;
-  loginSiswa: (nisn: string, password: string) => Promise<void>;
-  logoutSiswa: () => void;
+  loginStudent: (nisn: string, password: string) => Promise<void>;
+  logoutStudent: () => void;
   changePassword: (newPassword: string) => Promise<void>;
 }
 
-const SiswaAuthContext = createContext<SiswaAuthContextValue | undefined>(undefined);
+const StudentAuthContext = createContext<StudentAuthContextValue | undefined>(undefined);
 
-const SESSION_STORAGE_KEY = "siswa_auth_session";
+const SESSION_STORAGE_KEY = "student_auth_session";
 
-export const SiswaAuthProvider = ({ children }: { children: ReactNode }) => {
-  const [siswa, setSiswa] = useState<SiswaUser | null>(null);
+export const StudentAuthProvider = ({ children }: { children: ReactNode }) => {
+  const [student, setstudent] = useState<StudentUser | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const savedSession = sessionStorage.getItem(SESSION_STORAGE_KEY);
     if (savedSession) {
       try {
-        setSiswa(JSON.parse(savedSession));
+        setstudent(JSON.parse(savedSession));
       } catch (err) {
         sessionStorage.removeItem(SESSION_STORAGE_KEY);
       }
@@ -38,20 +38,20 @@ export const SiswaAuthProvider = ({ children }: { children: ReactNode }) => {
     setLoading(false);
   }, []);
 
-  const loginSiswa = useCallback(async (nisn: string, password: string) => {
-    // 1. Cek di tabel Master Data Siswa
-    const studentsRef = ref(database, "piket_students");
+  const loginStudent = useCallback(async (nisn: string, password: string) => {
+    // 1. Cek di tabel Master Data student
+    const studentsRef = ref(database, "students");
     const snapshot = await get(studentsRef);
 
     if (!snapshot.exists()) {
-      throw new Error("Data siswa kosong di server!");
+      throw new Error("Data student kosong di server!");
     }
 
     const studentsData = snapshot.val();
-    const siswaHit = Object.values(studentsData).find((s: any) => s.nisn === nisn) as any;
+    const studentHit = Object.values(studentsData).find((s: any) => s.nisn === nisn) as any;
 
-    if (!siswaHit) {
-      throw new Error("NISN tidak terdaftar di data siswa!");
+    if (!studentHit) {
+      throw new Error("NISN tidak terdaftar di data student!");
     }
 
     // 2. Cek Kredensial di tabel `users/${nisn}`
@@ -74,9 +74,9 @@ export const SiswaAuthProvider = ({ children }: { children: ReactNode }) => {
     // 3. Simpan Kredensial jika belum ada di node users/
     if (!credSnapshot.exists()) {
       await update(credRef, {
-        nisn: siswaHit.nisn,
-        name: siswaHit.name,
-        classId: siswaHit.classId,
+        nisn: studentHit.nisn,
+        name: studentHit.name,
+        classId: studentHit.classId,
         password: dbPassword,
         hasChangedPassword: false,
       });
@@ -84,53 +84,55 @@ export const SiswaAuthProvider = ({ children }: { children: ReactNode }) => {
 
     // Ambil Nama Kelas secara statis jika memungkinkan, atau sekadar kosong
     let className = "";
-    if (siswaHit.classId) {
-      const classSnap = await get(ref(database, `piket_classes/${siswaHit.classId}`));
+    if (studentHit.classId) {
+      const classSnap = await get(ref(database, `classes/${studentHit.classId}`));
       if (classSnap.exists()) className = classSnap.val().name;
     }
 
-    const siswaData: SiswaUser = {
-      nisn: siswaHit.nisn,
-      name: siswaHit.name,
-      classId: siswaHit.classId,
+    const studentData: StudentUser = {
+      nisn: studentHit.nisn,
+      name: studentHit.name,
+      classId: studentHit.classId,
       className: className,
       hasChangedPassword: hasChangedPassword,
     };
 
-    setSiswa(siswaData);
-    sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(siswaData));
+    setstudent(studentData);
+    sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(studentData));
   }, []);
 
   const changePassword = useCallback(async (newPassword: string) => {
-    if (!siswa) throw new Error("Tidak ada siswa yang aktif.");
+    if (!student) throw new Error("Tidak ada student yang aktif.");
 
-    const userRef = ref(database, `users/${siswa.nisn}`);
+    const userRef = ref(database, `users/${student.nisn}`);
     await update(userRef, {
       password: newPassword,
       hasChangedPassword: true,
     });
 
-    const updatedSiswa = { ...siswa, hasChangedPassword: true };
-    setSiswa(updatedSiswa);
-    sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(updatedSiswa));
-  }, [siswa]);
+    const updatedstudent = { ...student, hasChangedPassword: true };
+    setstudent(updatedstudent);
+    sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(updatedstudent));
+  }, [student]);
 
-  const logoutSiswa = useCallback(() => {
-    setSiswa(null);
+  const logoutStudent = useCallback(() => {
+    setstudent(null);
     sessionStorage.removeItem(SESSION_STORAGE_KEY);
   }, []);
 
   return (
-    <SiswaAuthContext.Provider value={{ siswa, loading, loginSiswa, logoutSiswa, changePassword }}>
+    <StudentAuthContext.Provider value={{ student, loading, loginStudent, logoutStudent, changePassword }}>
       {children}
-    </SiswaAuthContext.Provider>
+    </StudentAuthContext.Provider>
   );
 };
 
-export const useSiswaAuth = () => {
-  const context = useContext(SiswaAuthContext);
+export const useStudentAuth = () => {
+  const context = useContext(StudentAuthContext);
   if (context === undefined) {
-    throw new Error("useSiswaAuth must be used within SiswaAuthProvider");
+    throw new Error("useStudentAuth must be used within StudentAuthProvider");
   }
   return context;
 };
+
+

@@ -6,12 +6,12 @@ import type {
   ClassData, ClassPayload, 
   SubjectData, SubjectPayload,
   StudentData, StudentPayload 
-} from "../types/piket";
+} from "../types/exam";
 
-interface PiketContextType {
+interface ExamDataContextType {
   teachers: Teacher[];
   classes: ClassData[];
-  mapels: SubjectData[];
+  subjects: SubjectData[];
   students: StudentData[];
   loading: boolean;
   
@@ -25,10 +25,10 @@ interface PiketContextType {
   updateClass: (id: string, payload: Partial<ClassPayload>) => Promise<void>;
   deleteClass: (id: string) => Promise<void>;
 
-  // Mapels
-  createMapel: (payload: SubjectPayload) => Promise<void>;
-  updateMapel: (id: string, payload: Partial<SubjectPayload>) => Promise<void>;
-  deleteMapel: (id: string) => Promise<void>;
+  // Subjects
+  createSubject: (payload: SubjectPayload) => Promise<void>;
+  updateSubject: (id: string, payload: Partial<SubjectPayload>) => Promise<void>;
+  deleteSubject: (id: string) => Promise<void>;
 
   // Students
   createStudent: (payload: StudentPayload) => Promise<void>;
@@ -37,29 +37,29 @@ interface PiketContextType {
   updateStudentClassBatch: (studentIds: string[], newClassId: string) => Promise<void>;
 }
 
-const PiketContext = createContext<PiketContextType | undefined>(undefined);
+const ExamDataContext = createContext<ExamDataContextType | undefined>(undefined);
 
-export const PiketProvider = ({ children }: { children: ReactNode }) => {
+export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [classes, setClasses] = useState<ClassData[]>([]);
-  const [mapels, setMapels] = useState<SubjectData[]>([]);
+  const [subjects, setSubjects] = useState<SubjectData[]>([]);
   const [students, setStudents] = useState<StudentData[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [loadedTeachers, setLoadedTeachers] = useState(false);
   const [loadedClasses, setLoadedClasses] = useState(false);
-  const [loadedMapels, setLoadedMapels] = useState(false);
+  const [loadedSubjects, setLoadedSubjects] = useState(false);
   const [loadedStudents, setLoadedStudents] = useState(false);
 
   useEffect(() => {
-    if (loadedTeachers && loadedClasses && loadedMapels && loadedStudents) {
+    if (loadedTeachers && loadedClasses && loadedSubjects && loadedStudents) {
       setLoading(false);
     }
-  }, [loadedTeachers, loadedClasses, loadedMapels, loadedStudents]);
+  }, [loadedTeachers, loadedClasses, loadedSubjects, loadedStudents]);
 
   // Load teachers
   useEffect(() => {
-    const teachersRef = ref(database, "piket_teachers");
+    const teachersRef = ref(database, "teachers");
     const unsubscribe = onValue(teachersRef, (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.val();
@@ -79,7 +79,7 @@ export const PiketProvider = ({ children }: { children: ReactNode }) => {
 
   // Load classes
   useEffect(() => {
-    const classesRef = ref(database, "piket_classes");
+    const classesRef = ref(database, "classes");
     const unsubscribe = onValue(classesRef, (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.val();
@@ -96,28 +96,28 @@ export const PiketProvider = ({ children }: { children: ReactNode }) => {
     return () => unsubscribe();
   }, []);
 
-  // Load mapels
+  // Load subjects
   useEffect(() => {
-    const mapelsRef = ref(database, "piket_subjects");
-    const unsubscribe = onValue(mapelsRef, (snapshot) => {
+    const subjectsRef = ref(database, "subjects");
+    const unsubscribe = onValue(subjectsRef, (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.val();
-        const loadedMapels: SubjectData[] = Object.keys(data).map((key) => ({
+        const loadedSubjects: SubjectData[] = Object.keys(data).map((key) => ({
           id: key,
           ...data[key],
         }));
-        setMapels(loadedMapels);
+        setSubjects(loadedSubjects);
       } else {
-        setMapels([]);
+        setSubjects([]);
       }
-      setLoadedMapels(true);
+      setLoadedSubjects(true);
     });
     return () => unsubscribe();
   }, []);
 
   // Load students
   useEffect(() => {
-    const studentsRef = ref(database, "piket_students");
+    const studentsRef = ref(database, "students");
     const unsubscribe = onValue(studentsRef, (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.val();
@@ -136,86 +136,86 @@ export const PiketProvider = ({ children }: { children: ReactNode }) => {
 
   // --- Teacher Actions ---
   const createTeacher = async (payload: TeacherPayload) => {
-    const teachersRef = ref(database, "piket_teachers");
+    const teachersRef = ref(database, "teachers");
     await push(teachersRef, { ...payload, createdAt: Date.now() });
   };
   const updateTeacher = async (id: string, payload: Partial<TeacherPayload>) => {
-    const teacherRef = ref(database, `piket_teachers/${id}`);
+    const teacherRef = ref(database, `teachers/${id}`);
     await update(teacherRef, payload);
   };
   const deleteTeacher = async (id: string) => {
-    const teacherRef = ref(database, `piket_teachers/${id}`);
+    const teacherRef = ref(database, `teachers/${id}`);
     await remove(teacherRef);
   };
 
   // --- Class Actions ---
   const createClass = async (payload: ClassPayload) => {
-    const classRef = ref(database, "piket_classes");
+    const classRef = ref(database, "classes");
     await push(classRef, { ...payload, createdAt: Date.now() });
   };
   const updateClass = async (id: string, payload: Partial<ClassPayload>) => {
-    const classRef = ref(database, `piket_classes/${id}`);
+    const classRef = ref(database, `classes/${id}`);
     await update(classRef, payload);
   };
   const deleteClass = async (id: string) => {
-    const classRef = ref(database, `piket_classes/${id}`);
+    const classRef = ref(database, `classes/${id}`);
     await remove(classRef);
   };
 
-  // --- Mapel Actions ---
-  const createMapel = async (payload: SubjectPayload) => {
-    const mapelRef = ref(database, "piket_subjects");
-    await push(mapelRef, { ...payload, createdAt: Date.now() });
+  // --- Subject Actions ---
+  const createSubject = async (payload: SubjectPayload) => {
+    const subjectRef = ref(database, "subjects");
+    await push(subjectRef, { ...payload, createdAt: Date.now() });
   };
-  const updateMapel = async (id: string, payload: Partial<SubjectPayload>) => {
-    const mapelRef = ref(database, `piket_subjects/${id}`);
-    await update(mapelRef, payload);
+  const updateSubject = async (id: string, payload: Partial<SubjectPayload>) => {
+    const subjectRef = ref(database, `subjects/${id}`);
+    await update(subjectRef, payload);
   };
-  const deleteMapel = async (id: string) => {
-    const mapelRef = ref(database, `piket_subjects/${id}`);
-    await remove(mapelRef);
+  const deleteSubject = async (id: string) => {
+    const subjectRef = ref(database, `subjects/${id}`);
+    await remove(subjectRef);
   };
 
   // --- Student Actions ---
   const createStudent = async (payload: StudentPayload) => {
-    const studentsRef = ref(database, "piket_students");
+    const studentsRef = ref(database, "students");
     await push(studentsRef, { ...payload, createdAt: Date.now() });
   };
   const updateStudent = async (id: string, payload: Partial<StudentPayload>) => {
-    const studentRef = ref(database, `piket_students/${id}`);
+    const studentRef = ref(database, `students/${id}`);
     await update(studentRef, payload);
   };
   const deleteStudent = async (id: string) => {
-    const studentRef = ref(database, `piket_students/${id}`);
+    const studentRef = ref(database, `students/${id}`);
     await remove(studentRef);
   };
   const updateStudentClassBatch = async (studentIds: string[], newClassId: string) => {
     const updates: Record<string, any> = {};
     studentIds.forEach((id) => {
-      updates[`piket_students/${id}/classId`] = newClassId;
+      updates[`students/${id}/classId`] = newClassId;
     });
     await update(ref(database), updates);
   };
 
   return (
-    <PiketContext.Provider
+    <ExamDataContext.Provider
       value={{
-        teachers, classes, mapels, students, loading,
+        teachers, classes, subjects, students, loading,
         createTeacher, updateTeacher, deleteTeacher,
         createClass, updateClass, deleteClass,
-        createMapel, updateMapel, deleteMapel,
+        createSubject, updateSubject, deleteSubject,
         createStudent, updateStudent, deleteStudent, updateStudentClassBatch,
       }}
     >
       {children}
-    </PiketContext.Provider>
+    </ExamDataContext.Provider>
   );
 };
 
-export const usePiket = () => {
-  const context = useContext(PiketContext);
+export const useExamData = () => {
+  const context = useContext(ExamDataContext);
   if (context === undefined) {
-    throw new Error("usePiket must be used within a PiketProvider");
+    throw new Error("useExamData must be used within a ExamDataProvider");
   }
   return context;
 };

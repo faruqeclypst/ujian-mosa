@@ -10,7 +10,7 @@ import { ref, onValue, push, update, remove, get } from "firebase/database";
 import { database } from "../../lib/firebase";
 import { Input } from "../../components/ui/input";
 import FormField from "../../components/forms/FormField";
-import { usePiket } from "../../context/PiketContext";
+import { useExamData } from "../../context/ExamDataContext";
 import { useAuth } from "../../context/AuthContext";
 import { getExamTypeColorClass } from "./ExamsPage";
 import { ConfirmationDialog } from "../../components/ui/confirmation-dialog";
@@ -40,12 +40,13 @@ export interface ExamRoomData {
   isDisabled?: boolean;
   subjectName?: string;
   teacherName?: string;
+  show_result?: boolean;
 }
 
 const ExamRoomsPage = () => {
   const navigate = useNavigate();
   const { role, teacherId } = useAuth();
-  const { classes: piketClasses, students, mapels } = usePiket();
+  const { classes: examClasses, students, subjects } = useExamData();
   const [rooms, setRooms] = useState<ExamRoomData[]>([]);
   const [exams, setExams] = useState<any[]>([]);
   const [teachers, setTeachers] = useState<Record<string, any>>({});
@@ -69,6 +70,7 @@ const ExamRoomsPage = () => {
     cheat_limit: 3,
     submit_window: 10, // Default 10 mnt
     room_code: "",
+    show_result: true, // <--- Menampilkan skor ke student
   });
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -96,7 +98,7 @@ const ExamRoomsPage = () => {
   const [monitorRoom, setMonitorRoom] = useState<ExamRoomData | null>(null);
   const [attempts, setAttempts] = useState<any[]>([]);
   const [monitorQuestions, setMonitorQuestions] = useState<any[]>([]);
-  const [expandedSiswa, setExpandedSiswa] = useState<string | null>(null); // NISN
+  const [expandedstudent, setExpandedstudent] = useState<string | null>(null); // NISN
   const [answersList, setAnswersList] = useState<Record<string, any>>({}); // { nisn: answers }
   const [monitorSortBy, setMonitorSortBy] = useState<"default" | "nilai" | "login" | "nama">("default");
   const [monitorClassFilter, setMonitorClassFilter] = useState<string>("all");
@@ -144,20 +146,28 @@ const ExamRoomsPage = () => {
       const data = snap.val();
       const stats: Record<string, number> = {};
       let total = 0;
-      Object.keys(data).forEach(key => {
-        if (data[key].status === "ongoing") {
-          total++;
-          const parts = key.split("_");
-          if (parts.length >= 2) {
-            const roomId = parts[1];
-            stats[roomId] = (stats[roomId] || 0) + 1;
-          }
-        }
+      
+      // data is { roomId: { nisn: attempt } }
+      // data is { roomId: { nisn: attempt } }
+      Object.keys(data).forEach(rid => {
+        // filter: only count if room is not archived (exists in current active rooms list)
+        // Note: we'll check against rooms state or just calculate later.
+        // For simplicity and speed, we check if the roomId exists in our local record and is not archive.
+        const roomInfo = rooms.find(r => r.id === rid);
+        if (roomInfo && roomInfo.status === "archive") return;
+
+        const roomAttempts = data[rid];
+        Object.keys(roomAttempts).forEach(nisn => {
+           if (roomAttempts[nisn].status === "ongoing") {
+              stats[rid] = (stats[rid] || 0) + 1;
+              total++;
+           }
+        });
       });
       setLiveBreakdown(stats);
       setTotalOngoing(total);
     });
-  }, []);
+  }, [rooms]); // Added rooms as dependency to ensure archive filtering works
 
   useEffect(() => {
     if (!tokenUpdatedAt) return;
@@ -236,11 +246,11 @@ const ExamRoomsPage = () => {
     }
   };
 
-  // 🔒 Algoritma Token Otomatis Matematikal (Sama dengan Siswa)
+  // 🔒 Algoritma Token Otomatis Matematikal (Sama dengan student)
   const generateTimeToken = (timestamp: number) => {
     const coeff = 5 * 60 * 1000;
     const bucket = Math.floor(timestamp / coeff);
-    const seed = bucket * 3317 + 51233; // Harus Sama persis dengan siswa
+    const seed = bucket * 3317 + 51233; // Harus Sama persis dengan student
     const hash = Math.abs(seed % 233280);
     const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
     let t = "";
@@ -415,9 +425,9 @@ const ExamRoomsPage = () => {
   ];
 
   const handleArchiveRoom = (room: ExamRoomData) => {
-    // 🛡️ Cek apakah ada siswa yang sedang aktif pengerjaan
+    // 🛡️ Cek apakah ada student yang sedang aktif pengerjaan
     if (liveBreakdown[room.id] > 0) {
-      showAlert("Aksi Ditolak", `Terdapat ${liveBreakdown[room.id]} siswa yang sedang aktif ujian di ruang ini. Harap selesaikan ujian terlebih dahulu sebelum mengarsipkan.`, "warning");
+      showAlert("Aksi Ditolak", `Terdapat ${liveBreakdown[room.id]} student yang sedang aktif ujian di ruang ini. Harap selesaikan ujian terlebih dahulu sebelum mengarsipkan.`, "warning");
       return;
     }
 
@@ -466,7 +476,7 @@ const ExamRoomsPage = () => {
     setConfirmDialog({
       isOpen: true,
       title: "Selesaikan Ujian Sekarang",
-      description: `Apakah Anda yakin ingin mengakhiri sesi ujian ${room.room_name || room.examTitle || ""} saat ini juga? Semua siswa yang sedang mengerjakan tidak akan bisa melanjutkan lagi.`,
+      description: `Apakah Anda yakin ingin mengakhiri sesi ujian ${room.room_name || room.examTitle || ""} saat ini juga? Semua student yang sedang mengerjakan tidak akan bisa melanjutkan lagi.`,
       type: "danger",
       confirmLabel: "Selesaikan Paksa",
       onConfirm: async () => {
@@ -491,7 +501,7 @@ const ExamRoomsPage = () => {
     setConfirmDialog({
       isOpen: true,
       title: newState ? "Nonaktifkan Ujian" : "Aktifkan Ujian",
-      description: `Apakah Anda yakin ingin ${newState ? "menonaktifkan" : "mengaktifkan kembali"} ruang ujian ${room.room_name || room.examTitle || ""}? ${newState ? "Siswa tidak akan bisa masuk ke ruang ini." : ""}`,
+      description: `Apakah Anda yakin ingin ${newState ? "menonaktifkan" : "mengaktifkan kembali"} ruang ujian ${room.room_name || room.examTitle || ""}? ${newState ? "student tidak akan bisa masuk ke ruang ini." : ""}`,
       type: newState ? "warning" : "info",
       confirmLabel: newState ? "Ya, Nonaktifkan" : "Ya, Aktifkan",
       onConfirm: async () => {
@@ -513,7 +523,7 @@ const ExamRoomsPage = () => {
     if (!monitorRoom) return;
 
     const workbook = XLSX.utils.book_new();
-    const header = ["No", "NISN", "Nama Siswa", "Kelas", "Jam Login", "Jam Submit", "Cheat Count", "Benar", "Salah", "Nilai"];
+    const header = ["No", "NISN", "Nama student", "Kelas", "Jam Login", "Jam Submit", "Cheat Count", "Benar", "Salah", "Nilai"];
     monitorQuestions.forEach((q, idx) => header.push(`Soal ${idx + 1}`));
 
     const headerStyle = {
@@ -532,9 +542,9 @@ const ExamRoomsPage = () => {
     monitorQuestions.forEach(() => colsWidths.push({ wch: 8 }));
 
     const generateRowData = (att: any, idx: number) => {
-      const siswa = students.find((s) => String(s.nisn).trim() === String(att.nisn).trim());
+      const student = students.find((s) => String(s.nisn).trim() === String(att.nisn).trim());
       const sisAnswers = answersList[att.nisn] || {};
-      const kelasObj = piketClasses.find(c => c.id === (siswa ? siswa.classId : ""));
+      const kelasObj = examClasses.find(c => c.id === (student ? student.classId : ""));
       const className = kelasObj ? kelasObj.name : "-";
 
       let correct = 0;
@@ -547,7 +557,7 @@ const ExamRoomsPage = () => {
       const score = monitorQuestions.length > 0 ? (correct / monitorQuestions.length) * 100 : 0;
 
       const row = [
-        idx + 1, att.nisn, siswa ? siswa.name : "N/A", className,
+        idx + 1, att.nisn, student ? student.name : "N/A", className,
         att.startTime ? new Date(att.startTime).toLocaleTimeString("id-ID") : "-",
         att.submit_time ? new Date(att.submit_time).toLocaleTimeString("id-ID") : (att.status === "submitted" ? "Selesai" : "-"),
         att.cheatCount || 0, correct, wrong, score.toFixed(1)
@@ -594,16 +604,16 @@ const ExamRoomsPage = () => {
     // 2. PER-CLASS SHEETS
     // Get unique classes from attempts
     const classIdsInAttempts = Array.from(new Set(attempts.map(att => {
-      const s = students.find(siswa => siswa.nisn === att.nisn);
+      const s = students.find(student => student.nisn === att.nisn);
       return s ? s.classId : null;
     }).filter(Boolean)));
 
     classIdsInAttempts.forEach(cId => {
       const classAttempts = attempts.filter(att => {
-        const s = students.find(siswa => siswa.nisn === att.nisn);
+        const s = students.find(student => student.nisn === att.nisn);
         return s?.classId === cId;
       });
-      const className = piketClasses.find(c => c.id === cId)?.name || "Lainnya";
+      const className = examClasses.find(c => c.id === cId)?.name || "Lainnya";
       const classRows = classAttempts.map((att, idx) => generateRowData(att, idx));
       const wsClass = XLSX.utils.aoa_to_sheet([header, ...classRows]);
       applyStyles(wsClass, classRows.length, classAttempts);
@@ -617,9 +627,9 @@ const ExamRoomsPage = () => {
     const takenNisns = attempts.map(att => att.nisn);
     const notTakenStudents = classStudents.filter(s => !takenNisns.includes(s.nisn));
 
-    const ntHeader = ["No", "NISN", "Nama Siswa", "Kelas", "Keterangan"];
+    const ntHeader = ["No", "NISN", "Nama student", "Kelas", "Keterangan"];
     const ntRows = notTakenStudents.map((s, idx) => {
-      const cObj = piketClasses.find(c => c.id === s.classId);
+      const cObj = examClasses.find(c => c.id === s.classId);
       return [idx + 1, s.nisn, s.name, cObj ? cObj.name : "-", "Belum Mengerjakan"];
     });
     const wsNT = XLSX.utils.aoa_to_sheet([ntHeader, ...ntRows]);
@@ -643,7 +653,7 @@ const ExamRoomsPage = () => {
       setConfirmDialog({
         isOpen: true,
         title: "Sesi Aktif Kosong",
-        description: "Tidak ada siswa yang sedang aktif mengerjakan ujian di ruangan ini saat ini.",
+        description: "Tidak ada student yang sedang aktif mengerjakan ujian di ruangan ini saat ini.",
         type: "info",
         confirmLabel: "Ok",
         onConfirm: () => { }
@@ -654,7 +664,7 @@ const ExamRoomsPage = () => {
     setConfirmDialog({
       isOpen: true,
       title: "Selesaikan Paksa Sesi",
-      description: `Tindakan ini akan mengakhiri paksa sesi ujian untuk ${ongoing.length} siswa yang sedang aktif. Anda yakin?`,
+      description: `Tindakan ini akan mengakhiri paksa sesi ujian untuk ${ongoing.length} student yang sedang aktif. Anda yakin?`,
       type: "danger",
       confirmLabel: "Selesaikan",
       onConfirm: async () => {
@@ -663,7 +673,6 @@ const ExamRoomsPage = () => {
           const now = Date.now();
           
           ongoing.forEach((att) => {
-            // 🏹 Hitung Skor On-the-fly
             const sisAnswers = answersList[att.nisn] || {};
             let correct = 0;
             monitorQuestions.forEach((q) => {
@@ -672,11 +681,11 @@ const ExamRoomsPage = () => {
             });
             const score = monitorQuestions.length > 0 ? Math.round((correct / monitorQuestions.length) * 100) : 0;
 
-            updates[`attempts/${att.id}/status`] = "submitted";
-            updates[`attempts/${att.id}/submit_time`] = now;
-            updates[`attempts/${att.id}/score`] = score;
-            updates[`attempts/${att.id}/correct`] = correct;
-            updates[`attempts/${att.id}/total`] = monitorQuestions.length;
+            updates[`attempts/${monitorRoom.id}/${att.nisn}/status`] = "submitted";
+            updates[`attempts/${monitorRoom.id}/${att.nisn}/submit_time`] = now;
+            updates[`attempts/${monitorRoom.id}/${att.nisn}/score`] = score;
+            updates[`attempts/${monitorRoom.id}/${att.nisn}/correct`] = correct;
+            updates[`attempts/${monitorRoom.id}/${att.nisn}/total`] = monitorQuestions.length;
           });
           
           await update(ref(database), updates);
@@ -697,9 +706,9 @@ const ExamRoomsPage = () => {
              return a;
           }));
 
-          showAlert("Berhasil", `${ongoing.length} siswa berhasil diselesaikan secara paksa.`, "success");
+          showAlert("Berhasil", `${ongoing.length} student berhasil diselesaikan secara paksa.`, "success");
         } catch (error) {
-          showAlert("Gagal", "Gagal menyelesaikan paksa ujian siswa.", "danger");
+          showAlert("Gagal", "Gagal menyelesaikan paksa ujian student.", "danger");
         }
       }
     });
@@ -712,8 +721,8 @@ const ExamRoomsPage = () => {
 
     setConfirmDialog({
       isOpen: true,
-      title: "Selesaikan Ujian Siswa",
-      description: `Apakah Anda yakin ingin mengakhiri sesi ujian siswa ini secara paksa?`,
+      title: "Selesaikan Ujian student",
+      description: `Apakah Anda yakin ingin mengakhiri sesi ujian student ini secara paksa?`,
       type: "danger",
       confirmLabel: "Ya, Selesaikan",
       onConfirm: async () => {
@@ -730,7 +739,7 @@ const ExamRoomsPage = () => {
           });
           const score = monitorQuestions.length > 0 ? Math.round((correct / monitorQuestions.length) * 100) : 0;
 
-          await update(ref(database, `attempts/${attemptId}`), {
+          await update(ref(database, `attempts/${monitorRoom.id}/${nisn}`), {
             status: "submitted",
             submit_time: now,
             score: score,
@@ -739,9 +748,9 @@ const ExamRoomsPage = () => {
           });
 
           setAttempts(prev => prev.map(a => a.id === attemptId ? { ...a, status: "submitted", submit_time: now, score, correct, total: monitorQuestions.length } : a));
-          showAlert("Berhasil", "Sesi siswa telah diselesaikan.", "success");
+          showAlert("Berhasil", "Sesi student telah diselesaikan.", "success");
         } catch (error) {
-          showAlert("Gagal", "Gagal menyelesaikan sesi siswa.", "danger");
+          showAlert("Gagal", "Gagal menyelesaikan sesi student.", "danger");
         }
       }
     });
@@ -769,15 +778,13 @@ const ExamRoomsPage = () => {
     const processAttempts = (data: any) => {
       if (!data) { setAttempts([]); return; }
       const loaded = Object.keys(data)
-        .filter((key) => key.includes(monitorRoom.id))
-        .map((key) => {
-          const [nisn] = key.split("_");
-          return { id: key, nisn, ...data[key] };
+        .map((nisn) => {
+          return { id: nisn, nisn, ...data[nisn] };
         });
       setAttempts(loaded);
     };
 
-    const unsubAttempts = onValue(attemptsRef, (snapshot) => {
+    const unsubAttempts = onValue(ref(database, `attempts/${monitorRoom.id}`), (snapshot) => {
       latestAttempts = snapshot.val();
       if (!attemptsThrottle) {
         processAttempts(latestAttempts);
@@ -785,7 +792,7 @@ const ExamRoomsPage = () => {
         setTimeout(() => {
           attemptsThrottle = false;
           if (latestAttempts) processAttempts(latestAttempts);
-        }, 300000);
+        }, 2000);
       }
     });
 
@@ -796,17 +803,10 @@ const ExamRoomsPage = () => {
 
     const processAnswers = (data: any) => {
       if (!data) { setAnswersList({}); return; }
-      const mapped: Record<string, any> = {};
-      Object.keys(data).forEach((key) => {
-        if (key.includes(monitorRoom.id)) {
-          const nisn = key.split("_")[0];
-          mapped[nisn] = data[key];
-        }
-      });
-      setAnswersList(mapped);
+      setAnswersList(data);
     };
 
-    const unsubAnswers = onValue(answersRef, (snapshot) => {
+    const unsubAnswers = onValue(ref(database, `answers/${monitorRoom.id}`), (snapshot) => {
       latestAnswers = snapshot.val();
       if (!answersThrottle) {
         processAnswers(latestAnswers);
@@ -814,7 +814,7 @@ const ExamRoomsPage = () => {
         setTimeout(() => {
           answersThrottle = false;
           if (latestAnswers) processAnswers(latestAnswers);
-        }, 300000);
+        }, 2000);
       }
     });
 
@@ -844,7 +844,7 @@ const ExamRoomsPage = () => {
     });
 
     // 1b. Load Teachers
-    get(ref(database, "piket_teachers")).then(snap => {
+    get(ref(database, "teachers")).then(snap => {
       if(snap.exists()) setTeachers(snap.val());
     });
   }, []);
@@ -867,14 +867,14 @@ const ExamRoomsPage = () => {
           const examTitle = examData ? examData.title : "Ujian Tidak Diketahui";
           
           // 🏹 Cari Nama Mapel & Guru dari State (Cepat)
-          const subjectName = mapels.find(m => m.id === examData?.subjectId)?.name || "Mapel Tidak Ada";
+          const subjectName = subjects.find(m => m.id === examData?.subjectId)?.name || "Mapel Tidak Ada";
           const teacherName = teachers[examTeacherId || ""]?.name || "Guru Tidak Ada";
 
-          // Get Class Name from usePiket
+          // Get Class Name from useExamData
           let className = "Semua Kelas";
           if (room.classId && !room.allClasses) {
             const ids = room.classId.split(",");
-            const names = ids.map((id: string) => piketClasses.find(c => c.id === id)?.name).filter(Boolean);
+            const names = ids.map((id: string) => examClasses.find(c => c.id === id)?.name).filter(Boolean);
             if (names.length > 0) className = names.join(", ");
           }
 
@@ -897,7 +897,7 @@ const ExamRoomsPage = () => {
     });
 
     return () => unsubscribe();
-  }, [piketClasses, role, teacherId, exams, teachers, mapels]);
+  }, [examClasses, role, teacherId, exams, teachers, subjects]);
 
   const generateToken = () => {
     const token = generateNewToken();
@@ -920,17 +920,13 @@ const ExamRoomsPage = () => {
       cheat_limit: 3,
       submit_window: 10,
       room_code: "",
+      show_result: true,
     });
     generateToken();
     setIsDialogOpen(true);
   };
 
   const handleEditClick = (room: ExamRoomData) => {
-    // 🛡️ Cek apakah ada siswa yang sedang aktif pengerjaan
-    if (liveBreakdown[room.id] > 0) {
-      showAlert("Aksi Ditolak", `Terdapat ${liveBreakdown[room.id]} siswa yang sedang aktif di ruang ini. Kamu tidak dapat mengedit pengaturan selama ujian sedang berlangsung.`, "warning");
-      return;
-    }
     setDialogMode("edit");
     setSelectedRoom(room);
     setFormValues({
@@ -945,6 +941,7 @@ const ExamRoomsPage = () => {
       cheat_limit: room.cheat_limit,
       submit_window: room.submit_window || 0,
       room_code: room.room_code || "",
+      show_result: room.show_result !== false,
     });
     setIsDialogOpen(true);
   };
@@ -965,6 +962,7 @@ const ExamRoomsPage = () => {
         submit_window: Number(formValues.submit_window),
         room_code: formValues.room_code.toUpperCase(),
         token_updated_at: Date.now(),
+        show_result: formValues.show_result,
       };
 
       if (dialogMode === "edit" && selectedRoom) {
@@ -979,9 +977,9 @@ const ExamRoomsPage = () => {
   };
 
   const handleDeleteClick = (room: ExamRoomData) => {
-    // 🛡️ Cek apakah ada siswa yang sedang aktif pengerjaan
+    // 🛡️ Cek apakah ada student yang sedang aktif pengerjaan
     if (liveBreakdown[room.id] > 0) {
-      showAlert("Aksi Ditolak", `Ruang ini tidak bisa dihapus karena masih ada ${liveBreakdown[room.id]} siswa yang aktif di dalamnya.`, "danger");
+      showAlert("Aksi Ditolak", `Ruang ini tidak bisa dihapus karena masih ada ${liveBreakdown[room.id]} student yang aktif di dalamnya.`, "danger");
       return;
     }
     setRoomToDelete(room);
@@ -997,15 +995,14 @@ const ExamRoomsPage = () => {
   const handleUnlockStudent = async (nisn: string) => {
     if (!monitorRoom) return;
     try {
-      const attemptId = `${nisn}_${monitorRoom.id}`;
-      await update(ref(database, `attempts/${attemptId}`), {
+      await update(ref(database, `attempts/${monitorRoom.id}/${nisn}`), {
         status: "ongoing",
         cheatCount: 0
       });
-      setAttempts(prev => prev.map(a => a.id === attemptId ? { ...a, status: "ongoing", cheatCount: 0 } : a));
-      showAlert("Berhasil", "Siswa berhasil diunlock.", "success");
+      setAttempts(prev => prev.map(a => a.nisn === nisn ? { ...a, status: "ongoing", cheatCount: 0 } : a));
+      showAlert("Berhasil", "student berhasil diunlock.", "success");
     } catch (error) {
-      showAlert("Gagal", "Gagal mengunlock siswa.", "danger");
+      showAlert("Gagal", "Gagal mengunlock student.", "danger");
     }
   };
 
@@ -1014,16 +1011,15 @@ const ExamRoomsPage = () => {
     setConfirmDialog({
       isOpen: true,
       title: "Reset Total Sesi",
-      description: "Apakah anda yakin ingin RESET TOTAL sesi siswa ini? Seluruh jawaban dan progres mereka akan DIHAPUS PERMANEN.",
+      description: "Apakah anda yakin ingin RESET TOTAL sesi student ini? Seluruh jawaban dan progres mereka akan DIHAPUS PERMANEN.",
       type: "danger",
       confirmLabel: "Ya, Reset Total",
       onConfirm: async () => {
         try {
-          const attemptId = `${nisn}_${monitorRoom.id}`;
-          await remove(ref(database, `attempts/${attemptId}`));
-          await remove(ref(database, `answers/${attemptId}`));
-          setAttempts(prev => prev.filter(att => att.id !== attemptId));
-          showAlert("Berhasil", "Sesi siswa berhasil direset total.", "success");
+          await remove(ref(database, `attempts/${monitorRoom.id}/${nisn}`));
+          await remove(ref(database, `answers/${monitorRoom.id}/${nisn}`));
+          setAttempts(prev => prev.filter(att => att.nisn !== nisn));
+          showAlert("Berhasil", "Sesi student berhasil direset total.", "success");
         } catch (error) {
           showAlert("Gagal", "Gagal mereset sesi.", "danger");
         }
@@ -1044,8 +1040,7 @@ const ExamRoomsPage = () => {
 
     setLimitDialogOpen(false);
     try {
-      const attemptId = `${limitNisn}_${monitorRoom.id}`;
-      const attemptRef = ref(database, `attempts/${attemptId}`);
+      const attemptRef = ref(database, `attempts/${monitorRoom.id}/${limitNisn}`);
       const snap = await get(attemptRef);
       const currentExtra = snap.exists() ? (snap.val().extraCheatLimit || 0) : 0;
       const currentStatus = snap.exists() ? snap.val().status : "ongoing";
@@ -1055,9 +1050,9 @@ const ExamRoomsPage = () => {
         status: currentStatus === "LOCKED" ? "ongoing" : currentStatus, // Auto Unlock
       });
 
-      setAttempts(prev => prev.map(a => a.id === attemptId ? { ...a, extraCheatLimit: (currentExtra + added), status: (currentStatus === "LOCKED" ? "ongoing" : currentStatus) } : a));
+      setAttempts(prev => prev.map(a => a.nisn === limitNisn ? { ...a, extraCheatLimit: (currentExtra + added), status: (currentStatus === "LOCKED" ? "ongoing" : currentStatus) } : a));
 
-      showAlert("Berhasil", `Berhasil menambah +${added} batas pelanggaran untuk siswa.`, "success");
+      showAlert("Berhasil", `Berhasil menambah +${added} batas pelanggaran untuk student.`, "success");
     } catch {
       showAlert("Gagal", "Gagal memperbarui batas.", "danger");
     }
@@ -1068,17 +1063,16 @@ const ExamRoomsPage = () => {
     setConfirmDialog({
       isOpen: true,
       title: "Reset Pelanggaran",
-      description: "Hapus catatan deteksi kecurangan untuk siswa ini?",
+      description: "Hapus catatan deteksi kecurangan untuk student ini?",
       type: "warning",
       confirmLabel: "Ya, Reset",
       onConfirm: async () => {
         try {
-          const attemptId = `${nisn}_${monitorRoom.id}`;
-          await update(ref(database, `attempts/${attemptId}`), {
+          await update(ref(database, `attempts/${monitorRoom.id}/${nisn}`), {
             cheatCount: 0
           });
-          setAttempts(prev => prev.map(a => a.id === attemptId ? { ...a, cheatCount: 0 } : a));
-          showAlert("Berhasil", "Pelanggaran siswa berhasil direset.", "success");
+          setAttempts(prev => prev.map(a => a.nisn === nisn ? { ...a, cheatCount: 0 } : a));
+          showAlert("Berhasil", "Pelanggaran student berhasil direset.", "success");
         } catch (error) {
           showAlert("Gagal", "Gagal mereset cheat count.", "danger");
         }
@@ -1099,6 +1093,12 @@ const ExamRoomsPage = () => {
     }
   };
 
+  const isRoomActive = selectedRoom ? (
+    (liveBreakdown[selectedRoom.id] || 0) > 0 || 
+    (Date.now() >= new Date(selectedRoom.start_time).getTime() && Date.now() <= new Date(selectedRoom.end_time).getTime())
+  ) : false;
+  const isEditRestricted = dialogMode === "edit" && isRoomActive;
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between bg-card p-5 rounded-2xl border border-slate-200/60 dark:border-slate-800/40 shadow-sm backdrop-blur-sm">
@@ -1107,7 +1107,7 @@ const ExamRoomsPage = () => {
             <ClipboardList className="h-5 w-5 text-blue-500" />
             Ruang Ujian
           </h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Aktifkan dan kelola sesi ujian untuk siswa.</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Aktifkan dan kelola sesi ujian untuk Siswa.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex bg-slate-100 dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-800/80 p-1 rounded-xl text-xs font-semibold">
@@ -1212,82 +1212,70 @@ const ExamRoomsPage = () => {
               searchPlaceholder="Cari ruang..."
               emptyMessage={`Belum ada ruang ujian ${activeTab}.`}
               actions={(room: ExamRoomData) => (
-                <div className="grid grid-cols-2 gap-2 whitespace-nowrap min-w-[200px]">
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    className="bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 dark:border-blue-800/40 w-full justify-start"
+                <div className="flex justify-end gap-1.5 items-center whitespace-nowrap">
+                  <button
+                    className="p-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-lg dark:bg-blue-900/10 dark:text-blue-400 border border-blue-100 dark:border-blue-800/40"
                     onClick={() => handleMonitorClick(room)}
+                    title="Monitoring Ujian"
                   >
-                    <Users className="h-4 w-4 mr-1.5" /> Monitor
-                  </Button>
+                    <Users className="h-4 w-4" />
+                  </button>
 
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    className="bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-100 dark:bg-purple-900/30 dark:text-purple-400 dark:hover:bg-purple-900/50 dark:border-purple-800/40 w-full justify-start"
+                  <button
+                    className="p-1.5 bg-purple-50 text-purple-700 hover:bg-purple-100 rounded-lg dark:bg-purple-900/10 dark:text-purple-400 border border-purple-100 dark:border-purple-800/40"
                     onClick={() => navigate(`/admin/bank-soal/${room.examId}/questions`)}
+                    title="Bank Soal"
                   >
-                    <BookOpen className="h-4 w-4 mr-1.5" /> Soal
-                  </Button>
+                    <BookOpen className="h-4 w-4" />
+                  </button>
 
                   {(role === "admin" || room.examTeacherId === teacherId) && (
                     <>
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        className={`border w-full justify-start ${room.isDisabled 
-                          ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:hover:bg-emerald-900/50 dark:border-emerald-800/40" 
-                          : "bg-red-50 text-red-700 hover:bg-red-100 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-900/50 dark:border-red-800/40"}`}
+                      <button
+                        className={`p-1.5 rounded-lg border ${room.isDisabled 
+                          ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border-emerald-100 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-900/40" 
+                          : "bg-red-50 text-red-700 hover:bg-red-100 border-red-100 dark:bg-red-950/20 dark:text-red-400 dark:border-red-900/40"}`}
                         onClick={() => handleToggleDisabled(room)}
+                        title={room.isDisabled ? "Aktifkan Ruangan" : "Non-aktifkan"}
                       >
-                        {room.isDisabled ? (
-                          <><Power className="h-4 w-4 mr-1.5" /> Buka</>
-                        ) : (
-                          <><PowerOff className="h-4 w-4 mr-1.5" /> Tutup</>
-                        )}
-                      </Button>
+                        {room.isDisabled ? <Power className="h-4 w-4" /> : <PowerOff className="h-4 w-4" />}
+                      </button>
 
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        className="bg-green-50 text-green-700 hover:bg-green-100 border border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:hover:bg-green-900/50 dark:border-green-800/40 w-full justify-start"
+                      <button
+                        className="p-1.5 bg-sky-50 text-sky-700 hover:bg-sky-100 rounded-lg dark:bg-sky-900/10 dark:text-sky-400 border border-sky-100 dark:border-sky-800/40"
                         onClick={() => handleEditClick(room)}
+                        title="Edit Ruangan"
                       >
-                        <Edit className="h-4 w-4 mr-1.5" /> Edit
-                      </Button>
+                        <Edit className="h-4 w-4" />
+                      </button>
 
-                      <div className="col-span-2 flex gap-2 mt-0.5">
-                        {activeTab === "aktif" ? (
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            className="flex-1 bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:hover:bg-amber-900/50 dark:border-amber-800/40 py-1"
-                            onClick={() => handleArchiveRoom(room)}
-                          >
-                            <Archive className="h-3.5 w-3.5 mr-1" /> Arsipkan
-                          </Button>
-                        ) : (
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            className="flex-1 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-400 dark:hover:bg-indigo-900/50 dark:border-indigo-800/40 py-1"
-                            onClick={() => handleRestoreRoom(room)}
-                          >
-                            <RotateCw className="h-3.5 w-3.5 mr-1" /> Pulihkan
-                          </Button>
-                        )}
-                        {activeTab === "arsip" && (
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            className="flex-1 bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-900/50 dark:border-red-800/40 py-1"
-                            onClick={() => handleDeleteClick(room)}
-                          >
-                            <Trash className="h-3.5 w-3.5 mr-1" /> Hapus
-                          </Button>
-                        )}
-                      </div>
+                      {activeTab === "aktif" ? (
+                        <button
+                          className="p-1.5 bg-amber-50 text-amber-700 hover:bg-amber-100 rounded-lg dark:bg-amber-900/10 dark:text-amber-400 border border-amber-100 dark:border-amber-800/40"
+                          onClick={() => handleArchiveRoom(room)}
+                          title="Arsipkan"
+                        >
+                          <Archive className="h-4 w-4" />
+                        </button>
+                      ) : (
+                        <button
+                          className="p-1.5 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-lg dark:bg-indigo-900/10 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-800/40"
+                          onClick={() => handleRestoreRoom(room)}
+                          title="Pulihkan"
+                        >
+                          <RotateCw className="h-4 w-4" />
+                        </button>
+                      )}
+
+                      {activeTab === "arsip" && (
+                        <button
+                          className="p-1.5 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-lg dark:bg-rose-900/10 dark:text-rose-400 border border-rose-100 dark:border-rose-800/40"
+                          onClick={() => handleDeleteClick(room)}
+                          title="Hapus Permanen"
+                        >
+                          <Trash className="h-4 w-4" />
+                        </button>
+                      )}
                     </>
                   )}
                 </div>
@@ -1302,6 +1290,12 @@ const ExamRoomsPage = () => {
         <DialogContent className="max-w-md bg-card">
           <DialogHeader>
             <DialogTitle>{dialogMode === "edit" ? "Edit Ruang Ujian" : "Buka Ruang Ujian"}</DialogTitle>
+            {isEditRestricted && (
+              <div className="bg-amber-50 border border-amber-200 text-amber-700 p-2.5 rounded-xl text-[10px] mt-2 font-medium flex items-start gap-2 animate-pulse-slow dark:bg-amber-950/20 dark:border-amber-900/40 dark:text-amber-400">
+                <Lock className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                <span>Ujian sedang berlangsung. Demi keamanan data, Anda hanya diperbolehkan mengubah <b>Nama Ruang</b>, <b>Waktu Selesai</b>, <b>Kumpul Dibuka</b>, dan <b>Batas Cheat</b>.</span>
+              </div>
+            )}
           </DialogHeader>
 
           <form onSubmit={handleSubmit} className="space-y-4 pt-2">
@@ -1312,7 +1306,7 @@ const ExamRoomsPage = () => {
                 onChange={(e) => setFormValues({ ...formValues, room_name: e.target.value })}
                 required
               />
-              <p className="text-[10px] text-slate-400 mt-1">Nama ini yang akan ditampilkan di layar dashboard dashboard siswa Anda.</p>
+              <p className="text-[10px] text-slate-400 mt-1">Nama ini yang akan ditampilkan di layar dashboard dashboard Siswa Anda.</p>
             </FormField>
 
             <FormField id="examId" label="Pilih Bank Soal" error={undefined}>
@@ -1320,7 +1314,8 @@ const ExamRoomsPage = () => {
                 value={formValues.examId}
                 onChange={(e) => setFormValues({ ...formValues, examId: e.target.value })}
                 required
-                className="w-full rounded-md border border-slate-200 dark:border-slate-800 bg-card text-sm p-2"
+                disabled={isEditRestricted}
+                className={`w-full rounded-md border border-slate-200 dark:border-slate-800 bg-card text-sm p-2 ${isEditRestricted ? "opacity-60 cursor-not-allowed" : ""}`}
               >
                 <option value="">-- Pilih Bank Soal --</option>
                 {exams
@@ -1332,7 +1327,7 @@ const ExamRoomsPage = () => {
               {formValues.examId && exams.find(e => e.id === formValues.examId) && (
                 <div className="mt-2 text-xs text-slate-500 bg-slate-50 dark:bg-slate-800/50 p-2.5 rounded-lg border border-slate-100 dark:border-slate-800 flex flex-col gap-1">
                   <div><span className="font-semibold text-slate-700 dark:text-slate-300">Jenis:</span> {exams.find(e => e.id === formValues.examId)?.examType || "Latihan Biasa"}</div>
-                  <div><span className="font-semibold text-slate-700 dark:text-slate-300">Mapel:</span> {mapels.find(m => m.id === exams.find(e => e.id === formValues.examId)?.subjectId)?.name || "-"}</div>
+                  <div><span className="font-semibold text-slate-700 dark:text-slate-300">Mapel:</span> {subjects.find(m => m.id === exams.find(e => e.id === formValues.examId)?.subjectId)?.name || "-"}</div>
                   <div><span className="font-semibold text-slate-700 dark:text-slate-300">Guru:</span> {teachers[exams.find(e => e.id === formValues.examId)?.teacherId]?.name || "-"}</div>
                 </div>
               )}
@@ -1343,15 +1338,17 @@ const ExamRoomsPage = () => {
               <div className="flex gap-2 mb-2">
                 <button
                   type="button"
+                  disabled={isEditRestricted}
                   onClick={() => setFormValues({ ...formValues, allClasses: true, classId: "" })}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${formValues.allClasses ? "bg-blue-50 text-blue-700 border border-blue-100 dark:bg-blue-900/40 dark:text-blue-400 dark:border-blue-800/40" : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300"}`}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${isEditRestricted ? "opacity-50 cursor-not-allowed" : ""} ${formValues.allClasses ? "bg-blue-50 text-blue-700 border border-blue-100 dark:bg-blue-900/40 dark:text-blue-400 dark:border-blue-800/40" : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300"}`}
                 >
                   Semua Kelas
                 </button>
                 <button
                   type="button"
+                  disabled={isEditRestricted}
                   onClick={() => setFormValues({ ...formValues, allClasses: false })}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${!formValues.allClasses ? "bg-blue-50 text-blue-700 border border-blue-100 dark:bg-blue-900/40 dark:text-blue-400 dark:border-blue-800/40" : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300"}`}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${isEditRestricted ? "opacity-50 cursor-not-allowed" : ""} ${!formValues.allClasses ? "bg-blue-50 text-blue-700 border border-blue-100 dark:bg-blue-900/40 dark:text-blue-400 dark:border-blue-800/40" : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300"}`}
                 >
                   Pilih Parsial (Multiple)
                 </button>
@@ -1359,13 +1356,14 @@ const ExamRoomsPage = () => {
 
               {!formValues.allClasses && (
                 <div className="grid grid-cols-2 gap-2 border border-slate-200 dark:border-slate-800 rounded-xl p-2 max-h-40 overflow-y-auto bg-card">
-                  {piketClasses.map((c) => {
+                  {examClasses.map((c) => {
                     const isChecked = formValues.classId ? formValues.classId.split(",").includes(c.id) : false;
                     return (
-                      <label key={c.id} className="flex items-center gap-2 text-xs p-1 hover:bg-slate-50 dark:hover:bg-slate-800 rounded cursor-pointer text-slate-700 dark:text-slate-200">
+                      <label key={c.id} className={`flex items-center gap-2 text-xs p-1 hover:bg-slate-50 dark:hover:bg-slate-800 rounded cursor-pointer text-slate-700 dark:text-slate-200 ${isEditRestricted ? "opacity-50 cursor-not-allowed" : ""}`}>
                         <input
                           type="checkbox"
                           checked={isChecked}
+                          disabled={isEditRestricted}
                           onChange={(e) => {
                             let current = formValues.classId ? formValues.classId.split(",") : [];
                             if (e.target.checked) {
@@ -1388,7 +1386,7 @@ const ExamRoomsPage = () => {
 
             <div className="grid grid-cols-2 gap-3">
               <FormField id="start_time" label="Waktu Mulai" error={undefined}>
-                <Input type="datetime-local" value={formValues.start_time} onChange={(e) => setFormValues({ ...formValues, start_time: e.target.value })} required />
+                <Input type="datetime-local" value={formValues.start_time} onChange={(e) => setFormValues({ ...formValues, start_time: e.target.value })} required disabled={isEditRestricted} />
               </FormField>
               <FormField id="end_time" label="Waktu Berakhir" error={undefined}>
                 <Input type="datetime-local" value={formValues.end_time} onChange={(e) => setFormValues({ ...formValues, end_time: e.target.value })} required />
@@ -1399,7 +1397,7 @@ const ExamRoomsPage = () => {
             <div className="space-y-4 pt-1 border-t mt-4">
               <div className="grid grid-cols-2 gap-3 mt-2">
                 <FormField id="duration" label="Durasi (Menit)" error={undefined}>
-                  <Input type="number" value={formValues.duration} onChange={(e) => setFormValues({ ...formValues, duration: Number(e.target.value) })} required />
+                  <Input type="number" value={formValues.duration} onChange={(e) => setFormValues({ ...formValues, duration: Number(e.target.value) })} required disabled={isEditRestricted} />
                 </FormField>
                 <FormField id="cheat_limit" label="Batas Cheat" error={undefined}>
                   <Input type="number" value={formValues.cheat_limit} onChange={(e) => setFormValues({ ...formValues, cheat_limit: Number(e.target.value) })} required />
@@ -1407,8 +1405,24 @@ const ExamRoomsPage = () => {
               </div>
               <FormField id="submit_window" label="Kumpul Dibuka (Sisa Menit)" error={undefined}>
                 <Input type="number" placeholder="Contoh: 10 (Tombol kumpul aktif 10 menit sebelum berakhir)" value={formValues.submit_window || ""} onChange={(e) => setFormValues({ ...formValues, submit_window: Number(e.target.value) })} />
-                <p className="text-slate-400 text-xs mt-1">biarkan kosong agar siswa dapat mengumpulkan selama ujian berjalan</p>
+                <p className="text-slate-400 text-xs mt-1">biarkan kosong agar Siswa dapat mengumpulkan selama ujian berjalan</p>
               </FormField>
+              
+              <div className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-900/40 rounded-xl border border-slate-100 dark:border-slate-800/60 mt-2">
+                <div className="space-y-0.5 pr-2">
+                  <label className="text-sm font-semibold text-slate-700 dark:text-slate-200">Menampilkan Hasil Ujian</label>
+                  <p className="text-[10px] text-slate-400 leading-tight">student dapat melihat skor, jumlah benar & salah setelah selesai mengumpulkan.</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    className="sr-only peer" 
+                    checked={formValues.show_result} 
+                    onChange={(e) => setFormValues({...formValues, show_result: e.target.checked})}
+                  />
+                  <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none dark:bg-slate-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                </label>
+              </div>
             </div>
 
             <DialogFooter className="pt-2">
@@ -1435,7 +1449,7 @@ const ExamRoomsPage = () => {
           </DialogHeader>
           <div className="py-3 space-y-3">
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              Tambahkan extra toleransi pelanggaran/kecurangan untuk siswa ini (dalam angka):
+              Tambahkan extra toleransi pelanggaran/kecurangan untuk student ini (dalam angka):
             </p>
             <Input
               type="number"
@@ -1494,7 +1508,7 @@ const ExamRoomsPage = () => {
                     className="h-8 text-[11px] font-bold rounded-lg border border-slate-200 dark:border-slate-800 bg-card px-2 hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors focus:outline-none focus:ring-1 focus:ring-slate-300 dark:focus:ring-slate-700"
                   >
                     <option value="all">Semua Terdaftar</option>
-                    {piketClasses
+                    {examClasses
                       .filter(c => monitorRoom?.allClasses || monitorRoom?.classId?.split(",").includes(c.id))
                       .map(c => <option key={c.id} value={c.id}>{c.name}</option>)
                     }
@@ -1560,7 +1574,7 @@ const ExamRoomsPage = () => {
                 if (!allowedIds.includes(s.classId)) return false;
                 if (monitorClassFilter !== "all" && s.classId !== monitorClassFilter) return false;
                 return true;
-              }).length} Siswa
+              }).length} student
             </div>
             <div className="flex items-center gap-2">
               <span className="text-[11px] text-slate-500">Baris:</span>
@@ -1588,7 +1602,7 @@ const ExamRoomsPage = () => {
                   <TableRow className="hover:bg-transparent border-b bg-slate-50 dark:bg-slate-900 dark:border-slate-800">
                     <TableHead className="w-12 text-center sticky top-0 bg-slate-50 dark:bg-slate-900 z-20">No</TableHead>
                     <TableHead className="sticky top-0 bg-slate-50 dark:bg-slate-900 z-20">NISN</TableHead>
-                    <TableHead className="sticky top-0 bg-slate-50 dark:bg-slate-900 z-20">Nama Siswa</TableHead>
+                    <TableHead className="sticky top-0 bg-slate-50 dark:bg-slate-900 z-20">Nama student</TableHead>
                     <TableHead className="sticky top-0 bg-slate-50 dark:bg-slate-900 z-20">Kelas</TableHead>
                     <TableHead className="sticky top-0 bg-slate-50 dark:bg-slate-900 z-20">Login</TableHead>
                     <TableHead className="sticky top-0 bg-slate-50 dark:bg-slate-900 z-20">Status</TableHead>
@@ -1613,8 +1627,8 @@ const ExamRoomsPage = () => {
                         return true;
                       })
                       .sort((a, b) => {
-                        const attA = attempts.find((at) => at.id === `${a.nisn}_${monitorRoom?.id}`);
-                        const attB = attempts.find((at) => at.id === `${b.nisn}_${monitorRoom?.id}`);
+                        const attA = attempts.find((at) => at.id === a.nisn);
+                        const attB = attempts.find((at) => at.id === b.nisn);
                         if (monitorSortBy === "nilai") return (attB?.score || 0) - (attA?.score || 0);
                         if (monitorSortBy === "login") return (attB?.startTime || 0) - (attA?.startTime || 0);
                         if (monitorSortBy === "nama") return a.name.localeCompare(b.name);
@@ -1628,16 +1642,16 @@ const ExamRoomsPage = () => {
                       return (
                         <TableRow>
                           <TableCell colSpan={10} className="h-24 text-center text-slate-400">
-                            Tidak ada siswa ditemukan.
+                            Tidak ada student ditemukan.
                           </TableCell>
                         </TableRow>
                       );
                     }
 
-                    return currentData.map((siswa, localIndex) => {
+                    return currentData.map((student, localIndex) => {
                       const index = startIndex + localIndex;
-                      const attempt = attempts.find((a) => a.id === `${siswa.nisn}_${monitorRoom?.id}`);
-                      const sisAnswers = answersList[siswa.nisn] || {};
+                      const attempt = attempts.find((a) => a.id === student.nisn);
+                      const sisAnswers = answersList[student.nisn] || {};
                       const answeredCount = Object.keys(sisAnswers).length;
 
                       let statusLabel = <span className="text-slate-400">Belum Masuk</span>;
@@ -1659,12 +1673,12 @@ const ExamRoomsPage = () => {
                       const loginTime = attempt?.startTime ? new Date(attempt.startTime).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) : "-";
 
                       return (
-                        <React.Fragment key={siswa.id}>
+                        <React.Fragment key={student.id}>
                           <TableRow className="group transition-colors hover:bg-slate-100 dark:hover:bg-slate-800/40">
                             <TableCell className="text-center text-slate-400 font-medium">{index + 1}</TableCell>
-                            <TableCell className="font-mono text-[11px] text-slate-500">{siswa.nisn}</TableCell>
-                            <TableCell className="font-semibold text-slate-700 dark:text-slate-200">{siswa.name}</TableCell>
-                            <TableCell className="text-xs font-semibold text-slate-500">{piketClasses.find(c => c.id === siswa.classId)?.name || "-"}</TableCell>
+                            <TableCell className="font-mono text-[11px] text-slate-500">{student.nisn}</TableCell>
+                            <TableCell className="font-semibold text-slate-700 dark:text-slate-200">{student.name}</TableCell>
+                            <TableCell className="text-xs font-semibold text-slate-500">{examClasses.find(c => c.id === student.classId)?.name || "-"}</TableCell>
                             <TableCell className="text-slate-500 tabular-nums">{loginTime}</TableCell>
                             <TableCell>{statusLabel}</TableCell>
                             <TableCell className="text-center font-bold text-indigo-600 tabular-nums">{attempt?.score !== undefined ? attempt.score : "-"}</TableCell>
@@ -1686,11 +1700,11 @@ const ExamRoomsPage = () => {
                                   <>
                                   {/* 1. Logs & Reset Cheat tetap Standalone */}
                                     {(role === "admin" || monitorRoom?.examTeacherId === teacherId) && (
-                                      <Button size="sm" variant="secondary" className="bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-100 dark:bg-amber-900/30 dark:text-amber-400 dark:hover:bg-amber-900/50 dark:border-amber-800/40 h-7 text-[10px]" onClick={() => handleResetCheatCount(siswa.nisn)}>Reset Cheat</Button>
+                                      <Button size="sm" variant="secondary" className="bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-100 dark:bg-amber-900/30 dark:text-amber-400 dark:hover:bg-amber-900/50 dark:border-amber-800/40 h-7 text-[10px]" onClick={() => handleResetCheatCount(student.nisn)}>Reset Cheat</Button>
                                     )}
 
-                                    <Button size="sm" variant="secondary" className="bg-sky-50 text-sky-700 hover:bg-sky-100 border border-sky-100 dark:bg-sky-900/30 dark:text-sky-400 dark:hover:bg-sky-900/50 dark:border-sky-800/40 h-7 text-[10px]" onClick={() => setExpandedSiswa(expandedSiswa === siswa.nisn ? null : siswa.nisn)}>
-                                      {expandedSiswa === siswa.nisn ? "Tutup" : "Logs"}
+                                    <Button size="sm" variant="secondary" className="bg-sky-50 text-sky-700 hover:bg-sky-100 border border-sky-100 dark:bg-sky-900/30 dark:text-sky-400 dark:hover:bg-sky-900/50 dark:border-sky-800/40 h-7 text-[10px]" onClick={() => setExpandedstudent(expandedstudent === student.nisn ? null : student.nisn)}>
+                                      {expandedstudent === student.nisn ? "Tutup" : "Logs"}
                                     </Button>
 
                                     {/* 2. Tombol Lainnya masuk ke Dropdown Menu */}
@@ -1702,29 +1716,29 @@ const ExamRoomsPage = () => {
                                           className="h-7 px-2 text-[10px] bg-slate-100/80 text-slate-700 hover:bg-slate-200 border border-slate-200 dark:bg-slate-800/60 dark:text-slate-300 dark:hover:bg-slate-700/80 dark:border-slate-700/60 font-medium flex items-center gap-1 rounded-md shadow-sm transition-colors"
                                           onClick={(e) => {
                                             e.stopPropagation();
-                                            setOpenMenuId(openMenuId === siswa.nisn ? null : siswa.nisn);
+                                            setOpenMenuId(openMenuId === student.nisn ? null : student.nisn);
                                           }}
                                         >
                                           Menu
                                           <ChevronDown className="w-3 h-3 opacity-60 ml-0.5" />
                                         </Button>
 
-                                        {openMenuId === siswa.nisn && (
+                                        {openMenuId === student.nisn && (
                                           <div className="absolute right-0 mt-1 w-32 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg z-30 py-1 overflow-hidden">
                                             {attempt?.status === "LOCKED" && (
-                                              <button onClick={(e) => { e.stopPropagation(); handleUnlockStudent(siswa.nisn); setOpenMenuId(null); }} className="w-full text-left px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-700 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5 border-b border-slate-100 dark:border-slate-700/60">
+                                              <button onClick={(e) => { e.stopPropagation(); handleUnlockStudent(student.nisn); setOpenMenuId(null); }} className="w-full text-left px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-700 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5 border-b border-slate-100 dark:border-slate-700/60">
                                                 <Lock className="w-3.5 h-3.5 opacity-80" /> Buka Kunci
                                               </button>
                                             )}
-                                            <button onClick={(e) => { e.stopPropagation(); openLimitDialog(siswa.nisn); setOpenMenuId(null); }} className="w-full text-left px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-700 text-[10px] font-semibold text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
+                                            <button onClick={(e) => { e.stopPropagation(); openLimitDialog(student.nisn); setOpenMenuId(null); }} className="w-full text-left px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-700 text-[10px] font-semibold text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
                                               <Plus className="w-3.5 h-3.5 opacity-70 text-slate-400" /> + Limit
                                             </button>
                                             {attempt?.status !== "submitted" && (
-                                              <button onClick={(e) => { e.stopPropagation(); handleForceSubmitStudent(siswa.nisn); setOpenMenuId(null); }} className="w-full text-left px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-700 text-[10px] font-semibold text-rose-600 dark:text-rose-400 flex items-center gap-1.5 border-b border-slate-100 dark:border-slate-700/60">
+                                              <button onClick={(e) => { e.stopPropagation(); handleForceSubmitStudent(student.nisn); setOpenMenuId(null); }} className="w-full text-left px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-700 text-[10px] font-semibold text-rose-600 dark:text-rose-400 flex items-center gap-1.5 border-b border-slate-100 dark:border-slate-700/60">
                                                 <Square className="w-3.5 h-3.5 opacity-70 fill-current" /> Selesaikan
                                               </button>
                                             )}
-                                            <button onClick={(e) => { e.stopPropagation(); handleResetSession(siswa.nisn); setOpenMenuId(null); }} className="w-full text-left px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-700 text-[10px] font-semibold text-rose-600 dark:text-rose-400 flex items-center gap-1.5">
+                                            <button onClick={(e) => { e.stopPropagation(); handleResetSession(student.nisn); setOpenMenuId(null); }} className="w-full text-left px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-700 text-[10px] font-semibold text-rose-600 dark:text-rose-400 flex items-center gap-1.5">
                                               <RefreshCw className="w-3.5 h-3.5 opacity-70 text-rose-400" /> Reset Sesi
                                             </button>
                                           </div>
@@ -1736,7 +1750,7 @@ const ExamRoomsPage = () => {
                               </div>
                             </TableCell>
                           </TableRow>
-                          {expandedSiswa === siswa.nisn && (
+                          {expandedstudent === student.nisn && (
                             <TableRow className="bg-slate-50/30 dark:bg-slate-800/30 border-l-2 border-l-indigo-500">
                               <TableCell colSpan={10} className="p-4">
                                 <div className="flex items-center gap-2 mb-3">
@@ -1825,8 +1839,8 @@ const ExamRoomsPage = () => {
                     return true;
                   })
                   .sort((a, b) => {
-                    const attA = attempts.find((at) => at.id === `${a.nisn}_${monitorRoom?.id}`);
-                    const attB = attempts.find((at) => at.id === `${b.nisn}_${monitorRoom?.id}`);
+                    const attA = attempts.find((at) => at.id === a.nisn);
+                    const attB = attempts.find((at) => at.id === b.nisn);
                     if (monitorSortBy === "nilai") return (attB?.score || 0) - (attA?.score || 0);
                     if (monitorSortBy === "login") return (attB?.startTime || 0) - (attA?.startTime || 0);
                     if (monitorSortBy === "nama") return a.name.localeCompare(b.name);
@@ -1836,22 +1850,22 @@ const ExamRoomsPage = () => {
                 const startIndex = (monitorPage - 1) * monitorPageSize;
                 const currentData = filtered.slice(startIndex, startIndex + monitorPageSize);
 
-                if (currentData.length === 0) return <div className="text-center p-8 text-slate-400 text-sm">Tidak ada siswa ditemukan.</div>;
+                if (currentData.length === 0) return <div className="text-center p-8 text-slate-400 text-sm">Tidak ada student ditemukan.</div>;
 
-                return currentData.map((siswa, localIndex) => {
-                  const attempt = attempts.find((a) => a.id === `${siswa.nisn}_${monitorRoom?.id}`);
-                  const sisAnswers = answersList[siswa.nisn] || {};
+                return currentData.map((student, localIndex) => {
+                  const attempt = attempts.find((a) => a.id === student.nisn);
+                  const sisAnswers = answersList[student.nisn] || {};
                   const isOnline = attempt?.isOnline === true;
                   const status = attempt ? (attempt.status === "submitted" ? "Selesai" : attempt.status === "LOCKED" ? "Terkunci" : `Ujian (${isOnline ? "Online" : "Offline"})`) : "Belum Masuk";
                   const statusColor = attempt ? (attempt.status === "submitted" ? "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-400 dark:border-emerald-900" : attempt.status === "LOCKED" ? "bg-rose-100 text-rose-700 border-rose-200 dark:bg-rose-950/50 dark:text-rose-400 dark:border-rose-900" : isOnline ? "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-950/50 dark:text-amber-400 dark:border-amber-900 animate-pulse" : "bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700") : "bg-slate-100 text-slate-400 border-slate-200 dark:bg-slate-800 dark:text-slate-500 dark:border-slate-700";
 
                   return (
-                    <div key={siswa.id} className="bg-card border border-slate-200 dark:border-slate-800 rounded-2xl p-4 space-y-3 shadow-sm relative overflow-hidden">
+                    <div key={student.id} className="bg-card border border-slate-200 dark:border-slate-800 rounded-2xl p-4 space-y-3 shadow-sm relative overflow-hidden">
                       <div className="flex justify-between items-start">
                         <div className="space-y-1">
-                          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-vibrant">#{startIndex + localIndex + 1} • {siswa.nisn}</p>
-                          <h4 className="font-bold text-slate-800 leading-tight">{siswa.name}</h4>
-                          <p className="text-xs font-semibold text-slate-500 bg-slate-100 inline-block px-2 py-0.5 rounded-md">{piketClasses.find(c => c.id === siswa.classId)?.name}</p>
+                          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-vibrant">#{startIndex + localIndex + 1} • {student.nisn}</p>
+                          <h4 className="font-bold text-slate-800 leading-tight">{student.name}</h4>
+                          <p className="text-xs font-semibold text-slate-500 bg-slate-100 inline-block px-2 py-0.5 rounded-md">{examClasses.find(c => c.id === student.classId)?.name}</p>
                         </div>
                         <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border whitespace-nowrap ${statusColor}`}>{status.toUpperCase()}</span>
                       </div>
@@ -1875,14 +1889,14 @@ const ExamRoomsPage = () => {
 
                       <div className="flex justify-end gap-2 pt-1">
                         {attempt?.status === "LOCKED" && (
-                          <Button size="sm" variant="outline" className="h-8 text-[11px] font-bold border-green-200 text-green-700 hover:bg-green-50 rounded-xl px-4" onClick={() => handleUnlockStudent(siswa.nisn)}>Unlock</Button>
+                          <Button size="sm" variant="outline" className="h-8 text-[11px] font-bold border-green-200 text-green-700 hover:bg-green-50 rounded-xl px-4" onClick={() => handleUnlockStudent(student.nisn)}>Unlock</Button>
                         )}
-                        <Button size="sm" variant="secondary" className="h-8 text-[11px] font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-xl px-4" onClick={() => setExpandedSiswa(expandedSiswa === siswa.nisn ? null : siswa.nisn)}>
-                          {expandedSiswa === siswa.nisn ? "Tutup" : "Details"}
+                        <Button size="sm" variant="secondary" className="h-8 text-[11px] font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-xl px-4" onClick={() => setExpandedstudent(expandedstudent === student.nisn ? null : student.nisn)}>
+                          {expandedstudent === student.nisn ? "Tutup" : "Details"}
                         </Button>
                       </div>
 
-                      {expandedSiswa === siswa.nisn && (
+                      {expandedstudent === student.nisn && (
                         <div className="mt-3 pt-3 border-t border-slate-100 bg-slate-50/50 rounded-b-2xl space-y-2 p-2">
                           {monitorQuestions.map((q, qIdx) => {
                             const ansId = sisAnswers[q.id];
@@ -1928,7 +1942,7 @@ const ExamRoomsPage = () => {
             return (
               <div className="flex flex-col md:flex-row justify-between items-center gap-4 mt-6 bg-slate-100/30 dark:bg-slate-800/50 p-3 sm:p-4 rounded-2xl border border-slate-200/60 dark:border-slate-800">
                 <div className="text-xs font-bold text-slate-500 dark:text-slate-400 bg-card px-3 py-1.5 rounded-full border border-slate-200 dark:border-slate-800 shadow-sm">
-                  Menampilkan {Math.min((monitorPage - 1) * monitorPageSize + 1, filtered.length)} - {Math.min(monitorPage * monitorPageSize, filtered.length)} dari {filtered.length} Siswa
+                  Menampilkan {Math.min((monitorPage - 1) * monitorPageSize + 1, filtered.length)} - {Math.min(monitorPage * monitorPageSize, filtered.length)} dari {filtered.length} student
                 </div>
                 <div className="flex items-center gap-1.5 bg-card p-1 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
                   <Button variant="ghost" size="sm" onClick={() => setMonitorPage(1)} disabled={monitorPage === 1} className="h-8 w-8 p-0 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30">
@@ -1999,3 +2013,5 @@ const ExamRoomsPage = () => {
 };
 
 export default ExamRoomsPage;
+
+

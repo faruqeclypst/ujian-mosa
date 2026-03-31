@@ -7,27 +7,27 @@ import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import FormField from "../forms/FormField";
 
-const mapelSchema = z.object({
-  name: z.string().min(1, "Nama mapel wajib diisi"),
+const classSchema = z.object({
+  name: z.string().min(1, "Nama kelas wajib diisi"),
 });
 
-export type MapelFormValues = z.infer<typeof mapelSchema>;
+export type ClassFormValues = z.infer<typeof classSchema>;
 
-interface MapelFormProps {
-  defaultValues?: Partial<MapelFormValues>;
-  onSubmit: (values: MapelFormValues) => Promise<void>;
+interface ClassFormProps {
+  defaultValues?: Partial<ClassFormValues>;
+  onSubmit: (values: ClassFormValues) => Promise<void>;
   submitLabel?: string;
   onCancel?: () => void;
 }
 
-const MapelForm = ({ defaultValues, onSubmit, submitLabel = "Simpan", onCancel }: MapelFormProps) => {
+const ClassForm = ({ defaultValues, onSubmit, submitLabel = "Simpan", onCancel }: ClassFormProps) => {
   const {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
     reset,
-  } = useForm<MapelFormValues>({
-    resolver: zodResolver(mapelSchema),
+  } = useForm<ClassFormValues>({
+    resolver: zodResolver(classSchema),
     defaultValues: {
       name: "",
       ...defaultValues,
@@ -38,7 +38,7 @@ const MapelForm = ({ defaultValues, onSubmit, submitLabel = "Simpan", onCancel }
     reset((prev) => ({ ...prev, ...defaultValues }));
   }, [defaultValues, reset]);
 
-  const submitHandler = async (values: MapelFormValues) => {
+  const submitHandler = async (values: ClassFormValues) => {
     await onSubmit(values);
     if (!defaultValues || Object.keys(defaultValues).length === 0) {
       reset({ name: "" });
@@ -47,8 +47,8 @@ const MapelForm = ({ defaultValues, onSubmit, submitLabel = "Simpan", onCancel }
 
   return (
     <form onSubmit={handleSubmit(submitHandler)} className="space-y-4">
-      <FormField id="name" label="Mata Pelajaran" error={errors.name}>
-        <Input id="name" placeholder="Contoh: Matematika, Bahasa Inggris" {...register("name")} />
+      <FormField id="name" label="Nama Kelas" error={errors.name}>
+        <Input id="name" placeholder="Contoh: X RPL 1, XI TKJ 2" {...register("name")} />
       </FormField>
       
       <div className="flex justify-end gap-2 pt-4 border-t border-slate-200/60 dark:border-slate-800/40">
@@ -74,4 +74,4 @@ const MapelForm = ({ defaultValues, onSubmit, submitLabel = "Simpan", onCancel }
   );
 };
 
-export default MapelForm;
+export default ClassForm;

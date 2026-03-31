@@ -2,16 +2,16 @@ import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { DataTable } from "../ui/data-table";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
-import type { Teacher } from "../../types/piket";
+import type { Teacher } from "../../types/exam";
 import { Edit, Trash } from "lucide-react";
 
-interface GuruTableProps {
+interface TeacherTableProps {
   teachers: Teacher[];
   onEdit: (t: Teacher) => void;
   onDelete: (t: Teacher) => void;
 }
 
-const GuruTable = ({ teachers, onEdit, onDelete }: GuruTableProps) => {
+const TeacherTable = ({ teachers, onEdit, onDelete }: TeacherTableProps) => {
   const columns = [
     {
       key: "index",
@@ -46,22 +46,20 @@ const GuruTable = ({ teachers, onEdit, onDelete }: GuruTableProps) => {
 
   const renderActions = (teacher: Teacher) => (
     <div className="flex justify-end gap-2">
-      <Button 
-        variant="secondary" 
-        size="sm" 
-        className="bg-green-50 text-green-700 hover:bg-green-100 border border-green-100 dark:bg-green-900/10 dark:text-green-400 dark:hover:bg-green-900/30 dark:border-green-800/40 h-7 text-xs rounded-lg" 
+      <button 
+        className="p-1.5 bg-sky-50 text-sky-600 hover:bg-sky-100 rounded-lg dark:bg-sky-900/10 dark:text-sky-400 border border-sky-100 dark:border-sky-800/40"
         onClick={() => onEdit(teacher)}
+        title="Edit Guru"
       >
-        <Edit className="h-3.5 w-3.5 mr-1" /> Edit
-      </Button>
-      <Button 
-        variant="secondary" 
-        size="sm" 
-        className="bg-rose-50 text-rose-600 hover:bg-rose-100 border border-rose-100 dark:bg-rose-900/10 dark:text-rose-400 dark:hover:bg-rose-900/30 dark:border-green-800/40 h-7 text-xs rounded-lg" 
+        <Edit className="h-4 w-4" />
+      </button>
+      <button 
+        className="p-1.5 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-lg dark:bg-rose-900/10 dark:text-rose-400 border border-rose-100 dark:border-rose-800/40"
         onClick={() => onDelete(teacher)}
+        title="Hapus Guru"
       >
-        <Trash className="h-3.5 w-3.5 mr-1" /> Hapus
-      </Button>
+        <Trash className="h-4 w-4" />
+      </button>
     </div>
   );
 
@@ -83,4 +81,6 @@ const GuruTable = ({ teachers, onEdit, onDelete }: GuruTableProps) => {
   );
 };
 
-export default GuruTable;
+export default TeacherTable;
+
+
