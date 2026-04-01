@@ -74,15 +74,15 @@ const AlumniPage = () => {
 
   const handleRestore = async (id: string) => {
     showAlert(
-      "Pulihkan student",
-      "Kembalikan student ini ke status Aktif (Tanpa Kelas)?",
+      "Pulihkan Siswa",
+      "Kembalikan Siswa ini ke status Aktif (Tanpa Kelas)?",
       "warning",
       async () => {
         try {
           await updateStudent(id, { classId: "" });
         } catch (err) {
           console.error(err);
-          showAlert("Gagal", "Gagal memulihkan student.", "danger");
+          showAlert("Gagal", "Gagal memulihkan Siswa.", "danger");
         }
       },
       true,
@@ -207,14 +207,14 @@ const AlumniPage = () => {
               <button 
                 className="p-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-lg dark:bg-emerald-900/10 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-800/40"
                 onClick={() => handleRestore(student.id)}
-                title="Pulihkan student"
+                title="Pulihkan Siswa"
               >
                 <RotateCw className="h-4 w-4" />
               </button>
               <button 
                 className="p-1.5 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-lg dark:bg-rose-900/10 dark:text-rose-400 border border-rose-100 dark:border-rose-800/40"
                 onClick={() => handleDeleteClick(student)}
-                title="Hapus student"
+                title="Hapus Siswa"
               >
                 <Trash className="h-4 w-4" />
               </button>

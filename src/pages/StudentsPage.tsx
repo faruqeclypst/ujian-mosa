@@ -72,8 +72,8 @@ const StudentsPage = () => {
       }
       closeDialog();
     } catch (error) {
-      console.error("Gagal menyimpan data student", error);
-      showAlert("Gagal", "Gagal menyimpan data student.", "danger");
+      console.error("Gagal menyimpan data Siswa", error);
+      showAlert("Gagal", "Gagal menyimpan data Siswa.", "danger");
     }
   };
 
@@ -83,8 +83,8 @@ const StudentsPage = () => {
     try {
       await deleteStudent(studentToDelete.id);
     } catch (error) {
-      console.error("Gagal menghapus student", error);
-      showAlert("Gagal", "Gagal menghapus data student.", "danger");
+      console.error("Gagal menghapus Siswa", error);
+      showAlert("Gagal", "Gagal menghapus data Siswa.", "danger");
     } finally {
       setIsDeleting(false);
       setDeleteDialogOpen(false);
@@ -114,16 +114,16 @@ const StudentsPage = () => {
           classId: row.classId,
         });
       }
-      showAlert("Import Berhasil", `${newEntries.length} student berhasil diimport.`, "success");
+      showAlert("Import Berhasil", `${newEntries.length} Siswa berhasil diimport.`, "success");
     } catch (err: any) {
-      showAlert("Gagal Import", err.message || "Gagal mengimport data student.", "danger");
+      showAlert("Gagal Import", err.message || "Gagal mengimport data Siswa.", "danger");
     } finally {
       setIsImporting(false);
     }
   };
 
   const handleExportStudents = () => {
-    exportStudentToExcel({ students, classes, filename: "data-student.xlsx" });
+    exportStudentToExcel({ students, classes, filename: "data-siswa.xlsx" });
   };
 
   return (

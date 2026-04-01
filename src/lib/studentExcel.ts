@@ -1,9 +1,9 @@
 import * as XLSX from "xlsx-js-style";
 import type { StudentData, ClassData } from "../types/exam";
 
-export const STUDENT_IMPORT_HEADERS = ["NISN", "Nama student", "Gender (L/P)", "Nama Kelas"] as const;
+export const STUDENT_IMPORT_HEADERS = ["NISN", "Nama Siswa", "Gender (L/P)", "Nama Kelas"] as const;
 
-export function downloadStudentImportTemplate(filename = "template-import-student.xlsx") {
+export function downloadStudentImportTemplate(filename = "template-import-siswa.xlsx") {
   const ws = XLSX.utils.aoa_to_sheet([
     [...STUDENT_IMPORT_HEADERS],
     ["1234567890", "Ahmad Fauzi", "L", "X MIPA 1"],
@@ -29,18 +29,18 @@ export function downloadStudentImportTemplate(filename = "template-import-studen
   ];
 
   const wsNotes = XLSX.utils.aoa_to_sheet([
-    ["Keterangan Import student"],
+    ["Keterangan Import Siswa"],
     [],
     ["Aturan:"],
     ["- NISN wajib diisi (angka 10 digit biasanya)."],
-    ["- Nama student wajib diisi."],
+    ["- Nama Siswa wajib diisi."],
     ["- Gender wajib diisi dengan huruf L atau P."],
     ["- Nama Kelas wajib disi (pilih nama kelas yang sudah didaftarkan pada Menu Data Kelas)."],
   ]);
   (wsNotes as any)["!cols"] = [{ wch: 60 }];
 
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "student");
+  XLSX.utils.book_append_sheet(wb, ws, "siswa");
   XLSX.utils.book_append_sheet(wb, wsNotes, "Keterangan");
   XLSX.writeFile(wb, filename);
 }
@@ -59,7 +59,7 @@ export async function parseStudentImportExcel(
 
   for (const row of raw) {
     const nisn = String(row["NISN"] || "").trim();
-    const name = String(row["Nama student"] || "").trim();
+    const name = String(row["Nama Siswa"] || "").trim();
     const genderRaw = String(row["Gender (L/P)"] || "").trim().toUpperCase();
     const className = String(row["Nama Kelas"] || "").trim();
 
@@ -86,7 +86,7 @@ export function exportStudentToExcel(params: {
   classes: ClassData[];
   filename?: string 
 }) {
-  const filename = params.filename ?? "data-student.xlsx";
+  const filename = params.filename ?? "data-siswa.xlsx";
   const ws = XLSX.utils.aoa_to_sheet([
     [...STUDENT_IMPORT_HEADERS],
     ...params.students.map((s) => {
@@ -118,7 +118,7 @@ export function exportStudentToExcel(params: {
   ];
 
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "student");
+  XLSX.utils.book_append_sheet(wb, ws, "siswa");
   XLSX.writeFile(wb, filename);
 }
 

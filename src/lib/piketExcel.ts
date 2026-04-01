@@ -81,7 +81,7 @@ export async function exportPiketToExcel(piketOfficer = "Admin", filename = "rek
     const wsAbsensi = XLSX.utils.aoa_to_sheet([absensiHeader, ...finalAbsensiRows]);
 
     // 2. Build Perizinan Sheet
-    const izinHeader = ["Tanggal", "student", "Kelas", "Keperluan", "Jam Keluar", "Jam Kembali", "Status"];
+    const izinHeader = ["Tanggal", "Siswa", "Kelas", "Keperluan", "Jam Keluar", "Jam Kembali", "Status"];
     const izinRows: any[] = [];
 
     Object.values(permData).forEach((perm: any) => {

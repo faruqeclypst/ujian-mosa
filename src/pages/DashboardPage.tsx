@@ -109,7 +109,7 @@ const DashboardPage = () => {
             </div>
             <div>
                <div className="flex items-center gap-1.5">
-                  <p className="text-xs font-medium text-slate-500 dark:text-slate-400">student Sedang Ujian</p>
+                  <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Siswa Sedang Ujian</p>
                   <Badge className="bg-orange-500/10 text-orange-600 dark:text-orange-400 border-0 h-4 px-1 text-[9px] font-bold rounded">Live</Badge>
                </div>
                <p className="text-2xl font-black text-slate-800 dark:text-white mt-0.5">{ongoingStudents}</p>

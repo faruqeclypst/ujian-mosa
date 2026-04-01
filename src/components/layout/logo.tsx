@@ -4,6 +4,7 @@ import { ref, onValue } from "firebase/database";
 
 const Logo = () => {
   const [profile, setProfile] = useState({ name: "E-Ujian", logoUrl: "" });
+  const [logoError, setLogoError] = useState(false);
 
   useEffect(() => {
     const r = ref(database, "settings/school");
@@ -11,6 +12,7 @@ const Logo = () => {
       if (snap.exists()) {
         const d = snap.val();
         setProfile({ name: d.name || "E-Ujian", logoUrl: d.logoUrl || "" });
+        setLogoError(false);
       }
     });
   }, []);
@@ -19,11 +21,12 @@ const Logo = () => {
     <div className="flex items-center gap-3 sm:gap-4">
       <div className="relative flex-shrink-0">
         <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl flex items-center justify-center overflow-hidden">
-          {profile.logoUrl ? (
+          {profile.logoUrl && !logoError ? (
             <img
               src={profile.logoUrl}
               alt="Logo"
               className="h-full w-full object-contain"
+              onError={() => setLogoError(true)}
             />
           ) : (
             <img

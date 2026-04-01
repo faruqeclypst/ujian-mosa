@@ -427,7 +427,7 @@ const ExamRoomsPage = () => {
   const handleArchiveRoom = (room: ExamRoomData) => {
     // 🛡️ Cek apakah ada student yang sedang aktif pengerjaan
     if (liveBreakdown[room.id] > 0) {
-      showAlert("Aksi Ditolak", `Terdapat ${liveBreakdown[room.id]} student yang sedang aktif ujian di ruang ini. Harap selesaikan ujian terlebih dahulu sebelum mengarsipkan.`, "warning");
+      showAlert("Aksi Ditolak", `Terdapat ${liveBreakdown[room.id]} Siswa yang sedang aktif ujian di ruang ini. Harap selesaikan ujian terlebih dahulu sebelum mengarsipkan.`, "warning");
       return;
     }
 
@@ -476,7 +476,7 @@ const ExamRoomsPage = () => {
     setConfirmDialog({
       isOpen: true,
       title: "Selesaikan Ujian Sekarang",
-      description: `Apakah Anda yakin ingin mengakhiri sesi ujian ${room.room_name || room.examTitle || ""} saat ini juga? Semua student yang sedang mengerjakan tidak akan bisa melanjutkan lagi.`,
+      description: `Apakah Anda yakin ingin mengakhiri sesi ujian ${room.room_name || room.examTitle || ""} saat ini juga? Semua Siswa yang sedang mengerjakan tidak akan bisa melanjutkan lagi.`,
       type: "danger",
       confirmLabel: "Selesaikan Paksa",
       onConfirm: async () => {
@@ -501,7 +501,7 @@ const ExamRoomsPage = () => {
     setConfirmDialog({
       isOpen: true,
       title: newState ? "Nonaktifkan Ujian" : "Aktifkan Ujian",
-      description: `Apakah Anda yakin ingin ${newState ? "menonaktifkan" : "mengaktifkan kembali"} ruang ujian ${room.room_name || room.examTitle || ""}? ${newState ? "student tidak akan bisa masuk ke ruang ini." : ""}`,
+      description: `Apakah Anda yakin ingin ${newState ? "menonaktifkan" : "mengaktifkan kembali"} ruang ujian ${room.room_name || room.examTitle || ""}? ${newState ? "Siswa tidak akan bisa masuk ke ruang ini." : ""}`,
       type: newState ? "warning" : "info",
       confirmLabel: newState ? "Ya, Nonaktifkan" : "Ya, Aktifkan",
       onConfirm: async () => {
@@ -523,7 +523,7 @@ const ExamRoomsPage = () => {
     if (!monitorRoom) return;
 
     const workbook = XLSX.utils.book_new();
-    const header = ["No", "NISN", "Nama student", "Kelas", "Jam Login", "Jam Submit", "Cheat Count", "Benar", "Salah", "Nilai"];
+    const header = ["No", "NISN", "Nama Siswa", "Kelas", "Jam Login", "Jam Submit", "Cheat Count", "Benar", "Salah", "Nilai"];
     monitorQuestions.forEach((q, idx) => header.push(`Soal ${idx + 1}`));
 
     const headerStyle = {
@@ -604,13 +604,13 @@ const ExamRoomsPage = () => {
     // 2. PER-CLASS SHEETS
     // Get unique classes from attempts
     const classIdsInAttempts = Array.from(new Set(attempts.map(att => {
-      const s = students.find(student => student.nisn === att.nisn);
+      const s = students.find(siswa => siswa.nisn === att.nisn);
       return s ? s.classId : null;
     }).filter(Boolean)));
 
     classIdsInAttempts.forEach(cId => {
       const classAttempts = attempts.filter(att => {
-        const s = students.find(student => student.nisn === att.nisn);
+        const s = students.find(siswa => siswa.nisn === att.nisn);
         return s?.classId === cId;
       });
       const className = examClasses.find(c => c.id === cId)?.name || "Lainnya";
@@ -627,7 +627,7 @@ const ExamRoomsPage = () => {
     const takenNisns = attempts.map(att => att.nisn);
     const notTakenStudents = classStudents.filter(s => !takenNisns.includes(s.nisn));
 
-    const ntHeader = ["No", "NISN", "Nama student", "Kelas", "Keterangan"];
+    const ntHeader = ["No", "NISN", "Nama Siswa", "Kelas", "Keterangan"];
     const ntRows = notTakenStudents.map((s, idx) => {
       const cObj = examClasses.find(c => c.id === s.classId);
       return [idx + 1, s.nisn, s.name, cObj ? cObj.name : "-", "Belum Mengerjakan"];
@@ -653,7 +653,7 @@ const ExamRoomsPage = () => {
       setConfirmDialog({
         isOpen: true,
         title: "Sesi Aktif Kosong",
-        description: "Tidak ada student yang sedang aktif mengerjakan ujian di ruangan ini saat ini.",
+        description: "Tidak ada Siswa yang sedang aktif mengerjakan ujian di ruangan ini saat ini.",
         type: "info",
         confirmLabel: "Ok",
         onConfirm: () => { }
@@ -664,7 +664,7 @@ const ExamRoomsPage = () => {
     setConfirmDialog({
       isOpen: true,
       title: "Selesaikan Paksa Sesi",
-      description: `Tindakan ini akan mengakhiri paksa sesi ujian untuk ${ongoing.length} student yang sedang aktif. Anda yakin?`,
+      description: `Tindakan ini akan mengakhiri paksa sesi ujian untuk ${ongoing.length} Siswa yang sedang aktif. Anda yakin?`,
       type: "danger",
       confirmLabel: "Selesaikan",
       onConfirm: async () => {
@@ -706,9 +706,9 @@ const ExamRoomsPage = () => {
              return a;
           }));
 
-          showAlert("Berhasil", `${ongoing.length} student berhasil diselesaikan secara paksa.`, "success");
+          showAlert("Berhasil", `${ongoing.length} Siswa berhasil diselesaikan secara paksa.`, "success");
         } catch (error) {
-          showAlert("Gagal", "Gagal menyelesaikan paksa ujian student.", "danger");
+          showAlert("Gagal", "Gagal menyelesaikan paksa ujian Siswa.", "danger");
         }
       }
     });
@@ -721,8 +721,8 @@ const ExamRoomsPage = () => {
 
     setConfirmDialog({
       isOpen: true,
-      title: "Selesaikan Ujian student",
-      description: `Apakah Anda yakin ingin mengakhiri sesi ujian student ini secara paksa?`,
+      title: "Selesaikan Ujian Siswa",
+      description: `Apakah Anda yakin ingin mengakhiri sesi ujian Siswa ini secara paksa?`,
       type: "danger",
       confirmLabel: "Ya, Selesaikan",
       onConfirm: async () => {
@@ -748,9 +748,9 @@ const ExamRoomsPage = () => {
           });
 
           setAttempts(prev => prev.map(a => a.id === attemptId ? { ...a, status: "submitted", submit_time: now, score, correct, total: monitorQuestions.length } : a));
-          showAlert("Berhasil", "Sesi student telah diselesaikan.", "success");
+          showAlert("Berhasil", "Sesi Siswa telah diselesaikan.", "success");
         } catch (error) {
-          showAlert("Gagal", "Gagal menyelesaikan sesi student.", "danger");
+          showAlert("Gagal", "Sesi Siswa gagal diselesaikan.", "danger");
         }
       }
     });
@@ -979,7 +979,7 @@ const ExamRoomsPage = () => {
   const handleDeleteClick = (room: ExamRoomData) => {
     // 🛡️ Cek apakah ada student yang sedang aktif pengerjaan
     if (liveBreakdown[room.id] > 0) {
-      showAlert("Aksi Ditolak", `Ruang ini tidak bisa dihapus karena masih ada ${liveBreakdown[room.id]} student yang aktif di dalamnya.`, "danger");
+      showAlert("Aksi Ditolak", `Ruang ini tidak bisa dihapus karena masih ada ${liveBreakdown[room.id]} Siswa yang aktif di dalamnya.`, "danger");
       return;
     }
     setRoomToDelete(room);
@@ -1000,9 +1000,9 @@ const ExamRoomsPage = () => {
         cheatCount: 0
       });
       setAttempts(prev => prev.map(a => a.nisn === nisn ? { ...a, status: "ongoing", cheatCount: 0 } : a));
-      showAlert("Berhasil", "student berhasil diunlock.", "success");
+      showAlert("Berhasil", "Siswa berhasil diunlock.", "success");
     } catch (error) {
-      showAlert("Gagal", "Gagal mengunlock student.", "danger");
+      showAlert("Gagal", "Gagal mengunlock Siswa.", "danger");
     }
   };
 
@@ -1011,7 +1011,7 @@ const ExamRoomsPage = () => {
     setConfirmDialog({
       isOpen: true,
       title: "Reset Total Sesi",
-      description: "Apakah anda yakin ingin RESET TOTAL sesi student ini? Seluruh jawaban dan progres mereka akan DIHAPUS PERMANEN.",
+      description: "Apakah anda yakin ingin RESET TOTAL sesi Siswa ini? Seluruh jawaban dan progres mereka akan DIHAPUS PERMANEN.",
       type: "danger",
       confirmLabel: "Ya, Reset Total",
       onConfirm: async () => {
@@ -1019,7 +1019,7 @@ const ExamRoomsPage = () => {
           await remove(ref(database, `attempts/${monitorRoom.id}/${nisn}`));
           await remove(ref(database, `answers/${monitorRoom.id}/${nisn}`));
           setAttempts(prev => prev.filter(att => att.nisn !== nisn));
-          showAlert("Berhasil", "Sesi student berhasil direset total.", "success");
+          showAlert("Berhasil", "Sesi Siswa berhasil direset total.", "success");
         } catch (error) {
           showAlert("Gagal", "Gagal mereset sesi.", "danger");
         }
@@ -1052,7 +1052,7 @@ const ExamRoomsPage = () => {
 
       setAttempts(prev => prev.map(a => a.nisn === limitNisn ? { ...a, extraCheatLimit: (currentExtra + added), status: (currentStatus === "LOCKED" ? "ongoing" : currentStatus) } : a));
 
-      showAlert("Berhasil", `Berhasil menambah +${added} batas pelanggaran untuk student.`, "success");
+      showAlert("Berhasil", `Berhasil menambah +${added} batas pelanggaran untuk Siswa.`, "success");
     } catch {
       showAlert("Gagal", "Gagal memperbarui batas.", "danger");
     }
@@ -1063,7 +1063,7 @@ const ExamRoomsPage = () => {
     setConfirmDialog({
       isOpen: true,
       title: "Reset Pelanggaran",
-      description: "Hapus catatan deteksi kecurangan untuk student ini?",
+      description: "Hapus catatan deteksi kecurangan untuk Siswa ini?",
       type: "warning",
       confirmLabel: "Ya, Reset",
       onConfirm: async () => {
@@ -1072,7 +1072,7 @@ const ExamRoomsPage = () => {
             cheatCount: 0
           });
           setAttempts(prev => prev.map(a => a.nisn === nisn ? { ...a, cheatCount: 0 } : a));
-          showAlert("Berhasil", "Pelanggaran student berhasil direset.", "success");
+          showAlert("Berhasil", "Pelanggaran Siswa berhasil direset.", "success");
         } catch (error) {
           showAlert("Gagal", "Gagal mereset cheat count.", "danger");
         }
@@ -1411,7 +1411,7 @@ const ExamRoomsPage = () => {
               <div className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-900/40 rounded-xl border border-slate-100 dark:border-slate-800/60 mt-2">
                 <div className="space-y-0.5 pr-2">
                   <label className="text-sm font-semibold text-slate-700 dark:text-slate-200">Menampilkan Hasil Ujian</label>
-                  <p className="text-[10px] text-slate-400 leading-tight">student dapat melihat skor, jumlah benar & salah setelah selesai mengumpulkan.</p>
+                  <p className="text-[10px] text-slate-400 leading-tight">Siswa dapat melihat skor, jumlah benar & salah setelah selesai mengumpulkan.</p>
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer">
                   <input 
@@ -1449,7 +1449,7 @@ const ExamRoomsPage = () => {
           </DialogHeader>
           <div className="py-3 space-y-3">
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              Tambahkan extra toleransi pelanggaran/kecurangan untuk student ini (dalam angka):
+              Tambahkan extra toleransi pelanggaran/kecurangan untuk Siswa ini (dalam angka):
             </p>
             <Input
               type="number"
@@ -1574,7 +1574,7 @@ const ExamRoomsPage = () => {
                 if (!allowedIds.includes(s.classId)) return false;
                 if (monitorClassFilter !== "all" && s.classId !== monitorClassFilter) return false;
                 return true;
-              }).length} student
+              }).length} Siswa
             </div>
             <div className="flex items-center gap-2">
               <span className="text-[11px] text-slate-500">Baris:</span>
@@ -1602,7 +1602,7 @@ const ExamRoomsPage = () => {
                   <TableRow className="hover:bg-transparent border-b bg-slate-50 dark:bg-slate-900 dark:border-slate-800">
                     <TableHead className="w-12 text-center sticky top-0 bg-slate-50 dark:bg-slate-900 z-20">No</TableHead>
                     <TableHead className="sticky top-0 bg-slate-50 dark:bg-slate-900 z-20">NISN</TableHead>
-                    <TableHead className="sticky top-0 bg-slate-50 dark:bg-slate-900 z-20">Nama student</TableHead>
+                    <TableHead className="sticky top-0 bg-slate-50 dark:bg-slate-900 z-20">Nama Siswa</TableHead>
                     <TableHead className="sticky top-0 bg-slate-50 dark:bg-slate-900 z-20">Kelas</TableHead>
                     <TableHead className="sticky top-0 bg-slate-50 dark:bg-slate-900 z-20">Login</TableHead>
                     <TableHead className="sticky top-0 bg-slate-50 dark:bg-slate-900 z-20">Status</TableHead>
@@ -1642,7 +1642,7 @@ const ExamRoomsPage = () => {
                       return (
                         <TableRow>
                           <TableCell colSpan={10} className="h-24 text-center text-slate-400">
-                            Tidak ada student ditemukan.
+                            Tidak ada Siswa ditemukan.
                           </TableCell>
                         </TableRow>
                       );
@@ -1850,7 +1850,7 @@ const ExamRoomsPage = () => {
                 const startIndex = (monitorPage - 1) * monitorPageSize;
                 const currentData = filtered.slice(startIndex, startIndex + monitorPageSize);
 
-                if (currentData.length === 0) return <div className="text-center p-8 text-slate-400 text-sm">Tidak ada student ditemukan.</div>;
+                if (currentData.length === 0) return <div className="text-center p-8 text-slate-400 text-sm">Tidak ada Siswa ditemukan.</div>;
 
                 return currentData.map((student, localIndex) => {
                   const attempt = attempts.find((a) => a.id === student.nisn);
@@ -1942,7 +1942,7 @@ const ExamRoomsPage = () => {
             return (
               <div className="flex flex-col md:flex-row justify-between items-center gap-4 mt-6 bg-slate-100/30 dark:bg-slate-800/50 p-3 sm:p-4 rounded-2xl border border-slate-200/60 dark:border-slate-800">
                 <div className="text-xs font-bold text-slate-500 dark:text-slate-400 bg-card px-3 py-1.5 rounded-full border border-slate-200 dark:border-slate-800 shadow-sm">
-                  Menampilkan {Math.min((monitorPage - 1) * monitorPageSize + 1, filtered.length)} - {Math.min(monitorPage * monitorPageSize, filtered.length)} dari {filtered.length} student
+                  Menampilkan {Math.min((monitorPage - 1) * monitorPageSize + 1, filtered.length)} - {Math.min(monitorPage * monitorPageSize, filtered.length)} dari {filtered.length} Siswa
                 </div>
                 <div className="flex items-center gap-1.5 bg-card p-1 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
                   <Button variant="ghost" size="sm" onClick={() => setMonitorPage(1)} disabled={monitorPage === 1} className="h-8 w-8 p-0 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30">

@@ -3,12 +3,10 @@ import {
   ClipboardList,
   Home,
   X,
-  Lock,
   ChevronLeft,
   ChevronRight,
   HelpCircle,
   Settings,
-  CalendarCheck,
   Users,
   LayoutTemplate,
   BookOpen,
@@ -21,12 +19,8 @@ import * as React from "react";
 
 import { cn } from "../../lib/utils";
 import { Button } from "../ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
-import { Badge } from "../ui/badge";
-import { Separator } from "../ui/separator";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui/tooltip";
 import Logo from "./logo";
-import AppGuide from "../guide/AppGuide";
 import { useAuth } from "../../context/AuthContext";
 import { useSidebar } from "../../context/SidebarContext";
 
@@ -61,14 +55,12 @@ const navigation = [
       { to: "/admin/kelola-akun", label: "Kelola Akun", icon: ShieldAlert },
       { to: "/admin/pengaturan", label: "Pengaturan", icon: Settings }
     ]
-  }
+  },
+  { to: "/admin/panduan", label: "Panduan", icon: HelpCircle, badge: null }
 ];
 
-// Remove the old interface since we're using context now
-
 const Sidebar = () => {
-  const [showGuide, setShowGuide] = React.useState(false);
-  const { user, role, usernameFromEmail } = useAuth(); // <--- added role
+  const { role } = useAuth();
   const { isCollapsed, isMobileOpen, toggleCollapsed, closeMobile } = useSidebar();
   
   const [expandedMenus, setExpandedMenus] = React.useState<Record<string, boolean>>({});
@@ -81,12 +73,9 @@ const Sidebar = () => {
     if (role === "admin") return navigation;
 
     return navigation.reduce((acc, item) => {
-      // Guru tidak dapat mengakses "Master Data"
       if (item.label === "Master Data") return acc;
       
       if (item.label === "Sistem") {
-        // Guru tidak dapat mengakses "Kelola Akun" & "Pengaturan"
-        // (Berarti seluruh menu sistem bisa disembunyikan jika kosong)
         return acc;
       }
 
@@ -94,14 +83,6 @@ const Sidebar = () => {
       return acc;
     }, [] as typeof navigation);
   }, [role]);
-
-  const displayName = user?.displayName?.trim() || usernameFromEmail(user?.email) || "Pengguna";
-  const initials = displayName
-    .split(" ")
-    .filter(Boolean)
-    .map((part) => part[0]?.toUpperCase())
-    .join("")
-    .slice(0, 2) || "PG";
 
   return (
     <TooltipProvider>
@@ -116,7 +97,6 @@ const Sidebar = () => {
       {/* Desktop Sidebar */}
       <aside className={cn(
         "hidden lg:flex h-full flex-col bg-gradient-to-b from-slate-50 to-white dark:from-slate-900 dark:to-slate-800 border-r border-slate-200/60 dark:border-slate-700/60 shadow-2xl backdrop-blur-sm transition-all duration-300 ease-in-out z-20",
-        // Width transitions - responsive widths
         isCollapsed ? "w-16 lg:w-16" : "w-64 md:w-72 lg:w-80"
       )}>
         {/* Header with logo and collapse toggle */}
@@ -131,7 +111,6 @@ const Sidebar = () => {
             <Logo />
           </div>
 
-          {/* Desktop collapse toggle */}
           <Button
             variant="ghost"
             size="icon"
@@ -146,9 +125,9 @@ const Sidebar = () => {
             <span className="sr-only">Toggle sidebar</span>
           </Button>
 
-          {/* Decorative line */}
           <div className="absolute bottom-0 left-4 right-4 h-px bg-gradient-to-r from-transparent via-slate-200 dark:via-slate-600 to-transparent"></div>
         </div>
+
         {/* Navigation */}
         <nav className={cn("flex-1 py-3 sm:py-4 md:py-6 space-y-2", isCollapsed ? "px-2" : "px-3 sm:px-4 md:px-5 lg:px-6")}>
           <div className={cn(
@@ -288,46 +267,6 @@ const Sidebar = () => {
             );
           })}
         </nav>
-
-        {/* Bottom section */}
-        <div className={cn("mt-auto py-3 sm:py-4 md:py-6 bg-white/30 dark:bg-slate-800/30 backdrop-blur-sm border-t border-slate-200/60 dark:border-slate-700/60", isCollapsed ? "px-2" : "px-3 sm:px-4 md:px-5 lg:px-6")}>
-          <div className="space-y-3">
-            {/* Settings Link */}
-
-
-            {/* Help Button */}
-            {isCollapsed ? (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    onClick={() => setShowGuide(true)}
-                    className="w-10 h-10 sm:w-12 sm:h-12 p-0 mx-auto flex items-center justify-center rounded-xl transition-all duration-300 hover:scale-105 text-slate-600 dark:text-slate-300 hover:text-white hover:bg-gradient-to-br hover:from-blue-400 hover:to-indigo-500 dark:hover:from-blue-500 dark:hover:to-indigo-600 hover:shadow-lg"
-                  >
-                    <HelpCircle className="h-4 w-4 sm:h-5 sm:w-5 transition-transform hover:scale-110" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="right" className="md:block hidden">
-                  <p>Panduan Aplikasi</p>
-                </TooltipContent>
-              </Tooltip>
-            ) : (
-              <Button
-                variant="ghost"
-                onClick={() => setShowGuide(true)}
-                className="group relative flex items-center gap-4 rounded-xl px-4 py-3 mx-1 text-sm font-medium transition-all duration-300 hover:translate-x-1 text-slate-600 dark:text-slate-200 hover:bg-white/60 dark:hover:bg-slate-700/60 hover:shadow-md hover:text-slate-800 dark:hover:text-white w-full justify-start"
-              >
-                <div className={cn(
-                  "flex h-9 w-9 items-center justify-center rounded-lg transition-all duration-300 shrink-0 group-hover:scale-110",
-                  "bg-slate-100 dark:bg-slate-700/70 text-slate-600 dark:text-slate-300 group-hover:bg-gradient-to-br group-hover:from-blue-400 group-hover:to-indigo-500 dark:group-hover:from-blue-500 dark:group-hover:to-indigo-600 group-hover:text-white"
-                )}>
-                  <HelpCircle className="h-4 w-4 transition-transform" />
-                </div>
-                <span className="truncate font-medium">Panduan Aplikasi</span>
-              </Button>
-            )}
-          </div>
-        </div>
       </aside>
 
       {/* Mobile/Tablet Sidebar */}
@@ -339,7 +278,6 @@ const Sidebar = () => {
               <Logo />
             </div>
 
-            {/* Mobile close button */}
             <Button
               variant="ghost"
               size="icon"
@@ -350,11 +288,9 @@ const Sidebar = () => {
               <span className="sr-only">Close menu</span>
             </Button>
 
-            {/* Decorative line */}
             <div className="absolute bottom-0 left-4 right-4 h-px bg-gradient-to-r from-transparent via-slate-200 dark:via-slate-600 to-transparent"></div>
           </div>
 
-          {/* Navigation */}
           <nav className="flex-1 px-3 sm:px-4 md:px-5 py-3 sm:py-4 md:py-6 space-y-2">
             <div className="mb-3 sm:mb-4 md:mb-6">
               <div className="flex items-center gap-2 sm:gap-3 px-3 py-1.5 sm:py-2 mb-2 sm:mb-3 md:mb-4">
@@ -442,41 +378,10 @@ const Sidebar = () => {
               );
             })}
           </nav>
-
-          {/* Bottom section */}
-          <div className="px-3 sm:px-4 md:px-5 py-3 sm:py-4 mt-auto">
-            <Separator className="mb-4" />
-
-            <div className="space-y-2">
-              {/* Settings Link */}
-
-
-              {/* Help Button */}
-              <Button
-                variant="ghost"
-                onClick={() => {
-                  setShowGuide(true);
-                  closeMobile();
-                }}
-                className="w-full h-10 justify-start gap-3 px-3"
-              >
-                <div className="flex h-8 w-8 items-center justify-center rounded-md bg-muted/50 shrink-0">
-                  <HelpCircle className="h-4 w-4" />
-                </div>
-                <span className="truncate">Panduan Aplikasi</span>
-              </Button>
-            </div>
-          </div>
         </aside>
       )}
-
-      <AppGuide
-        isOpen={showGuide}
-        onClose={() => setShowGuide(false)}
-      />
     </TooltipProvider>
   );
 };
 
 export default Sidebar;
-

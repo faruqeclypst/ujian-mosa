@@ -11,7 +11,7 @@ import type { ClassData } from "../../types/exam";
 
 const studentSchema = z.object({
   nisn: z.string().min(5, "NISN minimal 5 karakter"),
-  name: z.string().min(1, "Nama student wajib diisi"),
+  name: z.string().min(1, "Nama Siswa wajib diisi"),
   gender: z.enum(["L", "P"], { required_error: "Gender wajib dipilih" }),
   classId: z.string().min(1, "Kelas wajib dipilih"),
 });
@@ -80,8 +80,8 @@ const StudentForm = ({
         <Input id="nisn" placeholder="Masukkan NISN" {...register("nisn")} />
       </FormField>
 
-      <FormField id="name" label="Nama student" error={errors.name}>
-        <Input id="name" placeholder="Masukkan Nama student" {...register("name")} />
+      <FormField id="name" label="Nama Siswa" error={errors.name}>
+        <Input id="name" placeholder="Masukkan Nama Siswa" {...register("name")} />
       </FormField>
 
       <FormField id="gender" label="Gender" error={errors.gender}>

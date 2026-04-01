@@ -21,7 +21,7 @@ const TopNavigation = () => {
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [lockedAttempts, setLockedAttempts] = useState<any[]>([]);
   const [examRooms, setExamRooms] = useState<Record<string, any>>({});
-  const [currentTime, setCurrentTime] = useState<string>(""); 
+  const [currentTime, setCurrentTime] = useState<string>("");
   const dropdownRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
 
@@ -93,13 +93,13 @@ const TopNavigation = () => {
       if (snapshot.exists()) {
         const data = snapshot.val();
         const locked: any[] = [];
-        
+
         // data is { roomId: { nisn: attempt } }
         Object.keys(data).forEach(rid => {
           const roomAttempts = data[rid];
           Object.keys(roomAttempts).forEach(nisn => {
             if (roomAttempts[nisn].status === "LOCKED") {
-               locked.push({ id: nisn, nisn, roomId: rid, ...roomAttempts[nisn] });
+              locked.push({ id: nisn, nisn, roomId: rid, ...roomAttempts[nisn] });
             }
           });
         });
@@ -195,7 +195,7 @@ const TopNavigation = () => {
   }, [tokenUpdatedAt]);
 
   return (
-    <header className="flex w-full items-center gap-3 sm:gap-4 border-b bg-card/95 backdrop-blur-sm px-4 sm:px-6 py-3 sm:py-4 shadow-sm shrink-0 relative z-30">
+    <header className="flex w-full items-center gap-2 sm:gap-4 border-b bg-card/95 backdrop-blur-sm px-3 sm:px-6 py-2 sm:py-4 shadow-sm shrink-0 relative z-30">
       <Button
         variant="ghost"
         size="icon"
@@ -209,16 +209,15 @@ const TopNavigation = () => {
 
       {/* Universal Token */}
       {universalToken && (
-        <div className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/40 rounded-lg text-amber-700 dark:text-amber-400 shadow-sm">
-          {/* <span className="text-[10px] font-bold uppercase tracking-wider">Token</span> */}
+        <div className="flex items-center gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/40 rounded-lg text-amber-700 dark:text-amber-400 shadow-sm shrink-0">
           <span className="text-xs sm:text-sm font-black font-mono tracking-widest tabular-nums">{universalToken}</span>
           {timeLeft && <span className="text-[10px] font-medium text-amber-600 dark:text-amber-500 opacity-80 border-l pl-1.5 border-amber-200 dark:border-amber-800/40">{timeLeft}</span>}
         </div>
       )}
 
-      {/* Live Clock */}
+      {/* Live Clock - Hidden on Mobile */}
       {currentTime && (
-        <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 rounded-lg text-slate-600 dark:text-slate-300 shadow-sm">
+        <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 rounded-lg text-slate-600 dark:text-slate-300 shadow-sm shrink-0">
           <Clock className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
           <span className="text-xs sm:text-sm font-semibold tabular-nums tracking-wide">{currentTime}</span>
         </div>
@@ -252,7 +251,7 @@ const TopNavigation = () => {
               <div className="p-4 border-b flex items-center justify-between bg-slate-50/50 dark:bg-slate-900/40">
                 <div className="flex items-center gap-2">
                   <ShieldAlert className="h-4 w-4 text-red-500" />
-                  <h3 className="font-bold text-sm">student Terkunci</h3>
+                  <h3 className="font-bold text-sm">Siswa Terkunci</h3>
                 </div>
                 <span className="text-[10px] bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-400 px-2 py-0.5 rounded-full font-bold">
                   {lockedAttempts.length} Aktif
@@ -264,7 +263,7 @@ const TopNavigation = () => {
                     <div className="w-12 h-12 bg-slate-50 dark:bg-slate-800 rounded-full flex items-center justify-center">
                       <Bell className="h-6 w-6 text-slate-300" />
                     </div>
-                    <p className="text-xs text-slate-400 font-medium tracking-tight">Tidak ada student yang terkunci saat ini.</p>
+                    <p className="text-xs text-slate-400 font-medium tracking-tight">Tidak ada Siswa yang terkunci saat ini.</p>
                   </div>
                 ) : (
                   <div className="divide-y dark:divide-slate-800">
@@ -280,7 +279,7 @@ const TopNavigation = () => {
                               <UserX className="h-5 w-5 text-red-600 dark:text-red-400" />
                             </div>
                             <div className="flex-1 min-w-0">
-                              <p className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">{student?.name || "student Tidak Dikenal"}</p>
+                              <p className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">{student?.name || "Siswa Tidak Dikenal"}</p>
                               <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5">
                                 <span className="text-[10px] font-medium text-slate-500">{className}</span>
                                 <span className="text-[10px] text-slate-300 dark:text-slate-700">•</span>
@@ -292,9 +291,9 @@ const TopNavigation = () => {
                                   {room?.room_name || "Ruang Tidak Ditemukan"}
                                 </p>
                               </div>
-                              <Button 
+                              <Button
                                 onClick={() => handleUnlockStudent(item.nisn, item.roomId)}
-                                size="sm" 
+                                size="sm"
                                 className="w-full mt-3 h-8 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold gap-1.5 shadow-sm shadow-blue-500/20"
                               >
                                 <Unlock className="h-3.5 w-3.5" />
@@ -310,7 +309,7 @@ const TopNavigation = () => {
               </div>
               {lockedAttempts.length > 0 && (
                 <div className="p-2 border-t bg-slate-50/50 dark:bg-slate-900/40">
-                  <p className="text-[9px] text-center text-slate-400 font-medium">Klik buka kunci untuk mengembalikan status student menjadi aktif.</p>
+                  <p className="text-[9px] text-center text-slate-400 font-medium">Klik buka kunci untuk mengembalikan status Siswa menjadi aktif.</p>
                 </div>
               )}
             </div>

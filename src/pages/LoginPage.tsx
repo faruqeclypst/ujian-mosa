@@ -14,7 +14,7 @@ import { Input } from "../components/ui/input";
 import { ThemeToggle } from "../components/ui/theme-toggle";
 import { useAuth } from "../context/AuthContext";
 import { database } from "../lib/firebase";
-import { ref, get } from "firebase/database";
+import { ref, onValue, DataSnapshot } from "firebase/database";
 
 const loginSchema = z.object({
   username: z.string().min(3, "Username minimal 3 karakter"),
@@ -50,16 +50,25 @@ const LoginPage = () => {
 
   const [schoolName, setSchoolName] = useState("");
   const [schoolLogo, setSchoolLogo] = useState("");
+  const [logoLoading, setLogoLoading] = useState(true);
+  const [logoError, setLogoError] = useState(false);
 
   useEffect(() => {
     const r = ref(database, "settings/school");
-    get(r).then((snap) => {
+    const unsubscribe = onValue(r, (snap: DataSnapshot) => {
+      setLogoLoading(true);
       if (snap.exists()) {
         const d = snap.val();
         setSchoolName(d.name || "");
         setSchoolLogo(d.logoUrl || "");
       }
+      setLogoLoading(false);
+    }, (error: Error) => {
+      console.error("Firebase read error:", error);
+      setLogoLoading(false);
     });
+
+    return () => unsubscribe();
   }, []);
 
   const {
@@ -178,10 +187,19 @@ const LoginPage = () => {
               }}
               className="mx-auto flex h-24 w-24 items-center justify-center relative overflow-hidden"
             >
-              {schoolLogo ? (
-                <img src={schoolLogo} alt="Logo Sekolah" className="h-full w-full object-contain" />
+              {logoLoading ? (
+                <div className="flex items-center justify-center h-full w-full bg-slate-100 dark:bg-slate-800 rounded-2xl animate-pulse">
+                  <div className="h-8 w-8 rounded-full border-2 border-blue-500 border-t-transparent animate-spin" />
+                </div>
+              ) : schoolLogo && !logoError ? (
+                <img
+                  src={schoolLogo}
+                  // alt="Logo Sekolah" 
+                  className="h-full w-full object-contain"
+                  onError={() => setLogoError(true)}
+                />
               ) : (
-                <div className="flex items-center justify-center h-full w-full bg-gradient-to-br from-blue-500 to-blue-700 rounded-2xl">
+                <div className="flex items-center justify-center h-full w-full bg-gradient-to-br from-blue-500 to-blue-700 rounded-2xl shadow-inner">
                   <Lock className="h-8 w-8 text-white" />
                 </div>
               )}

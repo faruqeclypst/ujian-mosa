@@ -177,7 +177,7 @@ const studentDashboardPage = () => {
         <div className="flex items-center gap-4">
           <div className="text-right hidden sm:block">
             <p className="text-sm font-bold text-slate-800 dark:text-slate-100">{student?.name}</p>
-            <p className="text-[10px] uppercase tracking-wider font-bold text-slate-400">{student?.className || "student"}</p>
+            <p className="text-[10px] uppercase tracking-wider font-bold text-slate-400">{student?.className || "Siswa"}</p>
           </div>
           <Button variant="ghost" size="icon" onClick={logoutStudent} className="text-red-500 hover:text-red-600 hover:bg-red-50 transition-colors">
             <LogOut className="h-5 w-5" />

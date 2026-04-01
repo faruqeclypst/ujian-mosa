@@ -6,7 +6,7 @@ import FormField from "../../components/forms/FormField";
 import { Card, CardHeader, CardTitle, CardContent } from "../../components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../../components/ui/dialog";
 import { database } from "../../lib/firebase";
-import { ref, get } from "firebase/database";
+import { ref, onValue, DataSnapshot } from "firebase/database";
 
 const studentLoginPage = () => {
   const { loginStudent, student, changePassword } = useStudentAuth();
@@ -24,16 +24,25 @@ const studentLoginPage = () => {
 
   const [schoolName, setSchoolName] = useState("");
   const [schoolLogo, setSchoolLogo] = useState("");
+  const [logoLoading, setLogoLoading] = useState(true);
+  const [logoError, setLogoError] = useState(false);
 
   useEffect(() => {
     const r = ref(database, "settings/school");
-    get(r).then((snap) => {
+    const unsubscribe = onValue(r, (snap: DataSnapshot) => {
+      setLogoLoading(true);
       if (snap.exists()) {
         const d = snap.val();
         setSchoolName(d.name || "");
         setSchoolLogo(d.logoUrl || "");
       }
+      setLogoLoading(false);
+    }, (error: Error) => {
+      console.error("Firebase read error:", error);
+      setLogoLoading(false);
     });
+
+    return () => unsubscribe();
   }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -86,15 +95,24 @@ const studentLoginPage = () => {
       <Card className="w-full max-w-md mx-4 bg-white/80 backdrop-blur-xl border border-slate-200/60 shadow-xl rounded-3xl p-2">
         <CardHeader className="text-center pb-2">
           <div className="mx-auto w-24 h-24 flex items-center justify-center mb-4 overflow-hidden relative">
-            {schoolLogo ? (
-              <img src={schoolLogo} alt="Logo Sekolah" className="h-full w-full object-contain" />
+            {logoLoading ? (
+              <div className="h-full w-full bg-slate-100 rounded-2xl animate-pulse flex items-center justify-center">
+                <div className="h-8 w-8 rounded-full border-2 border-blue-500 border-t-transparent animate-spin" />
+              </div>
+            ) : schoolLogo && !logoError ? (
+              <img 
+                src={schoolLogo} 
+                alt="Logo Sekolah" 
+                className="h-full w-full object-contain" 
+                onError={() => setLogoError(true)}
+              />
             ) : (
               <div className="h-full w-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/30 rounded-2xl">
                 <span className="text-3xl font-black text-white">CBT</span>
               </div>
             )}
           </div>
-          <CardTitle className="text-xl sm:text-2xl font-bold text-slate-800">Login student</CardTitle>
+          <CardTitle className="text-xl sm:text-2xl font-bold text-slate-800">Login Siswa</CardTitle>
           <p className="text-slate-500 text-xs sm:text-sm">{schoolName || "Ujian Computer Based Test"}</p>
         </CardHeader>
         <CardContent className="pt-4">

@@ -600,7 +600,7 @@ const CBTPage = () => {
         {/* Right: Student Info */}
         <div className="flex flex-col items-end text-right">
           <p className="font-semibold text-slate-700 dark:text-slate-200 line-clamp-1">{student?.name}</p>
-          <p className="text-[10px] text-slate-400">{student?.className || "student"}</p>
+          <p className="text-[10px] text-slate-400">{student?.className || "Siswa"}</p>
         </div>
       </header>
 
