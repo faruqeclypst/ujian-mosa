@@ -21,14 +21,23 @@ Quill.register("modules/imageResize", ImageResize);
 import { useExamData } from "../../context/ExamDataContext";
 import { useAuth } from "../../context/AuthContext";
 import { DataTable } from "../../components/ui/data-table";
+export type QuestionType = "pilihan_ganda" | "pilihan_ganda_kompleks" | "menjodohkan" | "benar_salah" | "isian_singkat" | "uraian" | "urutkan" | "drag_drop";
+
 export interface QuestionData {
   id: string;
   examId: string;
+  type?: QuestionType; // Default is pilihan_ganda if undefined
   text: string;
   imageUrl?: string;
   groupId?: string; // ID Kelompok/Literasi (Opsional)
   groupText?: string; // Teks khusus Literasi (Opsional)
-  choices: Record<string, { text: string; imageUrl?: string; isCorrect?: boolean }>;
+  choices?: Record<string, { text: string; imageUrl?: string; isCorrect?: boolean }>;
+  // Menjodohkan
+  pairs?: Array<{ id: string; left: string; right: string }>;
+  // Isian Singkat / Uraian
+  answerKey?: string;
+  // Urutkan / Drag & Drop
+  items?: Array<{ id: string; text: string; imageUrl?: string }>;
 }
 
 const compressImage = (file: File): Promise<File> => {
@@ -112,21 +121,61 @@ const columns = [
     ),
   },
   {
-    key: "choices",
-    label: "Detil Pilihan",
-    render: (v: any, item: QuestionData) => {
-      const keys = Object.keys(item.choices || {});
-      const correctKey = keys.find(k => item.choices[k].isCorrect);
+    key: "type",
+    label: "Tipe Soal",
+    render: (v: string, item: QuestionData) => {
+      const typeLabels: Record<string, string> = {
+        pilihan_ganda: "Pilihan Ganda",
+        pilihan_ganda_kompleks: "PG Kompleks",
+        menjodohkan: "Menjodohkan",
+        benar_salah: "Benar / Salah",
+        isian_singkat: "Isian Singkat",
+        uraian: "Uraian / Esai",
+        urutkan: "Urutkan",
+        drag_drop: "Drag and Drop"
+      };
       return (
-        <div className="flex items-center gap-1.5 flex-wrap">
-          <span className="p-1 px-2 rounded-md bg-slate-50 text-slate-600 dark:bg-slate-800/60 dark:text-slate-300 text-xs border border-slate-200 dark:border-slate-800">{keys.length} Pilihan</span>
-          {correctKey && (
-            <span className="p-1 px-2 text-[11px] font-bold rounded-md bg-green-50 text-green-600 dark:bg-green-950/40 dark:text-green-400 border border-green-200 dark:border-green-800/40">
-              Kunci {correctKey.toUpperCase()}
-            </span>
-          )}
-        </div>
-      )
+        <span className="p-1 px-2 rounded-md bg-indigo-50 text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400 text-[10px] font-bold border border-indigo-200 dark:border-indigo-800/40 uppercase">
+          {typeLabels[item.type || "pilihan_ganda"]}
+        </span>
+      );
+    }
+  },
+  {
+    key: "details",
+    label: "Detil Jawaban",
+    render: (v: any, item: QuestionData) => {
+      const type = item.type || "pilihan_ganda";
+      if (type === "pilihan_ganda" || type === "pilihan_ganda_kompleks" || type === "benar_salah") {
+        const keys = Object.keys(item.choices || {});
+        const correctCount = keys.filter(k => item.choices?.[k].isCorrect).length;
+        const correctKeys = keys.filter(k => item.choices?.[k].isCorrect).map(k => k.toUpperCase()).join(", ");
+        
+        return (
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="p-1 px-2 rounded-md bg-slate-50 text-slate-600 dark:bg-slate-800/60 dark:text-slate-300 text-xs border border-slate-200 dark:border-slate-800">{keys.length} Opsi</span>
+            {correctCount > 0 && (
+              <span className="p-1 px-2 text-[11px] font-bold rounded-md bg-green-50 text-green-600 dark:bg-green-950/40 dark:text-green-400 border border-green-200 dark:border-green-800/40">
+                Kunci: {correctKeys}
+              </span>
+            )}
+          </div>
+        );
+      }
+      
+      if (type === "menjodohkan") {
+        return <span className="text-xs text-slate-500">{(item.pairs || []).length} Pasangan</span>;
+      }
+      
+      if (type === "isian_singkat" || type === "uraian") {
+        return <div className="text-xs text-slate-500 line-clamp-1 max-w-[150px]">{item.answerKey || "-"}</div>;
+      }
+      
+      if (type === "urutkan" || type === "drag_drop") {
+        return <span className="text-xs text-slate-500">{(item.items || []).length} Item</span>;
+      }
+      
+      return null;
     }
   }
 ];
@@ -136,6 +185,28 @@ const QuestionsPage = () => {
   const navigate = useNavigate();
   const { role, teacherId } = useAuth();
   const { subjects, teachers } = useExamData();
+
+  // 📝 Manage Allowed Question Types
+  const [allowedTypes, setAllowedTypes] = useState<Record<string, boolean>>({
+    pilihan_ganda: true,
+    pilihan_ganda_kompleks: true,
+    menjodohkan: true,
+    benar_salah: true,
+    isian_singkat: true,
+    urutkan: true,
+    drag_drop: true,
+    uraian: true,
+  });
+
+  useEffect(() => {
+    const settingsRef = ref(database, "settings/allowed_question_types");
+    const unsubscribe = onValue(settingsRef, (snapshot) => {
+      if (snapshot.exists()) {
+        setAllowedTypes(prev => ({ ...prev, ...snapshot.val() }));
+      }
+    });
+    return () => unsubscribe();
+  }, []);
 
   const [exam, setExam] = useState<any>(null);
   const [questions, setQuestions] = useState<QuestionData[]>([]);
@@ -150,12 +221,17 @@ const QuestionsPage = () => {
 
   const [formValues, setFormValues] = useState<{
     text: string;
+    type: QuestionType;
     imageUrl?: string;
     groupId?: string;
     groupText?: string;
     choices: Record<string, { text: string; imageUrl?: string; isCorrect: boolean }>;
+    pairs: Array<{ id: string; left: string; right: string }>;
+    answerKey: string;
+    items: Array<{ id: string; text: string; imageUrl?: string }>;
   }>({
     text: "",
+    type: "pilihan_ganda",
     groupId: "",
     groupText: "",
     choices: {
@@ -164,7 +240,10 @@ const QuestionsPage = () => {
       c: { text: "", isCorrect: false },
       d: { text: "", isCorrect: false },
       e: { text: "", isCorrect: false },
-    }
+    },
+    pairs: [{ id: "1", left: "", right: "" }],
+    answerKey: "",
+    items: [{ id: "1", text: "" }]
   });
 
   const [isLiterasiActive, setIsLiterasiActive] = useState(false);
@@ -543,6 +622,7 @@ const QuestionsPage = () => {
     setSelectedQuestion(null);
     setFormValues({
       text: "",
+      type: "pilihan_ganda",
       groupId: "",
       groupText: "",
       choices: {
@@ -551,7 +631,10 @@ const QuestionsPage = () => {
         c: { text: "", isCorrect: false },
         d: { text: "", isCorrect: false },
         e: { text: "", isCorrect: false },
-      }
+      },
+      pairs: [{ id: "1", left: "", right: "" }],
+      answerKey: "",
+      items: [{ id: "1", text: "" }]
     });
     setIsLiterasiActive(false);
     setLiterasiMode("select");
@@ -565,6 +648,7 @@ const QuestionsPage = () => {
     setChoiceFiles({});
     setFormValues({
       text: q.text,
+      type: q.type || "pilihan_ganda",
       imageUrl: q.imageUrl,
       groupId: q.groupId || "",
       groupText: q.groupText || "",
@@ -574,7 +658,10 @@ const QuestionsPage = () => {
         c: { text: q.choices?.c?.text || "", imageUrl: q.choices?.c?.imageUrl, isCorrect: !!q.choices?.c?.isCorrect },
         d: { text: q.choices?.d?.text || "", imageUrl: q.choices?.d?.imageUrl, isCorrect: !!q.choices?.d?.isCorrect },
         e: { text: q.choices?.e?.text || "", imageUrl: q.choices?.e?.imageUrl, isCorrect: !!q.choices?.e?.isCorrect },
-      }
+      },
+      pairs: q.pairs || [{ id: "1", left: "", right: "" }],
+      answerKey: q.answerKey || "",
+      items: q.items || [{ id: "1", text: "" }]
     });
     // 🔒 Deteksi apakah ini soal pertama di grupnya agar hanya soal #1 yang bisa edit teks wacana
     const groupItems = questions.filter(item => q.groupId && item.groupId === q.groupId);
@@ -592,8 +679,8 @@ const QuestionsPage = () => {
       const updatedChoices = { ...prev.choices };
       updatedChoices[key] = { ...updatedChoices[key], [field]: value };
 
-      // If setting isCorrect: true, set others to false
-      if (field === "isCorrect" && value === true) {
+      // If setting isCorrect: true and current type is choices (single choice), set others to false
+      if (prev.type === "pilihan_ganda" && field === "isCorrect" && value === true) {
         Object.keys(updatedChoices).forEach((k) => {
           if (k !== key) updatedChoices[k].isCorrect = false;
         });
@@ -601,6 +688,48 @@ const QuestionsPage = () => {
 
       return { ...prev, choices: updatedChoices };
     });
+  };
+
+  const handleAddPair = () => {
+    setFormValues(prev => ({
+      ...prev,
+      pairs: [...prev.pairs, { id: Date.now().toString(), left: "", right: "" }]
+    }));
+  };
+
+  const handleRemovePair = (id: string) => {
+    setFormValues(prev => ({
+      ...prev,
+      pairs: prev.pairs.filter(p => p.id !== id)
+    }));
+  };
+
+  const handlePairChange = (id: string, field: "left" | "right", value: string) => {
+    setFormValues(prev => ({
+      ...prev,
+      pairs: prev.pairs.map(p => p.id === id ? { ...p, [field]: value } : p)
+    }));
+  };
+
+  const handleAddItem = () => {
+    setFormValues(prev => ({
+      ...prev,
+      items: [...prev.items, { id: Date.now().toString(), text: "" }]
+    }));
+  };
+
+  const handleRemoveItem = (id: string) => {
+    setFormValues(prev => ({
+      ...prev,
+      items: prev.items.filter(it => it.id !== id)
+    }));
+  };
+
+  const handleItemChange = (id: string, value: string) => {
+    setFormValues(prev => ({
+      ...prev,
+      items: prev.items.map(it => it.id === id ? { ...it, text: value } : it)
+    }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -613,27 +742,33 @@ const QuestionsPage = () => {
       return;
     }
 
-    // 2. Validasi Harus Ada Kunci Jawaban
-    const hasCorrectAnswer = Object.values(formValues.choices).some((c) => c.isCorrect);
-    if (!hasCorrectAnswer) {
-      showAlert("Gagal", "Soal wajib memiliki minimal satu kunci jawaban.", "danger");
-      return;
-    }
-
-    // 3. Validasi Teks Pilihan yang terpilih (Kunci Jawaban)
-    const correctChoicesKeys = Object.keys(formValues.choices).filter(key => formValues.choices[key].isCorrect);
-    const correctChoiceKey = correctChoicesKeys[0];
-    const isCorrectChoiceEmpty = !formValues.choices[correctChoiceKey].text || formValues.choices[correctChoiceKey].text.replace(/<[^>]*>/g, '').trim() === "";
-    if (isCorrectChoiceEmpty) {
-      showAlert("Gagal", "Pilihan jawaban yang dipilih sebagai kunci jawaban tidak boleh kosong.", "danger");
-      return;
-    }
-
-    // 4. Validasi Jumlah Pilihan yang Terisi (Minimal 2 pilihan)
-    const filledChoicesCount = Object.values(formValues.choices).filter(c => c.text && c.text.replace(/<[^>]*>/g, '').trim() !== "").length;
-    if (filledChoicesCount < 2) {
-      showAlert("Gagal", "Minimal harus mengisi atau membuat 2 pilihan jawaban.", "danger");
-      return;
+    // 2. Validasi Jawaban berdasarkan tipe
+    if (formValues.type === "pilihan_ganda" || formValues.type === "pilihan_ganda_kompleks" || formValues.type === "benar_salah") {
+      const hasCorrectAnswer = Object.values(formValues.choices).some((c) => c.isCorrect);
+      if (!hasCorrectAnswer) {
+        showAlert("Gagal", "Soal wajib memiliki minimal satu kunci jawaban.", "danger");
+        return;
+      }
+      const filledChoicesCount = Object.values(formValues.choices).filter(c => c.text && c.text.replace(/<[^>]*>/g, '').trim() !== "").length;
+      if (filledChoicesCount < 2) {
+        showAlert("Gagal", "Minimal harus mengisi atau membuat 2 pilihan jawaban.", "danger");
+        return;
+      }
+    } else if (formValues.type === "menjodohkan") {
+      if (formValues.pairs.length < 1 || formValues.pairs.some(p => !p.left.trim() || !p.right.trim())) {
+        showAlert("Gagal", "Semua pasangan menjodohkan harus diisi.", "danger");
+        return;
+      }
+    } else if (formValues.type === "isian_singkat") {
+      if (!formValues.answerKey?.trim()) {
+        showAlert("Gagal", "Kunci jawaban isian singkat tidak boleh kosong.", "danger");
+        return;
+      }
+    } else if (formValues.type === "urutkan" || formValues.type === "drag_drop") {
+      if (formValues.items.length < 2 || formValues.items.some(it => !it.text.trim())) {
+        showAlert("Gagal", "Minimal 2 item dan semuanya harus diisi.", "danger");
+        return;
+      }
     }
 
     try {
@@ -728,9 +863,19 @@ const QuestionsPage = () => {
       const payload: any = {
         examId,
         text: textToSave,
-        choices: updatedChoices,
+        type: formValues.type,
         createdAt: Date.now(),
       };
+
+      if (formValues.type === "pilihan_ganda" || formValues.type === "pilihan_ganda_kompleks" || formValues.type === "benar_salah") {
+        payload.choices = updatedChoices;
+      } else if (formValues.type === "menjodohkan") {
+        payload.pairs = formValues.pairs;
+      } else if (formValues.type === "isian_singkat" || formValues.type === "uraian") {
+        payload.answerKey = formValues.answerKey;
+      } else if (formValues.type === "urutkan" || formValues.type === "drag_drop") {
+        payload.items = formValues.items;
+      }
 
       if (imageUrl) {
         payload.imageUrl = imageUrl;
@@ -1138,28 +1283,62 @@ const QuestionsPage = () => {
               </div>
             </FormField>
 
-            {/* 🏷️ Pengaturan Wacana Literasi */}
-            <div className="bg-blue-50/40 dark:bg-blue-950/20 p-3 rounded-xl border border-blue-100 dark:border-blue-900/40 space-y-3">
-              <div className="flex items-center space-x-2">
-                <input 
-                  type="checkbox" 
-                  id="literasi-active" 
-                  checked={isLiterasiActive} 
+            <div className="grid grid-cols-2 gap-4">
+              <FormField id="type" label="Jenis / Tipe Soal" error={undefined}>
+                <select
+                  value={formValues.type}
                   onChange={(e) => {
-                    setIsLiterasiActive(e.target.checked);
-                    if (!e.target.checked) {
-                      setFormValues({ ...formValues, groupId: "", groupText: "" });
-                    }
-                  }} 
-                  className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
-                />
-                <label htmlFor="literasi-active" className="text-sm font-semibold text-blue-700 dark:text-blue-400 cursor-pointer">
-                  Aktifkan Soal Literasi
-                </label>
-              </div>
+                    const newType = e.target.value as QuestionType;
+                    setFormValues(prev => ({
+                      ...prev,
+                      type: newType,
+                      // Reset choices if switching to True/False
+                      choices: newType === "benar_salah" ? {
+                        a: { text: "Benar", isCorrect: true },
+                        b: { text: "Salah", isCorrect: false },
+                        c: { text: "", isCorrect: false },
+                        d: { text: "", isCorrect: false },
+                        e: { text: "", isCorrect: false },
+                      } : prev.choices
+                    }));
+                  }}
+                  className="bg-card w-full rounded-md border text-sm h-10 px-3 cursor-pointer text-slate-700 dark:text-slate-200"
+                >
+                  {(allowedTypes.pilihan_ganda !== false || formValues.type === "pilihan_ganda") && <option value="pilihan_ganda">Pilihan Ganda (Single Choice)</option>}
+                  {(allowedTypes.pilihan_ganda_kompleks || formValues.type === "pilihan_ganda_kompleks") && <option value="pilihan_ganda_kompleks">Pilihan Ganda Kompleks (Multi Response)</option>}
+                  {(allowedTypes.menjodohkan || formValues.type === "menjodohkan") && <option value="menjodohkan">Menjodohkan (Matching)</option>}
+                  {(allowedTypes.benar_salah || formValues.type === "benar_salah") && <option value="benar_salah">Benar / Salah</option>}
+                  {(allowedTypes.isian_singkat || formValues.type === "isian_singkat") && <option value="isian_singkat">Isian Singkat</option>}
+                  {(allowedTypes.uraian || formValues.type === "uraian") && <option value="uraian">Uraian / Esai</option>}
+                  {(allowedTypes.urutkan || formValues.type === "urutkan") && <option value="urutkan">Urutkan (Ordering)</option>}
+                  {(allowedTypes.drag_drop || formValues.type === "drag_drop") && <option value="drag_drop">Drag and Drop</option>}
+                </select>
+              </FormField>
 
-              {isLiterasiActive && (
-                <div className="space-y-2.5 pt-2 border-t border-blue-100/60 dark:border-blue-900/40">
+              <FormField id="literasi-active" label="Soal Literasi?" error={undefined}>
+                <div className="flex items-center space-x-2 h-10 bg-blue-50/40 dark:bg-blue-950/20 px-3 rounded-md border border-blue-100 dark:border-blue-900/40">
+                  <input 
+                    type="checkbox" 
+                    id="literasi-active" 
+                    checked={isLiterasiActive} 
+                    onChange={(e) => {
+                      setIsLiterasiActive(e.target.checked);
+                      if (!e.target.checked) {
+                        setFormValues({ ...formValues, groupId: "", groupText: "" });
+                      }
+                    }} 
+                    className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
+                  />
+                  <label htmlFor="literasi-active" className="text-sm font-semibold text-blue-700 dark:text-blue-400 cursor-pointer">
+                    Aktifkan Paket Wacana
+                  </label>
+                </div>
+              </FormField>
+            </div>
+
+            {isLiterasiActive && (
+              <div className="bg-blue-50/40 dark:bg-blue-950/20 p-3 rounded-xl border border-blue-100 dark:border-blue-900/40 space-y-3">
+                <div className="space-y-2.5">
                   <FormField id="groupId" label="Pilih / Hubungkan Literasi" error={undefined}>
                     <select
                       value={formValues.groupId === "NEW_LITERASI" ? "NEW_LITERASI" : (literasiMode === "create" ? "NEW_LITERASI" : formValues.groupId)}
@@ -1227,8 +1406,8 @@ const QuestionsPage = () => {
                     </div>
                   )}
                 </div>
-              )}
-            </div>
+              </div>
+            )}
 
             <FormField id="image" label="Gambar Cover Soal (Opsional)" error={undefined}>
               <div className="flex flex-col gap-2">
@@ -1264,66 +1443,178 @@ const QuestionsPage = () => {
             </FormField>
 
             <div className="space-y-4">
-              <label className="text-xs font-semibold text-slate-500 block">Pilihan Jawaban</label>
-              {['a', 'b', 'c', 'd', 'e'].map((letter) => (
-                <div key={letter} className="p-3 border border-slate-200 dark:border-slate-800 rounded-xl space-y-2 bg-slate-50/50 dark:bg-slate-900/30">
-                  <div className="flex gap-3 items-center">
-                    <div className="font-bold text-sm w-4">{letter.toUpperCase()}.</div>
-                    <div className="bg-card rounded-md border flex-1">
-                      <ReactQuill
-                        key={selectedQuestion ? `edit-${selectedQuestion.id}-${letter}` : `create-${letter}`}
-                        theme="snow"
-                        value={formValues.choices[letter].text}
-                        onChange={(content) => handleChoiceChange(letter, 'text', content)}
-                        placeholder={`Jawaban ${letter.toUpperCase()} ...`}
-                        modules={{
-                          toolbar: [
-                            ['bold', 'italic', 'underline'],
-                            [{ 'color': [] }],
-                            ['clean']
-                          ],
-                        }}
-                        className="[&_.ql-editor]:min-h-[42px] [&_.ql-editor]:py-2 [&_.ql-container]:border-none [&_.ql-toolbar]:border-none [&_.ql-toolbar]:border-b [&_.ql-toolbar]:px-1 [&_.ql-toolbar]:py-0 [&_.ql-formats]:mr-1"
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-semibold text-slate-500 block">Jawab & Penyelesaian</label>
+                <span className="text-[10px] text-indigo-500 border border-indigo-100 bg-indigo-50/50 dark:bg-indigo-900/20 dark:border-indigo-800 px-2 rounded-full font-bold">MODE: {formValues.type.replace("_", " ").toUpperCase()}</span>
+              </div>
+
+              {/* RENDER BASED ON TYPE */}
+              {(formValues.type === "pilihan_ganda" || formValues.type === "pilihan_ganda_kompleks" || formValues.type === "benar_salah") && (
+                <div className="space-y-3">
+                  {['a', 'b', 'c', 'd', 'e'].map((letter) => {
+                    if (formValues.type === "benar_salah" && (letter !== 'a' && letter !== 'b')) return null;
+                    
+                    return (
+                      <div key={letter} className={`p-3 border rounded-xl space-y-2 transition-all ${formValues.choices[letter].isCorrect ? "bg-green-50/30 border-green-200 dark:bg-green-950/10 dark:border-green-900/40" : "bg-slate-50/50 dark:bg-slate-900/30 border-slate-200 dark:border-slate-800"}`}>
+                        <div className="flex gap-3 items-center">
+                          <div className="font-bold text-sm w-4">{letter.toUpperCase()}.</div>
+                          <div className="bg-card rounded-md border flex-1">
+                            <ReactQuill
+                              key={selectedQuestion ? `edit-${selectedQuestion.id}-${letter}` : `create-${letter}`}
+                              theme="snow"
+                              value={formValues.choices[letter].text}
+                              onChange={(content) => handleChoiceChange(letter, 'text', content)}
+                              placeholder={`Jawaban ${letter.toUpperCase()} ...`}
+                              modules={{
+                                toolbar: [
+                                  ['bold', 'italic', 'underline'],
+                                  [{ 'color': [] }],
+                                  ['clean']
+                                ],
+                              }}
+                              className="[&_.ql-editor]:min-h-[42px] [&_.ql-editor]:py-2 [&_.ql-container]:border-none [&_.ql-toolbar]:border-none [&_.ql-toolbar]:border-b [&_.ql-toolbar]:px-1 [&_.ql-toolbar]:py-0 [&_.ql-formats]:mr-1"
+                            />
+                          </div>
+                          <div className="flex flex-col gap-1.5 shrink-0">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              className={`h-8 text-[10px] font-bold px-3 rounded-lg transition-all border flex items-center gap-1.5 focus-visible:ring-emerald-500/30 active:scale-95 ${
+                                formValues.choices[letter].isCorrect 
+                                  ? "bg-emerald-50 text-emerald-600 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800/40 shadow-sm hover:bg-emerald-100/80 hover:text-emerald-700 active:bg-emerald-200" 
+                                  : "bg-slate-50 text-slate-400 border-slate-200 dark:bg-slate-900/40 dark:text-slate-600 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-500 active:bg-slate-200"
+                               }`}
+                              size="sm"
+                              onClick={() => handleChoiceChange(letter, 'isCorrect', !formValues.choices[letter].isCorrect)}
+                            >
+                              {formValues.choices[letter].isCorrect ? (
+                                <>
+                                  <Check className="h-3.5 w-3.5" />
+                                  <span>KUNCI</span>
+                                </>
+                              ) : (
+                                "SET KUNCI"
+                              )}
+                            </Button>
+                            <button
+                              type="button"
+                              className="flex items-center justify-center gap-1 cursor-pointer bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-md h-8 text-[11px] px-2 border border-slate-200 dark:border-slate-800 transition-all font-medium"
+                              onClick={() => {
+                                setGalleryTarget({ type: "choice", letter });
+                                setIsPickerOpen(true);
+                              }}
+                            >
+                              <Image className="w-3.5 h-3.5 text-slate-400" />
+                              <span>{choiceFiles[letter] || formValues.choices[letter].imageUrl ? "Ubah" : "Img"}</span>
+                            </button>
+                          </div>
+                        </div>
+                        {(choiceFiles[letter] || formValues.choices[letter].imageUrl) && (
+                          <div className="pl-7 pt-1 flex items-center gap-2">
+                            <img
+                              src={choiceFiles[letter] ? URL.createObjectURL(choiceFiles[letter]!) : formValues.choices[letter].imageUrl}
+                              alt={`Pratinjau ${letter}`}
+                              className="max-h-16 w-auto rounded-lg border border-slate-200/80 shadow-sm"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {formValues.type === "menjodohkan" && (
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-4 px-2">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase">Pernyataan (Kiri)</span>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase">Pasangan (Kanan)</span>
+                  </div>
+                  {formValues.pairs.map((pair, idx) => (
+                    <div key={pair.id} className="flex gap-2 items-center p-2 rounded-xl bg-slate-50 dark:bg-slate-900/30 border border-slate-200 dark:border-slate-800">
+                      <Input
+                        placeholder="Kiri..."
+                        value={pair.left}
+                        onChange={(e) => handlePairChange(pair.id, "left", e.target.value)}
+                        className="h-9 text-xs"
                       />
-                    </div>
-                    <div className="flex flex-col gap-1.5 shrink-0">
+                      <span className="text-slate-300">➔</span>
+                      <Input
+                        placeholder="Kanan..."
+                        value={pair.right}
+                        onChange={(e) => handlePairChange(pair.id, "right", e.target.value)}
+                        className="h-9 text-xs"
+                      />
                       <Button
                         type="button"
-                        className={formValues.choices[letter].isCorrect ? "bg-green-50 text-green-700 border border-green-100 dark:bg-green-950/40 dark:text-green-400 dark:border-green-800/40 hover:bg-green-100 h-8 text-xs font-bold" : "h-8 text-xs border border-slate-200 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-800/60 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 font-medium"}
-                        size="sm"
-                        onClick={() => handleChoiceChange(letter, 'isCorrect', true)}
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleRemovePair(pair.id)}
+                        className="h-8 w-8 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/20"
+                        disabled={formValues.pairs.length <= 1}
                       >
-                        Benar
+                        <Trash className="h-4 w-4" />
                       </Button>
-                      <button
-                        type="button"
-                        className="flex items-center justify-center gap-1 cursor-pointer bg-card hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-md h-8 text-[11px] px-2 border border-slate-200 dark:border-slate-800 transition-all font-medium"
-                        onClick={() => {
-                          setGalleryTarget({ type: "choice", letter });
-                          setIsPickerOpen(true);
-                        }}
-                      >
-                        <Image className="w-3.5 h-3.5 text-slate-400" />
-                        <span>{choiceFiles[letter] || formValues.choices[letter].imageUrl ? "Ganti" : "Gambar"}</span>
-                      </button>
                     </div>
-                  </div>
-                  {(choiceFiles[letter] || formValues.choices[letter].imageUrl) && (
-                    <div className="pl-7 pt-1 flex items-center gap-2">
-                      <img
-                        src={choiceFiles[letter] ? URL.createObjectURL(choiceFiles[letter]!) : formValues.choices[letter].imageUrl}
-                        alt={`Pratinjau ${letter}`}
-                        className="max-h-16 w-auto rounded-lg border border-slate-200/80 shadow-sm"
-                      />
-                      {choicesSizeInfo[letter] && (
-                        <span className="text-[9px] text-green-600 font-semibold bg-green-50/80 px-1 py-0.5 rounded border border-green-200 dark:bg-green-950/40 dark:text-green-400 dark:border-green-800/40 shadow-sm">
-                          ⚡ {choicesSizeInfo[letter]}
-                        </span>
-                      )}
-                    </div>
-                  )}
+                  ))}
+                  <Button type="button" variant="outline" size="sm" onClick={handleAddPair} className="w-full text-xs h-8 border-dashed">
+                    <Plus className="h-3 w-3 mr-1" /> Tambah Pasangan
+                  </Button>
                 </div>
-              ))}
+              )}
+
+              {(formValues.type === "isian_singkat" || formValues.type === "uraian") && (
+                <div className="space-y-3">
+                  <FormField id="answerKey" label={formValues.type === "isian_singkat" ? "Kunci Jawaban" : "Pedoman / Contoh Jawaban"} error={undefined}>
+                    <Input
+                      placeholder={formValues.type === "isian_singkat" ? "Jawaban benar..." : "Tulis contoh jawaban/pedoman disini..."}
+                      value={formValues.answerKey}
+                      onChange={(e) => setFormValues(prev => ({ ...prev, answerKey: e.target.value }))}
+                      className="bg-card"
+                    />
+                    {formValues.type === "isian_singkat" && (
+                      <p className="text-[10px] text-slate-400 mt-1 italic">* Siswa harus menjawab identik dengan teks di atas untuk poin otomatis.</p>
+                    )}
+                    {formValues.type === "uraian" && (
+                      <p className="text-[10px] text-amber-500 mt-1 italic">* Jenis soal ini akan selalu butuh koreksi manual oleh Guru di dashboard.</p>
+                    )}
+                  </FormField>
+                </div>
+              )}
+
+              {(formValues.type === "urutkan" || formValues.type === "drag_drop") && (
+                <div className="space-y-3">
+                  <p className="text-[10px] text-indigo-500 p-2 bg-indigo-50/50 rounded-lg border border-indigo-100">
+                    Ketik item di bawah ini dalam <strong>URUTAN YANG BENAR</strong>. Sistem akan mengacak urutannya saat ujian dimulai.
+                  </p>
+                  {formValues.items.map((item, idx) => (
+                    <div key={item.id} className="flex gap-2 items-center p-2 rounded-xl bg-slate-50 dark:bg-slate-900/30 border border-slate-200 dark:border-slate-800">
+                      <div className="flex items-center justify-center w-6 h-6 rounded-full bg-indigo-600 text-white font-bold text-[10px]">
+                        {idx + 1}
+                      </div>
+                      <Input
+                        placeholder={`Item ke-${idx + 1}...`}
+                        value={item.text}
+                        onChange={(e) => handleItemChange(item.id, e.target.value)}
+                        className="h-9 text-xs"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleRemoveItem(item.id)}
+                        className="h-8 w-8 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/20"
+                        disabled={formValues.items.length <= 1}
+                      >
+                        <Trash className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                  <Button type="button" variant="outline" size="sm" onClick={handleAddItem} className="w-full text-xs h-8 border-dashed">
+                    <Plus className="h-3 w-3 mr-1" /> Tambah Item
+                  </Button>
+                </div>
+              )}
             </div>
 
             <DialogFooter className="pt-2">
@@ -1394,9 +1685,12 @@ const QuestionsPage = () => {
                 )}
               </CardHeader>
               
-              <CardContent className="p-4 pt-0 space-y-2.5">
-                {Object.keys(previewQuestion.choices || {}).map((cKey, idx) => {
-                  const choice = previewQuestion.choices[cKey];
+              <CardContent className="p-4 pt-0 space-y-3">
+                {/* PREVIEW SINGLE / MULTIPLE CHOICE / TRUE-FALSE */}
+                {(previewQuestion.type === "pilihan_ganda" || previewQuestion.type === "pilihan_ganda_kompleks" || previewQuestion.type === "benar_salah" || !previewQuestion.type) && Object.keys(previewQuestion.choices || {}).map((cKey, idx) => {
+                  const choice = previewQuestion.choices![cKey];
+                  if (!choice.text && !choice.imageUrl) return null;
+                  
                   return (
                     <div 
                       key={cKey} 
@@ -1421,6 +1715,55 @@ const QuestionsPage = () => {
                     </div>
                   );
                 })}
+
+                {/* PREVIEW MATCHING */}
+                {previewQuestion.type === "menjodohkan" && (
+                  <div className="space-y-2">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase">Pernyataan</span>
+                        {(previewQuestion.pairs || []).map(p => (
+                          <div key={p.id} className="p-2.5 rounded-lg border bg-slate-50 dark:bg-slate-900/30 text-xs font-semibold text-slate-700 dark:text-slate-300">
+                            {p.left}
+                          </div>
+                        ))}
+                      </div>
+                      <div className="space-y-2">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase">Pasangan</span>
+                        {(previewQuestion.pairs || []).map(p => (
+                          <div key={p.id} className="p-2.5 rounded-lg border border-green-200 bg-green-50 dark:bg-green-950/20 text-xs font-bold text-green-700 dark:text-green-400">
+                            {p.right}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* PREVIEW SHORT ANSWER / ESSAY */}
+                {(previewQuestion.type === "isian_singkat" || previewQuestion.type === "uraian") && (
+                  <div className="p-4 rounded-xl border bg-slate-50 dark:bg-slate-900/30 space-y-2">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase">{previewQuestion.type === "isian_singkat" ? "Kunci Jawaban" : "Pedoman Jawaban"}</span>
+                    <div className="text-sm font-bold text-blue-600 dark:text-blue-400">
+                      {previewQuestion.answerKey || "(Belum diisi)"}
+                    </div>
+                  </div>
+                )}
+
+                {/* PREVIEW ORDERING / DRAG DROP */}
+                {(previewQuestion.type === "urutkan" || previewQuestion.type === "drag_drop") && (
+                  <div className="space-y-2">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase">Urutan Yang Benar</span>
+                    <div className="grid grid-cols-1 gap-2">
+                      {(previewQuestion.items || []).map((it, idx) => (
+                        <div key={it.id} className="flex items-center gap-3 p-3 rounded-xl border border-blue-200 bg-blue-50/50 dark:bg-blue-900/20">
+                          <div className="w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xs">{idx + 1}</div>
+                          <span className="text-sm font-bold text-blue-700 dark:text-blue-300">{it.text}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           )}

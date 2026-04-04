@@ -6,15 +6,35 @@ import { database } from "../../lib/firebase";
 import { Button } from "../../components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "../../components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "../../components/ui/dialog";
-import { AlertCircle, Clock, CheckCircle2, Flag, Bookmark, LogOut } from "lucide-react";
+import { 
+  AlertCircle, 
+  Clock, 
+  CheckCircle2, 
+  Flag, 
+  Bookmark, 
+  LogOut,
+  ChevronLeft, 
+  ChevronRight, 
+  Menu, 
+  X, 
+  Maximize2, 
+  ArrowRight,
+  HelpCircle,
+  GripVertical 
+} from "lucide-react";
+import { motion, AnimatePresence, Reorder } from "framer-motion";
 
 interface Question {
   id: string;
+  type?: "pilihan_ganda" | "pilihan_ganda_kompleks" | "menjodohkan" | "benar_salah" | "isian_singkat" | "uraian" | "urutkan" | "drag_drop";
   text: string;
   imageUrl?: string;
-  groupId?: string; // <--- Sesuai literasi
-  groupText?: string; // <--- Teks wacana
-  choices: Record<string, { text: string; imageUrl?: string }>;
+  groupId?: string;
+  groupText?: string;
+  choices?: Record<string, { text: string; imageUrl?: string }>;
+  pairs?: Array<{ id: string; left: string; right: string }>;
+  answerKey?: string;
+  items?: Array<{ id: string; text: string; imageUrl?: string }>;
 }
 
 interface ExamAttempt {
@@ -27,6 +47,40 @@ interface ExamAttempt {
   startTime?: number;
 }
 
+// 🛡️ Fuzzy Match Helper for Short Answers
+const isFuzzyMatch = (studentAns: any, correctKey: string) => {
+  if (typeof studentAns !== "string" || !correctKey) return false;
+  
+  // Standardize: lowecase & remove punctuation & double spaces
+  const sAns = studentAns.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+  const cKey = correctKey.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+  
+  if (sAns === cKey) return true;
+  if (!sAns || !cKey) return false;
+  
+  // No tolerance for very short words
+  if (cKey.length < 3) return sAns === cKey; 
+
+  // Levenshtein Distance Calculation
+  const distance = (a: string, b: string) => {
+    const matrix = Array(b.length + 1).fill(null).map(() => Array(a.length + 1).fill(null));
+    for (let i = 0; i <= a.length; i++) matrix[0][i] = i;
+    for (let j = 0; j <= b.length; j++) matrix[j][0] = j;
+    for (let j = 1; j <= b.length; j++) {
+      for (let i = 1; i <= a.length; i++) {
+        const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+        matrix[j][i] = Math.min(matrix[j][i - 1] + 1, matrix[j - 1][i] + 1, matrix[j - 1][i - 1] + cost);
+      }
+    }
+    return matrix[b.length][a.length];
+  };
+
+  const dist = distance(sAns, cKey);
+  // Tolerance: 1 typo for 4-8 chars, 2 typos for > 8 chars
+  const maxAllowed = cKey.length > 8 ? 2 : (cKey.length >= 4 ? 1 : 0);
+  return dist <= maxAllowed;
+};
+
 const CBTPage = () => {
   const { roomId } = useParams<{ roomId: string }>();
   const { student, logoutStudent } = useStudentAuth();
@@ -35,7 +89,7 @@ const CBTPage = () => {
   const [loading, setLoading] = useState(true);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [answers, setAnswers] = useState<Record<string, string>>({}); // { questionId: choiceId }
+  const [answers, setAnswers] = useState<Record<string, any>>({}); // { questionId: value }
   const [attempt, setAttempt] = useState<ExamAttempt | null>(null);
 
   const [roomData, setRoomData] = useState<any>(null);
@@ -48,6 +102,8 @@ const CBTPage = () => {
   const [isCheatWarningOpen, setIsCheatWarningOpen] = useState(false); // <--- Modal peringatan cheat
   // Anti-Cheat State
   const [isLocked, setIsLocked] = useState(false);
+  const [isSkipNoticeOpen, setIsSkipNoticeOpen] = useState(false); // <--- Modal peringatan skip
+  const [targetIndex, setTargetIndex] = useState<number | null>(null); // <--- Target soal saat transisi skip
 
   // For debounce saving
   const saveTimeoutRef = useRef<Record<string, any>>({});
@@ -57,6 +113,8 @@ const CBTPage = () => {
   // Fix order randomizer on reload
   const [questionOrder, setQuestionOrder] = useState<string[]>([]);
   const [choicesOrder, setChoicesOrder] = useState<Record<string, string[]>>({});
+  const [itemsOrder, setItemsOrder] = useState<Record<string, string[]>>({});
+  const [matchingOptions, setMatchingOptions] = useState<Record<string, string[]>>({});
   const [flaggedQuestions, setFlaggedQuestions] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
@@ -215,6 +273,61 @@ const CBTPage = () => {
               }
             });
             const collection: (string | string[])[] = [...standalone, ...Object.values(grouped)];
+            
+            // Shuffle choices/items/matching options once during initialization
+            const newChoicesOrder: Record<string, string[] | any> = {};
+            const newItemsOrder: Record<string, string[]> = {};
+            const newMatchingOptions: Record<string, string[]> = {};
+
+            loadedQuestions.forEach((q: any) => {
+              if (q.choices) {
+                const keys = Object.keys(q.choices);
+                for (let i = keys.length - 1; i > 0; i--) {
+                  const j = Math.floor(Math.random() * (i + 1));
+                  [keys[i], keys[j]] = [keys[j], keys[i]];
+                }
+                newChoicesOrder[q.id] = keys;
+              }
+              if (q.items && (q.type === "urutkan" || q.type === "drag_drop")) {
+                const ids = q.items.map((it: any) => it.id);
+                for (let i = ids.length - 1; i > 0; i--) {
+                  const j = Math.floor(Math.random() * (i + 1));
+                  [ids[i], ids[j]] = [ids[j], ids[i]];
+                }
+                newItemsOrder[q.id] = ids;
+              }
+              if (q.pairs && q.type === "menjodohkan") {
+                const rightOptions = Array.from(new Set((q.pairs as any[]).map((p: any) => p.right as string))) as string[];
+                for (let i = rightOptions.length - 1; i > 0; i--) {
+                  const j = Math.floor(Math.random() * (i + 1));
+                  [rightOptions[i], rightOptions[j]] = [rightOptions[j], rightOptions[i]];
+                }
+                newMatchingOptions[q.id] = rightOptions;
+              }
+            });
+
+            // Restore from SessionStorage if exists
+            const savedChoices = sessionStorage.getItem(`choices_${student.nisn}_${roomId}`);
+            if (savedChoices) {
+              try { Object.assign(newChoicesOrder, JSON.parse(savedChoices)); } catch (e) {}
+            }
+            const savedItems = sessionStorage.getItem(`items_${student.nisn}_${roomId}`);
+            if (savedItems) {
+              try { Object.assign(newItemsOrder, JSON.parse(savedItems)); } catch (e) {}
+            }
+            const savedMatch = sessionStorage.getItem(`match_${student.nisn}_${roomId}`);
+            if (savedMatch) {
+              try { Object.assign(newMatchingOptions, JSON.parse(savedMatch)); } catch (e) {}
+            }
+
+            sessionStorage.setItem(`choices_${student.nisn}_${roomId}`, JSON.stringify(newChoicesOrder));
+            sessionStorage.setItem(`items_${student.nisn}_${roomId}`, JSON.stringify(newItemsOrder));
+            sessionStorage.setItem(`match_${student.nisn}_${roomId}`, JSON.stringify(newMatchingOptions));
+
+            setChoicesOrder(newChoicesOrder);
+            setItemsOrder(newItemsOrder);
+            setMatchingOptions(newMatchingOptions);
+
             // 🛡️ Gunakan Fisher-Yates Shuffle agar stabil & adil
             for (let i = collection.length - 1; i > 0; i--) {
               const j = Math.floor(Math.random() * (i + 1));
@@ -243,36 +356,26 @@ const CBTPage = () => {
           } 
           
           if (order.length === 0) {
-            // Shuffle
-            order = clusterShuffleIds(currentIds);
+            // 🏷️ Category Grouping Logic
+            const pgIds = currentIds.filter(id => {
+              const q = loadedQuestions.find(it => it.id === id);
+              return !q?.type || q.type === "pilihan_ganda" || q.type === "pilihan_ganda_kompleks";
+            });
+            const essayIds = currentIds.filter(id => {
+              const q = loadedQuestions.find(it => it.id === id);
+              return q?.type === "isian_singkat" || q?.type === "uraian";
+            });
+            const intermediateIds = currentIds.filter(id => !pgIds.includes(id) && !essayIds.includes(id));
+
+            // 🎲 Shuffle each category independently
+            order = [
+               ...clusterShuffleIds(pgIds),
+               ...clusterShuffleIds(intermediateIds),
+               ...clusterShuffleIds(essayIds)
+            ];
+
             sessionStorage.setItem(orderKey, JSON.stringify(order));
           }
-
-          // Handle Choices Randomizing 
-          const choiceOrderKey = `choices_${student.nisn}_${roomId}`;
-          const savedChoices = sessionStorage.getItem(choiceOrderKey);
-          let cOrder: Record<string, string[]> = {};
-          if (savedChoices) {
-             try {
-               cOrder = JSON.parse(savedChoices);
-             } catch (e) {
-               cOrder = {};
-             }
-          }
-          
-          loadedQuestions.forEach((q) => {
-              const keys = Object.keys(q.choices || {});
-              if (!cOrder[q.id] || cOrder[q.id].length !== keys.length) {
-                 const arr = [...keys];
-                 for (let i = arr.length - 1; i > 0; i--) {
-                    const j = Math.floor(Math.random() * (i + 1));
-                    [arr[i], arr[j]] = [arr[j], arr[i]];
-                 }
-                 cOrder[q.id] = arr;
-              }
-          });
-          sessionStorage.setItem(choiceOrderKey, JSON.stringify(cOrder));
-          setChoicesOrder(cOrder);
 
           setQuestionOrder(order);
           // Sort loadedQuestions based on order SAFELY
@@ -466,12 +569,75 @@ const CBTPage = () => {
     });
   };
 
-  const handleAnswerSelect = (questionId: string, choiceId: string) => {
+  const logInteraction = async (qId: string, action: "visit" | "answer" | "skip") => {
+    if (!student || !roomId) return;
+    try {
+      const logRef = ref(database, `activity_logs/${roomId}/${student.nisn}/${qId}`);
+      await update(logRef, {
+        [action]: Date.now(),
+        last_action: action
+      });
+    } catch (e) {}
+  };
+
+  const goToQuestion = (index: number) => {
+    if (index === currentQuestionIndex) return;
+    
+    const currentQId = questions[currentQuestionIndex]?.id;
+    const isAnswered = answers[currentQId] !== undefined;
+
+    // Log skip if moving away without answer
+    if (!isAnswered) {
+      logInteraction(currentQId, "skip");
+    }
+
+    setTargetIndex(null);
+    setCurrentQuestionIndex(index);
+    // Log visit to new question
+    const newQId = questions[index]?.id;
+    if (newQId) logInteraction(newQId, "visit");
+  };
+
+  const handleNextClick = () => {
+    const currentQId = questions[currentQuestionIndex]?.id;
+    const isAnswered = answers[currentQId] !== undefined;
+    const currentQ = questions[currentQuestionIndex];
+    const isPG = !currentQ.type || currentQ.type === "pilihan_ganda" || currentQ.type === "pilihan_ganda_kompleks";
+
+    if (!isAnswered && !isPG) {
+      setTargetIndex(currentQuestionIndex + 1);
+      setIsSkipNoticeOpen(true);
+      return;
+    }
+
+    goToQuestion(currentQuestionIndex + 1);
+  };
+
+  const handleNavClick = (index: number) => {
+    const currentQId = questions[currentQuestionIndex]?.id;
+    const isAnswered = answers[currentQId] !== undefined;
+    const currentQ = questions[currentQuestionIndex];
+    const isPG = !currentQ.type || currentQ.type === "pilihan_ganda" || currentQ.type === "pilihan_ganda_kompleks";
+
+    if (!isAnswered && index !== currentQuestionIndex && !isPG) {
+      setTargetIndex(index);
+      setIsSkipNoticeOpen(true);
+      return;
+    }
+
+    goToQuestion(index);
+    setIsNavModalOpen(false);
+  };
+
+  const handleAnswerSelect = (questionId: string, value: any) => {
     if (isExamOver || isLocked) return;
 
     setAnswers((prev) => {
-      const updated = { ...prev, [questionId]: choiceId };
+      const updated = { ...prev, [questionId]: value };
       
+      // Log as answer
+      logInteraction(questionId, "answer");
+
       // Debounced Save to Firebase Answers List
       if (saveTimeoutRef.current[questionId]) {
         clearTimeout(saveTimeoutRef.current[questionId]);
@@ -479,7 +645,7 @@ const CBTPage = () => {
 
       saveTimeoutRef.current[questionId] = setTimeout(async () => {
         const answersRef = ref(database, `answers/${roomId}/${student?.nisn}`);
-        await update(answersRef, { [questionId]: choiceId });
+        await update(answersRef, { [questionId]: value });
         // Backup to SessionStorage
         sessionStorage.setItem(`ans_${student?.nisn}_${roomId}`, JSON.stringify(updated));
       }, 300);
@@ -503,9 +669,46 @@ const CBTPage = () => {
 
       questions.forEach((q: any) => {
         const studentAnswer = answers[q.id];
-        if (studentAnswer && q.choices[studentAnswer]?.isCorrect === true) {
-          correctCount++;
+        const type = q.type || "pilihan_ganda";
+
+        if (!studentAnswer) return;
+
+        if (type === "pilihan_ganda" || type === "benar_salah") {
+          if (studentAnswer && q.choices[studentAnswer]?.isCorrect === true) {
+            correctCount++;
+          }
+        } 
+        else if (type === "pilihan_ganda_kompleks") {
+          // Check if all correct keys are in studentAnswer AND no extra keys
+          const correctKeys = Object.keys(q.choices).filter(k => q.choices[k].isCorrect);
+          const isAllCorrect = Array.isArray(studentAnswer) && 
+            studentAnswer.length === correctKeys.length && 
+            studentAnswer.every(k => correctKeys.includes(k));
+          if (isAllCorrect) correctCount++;
         }
+        else if (type === "menjodohkan") {
+          // Each pair is correct
+          const totalPairs = (q.pairs || []).length;
+          let correctPairs = 0;
+          (q.pairs || []).forEach((p: any) => {
+            if (studentAnswer[p.id] === p.right) correctPairs++;
+          });
+          if (totalPairs > 0) correctCount += (correctPairs / totalPairs);
+        }
+        else if (type === "isian_singkat") {
+          if (q.answerKey && isFuzzyMatch(studentAnswer, q.answerKey)) {
+            correctCount++;
+          }
+        }
+        else if (type === "urutkan" || type === "drag_drop") {
+          const items = q.items || [];
+          const correctOrder = items.map((it: any) => it.id);
+          const isAllCorrect = Array.isArray(studentAnswer) && 
+            studentAnswer.length === correctOrder.length && 
+            studentAnswer.every((val, idx) => val === correctOrder[idx]);
+          if (isAllCorrect) correctCount++;
+        }
+        // Uraian is not auto-scored
       });
 
       const score = Math.round((correctCount / totalQuestions) * 100) || 0;
@@ -611,28 +814,68 @@ const CBTPage = () => {
           {currentQuestion && (
             <Card className="rounded-xl border shadow-sm">
               <CardHeader className="p-4 pb-2">
-                <div className="flex justify-between items-center">
-                  <div className="text-sm font-semibold text-slate-400">
-                    {currentQuestion.groupId && (() => {
-                      const groupQuestions = questions.filter(q => q.groupId === currentQuestion.groupId);
-                      const indexInGroup = groupQuestions.findIndex(q => q.id === currentQuestion.id) + 1;
-                      return (
-                        <span className="text-blue-600 dark:text-blue-400 font-bold text-xs">
-                          {currentQuestion.groupId} - Soal {indexInGroup}
+                <div className="relative bg-slate-50/50 dark:bg-slate-950/20 p-4 rounded-2xl border border-slate-100 dark:border-slate-800/60 shadow-sm mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 bg-blue-600 text-white rounded-2xl flex items-center justify-center font-black text-xl shadow-lg shadow-blue-500/20 shrink-0">
+                      {currentQuestionIndex + 1}
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-xs sm:text-sm font-black text-slate-800 dark:text-white uppercase tracking-tight">Soal Nomor {currentQuestionIndex + 1}</span>
+                      <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                        <span className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 rounded-md text-[9px] font-black uppercase tracking-wider border border-blue-200/60 dark:border-blue-800/60">
+                           {(() => {
+                              switch(currentQuestion.type) {
+                                 case "pilihan_ganda": return "Pilihan Ganda";
+                                 case "pilihan_ganda_kompleks": return "PG Kompleks";
+                                 case "menjodohkan": return "Menjodohkan";
+                                 case "benar_salah": return "Benar / Salah";
+                                 case "isian_singkat": return "Isian Singkat";
+                                 case "uraian": return "Essay / Uraian";
+                                 case "urutkan": return "Mengurutkan";
+                                 case "drag_drop": return "Drag & Drop";
+                                 default: return "Pilihan Ganda";
+                              }
+                           })()}
                         </span>
-                      );
-                    })()}
+                        {currentQuestion.groupId && (
+                          <span className="px-2 py-0.5 bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 rounded-md text-[9px] font-black uppercase tracking-wider border border-amber-200/60 dark:border-amber-800/60">
+                             {currentQuestion.groupId}
+                          </span>
+                        )}
+                        {answers[currentQuestion.id] !== undefined && (
+                          <motion.span 
+                            initial={{ scale: 0.8, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            className="px-2 py-0.5 bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 rounded-md text-[9px] font-black uppercase tracking-wider border border-emerald-200/60 dark:border-emerald-800/60 flex items-center gap-1 shadow-sm"
+                          >
+                             <CheckCircle2 className="w-2.5 h-2.5" />
+                             Terjawab
+                          </motion.span>
+                        )}
+                      </div>
+                    </div>
                   </div>
+
                   {currentQuestion && (
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      onClick={() => toggleFlag(currentQuestion.id)} 
-                      className={`flex items-center gap-1.5 h-7 text-xs rounded-lg transition-colors ${flaggedQuestions[currentQuestion.id] ? "bg-amber-100 text-amber-700 border border-amber-200/60 hover:bg-amber-200" : "text-slate-400 hover:text-slate-600 hover:bg-slate-50"}`}
-                    >
-                       <Bookmark className={`w-3.5 h-3.5 ${flaggedQuestions[currentQuestion.id] ? "fill-amber-600 text-amber-600" : ""}`} />
-                       {flaggedQuestions[currentQuestion.id] ? "Tersimpan" : "Tandai Soal"}
-                    </Button>
+                    <div className="absolute top-4 right-4">
+                      <button 
+                        onClick={() => toggleFlag(currentQuestion.id)} 
+                        className={`w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center rounded-full transition-all duration-500 shadow-lg ${
+                           flaggedQuestions[currentQuestion.id] 
+                             ? "bg-amber-500 text-white shadow-amber-500/40 ring-4 ring-amber-500/10 scale-110" 
+                             : "bg-white dark:bg-slate-800 text-slate-400 dark:text-slate-500 hover:text-amber-500 hover:border-amber-200 border border-slate-100 dark:border-slate-700 shadow-slate-200/50"
+                        }`}
+                        title={flaggedQuestions[currentQuestion.id] ? "Hapus Tanda Ragu" : "Tandai Ragu-ragu"}
+                      >
+                         <Bookmark className={`w-5 h-5 sm:w-6 sm:h-6 transition-transform duration-500 ${flaggedQuestions[currentQuestion.id] ? "fill-white scale-110" : "group-hover:scale-110"}`} />
+                         {flaggedQuestions[currentQuestion.id] && (
+                           <motion.span 
+                              layoutId="badgeRagu"
+                              className="absolute -top-1 -right-1 w-4 h-4 bg-rose-500 border-2 border-white dark:border-slate-800 rounded-full"
+                           />
+                         )}
+                      </button>
+                    </div>
                   )}
                 </div>
                 {currentQuestion.imageUrl && (
@@ -678,46 +921,334 @@ const CBTPage = () => {
                   dangerouslySetInnerHTML={{ __html: proxifyHtml(currentQuestion.text) }}
                 />
               </CardHeader>
-              <CardContent className="p-4 pt-0 space-y-2.5">
-                {(() => {
-                  const order = choicesOrder[currentQuestion.id] || Object.keys(currentQuestion.choices || {});
-                  return order.map((choiceId, idx) => {
-                    const choice = currentQuestion.choices[choiceId];
-                    const isSelected = answers[currentQuestion.id] === choiceId;
+              <CardContent className="p-4 pt-0 space-y-4">
+                {/* RENDER FOR CHOICE TYPES (SINGLE/MULTIPLE) */}
+                {(currentQuestion.type === "pilihan_ganda" || currentQuestion.type === "pilihan_ganda_kompleks" || !currentQuestion.type) && (
+                  <div className="space-y-2.5">
+                    {(() => {
+                      const order = choicesOrder[currentQuestion.id] || Object.keys(currentQuestion.choices || {});
+                      return order.map((choiceId, idx) => {
+                        const choice = currentQuestion.choices?.[choiceId];
+                        if (!choice) return null;
+                        
+                        const isMultiple = currentQuestion.type === "pilihan_ganda_kompleks";
+                        const isSelected = isMultiple 
+                          ? (answers[currentQuestion.id] || []).includes(choiceId)
+                          : answers[currentQuestion.id] === choiceId;
 
-                    return (
-                      <button
-                        key={choiceId}
-                        onClick={() => handleAnswerSelect(currentQuestion.id, choiceId)}
-                        className={`w-full text-left p-3 rounded-xl border flex items-center gap-3 transition-all ${
-                          isSelected 
-                            ? "bg-blue-50 border-blue-500 shadow-sm text-blue-700" 
-                            : "bg-card border-slate-200 hover:bg-slate-50 text-slate-700"
-                        }`}
-                      >
-                        <div className={`w-6 h-6 rounded-full border flex items-center justify-center font-bold text-sm ${
-                          isSelected ? "bg-blue-600 border-blue-600 text-white" : "border-slate-300 text-slate-500"
-                        }`}>
-                          {String.fromCharCode(65 + idx)}
-                        </div>
-                        <div className="flex-1 text-sm font-medium">
-                          <div className="break-words ql-editor p-0 [&_img]:max-w-[200px] [&_img]:h-auto [&_img]:rounded-lg [&_img]:mt-1" dangerouslySetInnerHTML={{ __html: proxifyHtml(choice.text) }} />
-                          {choice.imageUrl && (
-                            <img 
-                              src={getProxiedUrl(choice.imageUrl)} 
-                              alt={`Pilihan ${String.fromCharCode(65 + idx)}`} 
-                              className="max-h-[150px] w-auto rounded-lg mt-1 border cursor-zoom-in hover:opacity-90 transition-opacity"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setPreviewImage(getProxiedUrl(choice.imageUrl));
-                              }}
+                        const onSelect = () => {
+                          if (isMultiple) {
+                            const currentAnswers = Array.isArray(answers[currentQuestion.id]) ? answers[currentQuestion.id] : [];
+                            const newAnswers = currentAnswers.includes(choiceId) 
+                              ? currentAnswers.filter((id: string) => id !== choiceId) 
+                              : [...currentAnswers, choiceId];
+                            handleAnswerSelect(currentQuestion.id, newAnswers);
+                          } else {
+                            handleAnswerSelect(currentQuestion.id, choiceId);
+                          }
+                        };
+
+                        return (
+                          <button
+                            key={choiceId}
+                            onClick={onSelect}
+                            className={`w-full text-left p-3.5 rounded-2xl border flex items-center gap-3.5 transition-all outline-none ring-offset-2 focus:ring-2 focus:ring-blue-500/20 active:scale-[0.99] ${
+                              isSelected 
+                                ? "bg-blue-50/80 border-blue-500 shadow-sm text-blue-700 dark:bg-blue-900/20 dark:border-blue-400 dark:text-blue-300" 
+                                : "bg-card border-slate-200 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/60 text-slate-700 dark:text-slate-200"
+                            }`}
+                          >
+                            <div className={`w-7 h-7 shrink-0 rounded-full border flex items-center justify-center font-bold text-sm transition-colors ${
+                              isSelected ? "bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-500/30" : "border-slate-300 bg-slate-50 dark:border-slate-700 dark:bg-slate-800 text-slate-500"
+                            }`}>
+                              {String.fromCharCode(65 + idx)}
+                            </div>
+                            <div className="flex-1 text-sm font-medium">
+                              <div className="break-words ql-editor p-0 [&_img]:max-w-[200px] [&_img]:h-auto [&_img]:rounded-lg [&_img]:mt-1" dangerouslySetInnerHTML={{ __html: proxifyHtml(choice.text) }} />
+                              {choice.imageUrl && (
+                                <img 
+                                  src={getProxiedUrl(choice.imageUrl)} 
+                                  alt={`Pilihan ${String.fromCharCode(65 + idx)}`} 
+                                  className="max-h-[150px] w-auto rounded-lg mt-2 border cursor-zoom-in hover:opacity-90 transition-opacity shadow-sm"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setPreviewImage(getProxiedUrl(choice.imageUrl));
+                                  }}
+                                />
+                              )}
+                            </div>
+                            {isMultiple && (
+                              <div className={`w-5 h-5 rounded border flex items-center justify-center transition-all ${isSelected ? "bg-blue-600 border-blue-600 text-white" : "border-slate-300 dark:border-slate-700"}`}>
+                                {isSelected && <CheckCircle2 className="w-3.5 h-3.5" />}
+                              </div>
+                            )}
+                          </button>
+                        );
+                      });
+                    })()}
+                  </div>
+                )}
+
+                {/* RENDER FOR TRUE/FALSE */}
+                {currentQuestion.type === "benar_salah" && (
+                  <div className="grid grid-cols-2 gap-5 px-2">
+                    {(() => {
+                      const keys = Object.keys(currentQuestion.choices || {}).slice(0, 2);
+                      return keys.map((choiceId, idx) => {
+                        const choice = currentQuestion.choices![choiceId];
+                        const isSelected = answers[currentQuestion.id] === choiceId;
+                        const isBenar = choice.text.toLowerCase().includes("benar") || idx === 0;
+
+                        return (
+                          <button
+                            key={choiceId}
+                            onClick={() => handleAnswerSelect(currentQuestion.id, choiceId)}
+                            className={`group relative flex flex-col items-center justify-center gap-4 py-8 px-6 rounded-[2.5rem] border-2 transition-all duration-300 active:scale-95 ${
+                              isSelected 
+                                ? (isBenar 
+                                   ? "bg-gradient-to-br from-emerald-500 to-emerald-600 border-emerald-400 text-white shadow-xl shadow-emerald-500/30 ring-4 ring-emerald-500/10" 
+                                   : "bg-gradient-to-br from-rose-500 to-rose-600 border-rose-400 text-white shadow-xl shadow-rose-500/30 ring-4 ring-rose-500/10")
+                                : "bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 hover:border-slate-200 dark:hover:border-slate-700 shadow-sm"
+                            }`}
+                          >
+                            <div className={`w-16 h-16 rounded-[1.5rem] flex items-center justify-center transition-all duration-300 ${
+                              isSelected 
+                                ? "bg-white/20 text-white backdrop-blur-md"
+                                : (isBenar 
+                                   ? "bg-emerald-50 dark:bg-emerald-950/20 text-emerald-500 dark:text-emerald-400" 
+                                   : "bg-rose-50 dark:bg-rose-950/20 text-rose-500 dark:text-rose-400")
+                            }`}>
+                              {isBenar 
+                                ? <CheckCircle2 className="w-9 h-9" strokeWidth={2.5} /> 
+                                : <X className="w-9 h-9" strokeWidth={2.5} />}
+                            </div>
+
+                            <span 
+                              className={`font-black text-sm uppercase tracking-widest text-center transition-colors duration-300 ${
+                                isSelected ? "text-white" : "text-slate-700 dark:text-slate-200"
+                              }`} 
+                              dangerouslySetInnerHTML={{ __html: proxifyHtml(choice.text) }} 
                             />
-                          )}
+                            
+                            {/* Inner Shine Effect */}
+                            {isSelected && (
+                              <div className="absolute top-0 left-0 w-full h-1/2 bg-white/10 rounded-t-[2.5rem] pointer-events-none" />
+                            )}
+                          </button>
+                        );
+                      });
+                    })()}
+                  </div>
+                )}
+
+                {/* RENDER MATCHING (Visual Drag & Drop / Click-to-Pair) */}
+                {currentQuestion.type === "menjodohkan" && (
+                  <div className="space-y-6">
+                    {/* INFO HEADER */}
+                    <div className="flex items-center gap-2 p-3 bg-blue-50/50 dark:bg-blue-900/10 rounded-xl border border-blue-100 dark:border-blue-800/40 text-xs text-blue-600 dark:text-blue-400 font-bold uppercase">
+                      <HelpCircle className="w-4 h-4" />
+                      <span>Pasangkan pernyataan kiri dengan jawaban yang tepat di kanan</span>
+                    </div>
+
+                    <div className="flex flex-col lg:flex-row gap-6">
+                      {/* LEFT SIDE: TARGET SLOTS (STATEMENTS) */}
+                      <div className="flex-1 space-y-3">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-2">Pernyataan & Pasangan</span>
+                        {(currentQuestion.pairs || []).map((pair) => {
+                          const studentAns = answers[currentQuestion.id] || {};
+                          const assignedValue = studentAns[pair.id];
+
+                          return (
+                            <div key={pair.id} className="group flex items-stretch gap-2 min-h-[50px]">
+                              <div className="flex-1 p-3 bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 rounded-xl flex items-center text-sm font-semibold text-slate-700 dark:text-slate-300 shadow-sm">
+                                {pair.left}
+                              </div>
+                              <div className="w-1.5 flex items-center justify-center opacity-20"><ArrowRight className="w-4 h-4" /></div>
+                              <div 
+                                className={`flex-1 p-1 rounded-xl border-2 border-dashed flex items-center justify-center min-h-[50px] transition-all relative overflow-hidden ${
+                                  assignedValue 
+                                    ? "bg-blue-50/20 border-blue-400/50 dark:bg-blue-900/10 dark:border-blue-800/80" 
+                                    : "bg-slate-50/30 border-slate-200 dark:bg-slate-900/20 dark:border-slate-800/60"
+                                }`}
+                              >
+                                {assignedValue ? (
+                                  <motion.div 
+                                    initial={{ scale: 0.5, opacity: 0 }}
+                                    animate={{ scale: 1, opacity: 1 }}
+                                    className="w-full h-full flex items-center justify-center bg-blue-600 text-white rounded-lg shadow-sm p-2 text-xs font-bold relative group cursor-pointer"
+                                    onClick={() => {
+                                      // Return to bank: Remove from answers
+                                      const newAns = { ...studentAns };
+                                      delete newAns[pair.id];
+                                      handleAnswerSelect(currentQuestion.id, newAns);
+                                    }}
+                                  >
+                                    <span className="text-center">{assignedValue}</span>
+                                    <div className="absolute top-0 right-0 p-0.5 bg-rose-500 rounded-bl-lg opacity-0 group-hover:opacity-100 transition-opacity">
+                                       <X className="w-2.5 h-2.5" />
+                                    </div>
+                                  </motion.div>
+                                ) : (
+                                  <span className="text-[10px] font-bold text-slate-300 dark:text-slate-700 uppercase">Drop Disini</span>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* RIGHT SIDE: ANSWER BANK */}
+                      <div className="lg:w-1/3 flex flex-col gap-3">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-2">Pilihan Jawaban</span>
+                        <div className="p-4 bg-slate-50/50 dark:bg-slate-900/30 border border-slate-200 dark:border-slate-800 rounded-2xl flex flex-wrap gap-2 min-h-[100px] content-start">
+                          {(() => {
+                            const studentAns = answers[currentQuestion.id] || {};
+                            const assignedValues = Object.values(studentAns);
+                            const allOptions = matchingOptions[currentQuestion.id] || Array.from(new Set((currentQuestion.pairs || []).map(p => p.right)));
+
+                            // Filter out options that are already assigned (menjodohkan hanya bisa sekali)
+                            const availableOptions = allOptions.filter(opt => !assignedValues.includes(opt));
+
+                            if (availableOptions.length === 0 && assignedValues.length < (currentQuestion.pairs || []).length) {
+                               // This scenario should only happen if options reuse is allowed, but here we restrict it.
+                            }
+
+                            return (
+                              <>
+                                {availableOptions.map((opt, i) => (
+                                  <motion.div
+                                    key={`${i}-${opt}`}
+                                    layoutId={`${currentQuestion.id}-${opt}`}
+                                    whileHover={{ scale: 1.05 }}
+                                    whileTap={{ scale: 0.95 }}
+                                    className="px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-800 rounded-xl text-[12px] font-bold text-blue-600 dark:text-blue-400 shadow-sm cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors border-b-2 border-b-slate-200 dark:border-b-indigo-900/40"
+                                    onClick={() => {
+                                      // Click-to-assign logic for mobile and convenience
+                                      // Find first empty target slot
+                                      const firstEmptyPair = (currentQuestion.pairs || []).find(p => !studentAns[p.id]);
+                                      if (firstEmptyPair) {
+                                        const newAns = { ...studentAns, [firstEmptyPair.id]: opt };
+                                        handleAnswerSelect(currentQuestion.id, newAns);
+                                      }
+                                    }}
+                                  >
+                                    {opt}
+                                  </motion.div>
+                                ))}
+                                {availableOptions.length === 0 && (
+                                  <div className="w-full py-8 text-center text-slate-400 text-[10px] font-medium uppercase italic">Semua jawaban telah dipasangkan</div>
+                                )}
+                              </>
+                            );
+                          })()}
                         </div>
-                      </button>
-                    );
-                  });
-                })()}
+                        <p className="text-[10px] text-slate-400 italic px-2">
+                          * Klik jawaban untuk memasangkan secara otomatis, klik tombol (X) pada pasangan untuk membatalkan.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* RENDER ISIAN SINGKAT / URAIAN */}
+                {(currentQuestion.type === "isian_singkat" || currentQuestion.type === "uraian") && (
+                  <div className="space-y-4">
+                    <div className="relative">
+                      <textarea
+                        value={answers[currentQuestion.id] || ""}
+                        onChange={(e) => handleAnswerSelect(currentQuestion.id, e.target.value)}
+                        placeholder="Tuliskan jawaban Anda di sini..."
+                        rows={currentQuestion.type === "uraian" ? 6 : 2}
+                        className="w-full p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/50 shadow-sm focus:ring-2 focus:ring-blue-500/20 text-slate-800 dark:text-white font-medium resize-none transition-all placeholder:text-slate-400"
+                      />
+                      <div className="absolute top-2 right-2 flex items-center gap-1.5 px-2 py-1 bg-amber-50 dark:bg-amber-950/40 rounded-lg border border-amber-200/50 text-[10px] text-amber-600 font-bold uppercase tracking-wider">
+                        <AlertCircle className="w-3 h-3" />
+                        {currentQuestion.type === "uraian" ? "Koreksi Guru" : "Auto Koreksi"}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* RENDER ORDERING / DRAG & DROP (Visual Reorder) */}
+                {(currentQuestion.type === "urutkan" || currentQuestion.type === "drag_drop") && (
+                  <div className="space-y-4">
+                    <div className="flex flex-col gap-2 p-4 bg-gradient-to-br from-blue-50/50 to-indigo-50/50 dark:from-blue-950/20 dark:to-indigo-950/20 rounded-2xl border border-blue-100/50 dark:border-blue-900/40 shadow-sm">
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium leading-relaxed">Tarik dan pindahkan kartu untuk menyusun urutan yang menurut Anda benar. Kartu akan otomatis bergeser jika Anda menyeretnya. Urutan dari atas ke bawah (A ke B, dst).</p>
+                    </div>
+
+                    <div className="flex gap-4">
+                      {/* Drop Indicator List */}
+                      <div className="w-12 space-y-3 pt-2">
+                        {(() => {
+                           const items = currentQuestion.items || [];
+                           return items.map((_, i) => (
+                             <div key={i} className="h-[74px] flex flex-col items-center justify-center">
+                                <div className="w-6 h-6 rounded-full bg-slate-200 dark:bg-slate-800 border-2 border-white dark:border-slate-700 flex items-center justify-center font-black text-[10px] text-slate-400 relative">
+                                  {i + 1}
+                                  {i < items.length - 1 && <div className="absolute top-full w-0.5 h-10 bg-slate-100 dark:bg-slate-800/50" />}
+                                </div>
+                             </div>
+                           ));
+                        })()}
+                      </div>
+
+                    <Reorder.Group 
+                      axis="y" 
+                      onReorder={(newOrder: string[]) => handleAnswerSelect(currentQuestion.id, newOrder)}
+                      values={answers[currentQuestion.id] || itemsOrder[currentQuestion.id] || (currentQuestion.items || []).map(it => it.id)}
+                      className="space-y-3 relative flex-1"
+                    >
+                      {(() => {
+                        const items = currentQuestion.items || [];
+                        const currentOrder: string[] = answers[currentQuestion.id] || itemsOrder[currentQuestion.id] || items.map(it => it.id);
+                        
+                        return (
+                          <AnimatePresence mode="popLayout" initial={false}>
+                            {currentOrder.map((itemId, idx) => {
+                              const item = items.find(it => it.id === itemId);
+                              if (!item) return null;
+                              return (
+                                <Reorder.Item 
+                                  key={itemId} 
+                                  value={itemId}
+                                  transition={{ type: "spring", stiffness: 600, damping: 50 }}
+                                  whileDrag={{ 
+                                    scale: 1.01, 
+                                    boxShadow: "0 8px 20px rgba(0,0,0,0.1)", 
+                                    zIndex: 50,
+                                  }}
+                                  className="flex items-center gap-4 p-4 bg-card border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm cursor-grab active:cursor-grabbing group select-none transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 active:border-indigo-500 overflow-hidden relative"
+                                >
+                                  {/* NOMOR URUT KECIL DI POJOK */}
+                                  <div className="absolute top-0 right-0 p-1">
+                                    <div className="text-[8px] font-black text-slate-300 dark:text-slate-700 bg-slate-50/50 dark:bg-slate-900/50 px-1.5 py-0.5 rounded-bl-lg border-l border-b border-slate-100 dark:border-slate-800">
+                                      {idx + 1}
+                                    </div>
+                                  </div>
+
+                                  <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center font-black text-base shrink-0 border border-blue-100 dark:border-blue-800/60 shadow-inner group-hover:scale-105 transition-transform">
+                                    {String.fromCharCode(65 + idx)}
+                                  </div>
+                                  <div className="flex-1 text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">
+                                    {item.text}
+                                  </div>
+                                  <div className="px-1 text-slate-300 dark:text-slate-700 group-hover:text-blue-500 transition-colors">
+                                    <GripVertical className="w-5 h-5" />
+                                  </div>
+                                </Reorder.Item>
+                              );
+                            })}
+                          </AnimatePresence>
+                        );
+                      })()}
+                    </Reorder.Group>
+                    </div>
+                    
+                    <div className="flex items-center gap-2 justify-center py-2 bg-slate-50/50 dark:bg-slate-900/20 rounded-xl border border-dashed border-slate-200 dark:border-slate-800">
+                       <span className="text-[9px] font-extrabold text-slate-400 uppercase tracking-widest">Sistem Urutan Interaktif Aktif</span>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           )}
@@ -737,7 +1268,7 @@ const CBTPage = () => {
               return (
                 <button
                   key={q.id}
-                  onClick={() => setCurrentQuestionIndex(index)}
+                  onClick={() => handleNavClick(index)}
                   className={`w-full aspect-square md:w-9 md:h-9 shrink-0 rounded-xl flex items-center justify-center font-bold text-xs border transition-all ${
                     isActive
                       ? "bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-500/30"
@@ -775,8 +1306,8 @@ const CBTPage = () => {
                 {isSubmitAllowed ? "Kumpulkan" : `Kumpul (${formatTime(timeLeft - submitWindowSeconds)})`}
               </Button>
             ) : (
-              <Button 
-                onClick={() => setCurrentQuestionIndex(prev => prev + 1)}
+            <Button 
+                onClick={handleNextClick}
                 className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl"
               > 
                 Selanjutnya 
@@ -827,7 +1358,7 @@ const CBTPage = () => {
           </Button>
         ) : (
           <Button 
-              onClick={() => setCurrentQuestionIndex(prev => prev + 1)}
+              onClick={handleNextClick}
               className="bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl"
               size="sm"
           > 
@@ -981,8 +1512,37 @@ const CBTPage = () => {
           <DialogFooter className="mt-4">
              <Button onClick={() => setIsCheatWarningOpen(false)} className="w-full bg-amber-600 hover:bg-amber-700 font-bold text-white rounded-xl h-11">
                 Saya Mengerti
-             </Button>
+              </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog Peringatan Skip Soal */}
+      <Dialog open={isSkipNoticeOpen} onOpenChange={setIsSkipNoticeOpen}>
+        <DialogContent className="max-w-xs bg-white dark:bg-slate-900 rounded-[2rem] p-6 pointer-events-auto border-none shadow-2xl">
+          <DialogHeader className="text-center">
+            <div className="mx-auto w-14 h-14 bg-amber-50 dark:bg-amber-950/20 rounded-2xl flex items-center justify-center mb-4 border border-amber-100 dark:border-amber-900/30">
+              <HelpCircle className="w-7 h-7 text-amber-600 dark:text-amber-500" />
+            </div>
+            <DialogTitle className="text-base font-black text-slate-900 dark:text-white uppercase tracking-tight">Soal Belum Dijawab</DialogTitle>
+            <DialogDescription className="text-slate-500 dark:text-slate-400 text-[11px] leading-relaxed font-medium">
+              Anda belum memberikan jawaban pada soal ini. Apakah Anda yakin ingin melewati soal ini?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-3 mt-6">
+             <Button variant="outline" onClick={() => setIsSkipNoticeOpen(false)} className="rounded-xl text-[10px] font-black uppercase tracking-widest border-slate-200 h-10">
+                Kembali
+             </Button>
+             <Button 
+                onClick={() => {
+                   if (targetIndex !== null) goToQuestion(targetIndex);
+                   setIsSkipNoticeOpen(false);
+                }} 
+                className="bg-slate-900 hover:bg-black dark:bg-indigo-600 dark:hover:bg-indigo-500 text-white font-black text-[10px] rounded-xl uppercase tracking-widest h-10"
+             >
+                Lompati Saja
+             </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

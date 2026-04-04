@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Plus, Trash, Edit, RefreshCw, Users, Archive, RotateCw, FileSpreadsheet, BookOpen, ClipboardList, Lock, ChevronDown, Power, PowerOff, Square } from "lucide-react";
+import { Plus, Trash, Edit, RefreshCw, Users, Archive, RotateCw, FileSpreadsheet, BookOpen, ClipboardList, Lock, ChevronDown, Power, PowerOff, Square, CheckCircle2, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import * as XLSX from "xlsx-js-style";
 import { Button } from "../../components/ui/button";
@@ -42,6 +42,40 @@ export interface ExamRoomData {
   teacherName?: string;
   show_result?: boolean;
 }
+
+// 🛡️ Fuzzy Match Helper for Short Answers
+const isFuzzyMatch = (studentAns: any, correctKey: string) => {
+  if (typeof studentAns !== "string" || !correctKey) return false;
+  
+  // Standardize: lowecase & remove punctuation & double spaces
+  const sAns = studentAns.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+  const cKey = correctKey.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+  
+  if (sAns === cKey) return true;
+  if (!sAns || !cKey) return false;
+  
+  // No tolerance for very short words
+  if (cKey.length < 3) return sAns === cKey; 
+
+  // Levenshtein Distance Calculation
+  const distance = (a: string, b: string) => {
+    const matrix = Array(b.length + 1).fill(null).map(() => Array(a.length + 1).fill(null));
+    for (let i = 0; i <= a.length; i++) matrix[0][i] = i;
+    for (let j = 0; j <= b.length; j++) matrix[j][0] = j;
+    for (let j = 1; j <= b.length; j++) {
+      for (let i = 1; i <= a.length; i++) {
+        const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+        matrix[j][i] = Math.min(matrix[j][i - 1] + 1, matrix[j - 1][i] + 1, matrix[j - 1][i - 1] + cost);
+      }
+    }
+    return matrix[b.length][a.length];
+  };
+
+  const dist = distance(sAns, cKey);
+  // Tolerance: 1 typo for 4-8 chars, 2 typos for > 8 chars
+  const maxAllowed = cKey.length > 8 ? 2 : (cKey.length >= 4 ? 1 : 0);
+  return dist <= maxAllowed;
+};
 
 const ExamRoomsPage = () => {
   const navigate = useNavigate();
@@ -114,7 +148,7 @@ const ExamRoomsPage = () => {
   const [universalToken, setUniversalToken] = useState("");
   const [tokenUpdatedAt, setTokenUpdatedAt] = useState<number>(0);
   const [timeLeft, setTimeLeft] = useState<string>("--:--");
-  
+
   const [liveBreakdown, setLiveBreakdown] = useState<Record<string, number>>({});
   const [totalOngoing, setTotalOngoing] = useState(0);
 
@@ -146,7 +180,7 @@ const ExamRoomsPage = () => {
       const data = snap.val();
       const stats: Record<string, number> = {};
       let total = 0;
-      
+
       // data is { roomId: { nisn: attempt } }
       // data is { roomId: { nisn: attempt } }
       Object.keys(data).forEach(rid => {
@@ -158,10 +192,10 @@ const ExamRoomsPage = () => {
 
         const roomAttempts = data[rid];
         Object.keys(roomAttempts).forEach(nisn => {
-           if (roomAttempts[nisn].status === "ongoing") {
-              stats[rid] = (stats[rid] || 0) + 1;
-              total++;
-           }
+          if (roomAttempts[nisn].status === "ongoing") {
+            stats[rid] = (stats[rid] || 0) + 1;
+            total++;
+          }
         });
       });
       setLiveBreakdown(stats);
@@ -216,31 +250,26 @@ const ExamRoomsPage = () => {
     setMonitorTimeLeft(300);
     // Trigger reload manual
     if (monitorRoom && isMonitorOpen) {
-      const attemptsRef = ref(database, "attempts");
+      const attemptsRef = ref(database, `attempts/${monitorRoom.id}`);
       get(attemptsRef).then((snap) => {
         const data = snap.val();
         if (data) {
           const loaded = Object.keys(data)
-            .filter((key) => key.includes(monitorRoom.id))
-            .map((key) => {
-              const [nisn] = key.split("_");
-              return { id: key, nisn, ...data[key] };
+            .map((nisn) => {
+              return { id: nisn, nisn, ...data[nisn] };
             });
           setAttempts(loaded);
+        } else {
+          setAttempts([]);
         }
       });
-      const answersRef = ref(database, "answers");
+      const answersRef = ref(database, `answers/${monitorRoom.id}`);
       get(answersRef).then((snap) => {
         const data = snap.val();
         if (data) {
-          const mapped: Record<string, any> = {};
-          Object.keys(data).forEach((key) => {
-            if (key.includes(monitorRoom.id)) {
-              const nisn = key.split("_")[0];
-              mapped[nisn] = data[key];
-            }
-          });
-          setAnswersList(mapped);
+          setAnswersList(data);
+        } else {
+          setAnswersList({});
         }
       });
     }
@@ -292,6 +321,68 @@ const ExamRoomsPage = () => {
       confirmLabel: "OK",
       onConfirm: () => { }
     });
+  };
+
+  const handleManualGrade = async (studentNisn: string, qId: string, isForcedCorrect: boolean) => {
+    if (!monitorRoom?.id) return;
+
+    try {
+      const studentAttempt = attempts.find(a => a.id === studentNisn);
+      if (!studentAttempt) return;
+
+      const attemptRef = ref(database, `attempts/${monitorRoom.id}/${studentNisn}`);
+      // Get current overrides or init empty
+      const currentOverrides = studentAttempt.overrides || {};
+      
+      const newOverrides = { ...currentOverrides, [qId]: isForcedCorrect };
+
+      // Calculate new score based on updated overrides
+      const sisAnswers = answersList[studentNisn] || {};
+      let correctCount = 0;
+      
+      monitorQuestions.forEach((q: any) => {
+        let itemCorrect = false;
+        
+        // 1. Check Oversee Overrides First
+        if (newOverrides[q.id] !== undefined) {
+          itemCorrect = newOverrides[q.id];
+        } 
+        else {
+          // 2. Fallback to Auto-Grading Logic
+          const ansId = sisAnswers[q.id];
+          if (ansId) {
+            const type = q.type || "pilihan_ganda";
+            if (type === "pilihan_ganda" || type === "benar_salah") {
+               itemCorrect = q.choices?.[ansId]?.isCorrect === true;
+            } else if (type === "pilihan_ganda_kompleks") {
+               const correctKeys = Object.keys(q.choices || {}).filter(k => q.choices[k].isCorrect);
+               itemCorrect = Array.isArray(ansId) && ansId.length === correctKeys.length && ansId.every(k => correctKeys.includes(k));
+            } else if (type === "isian_singkat") {
+               itemCorrect = isFuzzyMatch(ansId, q.answerKey);
+            } else if (type === "urutkan" || type === "drag_drop") {
+               const correctOrder = (q.items || []).map((it: any) => it.id);
+               itemCorrect = Array.isArray(ansId) && ansId.length === correctOrder.length && ansId.every((val, idx) => val === correctOrder[idx]);
+            } else if (type === "menjodohkan") {
+               const pairs = q.pairs || [];
+               itemCorrect = pairs.length > 0 && pairs.every((p: any) => ansId[p.id] === p.right);
+            }
+          }
+        }
+        
+        if (itemCorrect) correctCount++;
+      });
+
+      const totalQuestions = monitorQuestions.length;
+      const newScore = totalQuestions > 0 ? Math.round((correctCount / totalQuestions) * 100) : 0;
+
+      await update(attemptRef, {
+        overrides: newOverrides,
+        correct: correctCount,
+        score: newScore
+      });
+    } catch (error) {
+      console.error("Manual Grading failed:", error);
+    }
   };
 
   const columns = [
@@ -485,7 +576,7 @@ const ExamRoomsPage = () => {
           const now = new Date();
           const offsetHours = now.getTimezoneOffset() / -60;
           now.setHours(now.getHours() + offsetHours);
-          const nowFormatted = now.toISOString().slice(0, 16); 
+          const nowFormatted = now.toISOString().slice(0, 16);
 
           await update(ref(database, `exam_rooms/${room.id}`), { end_time: nowFormatted });
           showAlert("Berhasil", "Ujian telah dinyatakan SELESAI sekarang juga.", "success");
@@ -508,8 +599,8 @@ const ExamRoomsPage = () => {
         try {
           await update(ref(database, `exam_rooms/${room.id}`), { isDisabled: newState });
           showAlert(
-            "Berhasil", 
-            `Ruang ujian telah ${newState ? "dinonaktifkan" : "diaktifkan kembali"}.`, 
+            "Berhasil",
+            `Ruang ujian telah ${newState ? "dinonaktifkan" : "diaktifkan kembali"}.`,
             newState ? "warning" : "success"
           );
         } catch (error) {
@@ -671,7 +762,7 @@ const ExamRoomsPage = () => {
         try {
           const updates: any = {};
           const now = Date.now();
-          
+
           ongoing.forEach((att) => {
             const sisAnswers = answersList[att.nisn] || {};
             let correct = 0;
@@ -687,23 +778,23 @@ const ExamRoomsPage = () => {
             updates[`attempts/${monitorRoom.id}/${att.nisn}/correct`] = correct;
             updates[`attempts/${monitorRoom.id}/${att.nisn}/total`] = monitorQuestions.length;
           });
-          
+
           await update(ref(database), updates);
-          
+
           // Update local state agar UI langsung berubah
           setAttempts(prev => prev.map(a => {
-             const ongoingItem = ongoing.find(o => o.id === a.id);
-             if (ongoingItem) {
-                const sisAnswers = answersList[a.nisn] || {};
-                let correct = 0;
-                monitorQuestions.forEach((q) => {
-                   const ans = sisAnswers[q.id];
-                   if (ans && q.choices[ans]?.isCorrect === true) correct++;
-                });
-                const score = monitorQuestions.length > 0 ? Math.round((correct / monitorQuestions.length) * 100) : 0;
-                return { ...a, status: "submitted", submit_time: now, score, correct, total: monitorQuestions.length };
-             }
-             return a;
+            const ongoingItem = ongoing.find(o => o.id === a.id);
+            if (ongoingItem) {
+              const sisAnswers = answersList[a.nisn] || {};
+              let correct = 0;
+              monitorQuestions.forEach((q) => {
+                const ans = sisAnswers[q.id];
+                if (ans && q.choices[ans]?.isCorrect === true) correct++;
+              });
+              const score = monitorQuestions.length > 0 ? Math.round((correct / monitorQuestions.length) * 100) : 0;
+              return { ...a, status: "submitted", submit_time: now, score, correct, total: monitorQuestions.length };
+            }
+            return a;
           }));
 
           showAlert("Berhasil", `${ongoing.length} Siswa berhasil diselesaikan secara paksa.`, "success");
@@ -716,7 +807,7 @@ const ExamRoomsPage = () => {
 
   const handleForceSubmitStudent = (nisn: string) => {
     if (!monitorRoom) return;
-    const attempt = attempts.find(at => at.id === `${nisn}_${monitorRoom.id}`);
+    const attempt = attempts.find(at => at.id === nisn);
     if (!attempt) return;
 
     setConfirmDialog({
@@ -845,7 +936,7 @@ const ExamRoomsPage = () => {
 
     // 1b. Load Teachers
     get(ref(database, "teachers")).then(snap => {
-      if(snap.exists()) setTeachers(snap.val());
+      if (snap.exists()) setTeachers(snap.val());
     });
   }, []);
 
@@ -865,7 +956,7 @@ const ExamRoomsPage = () => {
           const examTeacherId = examData ? examData.teacherId : null;
           const examType = examData?.examType || "Latihan Biasa";
           const examTitle = examData ? examData.title : "Ujian Tidak Diketahui";
-          
+
           // 🏹 Cari Nama Mapel & Guru dari State (Cepat)
           const subjectName = subjects.find(m => m.id === examData?.subjectId)?.name || "Mapel Tidak Ada";
           const teacherName = teachers[examTeacherId || ""]?.name || "Guru Tidak Ada";
@@ -1094,7 +1185,7 @@ const ExamRoomsPage = () => {
   };
 
   const isRoomActive = selectedRoom ? (
-    (liveBreakdown[selectedRoom.id] || 0) > 0 || 
+    (liveBreakdown[selectedRoom.id] || 0) > 0 ||
     (Date.now() >= new Date(selectedRoom.start_time).getTime() && Date.now() <= new Date(selectedRoom.end_time).getTime())
   ) : false;
   const isEditRestricted = dialogMode === "edit" && isRoomActive;
@@ -1171,7 +1262,7 @@ const ExamRoomsPage = () => {
                     return (
                       <div key={rid} className="flex justify-between items-center text-[11px]">
                         <span className="text-slate-600 dark:text-slate-300 font-medium truncate pr-2">
-                           {room ? (room.room_name || room.examTitle) : "ID: " + rid}
+                          {room ? (room.room_name || room.examTitle) : "ID: " + rid}
                         </span>
                         <span className="bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 px-1.5 py-0.5 rounded font-bold min-w-[20px] text-center">
                           {liveBreakdown[rid]}
@@ -1232,8 +1323,8 @@ const ExamRoomsPage = () => {
                   {(role === "admin" || room.examTeacherId === teacherId) && (
                     <>
                       <button
-                        className={`p-1.5 rounded-lg border ${room.isDisabled 
-                          ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border-emerald-100 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-900/40" 
+                        className={`p-1.5 rounded-lg border ${room.isDisabled
+                          ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border-emerald-100 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-900/40"
                           : "bg-red-50 text-red-700 hover:bg-red-100 border-red-100 dark:bg-red-950/20 dark:text-red-400 dark:border-red-900/40"}`}
                         onClick={() => handleToggleDisabled(room)}
                         title={room.isDisabled ? "Aktifkan Ruangan" : "Non-aktifkan"}
@@ -1407,18 +1498,18 @@ const ExamRoomsPage = () => {
                 <Input type="number" placeholder="Contoh: 10 (Tombol kumpul aktif 10 menit sebelum berakhir)" value={formValues.submit_window || ""} onChange={(e) => setFormValues({ ...formValues, submit_window: Number(e.target.value) })} />
                 <p className="text-slate-400 text-xs mt-1">biarkan kosong agar Siswa dapat mengumpulkan selama ujian berjalan</p>
               </FormField>
-              
+
               <div className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-900/40 rounded-xl border border-slate-100 dark:border-slate-800/60 mt-2">
                 <div className="space-y-0.5 pr-2">
                   <label className="text-sm font-semibold text-slate-700 dark:text-slate-200">Menampilkan Hasil Ujian</label>
                   <p className="text-[10px] text-slate-400 leading-tight">Siswa dapat melihat skor, jumlah benar & salah setelah selesai mengumpulkan.</p>
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer">
-                  <input 
-                    type="checkbox" 
-                    className="sr-only peer" 
-                    checked={formValues.show_result} 
-                    onChange={(e) => setFormValues({...formValues, show_result: e.target.checked})}
+                  <input
+                    type="checkbox"
+                    className="sr-only peer"
+                    checked={formValues.show_result}
+                    onChange={(e) => setFormValues({ ...formValues, show_result: e.target.checked })}
                   />
                   <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none dark:bg-slate-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
                 </label>
@@ -1648,7 +1739,7 @@ const ExamRoomsPage = () => {
                       );
                     }
 
-                    return currentData.map((student, localIndex) => {
+                    const dataRows = currentData.map((student, localIndex) => {
                       const index = startIndex + localIndex;
                       const attempt = attempts.find((a) => a.id === student.nisn);
                       const sisAnswers = answersList[student.nisn] || {};
@@ -1698,7 +1789,7 @@ const ExamRoomsPage = () => {
                               <div className="flex justify-end gap-1.5 items-center whitespace-nowrap">
                                 {attempt && (
                                   <>
-                                  {/* 1. Logs & Reset Cheat tetap Standalone */}
+                                    {/* 1. Logs & Reset Cheat tetap Standalone */}
                                     {(role === "admin" || monitorRoom?.examTeacherId === teacherId) && (
                                       <Button size="sm" variant="secondary" className="bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-100 dark:bg-amber-900/30 dark:text-amber-400 dark:hover:bg-amber-900/50 dark:border-amber-800/40 h-7 text-[10px]" onClick={() => handleResetCheatCount(student.nisn)}>Reset Cheat</Button>
                                     )}
@@ -1760,7 +1851,30 @@ const ExamRoomsPage = () => {
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-h-[400px] overflow-y-auto pr-2 scrollbar-thin">
                                   {monitorQuestions.map((q, qIdx) => {
                                     const ansId = sisAnswers[q.id];
-                                    const isCorrect = ansId && q.choices[ansId]?.isCorrect === true;
+                                    const monitorOverrides = attempt?.overrides || {};
+                                    
+                                    const isCorrect = (() => {
+                                      if (monitorOverrides[q.id] !== undefined) return monitorOverrides[q.id];
+
+                                      if (!ansId) return false;
+                                      const type = q.type || "pilihan_ganda";
+                                      
+                                      if (type === "pilihan_ganda" || type === "benar_salah") {
+                                        return q.choices?.[ansId]?.isCorrect === true;
+                                      } else if (type === "pilihan_ganda_kompleks") {
+                                        const correctKeys = Object.keys(q.choices || {}).filter(k => q.choices[k].isCorrect);
+                                        return Array.isArray(ansId) && ansId.length === correctKeys.length && ansId.every(k => correctKeys.includes(k));
+                                      } else if (type === "isian_singkat") {
+                                        return isFuzzyMatch(ansId, q.answerKey);
+                                      } else if (type === "urutkan" || type === "drag_drop") {
+                                        const correctOrder = (q.items || []).map((it: any) => it.id);
+                                        return Array.isArray(ansId) && ansId.length === correctOrder.length && ansId.every((val, idx) => val === correctOrder[idx]);
+                                      } else if (type === "menjodohkan") {
+                                        const pairs = q.pairs || [];
+                                        return pairs.length > 0 && pairs.every((p: any) => ansId[p.id] === p.right);
+                                      }
+                                      return false;
+                                    })();
 
                                     // 📸 Ekstrak Semua Gambar dari Teks & Cover (untuk ditaruh di bawah)
                                     const extractedImages: string[] = [];
@@ -1800,13 +1914,53 @@ const ExamRoomsPage = () => {
                                         <div className={`mt-auto p-2 rounded-lg flex items-center justify-between transition-colors ${isCorrect ? "bg-emerald-50 text-emerald-700 border border-emerald-100 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-800/40" : ansId ? "bg-rose-50 text-rose-700 border border-rose-100 dark:bg-rose-950/20 dark:text-rose-400 dark:border-rose-800/40" : "bg-slate-50 text-slate-400 border border-slate-100 dark:bg-slate-800/60 dark:text-slate-500 dark:border-slate-700"}`}>
                                           <div className="flex flex-col">
                                             <span className="text-[10px] uppercase font-bold opacity-70">Jawaban</span>
-                                            <span className="text-xs font-bold leading-none">{ansId ? ansId.toUpperCase() : "Kosong"}</span>
+                                            <span className="text-xs font-bold leading-none">
+                                              {(() => {
+                                                if (!ansId) return "Kosong";
+                                                const type = q.type || "pilihan_ganda";
+                                                if (typeof ansId === 'string' && (type === "pilihan_ganda" || type === "benar_salah")) {
+                                                  const choice = q.choices?.[ansId];
+                                                  if (choice) {
+                                                    const plainText = choice.text.replace(/<[^>]*>/g, '');
+                                                    return `${ansId.toUpperCase()}. ${plainText}`;
+                                                  }
+                                                }
+                                                if (type === "pilihan_ganda_kompleks" && Array.isArray(ansId)) {
+                                                  return ansId.map(id => id.toUpperCase()).join(", ");
+                                                }
+                                                return typeof ansId === 'string' ? ansId.toUpperCase() : "DIJAWAB";
+                                              })()}
+                                            </span>
                                           </div>
-                                          {ansId && (
-                                            <div className={`px-2 py-1 rounded-md text-[10px] font-bold ${isCorrect ? "bg-emerald-100/30 dark:bg-emerald-800/20 text-emerald-700 dark:text-emerald-400" : "bg-rose-100/30 dark:bg-rose-800/20 text-rose-700 dark:text-rose-400"}`}>
-                                              {isCorrect ? "BENAR" : "SALAH"}
-                                            </div>
-                                          )}
+                                          <div className="flex items-center gap-1.5 shrink-0">
+                                            {ansId && (
+                                               <>
+                                                  <Button 
+                                                    size="icon" 
+                                                    variant="ghost" 
+                                                    className={`h-7 w-7 rounded-lg transition-all ${isCorrect && monitorOverrides[q.id] === true ? "bg-emerald-500 text-white shadow-md" : "hover:bg-emerald-50 text-slate-300 hover:text-emerald-600"}`}
+                                                    onClick={() => handleManualGrade(student.nisn, q.id, true)}
+                                                    title="Paksa Benar"
+                                                  >
+                                                    <CheckCircle2 className="w-4 h-4" />
+                                                  </Button>
+                                                  <Button 
+                                                    size="icon" 
+                                                    variant="ghost" 
+                                                    className={`h-7 w-7 rounded-lg transition-all ${!isCorrect && monitorOverrides[q.id] === false ? "bg-rose-500 text-white shadow-md" : "hover:bg-rose-50 text-slate-300 hover:text-rose-600"}`}
+                                                    onClick={() => handleManualGrade(student.nisn, q.id, false)}
+                                                    title="Paksa Salah"
+                                                  >
+                                                    <X className="w-4 h-4" />
+                                                  </Button>
+                                               </>
+                                            )}
+                                            {ansId && (
+                                              <div className={`px-2 py-1 rounded-md text-[10px] font-bold shadow-sm border ${isCorrect ? "bg-emerald-100/50 border-emerald-200/50 text-emerald-700" : "bg-rose-100/50 border-rose-200/50 text-rose-700"}`}>
+                                                {isCorrect ? "BENAR" : "SALAH"}
+                                              </div>
+                                            )}
+                                          </div>
                                         </div>
                                       </div>
                                     );
@@ -1818,6 +1972,16 @@ const ExamRoomsPage = () => {
                         </React.Fragment>
                       );
                     });
+
+                    // 💡 Tambah Baris Kosong agar tampilan tetap rapi (selalu 10 baris/sesuai PageSize)
+                    const emptyRowsCount = Math.max(0, monitorPageSize - currentData.length);
+                    const emptyRows = Array.from({ length: emptyRowsCount }).map((_, i) => (
+                      <TableRow key={`empty-${i}`} className="h-14 border-b border-slate-50/50 dark:border-slate-800/10">
+                        <TableCell colSpan={10} />
+                      </TableRow>
+                    ));
+
+                    return [...dataRows, ...emptyRows];
                   })()}
                 </TableBody>
               </Table>
@@ -1900,7 +2064,31 @@ const ExamRoomsPage = () => {
                         <div className="mt-3 pt-3 border-t border-slate-100 bg-slate-50/50 rounded-b-2xl space-y-2 p-2">
                           {monitorQuestions.map((q, qIdx) => {
                             const ansId = sisAnswers[q.id];
-                            const isCorrect = ansId && q.choices[ansId]?.isCorrect === true;
+                            const monitorOverrides = attempt?.overrides || {};
+
+                            const isCorrect = (() => {
+                              // 🛡️ OVERRIDE DULU
+                              if (monitorOverrides[q.id] !== undefined) return monitorOverrides[q.id];
+
+                              if (!ansId) return false;
+                              const type = q.type || "pilihan_ganda";
+                              
+                              if (type === "pilihan_ganda" || type === "benar_salah") {
+                                return q.choices?.[ansId]?.isCorrect === true;
+                              } else if (type === "pilihan_ganda_kompleks") {
+                                const correctKeys = Object.keys(q.choices || {}).filter(k => q.choices[k].isCorrect);
+                                return Array.isArray(ansId) && ansId.length === correctKeys.length && ansId.every(k => correctKeys.includes(k));
+                              } else if (type === "isian_singkat") {
+                                return isFuzzyMatch(ansId, q.answerKey);
+                              } else if (type === "urutkan" || type === "drag_drop") {
+                                const correctOrder = (q.items || []).map((it: any) => it.id);
+                                return Array.isArray(ansId) && ansId.length === correctOrder.length && ansId.every((val, idx) => val === correctOrder[idx]);
+                              } else if (type === "menjodohkan") {
+                                const pairs = q.pairs || [];
+                                return pairs.length > 0 && pairs.every((p: any) => ansId[p.id] === p.right);
+                              }
+                              return false;
+                            })();
                             return (
                               <div key={q.id} className="bg-card p-3 rounded-xl border border-slate-200 text-[11px] shadow-sm">
                                 <div className="flex gap-2 mb-2">
@@ -1908,7 +2096,29 @@ const ExamRoomsPage = () => {
                                   <div className="text-slate-700 leading-snug font-medium" dangerouslySetInnerHTML={{ __html: q.text }} />
                                 </div>
                                 <div className={`p-2 rounded-lg flex justify-between items-center ${isCorrect ? "bg-emerald-50 text-emerald-700 border border-emerald-100" : ansId ? "bg-rose-50 text-rose-700 border border-rose-100" : "bg-slate-50 text-slate-400"}`}>
-                                  <span className="font-bold">Jawaban: {ansId ? ansId.toUpperCase() : "KOSONG"}</span>
+                                  <div className="flex flex-col">
+                                     <span className="font-bold">
+                                       Jawaban: {(() => {
+                                         if (!ansId) return "KOSONG";
+                                         const type = q.type || "pilihan_ganda";
+                                         if (typeof ansId === 'string' && (type === "pilihan_ganda" || type === "benar_salah")) {
+                                           const choice = q.choices?.[ansId];
+                                           if (choice) {
+                                             const plainText = choice.text.replace(/<[^>]*>/g, '');
+                                             return `${ansId.toUpperCase()}. ${plainText}`;
+                                           }
+                                         }
+                                         if (type === "pilihan_ganda_kompleks" && Array.isArray(ansId)) {
+                                           return ansId.map(id => id.toUpperCase()).join(", ");
+                                         }
+                                         return typeof ansId === 'string' ? ansId.toUpperCase() : "DIJAWAB";
+                                       })()}
+                                     </span>
+                                     <div className="flex gap-2 mt-1">
+                                        <button onClick={() => handleManualGrade(student.nisn, q.id, true)} className={`px-2 py-0.5 rounded text-[9px] font-bold border transition-colors ${isCorrect && monitorOverrides[q.id] === true ? "bg-emerald-600 text-white border-emerald-600" : "bg-white text-emerald-600 border-emerald-200 hover:bg-emerald-50"}`}>Jadi Benar</button>
+                                        <button onClick={() => handleManualGrade(student.nisn, q.id, false)} className={`px-2 py-0.5 rounded text-[9px] font-bold border transition-colors ${!isCorrect && monitorOverrides[q.id] === false ? "bg-rose-600 text-white border-rose-600" : "bg-white text-rose-600 border-rose-200 hover:bg-rose-50"}`}>Jadi Salah</button>
+                                     </div>
+                                  </div>
                                   {ansId && <span className="text-[10px] font-black">{isCorrect ? "✓ BENAR" : "✗ SALAH"}</span>}
                                 </div>
                               </div>

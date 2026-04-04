@@ -117,7 +117,7 @@ export const StudentAuthProvider = ({ children }: { children: ReactNode }) => {
 
   const logoutStudent = useCallback(() => {
     setstudent(null);
-    sessionStorage.removeItem(SESSION_STORAGE_KEY);
+    sessionStorage.clear(); // 🧹 Membersihkan seluruh sesi termasuk urutan soal agar 'fresh' saat masuk kembali
   }, []);
 
   return (

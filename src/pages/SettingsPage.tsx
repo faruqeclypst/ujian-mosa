@@ -23,6 +23,29 @@ const SettingsPage = () => {
   const [isGalleryOpen, setIsGalleryOpen] = useState(false);
   const [galleryImages, setGalleryImages] = useState<string[]>([]);
 
+  // 📝 Question Types Management
+  const [allowedTypes, setAllowedTypes] = useState<Record<string, boolean>>({
+    pilihan_ganda: true,
+    pilihan_ganda_kompleks: true,
+    menjodohkan: true,
+    benar_salah: true,
+    isian_singkat: true,
+    urutkan: true,
+    drag_drop: true,
+    uraian: true,
+  });
+
+  const questionTypes = [
+    { id: "pilihan_ganda", label: "Pilihan Ganda (Single)" },
+    { id: "pilihan_ganda_kompleks", label: "Pilihan Ganda Kompleks" },
+    { id: "menjodohkan", label: "Menjodohkan (Matching)" },
+    { id: "benar_salah", label: "Benar / Salah" },
+    { id: "isian_singkat", label: "Isian Singkat" },
+    { id: "urutkan", label: "Mengurutkan (Ordering)" },
+    { id: "drag_drop", label: "Drag & Drop" },
+    { id: "uraian", label: "Uraian / Essay" },
+  ];
+
   const loadGalleryImages = async () => {
     try {
       const snapshot = await get(ref(database, "questions"));
@@ -50,6 +73,13 @@ const SettingsPage = () => {
   };
 
   useEffect(() => {
+    const typesRef = ref(database, "settings/allowed_question_types");
+    get(typesRef).then((snapshot) => {
+      if (snapshot.exists()) {
+        setAllowedTypes(snapshot.val());
+      }
+    });
+
     const configRef = ref(database, "settings/school");
     get(configRef).then((snapshot) => {
       if (snapshot.exists()) {
@@ -94,6 +124,10 @@ const SettingsPage = () => {
         logoUrl: logoUrl,
         updatedAt: Date.now(),
       });
+
+      // Save question types
+      const typesRef = ref(database, "settings/allowed_question_types");
+      await update(typesRef, allowedTypes);
 
       setSchoolLogo(logoUrl);
       setLogoFile(null);
@@ -176,6 +210,36 @@ const SettingsPage = () => {
                 </Button>
               </div>
             </form>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-2xl border border-slate-200/60 dark:border-slate-800/40 shadow-sm backdrop-blur-sm mt-6">
+          <CardHeader className="border-b border-slate-200/60 dark:border-slate-800/40 pb-4">
+            <CardTitle className="text-base font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+               <Save className="h-4 w-4 text-slate-400" /> Manajemen Tipe Soal
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {questionTypes.map((type) => (
+                    <div key={type.id} className="flex items-center justify-between p-3 rounded-xl border border-slate-100 dark:border-slate-800/60 bg-slate-50/50 dark:bg-slate-900/30">
+                        <div className="flex flex-col">
+                            <span className="text-xs font-bold text-slate-700 dark:text-slate-200">{type.label}</span>
+                            <span className="text-[10px] text-slate-400">{allowedTypes[type.id] ? "Aktif" : "Dinonaktifkan"}</span>
+                        </div>
+                        <label className="relative inline-flex items-center cursor-pointer group">
+                            <input 
+                                type="checkbox" 
+                                className="sr-only peer" 
+                                checked={allowedTypes[type.id] || false}
+                                onChange={(e) => setAllowedTypes(prev => ({ ...prev, [type.id]: e.target.checked }))}
+                            />
+                            <div className="w-11 h-6 bg-slate-200 dark:bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-slate-600 peer-checked:bg-blue-600 shadow-inner group-hover:after:scale-110"></div>
+                        </label>
+                    </div>
+                ))}
+            </div>
+            <p className="text-[10px] text-slate-400 mt-4 italic">* Tipe soal yang dinonaktifkan tidak akan muncul saat membuat Bank Soal baru.</p>
           </CardContent>
         </Card>
       </div>
