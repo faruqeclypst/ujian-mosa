@@ -1,19 +1,16 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Plus, BookOpen, Trash, Edit, Archive, RotateCw } from "lucide-react";
 import { Button } from "../../components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../../components/ui/dialog";
 import { DeleteConfirmationDialog } from "../../components/ui/delete-confirmation-dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
-import { ref, onValue, push, update, remove, get } from "firebase/database";
-import { database } from "../../lib/firebase";
-import { deleteImageFromStorage } from "../../lib/storage";
+import pb from "../../lib/pocketbase";
 import { Input } from "../../components/ui/input";
 import FormField from "../../components/forms/FormField";
 import { useAuth } from "../../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { useExamData } from "../../context/ExamDataContext";
 import { ConfirmationDialog } from "../../components/ui/confirmation-dialog";
-
 import { DataTable } from "../../components/ui/data-table";
 
 export interface ExamData {
@@ -21,8 +18,9 @@ export interface ExamData {
   title: string;
   subjectId: string;
   teacherId: string;
-  createdAt: number;
+  createdAt: string; // PocketBase uses ISO strings
   examType?: string;
+  status? : "archive" | null;
 }
 
 export const getExamTypeColorClass = (type: string) => {
@@ -74,7 +72,7 @@ const columns = [
 
 const ExamsPage = () => {
   const navigate = useNavigate();
-  const { role, teacherId } = useAuth();
+  const { user, role } = useAuth();
   const { subjects, teachers } = useExamData();
   const [exams, setExams] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -106,6 +104,17 @@ const ExamsPage = () => {
     onConfirm: () => {}
   });
 
+  const showAlert = (title: string, description: string, type: "success" | "danger" | "warning" | "info" = "info") => {
+    setConfirmDialog({
+      isOpen: true,
+      title,
+      description,
+      type,
+      confirmLabel: "OK",
+      onConfirm: () => {}
+    });
+  };
+
   const handleArchiveExam = (exam: any) => {
     if (activeExamIds.includes(exam.id)) {
        showAlert("Peringatan", "Batal mengarsipkan karena Bank Soal ini sedang diujikan di Ruang Ujian aktif.", "warning");
@@ -120,22 +129,11 @@ const ExamsPage = () => {
       confirmLabel: "Arsipkan",
       onConfirm: async () => {
         try {
-          await update(ref(database, `exams/${exam.id}`), { status: "archive" });
+          await pb.collection('exams').update(exam.id, { status: "archive" });
         } catch (e) { 
           showAlert("Gagal", "Gagal mengarsipkan bank soal.", "danger");
         }
       }
-    });
-  };
-
-  const showAlert = (title: string, description: string, type: "success" | "danger" | "warning" | "info" = "info") => {
-    setConfirmDialog({
-      isOpen: true,
-      title,
-      description,
-      type,
-      confirmLabel: "OK",
-      onConfirm: () => {}
     });
   };
 
@@ -148,7 +146,7 @@ const ExamsPage = () => {
       confirmLabel: "Pulihkan",
       onConfirm: async () => {
         try {
-          await update(ref(database, `exams/${exam.id}`), { status: null });
+          await pb.collection('exams').update(exam.id, { status: null });
         } catch (e) { 
           showAlert("Gagal", "Gagal memulihkan bank soal.", "danger");
         }
@@ -156,73 +154,105 @@ const ExamsPage = () => {
     });
   };
 
+  // Load active rooms to detect active exams
   useEffect(() => {
-    const roomsRef = ref(database, "exam_rooms");
-    const unsubscribe = onValue(roomsRef, (snapshot) => {
-      const ids: string[] = [];
-      if (snapshot.exists()) {
-         const data = snapshot.val();
-         const now = Date.now();
-         Object.values(data).forEach((room: any) => {
-             const start = new Date(room.start_time).getTime();
-             const end = new Date(room.end_time).getTime();
-             if (now >= start && now <= end && room.status !== "archive") {
-                 if (room.examId) ids.push(room.examId);
-             }
-         });
+    const fetchActiveRooms = async () => {
+      try {
+        const rooms = await pb.collection('exam_rooms').getFullList({
+          filter: 'isActive = true'
+        });
+        setActiveExamIds(rooms.map(r => r.examId));
+      } catch (e) {
+        console.error("Gagal load data ruang ujian:", e);
       }
-      setActiveExamIds(ids);
-    });
-    return () => unsubscribe();
+    };
+
+    fetchActiveRooms();
+    // Subscribe ke perubahan ruang ujian
+    pb.collection('exam_rooms').subscribe("*", fetchActiveRooms);
+
+    return () => {
+      pb.collection('exam_rooms').unsubscribe("*");
+    };
   }, []);
 
+  // Sync exams data
   useEffect(() => {
-    const examsRef = ref(database, "exams");
-    const unsubscribe = onValue(examsRef, (snapshot) => {
-      if (snapshot.exists()) {
-        const data = snapshot.val();
-        const loaded = Object.keys(data).map((key) => {
-          const exam = data[key];
-          const subjectObj = subjects.find((s: any) => s.id === exam.subjectId);
-          const teacherObj = teachers.find((t: any) => t.id === exam.teacherId);
+    const fetchExams = async () => {
+      if (!subjects.length || !teachers.length) return;
+      
+      try {
+        const loaded = await pb.collection('exams').getFullList({
+          sort: '-created'
+        });
+
+        const mapped = loaded.map((exam) => {
+          // Handle possible lowercase field names from PocketBase
+          const sId = exam.subjectId || (exam as any).subjectid;
+          const tId = exam.teacherId || (exam as any).teacherid;
+          const type = exam.examType || (exam as any).examtype || "Latihan Biasa";
+          
+          const subjectObj = subjects.find((s: any) => s.id === sId);
+          const teacherObj = teachers.find((t: any) => t.id === tId);
+          
+          const { id, ...rest } = exam;
           return {
-            id: key,
-            ...exam,
-            examType: exam.examType || "Latihan Biasa",
+            id,
+            ...rest,
+            subjectId: sId,
+            teacherId: tId,
+            examType: type,
             subjectName: subjectObj ? subjectObj.name : "Mapel Tidak Ditemukan",
             teacherName: teacherObj ? teacherObj.name : "Guru Tidak Ditemukan",
           };
         });
 
-        if (role !== "admin" && teacherId) {
-          loaded.sort((a, b) => {
-            const isAOwner = a.teacherId === teacherId ? 1 : 0;
-            const isBOwner = b.teacherId === teacherId ? 1 : 0;
+        // Filter role jika bukan admin
+        if (role !== "admin" && user?.id) {
+          mapped.sort((a, b) => {
+            const isAOwner = (a as any).teacherId === user.id ? 1 : 0;
+            const isBOwner = (b as any).teacherId === user.id ? 1 : 0;
             return isBOwner - isAOwner;
           });
         }
 
-        setExams(loaded);
-      } else {
-        setExams([]);
+        setExams(mapped);
+        setLoading(false);
+      } catch (e) {
+        console.error("Gagal load data ujian:", e);
+        setLoading(false);
       }
-      setLoading(false);
-    });
+    };
 
-    return () => unsubscribe();
-  }, [subjects, teachers]);
+    fetchExams();
+    pb.collection('exams').subscribe("*", fetchExams);
+
+    return () => {
+      pb.collection('exams').unsubscribe("*");
+    };
+  }, [subjects, teachers, role, user]);
 
   const handleCreateClick = () => {
     setDialogMode("create");
     setSelectedExam(null);
-    setFormValues({ title: "", subjectId: "", teacherId: role === "admin" ? "" : (teacherId || ""), examType: "Latihan Biasa" });
+    setFormValues({ 
+      title: "", 
+      subjectId: "", 
+      teacherId: role === "admin" ? "" : (user?.id || ""), 
+      examType: "Latihan Biasa" 
+    });
     setIsDialogOpen(true);
   };
 
   const handleEditClick = (exam: ExamData) => {
     setDialogMode("edit");
     setSelectedExam(exam);
-    setFormValues({ title: exam.title, subjectId: exam.subjectId, teacherId: exam.teacherId || "", examType: exam.examType || "Latihan Biasa" });
+    setFormValues({ 
+      title: exam.title, 
+      subjectId: exam.subjectId, 
+      teacherId: exam.teacherId || "", 
+      examType: exam.examType || "Latihan Biasa" 
+    });
     setIsDialogOpen(true);
   };
 
@@ -235,13 +265,10 @@ const ExamsPage = () => {
     e.preventDefault();
     try {
       if (dialogMode === "edit" && selectedExam) {
-        const examRef = ref(database, `exams/${selectedExam.id}`);
-        await update(examRef, { ...formValues });
+        await pb.collection('exams').update(selectedExam.id, { ...formValues });
       } else {
-        const examsRef = ref(database, "exams");
-        await push(examsRef, {
+        await pb.collection('exams').create({
           ...formValues,
-          createdAt: Date.now(),
         });
       }
       setIsDialogOpen(false);
@@ -250,61 +277,23 @@ const ExamsPage = () => {
     }
   };
 
-  const cleanupQuestionImages = async (q: any) => {
-    const keysToDelete: string[] = [];
-    const extractKey = (url: string) => {
-      if (url.includes("/questions/")) return "questions/" + url.split("/questions/")[1].split("?")[0];
-      return "";
-    };
-
-    if (q.imageUrl) keysToDelete.push(extractKey(q.imageUrl));
-    if (q.choices) {
-      Object.values(q.choices).forEach((c: any) => {
-        if (c.imageUrl) keysToDelete.push(extractKey(c.imageUrl));
-        if (c.text && c.text.includes("/questions/")) {
-          const doc = new DOMParser().parseFromString(c.text, "text/html");
-          doc.querySelectorAll("img").forEach((img) => {
-            const src = img.getAttribute("src") || "";
-            if (src) keysToDelete.push(extractKey(src));
-          });
-        }
-      });
-    }
-    if (q.text && q.text.includes("/questions/")) {
-      const doc = new DOMParser().parseFromString(q.text, "text/html");
-      doc.querySelectorAll("img").forEach((img) => {
-        const src = img.getAttribute("src") || "";
-        if (src) keysToDelete.push(extractKey(src));
-      });
-    }
-
-    for (const k of keysToDelete) {
-      if (k) {
-        try {
-          await deleteImageFromStorage(k);
-        } catch (e) {
-          console.error("Gagal menghapus gambar dari storage:", k, e);
-        }
-      }
-    }
-  };
-
   const handleConfirmDelete = async () => {
     if (!examToDelete) return;
     setIsDeleting(true);
     try {
-      const qRef = ref(database, "questions");
-      const snapshot = await get(qRef);
-      if (snapshot.exists()) {
-        const data = snapshot.val();
-        const keysToDelete = Object.keys(data).filter((k) => data[k].examId === examToDelete.id);
-        
-        for (const key of keysToDelete) {
-          await cleanupQuestionImages({ ...data[key], id: key });
-          await remove(ref(database, `questions/${key}`)); // Hapus record soal
-        }
+      // 1. Hapus soal terkait (opsional jika menggunakan Relasi cascade di PB)
+      // Namun di PocketBase v0.23, penghapusan record yang di-relasi-kan tidak otomatis hapus record-nya
+      // Kecuali diatur di API Rules. Mari kita hapus satu-satu untuk amannya:
+      const questions = await pb.collection('questions').getFullList({
+        filter: `examId = "${examToDelete.id}"`
+      });
+      
+      for (const q of questions) {
+        await pb.collection('questions').delete(q.id);
       }
-      await remove(ref(database, `exams/${examToDelete.id}`));
+
+      // 2. Hapus examnya
+      await pb.collection('exams').delete(examToDelete.id);
     } catch (error) {
       showAlert("Gagal", "Gagal menghapus bank soal.", "danger");
     } finally {
@@ -369,7 +358,7 @@ const ExamsPage = () => {
                     <BookOpen className="h-4 w-4" />
                   </button>
                   
-                  {(role === "admin" || exam.teacherId === teacherId) && (
+                  {(role === "admin" || exam.teacherId === user?.id) && (
                     <>
                       {activeTab === "aktif" ? (
                         <button 

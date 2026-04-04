@@ -1,20 +1,48 @@
 import React, { useState, useEffect } from "react";
-import { database } from "../../lib/firebase";
-import { ref, onValue } from "firebase/database";
+import pb from "../../lib/pocketbase";
 
 const Logo = () => {
   const [profile, setProfile] = useState({ name: "E-Ujian", logoUrl: "" });
   const [logoError, setLogoError] = useState(false);
 
   useEffect(() => {
-    const r = ref(database, "settings/school");
-    return onValue(r, (snap) => {
-      if (snap.exists()) {
-        const d = snap.val();
-        setProfile({ name: d.name || "E-Ujian", logoUrl: d.logoUrl || "" });
+    // Fungsi untuk mengambil data settings dari PocketBase
+    const fetchSettings = async () => {
+      try {
+        const records = await pb.collection("settings").getFullList({
+          sort: "created",
+          limit: 1
+        });
+
+        if (records.length > 0) {
+          const data = records[0];
+          setProfile({ 
+            name: data.name || "E-Ujian", 
+            logoUrl: data.logoUrl || data.logo || "" 
+          });
+          setLogoError(false);
+        }
+      } catch (err) {
+        console.error("Gagal memuat logo sidebar:", err);
+      }
+    };
+
+    fetchSettings();
+
+    // Subscribe ke perubahan data secara realtime di PocketBase
+    pb.collection("settings").subscribe("*", (e) => {
+      if (e.action === "update" || e.action === "create") {
+        setProfile({ 
+          name: e.record.name || "E-Ujian", 
+          logoUrl: e.record.logoUrl || e.record.logo || "" 
+        });
         setLogoError(false);
       }
     });
+
+    return () => {
+      pb.collection("settings").unsubscribe("*");
+    };
   }, []);
 
   return (
@@ -30,13 +58,9 @@ const Logo = () => {
             />
           ) : (
             <img
-              src="/logo.png"
-              alt="Logo"
-              className="h-full w-full object-contain"
-              onError={(e) => {
-                // Fallback jika /logo.png tidak tersedia
-                (e.target as HTMLImageElement).src = "https://cdn-icons-png.flaticon.com/512/2913/2913965.png";
-              }}
+              src="https://cdn-icons-png.flaticon.com/512/2913/2913965.png"
+              alt="Logo Default"
+              className="h-full w-full object-contain opacity-50"
             />
           )}
         </div>

@@ -30,6 +30,7 @@
     "jspdf-autotable": "^5.0.7",
     "lucide-react": "^0.370.0",
     "mammoth": "^1.12.0",
+    "pocketbase": "^0.26.8",
     "quill": "^2.0.3",
     "quill-image-resize-module-react": "^3.0.0",
     "react": "^18.2.0",

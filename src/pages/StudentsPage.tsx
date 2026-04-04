@@ -110,7 +110,6 @@ const StudentsPage = () => {
         await createStudent({
           nisn: String(row.nisn),
           name: row.name,
-          gender: row.gender as "L" | "P",
           classId: row.classId,
         });
       }
@@ -159,7 +158,6 @@ const StudentsPage = () => {
                 defaultValues={selectedStudent ? {
                   nisn: selectedStudent.nisn,
                   name: selectedStudent.name,
-                  gender: selectedStudent.gender,
                   classId: selectedStudent.classId
                 } : undefined}
                 onSubmit={handleSubmitStudent}

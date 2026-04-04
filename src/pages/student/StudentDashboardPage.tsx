@@ -2,12 +2,19 @@ import { useEffect, useState } from "react";
 import { useStudentAuth } from "../../context/StudentAuthContext";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
-import { ref, onValue, get } from "firebase/database";
-import { database } from "../../lib/firebase";
+import pb from "../../lib/pocketbase";
 import { LogOut, KeyRound, Calendar, Clock, ChevronRight, User } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../../components/ui/dialog";
-import { getExamTypeColorClass } from "../admin/ExamsPage";
 import { motion } from "framer-motion";
+
+const getExamTypeColorClass = (type: string) => {
+  switch (type?.toLowerCase()) {
+    case "uh": case "ulangan harian": return "bg-blue-50 text-blue-600 border-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800";
+    case "pts": case "tengah semester": return "bg-amber-50 text-amber-600 border-amber-100 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800";
+    case "pas": case "akhir semester": return "bg-emerald-50 text-emerald-600 border-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800";
+    default: return "bg-slate-50 text-slate-600 border-slate-100 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700";
+  }
+};
 
 const StudentDashboardPage = () => {
   const { student, logoutStudent } = useStudentAuth();
@@ -23,117 +30,144 @@ const StudentDashboardPage = () => {
   const [activeRooms, setActiveRooms] = useState<any[]>([]);
   const [userAttempts, setUserAttempts] = useState<Record<string, any>>({});
 
-  useEffect(() => {
-    if (!student?.classId) return;
-
-    let unsubRooms: (() => void) | null = null;
-
-    const init = async () => {
-      try {
-        const [examsSnap, teachersSnap, subjectsSnap, schoolSnap] = await Promise.all([
-          get(ref(database, "exams")),
-          get(ref(database, "teachers")),
-          get(ref(database, "subjects")),
-          get(ref(database, "settings/school"))
-        ]);
-
-        const examsData = examsSnap.exists() ? examsSnap.val() : {};
-        const teachersData = teachersSnap.exists() ? teachersSnap.val() : {};
-        const subjectsData = subjectsSnap.exists() ? subjectsSnap.val() : {};
-
-        if (schoolSnap.exists()) {
-          const sData = schoolSnap.val();
-          setSchoolName(sData.name || "CBT System");
-          setSchoolLogo(sData.logoUrl || "");
-        }
-
-        unsubRooms = onValue(ref(database, "exam_rooms"), (snapshot) => {
-          if (snapshot.exists()) {
-            const roomsData = snapshot.val();
-            const now = Date.now();
-            const validRooms: any[] = [];
-
-            Object.keys(roomsData).forEach((key) => {
-              const room = roomsData[key];
-              if (room.status === "archive" || room.isDisabled) return;
-
-              const hasClassAccess = room.allClasses ||
-                (room.classId && room.classId.split(",").includes(student.classId));
-
-              if (!hasClassAccess) return;
-
-              const start = new Date(room.start_time).getTime();
-              const end = new Date(room.end_time).getTime();
-              if (now < start || now > end) return;
-
-              const exam = examsData[room.examId];
-              const teacher = exam?.teacherId ? teachersData[exam.teacherId] : null;
-              const subject = exam?.subjectId ? subjectsData[exam.subjectId] : null;
-
-              validRooms.push({
-                id: key,
-                ...room,
-                examTitle: room.room_name || exam?.title || "Ujian",
-                subject: subject?.name || "Mapel",
-                teacherName: teacher?.name || "-",
-                examType: exam?.examType || "Latihan"
-              });
-            });
-
-            setActiveRooms(validRooms);
-          } else {
-            setActiveRooms([]);
-          }
-          setLoading(false);
-        });
-      } catch (err) {
-        console.error(err);
-        setLoading(false);
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      
+      // Ambil Settings Sekolah dulu (bisa tanpa login)
+      const settingsRecords = await pb.collection("settings").getFullList({ limit: 1 });
+      if (settingsRecords.length > 0) {
+        const sData = settingsRecords[0];
+        setSchoolName(sData.name || "CBT System");
+        setSchoolLogo(sData.logoUrl || sData.logo || "");
       }
-    };
 
-    init();
-    return () => {
-      if (unsubRooms) unsubRooms();
-    };
-  }, [student?.classId]);
+      if (!student) return;
 
-  useEffect(() => {
-    if (!student || activeRooms.length === 0) return;
-    const unsubAttempts = onValue(ref(database, "attempts"), (snap) => {
-      if (snap.exists()) {
-        const all = snap.val();
+      // 2. Ambil SEMUA Ruang Ujian dengan status yang menandakan sedang berjalan
+      const roomsRecords = await pb.collection("exam_rooms").getFullList({
+        // Mencari status active atau Ongoing (case insensitive di sisi JS nanti)
+        expand: "examId,examId.subjectId,examId.teacherId",
+        sort: "-created"
+      });
+
+      // Filter manual di Frontend agar presisi (Status, Waktu & Kelas)
+      const now = new Date();
+      const validRooms = roomsRecords.filter(room => {
+        // A. Filter Status & isActive (Toleran jika status teks kosong tapi isActive true)
+        const s = String(room.status || "").toLowerCase();
+        const isActive = room.isActive === true || (room as any).isactive === true;
+        const isDisabled = room.isDisabled === true || (room as any).isdisabled === true;
+        
+        if (isDisabled) return false;
+        if (!isActive && s !== "active" && s !== "ongoing" && s !== "berjalan") return false;
+
+        // B. Filter Waktu
+        const rawStart = room.start_time || (room as any).startTime;
+        const rawEnd = room.end_time || (room as any).endTime;
+        
+        const start = new Date(rawStart);
+        const end = new Date(rawEnd);
+        
+        // Jika format waktu tidak valid, anggap tidak aktif
+        if (isNaN(start.getTime()) || isNaN(end.getTime())) return false;
+        
+        if (now < start || now > end) return false;
+
+        // B. Filter Kelas
+        if (room.allClasses) return true;
+        
+        const studentClass = student.classId || "";
+        if (!studentClass) return false;
+
+        const clsData = room.classId || (room as any).classIds || "";
+        const allowedClasses = Array.isArray(clsData) 
+          ? clsData 
+          : String(clsData).split(",").map(id => id.trim()).filter(id => id && id !== "all");
+
+        return allowedClasses.includes(studentClass);
+      }).map(room => {
+        const exam = room.expand?.examId;
+        const subject = exam?.expand?.subjectId;
+        const teacher = exam?.expand?.teacherId;
+
+        return {
+          ...room,
+          examTitle: room.room_name || exam?.title || "Ujian",
+          subject: subject?.name || "Mapel",
+          teacherName: teacher?.name || "-",
+          examType: exam?.examType || "Latihan"
+        };
+      });
+
+      setActiveRooms(validRooms);
+
+      // 3. Ambil Status Percobaan (Attempts)
+      if (validRooms.length > 0) {
+        const roomIds = validRooms.map(r => r.id);
+        const filterStr = roomIds.map(id => `examRoomId = "${id}"`).join(" || ");
+        const attemptsRecords = await pb.collection("attempts").getFullList({
+          filter: `studentId = "${student.id}" && (${filterStr})`
+        });
+
         const myStatus: Record<string, any> = {};
-        activeRooms.forEach(r => {
-          if (all[r.id] && all[r.id][student.nisn]) myStatus[r.id] = all[r.id][student.nisn].status;
+        attemptsRecords.forEach(att => {
+          myStatus[att.examRoomId] = att.status;
         });
         setUserAttempts(myStatus);
       }
-    });
-    return () => unsubAttempts();
-  }, [student, activeRooms]);
+
+    } catch (err) {
+      console.error("Dashboard Fetch Error:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+    
+    // Subscribe ke perubahan ruang ujian
+    pb.collection("exam_rooms").subscribe("*", () => fetchData());
+    pb.collection("attempts").subscribe("*", () => fetchData());
+
+    return () => {
+      pb.collection("exam_rooms").unsubscribe();
+      pb.collection("attempts").unsubscribe();
+    };
+  }, [student]);
 
   const handleValidateToken = async () => {
-    if (!selectedRoom) return;
+    if (!selectedRoom || !student) return;
     setTokenError("");
     setIsValidating(true);
     try {
-      const roomRef = ref(database, `exam_rooms/${selectedRoom.id}`);
-      const snapshot = await get(roomRef);
-      const roomData = snapshot.val();
-      const globalTokenSnap = await get(ref(database, "settings/universal_token"));
-      const checkToken = globalTokenSnap.exists() ? globalTokenSnap.val() : roomData.token;
+      // 1. Ambil Token Global dari Settings
+      const settingsRecords = await pb.collection("settings").getFullList({ limit: 1 });
+      const globalToken = settingsRecords.length > 0 ? settingsRecords[0].universal_token : null;
+      
+      // 2. Ambil data ruangan terbaru
+      const room = await pb.collection("exam_rooms").getOne(selectedRoom.id);
+      
+      const checkToken = globalToken || room.token;
 
       if (tokenInput.trim().toUpperCase() !== String(checkToken).toUpperCase()) {
         throw new Error("Token salah!");
       }
 
-      const attemptSnap = await get(ref(database, `attempts/${selectedRoom.id}/${student?.nisn}`));
-      if (attemptSnap.exists() && attemptSnap.val().status === "LOCKED") throw new Error("Akun Terkunci!");
+      // 3. Cek apakah terkunci
+      const attempts = await pb.collection("attempts").getFullList({
+        filter: `studentId = "${student.id}" && examRoomId = "${room.id}"`
+      });
 
+      if (attempts.length > 0 && attempts[0].status === "LOCKED") {
+        throw new Error("Akun Terkunci! Hubungi Proktor.");
+      }
+
+      // Berhasil
       window.location.href = `/cbt/${selectedRoom.id}`;
     } catch (err: any) {
-      setTokenError(err.message);
+      setTokenError(err.message || "Gagal memverifikasi token");
     } finally {
       setIsValidating(false);
     }
@@ -145,7 +179,7 @@ const StudentDashboardPage = () => {
         <div className="flex items-center gap-3">
            <div className="p-1.5 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800 shadow-sm">
              {schoolLogo ? (
-               <img src={schoolLogo} className="h-6 w-6 object-contain" alt="Logo" />
+                <img src={schoolLogo} className="h-6 w-6 object-contain" alt="Logo" />
               ) : (
                 <div className="h-6 w-6 bg-slate-200 dark:bg-slate-700 rounded-lg animate-pulse" />
               )}
@@ -179,7 +213,7 @@ const StudentDashboardPage = () => {
         <div className="space-y-6">
           <div className="text-center space-y-1.5 mb-8">
              <h2 className="text-xl font-extrabold text-slate-900 dark:text-white uppercase tracking-tight">Ujian Berlangsung</h2>
-             <p className="text-[12px] text-slate-500 font-medium">Pilih ruang ujian aktif Anda di bawah ini</p>
+             <p className="text-[12px] text-slate-500 font-medium">Pilih jadwal ujian aktif Anda di bawah ini</p>
           </div>
 
           {loading ? (
@@ -196,10 +230,10 @@ const StudentDashboardPage = () => {
             <div className="space-y-4">
               {activeRooms.map((room) => (
                 <motion.div 
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  key={room.id} 
-                  className="p-6 bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200/60 dark:border-slate-800 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_20px_50px_rgb(0,0,0,0.08)] transition-all duration-300 relative overflow-hidden"
+                   initial={{ opacity: 0, y: 10 }}
+                   animate={{ opacity: 1, y: 0 }}
+                   key={room.id} 
+                   className="p-6 bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200/60 dark:border-slate-800 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_20px_50px_rgb(0,0,0,0.08)] transition-all duration-300 relative overflow-hidden"
                 >
                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
                     <div className="space-y-4 flex-1 min-w-0">
@@ -225,13 +259,13 @@ const StudentDashboardPage = () => {
                       <div className="flex items-center gap-4 text-[11px] font-black tracking-tight tabular-nums">
                         <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100/80 dark:border-slate-800 text-slate-600 dark:text-slate-300 shadow-sm">
                           <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                          <span>{new Date(room.start_time).toLocaleDateString("id-ID", { day: '2-digit', month: '2-digit' })}</span>
+                          <span>{new Date(room.start_time || (room as any).startTime).toLocaleDateString("id-ID", { day: '2-digit', month: '2-digit' })}</span>
                         </div>
                         <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100/80 dark:border-slate-800 shadow-sm">
                           <Clock className="w-3.5 h-3.5 text-slate-400" />
-                          <span className="text-emerald-600 dark:text-emerald-400">{new Date(room.start_time).toLocaleTimeString("id-ID", { hour: '2-digit', minute: '2-digit' })}</span>
+                          <span className="text-emerald-600 dark:text-emerald-400">{new Date(room.start_time || (room as any).startTime).toLocaleTimeString("id-ID", { hour: '2-digit', minute: '2-digit' })}</span>
                           <span className="text-slate-300 mx-0.5">—</span>
-                          <span className="text-rose-600 dark:text-rose-400">{new Date(room.end_time).toLocaleTimeString("id-ID", { hour: '2-digit', minute: '2-digit' })}</span>
+                          <span className="text-rose-600 dark:text-rose-400">{new Date(room.end_time || (room as any).endTime).toLocaleTimeString("id-ID", { hour: '2-digit', minute: '2-digit' })}</span>
                         </div>
                       </div>
                     </div>
@@ -304,9 +338,9 @@ const StudentDashboardPage = () => {
 
               <DialogFooter className="flex flex-col gap-3 pt-2">
                 <Button 
-                  onClick={handleValidateToken} 
-                  disabled={isValidating || !tokenInput} 
-                  className={`w-full h-12 ${isValidating ? 'bg-slate-200 dark:bg-slate-800' : 'bg-slate-900 hover:bg-black dark:bg-indigo-600 dark:hover:bg-indigo-500'} text-white font-extrabold text-[11px] rounded-xl uppercase tracking-[0.15em] shadow-lg shadow-slate-900/5 dark:shadow-none transition-all active:scale-[0.98] flex items-center justify-center`}
+                   onClick={handleValidateToken} 
+                   disabled={isValidating || !tokenInput} 
+                   className={`w-full h-12 ${isValidating ? 'bg-slate-200 dark:bg-slate-800' : 'bg-slate-900 hover:bg-black dark:bg-indigo-600 dark:hover:bg-indigo-500'} text-white font-extrabold text-[11px] rounded-xl uppercase tracking-[0.15em] shadow-lg shadow-slate-900/5 dark:shadow-none transition-all active:scale-[0.98] flex items-center justify-center`}
                 >
                   {isValidating ? (
                     <div className="flex items-center gap-2">
@@ -316,8 +350,8 @@ const StudentDashboardPage = () => {
                   ) : "MULAI UJIAN"}
                 </Button>
                 <button 
-                  onClick={() => setSelectedRoom(null)} 
-                  className="w-full py-2 text-[10px] font-black text-slate-400 hover:text-slate-900 dark:hover:text-white uppercase tracking-widest transition-colors active:scale-95"
+                   onClick={() => setSelectedRoom(null)} 
+                   className="w-full py-2 text-[10px] font-black text-slate-400 hover:text-slate-900 dark:hover:text-white uppercase tracking-widest transition-colors active:scale-95"
                 >
                   BATAL
                 </button>

@@ -28,9 +28,10 @@ export interface StudentData {
   id: string;
   nisn: string;
   name: string;
-  gender: "L" | "P";
   classId: string;
+  className?: string; // Tambahan untuk mempermudah tampilan
   createdAt: number;
+  password?: string; // Untuk PocketBase Auth
 }
 
 export type StudentPayload = Omit<StudentData, "id" | "createdAt">;

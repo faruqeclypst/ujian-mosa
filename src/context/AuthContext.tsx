@@ -7,134 +7,103 @@ import {
   useMemo,
   useState,
 } from "react";
-import {
-  createUserWithEmailAndPassword,
-  onAuthStateChanged,
-  signInWithEmailAndPassword,
-  signInWithPopup,
-  signOut as firebaseSignOut,
-  updateProfile,
-  User,
-} from "firebase/auth";
-import { ref, get, onValue } from "firebase/database"; // <--- added
+import pb from "../lib/pocketbase";
 
-import { auth, googleProvider, database } from "../lib/firebase"; // <--- added database
+interface UserData {
+  id: string;
+  email: string;
+  name: string;
+  role: "admin" | "teacher";
+  teacherId?: string;
+}
 
 interface AuthContextValue {
-  user: User | null;
-  role: "admin" | "teacher" | null; // <--- updated from gurupiket
-  teacherId?: string; // <--- added
+  user: UserData | null;
+  role: "admin" | "teacher" | null;
+  teacherId?: string;
   loading: boolean;
   signInWithUsername: (username: string, password: string) => Promise<void>;
   registerWithUsername: (username: string, password: string, displayName?: string) => Promise<void>;
-  signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
   usernameFromEmail: (email?: string | null) => string;
-  usernameToEmail: (username: string) => string;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
-const USERNAME_DOMAIN = import.meta.env.VITE_AUTH_USERNAME_DOMAIN ?? "inventory.local";
-
-const normalizeIdentifier = (identifier: string) => identifier.trim().toLowerCase();
-
-const usernameToEmail = (identifier: string) => {
-  const normalized = normalizeIdentifier(identifier);
-  return normalized.includes("@") ? normalized : `${normalized}@${USERNAME_DOMAIN}`;
-};
-
-const emailToUsername = (email?: string | null) => {
-  if (!email) return "";
-  const [username] = email.split("@");
-  return username;
-};
-
-interface AuthProviderProps {
-  children: ReactNode;
-}
-
-export const AuthProvider = ({ children }: AuthProviderProps) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [role, setRole] = useState<"admin" | "teacher" | null>(null);
-  const [teacherId, setTeacherId] = useState<string | undefined>(undefined);
+export const AuthProvider = ({ children }: { children: ReactNode }) => {
+  const [user, setUser] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Sync state dengan PocketBase AuthStore
   useEffect(() => {
-    let unsubscribeRole: () => void = () => {};
-
-    const unsubscribeAuth = onAuthStateChanged(auth, async (nextUser) => {
-      setUser(nextUser);
-      setRole(null);
-
-      if (nextUser) {
-        // Fetch role from RTDB
-        const userRef = ref(database, `staff/${nextUser.uid}`);
-        unsubscribeRole = onValue(userRef, (snapshot) => {
-          if (snapshot.exists()) {
-            const data = snapshot.val();
-            setRole(data.role || "teacher");
-            setTeacherId(data.teacherId);
-          } else {
-            // Owner/Admin yang sudah login sebelum fitur ini rilis otomatis jadi Admin
-            setRole("admin");
-            setTeacherId(undefined);
-          }
-          setLoading(false);
-        });
-      } else {
-        setTeacherId(undefined);
-        setLoading(false);
+    const initAuth = () => {
+      if (pb.authStore.isValid && pb.authStore.model) {
+        const model = pb.authStore.model;
+        // Cek apakah ini login Admin/Guru (dari koleksi 'users')
+        // (Secara default pb.authStore.model berasal dari koleksi terakhir yang login)
+        if (model.collectionName === "users") {
+          setUser({
+            id: model.id,
+            email: model.email,
+            name: model.name || model.username,
+            role: model.role || "teacher",
+            teacherId: model.teacherId,
+          });
+        }
       }
-    });
-
-    return () => {
-      unsubscribeAuth();
-      unsubscribeRole();
+      setLoading(false);
     };
+
+    initAuth();
+
+    return pb.authStore.onChange(() => {
+      initAuth();
+    });
   }, []);
 
   const signInWithUsername = useCallback(async (username: string, password: string) => {
-    await signInWithEmailAndPassword(auth, usernameToEmail(username), password);
+    try {
+      // Di PocketBase 'users', login bisa pakai email atau username
+      await pb.collection("users").authWithPassword(username, password);
+    } catch (err: any) {
+      throw new Error(err.message || "Email atau Password Admin salah!");
+    }
   }, []);
 
   const registerWithUsername = useCallback(
     async (username: string, password: string, displayName?: string) => {
-      const credential = await createUserWithEmailAndPassword(
-        auth,
-        usernameToEmail(username),
-        password
-      );
-      const profileName = displayName?.trim() || username;
-      if (profileName && credential.user) {
-        await updateProfile(credential.user, { displayName: profileName });
+      try {
+        await pb.collection("users").create({
+          username,
+          password,
+          passwordConfirm: password,
+          name: displayName,
+          role: "teacher", // Default role untuk registrasi baru
+        });
+      } catch (err: any) {
+        throw new Error("Gagal registrasi: " + err.message);
       }
     },
     []
   );
 
-  const signInWithGoogle = useCallback(async () => {
-    await signInWithPopup(auth, googleProvider);
-  }, []);
-
   const signOut = useCallback(async () => {
-    await firebaseSignOut(auth);
+    pb.authStore.clear();
+    setUser(null);
   }, []);
 
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
-      role, // <--- added
-      teacherId, // <--- added
+      role: user?.role || null,
+      teacherId: user?.teacherId,
       loading,
       signInWithUsername,
       registerWithUsername,
-      signInWithGoogle,
       signOut,
-      usernameFromEmail: emailToUsername,
-      usernameToEmail,
+      usernameFromEmail: (email) => email?.split("@")[0] || "",
     }),
-    [loading, role, teacherId, registerWithUsername, signInWithGoogle, signInWithUsername, signOut, user]
+    [loading, user, signInWithUsername, registerWithUsername, signOut]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
@@ -145,6 +114,5 @@ export const useAuth = () => {
   if (!context) {
     throw new Error("useAuth harus digunakan di dalam AuthProvider");
   }
-
   return context;
 };

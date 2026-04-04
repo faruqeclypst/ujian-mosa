@@ -12,7 +12,6 @@ import type { ClassData } from "../../types/exam";
 const studentSchema = z.object({
   nisn: z.string().min(5, "NISN minimal 5 karakter"),
   name: z.string().min(1, "Nama Siswa wajib diisi"),
-  gender: z.enum(["L", "P"], { required_error: "Gender wajib dipilih" }),
   classId: z.string().min(1, "Kelas wajib dipilih"),
 });
 
@@ -45,34 +44,36 @@ const StudentForm = ({
     defaultValues: {
       nisn: "",
       name: "",
-      gender: "L",
       classId: "",
       ...defaultValues,
     },
   });
 
-  const genderValue = watch("gender");
   const classIdValue = watch("classId");
 
+  // Reset form initialization when defaultValues changes (but only when it's first set or student changes)
   useEffect(() => {
     if (defaultValues) {
-      if (defaultValues.nisn) setValue("nisn", defaultValues.nisn);
-      if (defaultValues.name) setValue("name", defaultValues.name);
-      if (defaultValues.gender) setValue("gender", defaultValues.gender);
-      if (defaultValues.classId) setValue("classId", defaultValues.classId);
+      reset({
+        nisn: defaultValues.nisn || "",
+        name: defaultValues.name || "",
+        classId: defaultValues.classId || "",
+      });
+    } else {
+      reset({ nisn: "", name: "", classId: "" });
     }
-  }, [defaultValues, setValue]);
+  }, [defaultValues?.nisn, defaultValues?.name, defaultValues?.classId, reset]);
 
   const submitHandler = async (values: StudentFormValues) => {
     await onSubmit(values);
     if (!defaultValues || Object.keys(defaultValues).length === 0) {
-      reset({ nisn: "", name: "", gender: "L", classId: "" });
+      reset({ nisn: "", name: "", classId: "" });
     }
   };
 
-  const sortedClasses = [...classes].sort((a, b) => 
-    a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })
-  );
+  const sortedClasses = Array.isArray(classes) ? [...classes].sort((a, b) => 
+    (a.name || "").localeCompare(b.name || "", undefined, { numeric: true, sensitivity: 'base' })
+  ) : [];
 
   return (
     <form onSubmit={handleSubmit(submitHandler)} className="space-y-4">
@@ -84,20 +85,12 @@ const StudentForm = ({
         <Input id="name" placeholder="Masukkan Nama Siswa" {...register("name")} />
       </FormField>
 
-      <FormField id="gender" label="Gender" error={errors.gender}>
-        <Select 
-          value={genderValue} 
-          onChange={(e) => setValue("gender", e.target.value as "L" | "P", { shouldValidate: true })}
-        >
-          <option value="L">Laki-Laki</option>
-          <option value="P">Perempuan</option>
-        </Select>
-      </FormField>
 
       <FormField id="classId" label="Kelas" error={errors.classId}>
         <Select 
-          value={classIdValue} 
-          onChange={(e) => setValue("classId", e.target.value, { shouldValidate: true })}
+          id="classId"
+          {...register("classId")}
+          disabled={sortedClasses.length === 0}
         >
           <option value="">Pilih Kelas</option>
           {sortedClasses.map((cls) => (
@@ -106,6 +99,11 @@ const StudentForm = ({
             </option>
           ))}
         </Select>
+        {sortedClasses.length === 0 && (
+          <p className="text-[10px] text-rose-500 mt-1 font-medium italic">
+            * Data kelas tidak ditemukan. Mohon daftarkan kelas terlebih dahulu.
+          </p>
+        )}
       </FormField>
       
       <div className="flex justify-end gap-2 pt-4 border-t border-slate-200/60 dark:border-slate-800/40">

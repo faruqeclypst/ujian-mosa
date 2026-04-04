@@ -5,8 +5,7 @@ import { Button } from "../../components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../../components/ui/dialog";
 import { DeleteConfirmationDialog } from "../../components/ui/delete-confirmation-dialog";
 import { ConfirmationDialog } from "../../components/ui/confirmation-dialog";
-import { ref, onValue, push, update, remove, get } from "firebase/database";
-import { database } from "../../lib/firebase";
+import pb from "../../lib/pocketbase";
 import { Input } from "../../components/ui/input";
 import FormField from "../../components/forms/FormField";
 import { Card, CardHeader, CardContent, CardTitle } from "../../components/ui/card";
@@ -38,6 +37,7 @@ export interface QuestionData {
   answerKey?: string;
   // Urutkan / Drag & Drop
   items?: Array<{ id: string; text: string; imageUrl?: string }>;
+  order?: number;
 }
 
 const compressImage = (file: File): Promise<File> => {
@@ -199,13 +199,19 @@ const QuestionsPage = () => {
   });
 
   useEffect(() => {
-    const settingsRef = ref(database, "settings/allowed_question_types");
-    const unsubscribe = onValue(settingsRef, (snapshot) => {
-      if (snapshot.exists()) {
-        setAllowedTypes(prev => ({ ...prev, ...snapshot.val() }));
-      }
+    // Pengaturan Jenis Soal (Allowed Question Types)
+    // Untuk sementara kita pakai default (semua aktif) agar tidak memicu error API 400
+    // Jika nanti koleksi 'settings' sudah disesuaikan di PB, bagian ini bisa diaktifkan kembali.
+    setAllowedTypes({
+      pilihan_ganda: true,
+      pilihan_ganda_kompleks: true,
+      menjodohkan: true,
+      benar_salah: true,
+      isian_singkat: true,
+      urutkan: true,
+      drag_drop: true,
+      uraian: true,
     });
-    return () => unsubscribe();
   }, []);
 
   const [exam, setExam] = useState<any>(null);
@@ -452,9 +458,19 @@ const QuestionsPage = () => {
       return;
     }
 
+    const typeMap: Record<string, string> = {
+      pilihan_ganda: "multiple_choice",
+      pilihan_ganda_kompleks: "complex_choice",
+      menjodohkan: "matching",
+      benar_salah: "true_false",
+      isian_singkat: "short_answer",
+      uraian: "essay",
+      urutkan: "sequence",
+      drag_drop: "drag_drop"
+    };
+
     setIsSavingBatch(true);
     try {
-      const qRef = ref(database, "questions");
       for (const q of validQuestions) {
         let imageUrl = q.imageUrl || "";
         if (q.imageFile) {
@@ -480,35 +496,23 @@ const QuestionsPage = () => {
 
         const payload: any = {
           examId,
-          text: `<p>${q.text}</p>`, // wrap HTML dasar
-          choices: choicesToSave,
-          createdAt: Date.now()
+          text: `<p>${q.text}</p>`, 
+          field: typeMap[q.type || "pilihan_ganda"] || "multiple_choice", 
+          options: choicesToSave,
+          correctAnswer: q.correctKey,
+          order: questions.length + 1
         };
 
         if (imageUrl) {
           payload.imageUrl = imageUrl;
         }
 
-        await push(qRef, payload);
+        await pb.collection('questions').create(payload);
       }
       setIsBatchModalOpen(false);
-      setConfirmModal({
-        isOpen: true,
-        title: "Berhasil!",
-        description: `${validQuestions.length} Soal manual berhasil disimpan ke dalam Bank Soal.`,
-        type: "success",
-        confirmLabel: "Ok",
-        onConfirm: () => { }
-      });
+      showAlert("Berhasil!", `${validQuestions.length} Soal manual berhasil disimpan.`, "success");
     } catch (e) {
-      setConfirmModal({
-        isOpen: true,
-        title: "Gagal Menyimpan",
-        description: "Terjadi kesalahan saat menyimpan batch soal ke server.",
-        type: "danger",
-        confirmLabel: "Ok",
-        onConfirm: () => { }
-      });
+      showAlert("Gagal Menyimpan", "Terjadi kesalahan saat menyimpan batch soal.", "danger");
     } finally {
       setIsSavingBatch(false);
     }
@@ -581,12 +585,10 @@ const QuestionsPage = () => {
   useEffect(() => {
     if (!examId) return;
 
-    // Load Exam Info
-    const examRef = ref(database, `exams/${examId}`);
-    get(examRef).then((snapshot) => {
-      if (snapshot.exists()) {
-        const examData = snapshot.val();
-
+    const init = async () => {
+      try {
+        // 1. Load Exam Info dari PocketBase
+        const examData = await pb.collection('exams').getOne(examId);
         const subjectObj = subjects.find((s: any) => s.id === examData.subjectId);
         const teacherObj = teachers.find((t: any) => t.id === examData.teacherId);
 
@@ -596,25 +598,71 @@ const QuestionsPage = () => {
           teacherName: teacherObj ? teacherObj.name : "",
           teacherCode: teacherObj ? teacherObj.code || "" : ""
         });
-      }
-    });
 
-    // Load Questions
-    const questionsRef = ref(database, "questions");
-    const unsubscribe = onValue(questionsRef, (snapshot) => {
-      if (snapshot.exists()) {
-        const data = snapshot.val();
-        const loaded: QuestionData[] = Object.keys(data)
-          .map((key) => ({ id: key, ...data[key] }))
-          .filter((q) => q.examId === examId);
-        setQuestions(loaded);
-      } else {
-        setQuestions([]);
-      }
-      setLoading(false);
-    });
+        // 2. Load Questions dari PocketBase
+        const fetchQuestions = async () => {
+          try {
+            const loaded = await pb.collection('questions').getFullList({
+              filter: `examId = "${examId}"`,
+              sort: 'order,created'
+            });
 
-    return () => unsubscribe();
+            const typeMapReverse: Record<string, string> = {
+              multiple_choice: "pilihan_ganda",
+              complex_choice: "pilihan_ganda_kompleks",
+              matching: "menjodohkan",
+              true_false: "benar_salah",
+              short_answer: "isian_singkat",
+              essay: "uraian",
+              sequence: "urutkan",
+              drag_drop: "drag_drop"
+            };
+
+            const mapped = loaded.map(q => {
+              const rawType = q.field || q.type || "pilihan_ganda";
+              const mappedType = (typeMapReverse[rawType] || rawType) as any;
+              const options = q.options || {};
+
+              return {
+                ...q,
+                id: q.id,
+                type: mappedType,
+                text: q.text,
+                imageUrl: q.imageUrl,
+                // Pastikan tabel dan form mengenali choices, pairs, items
+                choices: (mappedType === "pilihan_ganda" || mappedType === "pilihan_ganda_kompleks" || mappedType === "benar_salah") 
+                  ? options : undefined,
+                pairs: mappedType === "menjodohkan" ? options.pairs : undefined,
+                items: (mappedType === "urutkan" || mappedType === "drag_drop") ? options.items : undefined,
+                answerKey: q.correctAnswer || q.answerKey
+              };
+            });
+
+            setQuestions(mapped as any);
+          } catch (e) {
+            setQuestions([]);
+          } finally {
+            setLoading(false);
+          }
+        };
+
+        await fetchQuestions();
+
+        // 3. Subscribe Realtime
+        const unsubscribe = await pb.collection('questions').subscribe("*", (e) => {
+          fetchQuestions();
+        });
+
+        return () => {
+          pb.collection('questions').unsubscribe("*");
+        };
+
+      } catch (error) {
+        setLoading(false);
+      }
+    };
+
+    init();
   }, [examId, subjects, teachers]);
 
   const handleCreateClick = () => {
@@ -860,21 +908,36 @@ const QuestionsPage = () => {
         }
       }
 
+      const typeMap: Record<string, string> = {
+        pilihan_ganda: "multiple_choice",
+        pilihan_ganda_kompleks: "complex_choice",
+        menjodohkan: "matching",
+        benar_salah: "true_false",
+        isian_singkat: "short_answer",
+        uraian: "essay",
+        urutkan: "sequence",
+        drag_drop: "drag_drop"
+      };
+
       const payload: any = {
         examId,
         text: textToSave,
-        type: formValues.type,
-        createdAt: Date.now(),
+        field: typeMap[formValues.type] || "multiple_choice", 
+        options: {}, 
+        correctAnswer: "",
+        order: selectedQuestion?.order || questions.length + 1
       };
 
       if (formValues.type === "pilihan_ganda" || formValues.type === "pilihan_ganda_kompleks" || formValues.type === "benar_salah") {
-        payload.choices = updatedChoices;
+        payload.options = updatedChoices;
+        const correctOnes = Object.keys(updatedChoices).filter(k => updatedChoices[k].isCorrect);
+        payload.correctAnswer = correctOnes.join(",");
       } else if (formValues.type === "menjodohkan") {
-        payload.pairs = formValues.pairs;
+        payload.options = { pairs: formValues.pairs };
       } else if (formValues.type === "isian_singkat" || formValues.type === "uraian") {
-        payload.answerKey = formValues.answerKey;
+        payload.correctAnswer = formValues.answerKey;
       } else if (formValues.type === "urutkan" || formValues.type === "drag_drop") {
-        payload.items = formValues.items;
+        payload.options = { items: formValues.items };
       }
 
       if (imageUrl) {
@@ -883,22 +946,18 @@ const QuestionsPage = () => {
 
       if (formValues.groupId) {
         payload.groupId = formValues.groupId;
-        payload.groupText = formValues.groupText || null; // Simpan teks wacana
-      } else {
-        payload.groupId = null; 
-        payload.groupText = null;
+        payload.groupText = formValues.groupText || "";
       }
 
       if (dialogMode === "edit" && selectedQuestion) {
-        const qRef = ref(database, `questions/${selectedQuestion.id}`);
-        await update(qRef, payload);
+        await pb.collection('questions').update(selectedQuestion.id, payload);
       } else {
-        const qRef = ref(database, "questions");
-        await push(qRef, payload);
+        await pb.collection('questions').create(payload);
       }
       setIsDialogOpen(false);
+      showAlert("Berhasil", "Soal berhasil disimpan.", "success");
     } catch (error) {
-      showAlert("Gagal", "Gagal menyimpan soal.", "danger");
+      showAlert("Gagal", "Gagal menyimpan soal ke PocketBase.", "danger");
     }
   };
 
@@ -951,7 +1010,8 @@ const QuestionsPage = () => {
     setIsDeleting(true);
     try {
       await cleanupQuestionImages(questionToDelete);
-      await remove(ref(database, `questions/${questionToDelete.id}`));
+      await pb.collection('questions').delete(questionToDelete.id);
+      showAlert("Berhasil", "Soal berhasil dihapus.", "success");
     } catch (error) {
       showAlert("Gagal", "Gagal menghapus soal.", "danger");
     } finally {
@@ -963,21 +1023,17 @@ const QuestionsPage = () => {
   const handleConfirmDeleteAll = async () => {
     setIsDeleting(true);
     try {
-      const qRef = ref(database, "questions");
-      const snapshot = await get(qRef);
-      if (snapshot.exists()) {
-        const data = snapshot.val();
-        const updates: any = {};
-        const keysToDelete = Object.keys(data).filter((k) => data[k].examId === examId);
+      const allQ = await pb.collection('questions').getFullList({
+        filter: `examId = "${examId}"`
+      });
 
-        for (const key of keysToDelete) {
-          await cleanupQuestionImages({ ...data[key], id: key });
-          updates[key] = null; // Set null untuk menghapus
-        }
-        await update(qRef, updates);
+      for (const q of allQ) {
+        await cleanupQuestionImages(q as any);
+        await pb.collection('questions').delete(q.id);
       }
-    } catch (error) {
-      showAlert("Gagal", "Gagal menghapus semua soal.", "danger");
+      showAlert("Berhasil", "Semua soal berhasil dikosongkan.", "success");
+    } catch (e) {
+      showAlert("Gagal", "Terjadi kesalahan saat mengosongkan soal.", "danger");
     } finally {
       setIsDeleting(false);
       setDeleteAllDialogOpen(false);
@@ -993,11 +1049,15 @@ const QuestionsPage = () => {
       const duplicates: number[] = [];
       let importedCount = 0;
 
+      const loadedQuestions = await pb.collection('questions').getFullList({
+        filter: `examId = "${examId}"`
+      });
+
       for (let i = 0; i < parsed.length; i++) {
         const q = parsed[i];
 
-        // Cek apakah teks soal sudah ada di daftar (questions state)
-        const isDuplicate = questions.some(
+        // Cek apakah teks soal sudah ada
+        const isDuplicate = (loadedQuestions as any[]).some(
           (existing) => existing.text.trim().toLowerCase() === q.text.trim().toLowerCase()
         );
 
@@ -1066,15 +1126,21 @@ const QuestionsPage = () => {
         const payload: any = {
           examId,
           text: textToSave,
-          choices: choicesToSave,
-          createdAt: Date.now(),
+          field: "multiple_choice", 
+          options: choicesToSave,
+          correctAnswer: "",
+          order: questions.length + importedCount + 1
         };
+
+        // Deteksi correctAnswer
+        const correctOnes = Object.keys(choicesToSave).filter(k => choicesToSave[k].isCorrect);
+        payload.correctAnswer = correctOnes.join(",");
 
         if (imageUrlToSave) {
           payload.imageUrl = imageUrlToSave;
         }
 
-        await push(ref(database, "questions"), payload);
+        await pb.collection('questions').create(payload);
         importedCount++;
       }
 

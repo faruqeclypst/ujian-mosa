@@ -1,6 +1,5 @@
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from "react";
-import { ref, onValue, push, update, remove, get } from "firebase/database";
-import { database } from "../lib/firebase";
+import pb from "../lib/pocketbase";
 import type { 
   Teacher, TeacherPayload, 
   ClassData, ClassPayload, 
@@ -35,6 +34,10 @@ interface ExamDataContextType {
   updateStudent: (id: string, payload: Partial<StudentPayload>) => Promise<void>;
   deleteStudent: (id: string) => Promise<void>;
   updateStudentClassBatch: (studentIds: string[], newClassId: string) => Promise<void>;
+  
+  // Universal Token
+  universalToken: string;
+  timeLeft: string;
 }
 
 const ExamDataContext = createContext<ExamDataContextType | undefined>(undefined);
@@ -46,155 +49,221 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
   const [students, setStudents] = useState<StudentData[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const [loadedTeachers, setLoadedTeachers] = useState(false);
-  const [loadedClasses, setLoadedClasses] = useState(false);
-  const [loadedSubjects, setLoadedSubjects] = useState(false);
-  const [loadedStudents, setLoadedStudents] = useState(false);
+  const [universalToken, setUniversalToken] = useState("");
+  const [tokenUpdatedAt, setTokenUpdatedAt] = useState<any>(null);
+  const [timeLeft, setTimeLeft] = useState("--:--");
 
-  useEffect(() => {
-    if (loadedTeachers && loadedClasses && loadedSubjects && loadedStudents) {
+  // Helper untuk memuai data awal dan subscribe ke perubahan Realtime
+  const setupRealtime = useCallback((collection: string, setter: (data: any[]) => void) => {
+    // 1. Ambil data awal (Full List)
+    pb.collection(collection).getFullList({ sort: '-created' })
+      .then((data) => {
+        setter(data.map(item => {
+          const { id, ...rest } = item;
+          return { id, ...rest };
+        }));
+      })
+      .catch(err => console.error(`Error loading ${collection}:`, err));
+
+    // 2. Subscribe ke perubahan Realtime
+    return pb.collection(collection).subscribe("*", (e) => {
+      pb.collection(collection).getFullList({ sort: '-created' })
+        .then((data) => {
+          setter(data.map(item => {
+            const { id, ...rest } = item;
+            const mapped = { id, ...rest } as any;
+            
+            // Khusus Siswa: Petakan username ke nisn jika perlu
+            if (collection === "students") {
+              mapped.nisn = item.username || item.nisn;
+              mapped.classId = item.classId || item.classid;
+            }
+            return mapped;
+          }));
+        });
+    });
+  }, []);
+
+  const initAll = useCallback(async () => {
+    try {
+      setLoading(true);
+      // Disable auto-cancellation globally to prevent AbortErrors during parallel fetches
+      pb.autoCancellation(false);
+      
+      // Ambil data awal untuk semua
+      const [tData, cData, sMapel, stData] = await Promise.all([
+        pb.collection("teachers").getFullList({ sort: '-created' }),
+        pb.collection("classes").getFullList({ sort: '-created' }),
+        pb.collection("subjects").getFullList({ sort: '-created' }),
+        pb.collection("students").getFullList({ sort: '-created' }),
+      ]);
+
+      setTeachers(tData.map(i => ({ ...i, id: i.id } as any)));
+      setClasses(cData.map(i => ({ ...i, id: i.id } as any)));
+      setSubjects(sMapel.map(i => ({ ...i, id: i.id } as any)));
+      setStudents(stData.map(i => {
+        return { 
+          ...i, 
+          id: i.id, 
+          nisn: i.username || i.nisn,
+          classId: i.classId || i.classid || i.class_id 
+        } as any;
+      }));
+
+    } finally {
       setLoading(false);
     }
-  }, [loadedTeachers, loadedClasses, loadedSubjects, loadedStudents]);
-
-  // Load teachers
-  useEffect(() => {
-    const teachersRef = ref(database, "teachers");
-    const unsubscribe = onValue(teachersRef, (snapshot) => {
-      if (snapshot.exists()) {
-        const data = snapshot.val();
-        const loadedTeachers: Teacher[] = Object.keys(data).map((key) => ({
-          id: key,
-          ...data[key],
-          subjects: data[key].subjects || [],
-        }));
-        setTeachers(loadedTeachers);
-      } else {
-        setTeachers([]);
-      }
-      setLoadedTeachers(true);
-    });
-    return () => unsubscribe();
   }, []);
 
-  // Load classes
   useEffect(() => {
-    const classesRef = ref(database, "classes");
-    const unsubscribe = onValue(classesRef, (snapshot) => {
-      if (snapshot.exists()) {
-        const data = snapshot.val();
-        const loadedClasses: ClassData[] = Object.keys(data).map((key) => ({
-          id: key,
-          ...data[key],
-        }));
-        setClasses(loadedClasses);
-      } else {
-        setClasses([]);
-      }
-      setLoadedClasses(true);
+    let unsubscribeTeachers: any, unsubscribeClasses: any, unsubscribeSubjects: any, unsubscribeStudents: any;
+
+    const setup = async () => {
+      await initAll();
+      unsubscribeTeachers = await pb.collection("teachers").subscribe("*", initAll);
+      unsubscribeClasses = await pb.collection("classes").subscribe("*", initAll);
+      unsubscribeSubjects = await pb.collection("subjects").subscribe("*", initAll);
+      unsubscribeStudents = await pb.collection("students").subscribe("*", initAll);
+    };
+
+    setup();
+    return () => {
+      if (unsubscribeTeachers) unsubscribeTeachers();
+      if (unsubscribeClasses) unsubscribeClasses();
+      if (unsubscribeSubjects) unsubscribeSubjects();
+      if (unsubscribeStudents) unsubscribeStudents();
+    };
+  }, [setupRealtime]);
+
+  // --- Universal Token & Settings Sync ---
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const records = await pb.collection('settings').getFullList();
+        if (records.length > 0) {
+          const s = records[0];
+          setUniversalToken(s.universal_token || "");
+          setTokenUpdatedAt(s.universal_token_updated_at || s.updated || "");
+        } else {
+          // Auto create if empty (Admin only usually)
+          const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+          let token = "";
+          for (let i = 0; i < 6; i++) token += chars.charAt(Math.floor(Math.random() * chars.length));
+          
+          await pb.collection('settings').create({
+            universal_token: token,
+            universal_token_updated_at: new Date().toISOString()
+          });
+          fetchSettings();
+        }
+      } catch (e) {}
+    };
+
+    fetchSettings();
+    const unsubscribe = pb.collection('settings').subscribe("*", () => {
+      fetchSettings();
     });
-    return () => unsubscribe();
+    return () => { unsubscribe.then(unsub => unsub()); };
   }, []);
 
-  // Load subjects
   useEffect(() => {
-    const subjectsRef = ref(database, "subjects");
-    const unsubscribe = onValue(subjectsRef, (snapshot) => {
-      if (snapshot.exists()) {
-        const data = snapshot.val();
-        const loadedSubjects: SubjectData[] = Object.keys(data).map((key) => ({
-          id: key,
-          ...data[key],
-        }));
-        setSubjects(loadedSubjects);
-      } else {
-        setSubjects([]);
-      }
-      setLoadedSubjects(true);
-    });
-    return () => unsubscribe();
-  }, []);
+    if (!tokenUpdatedAt) return;
 
-  // Load students
-  useEffect(() => {
-    const studentsRef = ref(database, "students");
-    const unsubscribe = onValue(studentsRef, (snapshot) => {
-      if (snapshot.exists()) {
-        const data = snapshot.val();
-        const loadedStudents: StudentData[] = Object.keys(data).map((key) => ({
-          id: key,
-          ...data[key],
-        }));
-        setStudents(loadedStudents);
+    const timer = setInterval(async () => {
+      const now = Date.now();
+      const updatedDate = new Date(tokenUpdatedAt).getTime();
+      const nextUpdate = updatedDate + 5 * 60 * 1000;
+      const diff = nextUpdate - now;
+
+      if (diff <= 0) {
+        setTimeLeft("00:00");
+        try {
+          const records = await pb.collection('settings').getFullList();
+          if (records.length > 0) {
+            const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+            let token = "";
+            for (let i = 0; i < 6; i++) token += chars.charAt(Math.floor(Math.random() * chars.length));
+            
+            await pb.collection('settings').update(records[0].id, {
+              universal_token: token,
+              universal_token_updated_at: new Date().toISOString()
+            });
+          }
+        } catch (e) {}
       } else {
-        setStudents([]);
+        const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+        const s = Math.floor((diff % (1000 * 60)) / 1000);
+        setTimeLeft(`${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`);
       }
-      setLoadedStudents(true);
-    });
-    return () => unsubscribe();
-  }, []);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [tokenUpdatedAt]);
 
   // --- Teacher Actions ---
   const createTeacher = async (payload: TeacherPayload) => {
-    const teachersRef = ref(database, "teachers");
-    await push(teachersRef, { ...payload, createdAt: Date.now() });
+    await pb.collection("teachers").create(payload);
   };
   const updateTeacher = async (id: string, payload: Partial<TeacherPayload>) => {
-    const teacherRef = ref(database, `teachers/${id}`);
-    await update(teacherRef, payload);
+    await pb.collection("teachers").update(id, payload);
   };
   const deleteTeacher = async (id: string) => {
-    const teacherRef = ref(database, `teachers/${id}`);
-    await remove(teacherRef);
+    await pb.collection("teachers").delete(id);
   };
 
   // --- Class Actions ---
   const createClass = async (payload: ClassPayload) => {
-    const classRef = ref(database, "classes");
-    await push(classRef, { ...payload, createdAt: Date.now() });
+    await pb.collection("classes").create(payload);
   };
   const updateClass = async (id: string, payload: Partial<ClassPayload>) => {
-    const classRef = ref(database, `classes/${id}`);
-    await update(classRef, payload);
+    await pb.collection("classes").update(id, payload);
   };
   const deleteClass = async (id: string) => {
-    const classRef = ref(database, `classes/${id}`);
-    await remove(classRef);
+    await pb.collection("classes").delete(id);
   };
 
   // --- Subject Actions ---
   const createSubject = async (payload: SubjectPayload) => {
-    const subjectRef = ref(database, "subjects");
-    await push(subjectRef, { ...payload, createdAt: Date.now() });
+    await pb.collection("subjects").create(payload);
   };
   const updateSubject = async (id: string, payload: Partial<SubjectPayload>) => {
-    const subjectRef = ref(database, `subjects/${id}`);
-    await update(subjectRef, payload);
+    await pb.collection("subjects").update(id, payload);
   };
   const deleteSubject = async (id: string) => {
-    const subjectRef = ref(database, `subjects/${id}`);
-    await remove(subjectRef);
+    await pb.collection("subjects").delete(id);
   };
 
   // --- Student Actions ---
   const createStudent = async (payload: StudentPayload) => {
-    const studentsRef = ref(database, "students");
-    await push(studentsRef, { ...payload, createdAt: Date.now() });
+    const defaultPass = payload.password || `${payload.nisn}@mosa`;
+    await pb.collection("students").create({
+      username: payload.nisn,
+      password: defaultPass,
+      passwordConfirm: defaultPass,
+      name: payload.name,
+      classId: payload.classId,
+      classid: payload.classId, // backup for lowercase field
+    });
   };
   const updateStudent = async (id: string, payload: Partial<StudentPayload>) => {
-    const studentRef = ref(database, `students/${id}`);
-    await update(studentRef, payload);
+    const updateData: any = {};
+    if (payload.name) updateData.name = payload.name;
+    if (payload.nisn) updateData.username = payload.nisn;
+    if (payload.classId) {
+      updateData.classId = payload.classId;
+      updateData.classid = payload.classId;
+    }
+    await pb.collection("students").update(id, updateData);
   };
   const deleteStudent = async (id: string) => {
-    const studentRef = ref(database, `students/${id}`);
-    await remove(studentRef);
+    await pb.collection("students").delete(id);
   };
   const updateStudentClassBatch = async (studentIds: string[], newClassId: string) => {
-    const updates: Record<string, any> = {};
-    studentIds.forEach((id) => {
-      updates[`students/${id}/classId`] = newClassId;
-    });
-    await update(ref(database), updates);
+    for (const id of studentIds) {
+      await pb.collection("students").update(id, { 
+        classId: newClassId,
+        classid: newClassId 
+      });
+    }
   };
 
   return (
@@ -205,6 +274,7 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
         createClass, updateClass, deleteClass,
         createSubject, updateSubject, deleteSubject,
         createStudent, updateStudent, deleteStudent, updateStudentClassBatch,
+        universalToken, timeLeft
       }}
     >
       {children}

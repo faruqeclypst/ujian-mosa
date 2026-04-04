@@ -1,16 +1,16 @@
 import { useState, useEffect } from "react";
-import { database } from "../lib/firebase";
-import { ref, get, update } from "firebase/database";
-import { uploadInventoryImage } from "../lib/storage";
+import pb from "../lib/pocketbase";
+import { uploadInventoryImage } from "../lib/storage"; 
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import FormField from "../components/forms/FormField";
 import { Card, CardHeader, CardTitle, CardContent } from "../components/ui/card";
 import { useToast } from "../components/ui/toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../components/ui/dialog";
-import { Upload, Save, Building, FolderOpen, Image } from "lucide-react";
+import { Upload, Save, Building, FolderOpen, Image as ImageIcon } from "lucide-react";
 
 const SettingsPage = () => {
+  const [settingsId, setSettingsId] = useState<string | null>(null);
   const [schoolName, setSchoolName] = useState("");
   const [schoolLogo, setSchoolLogo] = useState("");
   const [logoFile, setLogoFile] = useState<File | null>(null);
@@ -46,22 +46,46 @@ const SettingsPage = () => {
     { id: "uraian", label: "Uraian / Essay" },
   ];
 
+  const fetchSettings = async () => {
+    try {
+      setLoading(true);
+      const records = await pb.collection("settings").getFullList({
+        sort: "created",
+        limit: 1
+      });
+
+      if (records.length > 0) {
+        const data = records[0];
+        setSettingsId(data.id);
+        setSchoolName(data.name || "E-Ujian");
+        
+        // Handle logo dari URL Text
+        const logoUrl = data.logoUrl || data.logo || "";
+        setSchoolLogo(logoUrl);
+        setLogoPreview(logoUrl);
+
+        // Handle allowed types
+        if (data.allowed_types) setAllowedTypes(data.allowed_types);
+        else if (data.allowed_question_types) setAllowedTypes(data.allowed_question_types);
+      } else {
+        setSchoolName("E-Ujian");
+      }
+    } catch (e) {
+      console.error("Settings fetch err", e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const loadGalleryImages = async () => {
     try {
-      const snapshot = await get(ref(database, "questions"));
-      const images = new Set<string>();
-      if (snapshot.exists()) {
-        const data = snapshot.val();
-        Object.values(data).forEach((q: any) => {
-          if (q.imageUrl) images.add(q.imageUrl);
-          if (q.choices) {
-             Object.values(q.choices).forEach((c: any) => {
-                if (c.imageUrl) images.add(c.imageUrl);
-             });
-          }
-        });
-      }
-      setGalleryImages(Array.from(images));
+      // Ambil gambar yang sudah pernah di-upload ke soal
+      const qRecords = await pb.collection("questions").getFullList({
+        filter: 'imageUrl != "" || image != ""',
+        limit: 20
+      });
+      const images = qRecords.map(q => q.imageUrl || q.image);
+      setGalleryImages(images.filter(Boolean));
     } catch (e) { console.error("Gallery err", e); }
   };
 
@@ -73,25 +97,7 @@ const SettingsPage = () => {
   };
 
   useEffect(() => {
-    const typesRef = ref(database, "settings/allowed_question_types");
-    get(typesRef).then((snapshot) => {
-      if (snapshot.exists()) {
-        setAllowedTypes(snapshot.val());
-      }
-    });
-
-    const configRef = ref(database, "settings/school");
-    get(configRef).then((snapshot) => {
-      if (snapshot.exists()) {
-        const data = snapshot.val();
-        setSchoolName(data.name || "E-Ujian");
-        setSchoolLogo(data.logoUrl || "");
-        setLogoPreview(data.logoUrl || "");
-      } else {
-        setSchoolName("E-Ujian");
-      }
-      setLoading(false);
-    });
+    fetchSettings();
   }, []);
 
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -111,29 +117,52 @@ const SettingsPage = () => {
 
     setSaving(true);
     try {
-      let logoUrl = schoolLogo;
+      let finalLogoUrl = schoolLogo;
 
+      // ☁️ Langkah 1: Upload ke Cloudflare R2 jika ada file baru (logoFile)
       if (logoFile) {
-        const uploadRes = await uploadInventoryImage("school", logoFile);
-        logoUrl = uploadRes.url;
+        try {
+          const uploadRes = await uploadInventoryImage("school", logoFile);
+          if (uploadRes && uploadRes.url) {
+            finalLogoUrl = uploadRes.url;
+          }
+        } catch (uploadErr) {
+          console.error("Cloudflare Upload Error:", uploadErr);
+          addToast({ title: "Gagal Upload", description: "Gagal mengunggah logo ke Cloudflare. Cek koneksi internet/token R2.", type: "error" });
+          setSaving(false);
+          return;
+        }
       }
 
-      const configRef = ref(database, "settings/school");
-      await update(configRef, {
+      // Pastikan bukan Base64/DataURL yang dikirim (Cegah error 5000 karakter)
+      if (finalLogoUrl.startsWith("data:")) {
+        addToast({ title: "Gagal Simpan", description: "Format gambar tidak didukung (DataURL). Harap upload ulang.", type: "error" });
+        setSaving(false);
+        return;
+      }
+
+      // 📁 Langkah 2: Simpan URL ke PocketBase
+      const payload: any = {
         name: schoolName,
-        logoUrl: logoUrl,
-        updatedAt: Date.now(),
-      });
+        logo: finalLogoUrl,
+        allowed_types: allowedTypes
+      };
 
-      // Save question types
-      const typesRef = ref(database, "settings/allowed_question_types");
-      await update(typesRef, allowedTypes);
+      if (settingsId) {
+        await pb.collection("settings").update(settingsId, payload);
+      } else {
+        const created = await pb.collection("settings").create(payload);
+        setSettingsId(created.id);
+      }
 
-      setSchoolLogo(logoUrl);
+      setSchoolLogo(finalLogoUrl);
       setLogoFile(null);
       addToast({ title: "Berhasil!", description: "Pengaturan berhasil diperbarui.", type: "success" });
+      fetchSettings();
     } catch (err: any) {
-      addToast({ title: "Gagal", description: "Terjadi kesalahan saat menyimpan pengaturan.", type: "error" });
+      console.error("Save settings err", err);
+      const detail = err.data?.data ? JSON.stringify(err.data.data) : (err.message || "Gagal simpan");
+      addToast({ title: "Gagal", description: "Terjadi kesalahan: " + detail, type: "error" });
     } finally {
       setSaving(false);
     }
@@ -155,7 +184,7 @@ const SettingsPage = () => {
             <Save className="h-5 w-5 text-indigo-500" />
             Pengaturan Aplikasi
           </h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Kelola informasi sekolah dan aset visual identitas CBT.</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Kelola identitas sekolah dan lisensi tipe soal.</p>
         </div>
       </div>
 
@@ -173,7 +202,7 @@ const SettingsPage = () => {
                   value={schoolName}
                   onChange={(e) => setSchoolName(e.target.value)}
                   placeholder="Masukkan nama sekolah"
-                  className="rounded-xl"
+                  className="rounded-xl font-semibold"
                 />
               </FormField>
 
@@ -194,7 +223,7 @@ const SettingsPage = () => {
                     >
                       <Upload className="h-3.5 w-3.5" /> Ganti Logo
                     </button>
-                    <p className="text-[10px] text-slate-400 dark:text-slate-500">Rekomendasi model sirkel/kotak, max 2MB.</p>
+                    <p className="text-[10px] text-slate-400 dark:text-slate-500">Logo akan disimpan ke Cloudflare R2.</p>
                   </div>
                 </div>
               </FormField>
@@ -203,7 +232,7 @@ const SettingsPage = () => {
                 <Button 
                    type="submit" 
                    disabled={saving} 
-                   className="bg-blue-50 hover:bg-blue-100 border border-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 dark:border-blue-800/40 text-blue-700 font-semibold rounded-xl h-9 gap-1.5"
+                   className="bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl h-9 gap-1.5"
                 >
                   <Save className="h-3.5 w-3.5" />
                   {saving ? "Menyimpan..." : "Simpan Perubahan"}
@@ -213,6 +242,7 @@ const SettingsPage = () => {
           </CardContent>
         </Card>
 
+        {/* Question Types Card Remains Same */}
         <Card className="rounded-2xl border border-slate-200/60 dark:border-slate-800/40 shadow-sm backdrop-blur-sm mt-6">
           <CardHeader className="border-b border-slate-200/60 dark:border-slate-800/40 pb-4">
             <CardTitle className="text-base font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
@@ -239,7 +269,6 @@ const SettingsPage = () => {
                     </div>
                 ))}
             </div>
-            <p className="text-[10px] text-slate-400 mt-4 italic">* Tipe soal yang dinonaktifkan tidak akan muncul saat membuat Bank Soal baru.</p>
           </CardContent>
         </Card>
       </div>
@@ -255,12 +284,12 @@ const SettingsPage = () => {
               className="flex items-center gap-2.5 justify-start p-3 w-full rounded-xl bg-slate-50/80 hover:bg-slate-100 dark:bg-slate-900/50 dark:hover:bg-slate-800 border border-slate-200/80 dark:border-slate-800 transition-all text-slate-700 dark:text-slate-200"
               onClick={() => { setIsPickerOpen(false); document.getElementById("logoInput")?.click(); }}
             >
-              <div className="p-2 rounded-lg bg-purple-50 dark:bg-purple-950/40 border border-purple-100 dark:border-purple-800/40 text-purple-600 dark:text-purple-400">
-                <Image className="h-4 w-4" />
+              <div className="p-2 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-800/40 text-indigo-600 dark:text-indigo-400">
+                <ImageIcon className="h-4 w-4" />
               </div>
               <div className="flex flex-col items-start">
-                  <span className="font-semibold text-xs">Unggah Dari Komputer</span>
-                  <span className="text-[10px] text-slate-400">File foto maksimal 2MB</span>
+                  <span className="font-semibold text-xs text-left">Unggah Gambar Baru</span>
+                  <span className="text-[10px] text-slate-400">Menuju Cloudflare R2</span>
               </div>
             </button>
             <button
@@ -272,8 +301,8 @@ const SettingsPage = () => {
                 <FolderOpen className="h-4 w-4" />
               </div>
               <div className="flex flex-col items-start">
-                  <span className="font-semibold text-xs">Ambil Dari Galeri</span>
-                  <span className="text-[10px] text-slate-400">Gunakan file yang sudah di-upload</span>
+                  <span className="font-semibold text-xs text-left">Ambil Dari Galeri</span>
+                  <span className="text-[10px] text-slate-400">Gunakan yang sudah di-upload</span>
               </div>
             </button>
           </div>
@@ -284,12 +313,12 @@ const SettingsPage = () => {
         <DialogContent className="max-w-2xl bg-card max-h-[80vh] overflow-y-auto">
           <DialogHeader className="border-b pb-3">
             <DialogTitle className="text-base font-bold flex items-center gap-2">
-              <FolderOpen className="h-4 w-4 text-blue-500" /> Galeri Media Soal
+              <FolderOpen className="h-4 w-4 text-blue-500" /> Galeri Media
             </DialogTitle>
           </DialogHeader>
-          <div className="py-4">
-            {galleryImages.length === 0 ? (
-              <div className="text-center py-8 text-slate-400 text-sm">Belum ada gambar di galeri.</div>
+          <div className="py-4 text-left">
+            {!galleryImages.length ? (
+              <div className="text-center py-8 text-slate-400 text-sm italic underline">Belum ada gambar yang ditemukan.</div>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {galleryImages.map((src, idx) => (

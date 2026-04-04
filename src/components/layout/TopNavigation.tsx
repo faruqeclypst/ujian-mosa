@@ -10,13 +10,11 @@ import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { ThemeToggle } from "../ui/theme-toggle";
 import { cn } from "../../lib/utils";
-import { database } from "../../lib/firebase";
-import { ref, onValue, get, update } from "firebase/database";
+import pb from "../../lib/pocketbase";
 
 const TopNavigation = () => {
   const { user, signOut, usernameFromEmail } = useAuth();
   const { setMobileOpen } = useSidebar();
-  const { students, classes } = useExamData();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [lockedAttempts, setLockedAttempts] = useState<any[]>([]);
@@ -25,11 +23,11 @@ const TopNavigation = () => {
   const dropdownRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
 
-  const displayName = user?.displayName?.trim() || usernameFromEmail(user?.email) || "Pengguna";
+  const displayName = (user as any)?.name || (user as any)?.username || usernameFromEmail(user?.email) || "Pengguna";
   const initials = displayName
     .split(" ")
     .filter(Boolean)
-    .map((part) => part[0]?.toUpperCase())
+    .map((part: string) => part[0]?.toUpperCase())
     .join("")
     .slice(0, 2) || "PG";
 
@@ -80,119 +78,54 @@ const TopNavigation = () => {
   }, []);
 
   // Listen for LOCKED attempts and Exam Rooms
+  // Listen for LOCKED attempts and Exam Rooms from PocketBase
   useEffect(() => {
-    const roomsRef = ref(database, "exam_rooms");
-    const unsubRooms = onValue(roomsRef, (snapshot) => {
-      if (snapshot.exists()) {
-        setExamRooms(snapshot.val());
-      }
-    });
+    const fetchData = async () => {
+      try {
+        // Fetch Exam Rooms for names mapping
+        const rooms = await pb.collection('exam_rooms').getFullList();
+        const roomsMap: Record<string, any> = {};
+        rooms.forEach((r: any) => { roomsMap[r.id] = r; });
+        setExamRooms(roomsMap);
 
-    const attemptsRef = ref(database, "attempts");
-    const unsubAttempts = onValue(attemptsRef, (snapshot) => {
-      if (snapshot.exists()) {
-        const data = snapshot.val();
-        const locked: any[] = [];
-
-        // data is { roomId: { nisn: attempt } }
-        Object.keys(data).forEach(rid => {
-          const roomAttempts = data[rid];
-          Object.keys(roomAttempts).forEach(nisn => {
-            if (roomAttempts[nisn].status === "LOCKED") {
-              locked.push({ id: nisn, nisn, roomId: rid, ...roomAttempts[nisn] });
-            }
-          });
+        // Fetch Locked Attempts
+        const locked = await pb.collection('attempts').getFullList({
+          filter: 'status = "LOCKED"',
+          expand: 'studentId'
         });
-        setLockedAttempts(locked);
-      } else {
-        setLockedAttempts([]);
-      }
-    });
+        
+        setLockedAttempts(locked.map((a: any) => ({
+          id: a.id,
+          nisn: a.expand?.studentId?.nisn || "N/A",
+          studentId: a.studentId,
+          roomId: a.examRoomId,
+          status: a.status
+        })));
+      } catch (e) {}
+    };
+
+    fetchData();
+    const unsubRooms = pb.collection('exam_rooms').subscribe("*", fetchData);
+    const unsubAttempts = pb.collection('attempts').subscribe("*", fetchData);
 
     return () => {
-      unsubRooms();
-      unsubAttempts();
+      unsubRooms.then(un => un());
+      unsubAttempts.then(un => un());
     };
-  }, [students]);
+  }, []);
 
-  const handleUnlockStudent = async (nisn: string, roomId: string) => {
+  const handleUnlockStudent = async (attId: string) => {
     try {
-      await update(ref(database, `attempts/${roomId}/${nisn}`), {
+      await pb.collection('attempts').update(attId, {
         status: "ongoing",
-        cheatCount: 0, // Reset cheat count after unlock
+        cheatCount: 0,
       });
     } catch (error) {
       console.error("Gagal membuka kunci student", error);
     }
   };
 
-  const [universalToken, setUniversalToken] = useState<string>("");
-  const [tokenUpdatedAt, setTokenUpdatedAt] = useState<number | null>(null);
-  const [timeLeft, setTimeLeft] = useState<string>("");
-
-  useEffect(() => {
-    const tokenRef = ref(database, "settings/universal_token");
-    const unsub1 = onValue(tokenRef, (snapshot) => {
-      if (snapshot.exists()) {
-        setUniversalToken(snapshot.val());
-      } else {
-        setUniversalToken("");
-      }
-    });
-
-    const tokenUpdatedAtRef = ref(database, "settings/universal_token_updated_at");
-    const unsub2 = onValue(tokenUpdatedAtRef, (snapshot) => {
-      if (snapshot.exists()) {
-        setTokenUpdatedAt(snapshot.val());
-      } else {
-        setTokenUpdatedAt(null);
-      }
-    });
-
-    return () => {
-      unsub1();
-      unsub2();
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!tokenUpdatedAt) return;
-
-    const timer = setInterval(() => {
-      const now = Date.now();
-      const nextUpdate = tokenUpdatedAt + 5 * 60 * 1000;
-      const diff = nextUpdate - now;
-
-      if (diff <= 0) {
-        setTimeLeft("00:00");
-        const rotateToken = async () => {
-          try {
-            const snap = await get(ref(database, "settings/universal_token_updated_at"));
-            const lastFirebaseUpdate = snap.exists() ? snap.val() : 0;
-            const nowCheck = Date.now();
-
-            if (nowCheck - lastFirebaseUpdate >= 5 * 60 * 1000) {
-              const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-              let token = "";
-              for (let i = 0; i < 6; i++) {
-                token += chars.charAt(Math.floor(Math.random() * chars.length));
-              }
-              await update(ref(database, "settings"), {
-                universal_token: token,
-                universal_token_updated_at: nowCheck
-              });
-            }
-          } catch (e) { }
-        };
-        rotateToken();
-      } else {
-        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-        const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-        setTimeLeft(`${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`);
-      }
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [tokenUpdatedAt]);
+  const { students, classes, universalToken, timeLeft } = useExamData();
 
   return (
     <header className="flex w-full items-center gap-2 sm:gap-4 border-b bg-card/95 backdrop-blur-sm px-3 sm:px-6 py-2 sm:py-4 shadow-sm shrink-0 relative z-30">
@@ -267,23 +200,21 @@ const TopNavigation = () => {
                   </div>
                 ) : (
                   <div className="divide-y dark:divide-slate-800">
-                    {lockedAttempts.map((item) => {
-                      const student = students.find(s => s.nisn === item.nisn);
-                      const room = examRooms[item.roomId];
-                      const className = classes.find(c => c.id === student?.classId)?.name || "-";
+                    {lockedAttempts.map((a) => {
+                      const room = examRooms[a.roomId];
 
                       return (
-                        <div key={item.id} className="p-4 hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                        <div key={a.id} className="p-4 hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
                           <div className="flex items-start gap-3">
                             <div className="w-10 h-10 rounded-xl bg-red-50 dark:bg-red-950/30 flex items-center justify-center shrink-0 border border-red-100 dark:border-red-900/30">
                               <UserX className="h-5 w-5 text-red-600 dark:text-red-400" />
                             </div>
                             <div className="flex-1 min-w-0">
-                              <p className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">{student?.name || "Siswa Tidak Dikenal"}</p>
+                              <p className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">{a.expand?.studentId?.name || "Siswa Tidak Dikenal"}</p>
                               <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5">
-                                <span className="text-[10px] font-medium text-slate-500">{className}</span>
+                                <span className="text-[10px] font-medium text-slate-500">{classes.find(c => c.id === a.expand?.studentId?.classId)?.name || "-"}</span>
                                 <span className="text-[10px] text-slate-300 dark:text-slate-700">•</span>
-                                <span className="text-[10px] font-mono text-slate-400 bg-slate-100 dark:bg-slate-800 px-1 rounded">{item.nisn}</span>
+                                <span className="text-[10px] font-mono text-slate-400 bg-slate-100 dark:bg-slate-800 px-1 rounded">{a.nisn}</span>
                               </div>
                               <div className="mt-2 flex items-center gap-1.5 p-1.5 bg-blue-50/50 dark:bg-blue-950/20 rounded-lg border border-blue-100/50 dark:border-blue-900/20">
                                 <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></div>
@@ -292,7 +223,7 @@ const TopNavigation = () => {
                                 </p>
                               </div>
                               <Button
-                                onClick={() => handleUnlockStudent(item.nisn, item.roomId)}
+                                onClick={() => handleUnlockStudent(a.id)}
                                 size="sm"
                                 className="w-full mt-3 h-8 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold gap-1.5 shadow-sm shadow-blue-500/20"
                               >
@@ -332,7 +263,7 @@ const TopNavigation = () => {
             onClick={() => setIsDropdownOpen(!isDropdownOpen)}
           >
             <Avatar className="h-9 w-9 sm:h-10 sm:w-10">
-              <AvatarImage src={user?.photoURL || undefined} alt={displayName} />
+              <AvatarImage src={(user as any)?.avatar ? pb.getFileUrl(user as any, (user as any).avatar) : undefined} alt={displayName} />
               <AvatarFallback className="bg-gradient-to-br from-blue-500 to-blue-600 text-white text-xs sm:text-sm">
                 {initials}
               </AvatarFallback>
@@ -344,7 +275,7 @@ const TopNavigation = () => {
             <div className="absolute right-0 mt-2 w-64 sm:w-56 rounded-lg border bg-popover p-1 text-popover-foreground shadow-xl animate-in fade-in-0 zoom-in-95 z-[99999] pointer-events-auto">
               <div className="flex items-center justify-start gap-3 p-3 sm:p-2">
                 <Avatar className="h-10 w-10 ring-2 ring-background">
-                  <AvatarImage src={user?.photoURL || undefined} alt={displayName} />
+                  <AvatarImage src={(user as any)?.avatar ? pb.getFileUrl(user as any, (user as any).avatar) : undefined} alt={displayName} />
                   <AvatarFallback className="bg-gradient-to-br from-blue-500 to-blue-600 text-white text-xs">
                     {initials}
                   </AvatarFallback>

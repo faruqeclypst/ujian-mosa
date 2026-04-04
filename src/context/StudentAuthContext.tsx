@@ -1,8 +1,8 @@
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from "react";
-import { ref, get, update } from "firebase/database";
-import { database } from "../lib/firebase";
+import pb from "../lib/pocketbase";
 
 interface StudentUser {
+  id: string;
   nisn: string;
   name: string;
   classId: string;
@@ -20,104 +20,128 @@ interface StudentAuthContextValue {
 
 const StudentAuthContext = createContext<StudentAuthContextValue | undefined>(undefined);
 
-const SESSION_STORAGE_KEY = "student_auth_session";
-
 export const StudentAuthProvider = ({ children }: { children: ReactNode }) => {
   const [student, setstudent] = useState<StudentUser | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Sync state dengan PocketBase AuthStore
   useEffect(() => {
-    const savedSession = sessionStorage.getItem(SESSION_STORAGE_KEY);
-    if (savedSession) {
-      try {
-        setstudent(JSON.parse(savedSession));
-      } catch (err) {
-        sessionStorage.removeItem(SESSION_STORAGE_KEY);
+    const initAuth = async () => {
+      // 1. Ambil data SECARA INSTAN dari AuthStore (No Blink)
+      if (pb.authStore.isValid && pb.authStore.model && pb.authStore.model.collectionName === "students") {
+        const model = pb.authStore.model;
+        
+        // Langsung pasang data dasar yang ada di memori kounter
+        setstudent({
+          id: model.id,
+          nisn: model.username,
+          name: model.name || "-",
+          classId: model.classId || model.classid || (model as any).class_id || (model as any).class || "", 
+          className: (model as any).className || (model as any).class_name || "-",
+          hasChangedPassword: true
+        });
+
+        // 2. Jalankan pembaruan data secara ASYNC di latar belakang
+        try {
+          const studentFields = ["classId", "classid", "class_id", "class", "id_kelas", "kode_kelas"];
+          const refreshed = await pb.collection("students").getOne(model.id, { 
+            expand: studentFields.join(",") 
+          });
+
+          // Detect classObj dari rujukan (expand)
+          let classObj = null;
+          if (refreshed.expand) {
+            const keys = Object.keys(refreshed.expand);
+            for (const key of keys) {
+              const obj = refreshed.expand[key];
+              if (obj && (obj.name || obj.nama || (obj as any).classname)) {
+                classObj = obj; break;
+              }
+            }
+          }
+
+          // Fallback manual jika expand gagal
+          if (!classObj) {
+            const possibleId = refreshed.classId || refreshed.classid || (refreshed as any).class_id || (refreshed as any).class;
+            if (possibleId && possibleId.length > 5) {
+              try { classObj = await pb.collection("classes").getOne(possibleId); } catch(e){}
+            }
+          }
+
+          // Final update (Lengkap dengan Nama Kelas)
+          setstudent({
+            id: refreshed.id,
+            nisn: refreshed.username,
+            name: refreshed.name,
+            classId: refreshed.classId || refreshed.classid || (refreshed as any).class_id || "", 
+            className: classObj?.name || classObj?.nama || (classObj as any)?.classname || "-",
+            hasChangedPassword: refreshed.hasChangedPassword,
+          });
+        } catch (e) {
+          console.warn("Background sync failed:", e);
+        }
       }
-    }
-    setLoading(false);
+      setLoading(false);
+    };
+
+    initAuth();
+
+    // Listen perubahan auth (misal logout dari tab lain)
+    return pb.authStore.onChange(() => {
+      initAuth();
+    });
   }, []);
 
   const loginStudent = useCallback(async (nisn: string, password: string) => {
-    // 1. Cek di tabel Master Data student
-    const studentsRef = ref(database, "students");
-    const snapshot = await get(studentsRef);
-
-    if (!snapshot.exists()) {
-      throw new Error("Data student kosong di server!");
-    }
-
-    const studentsData = snapshot.val();
-    const studentHit = Object.values(studentsData).find((s: any) => s.nisn === nisn) as any;
-
-    if (!studentHit) {
-      throw new Error("NISN tidak terdaftar di data student!");
-    }
-
-    // 2. Cek Kredensial di tabel `users/${nisn}`
-    const credRef = ref(database, `users/${nisn}`);
-    const credSnapshot = await get(credRef);
-    
-    let dbPassword = "12345678"; // Default
-    let hasChangedPassword = false;
-
-    if (credSnapshot.exists()) {
-      const credData = credSnapshot.val();
-      dbPassword = credData.password;
-      hasChangedPassword = credData.hasChangedPassword || false;
-    }
-
-    if (dbPassword !== password) {
-      throw new Error("Password salah!");
-    }
-
-    // 3. Simpan Kredensial jika belum ada di node users/
-    if (!credSnapshot.exists()) {
-      await update(credRef, {
-        nisn: studentHit.nisn,
-        name: studentHit.name,
-        classId: studentHit.classId,
-        password: dbPassword,
-        hasChangedPassword: false,
+    try {
+      // 1. Authenticate ke koleksi 'students'
+      const authData = await pb.collection("students").authWithPassword(nisn, password, {
+        expand: 'classId'
       });
+      
+      const model = authData.record;
+      const classId = model.classId || model.class_id || model.classid || "";
+      const classObj = model.expand?.classId || (model.expand as any)?.class_id || (model.expand as any)?.classid;
+
+      const studentData: StudentUser = {
+        id: model.id,
+        nisn: model.username,
+        name: model.name,
+        classId: classId,
+        className: classObj?.name || model.className || model.class_name || "-",
+        hasChangedPassword: model.hasChangedPassword,
+      };
+
+      setstudent(studentData);
+    } catch (err: any) {
+      if (err.status === 400 || err.status === 404) {
+        throw new Error("NISN atau Password salah!");
+      }
+      throw new Error(err.message || "Terjadi kesalahan saat login");
     }
-
-    // Ambil Nama Kelas secara statis jika memungkinkan, atau sekadar kosong
-    let className = "";
-    if (studentHit.classId) {
-      const classSnap = await get(ref(database, `classes/${studentHit.classId}`));
-      if (classSnap.exists()) className = classSnap.val().name;
-    }
-
-    const studentData: StudentUser = {
-      nisn: studentHit.nisn,
-      name: studentHit.name,
-      classId: studentHit.classId,
-      className: className,
-      hasChangedPassword: hasChangedPassword,
-    };
-
-    setstudent(studentData);
-    sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(studentData));
   }, []);
 
   const changePassword = useCallback(async (newPassword: string) => {
     if (!student) throw new Error("Tidak ada student yang aktif.");
 
-    const userRef = ref(database, `users/${student.nisn}`);
-    await update(userRef, {
-      password: newPassword,
-      hasChangedPassword: true,
-    });
+    try {
+      await pb.collection("students").update(student.id, {
+        password: newPassword,
+        passwordConfirm: newPassword,
+        hasChangedPassword: true,
+      });
 
-    const updatedstudent = { ...student, hasChangedPassword: true };
-    setstudent(updatedstudent);
-    sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(updatedstudent));
+      // Update state lokal
+      setstudent((prev) => prev ? { ...prev, hasChangedPassword: true } : null);
+    } catch (err: any) {
+      throw new Error("Gagal mengganti password: " + err.message);
+    }
   }, [student]);
 
   const logoutStudent = useCallback(() => {
+    pb.authStore.clear();
     setstudent(null);
-    sessionStorage.clear(); // 🧹 Membersihkan seluruh sesi termasuk urutan soal agar 'fresh' saat masuk kembali
+    sessionStorage.clear(); 
   }, []);
 
   return (

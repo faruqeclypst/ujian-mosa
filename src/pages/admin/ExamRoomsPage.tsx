@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Plus, Trash, Edit, RefreshCw, Users, Archive, RotateCw, FileSpreadsheet, BookOpen, ClipboardList, Lock, ChevronDown, Power, PowerOff, Square, CheckCircle2, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import * as XLSX from "xlsx-js-style";
@@ -6,8 +6,7 @@ import { Button } from "../../components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../../components/ui/dialog";
 import { DeleteConfirmationDialog } from "../../components/ui/delete-confirmation-dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
-import { ref, onValue, push, update, remove, get } from "firebase/database";
-import { database } from "../../lib/firebase";
+import pb from "../../lib/pocketbase";
 import { Input } from "../../components/ui/input";
 import FormField from "../../components/forms/FormField";
 import { useExamData } from "../../context/ExamDataContext";
@@ -32,8 +31,8 @@ export interface ExamRoomData {
   examTitle?: string;
   className?: string;
   room_code?: string;
-  token_updated_at?: number;
-  status?: "archive" | null; // <--- Status Arsip
+  token_updated_at?: string; // ISO string from PB
+  status?: "archive" | null;
   room_name?: string;
   examTeacherId?: string;
   examType?: string;
@@ -47,17 +46,14 @@ export interface ExamRoomData {
 const isFuzzyMatch = (studentAns: any, correctKey: string) => {
   if (typeof studentAns !== "string" || !correctKey) return false;
   
-  // Standardize: lowecase & remove punctuation & double spaces
   const sAns = studentAns.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
   const cKey = correctKey.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
   
   if (sAns === cKey) return true;
   if (!sAns || !cKey) return false;
   
-  // No tolerance for very short words
   if (cKey.length < 3) return sAns === cKey; 
 
-  // Levenshtein Distance Calculation
   const distance = (a: string, b: string) => {
     const matrix = Array(b.length + 1).fill(null).map(() => Array(a.length + 1).fill(null));
     for (let i = 0; i <= a.length; i++) matrix[0][i] = i;
@@ -72,21 +68,18 @@ const isFuzzyMatch = (studentAns: any, correctKey: string) => {
   };
 
   const dist = distance(sAns, cKey);
-  // Tolerance: 1 typo for 4-8 chars, 2 typos for > 8 chars
   const maxAllowed = cKey.length > 8 ? 2 : (cKey.length >= 4 ? 1 : 0);
   return dist <= maxAllowed;
 };
 
 const ExamRoomsPage = () => {
   const navigate = useNavigate();
-  const { role, teacherId } = useAuth();
-  const { classes: examClasses, students, subjects } = useExamData();
+  const { user, role } = useAuth();
   const [rooms, setRooms] = useState<ExamRoomData[]>([]);
   const [exams, setExams] = useState<any[]>([]);
-  const [teachers, setTeachers] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"aktif" | "arsip">("aktif"); // <--- Active tab filter
-  const [showAdvanced, setShowAdvanced] = useState(false); // <--- Advanced settings dialog collapsible
+  const [activeTab, setActiveTab] = useState<"aktif" | "arsip">("aktif");
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [dialogMode, setDialogMode] = useState<"create" | "edit">("create");
@@ -95,16 +88,16 @@ const ExamRoomsPage = () => {
   const [formValues, setFormValues] = useState({
     room_name: "",
     examId: "",
-    classId: "all", // "all" or specific classId
+    classId: "all",
     allClasses: true,
     token: "",
     start_time: "",
     end_time: "",
     duration: 60,
     cheat_limit: 3,
-    submit_window: 10, // Default 10 mnt
+    submit_window: 10,
     room_code: "",
-    show_result: true, // <--- Menampilkan skor ke student
+    show_result: true,
   });
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -132,25 +125,29 @@ const ExamRoomsPage = () => {
   const [monitorRoom, setMonitorRoom] = useState<ExamRoomData | null>(null);
   const [attempts, setAttempts] = useState<any[]>([]);
   const [monitorQuestions, setMonitorQuestions] = useState<any[]>([]);
-  const [expandedstudent, setExpandedstudent] = useState<string | null>(null); // NISN
-  const [answersList, setAnswersList] = useState<Record<string, any>>({}); // { nisn: answers }
-  const [monitorSortBy, setMonitorSortBy] = useState<"default" | "nilai" | "login" | "nama">("default");
-  const [monitorClassFilter, setMonitorClassFilter] = useState<string>("all");
-  const [monitorPage, setMonitorPage] = useState(1);
-  const [monitorPageSize, setMonitorPageSize] = useState(10);
-  const [openMenuId, setOpenMenuId] = useState<string | null>(null); // <--- Kontrol Dropdown Aksis
+  const [answersList, setAnswersList] = useState<Record<string, any>>({});
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [expandedstudent, setExpandedstudent] = useState<string | null>(null);
 
   const [limitDialogOpen, setLimitDialogOpen] = useState(false);
   const [limitNisn, setLimitNisn] = useState("");
   const [limitValue, setLimitValue] = useState("1");
   const [previewImage, setPreviewImage] = useState<string | null>(null); // <--- Pratinjau Zoom Gambar Logs
 
-  const [universalToken, setUniversalToken] = useState("");
-  const [tokenUpdatedAt, setTokenUpdatedAt] = useState<number>(0);
-  const [timeLeft, setTimeLeft] = useState<string>("--:--");
+  const { 
+    classes: examClasses, students, subjects, teachers: masterTeachers,
+    universalToken, timeLeft
+  } = useExamData();
 
   const [liveBreakdown, setLiveBreakdown] = useState<Record<string, number>>({});
   const [totalOngoing, setTotalOngoing] = useState(0);
+
+  const [monitorPage, setMonitorPage] = useState(1);
+  const [monitorPageSize, setMonitorPageSize] = useState(25);
+  const [monitorClassFilter, setMonitorClassFilter] = useState("all");
+  const [monitorSortBy, setMonitorSortBy] = useState<"default" | "nama" | "nilai" | "login">("default");
+  
+  const teacherId = user?.id; // PocketBase user id
 
   // 🖱️ Menarik/Menutup Dropdown Menu otomatis saat Klik di Luar kontainer
   useEffect(() => {
@@ -159,121 +156,149 @@ const ExamRoomsPage = () => {
     return () => document.removeEventListener("click", handleGlobalClick);
   }, []);
 
+  // Sync Live Monitoring Progres
   useEffect(() => {
-    return onValue(ref(database, "settings"), (snap) => {
-      if (snap.exists()) {
-        const data = snap.val();
-        setUniversalToken(data.universal_token || "");
-        setTokenUpdatedAt(data.universal_token_updated_at || Date.now());
-      }
-    });
+    const fetchAttempts = async () => {
+      try {
+        const allAttempts = await pb.collection('attempts').getFullList({
+          filter: 'status = "ongoing"'
+        });
+        
+        const stats: Record<string, number> = {};
+        let total = 0;
+
+        allAttempts.forEach(att => {
+          stats[att.examRoomId] = (stats[att.examRoomId] || 0) + 1;
+          total++;
+        });
+
+        setLiveBreakdown(stats);
+        setTotalOngoing(total);
+      } catch (e) {}
+    };
+
+    fetchAttempts();
+    const unsub = pb.collection('attempts').subscribe("*", fetchAttempts);
+    return () => { unsub.then(u => u()); };
   }, []);
 
+  // Sync Master Exams for Room creation selection
   useEffect(() => {
-    const attemptsRef = ref(database, "attempts");
-    return onValue(attemptsRef, (snap) => {
-      if (!snap.exists()) {
-        setLiveBreakdown({});
-        setTotalOngoing(0);
-        return;
-      }
-      const data = snap.val();
-      const stats: Record<string, number> = {};
-      let total = 0;
+    const fetchExams = async () => {
+      try {
+        const loaded = await pb.collection('exams').getFullList({ sort: '-created' });
+        setExams(loaded);
+      } catch (e) {}
+    };
+    fetchExams();
+  }, []);
 
-      // data is { roomId: { nisn: attempt } }
-      // data is { roomId: { nisn: attempt } }
-      Object.keys(data).forEach(rid => {
-        // filter: only count if room is not archived (exists in current active rooms list)
-        // Note: we'll check against rooms state or just calculate later.
-        // For simplicity and speed, we check if the roomId exists in our local record and is not archive.
-        const roomInfo = rooms.find(r => r.id === rid);
-        if (roomInfo && roomInfo.status === "archive") return;
-
-        const roomAttempts = data[rid];
-        Object.keys(roomAttempts).forEach(nisn => {
-          if (roomAttempts[nisn].status === "ongoing") {
-            stats[rid] = (stats[rid] || 0) + 1;
-            total++;
-          }
-        });
-      });
-      setLiveBreakdown(stats);
-      setTotalOngoing(total);
-    });
-  }, [rooms]); // Added rooms as dependency to ensure archive filtering works
-
+  // Sync Exam Rooms listing
   useEffect(() => {
-    if (!tokenUpdatedAt) return;
+    const fetchRooms = async () => {
+      try {
+        const loaded = await pb.collection('exam_rooms').getFullList({ sort: '-created' });
+        const mapped = loaded.map(room => {
+          // Robust field mapping for CamelCase and snake_case
+          const sId = room.examId || (room as any).examid || "";
+          const startTime = room.start_time || (room as any).startTime || "";
+          const endTime = room.end_time || (room as any).endTime || "";
+          const roomName = room.room_name || (room as any).title || room.title || "";
+          const clsId = room.classId || (room as any).classIds || "";
+          const isOff = room.isDisabled !== undefined ? room.isDisabled : (room as any).isActive === false;
 
-    const timer = setInterval(() => {
-      const now = Date.now();
-      const nextUpdate = tokenUpdatedAt + 5 * 60 * 1000;
-      const diff = nextUpdate - now;
-
-      if (diff <= 0) {
-        setTimeLeft("00:00");
-        const rotateToken = async () => {
-          try {
-            const snap = await get(ref(database, "settings/universal_token_updated_at"));
-            const lastFirebaseUpdate = snap.exists() ? snap.val() : 0;
-            const nowCheck = Date.now();
-
-            if (nowCheck - lastFirebaseUpdate >= 5 * 60 * 1000) {
-              const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-              let token = "";
-              for (let i = 0; i < 6; i++) {
-                token += chars.charAt(Math.floor(Math.random() * chars.length));
-              }
-              await update(ref(database, "settings"), {
-                universal_token: token,
-                universal_token_updated_at: nowCheck
-              });
+          const examObj = exams.find(e => e.id === sId);
+          const subjectObj = subjects.find(s => s.id === (examObj?.subjectId || (examObj as any)?.subjectid));
+          const teacherObj = masterTeachers.find(t => t.id === (examObj?.teacherId || (examObj as any)?.teacherid));
+          
+          let className = "Semua Kelas";
+          if (!room.allClasses) {
+            // Kita coba ambil dari berbagai kemungkinan field (classId atau classIds)
+            const clsData = room.classId || (room as any).classid || (room as any).classIds || (room as any).classids || "";
+            
+            // Konversi ke Array ID yang bersih
+            let classList: string[] = [];
+            if (Array.isArray(clsData)) {
+              classList = clsData;
+            } else if (typeof clsData === 'string' && clsData.length > 0) {
+              const rawCls = clsData;
+              classList = Array.isArray(rawCls) 
+                ? rawCls 
+                : String(rawCls || "").split(",").map(id => id.trim()).filter(id => id && id !== "all");
             }
-          } catch (e) { }
-        };
-        rotateToken();
-      } else {
-        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-        const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-        setTimeLeft(`${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`);
-      }
-    }, 1000);
+            
+            // Cari nama-nama kelasnya
+            const foundNames = classList.map(id => {
+              const c = (examClasses || []).find(cl => cl.id === id);
+              return c ? c.name : null;
+            }).filter(Boolean);
 
-    return () => clearInterval(timer);
-  }, [tokenUpdatedAt]);
+            if (foundNames.length > 0) {
+              className = foundNames.join(", ");
+            } else {
+              // Jika ID tidak ditemukan namanya, tapi ada ID-nya, tampilkan ID-nya saja sebagai cadangan
+              className = classList.length > 0 ? `ID: ${classList[0].substring(0,5)}...` : "N/A";
+            }
+          }
+
+          const { id, ...rest } = room;
+          return {
+            id,
+            ...rest,
+            examId: sId,
+            room_name: roomName,
+            start_time: startTime,
+            end_time: endTime,
+            classId: clsId,
+            isDisabled: isOff,
+            examTitle: examObj?.title || "Draft Ujian",
+            examType: (examObj as any)?.examType || (examObj as any)?.examtype || "UMUM",
+            subjectName: subjectObj?.name || "N/A",
+            teacherName: teacherObj?.name || "N/A",
+            className: className
+          } as any as ExamRoomData;
+        });
+
+        setRooms(mapped);
+      } catch (e) {
+        console.error("Error fetching rooms:", e);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchRooms();
+    const unsubscribe = pb.collection('exam_rooms').subscribe("*", () => {
+      fetchRooms();
+    });
+    return () => {
+      unsubscribe.then(unsub => unsub());
+    };
+  }, [subjects, masterTeachers, exams, examClasses]);
 
   const [monitorTimeLeft, setMonitorTimeLeft] = useState(0);
   const [isMonitorRefreshing, setIsMonitorRefreshing] = useState(false);
 
-  const handleManualRefreshMonitor = () => {
-    setMonitorTimeLeft(300);
-    // Trigger reload manual
-    if (monitorRoom && isMonitorOpen) {
-      const attemptsRef = ref(database, `attempts/${monitorRoom.id}`);
-      get(attemptsRef).then((snap) => {
-        const data = snap.val();
-        if (data) {
-          const loaded = Object.keys(data)
-            .map((nisn) => {
-              return { id: nisn, nisn, ...data[nisn] };
-            });
-          setAttempts(loaded);
-        } else {
-          setAttempts([]);
+  const handleManualRefreshMonitor = useCallback(async () => {
+    if (!monitorRoom?.id) return;
+    try {
+      const loadedAttempts = await pb.collection('attempts').getFullList({
+        filter: `examRoomId = "${monitorRoom.id}"`
+      });
+      setAttempts(loadedAttempts);
+
+      // Grouping answers dari kolom answers (JSON) di attempts
+      const grouped: Record<string, any> = {};
+      loadedAttempts.forEach(att => {
+        if (att.answers) {
+          grouped[att.studentId] = att.answers;
         }
       });
-      const answersRef = ref(database, `answers/${monitorRoom.id}`);
-      get(answersRef).then((snap) => {
-        const data = snap.val();
-        if (data) {
-          setAnswersList(data);
-        } else {
-          setAnswersList({});
-        }
-      });
+      setAnswersList(grouped);
+    } catch (e) {
+      console.error("Refresh Monitor Error:", e);
     }
-  };
+  }, [monitorRoom]);
 
   // 🔒 Algoritma Token Otomatis Matematikal (Sama dengan student)
   const generateTimeToken = (timestamp: number) => {
@@ -305,12 +330,63 @@ const ExamRoomsPage = () => {
     return () => clearInterval(timer);
   }, []);
 
-  // 🔄 Automated refresh saat bucket (5-menit) berganti
+  // 📡 Real-time Subscription khusus untuk Ruangan yang sedang di-Monitor
   useEffect(() => {
-    if (isMonitorOpen && monitorRoom) {
-      handleManualRefreshMonitor();
-    }
-  }, [currentBucket]);
+    if (!isMonitorOpen || !monitorRoom?.id) return;
+
+    let unsubFunc: (() => void) | null = null;
+
+    const startSubscribe = async () => {
+      try {
+        console.log("📡 Mencoba berlangganan real-time untuk Ruang:", monitorRoom.id);
+        const unsub = await pb.collection('attempts').subscribe("*", (e) => {
+          console.log("🔔 Sinyal masuk:", e.action, e.record.id);
+          
+          if (e.record.examRoomId !== monitorRoom.id) return;
+          
+          if (e.action === 'create' || e.action === 'update') {
+            setAttempts(prev => {
+              const idx = prev.findIndex(a => a.id === e.record.id);
+              if (idx > -1) {
+                const newArr = [...prev];
+                newArr[idx] = e.record;
+                return newArr;
+              }
+              return [...prev, e.record];
+            });
+
+            if (e.record.answers) {
+              setAnswersList(prev => ({
+                ...prev,
+                [e.record.studentId]: e.record.answers
+              }));
+            }
+          } else if (e.action === 'delete') {
+            setAttempts(prev => prev.filter(a => a.id !== e.record.id));
+          }
+        });
+        unsubFunc = unsub;
+        console.log("✅ Berhasil terhubung ke Live Monitoring.");
+      } catch (err) {
+        console.error("❌ Gagal berlangganan real-time:", err);
+      }
+    };
+
+    startSubscribe();
+    
+    // 🛡️ Backup: Re-fetch manual setiap 10 detik jika real-time terganggu
+    const polling = setInterval(() => {
+      if (isMonitorOpen) handleManualRefreshMonitor();
+    }, 10000);
+
+    return () => {
+      clearInterval(polling);
+      if (unsubFunc) {
+        console.log("📴 Berhenti berlangganan real-time.");
+        unsubFunc();
+      }
+    };
+  }, [isMonitorOpen, monitorRoom?.id]);
 
   const showAlert = (title: string, description: string, type: "success" | "danger" | "warning" | "info" = "info") => {
     setConfirmDialog({
@@ -323,66 +399,100 @@ const ExamRoomsPage = () => {
     });
   };
 
-  const handleManualGrade = async (studentNisn: string, qId: string, isForcedCorrect: boolean) => {
+  const handleManualGrade = async (studentId: string, qId: string, isForcedCorrect: boolean) => {
     if (!monitorRoom?.id) return;
-
     try {
-      const studentAttempt = attempts.find(a => a.id === studentNisn);
-      if (!studentAttempt) return;
+      const att = attempts.find(a => a.studentId === studentId);
+      if (!att) return;
 
-      const attemptRef = ref(database, `attempts/${monitorRoom.id}/${studentNisn}`);
-      // Get current overrides or init empty
-      const currentOverrides = studentAttempt.overrides || {};
-      
+      const currentOverrides = att.overrides || {};
       const newOverrides = { ...currentOverrides, [qId]: isForcedCorrect };
 
-      // Calculate new score based on updated overrides
-      const sisAnswers = answersList[studentNisn] || {};
+      const sisAnswers = answersList[studentId] || {};
       let correctCount = 0;
       
       monitorQuestions.forEach((q: any) => {
         let itemCorrect = false;
-        
-        // 1. Check Oversee Overrides First
         if (newOverrides[q.id] !== undefined) {
-          itemCorrect = newOverrides[q.id];
-        } 
-        else {
-          // 2. Fallback to Auto-Grading Logic
-          const ansId = sisAnswers[q.id];
-          if (ansId) {
-            const type = q.type || "pilihan_ganda";
-            if (type === "pilihan_ganda" || type === "benar_salah") {
-               itemCorrect = q.choices?.[ansId]?.isCorrect === true;
-            } else if (type === "pilihan_ganda_kompleks") {
-               const correctKeys = Object.keys(q.choices || {}).filter(k => q.choices[k].isCorrect);
-               itemCorrect = Array.isArray(ansId) && ansId.length === correctKeys.length && ansId.every(k => correctKeys.includes(k));
-            } else if (type === "isian_singkat") {
-               itemCorrect = isFuzzyMatch(ansId, q.answerKey);
-            } else if (type === "urutkan" || type === "drag_drop") {
-               const correctOrder = (q.items || []).map((it: any) => it.id);
-               itemCorrect = Array.isArray(ansId) && ansId.length === correctOrder.length && ansId.every((val, idx) => val === correctOrder[idx]);
-            } else if (type === "menjodohkan") {
-               const pairs = q.pairs || [];
-               itemCorrect = pairs.length > 0 && pairs.every((p: any) => ansId[p.id] === p.right);
-            }
-          }
+           itemCorrect = newOverrides[q.id];
+        } else {
+           const ansId = sisAnswers[q.id];
+           if (ansId) {
+              const type = q.type || "pilihan_ganda";
+              if (type === "pilihan_ganda" || type === "benar_salah") {
+                 itemCorrect = q.choices?.[ansId]?.isCorrect === true;
+              } else if (type === "pilihan_ganda_kompleks") {
+                 const correctKeys = Object.keys(q.choices || {}).filter(k => q.choices[k].isCorrect);
+                 itemCorrect = Array.isArray(ansId) && ansId.length === correctKeys.length && ansId.every(k => correctKeys.includes(k));
+              } else if (type === "isian_singkat") {
+                 itemCorrect = isFuzzyMatch(ansId, q.answerKey);
+              } else if (type === "urutkan" || type === "drag_drop") {
+                 const correctOrder = (q.items || []).map((it: any) => it.id);
+                 itemCorrect = Array.isArray(ansId) && ansId.length === correctOrder.length && ansId.every((val, idx) => val === correctOrder[idx]);
+              } else if (type === "menjodohkan") {
+                 const pairs = q.pairs || [];
+                 itemCorrect = pairs.length > 0 && pairs.every((p: any) => ansId[p.id] === p.right);
+              }
+           }
         }
-        
         if (itemCorrect) correctCount++;
       });
 
-      const totalQuestions = monitorQuestions.length;
-      const newScore = totalQuestions > 0 ? Math.round((correctCount / totalQuestions) * 100) : 0;
+      const total = monitorQuestions.length;
+      const score = total > 0 ? Math.round((correctCount / total) * 100) : 0;
 
-      await update(attemptRef, {
-        overrides: newOverrides,
-        correct: correctCount,
-        score: newScore
+      await pb.collection('attempts').update(att.id, {
+         overrides: newOverrides,
+         correct: correctCount,
+         score: score
       });
-    } catch (error) {
-      console.error("Manual Grading failed:", error);
+      handleManualRefreshMonitor();
+    } catch (error) {}
+  };
+
+  const handleExportExcel = () => {
+    if (!monitorRoom) return;
+    const workbook = XLSX.utils.book_new();
+    const header = ["No", "NISN", "Nama Siswa", "Kelas", "Jam Login", "Jam Submit", "Cheat Count", "Benar", "Salah", "Nilai"];
+    monitorQuestions.forEach((q, idx) => header.push(`Soal ${idx + 1}`));
+
+    const headerStyle = {
+      font: { bold: true, color: { rgb: "FFFFFF" } },
+      fill: { patternType: "solid", fgColor: { rgb: "16A34A" } },
+      alignment: { horizontal: "center", vertical: "center" }
+    };
+
+    const generateRowData = (att: any, idx: number) => {
+      const student = students.find((s) => s.id === att.studentId);
+      const sisAnswers = answersList[att.studentId] || {};
+      const kelasObj = examClasses.find(c => c.id === (student ? student.classId : ""));
+      const className = kelasObj ? kelasObj.name : "-";
+
+      let correct = att.correct || 0;
+      let wrong = (monitorQuestions.length - correct) || 0;
+      const score = att.score || 0;
+
+      const row = [
+        idx + 1, student?.nisn || "-", student ? student.name : "N/A", className,
+        att.startTime ? new Date(att.startTime).toLocaleTimeString("id-ID") : "-",
+        att.submitTime ? new Date(att.submitTime).toLocaleTimeString("id-ID") : (att.status === "submitted" ? "Selesai" : "-"),
+        att.cheatCount || 0, correct, wrong, score.toFixed(1)
+      ];
+      monitorQuestions.forEach((q) => {
+        const ans = sisAnswers[q.id];
+        row.push(ans ? (Array.isArray(ans) ? ans.join(",") : String(ans).toUpperCase()) : "-");
+      });
+      return row;
+    };
+
+    const overallRows = attempts.map((att, idx) => generateRowData(att, idx));
+    const wsOverall = XLSX.utils.aoa_to_sheet([header, ...overallRows]);
+    for (let c = 0; c < header.length; c++) {
+      const addr = XLSX.utils.encode_cell({ r: 0, c: c });
+      if (wsOverall[addr]) (wsOverall[addr] as any).s = headerStyle;
     }
+    XLSX.utils.book_append_sheet(workbook, wsOverall, "Overall");
+    XLSX.writeFile(workbook, `Nilai_Ujian_${monitorRoom.room_name || monitorRoom.examTitle}.xlsx`);
   };
 
   const columns = [
@@ -433,7 +543,6 @@ const ExamRoomsPage = () => {
           );
         }
         if (!v) return <span className="text-slate-400 text-xs">-</span>;
-
         return (
           <div className="flex flex-wrap gap-1 max-w-[120px]">
             {v.split(", ").map((cls, idx) => (
@@ -448,563 +557,66 @@ const ExamRoomsPage = () => {
     {
       key: "duration",
       label: "Durasi",
-      render: (v: number) => <span className="text-slate-500 font-medium">{v} Menit</span>
+      render: (v: any) => <span className="text-slate-500 font-medium">{(v || "0")} Menit</span>
     },
     {
       key: "start_time",
       label: "Waktu",
-      render: (v: any, item: ExamRoomData) => (
-        <div className="flex flex-col gap-0.5 text-xs text-slate-600 dark:text-slate-300 font-medium whitespace-nowrap">
-          <div className="flex items-center">
-            <span className="w-14">Mulai</span>
-            <span className="mr-1.5">:</span>
-            <span>{new Date(item.start_time).toLocaleDateString("id-ID", { day: '2-digit', month: '2-digit' })} {new Date(item.start_time).toLocaleTimeString("id-ID", { hour: '2-digit', minute: '2-digit' })}</span>
+      render: (v: any, item: ExamRoomData) => {
+        const start = item.start_time ? new Date(item.start_time) : null;
+        const end = item.end_time ? new Date(item.end_time) : null;
+        
+        const isValidStart = start && !isNaN(start.getTime());
+        const isValidEnd = end && !isNaN(end.getTime());
+
+        return (
+          <div className="flex flex-col gap-0.5 text-xs text-slate-600 dark:text-slate-300 font-medium whitespace-nowrap">
+            <div className="flex items-center">
+              <span className="w-14">Mulai</span>
+              <span className="mr-1.5">:</span>
+              <span>{isValidStart ? `${start.toLocaleDateString("id-ID", { day: '2-digit', month: '2-digit' })} ${start.toLocaleTimeString("id-ID", { hour: '2-digit', minute: '2-digit' })}` : "-"}</span>
+            </div>
+            <div className="flex items-center">
+              <span className="w-14">Selesai</span>
+              <span className="mr-1.5">:</span>
+              <span>{isValidEnd ? `${end.toLocaleDateString("id-ID", { day: '2-digit', month: '2-digit' })} ${end.toLocaleTimeString("id-ID", { hour: '2-digit', minute: '2-digit' })}` : "-"}</span>
+            </div>
           </div>
-          <div className="flex items-center">
-            <span className="w-14">Selesai</span>
-            <span className="mr-1.5">:</span>
-            <span>{new Date(item.end_time).toLocaleDateString("id-ID", { day: '2-digit', month: '2-digit' })} {new Date(item.end_time).toLocaleTimeString("id-ID", { hour: '2-digit', minute: '2-digit' })}</span>
-          </div>
-        </div>
-      )
+        );
+      }
     },
     {
-      key: "status_label",
-      label: "Status",
-      render: (_: any, item: ExamRoomData) => {
-        const now = Date.now();
-        const start = new Date(item.start_time).getTime();
-        const end = new Date(item.end_time).getTime();
-
-        if (item.status === "archive") {
-          return (
-            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold tracking-wide bg-slate-100 text-slate-600 border border-slate-200/60 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-800">
-              Arsip
-            </span>
-          );
-        }
-
-        if (item.isDisabled) {
-          return (
-            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold tracking-wide bg-slate-100 text-slate-400 border border-slate-200 dark:bg-slate-900 dark:text-slate-600 dark:border-slate-800">
-              Nonaktif
-            </span>
-          );
-        }
-
-        if (now < start) {
-          return (
-            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold tracking-wide bg-slate-50 text-slate-500 border border-slate-200/80 dark:bg-slate-900 dark:text-slate-500 dark:border-slate-800/40">
-              Belum Dimulai
-            </span>
-          );
-        } else if (now > end) {
-          return (
-            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold tracking-wide bg-red-50 text-red-600 border border-red-100 dark:bg-red-950/20 dark:text-red-400 dark:border-red-900/40">
-              Selesai
-            </span>
-          );
-        } else {
-          return (
-            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold tracking-wide bg-emerald-50 text-emerald-600 border border-emerald-100 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-900/40 animate-pulse-slow">
-              Berjalan
-            </span>
-          );
-        }
-      }
+       key: "actions",
+       label: "Status",
+       render: (_: any, item: ExamRoomData) => {
+         const now = Date.now();
+         const start = new Date(item.start_time).getTime();
+         const end = new Date(item.end_time).getTime();
+         if (item.status === "archive") return <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded">Arsip</span>;
+         if (item.isDisabled) return <span className="text-[10px] bg-red-100 text-red-500 px-1.5 py-0.5 rounded">Nonaktif</span>;
+         if (now < start) return <span className="text-[10px] bg-blue-100 text-blue-500 px-1.5 py-0.5 rounded">Menunggu</span>;
+         if (now > end) return <span className="text-[10px] bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded">Selesai</span>;
+         return <span className="text-[10px] bg-emerald-100 text-emerald-600 px-1.5 py-0.5 rounded animate-pulse">Berjalan</span>;
+       }
     }
   ];
 
-  const handleArchiveRoom = (room: ExamRoomData) => {
-    // 🛡️ Cek apakah ada student yang sedang aktif pengerjaan
-    if (liveBreakdown[room.id] > 0) {
-      showAlert("Aksi Ditolak", `Terdapat ${liveBreakdown[room.id]} Siswa yang sedang aktif ujian di ruang ini. Harap selesaikan ujian terlebih dahulu sebelum mengarsipkan.`, "warning");
-      return;
-    }
-
-    const now = Date.now();
-    const start = new Date(room.start_time).getTime();
-    const end = new Date(room.end_time).getTime();
-    if (now >= start && now <= end) {
-      showAlert("Peringatan", "Tidak dapat di arsipkan karena Ruang Ujian sedang dalam periode waktu aktif (Berjalan).", "warning");
-      return;
-    }
-
-    setConfirmDialog({
-      isOpen: true,
-      title: "Arsipkan Ruang Ujian",
-      description: `Apakah Anda yakin ingin mengarsipkan ruang ujian ${room.examTitle || ""}?`,
-      type: "warning",
-      confirmLabel: "Arsipkan",
-      onConfirm: async () => {
-        try {
-          await update(ref(database, `exam_rooms/${room.id}`), { status: "archive" });
-        } catch (error) {
-          showAlert("Gagal", "Gagal mengarsipkan ruang ujian.", "danger");
-        }
-      }
-    });
-  };
-
-  const handleRestoreRoom = (room: ExamRoomData) => {
-    setConfirmDialog({
-      isOpen: true,
-      title: "Buka Ruang Ujian",
-      description: `Apakah Anda yakin ingin membuka/mengaktifkan kembali ruang ujian ${room.examTitle || ""}?`,
-      type: "info",
-      confirmLabel: "Buka Ruang",
-      onConfirm: async () => {
-        try {
-          await update(ref(database, `exam_rooms/${room.id}`), { status: null });
-        } catch (error) {
-          showAlert("Gagal", "Gagal membuka arsip ruang ujian.", "danger");
-        }
-      }
-    });
-  };
-
-  const handleForceEndRoom = (room: ExamRoomData) => {
-    setConfirmDialog({
-      isOpen: true,
-      title: "Selesaikan Ujian Sekarang",
-      description: `Apakah Anda yakin ingin mengakhiri sesi ujian ${room.room_name || room.examTitle || ""} saat ini juga? Semua Siswa yang sedang mengerjakan tidak akan bisa melanjutkan lagi.`,
-      type: "danger",
-      confirmLabel: "Selesaikan Paksa",
-      onConfirm: async () => {
-        try {
-          // Format current time properly for input datetime-local
-          const now = new Date();
-          const offsetHours = now.getTimezoneOffset() / -60;
-          now.setHours(now.getHours() + offsetHours);
-          const nowFormatted = now.toISOString().slice(0, 16);
-
-          await update(ref(database, `exam_rooms/${room.id}`), { end_time: nowFormatted });
-          showAlert("Berhasil", "Ujian telah dinyatakan SELESAI sekarang juga.", "success");
-        } catch (error) {
-          showAlert("Gagal", "Gagal mengakhiri ruang ujian.", "danger");
-        }
-      }
-    });
-  };
-
-  const handleToggleDisabled = (room: ExamRoomData) => {
-    const newState = !room.isDisabled;
-    setConfirmDialog({
-      isOpen: true,
-      title: newState ? "Nonaktifkan Ujian" : "Aktifkan Ujian",
-      description: `Apakah Anda yakin ingin ${newState ? "menonaktifkan" : "mengaktifkan kembali"} ruang ujian ${room.room_name || room.examTitle || ""}? ${newState ? "Siswa tidak akan bisa masuk ke ruang ini." : ""}`,
-      type: newState ? "warning" : "info",
-      confirmLabel: newState ? "Ya, Nonaktifkan" : "Ya, Aktifkan",
-      onConfirm: async () => {
-        try {
-          await update(ref(database, `exam_rooms/${room.id}`), { isDisabled: newState });
-          showAlert(
-            "Berhasil",
-            `Ruang ujian telah ${newState ? "dinonaktifkan" : "diaktifkan kembali"}.`,
-            newState ? "warning" : "success"
-          );
-        } catch (error) {
-          showAlert("Gagal", "Gagal mengubah status ruang ujian.", "danger");
-        }
-      }
-    });
-  };
-
-  const handleExportExcel = () => {
-    if (!monitorRoom) return;
-
-    const workbook = XLSX.utils.book_new();
-    const header = ["No", "NISN", "Nama Siswa", "Kelas", "Jam Login", "Jam Submit", "Cheat Count", "Benar", "Salah", "Nilai"];
-    monitorQuestions.forEach((q, idx) => header.push(`Soal ${idx + 1}`));
-
-    const headerStyle = {
-      font: { bold: true, color: { rgb: "FFFFFF" } },
-      fill: { patternType: "solid", fgColor: { rgb: "16A34A" } },
-      alignment: { horizontal: "center", vertical: "center" },
-      border: {
-        top: { style: "thin", color: { rgb: "E2E8F0" } },
-        bottom: { style: "thin", color: { rgb: "E2E8F0" } }
-      }
-    };
-
-    const colsWidths = [
-      { wch: 4 }, { wch: 15 }, { wch: 25 }, { wch: 12 }, { wch: 11 }, { wch: 11 }, { wch: 11 }, { wch: 7 }, { wch: 7 }, { wch: 7 }
-    ];
-    monitorQuestions.forEach(() => colsWidths.push({ wch: 8 }));
-
-    const generateRowData = (att: any, idx: number) => {
-      const student = students.find((s) => String(s.nisn).trim() === String(att.nisn).trim());
-      const sisAnswers = answersList[att.nisn] || {};
-      const kelasObj = examClasses.find(c => c.id === (student ? student.classId : ""));
-      const className = kelasObj ? kelasObj.name : "-";
-
-      let correct = 0;
-      let wrong = 0;
-      monitorQuestions.forEach((q) => {
-        const ans = sisAnswers[q.id];
-        if (ans && q.choices[ans]?.isCorrect === true) correct++;
-        else if (ans) wrong++;
-      });
-      const score = monitorQuestions.length > 0 ? (correct / monitorQuestions.length) * 100 : 0;
-
-      const row = [
-        idx + 1, att.nisn, student ? student.name : "N/A", className,
-        att.startTime ? new Date(att.startTime).toLocaleTimeString("id-ID") : "-",
-        att.submit_time ? new Date(att.submit_time).toLocaleTimeString("id-ID") : (att.status === "submitted" ? "Selesai" : "-"),
-        att.cheatCount || 0, correct, wrong, score.toFixed(1)
-      ];
-      monitorQuestions.forEach((q) => {
-        const ans = sisAnswers[q.id];
-        row.push(ans ? ans.toUpperCase() : "-");
-      });
-      return row;
-    };
-
-    const applyStyles = (ws: XLSX.WorkSheet, rowsCount: number, atts: any[]) => {
-      // Style header
-      for (let c = 0; c < header.length; c++) {
-        const addr = XLSX.utils.encode_cell({ r: 0, c: c });
-        if (ws[addr]) (ws[addr] as any).s = headerStyle;
-      }
-      // Style wrong answers
-      atts.forEach((att: any, rIdx: number) => {
-        const sisAnswers = answersList[att.nisn] || {};
-        monitorQuestions.forEach((q, qIdx) => {
-          const ans = sisAnswers[q.id];
-          const isCorrect = ans && q.choices[ans]?.isCorrect === true;
-          if (!isCorrect && ans) {
-            const cellAddr = XLSX.utils.encode_cell({ r: rIdx + 1, c: 10 + qIdx });
-            if (ws[cellAddr]) {
-              (ws[cellAddr] as any).s = {
-                fill: { patternType: "solid", fgColor: { rgb: "FCA5A5" } },
-                font: { color: { rgb: "991B1B" } }
-              };
-            }
-          }
-        });
-      });
-      (ws as any)["!cols"] = colsWidths;
-    };
-
-    // 1. OVERALL SHEET
-    const overallRows = attempts.map((att, idx) => generateRowData(att, idx));
-    const wsOverall = XLSX.utils.aoa_to_sheet([header, ...overallRows]);
-    applyStyles(wsOverall, overallRows.length, attempts);
-    XLSX.utils.book_append_sheet(workbook, wsOverall, "Overall");
-
-    // 2. PER-CLASS SHEETS
-    // Get unique classes from attempts
-    const classIdsInAttempts = Array.from(new Set(attempts.map(att => {
-      const s = students.find(siswa => siswa.nisn === att.nisn);
-      return s ? s.classId : null;
-    }).filter(Boolean)));
-
-    classIdsInAttempts.forEach(cId => {
-      const classAttempts = attempts.filter(att => {
-        const s = students.find(siswa => siswa.nisn === att.nisn);
-        return s?.classId === cId;
-      });
-      const className = examClasses.find(c => c.id === cId)?.name || "Lainnya";
-      const classRows = classAttempts.map((att, idx) => generateRowData(att, idx));
-      const wsClass = XLSX.utils.aoa_to_sheet([header, ...classRows]);
-      applyStyles(wsClass, classRows.length, classAttempts);
-      // Sheet name limit is 31 chars
-      XLSX.utils.book_append_sheet(workbook, wsClass, className.substring(0, 31));
-    });
-
-    // 3. BELUM MENGERJAKAN SHEET
-    const allowedIds = monitorRoom.allClasses ? [] : monitorRoom.classId ? monitorRoom.classId.split(",") : [];
-    const classStudents = students.filter(s => monitorRoom.allClasses || allowedIds.includes(s.classId));
-    const takenNisns = attempts.map(att => att.nisn);
-    const notTakenStudents = classStudents.filter(s => !takenNisns.includes(s.nisn));
-
-    const ntHeader = ["No", "NISN", "Nama Siswa", "Kelas", "Keterangan"];
-    const ntRows = notTakenStudents.map((s, idx) => {
-      const cObj = examClasses.find(c => c.id === s.classId);
-      return [idx + 1, s.nisn, s.name, cObj ? cObj.name : "-", "Belum Mengerjakan"];
-    });
-    const wsNT = XLSX.utils.aoa_to_sheet([ntHeader, ...ntRows]);
-    for (let c = 0; c < ntHeader.length; c++) {
-      const addr = XLSX.utils.encode_cell({ r: 0, c: c });
-      if (wsNT[addr]) (wsNT[addr] as any).s = headerStyle;
-    }
-    (wsNT as any)["!cols"] = [{ wch: 4 }, { wch: 15 }, { wch: 25 }, { wch: 12 }, { wch: 20 }];
-    XLSX.utils.book_append_sheet(workbook, wsNT, "Belum Mengerjakan");
-
-    XLSX.writeFile(workbook, `Nilai_Ujian_${monitorRoom.examTitle || "Ruang"}.xlsx`);
-  };
-
-
-
-  const handleForceSubmitAll = () => {
-    if (!monitorRoom) return;
-
-    const ongoing = attempts.filter((att) => att.status === "ongoing");
-    if (ongoing.length === 0) {
-      setConfirmDialog({
-        isOpen: true,
-        title: "Sesi Aktif Kosong",
-        description: "Tidak ada Siswa yang sedang aktif mengerjakan ujian di ruangan ini saat ini.",
-        type: "info",
-        confirmLabel: "Ok",
-        onConfirm: () => { }
-      });
-      return;
-    }
-
-    setConfirmDialog({
-      isOpen: true,
-      title: "Selesaikan Paksa Sesi",
-      description: `Tindakan ini akan mengakhiri paksa sesi ujian untuk ${ongoing.length} Siswa yang sedang aktif. Anda yakin?`,
-      type: "danger",
-      confirmLabel: "Selesaikan",
-      onConfirm: async () => {
-        try {
-          const updates: any = {};
-          const now = Date.now();
-
-          ongoing.forEach((att) => {
-            const sisAnswers = answersList[att.nisn] || {};
-            let correct = 0;
-            monitorQuestions.forEach((q) => {
-              const ans = sisAnswers[q.id];
-              if (ans && q.choices[ans]?.isCorrect === true) correct++;
-            });
-            const score = monitorQuestions.length > 0 ? Math.round((correct / monitorQuestions.length) * 100) : 0;
-
-            updates[`attempts/${monitorRoom.id}/${att.nisn}/status`] = "submitted";
-            updates[`attempts/${monitorRoom.id}/${att.nisn}/submit_time`] = now;
-            updates[`attempts/${monitorRoom.id}/${att.nisn}/score`] = score;
-            updates[`attempts/${monitorRoom.id}/${att.nisn}/correct`] = correct;
-            updates[`attempts/${monitorRoom.id}/${att.nisn}/total`] = monitorQuestions.length;
-          });
-
-          await update(ref(database), updates);
-
-          // Update local state agar UI langsung berubah
-          setAttempts(prev => prev.map(a => {
-            const ongoingItem = ongoing.find(o => o.id === a.id);
-            if (ongoingItem) {
-              const sisAnswers = answersList[a.nisn] || {};
-              let correct = 0;
-              monitorQuestions.forEach((q) => {
-                const ans = sisAnswers[q.id];
-                if (ans && q.choices[ans]?.isCorrect === true) correct++;
-              });
-              const score = monitorQuestions.length > 0 ? Math.round((correct / monitorQuestions.length) * 100) : 0;
-              return { ...a, status: "submitted", submit_time: now, score, correct, total: monitorQuestions.length };
-            }
-            return a;
-          }));
-
-          showAlert("Berhasil", `${ongoing.length} Siswa berhasil diselesaikan secara paksa.`, "success");
-        } catch (error) {
-          showAlert("Gagal", "Gagal menyelesaikan paksa ujian Siswa.", "danger");
-        }
-      }
-    });
-  };
-
-  const handleForceSubmitStudent = (nisn: string) => {
-    if (!monitorRoom) return;
-    const attempt = attempts.find(at => at.id === nisn);
-    if (!attempt) return;
-
-    setConfirmDialog({
-      isOpen: true,
-      title: "Selesaikan Ujian Siswa",
-      description: `Apakah Anda yakin ingin mengakhiri sesi ujian Siswa ini secara paksa?`,
-      type: "danger",
-      confirmLabel: "Ya, Selesaikan",
-      onConfirm: async () => {
-        try {
-          const now = Date.now();
-          const attemptId = `${nisn}_${monitorRoom.id}`;
-
-          // 🏹 Hitung Skor On-the-fly
-          const sisAnswers = answersList[nisn] || {};
-          let correct = 0;
-          monitorQuestions.forEach((q) => {
-            const ans = sisAnswers[q.id];
-            if (ans && q.choices[ans]?.isCorrect === true) correct++;
-          });
-          const score = monitorQuestions.length > 0 ? Math.round((correct / monitorQuestions.length) * 100) : 0;
-
-          await update(ref(database, `attempts/${monitorRoom.id}/${nisn}`), {
-            status: "submitted",
-            submit_time: now,
-            score: score,
-            correct: correct,
-            total: monitorQuestions.length
-          });
-
-          setAttempts(prev => prev.map(a => a.id === attemptId ? { ...a, status: "submitted", submit_time: now, score, correct, total: monitorQuestions.length } : a));
-          showAlert("Berhasil", "Sesi Siswa telah diselesaikan.", "success");
-        } catch (error) {
-          showAlert("Gagal", "Sesi Siswa gagal diselesaikan.", "danger");
-        }
-      }
-    });
-  };
-
   const generateNewToken = () => {
-    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
     let token = "";
-    for (let i = 0; i < 6; i++) {
-      token += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
+    for (let i = 0; i < 6; i++) token += chars.charAt(Math.floor(Math.random() * chars.length));
     return token;
-  };
-
-  // 🔄 Loop auto rotate dipindahkan ke countdown ticker utama untuk rotasi instan.
-
-  useEffect(() => {
-    if (!monitorRoom || !isMonitorOpen) return;
-
-    // 1. Load Attempts (Throttled 5s)
-    const attemptsRef = ref(database, "attempts");
-    let attemptsThrottle = false;
-    let latestAttempts: any = null;
-
-    const processAttempts = (data: any) => {
-      if (!data) { setAttempts([]); return; }
-      const loaded = Object.keys(data)
-        .map((nisn) => {
-          return { id: nisn, nisn, ...data[nisn] };
-        });
-      setAttempts(loaded);
-    };
-
-    const unsubAttempts = onValue(ref(database, `attempts/${monitorRoom.id}`), (snapshot) => {
-      latestAttempts = snapshot.val();
-      if (!attemptsThrottle) {
-        processAttempts(latestAttempts);
-        attemptsThrottle = true;
-        setTimeout(() => {
-          attemptsThrottle = false;
-          if (latestAttempts) processAttempts(latestAttempts);
-        }, 2000);
-      }
-    });
-
-    // 2. Load Answers for details view (Throttled 5s)
-    const answersRef = ref(database, "answers");
-    let answersThrottle = false;
-    let latestAnswers: any = null;
-
-    const processAnswers = (data: any) => {
-      if (!data) { setAnswersList({}); return; }
-      setAnswersList(data);
-    };
-
-    const unsubAnswers = onValue(ref(database, `answers/${monitorRoom.id}`), (snapshot) => {
-      latestAnswers = snapshot.val();
-      if (!answersThrottle) {
-        processAnswers(latestAnswers);
-        answersThrottle = true;
-        setTimeout(() => {
-          answersThrottle = false;
-          if (latestAnswers) processAnswers(latestAnswers);
-        }, 2000);
-      }
-    });
-
-    // 3. Load Questions of Exam
-    get(ref(database, "questions")).then((snap) => {
-      if (snap.exists()) {
-        const data = snap.val();
-        const loaded = Object.keys(data)
-          .filter((id) => data[id].examId === monitorRoom.examId)
-          .map((id) => ({ id, ...data[id] }));
-        setMonitorQuestions(loaded);
-      }
-    });
-
-    return () => {
-      unsubAttempts();
-      unsubAnswers();
-    };
-  }, [monitorRoom, isMonitorOpen]);
-
-  // 1. Load Reference Data (Exams & Teachers)
-  useEffect(() => {
-    // 1a. Load Exams for Select
-    get(ref(database, "exams")).then((snap) => {
-      let loadedExams = snap.exists() ? Object.keys(snap.val()).map((k) => ({ id: k, ...snap.val()[k] })) : [];
-      setExams(loadedExams);
-    });
-
-    // 1b. Load Teachers
-    get(ref(database, "teachers")).then(snap => {
-      if (snap.exists()) setTeachers(snap.val());
-    });
-  }, []);
-
-  // 2. Load Rooms & Merge Labels (Real-time)
-  useEffect(() => {
-    const roomsRef = ref(database, "exam_rooms");
-    const unsubscribe = onValue(roomsRef, (snapshot) => {
-      if (snapshot.exists()) {
-        const data = snapshot.val();
-        const loaded: ExamRoomData[] = [];
-
-        Object.keys(data).forEach((key) => {
-          const room = data[key];
-
-          // 🏹 Cari Data Exam dari State (Cepat)
-          const examData = exams.find(e => e.id === room.examId);
-          const examTeacherId = examData ? examData.teacherId : null;
-          const examType = examData?.examType || "Latihan Biasa";
-          const examTitle = examData ? examData.title : "Ujian Tidak Diketahui";
-
-          // 🏹 Cari Nama Mapel & Guru dari State (Cepat)
-          const subjectName = subjects.find(m => m.id === examData?.subjectId)?.name || "Mapel Tidak Ada";
-          const teacherName = teachers[examTeacherId || ""]?.name || "Guru Tidak Ada";
-
-          // Get Class Name from useExamData
-          let className = "Semua Kelas";
-          if (room.classId && !room.allClasses) {
-            const ids = room.classId.split(",");
-            const names = ids.map((id: string) => examClasses.find(c => c.id === id)?.name).filter(Boolean);
-            if (names.length > 0) className = names.join(", ");
-          }
-
-          loaded.push({ id: key, ...room, examTitle, className, examTeacherId, examType, subjectName, teacherName });
-        });
-
-        if (role !== "admin" && teacherId) {
-          loaded.sort((a, b) => {
-            const isAOwner = a.examTeacherId === teacherId ? 1 : 0;
-            const isBOwner = b.examTeacherId === teacherId ? 1 : 0;
-            return isBOwner - isAOwner;
-          });
-        }
-
-        setRooms(loaded);
-      } else {
-        setRooms([]);
-      }
-      setLoading(false);
-    });
-
-    return () => unsubscribe();
-  }, [examClasses, role, teacherId, exams, teachers, subjects]);
-
-  const generateToken = () => {
-    const token = generateNewToken();
-    setFormValues((prev) => ({ ...prev, token }));
   };
 
   const handleCreateClick = () => {
     setDialogMode("create");
     setSelectedRoom(null);
-    const availableExams = exams.filter(e => role === "admin" || e.teacherId === teacherId);
     setFormValues({
       room_name: "",
-      examId: availableExams[0]?.id || "",
+      examId: exams[0]?.id || "",
       classId: "all",
       allClasses: true,
-      token: "",
+      token: generateNewToken(),
       start_time: "",
       end_time: "",
       duration: 60,
@@ -1013,7 +625,6 @@ const ExamRoomsPage = () => {
       room_code: "",
       show_result: true,
     });
-    generateToken();
     setIsDialogOpen(true);
   };
 
@@ -1023,11 +634,11 @@ const ExamRoomsPage = () => {
     setFormValues({
       room_name: room.room_name || "",
       examId: room.examId,
-      classId: room.allClasses ? "all" : room.classId || "",
+      classId: room.allClasses ? "" : (Array.isArray(room.classId) ? room.classId.join(",") : (room.classId || "")),
       allClasses: room.allClasses || false,
       token: room.token,
-      start_time: room.start_time,
-      end_time: room.end_time,
+      start_time: room.start_time && !isNaN(new Date(room.start_time).getTime()) ? new Date(room.start_time).toISOString().slice(0, 16) : "",
+      end_time: room.end_time && !isNaN(new Date(room.end_time).getTime()) ? new Date(room.end_time).toISOString().slice(0, 16) : "",
       duration: room.duration,
       cheat_limit: room.cheat_limit,
       submit_window: room.submit_window || 0,
@@ -1037,151 +648,206 @@ const ExamRoomsPage = () => {
     setIsDialogOpen(true);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      const payload = {
-        room_name: formValues.room_name,
-        examId: formValues.examId,
-        classId: formValues.classId === "all" ? null : formValues.classId,
-        allClasses: formValues.classId === "all",
-        token: formValues.token,
-        start_time: formValues.start_time,
-        end_time: formValues.end_time,
-        duration: Number(formValues.duration),
-        cheat_limit: Number(formValues.cheat_limit),
-        submit_window: Number(formValues.submit_window),
-        room_code: formValues.room_code.toUpperCase(),
-        token_updated_at: Date.now(),
-        show_result: formValues.show_result,
-      };
-
-      if (dialogMode === "edit" && selectedRoom) {
-        await update(ref(database, `exam_rooms/${selectedRoom.id}`), payload);
-      } else {
-        await push(ref(database, "exam_rooms"), payload);
+  const handleForceEndRoom = async (room: ExamRoomData) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: "Selesaikan Paksa",
+      description: "Akhiri pengerjaan ruang ujian ini untuk semua siswa sekarang?",
+      type: "danger",
+      confirmLabel: "Akhiri",
+      onConfirm: async () => {
+        try {
+          await pb.collection('exam_rooms').update(room.id, { end_time: new Date().toISOString() });
+          showAlert("Berhasil", "Ruang ujian telah diakhiri.", "success");
+        } catch (e) {
+          showAlert("Gagal", "Gagal mengakhiri ruang.", "danger");
+        }
       }
-      setIsDialogOpen(false);
-    } catch (error) {
-      showAlert("Gagal", "Gagal menyimpan ruang ujian.", "danger");
+    });
+  };
+
+  const handleToggleDisabled = async (room: ExamRoomData) => {
+    try {
+      // room.isDisabled is true if it was inactive
+      // isActive should be the opposite of that toggled value
+      const newIsActive = !!room.isDisabled; // if it was disabled, we make it active
+      await pb.collection('exam_rooms').update(room.id, { 
+        isActive: newIsActive,
+        isDisabled: !newIsActive // also update snake_case just in case
+      });
+      showAlert("Berhasil", `Ruang berhasil ${newIsActive ? "diaktifkan" : "dinonaktifkan"}.`, "success");
+    } catch (e) {
+      showAlert("Gagal", "Gagal mengubah status.", "danger");
     }
+  };
+
+  const handleArchiveRoom = async (room: ExamRoomData) => {
+    try {
+      await pb.collection('exam_rooms').update(room.id, { status: "archive" });
+      showAlert("Berhasil", "Ruang diarsipkan.", "success");
+    } catch (e) {
+      showAlert("Gagal", "Gagal mengarsipkan.", "danger");
+    }
+  };
+
+  const handleRestoreRoom = async (room: ExamRoomData) => {
+    try {
+      await pb.collection('exam_rooms').update(room.id, { status: null });
+      showAlert("Berhasil", "Ruang dipulihkan.", "success");
+    } catch (e) {
+      showAlert("Gagal", "Gagal memulihkan.", "danger");
+    }
+  };
+
+  const handleForceSubmitAll = () => {
+     const ongoing = attempts.filter(a => a.status === 'ongoing');
+     if (ongoing.length === 0) return showAlert("Info", "Tidak ada siswa aktif.", "info");
+     setConfirmDialog({
+       isOpen: true,
+       title: "Submit Semua",
+       description: `Submit paksa ${ongoing.length} siswa sekarang?`,
+       type: "danger",
+       confirmLabel: "Submit",
+       onConfirm: async () => {
+         try {
+           for (const a of ongoing) {
+             await pb.collection('attempts').update(a.id, { status: 'submitted', submitTime: new Date().toISOString() });
+           }
+           showAlert("Berhasil", "Semua siswa telah disubmit.", "success");
+           handleManualRefreshMonitor();
+         } catch (e) { showAlert("Gagal", "Error submitting all.", "danger"); }
+       }
+     });
+  };
+
+  const handleForceSubmitStudent = (attId: string) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: "Submit Paksa",
+      description: "Selesaikan pengerjaan siswa ini?",
+      type: "danger",
+      confirmLabel: "Submit",
+      onConfirm: async () => {
+        try {
+          await pb.collection('attempts').update(attId, { status: 'submitted', submitTime: new Date().toISOString() });
+          handleManualRefreshMonitor();
+          showAlert("Berhasil", "Siswa disubmit.", "success");
+        } catch (e) { showAlert("Gagal", "Error.", "danger"); }
+      }
+    });
   };
 
   const handleDeleteClick = (room: ExamRoomData) => {
-    // 🛡️ Cek apakah ada student yang sedang aktif pengerjaan
-    if (liveBreakdown[room.id] > 0) {
-      showAlert("Aksi Ditolak", `Ruang ini tidak bisa dihapus karena masih ada ${liveBreakdown[room.id]} Siswa yang aktif di dalamnya.`, "danger");
-      return;
-    }
     setRoomToDelete(room);
     setDeleteDialogOpen(true);
-  };
-
-  const handleMonitorClick = (room: ExamRoomData) => {
-    setMonitorRoom(room);
-    setMonitorPage(1);
-    setIsMonitorOpen(true);
-  };
-
-  const handleUnlockStudent = async (nisn: string) => {
-    if (!monitorRoom) return;
-    try {
-      await update(ref(database, `attempts/${monitorRoom.id}/${nisn}`), {
-        status: "ongoing",
-        cheatCount: 0
-      });
-      setAttempts(prev => prev.map(a => a.nisn === nisn ? { ...a, status: "ongoing", cheatCount: 0 } : a));
-      showAlert("Berhasil", "Siswa berhasil diunlock.", "success");
-    } catch (error) {
-      showAlert("Gagal", "Gagal mengunlock Siswa.", "danger");
-    }
-  };
-
-  const handleResetSession = (nisn: string) => {
-    if (!monitorRoom) return;
-    setConfirmDialog({
-      isOpen: true,
-      title: "Reset Total Sesi",
-      description: "Apakah anda yakin ingin RESET TOTAL sesi Siswa ini? Seluruh jawaban dan progres mereka akan DIHAPUS PERMANEN.",
-      type: "danger",
-      confirmLabel: "Ya, Reset Total",
-      onConfirm: async () => {
-        try {
-          await remove(ref(database, `attempts/${monitorRoom.id}/${nisn}`));
-          await remove(ref(database, `answers/${monitorRoom.id}/${nisn}`));
-          setAttempts(prev => prev.filter(att => att.nisn !== nisn));
-          showAlert("Berhasil", "Sesi Siswa berhasil direset total.", "success");
-        } catch (error) {
-          showAlert("Gagal", "Gagal mereset sesi.", "danger");
-        }
-      }
-    });
-  };
-
-  const openLimitDialog = (nisn: string) => {
-    setLimitNisn(nisn);
-    setLimitValue("1");
-    setLimitDialogOpen(true);
-  };
-
-  const handleConfirmAddLimit = async () => {
-    if (!monitorRoom || !limitNisn) return;
-    const added = parseInt(limitValue);
-    if (isNaN(added) || added <= 0) return alert("Masukkan angka yang valid.");
-
-    setLimitDialogOpen(false);
-    try {
-      const attemptRef = ref(database, `attempts/${monitorRoom.id}/${limitNisn}`);
-      const snap = await get(attemptRef);
-      const currentExtra = snap.exists() ? (snap.val().extraCheatLimit || 0) : 0;
-      const currentStatus = snap.exists() ? snap.val().status : "ongoing";
-
-      await update(attemptRef, {
-        extraCheatLimit: currentExtra + added,
-        status: currentStatus === "LOCKED" ? "ongoing" : currentStatus, // Auto Unlock
-      });
-
-      setAttempts(prev => prev.map(a => a.nisn === limitNisn ? { ...a, extraCheatLimit: (currentExtra + added), status: (currentStatus === "LOCKED" ? "ongoing" : currentStatus) } : a));
-
-      showAlert("Berhasil", `Berhasil menambah +${added} batas pelanggaran untuk Siswa.`, "success");
-    } catch {
-      showAlert("Gagal", "Gagal memperbarui batas.", "danger");
-    }
-  };
-
-  const handleResetCheatCount = (nisn: string) => {
-    if (!monitorRoom) return;
-    setConfirmDialog({
-      isOpen: true,
-      title: "Reset Pelanggaran",
-      description: "Hapus catatan deteksi kecurangan untuk Siswa ini?",
-      type: "warning",
-      confirmLabel: "Ya, Reset",
-      onConfirm: async () => {
-        try {
-          await update(ref(database, `attempts/${monitorRoom.id}/${nisn}`), {
-            cheatCount: 0
-          });
-          setAttempts(prev => prev.map(a => a.nisn === nisn ? { ...a, cheatCount: 0 } : a));
-          showAlert("Berhasil", "Pelanggaran Siswa berhasil direset.", "success");
-        } catch (error) {
-          showAlert("Gagal", "Gagal mereset cheat count.", "danger");
-        }
-      }
-    });
   };
 
   const handleConfirmDelete = async () => {
     if (!roomToDelete) return;
     setIsDeleting(true);
     try {
-      await remove(ref(database, `exam_rooms/${roomToDelete.id}`));
-    } catch (error) {
-      showAlert("Gagal", "Gagal menghapus ruang ujian.", "danger");
-    } finally {
-      setIsDeleting(false);
-      setDeleteDialogOpen(false);
+      await pb.collection('exam_rooms').delete(roomToDelete.id);
+      showAlert("Berhasil", "Ruang dihapus.", "success");
+    } catch (e) { showAlert("Gagal", "Gagal hapus.", "danger"); }
+    finally { setIsDeleting(false); setDeleteDialogOpen(false); }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+        // Jika Semua Kelas dipilih, kita masukkan seluruh daftar ID kelas yang ada
+        const finalClassIds = formValues.allClasses 
+          ? (examClasses || []).map(c => c.id)
+          : formValues.classId.split(",").filter(Boolean);
+
+        const data = {
+          title: formValues.room_name,
+          room_name: formValues.room_name,
+          examId: formValues.examId,
+          startTime: new Date(formValues.start_time).toISOString(),
+          start_time: new Date(formValues.start_time).toISOString(),
+          endTime: new Date(formValues.end_time).toISOString(),
+          end_time: new Date(formValues.end_time).toISOString(),
+          
+          classIds: finalClassIds,
+          classId: finalClassIds,
+          allClasses: formValues.allClasses,
+          all_classes: formValues.allClasses,
+          
+          duration: Number(formValues.duration),
+          cheat_limit: Number(formValues.cheat_limit),
+          submit_window: Number(formValues.submit_window),
+          room_code: formValues.room_code,
+          show_result: formValues.show_result,
+          isActive: true,
+          status: "active",
+          isDisabled: false
+        };
+      
+      if (dialogMode === "edit" && selectedRoom) {
+        await pb.collection('exam_rooms').update(selectedRoom.id, data);
+      } else {
+        await pb.collection('exam_rooms').create(data);
+      }
+      setIsDialogOpen(false);
+      showAlert("Berhasil", "Data berhasil disimpan.", "success");
+    } catch (e) { 
+      console.error("Save error:", e);
+      showAlert("Gagal", "Gagal simpan.", "danger"); 
     }
+  };
+
+  const handleMonitorClick = (room: ExamRoomData) => {
+    setMonitorRoom(room);
+    setMonitorPage(1);
+    setIsMonitorOpen(true);
+    handleManualRefreshMonitor();
+  };
+
+  const handleUnlockStudent = async (attId: string) => {
+     try {
+       await pb.collection('attempts').update(attId, { status: 'ongoing', cheatCount: 0 });
+       handleManualRefreshMonitor();
+       showAlert("Berhasil", "Siswa di-unlock.", "success");
+     } catch (e) { showAlert("Gagal", "Error.", "danger"); }
+  };
+
+  const handleResetSession = (attId: string) => {
+     setConfirmDialog({
+       isOpen: true,
+       title: "Reset Sesi",
+       description: "Hapus permanen progres siswa ini?",
+       type: "danger",
+       confirmLabel: "Reset",
+       onConfirm: async () => {
+         try {
+           await pb.collection('attempts').delete(attId);
+           handleManualRefreshMonitor();
+           showAlert("Berhasil", "Sesi direset.", "success");
+         } catch (e) { showAlert("Gagal", "Error.", "danger"); }
+       }
+     });
+  };
+
+  const openLimitDialog = (nisn: string) => { setLimitNisn(nisn); setLimitValue("1"); setLimitDialogOpen(true); };
+
+  const handleConfirmAddLimit = async () => {
+    const att = attempts.find(a => a.studentId === limitNisn);
+    if (!att) return;
+    try {
+      await pb.collection('attempts').update(att.id, { extraCheatLimit: (att.extraCheatLimit || 0) + parseInt(limitValue) });
+      handleManualRefreshMonitor();
+      setLimitDialogOpen(false);
+      showAlert("Berhasil", "Batas ditambah.", "success");
+    } catch (e) { showAlert("Gagal", "Error.", "danger"); }
+  };
+
+  const handleResetCheatCount = async (attId: string) => {
+     try {
+       await pb.collection('attempts').update(attId, { cheatCount: 0 });
+       handleManualRefreshMonitor();
+       showAlert("Berhasil", "Reset pelanggaran.", "success");
+     } catch (e) { showAlert("Gagal", "Error.", "danger"); }
   };
 
   const isRoomActive = selectedRoom ? (
@@ -1384,7 +1050,7 @@ const ExamRoomsPage = () => {
             {isEditRestricted && (
               <div className="bg-amber-50 border border-amber-200 text-amber-700 p-2.5 rounded-xl text-[10px] mt-2 font-medium flex items-start gap-2 animate-pulse-slow dark:bg-amber-950/20 dark:border-amber-900/40 dark:text-amber-400">
                 <Lock className="h-3.5 w-3.5 shrink-0 mt-0.5" />
-                <span>Ujian sedang berlangsung. Demi keamanan data, Anda hanya diperbolehkan mengubah <b>Nama Ruang</b>, <b>Waktu Selesai</b>, <b>Kumpul Dibuka</b>, dan <b>Batas Cheat</b>.</span>
+                <span>Ujian sedang berlangsung. Anda diperbolehkan mengubah <b>Nama Ruang</b>, <b>Kelas</b>, <b>Waktu (Mulai/Selesai)</b>, <b>Durasi</b>, <b>Kumpul Dibuka</b>, dan <b>Batas Cheat</b>.</span>
               </div>
             )}
           </DialogHeader>
@@ -1419,7 +1085,7 @@ const ExamRoomsPage = () => {
                 <div className="mt-2 text-xs text-slate-500 bg-slate-50 dark:bg-slate-800/50 p-2.5 rounded-lg border border-slate-100 dark:border-slate-800 flex flex-col gap-1">
                   <div><span className="font-semibold text-slate-700 dark:text-slate-300">Jenis:</span> {exams.find(e => e.id === formValues.examId)?.examType || "Latihan Biasa"}</div>
                   <div><span className="font-semibold text-slate-700 dark:text-slate-300">Mapel:</span> {subjects.find(m => m.id === exams.find(e => e.id === formValues.examId)?.subjectId)?.name || "-"}</div>
-                  <div><span className="font-semibold text-slate-700 dark:text-slate-300">Guru:</span> {teachers[exams.find(e => e.id === formValues.examId)?.teacherId]?.name || "-"}</div>
+                  <div><span className="font-semibold text-slate-700 dark:text-slate-300">Guru:</span> {masterTeachers.find(t => t.id === exams.find(e => e.id === formValues.examId)?.teacherId)?.name || "-"}</div>
                 </div>
               )}
             </FormField>
@@ -1429,17 +1095,15 @@ const ExamRoomsPage = () => {
               <div className="flex gap-2 mb-2">
                 <button
                   type="button"
-                  disabled={isEditRestricted}
                   onClick={() => setFormValues({ ...formValues, allClasses: true, classId: "" })}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${isEditRestricted ? "opacity-50 cursor-not-allowed" : ""} ${formValues.allClasses ? "bg-blue-50 text-blue-700 border border-blue-100 dark:bg-blue-900/40 dark:text-blue-400 dark:border-blue-800/40" : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300"}`}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${formValues.allClasses ? "bg-blue-50 text-blue-700 border border-blue-100 dark:bg-blue-900/40 dark:text-blue-400 dark:border-blue-800/40" : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300"}`}
                 >
                   Semua Kelas
                 </button>
                 <button
                   type="button"
-                  disabled={isEditRestricted}
                   onClick={() => setFormValues({ ...formValues, allClasses: false })}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${isEditRestricted ? "opacity-50 cursor-not-allowed" : ""} ${!formValues.allClasses ? "bg-blue-50 text-blue-700 border border-blue-100 dark:bg-blue-900/40 dark:text-blue-400 dark:border-blue-800/40" : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300"}`}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${!formValues.allClasses ? "bg-blue-50 text-blue-700 border border-blue-100 dark:bg-blue-900/40 dark:text-blue-400 dark:border-blue-800/40" : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300"}`}
                 >
                   Pilih Parsial (Multiple)
                 </button>
@@ -1450,11 +1114,10 @@ const ExamRoomsPage = () => {
                   {examClasses.map((c) => {
                     const isChecked = formValues.classId ? formValues.classId.split(",").includes(c.id) : false;
                     return (
-                      <label key={c.id} className={`flex items-center gap-2 text-xs p-1 hover:bg-slate-50 dark:hover:bg-slate-800 rounded cursor-pointer text-slate-700 dark:text-slate-200 ${isEditRestricted ? "opacity-50 cursor-not-allowed" : ""}`}>
+                      <label key={c.id} className={`flex items-center gap-2 text-xs p-1 hover:bg-slate-50 dark:hover:bg-slate-800 rounded cursor-pointer text-slate-700 dark:text-slate-200`}>
                         <input
                           type="checkbox"
                           checked={isChecked}
-                          disabled={isEditRestricted}
                           onChange={(e) => {
                             let current = formValues.classId ? formValues.classId.split(",") : [];
                             if (e.target.checked) {
@@ -1477,7 +1140,7 @@ const ExamRoomsPage = () => {
 
             <div className="grid grid-cols-2 gap-3">
               <FormField id="start_time" label="Waktu Mulai" error={undefined}>
-                <Input type="datetime-local" value={formValues.start_time} onChange={(e) => setFormValues({ ...formValues, start_time: e.target.value })} required disabled={isEditRestricted} />
+                <Input type="datetime-local" value={formValues.start_time} onChange={(e) => setFormValues({ ...formValues, start_time: e.target.value })} required />
               </FormField>
               <FormField id="end_time" label="Waktu Berakhir" error={undefined}>
                 <Input type="datetime-local" value={formValues.end_time} onChange={(e) => setFormValues({ ...formValues, end_time: e.target.value })} required />
@@ -1488,7 +1151,7 @@ const ExamRoomsPage = () => {
             <div className="space-y-4 pt-1 border-t mt-4">
               <div className="grid grid-cols-2 gap-3 mt-2">
                 <FormField id="duration" label="Durasi (Menit)" error={undefined}>
-                  <Input type="number" value={formValues.duration} onChange={(e) => setFormValues({ ...formValues, duration: Number(e.target.value) })} required disabled={isEditRestricted} />
+                  <Input type="number" value={formValues.duration} onChange={(e) => setFormValues({ ...formValues, duration: Number(e.target.value) })} required />
                 </FormField>
                 <FormField id="cheat_limit" label="Batas Cheat" error={undefined}>
                   <Input type="number" value={formValues.cheat_limit} onChange={(e) => setFormValues({ ...formValues, cheat_limit: Number(e.target.value) })} required />
@@ -1562,25 +1225,38 @@ const ExamRoomsPage = () => {
       <Dialog open={isMonitorOpen} onOpenChange={setIsMonitorOpen}>
         <DialogContent className="max-w-[95vw] lg:max-w-6xl w-full bg-card max-h-[95vh] flex flex-col p-4 sm:p-6 overflow-hidden">
           <DialogHeader className="flex flex-row items-center justify-between border-b pb-3 border-slate-200/50 dark:border-slate-800/40">
-            <DialogTitle className="flex items-center gap-2 text-base font-bold text-slate-800 dark:text-slate-100 truncate">
-              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse-slow shrink-0"></span>
-              <span className="truncate">Monitor Ujian: {monitorRoom?.room_name || "Ruang Tanpa Nama"} — <span className="text-slate-500 font-normal">{monitorRoom?.examTitle}</span></span>
-            </DialogTitle>
-            <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-900/60 px-2 py-1 rounded-xl border border-slate-200/60 dark:border-slate-800/40">
-              <span className="text-xs text-slate-600 dark:text-slate-400 font-mono font-bold">
-                {Math.floor(monitorTimeLeft / 60).toString().padStart(2, '0')}:{(monitorTimeLeft % 60).toString().padStart(2, '0')}
-              </span>
-              <Button
-                onClick={() => {
-                  setIsMonitorRefreshing(true);
-                  handleManualRefreshMonitor();
-                  setTimeout(() => setIsMonitorRefreshing(false), 600);
-                }}
-                size="icon"
-                variant="ghost"
-                className="h-5 w-5 p-0 rounded-lg hover:bg-white dark:hover:bg-slate-800 text-slate-400 hover:text-slate-700 dark:hover:text-slate-100"
-              >
-                <RefreshCw className={`h-3 w-3 ${isMonitorRefreshing ? "animate-spin" : ""}`} />
+            <div className="flex flex-col gap-1">
+              <DialogTitle className="flex items-center gap-2 text-base font-bold text-slate-800 dark:text-slate-100 truncate">
+                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse-slow shrink-0"></span>
+                <span className="truncate">Monitor Ujian: {monitorRoom?.room_name || "Ruang Tanpa Nama"} — <span className="text-slate-500 font-normal">{monitorRoom?.examTitle}</span></span>
+              </DialogTitle>
+              <div className="flex items-center gap-1.5 pl-4">
+                 <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-100/50 dark:border-emerald-800/50">
+                    <div className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse" />
+                    <span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-tighter">Live Sync Connected</span>
+                 </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-900/60 px-2 py-1 rounded-xl border border-slate-200/60 dark:border-slate-800/40">
+                <span className="text-xs text-slate-600 dark:text-slate-400 font-mono font-bold">
+                  {Math.floor(monitorTimeLeft / 60).toString().padStart(2, '0')}:{(monitorTimeLeft % 60).toString().padStart(2, '0')}
+                </span>
+                <Button
+                  onClick={() => {
+                    setIsMonitorRefreshing(true);
+                    handleManualRefreshMonitor();
+                    setTimeout(() => setIsMonitorRefreshing(false), 600);
+                  }}
+                  size="icon"
+                  variant="ghost"
+                  className="h-5 w-5 p-0 rounded-lg hover:bg-white dark:hover:bg-slate-800 text-slate-400 hover:text-slate-700 dark:hover:text-slate-100"
+                >
+                  <RefreshCw className={`h-3 w-3 ${isMonitorRefreshing ? "animate-spin text-blue-500" : ""}`} />
+                </Button>
+              </div>
+              <Button onClick={() => setIsMonitorOpen(false)} size="icon" variant="ghost" className="h-8 w-8 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800">
+                <X className="h-4 w-4 text-slate-400" />
               </Button>
             </div>
           </DialogHeader>
@@ -1600,7 +1276,13 @@ const ExamRoomsPage = () => {
                   >
                     <option value="all">Semua Terdaftar</option>
                     {examClasses
-                      .filter(c => monitorRoom?.allClasses || monitorRoom?.classId?.split(",").includes(c.id))
+                      .filter(c => {
+                        if (monitorRoom?.allClasses) return true;
+                        if (!monitorRoom?.classId) return false;
+                        const rawIds = monitorRoom.classId;
+                        const ids = Array.isArray(rawIds) ? rawIds : String(rawIds || "").split(",").map(id => id.trim()).filter(Boolean);
+                        return ids.includes(c.id);
+                      })
                       .map(c => <option key={c.id} value={c.id}>{c.name}</option>)
                     }
                   </select>
@@ -1635,37 +1317,30 @@ const ExamRoomsPage = () => {
 
           <div className="flex justify-between items-center mb-2 px-1">
             <div className="text-[11px] text-slate-500">
-              Menampilkan {Math.min((monitorPage - 1) * monitorPageSize + 1, students.filter(s => {
-                if (monitorRoom?.allClasses) {
+              {(() => {
+                const filtered = students.filter(s => {
+                  if (monitorRoom?.allClasses) {
+                    if (monitorClassFilter !== "all" && s.classId !== monitorClassFilter) return false;
+                    return true;
+                  }
+                  if (!monitorRoom?.classId) return false;
+                  
+                  const rawIds = monitorRoom.classId;
+                  const allowedIds = Array.isArray(rawIds) 
+                    ? rawIds 
+                    : String(rawIds || "").split(",").map(id => id.trim()).filter(Boolean);
+                    
+                  if (!allowedIds.includes(s.classId)) return false;
                   if (monitorClassFilter !== "all" && s.classId !== monitorClassFilter) return false;
                   return true;
-                }
-                if (!monitorRoom?.classId) return false;
-                const allowedIds = monitorRoom.classId.split(",");
-                if (!allowedIds.includes(s.classId)) return false;
-                if (monitorClassFilter !== "all" && s.classId !== monitorClassFilter) return false;
-                return true;
-              }).length)} - {Math.min(monitorPage * monitorPageSize, students.filter(s => {
-                if (monitorRoom?.allClasses) {
-                  if (monitorClassFilter !== "all" && s.classId !== monitorClassFilter) return false;
-                  return true;
-                }
-                if (!monitorRoom?.classId) return false;
-                const allowedIds = monitorRoom.classId.split(",");
-                if (!allowedIds.includes(s.classId)) return false;
-                if (monitorClassFilter !== "all" && s.classId !== monitorClassFilter) return false;
-                return true;
-              }).length)} dari {students.filter(s => {
-                if (monitorRoom?.allClasses) {
-                  if (monitorClassFilter !== "all" && s.classId !== monitorClassFilter) return false;
-                  return true;
-                }
-                if (!monitorRoom?.classId) return false;
-                const allowedIds = monitorRoom.classId.split(",");
-                if (!allowedIds.includes(s.classId)) return false;
-                if (monitorClassFilter !== "all" && s.classId !== monitorClassFilter) return false;
-                return true;
-              }).length} Siswa
+                });
+                
+                const count = filtered.length;
+                const start = Math.min((monitorPage - 1) * monitorPageSize + 1, count);
+                const end = Math.min(monitorPage * monitorPageSize, count);
+                
+                return `Menampilkan ${start} - ${end} dari ${count} Siswa`;
+              })()}
             </div>
             <div className="flex items-center gap-2">
               <span className="text-[11px] text-slate-500">Baris:</span>
@@ -1712,7 +1387,12 @@ const ExamRoomsPage = () => {
                           return true;
                         }
                         if (!monitorRoom?.classId) return false;
-                        const allowedIds = monitorRoom.classId.split(",");
+                        
+                        const rawIds = monitorRoom.classId;
+                        const allowedIds = Array.isArray(rawIds) 
+                          ? rawIds 
+                          : String(rawIds || "").split(",").map(id => id.trim()).filter(Boolean);
+                          
                         if (!allowedIds.includes(s.classId)) return false;
                         if (monitorClassFilter !== "all" && s.classId !== monitorClassFilter) return false;
                         return true;
@@ -1741,8 +1421,8 @@ const ExamRoomsPage = () => {
 
                     const dataRows = currentData.map((student, localIndex) => {
                       const index = startIndex + localIndex;
-                      const attempt = attempts.find((a) => a.id === student.nisn);
-                      const sisAnswers = answersList[student.nisn] || {};
+                      const attempt = attempts.find((a) => a.studentId === student.id);
+                      const sisAnswers = answersList[student.id] || {};
                       const answeredCount = Object.keys(sisAnswers).length;
 
                       let statusLabel = <span className="text-slate-400">Belum Masuk</span>;
@@ -1752,10 +1432,11 @@ const ExamRoomsPage = () => {
                         } else if (attempt.status === "LOCKED") {
                           statusLabel = <span className="text-red-500 font-bold px-2 py-0.5 bg-red-50 dark:bg-red-950/40 rounded-full border border-red-100 dark:border-red-900 italic">TERKUNCI</span>;
                         } else {
-                          const isOnline = attempt.isOnline === true;
+                          const lastH = attempt?.lastHeartbeat ? new Date(attempt.lastHeartbeat).getTime() : 0;
+                          const isTrulyOnline = attempt?.isOnline && (Date.now() - lastH < 60000);
                           statusLabel = (
-                            <span className={`font-semibold px-2 py-0.5 rounded-full border whitespace-nowrap ${isOnline ? "text-amber-600 bg-amber-50 dark:bg-amber-950/40 border-amber-100 dark:border-amber-900 animate-pulse" : "text-slate-500 bg-slate-50 dark:bg-slate-800 border-slate-100 dark:border-slate-700"}`}>
-                              Ujian ({isOnline ? "Online" : "Offline"})
+                            <span className={`font-semibold px-2 py-0.5 rounded-full border whitespace-nowrap ${isTrulyOnline ? "text-amber-600 bg-amber-50 dark:bg-amber-950/40 border-amber-100 dark:border-amber-900 animate-pulse" : "text-slate-500 bg-slate-50 dark:bg-slate-800 border-slate-100 dark:border-slate-700"}`}>
+                              Ujian ({isTrulyOnline ? "Online" : "Offline"})
                             </span>
                           );
                         }
@@ -1791,11 +1472,11 @@ const ExamRoomsPage = () => {
                                   <>
                                     {/* 1. Logs & Reset Cheat tetap Standalone */}
                                     {(role === "admin" || monitorRoom?.examTeacherId === teacherId) && (
-                                      <Button size="sm" variant="secondary" className="bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-100 dark:bg-amber-900/30 dark:text-amber-400 dark:hover:bg-amber-900/50 dark:border-amber-800/40 h-7 text-[10px]" onClick={() => handleResetCheatCount(student.nisn)}>Reset Cheat</Button>
+                                      <Button size="sm" variant="secondary" className="bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-100 dark:bg-amber-900/30 dark:text-amber-400 dark:hover:bg-amber-900/50 dark:border-amber-800/40 h-7 text-[10px]" onClick={() => handleResetCheatCount(attempt.id)}>Reset Cheat</Button>
                                     )}
 
-                                    <Button size="sm" variant="secondary" className="bg-sky-50 text-sky-700 hover:bg-sky-100 border border-sky-100 dark:bg-sky-900/30 dark:text-sky-400 dark:hover:bg-sky-900/50 dark:border-sky-800/40 h-7 text-[10px]" onClick={() => setExpandedstudent(expandedstudent === student.nisn ? null : student.nisn)}>
-                                      {expandedstudent === student.nisn ? "Tutup" : "Logs"}
+                                    <Button size="sm" variant="secondary" className="bg-sky-50 text-sky-700 hover:bg-sky-100 border border-sky-100 dark:bg-sky-900/30 dark:text-sky-400 dark:hover:bg-sky-900/50 dark:border-sky-800/40 h-7 text-[10px]" onClick={() => setExpandedstudent(expandedstudent === student.id ? null : student.id)}>
+                                      {expandedstudent === student.id ? "Tutup" : "Logs"}
                                     </Button>
 
                                     {/* 2. Tombol Lainnya masuk ke Dropdown Menu */}
@@ -1807,29 +1488,29 @@ const ExamRoomsPage = () => {
                                           className="h-7 px-2 text-[10px] bg-slate-100/80 text-slate-700 hover:bg-slate-200 border border-slate-200 dark:bg-slate-800/60 dark:text-slate-300 dark:hover:bg-slate-700/80 dark:border-slate-700/60 font-medium flex items-center gap-1 rounded-md shadow-sm transition-colors"
                                           onClick={(e) => {
                                             e.stopPropagation();
-                                            setOpenMenuId(openMenuId === student.nisn ? null : student.nisn);
+                                            setOpenMenuId(openMenuId === student.id ? null : student.id);
                                           }}
                                         >
                                           Menu
                                           <ChevronDown className="w-3 h-3 opacity-60 ml-0.5" />
                                         </Button>
 
-                                        {openMenuId === student.nisn && (
+                                        {openMenuId === student.id && (
                                           <div className="absolute right-0 mt-1 w-32 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg z-30 py-1 overflow-hidden">
                                             {attempt?.status === "LOCKED" && (
-                                              <button onClick={(e) => { e.stopPropagation(); handleUnlockStudent(student.nisn); setOpenMenuId(null); }} className="w-full text-left px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-700 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5 border-b border-slate-100 dark:border-slate-700/60">
+                                              <button onClick={(e) => { e.stopPropagation(); handleUnlockStudent(attempt.id); setOpenMenuId(null); }} className="w-full text-left px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-700 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5 border-b border-slate-100 dark:border-slate-700/60">
                                                 <Lock className="w-3.5 h-3.5 opacity-80" /> Buka Kunci
                                               </button>
                                             )}
-                                            <button onClick={(e) => { e.stopPropagation(); openLimitDialog(student.nisn); setOpenMenuId(null); }} className="w-full text-left px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-700 text-[10px] font-semibold text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
+                                            <button onClick={(e) => { e.stopPropagation(); openLimitDialog(student.id); setOpenMenuId(null); }} className="w-full text-left px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-700 text-[10px] font-semibold text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
                                               <Plus className="w-3.5 h-3.5 opacity-70 text-slate-400" /> + Limit
                                             </button>
                                             {attempt?.status !== "submitted" && (
-                                              <button onClick={(e) => { e.stopPropagation(); handleForceSubmitStudent(student.nisn); setOpenMenuId(null); }} className="w-full text-left px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-700 text-[10px] font-semibold text-rose-600 dark:text-rose-400 flex items-center gap-1.5 border-b border-slate-100 dark:border-slate-700/60">
+                                              <button onClick={(e) => { e.stopPropagation(); handleForceSubmitStudent(attempt.id); setOpenMenuId(null); }} className="w-full text-left px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-700 text-[10px] font-semibold text-rose-600 dark:text-rose-400 flex items-center gap-1.5 border-b border-slate-100 dark:border-slate-700/60">
                                                 <Square className="w-3.5 h-3.5 opacity-70 fill-current" /> Selesaikan
                                               </button>
                                             )}
-                                            <button onClick={(e) => { e.stopPropagation(); handleResetSession(student.nisn); setOpenMenuId(null); }} className="w-full text-left px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-700 text-[10px] font-semibold text-rose-600 dark:text-rose-400 flex items-center gap-1.5">
+                                            <button onClick={(e) => { e.stopPropagation(); handleResetSession(attempt.id); setOpenMenuId(null); }} className="w-full text-left px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-700 text-[10px] font-semibold text-rose-600 dark:text-rose-400 flex items-center gap-1.5">
                                               <RefreshCw className="w-3.5 h-3.5 opacity-70 text-rose-400" /> Reset Sesi
                                             </button>
                                           </div>
@@ -1841,7 +1522,7 @@ const ExamRoomsPage = () => {
                               </div>
                             </TableCell>
                           </TableRow>
-                          {expandedstudent === student.nisn && (
+                          {expandedstudent === student.id && (
                             <TableRow className="bg-slate-50/30 dark:bg-slate-800/30 border-l-2 border-l-indigo-500">
                               <TableCell colSpan={10} className="p-4">
                                 <div className="flex items-center gap-2 mb-3">
@@ -1997,7 +1678,12 @@ const ExamRoomsPage = () => {
                       return true;
                     }
                     if (!monitorRoom?.classId) return false;
-                    const allowedIds = monitorRoom.classId.split(",");
+                    
+                    const rawIds = monitorRoom.classId;
+                    const allowedIds = Array.isArray(rawIds) 
+                      ? rawIds 
+                      : String(rawIds || "").split(",").map(id => id.trim()).filter(Boolean);
+                      
                     if (!allowedIds.includes(s.classId)) return false;
                     if (monitorClassFilter !== "all" && s.classId !== monitorClassFilter) return false;
                     return true;
@@ -2016,12 +1702,15 @@ const ExamRoomsPage = () => {
 
                 if (currentData.length === 0) return <div className="text-center p-8 text-slate-400 text-sm">Tidak ada Siswa ditemukan.</div>;
 
-                return currentData.map((student, localIndex) => {
-                  const attempt = attempts.find((a) => a.id === student.nisn);
-                  const sisAnswers = answersList[student.nisn] || {};
-                  const isOnline = attempt?.isOnline === true;
-                  const status = attempt ? (attempt.status === "submitted" ? "Selesai" : attempt.status === "LOCKED" ? "Terkunci" : `Ujian (${isOnline ? "Online" : "Offline"})`) : "Belum Masuk";
-                  const statusColor = attempt ? (attempt.status === "submitted" ? "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-400 dark:border-emerald-900" : attempt.status === "LOCKED" ? "bg-rose-100 text-rose-700 border-rose-200 dark:bg-rose-950/50 dark:text-rose-400 dark:border-rose-900" : isOnline ? "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-950/50 dark:text-amber-400 dark:border-amber-900 animate-pulse" : "bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700") : "bg-slate-100 text-slate-400 border-slate-200 dark:bg-slate-800 dark:text-slate-500 dark:border-slate-700";
+                  return currentData.map((student, localIndex) => {
+                    const attempt = attempts.find((a) => a.studentId === student.id);
+                    const sisAnswers = answersList[student.id] || {};
+                    
+                    const lastH = attempt?.lastHeartbeat ? new Date(attempt.lastHeartbeat).getTime() : 0;
+                    const isTrulyOnline = attempt?.isOnline && (Date.now() - lastH < 60000);
+                    
+                    const status = attempt ? (attempt.status === "submitted" ? "Selesai" : attempt.status === "LOCKED" ? "Terkunci" : `Ujian (${isTrulyOnline ? "Online" : "Offline"})`) : "Belum Masuk";
+                    const statusColor = attempt ? (attempt.status === "submitted" ? "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-400 dark:border-emerald-900" : attempt.status === "LOCKED" ? "bg-rose-100 text-rose-700 border-rose-200 dark:bg-rose-950/50 dark:text-rose-400 dark:border-rose-900" : isTrulyOnline ? "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-950/50 dark:text-amber-400 dark:border-amber-900 animate-pulse" : "bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700") : "bg-slate-100 text-slate-400 border-slate-200 dark:bg-slate-800 dark:text-slate-500 dark:border-slate-700";
 
                   return (
                     <div key={student.id} className="bg-card border border-slate-200 dark:border-slate-800 rounded-2xl p-4 space-y-3 shadow-sm relative overflow-hidden">
@@ -2051,16 +1740,25 @@ const ExamRoomsPage = () => {
                         </div>
                       </div>
 
-                      <div className="flex justify-end gap-2 pt-1">
-                        {attempt?.status === "LOCKED" && (
-                          <Button size="sm" variant="outline" className="h-8 text-[11px] font-bold border-green-200 text-green-700 hover:bg-green-50 rounded-xl px-4" onClick={() => handleUnlockStudent(student.nisn)}>Unlock</Button>
+                      <div className="flex flex-wrap justify-end gap-2 pt-1">
+                        {attempt && (role === "admin" || monitorRoom?.examTeacherId === teacherId) && (
+                          <>
+                            {attempt.status === "LOCKED" && (
+                              <Button size="sm" variant="outline" className="h-8 text-[10px] font-bold border-green-200 text-green-700 hover:bg-green-50 rounded-xl px-3" onClick={() => handleUnlockStudent(attempt.id)}>Unlock</Button>
+                            )}
+                            <Button size="sm" variant="outline" className="h-8 text-[10px] font-bold border-rose-200 text-rose-700 hover:bg-rose-50 rounded-xl px-3" onClick={() => handleResetSession(attempt.id)}>Reset</Button>
+                            {attempt.status !== "submitted" && (
+                              <Button size="sm" variant="outline" className="h-8 text-[10px] font-bold border-amber-200 text-amber-700 hover:bg-amber-50 rounded-xl px-3" onClick={() => handleForceSubmitStudent(attempt.id)}>Submit</Button>
+                            )}
+                            <Button size="sm" variant="outline" className="h-8 text-[10px] font-bold border-slate-200 text-slate-700 hover:bg-slate-50 rounded-xl px-3" onClick={() => openLimitDialog(student.id)}>+ Limit</Button>
+                          </>
                         )}
-                        <Button size="sm" variant="secondary" className="h-8 text-[11px] font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-xl px-4" onClick={() => setExpandedstudent(expandedstudent === student.nisn ? null : student.nisn)}>
-                          {expandedstudent === student.nisn ? "Tutup" : "Details"}
+                        <Button size="sm" variant="secondary" className="h-8 text-[10px] font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-xl px-3" onClick={() => setExpandedstudent(expandedstudent === student.id ? null : student.id)}>
+                          {expandedstudent === student.id ? "Tutup" : "Details"}
                         </Button>
                       </div>
 
-                      {expandedstudent === student.nisn && (
+                      {expandedstudent === student.id && (
                         <div className="mt-3 pt-3 border-t border-slate-100 bg-slate-50/50 rounded-b-2xl space-y-2 p-2">
                           {monitorQuestions.map((q, qIdx) => {
                             const ansId = sisAnswers[q.id];
@@ -2141,7 +1839,10 @@ const ExamRoomsPage = () => {
                 return true;
               }
               if (!monitorRoom?.classId) return false;
-              const allowedIds = monitorRoom.classId.split(",");
+              const rawIds = monitorRoom.classId;
+              const allowedIds = Array.isArray(rawIds) 
+                ? rawIds 
+                : String(rawIds || "").split(",").map(id => id.trim()).filter(Boolean);
               if (!allowedIds.includes(s.classId)) return false;
               if (monitorClassFilter !== "all" && s.classId !== monitorClassFilter) return false;
               return true;

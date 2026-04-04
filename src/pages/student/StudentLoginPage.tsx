@@ -5,10 +5,9 @@ import { Input } from "../../components/ui/input";
 import FormField from "../../components/forms/FormField";
 import { Card, CardHeader, CardTitle, CardContent } from "../../components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../../components/ui/dialog";
-import { database } from "../../lib/firebase";
-import { ref, onValue, DataSnapshot } from "firebase/database";
+import pb from "../../lib/pocketbase";
 
-const studentLoginPage = () => {
+const StudentLoginPage = () => {
   const { loginStudent, student, changePassword } = useStudentAuth();
   
   const [nisn, setNisn] = useState("");
@@ -28,21 +27,31 @@ const studentLoginPage = () => {
   const [logoError, setLogoError] = useState(false);
 
   useEffect(() => {
-    const r = ref(database, "settings/school");
-    const unsubscribe = onValue(r, (snap: DataSnapshot) => {
-      setLogoLoading(true);
-      if (snap.exists()) {
-        const d = snap.val();
-        setSchoolName(d.name || "");
-        setSchoolLogo(d.logoUrl || "");
-      }
-      setLogoLoading(false);
-    }, (error: Error) => {
-      console.error("Firebase read error:", error);
-      setLogoLoading(false);
-    });
+    const fetchSettings = async () => {
+      try {
+        setLogoLoading(true);
+        // Ambil record pertama dari koleksi settings di PocketBase
+        const records = await pb.collection("settings").getFullList({
+          sort: "created",
+          limit: 1
+        });
 
-    return () => unsubscribe();
+        if (records.length > 0) {
+          const data = records[0];
+          setSchoolName(data.name || "E-Ujian CBT");
+          
+          // Handle logo dari uritext atau file
+          const logoUrl = data.logoUrl || data.logo || "";
+          setSchoolLogo(logoUrl);
+        }
+      } catch (err) {
+        console.error("Gagal memuat settings sekolah:", err);
+      } finally {
+        setLogoLoading(false);
+      }
+    };
+
+    fetchSettings();
   }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -113,7 +122,7 @@ const studentLoginPage = () => {
             )}
           </div>
           <CardTitle className="text-xl sm:text-2xl font-bold text-slate-800">Login Siswa</CardTitle>
-          <p className="text-slate-500 text-xs sm:text-sm">{schoolName || "Ujian Computer Based Test"}</p>
+          <p className="text-slate-500 text-xs sm:text-sm font-semibold">{schoolName || "SMAN Modal Bangsa Aceh"}</p>
         </CardHeader>
         <CardContent className="pt-4">
           <form onSubmit={handleLogin} className="space-y-4">
@@ -123,11 +132,11 @@ const studentLoginPage = () => {
               </div>
             )}
             
-            <FormField id="nisn" label="NISN" error={undefined}>
+            <FormField id="nisn" label="NISN (Username)" error={undefined}>
               <Input 
                 value={nisn}
-                onChange={(e) => setNisn(e.target.value.replace(/\D/g, ''))} // only numbers
-                placeholder="Masukkan NISN Anda"
+                onChange={(e) => setNisn(e.target.value)} 
+                placeholder="Masukkan NISN / Username"
                 className="bg-slate-50 border-slate-200 text-slate-800 placeholder:text-slate-400 hover:bg-slate-100/50 focus:bg-white rounded-xl px-4 h-11 transition-all"
                 disabled={loading}
               />
@@ -208,5 +217,4 @@ const studentLoginPage = () => {
   );
 };
 
-export default studentLoginPage;
-
+export default StudentLoginPage;

@@ -69,12 +69,6 @@ const StudentTable = ({
     { key: "nisn", label: "NISN", sortable: true },
     { key: "name", label: "Nama Siswa", sortable: true },
     { 
-      key: "gender", 
-      label: "L/P", 
-      sortable: true,
-      render: (v: string) => (v === "L" ? "Laki-laki" : "Perempuan")
-    },
-    { 
       key: "classId", 
       label: "Kelas", 
       sortable: true,
