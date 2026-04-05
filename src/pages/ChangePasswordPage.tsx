@@ -1,19 +1,18 @@
 import { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { FirebaseError } from "firebase/app";
 import { Lock, Eye, EyeOff, Sparkles, Shield, ArrowLeft } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { motion } from "framer-motion";
 import { Link, useNavigate } from "react-router-dom";
-import { updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "firebase/auth";
-import { auth } from "../lib/firebase";
+import pb from "../lib/pocketbase";
 
 import FormField from "../components/forms/FormField";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Input } from "../components/ui/input";
 import { useAuth } from "../context/AuthContext";
+import { useToast } from "../components/ui/toast";
 
 const changePasswordSchema = z.object({
   currentPassword: z.string().min(1, "Password saat ini wajib diisi"),
@@ -26,32 +25,10 @@ const changePasswordSchema = z.object({
 
 type ChangePasswordFormValues = z.infer<typeof changePasswordSchema>;
 
-const firebaseErrorMessage = (error: unknown) => {
-  if (error instanceof FirebaseError) {
-    switch (error.code) {
-      case "auth/wrong-password":
-        return "Password saat ini tidak benar.";
-      case "auth/weak-password":
-        return "Password baru terlalu lemah. Gunakan kombinasi yang lebih kuat.";
-      case "auth/requires-recent-login":
-        return "Untuk keamanan, silakan login ulang terlebih dahulu.";
-      case "auth/too-many-requests":
-        return "Terlalu banyak percobaan. Coba lagi beberapa saat lagi.";
-      default:
-        return error.message;
-    }
-  }
-
-  if (error instanceof Error) {
-    return error.message;
-  }
-
-  return "Terjadi kesalahan yang tidak diketahui.";
-};
-
 const ChangePasswordPage = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { addToast } = useToast();
   const [formError, setFormError] = useState<string | null>(null);
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
@@ -72,24 +49,27 @@ const ChangePasswordPage = () => {
 
   const onSubmit = async (values: ChangePasswordFormValues) => {
     if (!user) {
-      setFormError("User tidak ditemukan. Silakan login ulang.");
+      setFormError("User tidak ditemukan.");
       return;
     }
 
     setFormError(null);
     try {
-      // Re-authenticate user with current password
-      const credential = EmailAuthProvider.credential(user.email!, values.currentPassword);
-      await reauthenticateWithCredential(user, credential);
+      await pb.collection("users").update(user.id, {
+        oldPassword: values.currentPassword,
+        password: values.newPassword,
+        passwordConfirm: values.confirmPassword,
+      });
 
-      // Update password
-      await updatePassword(user, values.newPassword);
+      addToast({
+        title: "Password Berhasil Diubah",
+        description: "Password akun Anda telah berhasil diperbarui.",
+        type: "success"
+      });
 
-      // Success - redirect to dashboard
-      navigate("/", { replace: true });
-    } catch (error) {
-      const message = firebaseErrorMessage(error);
-      setFormError(message);
+      navigate("/admin", { replace: true });
+    } catch (error: any) {
+      setFormError(error.message || "Gagal mengubah password. Pastikan password saat ini benar.");
     }
   };
 

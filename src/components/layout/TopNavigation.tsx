@@ -96,10 +96,11 @@ const TopNavigation = () => {
         
         setLockedAttempts(locked.map((a: any) => ({
           id: a.id,
-          nisn: a.expand?.studentId?.nisn || "N/A",
-          studentId: a.studentId,
-          roomId: a.examRoomId,
-          status: a.status
+          nisn: a.expand?.studentId?.nisn || a.nisn || "N/A",
+          studentId: a.studentId || a.student_id,
+          roomId: a.examRoomId || a.exam_room_id,
+          status: a.status,
+          expand: a.expand
         })));
       } catch (e) {}
     };
@@ -210,18 +211,24 @@ const TopNavigation = () => {
                               <UserX className="h-5 w-5 text-red-600 dark:text-red-400" />
                             </div>
                             <div className="flex-1 min-w-0">
-                              <p className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">{a.expand?.studentId?.name || "Siswa Tidak Dikenal"}</p>
-                              <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5">
-                                <span className="text-[10px] font-medium text-slate-500">{classes.find(c => c.id === a.expand?.studentId?.classId)?.name || "-"}</span>
-                                <span className="text-[10px] text-slate-300 dark:text-slate-700">•</span>
-                                <span className="text-[10px] font-mono text-slate-400 bg-slate-100 dark:bg-slate-800 px-1 rounded">{a.nisn}</span>
-                              </div>
-                              <div className="mt-2 flex items-center gap-1.5 p-1.5 bg-blue-50/50 dark:bg-blue-950/20 rounded-lg border border-blue-100/50 dark:border-blue-900/20">
-                                <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></div>
-                                <p className="text-[10px] font-semibold text-blue-700 dark:text-blue-400 truncate">
-                                  {room?.room_name || "Ruang Tidak Ditemukan"}
-                                </p>
-                              </div>
+                               <p className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">
+                                 {a.expand?.studentId?.name || students.find(s => s.id === a.studentId)?.name || "Siswa Tidak Dikenal"}
+                               </p>
+                               <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5">
+                                 <span className="text-[10px] font-medium text-slate-500">
+                                   {classes.find(c => c.id === (a.expand?.studentId?.classId || students.find(s => s.id === a.studentId)?.classId))?.name || "-"}
+                                 </span>
+                                 <span className="text-[10px] text-slate-300 dark:text-slate-700">•</span>
+                                 <span className="text-[10px] font-mono text-slate-400 bg-slate-100 dark:bg-slate-800 px-1 rounded">
+                                   {a.nisn !== "N/A" ? a.nisn : (students.find(s => s.id === a.studentId)?.nisn || "-")}
+                                 </span>
+                               </div>
+                               <div className="mt-2 flex items-center gap-1.5 p-1.5 bg-blue-50/50 dark:bg-blue-950/20 rounded-lg border border-blue-100/50 dark:border-blue-900/20">
+                                 <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></div>
+                                 <p className="text-[10px] font-semibold text-blue-700 dark:text-blue-400 truncate">
+                                   {room?.room_name || room?.title || "Ruang Ujian"}
+                                 </p>
+                               </div>
                               <Button
                                 onClick={() => handleUnlockStudent(a.id)}
                                 size="sm"

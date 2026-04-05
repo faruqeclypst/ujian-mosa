@@ -40,19 +40,20 @@ export interface ExamRoomData {
   subjectName?: string;
   teacherName?: string;
   show_result?: boolean;
+  isActive?: boolean;
 }
 
 // 🛡️ Fuzzy Match Helper for Short Answers
 const isFuzzyMatch = (studentAns: any, correctKey: string) => {
   if (typeof studentAns !== "string" || !correctKey) return false;
-  
+
   const sAns = studentAns.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
   const cKey = correctKey.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
-  
+
   if (sAns === cKey) return true;
   if (!sAns || !cKey) return false;
-  
-  if (cKey.length < 3) return sAns === cKey; 
+
+  if (cKey.length < 3) return sAns === cKey;
 
   const distance = (a: string, b: string) => {
     const matrix = Array(b.length + 1).fill(null).map(() => Array(a.length + 1).fill(null));
@@ -134,7 +135,7 @@ const ExamRoomsPage = () => {
   const [limitValue, setLimitValue] = useState("1");
   const [previewImage, setPreviewImage] = useState<string | null>(null); // <--- Pratinjau Zoom Gambar Logs
 
-  const { 
+  const {
     classes: examClasses, students, subjects, teachers: masterTeachers,
     universalToken, timeLeft
   } = useExamData();
@@ -146,7 +147,7 @@ const ExamRoomsPage = () => {
   const [monitorPageSize, setMonitorPageSize] = useState(25);
   const [monitorClassFilter, setMonitorClassFilter] = useState("all");
   const [monitorSortBy, setMonitorSortBy] = useState<"default" | "nama" | "nilai" | "login">("default");
-  
+
   const teacherId = user?.id; // PocketBase user id
 
   // 🖱️ Menarik/Menutup Dropdown Menu otomatis saat Klik di Luar kontainer
@@ -156,29 +157,57 @@ const ExamRoomsPage = () => {
     return () => document.removeEventListener("click", handleGlobalClick);
   }, []);
 
-  // Sync Live Monitoring Progres
+  // Sync Live Monitoring Progres (Efficient One-time fetch + Event-based update)
   useEffect(() => {
-    const fetchAttempts = async () => {
+    let attemptsCache: Record<string, any> = {};
+
+    const updateOverviewStats = (cache: Record<string, any>) => {
+      const stats: Record<string, number> = {};
+      const uniqueStudentsGlobal = new Set();
+      const uniqueStudentsPerRoom: Record<string, Set<string>> = {};
+
+      Object.values(cache).forEach(att => {
+        const sId = att.studentId || att.student_id;
+        if (!sId || att.status !== "ongoing") return;
+
+        uniqueStudentsGlobal.add(sId);
+        if (!uniqueStudentsPerRoom[att.examRoomId]) {
+          uniqueStudentsPerRoom[att.examRoomId] = new Set();
+        }
+        uniqueStudentsPerRoom[att.examRoomId].add(sId);
+      });
+
+      Object.keys(uniqueStudentsPerRoom).forEach(rid => {
+        stats[rid] = uniqueStudentsPerRoom[rid].size;
+      });
+
+      setLiveBreakdown(stats);
+      setTotalOngoing(uniqueStudentsGlobal.size);
+    };
+
+    const initStats = async () => {
       try {
         const allAttempts = await pb.collection('attempts').getFullList({
           filter: 'status = "ongoing"'
         });
-        
-        const stats: Record<string, number> = {};
-        let total = 0;
-
-        allAttempts.forEach(att => {
-          stats[att.examRoomId] = (stats[att.examRoomId] || 0) + 1;
-          total++;
-        });
-
-        setLiveBreakdown(stats);
-        setTotalOngoing(total);
-      } catch (e) {}
+        const initialCache: Record<string, any> = {};
+        allAttempts.forEach(a => initialCache[a.id] = a);
+        attemptsCache = initialCache;
+        updateOverviewStats(initialCache);
+      } catch (e) { }
     };
 
-    fetchAttempts();
-    const unsub = pb.collection('attempts').subscribe("*", fetchAttempts);
+    initStats();
+
+    const unsub = pb.collection('attempts').subscribe("*", (e) => {
+      if (e.action === 'delete') {
+        delete attemptsCache[e.record.id];
+      } else {
+        attemptsCache[e.record.id] = e.record;
+      }
+      updateOverviewStats(attemptsCache);
+    });
+
     return () => { unsub.then(u => u()); };
   }, []);
 
@@ -188,7 +217,7 @@ const ExamRoomsPage = () => {
       try {
         const loaded = await pb.collection('exams').getFullList({ sort: '-created' });
         setExams(loaded);
-      } catch (e) {}
+      } catch (e) { }
     };
     fetchExams();
   }, []);
@@ -210,23 +239,23 @@ const ExamRoomsPage = () => {
           const examObj = exams.find(e => e.id === sId);
           const subjectObj = subjects.find(s => s.id === (examObj?.subjectId || (examObj as any)?.subjectid));
           const teacherObj = masterTeachers.find(t => t.id === (examObj?.teacherId || (examObj as any)?.teacherid));
-          
+
           let className = "Semua Kelas";
           if (!room.allClasses) {
             // Kita coba ambil dari berbagai kemungkinan field (classId atau classIds)
             const clsData = room.classId || (room as any).classid || (room as any).classIds || (room as any).classids || "";
-            
+
             // Konversi ke Array ID yang bersih
             let classList: string[] = [];
             if (Array.isArray(clsData)) {
               classList = clsData;
             } else if (typeof clsData === 'string' && clsData.length > 0) {
               const rawCls = clsData;
-              classList = Array.isArray(rawCls) 
-                ? rawCls 
+              classList = Array.isArray(rawCls)
+                ? rawCls
                 : String(rawCls || "").split(",").map(id => id.trim()).filter(id => id && id !== "all");
             }
-            
+
             // Cari nama-nama kelasnya
             const foundNames = classList.map(id => {
               const c = (examClasses || []).find(cl => cl.id === id);
@@ -237,7 +266,7 @@ const ExamRoomsPage = () => {
               className = foundNames.join(", ");
             } else {
               // Jika ID tidak ditemukan namanya, tapi ada ID-nya, tampilkan ID-nya saja sebagai cadangan
-              className = classList.length > 0 ? `ID: ${classList[0].substring(0,5)}...` : "N/A";
+              className = classList.length > 0 ? `ID: ${classList[0].substring(0, 5)}...` : "N/A";
             }
           }
 
@@ -279,26 +308,73 @@ const ExamRoomsPage = () => {
   const [monitorTimeLeft, setMonitorTimeLeft] = useState(0);
   const [isMonitorRefreshing, setIsMonitorRefreshing] = useState(false);
 
-  const handleManualRefreshMonitor = useCallback(async () => {
-    if (!monitorRoom?.id) return;
+  const handleManualRefreshMonitor = useCallback(async (currRoom?: ExamRoomData) => {
+    const targetRoom = currRoom || monitorRoom;
+    if (!targetRoom?.id) return;
+    
+    setIsMonitorRefreshing(true);
     try {
-      const loadedAttempts = await pb.collection('attempts').getFullList({
-        filter: `examRoomId = "${monitorRoom.id}"`
-      });
-      setAttempts(loadedAttempts);
+      // 1. Ambil DAFTAR SOAL (Hanya jika belum ada)
+      if (monitorQuestions.length === 0) {
+        const qList = await pb.collection('questions').getFullList({
+          filter: `examId = "${targetRoom.examId}"`,
+          sort: 'order,created'
+        });
 
-      // Grouping answers dari kolom answers (JSON) di attempts
+        // 🛠️ Mapping agar UI Monitoring mengenali Type, Choices, dan AnswerKey
+        const mappedQuestions = qList.map(q => {
+          const rawType = q.field || q.type || "pilihan_ganda";
+          const typeMapReverse: Record<string, string> = {
+            multiple_choice: "pilihan_ganda",
+            complex_multiple_choice: "pilihan_ganda_kompleks",
+            matching: "menjodohkan",
+            true_false: "benar_salah",
+            short_answer: "isian_singkat",
+            essay: "uraian",
+            ordering: "urutkan",
+            drag_drop: "drag_drop",
+            pilihan_ganda: "pilihan_ganda",
+            pilihan_ganda_kompleks: "pilihan_ganda_kompleks",
+            isian_singkat: "isian_singkat",
+            uraian: "uraian",
+            menjodohkan: "menjodohkan",
+            urutkan: "urutkan",
+            benar_salah: "benar_salah"
+          };
+          const mappedType = typeMapReverse[rawType] || rawType;
+          const options = q.options || {};
+
+          return {
+            ...q,
+            type: mappedType,
+            choices: options,
+            pairs: mappedType === "menjodohkan" ? options.pairs : undefined,
+            items: (mappedType === "urutkan" || mappedType === "drag_drop") ? options.items : undefined,
+            answerKey: q.correctAnswer || q.answerKey
+          };
+        });
+        setMonitorQuestions(mappedQuestions);
+      }
+
+      // 2. Ambil DATA PENGERJAAN (Selalu ambil yang terbaru)
+      const loadedAttempts = await pb.collection('attempts').getFullList({
+        filter: `examRoomId = "${targetRoom.id}"`
+      });
+
       const grouped: Record<string, any> = {};
       loadedAttempts.forEach(att => {
-        if (att.answers) {
-          grouped[att.studentId] = att.answers;
-        }
+        const sId = att.studentId || att.student_id;
+        if (sId && att.answers) grouped[sId] = att.answers;
       });
+
       setAnswersList(grouped);
+      setAttempts(loadedAttempts);
     } catch (e) {
       console.error("Refresh Monitor Error:", e);
+    } finally {
+      setIsMonitorRefreshing(false);
     }
-  }, [monitorRoom]);
+  }, [monitorRoom, monitorQuestions.length]);
 
   // 🔒 Algoritma Token Otomatis Matematikal (Sama dengan student)
   const generateTimeToken = (timestamp: number) => {
@@ -334,57 +410,71 @@ const ExamRoomsPage = () => {
   useEffect(() => {
     if (!isMonitorOpen || !monitorRoom?.id) return;
 
-    let unsubFunc: (() => void) | null = null;
+    let isSubscribed = true;
+    let currentUnsub: (() => void) | null = null;
 
     const startSubscribe = async () => {
       try {
-        console.log("📡 Mencoba berlangganan real-time untuk Ruang:", monitorRoom.id);
+        // SUBSKRIPSI PENGERJAAN (UNTUK LIVE PROGRES)
         const unsub = await pb.collection('attempts').subscribe("*", (e) => {
-          console.log("🔔 Sinyal masuk:", e.action, e.record.id);
-          
-          if (e.record.examRoomId !== monitorRoom.id) return;
-          
+          if (!isSubscribed) return;
+
+          // Pencocokan ID Ruangan (Robust)
+          const recRoomId = e.record.examRoomId || e.record.exam_room_id || "";
+          if (recRoomId !== monitorRoom.id) return;
+
           if (e.action === 'create' || e.action === 'update') {
             setAttempts(prev => {
               const idx = prev.findIndex(a => a.id === e.record.id);
+              const updatedRecord = { ...e.record };
               if (idx > -1) {
                 const newArr = [...prev];
-                newArr[idx] = e.record;
+                newArr[idx] = { ...newArr[idx], ...updatedRecord };
                 return newArr;
               }
-              return [...prev, e.record];
+              // PREPEND (taruh di atas) agar data terbaru diprioritaskan oleh .find()
+              return [updatedRecord, ...prev];
             });
 
-            if (e.record.answers) {
-              setAnswersList(prev => ({
-                ...prev,
-                [e.record.studentId]: e.record.answers
-              }));
+            const sId = e.record.studentId || e.record.student_id;
+            if (sId && e.record.answers) {
+              setAnswersList(prev => ({ ...prev, [sId]: e.record.answers }));
             }
           } else if (e.action === 'delete') {
             setAttempts(prev => prev.filter(a => a.id !== e.record.id));
           }
         });
-        unsubFunc = unsub;
-        console.log("✅ Berhasil terhubung ke Live Monitoring.");
-      } catch (err) {
-        console.error("❌ Gagal berlangganan real-time:", err);
-      }
+
+        // 🛡️ SUBSKRIPSI SOAL (JIKA ADA UPDATE ERROR SAAT UJIAN)
+        const unsubQuestions = await pb.collection('questions').subscribe("*", (e) => {
+           if (!isSubscribed) return;
+           if (e.record.examId === monitorRoom.examId) {
+              console.log("📝 Pertanyaan diperbarui oleh Admin lain, Sinkronisasi Monitoring...");
+              // Kosongkan cache pertanyaan lokal agar handleManualRefreshMonitor mengambil yang terbaru
+              setMonitorQuestions([]);
+           }
+        });
+
+        if (!isSubscribed) {
+          unsub();
+          unsubQuestions();
+        } else {
+          currentUnsub = () => { unsub(); unsubQuestions(); };
+        }
+      } catch (err) { }
     };
 
     startSubscribe();
-    
+
     // 🛡️ Backup: Re-fetch manual setiap 10 detik jika real-time terganggu
     const polling = setInterval(() => {
       if (isMonitorOpen) handleManualRefreshMonitor();
     }, 10000);
 
     return () => {
+      isSubscribed = false;
       clearInterval(polling);
-      if (unsubFunc) {
-        console.log("📴 Berhenti berlangganan real-time.");
-        unsubFunc();
-      }
+      if (currentUnsub) currentUnsub();
     };
   }, [isMonitorOpen, monitorRoom?.id]);
 
@@ -402,38 +492,54 @@ const ExamRoomsPage = () => {
   const handleManualGrade = async (studentId: string, qId: string, isForcedCorrect: boolean) => {
     if (!monitorRoom?.id) return;
     try {
-      const att = attempts.find(a => a.studentId === studentId);
-      if (!att) return;
-
-      const currentOverrides = att.overrides || {};
-      const newOverrides = { ...currentOverrides, [qId]: isForcedCorrect };
-
-      const sisAnswers = answersList[studentId] || {};
-      let correctCount = 0;
+      // 1. Cari pengerjaan terbaru siswa ini
+      const studentAttempts = attempts.filter(a => a.studentId === studentId || (a as any).student_id === studentId);
+      const att = studentAttempts.sort((a, b) => {
+        const diff = new Date(b.created || 0).getTime() - new Date(a.created || 0).getTime();
+        return diff !== 0 ? diff : b.id.localeCompare(a.id);
+      })[0];
       
+      if (!att) {
+        showAlert("Peringatan", "Data pengerjaan tidak ditemukan.", "danger");
+        return;
+      }
+
+      // Pastikan overrides adalah object
+      let currentOverrides: any = {};
+      try {
+        if (typeof att.overrides === 'string') currentOverrides = JSON.parse(att.overrides);
+        else if (typeof att.overrides === 'object') currentOverrides = { ...att.overrides };
+      } catch (e) { currentOverrides = {}; }
+      
+      const newOverrides = { ...currentOverrides, [qId]: isForcedCorrect };
+      const sisAnswers = (att.answers !== undefined ? att.answers : (att as any).answers) || {};
+      let correctCount = 0;
+
+      // Hitung ulang benar & skor
       monitorQuestions.forEach((q: any) => {
         let itemCorrect = false;
         if (newOverrides[q.id] !== undefined) {
-           itemCorrect = newOverrides[q.id];
+          itemCorrect = newOverrides[q.id];
         } else {
-           const ansId = sisAnswers[q.id];
-           if (ansId) {
-              const type = q.type || "pilihan_ganda";
-              if (type === "pilihan_ganda" || type === "benar_salah") {
-                 itemCorrect = q.choices?.[ansId]?.isCorrect === true;
-              } else if (type === "pilihan_ganda_kompleks") {
-                 const correctKeys = Object.keys(q.choices || {}).filter(k => q.choices[k].isCorrect);
-                 itemCorrect = Array.isArray(ansId) && ansId.length === correctKeys.length && ansId.every(k => correctKeys.includes(k));
-              } else if (type === "isian_singkat") {
-                 itemCorrect = isFuzzyMatch(ansId, q.answerKey);
-              } else if (type === "urutkan" || type === "drag_drop") {
-                 const correctOrder = (q.items || []).map((it: any) => it.id);
-                 itemCorrect = Array.isArray(ansId) && ansId.length === correctOrder.length && ansId.every((val, idx) => val === correctOrder[idx]);
-              } else if (type === "menjodohkan") {
-                 const pairs = q.pairs || [];
-                 itemCorrect = pairs.length > 0 && pairs.every((p: any) => ansId[p.id] === p.right);
-              }
-           }
+          const ansId = sisAnswers[q.id];
+          if (ansId) {
+            const type = q.type || "pilihan_ganda";
+            if (type === "pilihan_ganda" || type === "benar_salah") {
+              const ck = Object.keys(q.choices || {}).find(k => k.toLowerCase() === String(ansId).toLowerCase());
+              itemCorrect = ck ? q.choices[ck].isCorrect === true : false;
+            } else if (type === "pilihan_ganda_kompleks") {
+              const correctKeys = Object.keys(q.choices || {}).filter(k => q.choices[k].isCorrect).map(k => k.toLowerCase());
+              const studentKeys = Array.isArray(ansId) ? ansId.map(k => String(k).toLowerCase()) : [];
+              itemCorrect = studentKeys.length === correctKeys.length && studentKeys.every(k => correctKeys.includes(k));
+            } else if (type === "isian_singkat") itemCorrect = isFuzzyMatch(ansId, q.answerKey);
+            else if (type === "urutkan" || type === "drag_drop") {
+              const co = (q.items || []).map((it: any) => it.id);
+              itemCorrect = Array.isArray(ansId) && ansId.length === co.length && ansId.every((v, i) => v === co[i]);
+            } else if (type === "menjodohkan") {
+              const pairs = q.pairs || [];
+              itemCorrect = pairs.length > 0 && pairs.every((p: any) => ansId[p.id] === p.right);
+            }
+          }
         }
         if (itemCorrect) correctCount++;
       });
@@ -441,20 +547,120 @@ const ExamRoomsPage = () => {
       const total = monitorQuestions.length;
       const score = total > 0 ? Math.round((correctCount / total) * 100) : 0;
 
-      await pb.collection('attempts').update(att.id, {
-         overrides: newOverrides,
-         correct: correctCount,
-         score: score
-      });
+      // 🔄 Optimistic Update
+      setAttempts(prev => prev.map(a => a.id === att.id ? { ...a, overrides: newOverrides, correct: correctCount, score: score } : a));
+
+      // 2. Simpan ke Database
+      const updateData = {
+        overrides: newOverrides,
+        correct: correctCount,
+        score: score
+      };
+      
+      console.log("Saving to DB:", updateData);
+      await pb.collection('attempts').update(att.id, updateData);
+    } catch (error: any) {
+      console.error("Manual Grade Error:", error);
+      const msg = error.data?.message || error.message || "Gagal";
+      showAlert("Gagal", `Tidak dapat menyimpan (${msg}). Pastikan database terhubung.`, "danger");
       handleManualRefreshMonitor();
-    } catch (error) {}
+    }
   };
 
   const handleExportExcel = () => {
     if (!monitorRoom) return;
     const workbook = XLSX.utils.book_new();
+
+    // 1. Filter Siswa Identik dengan Tabel Monitoring (Agar semua siswa tampil di Excel)
+    const filteredStudents = students.filter(s => {
+      if (monitorRoom?.allClasses) {
+        if (monitorClassFilter !== "all" && s.classId !== monitorClassFilter) return false;
+        return true;
+      }
+      if (!monitorRoom?.classId) return false;
+      const rawIds = monitorRoom.classId;
+      const allowedIds = Array.isArray(rawIds)
+        ? rawIds
+        : String(rawIds || "").split(",").map(id => id.trim()).filter(Boolean);
+      if (!allowedIds.includes(s.classId)) return false;
+      if (monitorClassFilter !== "all" && s.classId !== monitorClassFilter) return false;
+      return true;
+    }).sort((a, b) => a.name.localeCompare(b.name));
+
+    // 2. Definisi Header
     const header = ["No", "NISN", "Nama Siswa", "Kelas", "Jam Login", "Jam Submit", "Cheat Count", "Benar", "Salah", "Nilai"];
     monitorQuestions.forEach((q, idx) => header.push(`Soal ${idx + 1}`));
+
+    // 3. Olah Data Siswa (Live Calculation)
+    const exportRows = filteredStudents.map((student, idx) => {
+      // Ambil pengerjaan TERBARU (Latest) milik siswa ini
+      const studentAttempts = attempts.filter((a) => (a.studentId === student.id) || (a.student_id === student.id));
+      const att = studentAttempts.sort((a, b) => {
+        const dateA = new Date(a.created || 0).getTime();
+        const dateB = new Date(b.created || 0).getTime();
+        return dateB - dateA;
+      })[0];
+
+      const sisAnswers = att?.answers || {};
+      const monitorOverrides = att?.overrides || {};
+      const kelasObj = examClasses.find(c => c.id === student.classId);
+      const className = kelasObj ? kelasObj.name : "-";
+
+      let correct = 0;
+      if (att) {
+        monitorQuestions.forEach(q => {
+          const ansId = sisAnswers[q.id];
+          if (monitorOverrides[q.id] === true) {
+            correct++;
+          } else if (monitorOverrides[q.id] === false) {
+            // Skrip Salah
+          } else if (ansId) {
+            const type = q.type || "pilihan_ganda";
+            if (type === "pilihan_ganda" || type === "benar_salah") {
+              const choiceKey = Object.keys(q.choices || {}).find(k => k.toLowerCase() === String(ansId).toLowerCase());
+              if (choiceKey && q.choices[choiceKey].isCorrect === true) correct++;
+            } else if (type === "pilihan_ganda_kompleks") {
+              const correctKeys = Object.keys(q.choices || {}).filter(k => q.choices[k].isCorrect);
+              const studentKeys = Array.isArray(ansId) ? ansId.map(k => String(k).toLowerCase()) : [];
+              const lowerCorrect = correctKeys.map(k => k.toLowerCase());
+              if (studentKeys.length === lowerCorrect.length && studentKeys.every(k => lowerCorrect.includes(k))) correct++;
+            } else if (type === "isian_singkat") {
+              if (isFuzzyMatch(ansId, q.answerKey)) correct++;
+            } else if (type === "urutkan" || type === "drag_drop") {
+              const correctOrder = (q.items || []).map((it: any) => it.id);
+              if (Array.isArray(ansId) && ansId.length === correctOrder.length && ansId.every((val, idx) => val === correctOrder[idx])) correct++;
+            } else if (type === "menjodohkan") {
+              const pairs = q.pairs || [];
+              if (pairs.length > 0 && pairs.every((p: any) => ansId[p.id] === p.right)) correct++;
+            }
+          }
+        });
+      }
+
+      const scoreValue = monitorQuestions.length > 0 ? (correct / monitorQuestions.length) * 100 : 0;
+      const finalScore = att?.status === "finished" ? (att.score ?? scoreValue) : scoreValue;
+
+      const row = [
+        idx + 1,
+        student.nisn,
+        student.name,
+        className,
+        att?.startTime || (att as any)?.start_time ? new Date(att?.startTime || (att as any)?.start_time).toLocaleTimeString("id-ID", { hour: '2-digit', minute: '2-digit' }) : "-",
+        att?.submittedAt || att?.submitTime ? new Date(att?.submittedAt || att?.submitTime).toLocaleTimeString("id-ID", { hour: '2-digit', minute: '2-digit' }) : (att?.status === "finished" ? "Selesai" : (att ? "Ongoing" : "-")),
+        att?.cheatCount || (att as any)?.cheat_count || 0,
+        correct,
+        monitorQuestions.length - correct,
+        finalScore.toFixed(1)
+      ];
+
+      // Tambahkan Jawaban per Soal
+      monitorQuestions.forEach((q) => {
+        const ans = sisAnswers[q.id];
+        row.push(ans ? (Array.isArray(ans) ? (Array.isArray(ans) ? ans.join(",") : JSON.stringify(ans)) : String(ans).toUpperCase()) : "-");
+      });
+
+      return row;
+    });
 
     const headerStyle = {
       font: { bold: true, color: { rgb: "FFFFFF" } },
@@ -462,36 +668,70 @@ const ExamRoomsPage = () => {
       alignment: { horizontal: "center", vertical: "center" }
     };
 
-    const generateRowData = (att: any, idx: number) => {
-      const student = students.find((s) => s.id === att.studentId);
-      const sisAnswers = answersList[att.studentId] || {};
-      const kelasObj = examClasses.find(c => c.id === (student ? student.classId : ""));
-      const className = kelasObj ? kelasObj.name : "-";
-
-      let correct = att.correct || 0;
-      let wrong = (monitorQuestions.length - correct) || 0;
-      const score = att.score || 0;
-
-      const row = [
-        idx + 1, student?.nisn || "-", student ? student.name : "N/A", className,
-        att.startTime ? new Date(att.startTime).toLocaleTimeString("id-ID") : "-",
-        att.submitTime ? new Date(att.submitTime).toLocaleTimeString("id-ID") : (att.status === "submitted" ? "Selesai" : "-"),
-        att.cheatCount || 0, correct, wrong, score.toFixed(1)
-      ];
-      monitorQuestions.forEach((q) => {
-        const ans = sisAnswers[q.id];
-        row.push(ans ? (Array.isArray(ans) ? ans.join(",") : String(ans).toUpperCase()) : "-");
-      });
-      return row;
+    const correctStyle = {
+      fill: { patternType: "solid", fgColor: { rgb: "DCFCE7" } }, // Hijau muda lembut
+      font: { color: { rgb: "15803D" }, bold: true },           // Teks hijau tua tebal
+      alignment: { horizontal: "center" }
     };
 
-    const overallRows = attempts.map((att, idx) => generateRowData(att, idx));
-    const wsOverall = XLSX.utils.aoa_to_sheet([header, ...overallRows]);
+    const wrongStyle = {
+      fill: { patternType: "solid", fgColor: { rgb: "FEE2E2" } }, // Merah muda lembut
+      font: { color: { rgb: "B91C1C" }, bold: true },           // Teks merah tua tebal
+      alignment: { horizontal: "center" }
+    };
+
+    const wsOverall = XLSX.utils.aoa_to_sheet([header, ...exportRows]);
+
+    // 🎨 Apply Styling ke Lembar Kerja Excel
+    // Baris 0: Header
     for (let c = 0; c < header.length; c++) {
       const addr = XLSX.utils.encode_cell({ r: 0, c: c });
       if (wsOverall[addr]) (wsOverall[addr] as any).s = headerStyle;
     }
-    XLSX.utils.book_append_sheet(workbook, wsOverall, "Overall");
+
+    // Baris 1+: Data Siswa
+    exportRows.forEach((row, rowIndex) => {
+      const student = filteredStudents[rowIndex];
+      const studentAttempts = attempts.filter((a) => (a.studentId === student.id) || (a.student_id === student.id));
+      const att = studentAttempts.sort((a, b) => new Date(b.created).getTime() - new Date(a.created).getTime())[0];
+      const sisAnswers = att?.answers || {};
+      const monitorOverrides = att?.overrides || {};
+
+      row.forEach((cellValue, colIndex) => {
+        const r = rowIndex + 1; // Index 0 adalah header
+        const addr = XLSX.utils.encode_cell({ r: r, c: colIndex });
+        if (!wsOverall[addr]) return;
+
+        // Terapkan Warna mulai dari Kolom "Soal 1" (Indeks 10)
+        if (colIndex >= 10 && att && cellValue !== "-") {
+          const qIdx = colIndex - 10;
+          const q = monitorQuestions[qIdx];
+          const ansId = sisAnswers[q.id];
+
+          let isCorrect = false;
+          if (monitorOverrides[q.id] === true) {
+            isCorrect = true;
+          } else if (monitorOverrides[q.id] === false) {
+            isCorrect = false;
+          } else if (ansId) {
+            const type = q.type || "pilihan_ganda";
+            if (type === "pilihan_ganda" || type === "benar_salah") {
+              const choiceKey = Object.keys(q.choices || {}).find(k => k.toLowerCase() === String(ansId).toLowerCase());
+              if (choiceKey && q.choices[choiceKey].isCorrect === true) isCorrect = true;
+            } else if (type === "pilihan_ganda_kompleks") {
+              const correctKeys = Object.keys(q.choices || {}).filter(k => q.choices[k].isCorrect);
+              const studentKeys = Array.isArray(ansId) ? ansId.map(k => String(k).toLowerCase()) : [];
+              const lowerCorrect = correctKeys.map(k => k.toLowerCase());
+              if (studentKeys.length === lowerCorrect.length && studentKeys.every(k => lowerCorrect.includes(k))) isCorrect = true;
+            }
+          }
+
+          (wsOverall[addr] as any).s = isCorrect ? correctStyle : wrongStyle;
+        }
+      });
+    });
+
+    XLSX.utils.book_append_sheet(workbook, wsOverall, "Laporan Nilai");
     XLSX.writeFile(workbook, `Nilai_Ujian_${monitorRoom.room_name || monitorRoom.examTitle}.xlsx`);
   };
 
@@ -565,7 +805,7 @@ const ExamRoomsPage = () => {
       render: (v: any, item: ExamRoomData) => {
         const start = item.start_time ? new Date(item.start_time) : null;
         const end = item.end_time ? new Date(item.end_time) : null;
-        
+
         const isValidStart = start && !isNaN(start.getTime());
         const isValidEnd = end && !isNaN(end.getTime());
 
@@ -586,18 +826,18 @@ const ExamRoomsPage = () => {
       }
     },
     {
-       key: "actions",
-       label: "Status",
-       render: (_: any, item: ExamRoomData) => {
-         const now = Date.now();
-         const start = new Date(item.start_time).getTime();
-         const end = new Date(item.end_time).getTime();
-         if (item.status === "archive") return <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded">Arsip</span>;
-         if (item.isDisabled) return <span className="text-[10px] bg-red-100 text-red-500 px-1.5 py-0.5 rounded">Nonaktif</span>;
-         if (now < start) return <span className="text-[10px] bg-blue-100 text-blue-500 px-1.5 py-0.5 rounded">Menunggu</span>;
-         if (now > end) return <span className="text-[10px] bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded">Selesai</span>;
-         return <span className="text-[10px] bg-emerald-100 text-emerald-600 px-1.5 py-0.5 rounded animate-pulse">Berjalan</span>;
-       }
+      key: "actions",
+      label: "Status",
+      render: (_: any, item: ExamRoomData) => {
+        const now = Date.now();
+        const start = new Date(item.start_time).getTime();
+        const end = new Date(item.end_time).getTime();
+        if (item.status === "archive") return <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded">Arsip</span>;
+        if (item.isDisabled) return <span className="text-[10px] bg-red-100 text-red-500 px-1.5 py-0.5 rounded">Nonaktif</span>;
+        if (now < start) return <span className="text-[10px] bg-blue-100 text-blue-500 px-1.5 py-0.5 rounded">Menunggu</span>;
+        if (now > end) return <span className="text-[10px] bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded">Selesai</span>;
+        return <span className="text-[10px] bg-emerald-100 text-emerald-600 px-1.5 py-0.5 rounded animate-pulse">Berjalan</span>;
+      }
     }
   ];
 
@@ -666,19 +906,29 @@ const ExamRoomsPage = () => {
     });
   };
 
-  const handleToggleDisabled = async (room: ExamRoomData) => {
-    try {
-      // room.isDisabled is true if it was inactive
-      // isActive should be the opposite of that toggled value
-      const newIsActive = !!room.isDisabled; // if it was disabled, we make it active
-      await pb.collection('exam_rooms').update(room.id, { 
-        isActive: newIsActive,
-        isDisabled: !newIsActive // also update snake_case just in case
-      });
-      showAlert("Berhasil", `Ruang berhasil ${newIsActive ? "diaktifkan" : "dinonaktifkan"}.`, "success");
-    } catch (e) {
-      showAlert("Gagal", "Gagal mengubah status.", "danger");
-    }
+  const handleToggleDisabled = (room: ExamRoomData) => {
+    const isCurrentlyActive = room.isActive !== false;
+    setConfirmDialog({
+      isOpen: true,
+      title: isCurrentlyActive ? "Nonaktifkan Ruangan" : "Aktifkan Ruangan",
+      description: isCurrentlyActive 
+        ? `Apakah Anda yakin ingin menonaktifkan "${room.room_name}"? Siswa tidak akan bisa masuk atau lanjut mengerjakan.` 
+        : `Aktifkan "${room.room_name}" sekarang agar siswa bisa mulai mengerjakan?`,
+      type: isCurrentlyActive ? "warning" : "info",
+      confirmLabel: isCurrentlyActive ? "Nonaktifkan" : "Aktifkan",
+      onConfirm: async () => {
+        try {
+          const newIsActive = !isCurrentlyActive;
+          await pb.collection('exam_rooms').update(room.id, {
+            isActive: newIsActive,
+            isDisabled: !newIsActive
+          });
+          showAlert("Berhasil", `Ruang berhasil ${newIsActive ? "diaktifkan" : "dinonaktifkan"}.`, "success");
+        } catch (e) {
+          showAlert("Gagal", "Gagal mengubah status.", "danger");
+        }
+      }
+    });
   };
 
   const handleArchiveRoom = async (room: ExamRoomData) => {
@@ -700,24 +950,27 @@ const ExamRoomsPage = () => {
   };
 
   const handleForceSubmitAll = () => {
-     const ongoing = attempts.filter(a => a.status === 'ongoing');
-     if (ongoing.length === 0) return showAlert("Info", "Tidak ada siswa aktif.", "info");
-     setConfirmDialog({
-       isOpen: true,
-       title: "Submit Semua",
-       description: `Submit paksa ${ongoing.length} siswa sekarang?`,
-       type: "danger",
-       confirmLabel: "Submit",
-       onConfirm: async () => {
-         try {
-           for (const a of ongoing) {
-             await pb.collection('attempts').update(a.id, { status: 'submitted', submitTime: new Date().toISOString() });
-           }
-           showAlert("Berhasil", "Semua siswa telah disubmit.", "success");
-           handleManualRefreshMonitor();
-         } catch (e) { showAlert("Gagal", "Error submitting all.", "danger"); }
-       }
-     });
+    const ongoing = attempts.filter(a => a.status === 'ongoing');
+    if (ongoing.length === 0) return showAlert("Info", "Tidak ada siswa aktif.", "info");
+    setConfirmDialog({
+      isOpen: true,
+      title: "Submit Semua",
+      description: `Submit paksa ${ongoing.length} siswa sekarang?`,
+      type: "danger",
+      confirmLabel: "Submit",
+      onConfirm: async () => {
+        try {
+          for (const a of ongoing) {
+            await pb.collection('attempts').update(a.id, {
+              status: 'finished',
+              submittedAt: new Date().toISOString()
+            });
+          }
+          showAlert("Berhasil", "Semua siswa telah disubmit.", "success");
+          handleManualRefreshMonitor();
+        } catch (e) { showAlert("Gagal", "Error submitting all.", "danger"); }
+      }
+    });
   };
 
   const handleForceSubmitStudent = (attId: string) => {
@@ -729,7 +982,7 @@ const ExamRoomsPage = () => {
       confirmLabel: "Submit",
       onConfirm: async () => {
         try {
-          await pb.collection('attempts').update(attId, { status: 'submitted', submitTime: new Date().toISOString() });
+          await pb.collection('attempts').update(attId, { status: 'finished', submittedAt: new Date().toISOString() });
           handleManualRefreshMonitor();
           showAlert("Berhasil", "Siswa disubmit.", "success");
         } catch (e) { showAlert("Gagal", "Error.", "danger"); }
@@ -755,35 +1008,35 @@ const ExamRoomsPage = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-        // Jika Semua Kelas dipilih, kita masukkan seluruh daftar ID kelas yang ada
-        const finalClassIds = formValues.allClasses 
-          ? (examClasses || []).map(c => c.id)
-          : formValues.classId.split(",").filter(Boolean);
+      // Jika Semua Kelas dipilih, kita masukkan seluruh daftar ID kelas yang ada
+      const finalClassIds = formValues.allClasses
+        ? (examClasses || []).map(c => c.id)
+        : formValues.classId.split(",").filter(Boolean);
 
-        const data = {
-          title: formValues.room_name,
-          room_name: formValues.room_name,
-          examId: formValues.examId,
-          startTime: new Date(formValues.start_time).toISOString(),
-          start_time: new Date(formValues.start_time).toISOString(),
-          endTime: new Date(formValues.end_time).toISOString(),
-          end_time: new Date(formValues.end_time).toISOString(),
-          
-          classIds: finalClassIds,
-          classId: finalClassIds,
-          allClasses: formValues.allClasses,
-          all_classes: formValues.allClasses,
-          
-          duration: Number(formValues.duration),
-          cheat_limit: Number(formValues.cheat_limit),
-          submit_window: Number(formValues.submit_window),
-          room_code: formValues.room_code,
-          show_result: formValues.show_result,
-          isActive: true,
-          status: "active",
-          isDisabled: false
-        };
-      
+      const data = {
+        title: formValues.room_name,
+        room_name: formValues.room_name,
+        examId: formValues.examId,
+        startTime: new Date(formValues.start_time).toISOString(),
+        start_time: new Date(formValues.start_time).toISOString(),
+        endTime: new Date(formValues.end_time).toISOString(),
+        end_time: new Date(formValues.end_time).toISOString(),
+
+        classIds: finalClassIds,
+        classId: finalClassIds,
+        allClasses: formValues.allClasses,
+        all_classes: formValues.allClasses,
+
+        duration: Number(formValues.duration),
+        cheat_limit: Number(formValues.cheat_limit),
+        submit_window: Number(formValues.submit_window),
+        room_code: formValues.room_code,
+        show_result: formValues.show_result,
+        isActive: true,
+        status: "active",
+        isDisabled: false
+      };
+
       if (dialogMode === "edit" && selectedRoom) {
         await pb.collection('exam_rooms').update(selectedRoom.id, data);
       } else {
@@ -791,9 +1044,9 @@ const ExamRoomsPage = () => {
       }
       setIsDialogOpen(false);
       showAlert("Berhasil", "Data berhasil disimpan.", "success");
-    } catch (e) { 
+    } catch (e) {
       console.error("Save error:", e);
-      showAlert("Gagal", "Gagal simpan.", "danger"); 
+      showAlert("Gagal", "Gagal simpan.", "danger");
     }
   };
 
@@ -801,53 +1054,90 @@ const ExamRoomsPage = () => {
     setMonitorRoom(room);
     setMonitorPage(1);
     setIsMonitorOpen(true);
-    handleManualRefreshMonitor();
+    handleManualRefreshMonitor(room);
   };
 
   const handleUnlockStudent = async (attId: string) => {
-     try {
-       await pb.collection('attempts').update(attId, { status: 'ongoing', cheatCount: 0 });
-       handleManualRefreshMonitor();
-       showAlert("Berhasil", "Siswa di-unlock.", "success");
-     } catch (e) { showAlert("Gagal", "Error.", "danger"); }
+    try {
+      await pb.collection('attempts').update(attId, {
+        status: 'ongoing',
+        cheatCount: 0,
+        cheat_count: 0
+      });
+      handleManualRefreshMonitor();
+      showAlert("Berhasil", "Siswa berhasil dibuka kuncinya.", "success");
+    } catch (e) { showAlert("Gagal", "Gagal membuka kunci.", "danger"); }
   };
 
-  const handleResetSession = (attId: string) => {
-     setConfirmDialog({
-       isOpen: true,
-       title: "Reset Sesi",
-       description: "Hapus permanen progres siswa ini?",
-       type: "danger",
-       confirmLabel: "Reset",
-       onConfirm: async () => {
-         try {
-           await pb.collection('attempts').delete(attId);
-           handleManualRefreshMonitor();
-           showAlert("Berhasil", "Sesi direset.", "success");
-         } catch (e) { showAlert("Gagal", "Error.", "danger"); }
-       }
-     });
+  const handleResetSession = (attId: string, sisId: string, rid: string) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: "Reset Sesi",
+      description: "Hapus permanen progres siswa ini?",
+      type: "danger",
+      confirmLabel: "Reset",
+      onConfirm: async () => {
+        try {
+          // 🔥 Hapus SEMUA pengerjaan siswa ini di ruang ini untuk membersihkan sisa data atau duplikat
+          const related = await pb.collection('attempts').getFullList({
+             filter: `studentId = "${sisId}" && examRoomId = "${rid}"`
+          });
+          
+          for (const r of related) {
+            await pb.collection('attempts').delete(r.id);
+          }
+          
+          handleManualRefreshMonitor();
+          showAlert("Berhasil", "Sesi direset.", "success");
+        } catch (e) { showAlert("Gagal", "Error.", "danger"); }
+      }
+    });
   };
 
   const openLimitDialog = (nisn: string) => { setLimitNisn(nisn); setLimitValue("1"); setLimitDialogOpen(true); };
 
   const handleConfirmAddLimit = async () => {
-    const att = attempts.find(a => a.studentId === limitNisn);
+    // 🔍 Mencari pengerjaan siswa yang sesuai (Mendukung studentId & student_id)
+    const studentAttempts = attempts.filter(a => (a.studentId === limitNisn) || (a.student_id === limitNisn));
+
+    // 💡 Selalu pilih pengerjaan TERBARU (Latest) agar sesuai dengan tampilan di tabel monitoring
+    const att = studentAttempts.sort((a, b) => {
+      const diff = new Date(b.created || 0).getTime() - new Date(a.created || 0).getTime();
+      return diff !== 0 ? diff : b.id.localeCompare(a.id);
+    })[0];
+
     if (!att) return;
     try {
-      await pb.collection('attempts').update(att.id, { extraCheatLimit: (att.extraCheatLimit || 0) + parseInt(limitValue) });
+      const currentLimit = (att.extraCheatLimit !== undefined ? att.extraCheatLimit : (att as any).extra_cheat_limit) || 0;
+      const addedValue = parseInt(limitValue) || 1;
+
+      // Update dengan dual naming untuk kompatibilitas schema
+      await pb.collection('attempts').update(att.id, {
+        extraCheatLimit: currentLimit + addedValue,
+        extra_cheat_limit: currentLimit + addedValue
+      });
+
       handleManualRefreshMonitor();
       setLimitDialogOpen(false);
-      showAlert("Berhasil", "Batas ditambah.", "success");
-    } catch (e) { showAlert("Gagal", "Error.", "danger"); }
+      showAlert("Berhasil", "Batas toleransi berhasil ditambahkan.", "success");
+    } catch (e) { showAlert("Gagal", "Terjadi kesalahan saat menambah batas.", "danger"); }
   };
 
   const handleResetCheatCount = async (attId: string) => {
-     try {
-       await pb.collection('attempts').update(attId, { cheatCount: 0 });
-       handleManualRefreshMonitor();
-       showAlert("Berhasil", "Reset pelanggaran.", "success");
-     } catch (e) { showAlert("Gagal", "Error.", "danger"); }
+    try {
+      const existing = attempts.find(a => a.id === attId);
+      const curExtra = (existing?.extraCheatLimit !== undefined ? existing.extraCheatLimit : (existing as any)?.extra_cheat_limit) || 0;
+
+      await pb.collection('attempts').update(attId, {
+        cheatCount: 0,
+        cheat_count: 0,
+        status: "ongoing",
+        extraCheatLimit: curExtra + 1,
+        extra_cheat_limit: curExtra + 1
+      });
+      handleManualRefreshMonitor();
+      showAlert("Berhasil", "Pelanggaran telah di-reset.", "success");
+    } catch (e) { showAlert("Gagal", "Error reset.", "danger"); }
   };
 
   const isRoomActive = selectedRoom ? (
@@ -904,7 +1194,7 @@ const ExamRoomsPage = () => {
         </div>
 
         <div className="group relative bg-card p-4 rounded-2xl border border-slate-200/60 dark:border-slate-800/40 shadow-sm flex items-center gap-3 backdrop-blur-sm cursor-help hover:border-emerald-300 dark:hover:border-emerald-800 transition-all">
-          <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-900/10 text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform">
+          <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-900/10 text-emerald-600 dark:emerald-400 group-hover:scale-110 transition-transform">
             <Users className="h-5 w-5" />
           </div>
           <div>
@@ -1231,10 +1521,10 @@ const ExamRoomsPage = () => {
                 <span className="truncate">Monitor Ujian: {monitorRoom?.room_name || "Ruang Tanpa Nama"} — <span className="text-slate-500 font-normal">{monitorRoom?.examTitle}</span></span>
               </DialogTitle>
               <div className="flex items-center gap-1.5 pl-4">
-                 <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-100/50 dark:border-emerald-800/50">
-                    <div className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse" />
-                    <span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-tighter">Live Sync Connected</span>
-                 </div>
+                <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-100/50 dark:border-emerald-800/50">
+                  <div className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-tighter">Live Sync Connected</span>
+                </div>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -1255,9 +1545,6 @@ const ExamRoomsPage = () => {
                   <RefreshCw className={`h-3 w-3 ${isMonitorRefreshing ? "animate-spin text-blue-500" : ""}`} />
                 </Button>
               </div>
-              <Button onClick={() => setIsMonitorOpen(false)} size="icon" variant="ghost" className="h-8 w-8 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800">
-                <X className="h-4 w-4 text-slate-400" />
-              </Button>
             </div>
           </DialogHeader>
           <div className="flex justify-between items-center mb-2">
@@ -1324,21 +1611,21 @@ const ExamRoomsPage = () => {
                     return true;
                   }
                   if (!monitorRoom?.classId) return false;
-                  
+
                   const rawIds = monitorRoom.classId;
-                  const allowedIds = Array.isArray(rawIds) 
-                    ? rawIds 
+                  const allowedIds = Array.isArray(rawIds)
+                    ? rawIds
                     : String(rawIds || "").split(",").map(id => id.trim()).filter(Boolean);
-                    
+
                   if (!allowedIds.includes(s.classId)) return false;
                   if (monitorClassFilter !== "all" && s.classId !== monitorClassFilter) return false;
                   return true;
                 });
-                
+
                 const count = filtered.length;
                 const start = Math.min((monitorPage - 1) * monitorPageSize + 1, count);
                 const end = Math.min(monitorPage * monitorPageSize, count);
-                
+
                 return `Menampilkan ${start} - ${end} dari ${count} Siswa`;
               })()}
             </div>
@@ -1387,21 +1674,25 @@ const ExamRoomsPage = () => {
                           return true;
                         }
                         if (!monitorRoom?.classId) return false;
-                        
+
                         const rawIds = monitorRoom.classId;
-                        const allowedIds = Array.isArray(rawIds) 
-                          ? rawIds 
+                        const allowedIds = Array.isArray(rawIds)
+                          ? rawIds
                           : String(rawIds || "").split(",").map(id => id.trim()).filter(Boolean);
-                          
+
                         if (!allowedIds.includes(s.classId)) return false;
                         if (monitorClassFilter !== "all" && s.classId !== monitorClassFilter) return false;
                         return true;
                       })
                       .sort((a, b) => {
-                        const attA = attempts.find((at) => at.id === a.nisn);
-                        const attB = attempts.find((at) => at.id === b.nisn);
+                        const attA = attempts.find((at) => at.studentId === a.id);
+                        const attB = attempts.find((at) => at.studentId === b.id);
                         if (monitorSortBy === "nilai") return (attB?.score || 0) - (attA?.score || 0);
-                        if (monitorSortBy === "login") return (attB?.startTime || 0) - (attA?.startTime || 0);
+                        if (monitorSortBy === "login") {
+                          const timeA = attA?.startTime ? new Date(attA.startTime).getTime() : 0;
+                          const timeB = attB?.startTime ? new Date(attB.startTime).getTime() : 0;
+                          return timeB - timeA;
+                        }
                         if (monitorSortBy === "nama") return a.name.localeCompare(b.name);
                         return 0;
                       });
@@ -1421,28 +1712,42 @@ const ExamRoomsPage = () => {
 
                     const dataRows = currentData.map((student, localIndex) => {
                       const index = startIndex + localIndex;
-                      const attempt = attempts.find((a) => a.studentId === student.id);
+                      // Ambil pengerjaan TERBARU (terakhir dibuat) jika ada duplikat
+                      const studentAttempts = attempts.filter((a) => (a.studentId === student.id) || (a.student_id === student.id));
+                      const attempt = studentAttempts.sort((ax, bx) => {
+                        const diff = new Date(bx.created || 0).getTime() - new Date(ax.created || 0).getTime();
+                        return diff !== 0 ? diff : bx.id.localeCompare(ax.id);
+                      })[0];
                       const sisAnswers = answersList[student.id] || {};
                       const answeredCount = Object.keys(sisAnswers).length;
+                      
+                      if (attempt && attempt.overrides) {
+                        console.log(`Overrides for ${student.name}:`, attempt.overrides);
+                      }
 
-                      let statusLabel = <span className="text-slate-400">Belum Masuk</span>;
+                      let statusLabel = <span className="text-slate-400 italic text-[10px]">Belum Masuk</span>;
                       if (attempt) {
-                        if (attempt.status === "submitted") {
-                          statusLabel = <span className="text-green-600 font-semibold px-2 py-0.5 bg-green-50 dark:bg-green-950/40 rounded-full border border-green-100 dark:border-green-900">Selesai</span>;
-                        } else if (attempt.status === "LOCKED") {
-                          statusLabel = <span className="text-red-500 font-bold px-2 py-0.5 bg-red-50 dark:bg-red-950/40 rounded-full border border-red-100 dark:border-red-900 italic">TERKUNCI</span>;
+                        const status = attempt.status || (attempt as any).status;
+                        if (status === "finished") {
+                          statusLabel = <span className="text-green-600 font-semibold px-2 py-0.5 bg-green-50 rounded-full border border-green-100">Selesai</span>;
+                        } else if (status === "LOCKED") {
+                          statusLabel = <span className="text-red-500 font-bold px-2 py-0.5 bg-red-50 rounded-full border border-red-100 italic">TERKUNCI</span>;
                         } else {
-                          const lastH = attempt?.lastHeartbeat ? new Date(attempt.lastHeartbeat).getTime() : 0;
-                          const isTrulyOnline = attempt?.isOnline && (Date.now() - lastH < 60000);
+                          const lastHeartbeat = attempt.lastHeartbeat || (attempt as any).last_heartbeat || null;
+                          const lastH = lastHeartbeat ? new Date(lastHeartbeat).getTime() : 0;
+                          const isOnline = (attempt.isOnline || (attempt as any).is_online) === true;
+                          const isTrulyOnline = isOnline && (Date.now() - lastH < 120000);
+
                           statusLabel = (
-                            <span className={`font-semibold px-2 py-0.5 rounded-full border whitespace-nowrap ${isTrulyOnline ? "text-amber-600 bg-amber-50 dark:bg-amber-950/40 border-amber-100 dark:border-amber-900 animate-pulse" : "text-slate-500 bg-slate-50 dark:bg-slate-800 border-slate-100 dark:border-slate-700"}`}>
+                            <span className={`font-semibold px-2 py-0.5 rounded-full border whitespace-nowrap text-[10px] ${isTrulyOnline ? "text-amber-600 bg-amber-50 border-amber-100 animate-pulse" : "text-slate-500 bg-slate-50 border-slate-100"}`}>
                               Ujian ({isTrulyOnline ? "Online" : "Offline"})
                             </span>
                           );
                         }
                       }
 
-                      const loginTime = attempt?.startTime ? new Date(attempt.startTime).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) : "-";
+                      const sTime = attempt?.startTime || (attempt as any)?.start_time || attempt?.created || null;
+                      const loginTime = sTime ? new Date(sTime).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) : "-";
 
                       return (
                         <React.Fragment key={student.id}>
@@ -1453,14 +1758,37 @@ const ExamRoomsPage = () => {
                             <TableCell className="text-xs font-semibold text-slate-500">{examClasses.find(c => c.id === student.classId)?.name || "-"}</TableCell>
                             <TableCell className="text-slate-500 tabular-nums">{loginTime}</TableCell>
                             <TableCell>{statusLabel}</TableCell>
-                            <TableCell className="text-center font-bold text-indigo-600 tabular-nums">{attempt?.score !== undefined ? attempt.score : "-"}</TableCell>
+                            <TableCell className="text-center font-bold text-indigo-600 tabular-nums">
+                              {(() => {
+                                if (!attempt) return "-";
+                                if (attempt.status === "finished") return attempt.score ?? 0;
+
+                                // Live Calculate
+                                let corrects = 0;
+                                const monitorOverrides = attempt?.overrides || {};
+                                monitorQuestions.forEach(q => {
+                                  const ansId = sisAnswers[q.id];
+                                  if (monitorOverrides[q.id] === true) {
+                                    corrects++;
+                                  } else if (ansId) {
+                                    const type = q.type || "pilihan_ganda";
+                                    if (type === "pilihan_ganda" || type === "benar_salah") {
+                                      const choiceKey = Object.keys(q.choices || {}).find(k => k.toLowerCase() === String(ansId).toLowerCase());
+                                      if (choiceKey && q.choices[choiceKey].isCorrect === true) corrects++;
+                                    }
+                                  }
+                                });
+                                return monitorQuestions.length > 0 ? Math.round((corrects / monitorQuestions.length) * 100) : 0;
+                              })()}
+                            </TableCell>
+
                             <TableCell className="text-center text-xs text-slate-500 font-medium tabular-nums">{answeredCount}/{monitorQuestions.length}</TableCell>
                             <TableCell className="text-center">
                               {(() => {
-                                const totalAllowed = (monitorRoom?.cheat_limit || 3) + (attempt?.extraCheatLimit || 0);
-                                const currentCount = attempt?.cheatCount || 0;
+                                const totalAllowed = (monitorRoom?.cheat_limit || 3) + (attempt?.extraCheatLimit || (attempt as any)?.extra_cheat_limit || 0);
+                                const currentCount = attempt?.cheatCount !== undefined ? attempt.cheatCount : (attempt as any)?.cheat_count || 0;
                                 return (
-                                  <span className={`font-bold tabular-nums ${currentCount > 0 ? "text-red-500" : "text-slate-400"}`}>
+                                  <span className={`font-bold tabular-nums text-[11px] ${currentCount > 0 ? "text-red-500" : "text-slate-400"}`}>
                                     {currentCount} / {totalAllowed}
                                   </span>
                                 )
@@ -1505,12 +1833,12 @@ const ExamRoomsPage = () => {
                                             <button onClick={(e) => { e.stopPropagation(); openLimitDialog(student.id); setOpenMenuId(null); }} className="w-full text-left px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-700 text-[10px] font-semibold text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
                                               <Plus className="w-3.5 h-3.5 opacity-70 text-slate-400" /> + Limit
                                             </button>
-                                            {attempt?.status !== "submitted" && (
+                                            {attempt?.status !== "finished" && (
                                               <button onClick={(e) => { e.stopPropagation(); handleForceSubmitStudent(attempt.id); setOpenMenuId(null); }} className="w-full text-left px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-700 text-[10px] font-semibold text-rose-600 dark:text-rose-400 flex items-center gap-1.5 border-b border-slate-100 dark:border-slate-700/60">
                                                 <Square className="w-3.5 h-3.5 opacity-70 fill-current" /> Selesaikan
                                               </button>
                                             )}
-                                            <button onClick={(e) => { e.stopPropagation(); handleResetSession(attempt.id); setOpenMenuId(null); }} className="w-full text-left px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-700 text-[10px] font-semibold text-rose-600 dark:text-rose-400 flex items-center gap-1.5">
+                                            <button onClick={(e) => { e.stopPropagation(); handleResetSession(attempt.id, student.id, monitorRoom?.id || ""); setOpenMenuId(null); }} className="w-full text-left px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-700 text-[10px] font-semibold text-rose-600 dark:text-rose-400 flex items-center gap-1.5">
                                               <RefreshCw className="w-3.5 h-3.5 opacity-70 text-rose-400" /> Reset Sesi
                                             </button>
                                           </div>
@@ -1533,18 +1861,21 @@ const ExamRoomsPage = () => {
                                   {monitorQuestions.map((q, qIdx) => {
                                     const ansId = sisAnswers[q.id];
                                     const monitorOverrides = attempt?.overrides || {};
-                                    
+
                                     const isCorrect = (() => {
                                       if (monitorOverrides[q.id] !== undefined) return monitorOverrides[q.id];
 
                                       if (!ansId) return false;
                                       const type = q.type || "pilihan_ganda";
-                                      
+
                                       if (type === "pilihan_ganda" || type === "benar_salah") {
-                                        return q.choices?.[ansId]?.isCorrect === true;
+                                        const choiceKey = Object.keys(q.choices || {}).find(k => k.toLowerCase() === String(ansId).toLowerCase());
+                                        return choiceKey ? q.choices[choiceKey].isCorrect === true : false;
                                       } else if (type === "pilihan_ganda_kompleks") {
                                         const correctKeys = Object.keys(q.choices || {}).filter(k => q.choices[k].isCorrect);
-                                        return Array.isArray(ansId) && ansId.length === correctKeys.length && ansId.every(k => correctKeys.includes(k));
+                                        const studentKeys = Array.isArray(ansId) ? ansId.map(k => String(k).toLowerCase()) : [];
+                                        const lowerCorrect = correctKeys.map(k => k.toLowerCase());
+                                        return studentKeys.length === lowerCorrect.length && studentKeys.every(k => lowerCorrect.includes(k));
                                       } else if (type === "isian_singkat") {
                                         return isFuzzyMatch(ansId, q.answerKey);
                                       } else if (type === "urutkan" || type === "drag_drop") {
@@ -1600,7 +1931,8 @@ const ExamRoomsPage = () => {
                                                 if (!ansId) return "Kosong";
                                                 const type = q.type || "pilihan_ganda";
                                                 if (typeof ansId === 'string' && (type === "pilihan_ganda" || type === "benar_salah")) {
-                                                  const choice = q.choices?.[ansId];
+                                                  const choiceKey = Object.keys(q.choices || {}).find(k => k.toLowerCase() === ansId.toLowerCase());
+                                                  const choice = choiceKey ? q.choices[choiceKey] : null;
                                                   if (choice) {
                                                     const plainText = choice.text.replace(/<[^>]*>/g, '');
                                                     return `${ansId.toUpperCase()}. ${plainText}`;
@@ -1615,26 +1947,26 @@ const ExamRoomsPage = () => {
                                           </div>
                                           <div className="flex items-center gap-1.5 shrink-0">
                                             {ansId && (
-                                               <>
-                                                  <Button 
-                                                    size="icon" 
-                                                    variant="ghost" 
-                                                    className={`h-7 w-7 rounded-lg transition-all ${isCorrect && monitorOverrides[q.id] === true ? "bg-emerald-500 text-white shadow-md" : "hover:bg-emerald-50 text-slate-300 hover:text-emerald-600"}`}
-                                                    onClick={() => handleManualGrade(student.nisn, q.id, true)}
-                                                    title="Paksa Benar"
-                                                  >
-                                                    <CheckCircle2 className="w-4 h-4" />
-                                                  </Button>
-                                                  <Button 
-                                                    size="icon" 
-                                                    variant="ghost" 
-                                                    className={`h-7 w-7 rounded-lg transition-all ${!isCorrect && monitorOverrides[q.id] === false ? "bg-rose-500 text-white shadow-md" : "hover:bg-rose-50 text-slate-300 hover:text-rose-600"}`}
-                                                    onClick={() => handleManualGrade(student.nisn, q.id, false)}
-                                                    title="Paksa Salah"
-                                                  >
-                                                    <X className="w-4 h-4" />
-                                                  </Button>
-                                               </>
+                                              <>
+                                                <Button
+                                                  size="icon"
+                                                  variant="ghost"
+                                                  className={`h-7 w-7 rounded-lg transition-all ${isCorrect && monitorOverrides[q.id] === true ? "bg-emerald-500 text-white shadow-md" : "hover:bg-emerald-50 text-slate-300 hover:text-emerald-600"}`}
+                                                  onClick={() => handleManualGrade(student.id, q.id, true)}
+                                                  title="Paksa Benar"
+                                                >
+                                                  <CheckCircle2 className="w-4 h-4" />
+                                                </Button>
+                                                <Button
+                                                  size="icon"
+                                                  variant="ghost"
+                                                  className={`h-7 w-7 rounded-lg transition-all ${!isCorrect && monitorOverrides[q.id] === false ? "bg-rose-500 text-white shadow-md" : "hover:bg-rose-50 text-slate-300 hover:text-rose-600"}`}
+                                                  onClick={() => handleManualGrade(student.id, q.id, false)}
+                                                  title="Paksa Salah"
+                                                >
+                                                  <X className="w-4 h-4" />
+                                                </Button>
+                                              </>
                                             )}
                                             {ansId && (
                                               <div className={`px-2 py-1 rounded-md text-[10px] font-bold shadow-sm border ${isCorrect ? "bg-emerald-100/50 border-emerald-200/50 text-emerald-700" : "bg-rose-100/50 border-rose-200/50 text-rose-700"}`}>
@@ -1678,12 +2010,12 @@ const ExamRoomsPage = () => {
                       return true;
                     }
                     if (!monitorRoom?.classId) return false;
-                    
+
                     const rawIds = monitorRoom.classId;
-                    const allowedIds = Array.isArray(rawIds) 
-                      ? rawIds 
+                    const allowedIds = Array.isArray(rawIds)
+                      ? rawIds
                       : String(rawIds || "").split(",").map(id => id.trim()).filter(Boolean);
-                      
+
                     if (!allowedIds.includes(s.classId)) return false;
                     if (monitorClassFilter !== "all" && s.classId !== monitorClassFilter) return false;
                     return true;
@@ -1702,15 +2034,19 @@ const ExamRoomsPage = () => {
 
                 if (currentData.length === 0) return <div className="text-center p-8 text-slate-400 text-sm">Tidak ada Siswa ditemukan.</div>;
 
-                  return currentData.map((student, localIndex) => {
-                    const attempt = attempts.find((a) => a.studentId === student.id);
-                    const sisAnswers = answersList[student.id] || {};
-                    
-                    const lastH = attempt?.lastHeartbeat ? new Date(attempt.lastHeartbeat).getTime() : 0;
-                    const isTrulyOnline = attempt?.isOnline && (Date.now() - lastH < 60000);
-                    
-                    const status = attempt ? (attempt.status === "submitted" ? "Selesai" : attempt.status === "LOCKED" ? "Terkunci" : `Ujian (${isTrulyOnline ? "Online" : "Offline"})`) : "Belum Masuk";
-                    const statusColor = attempt ? (attempt.status === "submitted" ? "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-400 dark:border-emerald-900" : attempt.status === "LOCKED" ? "bg-rose-100 text-rose-700 border-rose-200 dark:bg-rose-950/50 dark:text-rose-400 dark:border-rose-900" : isTrulyOnline ? "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-950/50 dark:text-amber-400 dark:border-amber-900 animate-pulse" : "bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700") : "bg-slate-100 text-slate-400 border-slate-200 dark:bg-slate-800 dark:text-slate-500 dark:border-slate-700";
+                return currentData.map((student, localIndex) => {
+                  const studentAttempts = attempts.filter((a) => (a.studentId === student.id) || ((a as any).student_id === student.id));
+                  const attempt = studentAttempts.sort((ax, bx) => {
+                    const diff = new Date(bx.created || 0).getTime() - new Date(ax.created || 0).getTime();
+                    return diff !== 0 ? diff : bx.id.localeCompare(ax.id);
+                  })[0];
+                  const sisAnswers = answersList[student.id] || {};
+
+                  const lastH = attempt?.lastHeartbeat ? new Date(attempt.lastHeartbeat).getTime() : 0;
+                  const isTrulyOnline = attempt?.isOnline && (Date.now() - lastH < 60000);
+
+                  const status = attempt ? (attempt.status === "submitted" ? "Selesai" : attempt.status === "LOCKED" ? "Terkunci" : `Ujian (${isTrulyOnline ? "Online" : "Offline"})`) : "Belum Masuk";
+                  const statusColor = attempt ? (attempt.status === "submitted" ? "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-400 dark:border-emerald-900" : attempt.status === "LOCKED" ? "bg-rose-100 text-rose-700 border-rose-200 dark:bg-rose-950/50 dark:text-rose-400 dark:border-rose-900" : isTrulyOnline ? "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-950/50 dark:text-amber-400 dark:border-amber-900 animate-pulse" : "bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700") : "bg-slate-100 text-slate-400 border-slate-200 dark:bg-slate-800 dark:text-slate-500 dark:border-slate-700";
 
                   return (
                     <div key={student.id} className="bg-card border border-slate-200 dark:border-slate-800 rounded-2xl p-4 space-y-3 shadow-sm relative overflow-hidden">
@@ -1746,7 +2082,7 @@ const ExamRoomsPage = () => {
                             {attempt.status === "LOCKED" && (
                               <Button size="sm" variant="outline" className="h-8 text-[10px] font-bold border-green-200 text-green-700 hover:bg-green-50 rounded-xl px-3" onClick={() => handleUnlockStudent(attempt.id)}>Unlock</Button>
                             )}
-                            <Button size="sm" variant="outline" className="h-8 text-[10px] font-bold border-rose-200 text-rose-700 hover:bg-rose-50 rounded-xl px-3" onClick={() => handleResetSession(attempt.id)}>Reset</Button>
+                            <Button size="sm" variant="outline" className="h-8 text-[10px] font-bold border-rose-200 text-rose-700 hover:bg-rose-50 rounded-xl px-3" onClick={() => handleResetSession(attempt.id, student.id, monitorRoom?.id || "")}>Reset</Button>
                             {attempt.status !== "submitted" && (
                               <Button size="sm" variant="outline" className="h-8 text-[10px] font-bold border-amber-200 text-amber-700 hover:bg-amber-50 rounded-xl px-3" onClick={() => handleForceSubmitStudent(attempt.id)}>Submit</Button>
                             )}
@@ -1770,7 +2106,7 @@ const ExamRoomsPage = () => {
 
                               if (!ansId) return false;
                               const type = q.type || "pilihan_ganda";
-                              
+
                               if (type === "pilihan_ganda" || type === "benar_salah") {
                                 return q.choices?.[ansId]?.isCorrect === true;
                               } else if (type === "pilihan_ganda_kompleks") {
@@ -1795,27 +2131,27 @@ const ExamRoomsPage = () => {
                                 </div>
                                 <div className={`p-2 rounded-lg flex justify-between items-center ${isCorrect ? "bg-emerald-50 text-emerald-700 border border-emerald-100" : ansId ? "bg-rose-50 text-rose-700 border border-rose-100" : "bg-slate-50 text-slate-400"}`}>
                                   <div className="flex flex-col">
-                                     <span className="font-bold">
-                                       Jawaban: {(() => {
-                                         if (!ansId) return "KOSONG";
-                                         const type = q.type || "pilihan_ganda";
-                                         if (typeof ansId === 'string' && (type === "pilihan_ganda" || type === "benar_salah")) {
-                                           const choice = q.choices?.[ansId];
-                                           if (choice) {
-                                             const plainText = choice.text.replace(/<[^>]*>/g, '');
-                                             return `${ansId.toUpperCase()}. ${plainText}`;
-                                           }
-                                         }
-                                         if (type === "pilihan_ganda_kompleks" && Array.isArray(ansId)) {
-                                           return ansId.map(id => id.toUpperCase()).join(", ");
-                                         }
-                                         return typeof ansId === 'string' ? ansId.toUpperCase() : "DIJAWAB";
-                                       })()}
-                                     </span>
-                                     <div className="flex gap-2 mt-1">
-                                        <button onClick={() => handleManualGrade(student.nisn, q.id, true)} className={`px-2 py-0.5 rounded text-[9px] font-bold border transition-colors ${isCorrect && monitorOverrides[q.id] === true ? "bg-emerald-600 text-white border-emerald-600" : "bg-white text-emerald-600 border-emerald-200 hover:bg-emerald-50"}`}>Jadi Benar</button>
-                                        <button onClick={() => handleManualGrade(student.nisn, q.id, false)} className={`px-2 py-0.5 rounded text-[9px] font-bold border transition-colors ${!isCorrect && monitorOverrides[q.id] === false ? "bg-rose-600 text-white border-rose-600" : "bg-white text-rose-600 border-rose-200 hover:bg-rose-50"}`}>Jadi Salah</button>
-                                     </div>
+                                    <span className="font-bold">
+                                      Jawaban: {(() => {
+                                        if (!ansId) return "KOSONG";
+                                        const type = q.type || "pilihan_ganda";
+                                        if (typeof ansId === 'string' && (type === "pilihan_ganda" || type === "benar_salah")) {
+                                          const choice = q.choices?.[ansId];
+                                          if (choice) {
+                                            const plainText = choice.text.replace(/<[^>]*>/g, '');
+                                            return `${ansId.toUpperCase()}. ${plainText}`;
+                                          }
+                                        }
+                                        if (type === "pilihan_ganda_kompleks" && Array.isArray(ansId)) {
+                                          return ansId.map(id => id.toUpperCase()).join(", ");
+                                        }
+                                        return typeof ansId === 'string' ? ansId.toUpperCase() : "DIJAWAB";
+                                      })()}
+                                    </span>
+                                    <div className="flex gap-2 mt-1">
+                                      <button onClick={() => handleManualGrade(student.id, q.id, true)} className={`px-2 py-0.5 rounded text-[9px] font-bold border transition-colors ${isCorrect && monitorOverrides[q.id] === true ? "bg-emerald-600 text-white border-emerald-600" : "bg-white text-emerald-600 border-emerald-200 hover:bg-emerald-50"}`}>Jadi Benar</button>
+                                      <button onClick={() => handleManualGrade(student.id, q.id, false)} className={`px-2 py-0.5 rounded text-[9px] font-bold border transition-colors ${!isCorrect && monitorOverrides[q.id] === false ? "bg-rose-600 text-white border-rose-600" : "bg-white text-rose-600 border-rose-200 hover:bg-rose-50"}`}>Jadi Salah</button>
+                                    </div>
                                   </div>
                                   {ansId && <span className="text-[10px] font-black">{isCorrect ? "✓ BENAR" : "✗ SALAH"}</span>}
                                 </div>
@@ -1840,8 +2176,8 @@ const ExamRoomsPage = () => {
               }
               if (!monitorRoom?.classId) return false;
               const rawIds = monitorRoom.classId;
-              const allowedIds = Array.isArray(rawIds) 
-                ? rawIds 
+              const allowedIds = Array.isArray(rawIds)
+                ? rawIds
                 : String(rawIds || "").split(",").map(id => id.trim()).filter(Boolean);
               if (!allowedIds.includes(s.classId)) return false;
               if (monitorClassFilter !== "all" && s.classId !== monitorClassFilter) return false;

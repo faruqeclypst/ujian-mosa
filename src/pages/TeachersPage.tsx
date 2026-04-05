@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Plus, Users } from "lucide-react";
 import { useExamData } from "../context/ExamDataContext";
 import { Button } from "../components/ui/button";
@@ -115,13 +115,15 @@ const TeachersPage = () => {
     exportTeacherToExcel({ teachers, filename: "data-guru.xlsx" });
   };
 
-  const defaultValues = selectedTeacher
-    ? {
-        name: selectedTeacher.name,
-        code: selectedTeacher.code || "",
-        subjects: selectedTeacher.subjects || [],
-      }
-    : undefined;
+  const defaultValues = useMemo(() => 
+    selectedTeacher
+      ? {
+          name: selectedTeacher.name,
+          code: selectedTeacher.code || "",
+          subjects: selectedTeacher.subjects || [],
+        }
+      : { name: "", code: "", subjects: [] },
+  [selectedTeacher]);
 
   return (
     <div className="space-y-6">

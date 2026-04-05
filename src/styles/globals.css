@@ -154,3 +154,26 @@ body {
 .ql-editor strong, .ql-editor b {
   font-weight: 800 !important;
 }
+
+/* 🏷️ Professional Heading Styles for Literacy Titles */
+.ql-editor h1, .ql-editor h2 {
+  font-weight: 800 !important;
+  text-align: center !important;
+  margin-top: 1.5rem !important;
+  margin-bottom: 2rem !important;
+  line-height: 1.2 !important;
+  color: #1e3a8a !important; /* blue-900 */
+}
+
+.dark .ql-editor h1, .dark .ql-editor h2 {
+  color: #60a5fa !important; /* blue-400 */
+}
+
+.ql-editor h1 {
+  font-size: 1.875rem !important; /* text-3xl */
+}
+
+.ql-editor h2 {
+  font-size: 1.5rem !important; /* text-2xl */
+}
+

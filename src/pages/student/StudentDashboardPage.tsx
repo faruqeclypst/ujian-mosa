@@ -1,22 +1,24 @@
 import { useEffect, useState } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import { useStudentAuth } from "../../context/StudentAuthContext";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import pb from "../../lib/pocketbase";
-import { LogOut, KeyRound, Calendar, Clock, ChevronRight, User } from "lucide-react";
+import { LogOut, KeyRound, Calendar, Clock, ChevronRight, User, BookOpen, AlertCircle, ClipboardCheck } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../../components/ui/dialog";
 import { motion } from "framer-motion";
 
 const getExamTypeColorClass = (type: string) => {
   switch (type?.toLowerCase()) {
-    case "uh": case "ulangan harian": return "bg-blue-50 text-blue-600 border-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800";
-    case "pts": case "tengah semester": return "bg-amber-50 text-amber-600 border-amber-100 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800";
-    case "pas": case "akhir semester": return "bg-emerald-50 text-emerald-600 border-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800";
-    default: return "bg-slate-50 text-slate-600 border-slate-100 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700";
+    case "uh": case "ulangan harian": return "bg-blue-50 text-blue-700 border-blue-100";
+    case "pts": case "tengah semester": return "bg-amber-50 text-amber-700 border-amber-100";
+    case "pas": case "akhir semester": return "bg-emerald-50 text-emerald-700 border-emerald-100";
+    default: return "bg-slate-50 text-slate-700 border-slate-100";
   }
 };
 
 const StudentDashboardPage = () => {
+  const navigate = useNavigate();
   const { student, logoutStudent } = useStudentAuth();
   const [loading, setLoading] = useState(true);
   const [schoolName, setSchoolName] = useState("CBT System");
@@ -33,108 +35,55 @@ const StudentDashboardPage = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      
-      // Ambil Settings Sekolah dulu (bisa tanpa login)
       const settingsRecords = await pb.collection("settings").getFullList({ limit: 1 });
       if (settingsRecords.length > 0) {
-        const sData = settingsRecords[0];
-        setSchoolName(sData.name || "CBT System");
-        setSchoolLogo(sData.logoUrl || sData.logo || "");
+        setSchoolName(settingsRecords[0].name || "CBT System");
+        setSchoolLogo(settingsRecords[0].logoUrl || settingsRecords[0].logo || "");
       }
 
       if (!student) return;
 
-      // 2. Ambil SEMUA Ruang Ujian dengan status yang menandakan sedang berjalan
       const roomsRecords = await pb.collection("exam_rooms").getFullList({
-        // Mencari status active atau Ongoing (case insensitive di sisi JS nanti)
         expand: "examId,examId.subjectId,examId.teacherId",
         sort: "-created"
       });
 
-      // Filter manual di Frontend agar presisi (Status, Waktu & Kelas)
-      const now = new Date();
-      const validRooms = roomsRecords.filter(room => {
-        // A. Filter Status & isActive (Toleran jika status teks kosong tapi isActive true)
-        const s = String(room.status || "").toLowerCase();
-        const isActive = room.isActive === true || (room as any).isactive === true;
-        const isDisabled = room.isDisabled === true || (room as any).isdisabled === true;
-        
-        if (isDisabled) return false;
-        if (!isActive && s !== "active" && s !== "ongoing" && s !== "berjalan") return false;
-
-        // B. Filter Waktu
-        const rawStart = room.start_time || (room as any).startTime;
-        const rawEnd = room.end_time || (room as any).endTime;
-        
-        const start = new Date(rawStart);
-        const end = new Date(rawEnd);
-        
-        // Jika format waktu tidak valid, anggap tidak aktif
-        if (isNaN(start.getTime()) || isNaN(end.getTime())) return false;
-        
-        if (now < start || now > end) return false;
-
-        // B. Filter Kelas
+      const allRooms = roomsRecords.filter(room => {
+        if (room.isActive === false || room.status === "archive") return false;
         if (room.allClasses) return true;
-        
-        const studentClass = student.classId || "";
-        if (!studentClass) return false;
-
         const clsData = room.classId || (room as any).classIds || "";
-        const allowedClasses = Array.isArray(clsData) 
-          ? clsData 
-          : String(clsData).split(",").map(id => id.trim()).filter(id => id && id !== "all");
-
-        return allowedClasses.includes(studentClass);
+        const allowedClasses = Array.isArray(clsData) ? clsData : String(clsData).split(",").map(id => id.trim());
+        return allowedClasses.includes(student.classId);
       }).map(room => {
         const exam = room.expand?.examId;
-        const subject = exam?.expand?.subjectId;
-        const teacher = exam?.expand?.teacherId;
-
-        return {
-          ...room,
-          examTitle: room.room_name || exam?.title || "Ujian",
-          subject: subject?.name || "Mapel",
-          teacherName: teacher?.name || "-",
-          examType: exam?.examType || "Latihan"
-        };
+        const now = new Date();
+        const start = new Date(room.start_time || room.startTime);
+        const end = new Date(room.end_time || room.endTime);
+        let timeStatus = "upcoming";
+        if (now >= start && now <= end) timeStatus = "ongoing";
+        else if (now > end) timeStatus = "expired";
+        return { ...room, examTitle: room.room_name || exam?.title || "Ujian", subject: exam?.expand?.subjectId?.name || "Mapel", teacherName: exam?.expand?.teacherId?.name || "-", examType: exam?.examType || "Latihan", timeStatus, startTimeDate: start, endTimeDate: end };
+      }).sort((a, b) => {
+        const order: any = { "ongoing": 0, "upcoming": 1, "expired": 2 };
+        return order[a.timeStatus] - order[b.timeStatus];
       });
 
-      setActiveRooms(validRooms);
+      setActiveRooms(allRooms);
 
-      // 3. Ambil Status Percobaan (Attempts)
-      if (validRooms.length > 0) {
-        const roomIds = validRooms.map(r => r.id);
-        const filterStr = roomIds.map(id => `examRoomId = "${id}"`).join(" || ");
-        const attemptsRecords = await pb.collection("attempts").getFullList({
-          filter: `studentId = "${student.id}" && (${filterStr})`
-        });
-
+      if (allRooms.length > 0) {
+        const attempts = await pb.collection("attempts").getFullList({ filter: `studentId = "${student.id}"` });
         const myStatus: Record<string, any> = {};
-        attemptsRecords.forEach(att => {
-          myStatus[att.examRoomId] = att.status;
-        });
+        attempts.forEach(att => { myStatus[att.examRoomId] = att; });
         setUserAttempts(myStatus);
       }
-
-    } catch (err) {
-      console.error("Dashboard Fetch Error:", err);
-    } finally {
-      setLoading(false);
-    }
+    } catch (err) { console.error(err); } finally { setLoading(false); }
   };
 
   useEffect(() => {
     fetchData();
-    
-    // Subscribe ke perubahan ruang ujian
-    pb.collection("exam_rooms").subscribe("*", () => fetchData());
-    pb.collection("attempts").subscribe("*", () => fetchData());
-
-    return () => {
-      pb.collection("exam_rooms").unsubscribe();
-      pb.collection("attempts").unsubscribe();
-    };
+    const unsubR = pb.collection("exam_rooms").subscribe("*", () => fetchData());
+    const unsubA = pb.collection("attempts").subscribe("*", () => fetchData());
+    return () => { pb.collection("exam_rooms").unsubscribe(); pb.collection("attempts").unsubscribe(); };
   }, [student]);
 
   const handleValidateToken = async () => {
@@ -142,222 +91,231 @@ const StudentDashboardPage = () => {
     setTokenError("");
     setIsValidating(true);
     try {
-      // 1. Ambil Token Global dari Settings
-      const settingsRecords = await pb.collection("settings").getFullList({ limit: 1 });
-      const globalToken = settingsRecords.length > 0 ? settingsRecords[0].universal_token : null;
+      const settings = await pb.collection("settings").getFullList({ limit: 1 });
+      const globalToken = settings[0]?.universal_token || settings[0]?.global_token || settings[0]?.globalToken;
+      const roomToken = selectedRoom.token;
       
-      // 2. Ambil data ruangan terbaru
-      const room = await pb.collection("exam_rooms").getOne(selectedRoom.id);
+      const input = tokenInput.trim().toUpperCase();
       
-      const checkToken = globalToken || room.token;
-
-      if (tokenInput.trim().toUpperCase() !== String(checkToken).toUpperCase()) {
-        throw new Error("Token salah!");
+      if (input !== globalToken && input !== roomToken) {
+        throw new Error("Token tidak valid");
       }
 
-      // 3. Cek apakah terkunci
-      const attempts = await pb.collection("attempts").getFullList({
-        filter: `studentId = "${student.id}" && examRoomId = "${room.id}"`
-      });
-
-      if (attempts.length > 0 && attempts[0].status === "LOCKED") {
-        throw new Error("Akun Terkunci! Hubungi Proktor.");
-      }
-
-      // Berhasil
-      window.location.href = `/cbt/${selectedRoom.id}`;
-    } catch (err: any) {
-      setTokenError(err.message || "Gagal memverifikasi token");
-    } finally {
-      setIsValidating(false);
-    }
+      sessionStorage.setItem("activeCBTRoomId", selectedRoom.id);
+      navigate(`/cbt`);
+    } catch (err: any) { setTokenError(err.message); } finally { setIsValidating(false); }
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
-      <header className="bg-white/80 dark:bg-slate-950/80 backdrop-blur-md sticky top-0 z-50 border-b border-slate-200/50 dark:border-slate-800/50 px-6 h-16 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-           <div className="p-1.5 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800 shadow-sm">
-             {schoolLogo ? (
-                <img src={schoolLogo} className="h-6 w-6 object-contain" alt="Logo" />
-              ) : (
-                <div className="h-6 w-6 bg-slate-200 dark:bg-slate-700 rounded-lg animate-pulse" />
-              )}
-           </div>
-           <h1 className="text-sm font-black text-slate-800 dark:text-white uppercase tracking-tighter flex items-center gap-2">
-             CBT <span className="w-px h-3 bg-slate-300 dark:bg-slate-700 mx-1"></span> 
-             <span className="text-slate-500 font-medium normal-case tracking-normal truncate max-w-[150px] sm:max-w-none">{schoolName}</span>
-           </h1>
+    <div className="min-h-screen bg-[#f8fafc] dark:bg-slate-950">
+      <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-50 px-4 sm:px-6 h-14 sm:h-16 flex items-center justify-between shadow-sm">
+        <div className="flex items-center gap-3 sm:gap-4">
+          <div className="p-1 sm:p-1.5 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-100 dark:border-slate-700 shrink-0">
+            {schoolLogo ? <img src={schoolLogo} className="h-6 w-6 sm:h-8 sm:w-8 object-contain" alt="Logo" /> : <div className="h-6 w-6 sm:h-8 sm:w-8 bg-slate-200 dark:bg-slate-700 rounded" />}
+          </div>
+          <div className="flex flex-col -space-y-0.5 sm:-space-y-1">
+             <h1 className="text-[13px] sm:text-lg font-extrabold text-[#0f172a] dark:text-white uppercase tracking-tight whitespace-nowrap">
+               {schoolName}
+             </h1>
+             <span className="text-[8px] sm:text-[11px] font-bold text-blue-600/70 dark:text-blue-400/70 uppercase tracking-[0.1em] sm:tracking-[0.2em]">
+               Computer Based Test
+             </span>
+          </div>
         </div>
-        <div className="flex items-center gap-3">
-           <div className="flex items-center gap-3 px-3 py-1.5 bg-slate-50 dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800">
-             <div className="w-7 h-7 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center border border-white dark:border-slate-700 shadow-sm overflow-hidden">
-                <User className="h-4 w-4 text-slate-500" />
-             </div>
-             <div className="text-left hidden sm:block">
-               <p className="text-[11px] font-bold text-slate-700 dark:text-slate-200 leading-none">{student?.name}</p>
-               <p className="text-[9px] text-slate-400 font-semibold uppercase tracking-wider mt-0.5">{student?.className}</p>
-             </div>
+        <div className="flex items-center gap-2 sm:gap-4">
+           <div className="flex items-center gap-2 sm:gap-3.5 pr-2 sm:pr-3 border-r border-slate-100 dark:border-slate-800">
+              <div className="text-right min-w-0 hidden sm:block">
+                <p className="text-sm font-semibold text-[#0f172a] dark:text-slate-200 leading-none truncate max-w-[150px]">{student?.name}</p>
+                <div className="inline-block px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800 rounded text-[10px] font-bold text-slate-500 mt-1.5 leading-none">
+                  {student?.className}
+                </div>
+              </div>
+              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-blue-50 dark:bg-blue-900/40 flex items-center justify-center border border-blue-100 dark:border-blue-800 shadow-sm shrink-0">
+                 <User className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+              </div>
+              <div className="text-left min-w-0 block sm:hidden">
+                <p className="text-[13px] font-bold text-[#0f172a] dark:text-slate-200 leading-none truncate max-w-[100px]">{student?.name}</p>
+                <p className="text-[10px] font-semibold text-blue-500 mt-0.5 leading-none">{student?.className}</p>
+              </div>
            </div>
-           <button 
-             onClick={logoutStudent} 
-             className="p-2.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-xl transition-all active:scale-90"
-             title="Log Out"
-           >
-              <LogOut className="h-4 w-4" />
+           <button onClick={logoutStudent} className="p-2 text-rose-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-full transition-all active:scale-90" title="Keluar">
+              <LogOut className="h-5 w-5" />
            </button>
         </div>
       </header>
 
-      <main className="max-w-xl mx-auto p-6 sm:py-12">
-        <div className="space-y-6">
-          <div className="text-center space-y-1.5 mb-8">
-             <h2 className="text-xl font-extrabold text-slate-900 dark:text-white uppercase tracking-tight">Ujian Berlangsung</h2>
-             <p className="text-[12px] text-slate-500 font-medium">Pilih jadwal ujian aktif Anda di bawah ini</p>
-          </div>
+      <main className="max-w-2xl mx-auto p-4 sm:p-6 lg:p-8">
+        <div className="space-y-6 sm:space-y-10">
+           {/* Welcome Banner Formal - Compact on Mobile */}
+           <div className="pb-4 sm:pb-8 border-b border-slate-200/60 dark:border-slate-800">
+              <div className="flex flex-col gap-1 sm:gap-2 text-left">
+                 <span className="text-[10px] sm:text-[11px] font-bold text-blue-600 dark:text-blue-400 tracking-wide uppercase">Dashboard Siswa</span>
+                 <h2 className="text-xl sm:text-2xl font-bold text-[#0f172a] dark:text-white tracking-tight leading-tight">
+                    Selamat Mengerjakan, <span className="text-blue-600">{student?.name}</span>
+                 </h2>
+                 <p className="text-[13px] sm:text-base text-slate-500 font-medium leading-normal">Semoga sukses dengan ujian Anda hari ini.</p>
+              </div>
+           </div>
 
-          {loading ? (
-             <div className="text-center py-12 text-slate-300 text-xs animate-pulse">Menghubungkan ke server...</div>
-          ) : activeRooms.length === 0 ? (
-             <div className="py-20 px-10 border border-slate-200/50 dark:border-slate-800/50 rounded-[3rem] text-center bg-white/50 dark:bg-slate-900/50 shadow-sm backdrop-blur-sm">
-                <div className="w-16 h-16 bg-slate-50 dark:bg-slate-800 rounded-3xl flex items-center justify-center mx-auto mb-4 border border-slate-100 dark:border-slate-800">
-                  <Calendar className="h-8 w-8 text-slate-300 dark:text-slate-600" />
-                </div>
-                <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Tidak Ada Ujian</h3>
-                <p className="text-xs text-slate-400 font-medium mt-1">Belum ada ruang ujian aktif yang ditujukan untuk kelas Anda saat ini.</p>
+           <div className="space-y-1">
+              <h3 className="text-xs sm:text-sm font-bold text-slate-400 dark:text-slate-500 mb-2 sm:mb-4 uppercase tracking-wider">Jadwal Ujian Aktif</h3>
+           </div>
+
+           {loading ? (
+             <div className="py-20 text-center text-slate-400 text-xs animate-pulse font-bold uppercase tracking-widest">Memuat Data...</div>
+           ) : activeRooms.length === 0 ? (
+             <div className="py-20 border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl text-center bg-white dark:bg-slate-900/50">
+                <Calendar className="h-10 w-10 text-slate-200 mx-auto mb-4" />
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase">Tidak ada jadwal aktif</h3>
              </div>
-          ) : (
-            <div className="space-y-4">
-              {activeRooms.map((room) => (
-                <motion.div 
-                   initial={{ opacity: 0, y: 10 }}
-                   animate={{ opacity: 1, y: 0 }}
-                   key={room.id} 
-                   className="p-6 bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200/60 dark:border-slate-800 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_20px_50px_rgb(0,0,0,0.08)] transition-all duration-300 relative overflow-hidden"
-                >
-                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
-                    <div className="space-y-4 flex-1 min-w-0">
-                      <div>
-                        <div className="flex flex-wrap items-center gap-3 mb-4">
-                           <span className={`text-[10px] font-black px-3 py-1 rounded-full border shadow-sm ${getExamTypeColorClass(room.examType)}`}>
-                             {room.examType}
-                           </span>
-                           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.1em] bg-slate-50 dark:bg-slate-800/50 px-3 py-1 rounded-full border border-slate-100 dark:border-slate-800">
-                             {room.duration} MENIT
-                           </span>
-                        </div>
-                        <h3 className="text-lg font-extrabold text-slate-900 dark:text-white truncate uppercase tracking-tight leading-none mb-1.5">
-                          {room.examTitle}
-                        </h3>
-                        <div className="flex items-center gap-2 text-[11px] font-bold text-slate-400 uppercase">
-                           <span className="text-indigo-600 dark:text-indigo-400 tracking-wider bg-indigo-50/50 dark:bg-indigo-950/20 px-2 py-0.5 rounded-lg border border-indigo-100/50 dark:border-indigo-900/30">{room.subject}</span>
-                           <span className="h-1 w-1 bg-slate-300 rounded-full"></span>
-                           <span className="tracking-tight">{room.teacherName}</span>
-                        </div>
-                      </div>
+           ) : (
+             <div className="space-y-4">
+                {activeRooms.map((room, idx) => {
+                  const attempt = userAttempts[room.id];
+                  const isFinished = attempt && (attempt.status === "finished" || attempt.status === "submitted" || attempt.status === "graded");
+                  
+                  // Variasi acak berbasis index agar tiap kartu unik
+                  const rotation = (idx * 37) % 45;
+                  const offsetX = (idx * 59) % 150;
+                  const offsetY = (idx * 83) % 100;
+                  const scale = 1.2 + ((idx * 13) % 5) * 0.1;
 
-                      <div className="flex items-center gap-4 text-[11px] font-black tracking-tight tabular-nums">
-                        <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100/80 dark:border-slate-800 text-slate-600 dark:text-slate-300 shadow-sm">
-                          <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                          <span>{new Date(room.start_time || (room as any).startTime).toLocaleDateString("id-ID", { day: '2-digit', month: '2-digit' })}</span>
-                        </div>
-                        <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100/80 dark:border-slate-800 shadow-sm">
-                          <Clock className="w-3.5 h-3.5 text-slate-400" />
-                          <span className="text-emerald-600 dark:text-emerald-400">{new Date(room.start_time || (room as any).startTime).toLocaleTimeString("id-ID", { hour: '2-digit', minute: '2-digit' })}</span>
-                          <span className="text-slate-300 mx-0.5">—</span>
-                          <span className="text-rose-600 dark:text-rose-400">{new Date(room.end_time || (room as any).endTime).toLocaleTimeString("id-ID", { hour: '2-digit', minute: '2-digit' })}</span>
-                        </div>
-                      </div>
-                    </div>
+                  return (
+                    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} key={room.id} className="group bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm hover:shadow-md transition-all relative overflow-hidden">
+                       {/* Aksen Status (Samping) */}
+                       <div className={`absolute top-0 left-0 w-1 h-full z-20 ${
+                         isFinished ? 'bg-slate-300' : (room.timeStatus === 'ongoing' ? 'bg-blue-600' : 'bg-slate-200')
+                       }`} />
 
-                    <div className="shrink-0 w-full sm:w-auto">
-                      {userAttempts[room.id] === "submitted" ? (
-                        <div className="h-14 px-8 flex items-center justify-center gap-2 bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 font-black text-xs rounded-2xl border border-emerald-100 dark:border-emerald-900/40 w-full sm:w-auto uppercase tracking-widest shadow-inner">
-                           Sudah Terkirim
-                        </div>
-                      ) : (
-                        <Button 
-                          onClick={() => { setSelectedRoom(room); setTokenInput(""); setTokenError(""); }}
-                          className="h-14 px-10 rounded-2xl bg-slate-900 hover:bg-black dark:bg-white dark:text-slate-950 text-white font-black text-xs uppercase tracking-[0.2em] w-full sm:w-auto transition-all active:scale-95 shadow-xl shadow-slate-900/10 dark:shadow-white/5 flex items-center justify-center group"
-                        >
-                          Mulai <ChevronRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                </motion.div>
-              ))}
-            </div>
-          )}
+                       {/* Background Pattern Doodle (Bergerak & Acak tiap kartu) */}
+                       <motion.div 
+                          initial={{ rotate: rotation }}
+                          animate={{ 
+                            x: [offsetX, offsetX - 20, offsetX],
+                            y: [offsetY, offsetY - 20, offsetY] 
+                          }}
+                          transition={{ 
+                            duration: 20 + (idx % 10), 
+                            repeat: Infinity, 
+                            ease: "linear" 
+                          }}
+                          className="absolute inset-0 z-0 opacity-[0.06] dark:opacity-[0.02] pointer-events-none overflow-hidden select-none"
+                       >
+                          <svg width="400" height="400" viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg" 
+                             style={{ transform: `scale(${scale})` }}
+                             className="absolute top-0 left-0 w-[250%] h-[250%] origin-center"
+                          >
+                            <path d="M40 40h20v20H40V40zm60 60h20v20h-20v-20zM20 140h10v10H20v-10zm140-100h15v15h-15V40zM80 20h10v10H80V20zm80 140h10v10h-10v-10z" fill="currentColor" fillRule="evenodd" />
+                            <rect x="20" y="80" width="10" height="15" rx="1" fill="currentColor" transform="rotate(-15 20 80)" />
+                            <rect x="150" y="100" width="12" height="18" rx="1" fill="currentColor" transform="rotate(25 150 100)" />
+                            <circle cx="100" cy="40" r="4" fill="currentColor" />
+                            <path d="M120 160l10-5 5 10-10 5z" fill="currentColor" />
+                            <rect x="50" y="150" width="20" height="4" rx="2" fill="currentColor" transform="rotate(45 50 150)" />
+                            <path d="M240 240h20v20h-20v-20zM220 340h10v10h-10v-10z" fill="currentColor" />
+                            <circle cx="300" cy="240" r="4" fill="currentColor" />
+                          </svg>
+                       </motion.div>
+
+                       <div className="p-5 sm:p-7 text-left relative z-10">
+                          <div className="flex flex-col gap-5 sm:gap-6">
+                             <div className="flex justify-between items-start gap-4">
+                                <div className="space-y-1 sm:space-y-1.5 flex-1 min-w-0">
+                                   <span className="text-[11px] sm:text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider block">{room.subject}</span>
+                                   <h3 className="text-lg sm:text-xl font-bold text-[#0f172a] dark:text-white uppercase tracking-tight leading-tight truncate">
+                                      {room.examTitle}
+                                   </h3>
+                                </div>
+                                <div className="flex items-center sm:flex-col sm:items-end gap-2 shrink-0">
+                                   <div className={`text-[10px] sm:text-xs font-bold uppercase px-2 py-0.5 rounded border ${getExamTypeColorClass(room.examType)}`}>
+                                      {room.examType}
+                                   </div>
+                                   <div className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-widest bg-slate-50 dark:bg-slate-800/50 px-2 py-0.5 rounded border border-slate-100 dark:border-slate-800">
+                                      {room.duration}M
+                                   </div>
+                                </div>
+                             </div>
+
+                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div className="space-y-1">
+                                   <label className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-wider block">Guru:</label>
+                                   <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300">
+                                      <User className="w-3.5 h-3.5 text-slate-400" />
+                                      <span className="text-sm sm:text-base font-semibold">{room.teacherName}</span>
+                                   </div>
+                                </div>
+                                <div className="space-y-1">
+                                   <label className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-wider block">Jadwal:</label>
+                                   <div className="flex items-center gap-3 text-slate-700 dark:text-slate-300">
+                                      <div className="flex items-center gap-1.5 font-bold text-[11px] sm:text-sm tabular-nums">
+                                         <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                                         {new Date(room.startTimeDate).toLocaleDateString("id-ID", { day: '2-digit', month: 'short' })}
+                                      </div>
+                                      <div className="flex items-center gap-1.5 font-bold text-[11px] sm:text-sm tabular-nums">
+                                         <Clock className="w-3.5 h-3.5 text-slate-400" />
+                                         {new Date(room.startTimeDate).toLocaleTimeString("id-ID", { hour: '2-digit', minute: '2-digit' })} — {new Date(room.endTimeDate).toLocaleTimeString("id-ID", { hour: '2-digit', minute: '2-digit' })}
+                                      </div>
+                                   </div>
+                                </div>
+                             </div>
+
+                             <div className="w-full pt-4 border-t border-slate-50 dark:border-slate-800/50">
+                                {isFinished ? (
+                                  <div className="bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-700 p-3 rounded-lg flex items-center justify-between">
+                                     <div className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase flex items-center gap-2 min-w-0">
+                                        <ClipboardCheck className="w-4 h-4 text-emerald-500 shrink-0" />
+                                        <span className="truncate">Selesai Dikirim</span>
+                                     </div>
+                                     <button onClick={() => { sessionStorage.setItem("activeCBTRoomId", room.id); navigate(`/cbt/result`); }} className="text-[11px] sm:text-xs font-bold text-blue-600 hover:underline uppercase tracking-wider whitespace-nowrap ml-2">Detail Hasil</button>
+                                  </div>
+                                ) : room.timeStatus === "ongoing" ? (
+                                  <Button 
+                                    onClick={() => setSelectedRoom(room)}
+                                    className="w-full bg-[#1e293b] hover:bg-[#0f172a] dark:bg-blue-600 dark:hover:bg-blue-500 text-white h-11 sm:h-12 rounded-lg font-bold text-xs sm:text-sm uppercase tracking-widest flex items-center justify-center gap-2 shadow-sm"
+                                  >
+                                    Mulai Ujian <ChevronRight className="w-3.5 h-3.5" />
+                                  </Button>
+                                ) : room.timeStatus === "expired" ? (
+                                  <div className="bg-rose-50/50 dark:bg-rose-950/20 border border-rose-100 dark:border-rose-900/40 py-3 rounded-lg text-center">
+                                     <span className="text-[10px] sm:text-xs font-bold text-rose-600 uppercase tracking-widest">WAKTU BERAKHIR</span>
+                                  </div>
+                                ) : (
+                                  <div className="bg-amber-50/50 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-900/40 py-3 rounded-lg text-center">
+                                     <span className="text-[10px] sm:text-xs font-bold text-amber-600 uppercase tracking-widest">BELUM DIMULAI</span>
+                                  </div>
+                                )}
+                             </div>
+                          </div>
+                       </div>
+                    </motion.div>
+                  );
+                })}
+             </div>
+           )}
         </div>
       </main>
 
-      <Dialog open={selectedRoom !== null} onOpenChange={(o) => !o && setSelectedRoom(null)}>
-        <DialogContent className="max-w-sm bg-white dark:bg-slate-950 rounded-[2.5rem] p-0 border-none shadow-[0_20px_70px_rgba(0,0,0,0.2)] overflow-hidden">
-          <div className="p-8">
-            <DialogHeader className="relative">
-              <div className="w-16 h-16 rounded-3xl bg-slate-50 dark:bg-slate-900 flex items-center justify-center mb-6 mx-auto border border-slate-100 dark:border-slate-800 shadow-sm relative">
-                <KeyRound className="h-7 w-7 text-slate-800 dark:text-slate-200" />
-                <div className="absolute -inset-1 bg-indigo-500/10 blur-xl rounded-full" />
-              </div>
-              <DialogTitle className="text-lg font-extrabold text-center text-slate-900 dark:text-white uppercase tracking-tight">
-                Konfirmasi Akses
-              </DialogTitle>
-            </DialogHeader>
-
-            <div className="space-y-6 pt-6">
-              <div className="space-y-0.5 p-1 bg-slate-50/80 dark:bg-slate-900/80 rounded-2xl border border-slate-200/50 dark:border-slate-800 shadow-sm overflow-hidden">
-                 <div className="flex justify-between items-center p-3 px-4">
-                   <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Siswa</span>
-                   <span className="text-[11px] text-slate-800 dark:text-white font-black uppercase text-right leading-none">{student?.name}</span>
+      <Dialog open={!!selectedRoom} onOpenChange={() => { if (!isValidating) setSelectedRoom(null); setTokenInput(""); setTokenError(""); }}>
+        <DialogContent className="sm:max-w-md bg-white dark:bg-slate-950 rounded-xl border-none shadow-2xl p-0">
+           <div className="bg-slate-900 px-6 py-8 text-white relative">
+              <div className="absolute top-0 right-0 p-4 opacity-10"><KeyRound className="w-16 h-16" /></div>
+              <DialogHeader>
+                <DialogTitle className="text-lg font-bold uppercase tracking-tight">Verifikasi Akses</DialogTitle>
+                <p className="text-slate-400 text-[10px] font-semibold uppercase tracking-widest mt-1">Masukkan Token Ruangan</p>
+              </DialogHeader>
+           </div>
+           <div className="p-8 space-y-6">
+              <div className="space-y-4">
+                 <div>
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 block">Token Ujian</label>
+                    <Input value={tokenInput} onChange={(e) => setTokenInput(e.target.value.toUpperCase())} placeholder="AB123" className="h-12 text-center text-xl font-black tracking-[0.3em] bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 rounded-lg" disabled={isValidating} />
+                    {tokenError && <p className="text-rose-500 text-[9px] font-bold mt-2 flex items-center gap-1 uppercase"><AlertCircle className="w-3 h-3" /> {tokenError}</p>}
                  </div>
-                 <div className="h-px bg-slate-200/50 dark:bg-slate-800/50 mx-4" />
-                 <div className="flex justify-between items-center p-3 px-4">
-                   <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Ruangan</span>
-                   <span className="text-[11px] text-slate-800 dark:text-white font-black uppercase text-right truncate ml-6 leading-none">{selectedRoom?.examTitle}</span>
-                 </div>
+                 <div className="bg-blue-50/50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-100 dark:border-blue-800"><p className="text-[10px] text-blue-600 dark:text-blue-400 leading-relaxed font-medium">⚠️ Pastikan koneksi internet stabil sebelum mulai. Pengerjaan Anda akan tercatat secara otomatis.</p></div>
               </div>
-
-              <div className="space-y-2.5">
-                 <div className="flex items-center justify-between px-1">
-                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">TOKEN</label>
-                   {tokenError && <span className="text-[9px] text-rose-500 font-bold uppercase tracking-tighter px-2 py-0.5 bg-rose-50 dark:bg-rose-950/30 rounded-lg border border-rose-100 dark:border-rose-900/30">{tokenError}</span>}
-                 </div>
-                 <Input
-                   value={tokenInput}
-                   onChange={(e) => { 
-                     setTokenInput(e.target.value.toUpperCase()); 
-                     if (tokenError) setTokenError("");
-                   }}
-                   placeholder="KETIK TOKEN"
-                   className={`h-14 bg-white dark:bg-slate-900 border-[2.5px] ${tokenError ? 'border-rose-500/50 focus:border-rose-500' : 'border-slate-100 dark:border-slate-800 focus:border-slate-900 dark:focus:border-white'} rounded-2xl text-center font-extrabold tracking-[0.3em] uppercase text-slate-950 dark:text-white transition-all text-lg shadow-inner focus:ring-0`}
-                   maxLength={12}
-                   autoFocus
-                 />
-              </div>
-
-              <DialogFooter className="flex flex-col gap-3 pt-2">
-                <Button 
-                   onClick={handleValidateToken} 
-                   disabled={isValidating || !tokenInput} 
-                   className={`w-full h-12 ${isValidating ? 'bg-slate-200 dark:bg-slate-800' : 'bg-slate-900 hover:bg-black dark:bg-indigo-600 dark:hover:bg-indigo-500'} text-white font-extrabold text-[11px] rounded-xl uppercase tracking-[0.15em] shadow-lg shadow-slate-900/5 dark:shadow-none transition-all active:scale-[0.98] flex items-center justify-center`}
-                >
-                  {isValidating ? (
-                    <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-                      <span>MEMVERIFIKASI...</span>
-                    </div>
-                  ) : "MULAI UJIAN"}
-                </Button>
-                <button 
-                   onClick={() => setSelectedRoom(null)} 
-                   className="w-full py-2 text-[10px] font-black text-slate-400 hover:text-slate-900 dark:hover:text-white uppercase tracking-widest transition-colors active:scale-95"
-                >
-                  BATAL
-                </button>
+              <DialogFooter>
+                <Button onClick={handleValidateToken} disabled={!tokenInput || isValidating} className="w-full h-12 bg-slate-900 dark:bg-blue-600 text-white rounded-lg font-bold uppercase tracking-widest text-[10px] transition-all active:scale-95">{isValidating ? "Memverifikasi..." : "Konfirmasi & Masuk"}</Button>
               </DialogFooter>
-            </div>
-          </div>
+           </div>
         </DialogContent>
       </Dialog>
     </div>

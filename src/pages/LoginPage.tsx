@@ -1,11 +1,9 @@
 import { useState, useEffect } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { FirebaseError } from "firebase/app";
 import { Lock, User, Eye, EyeOff, Sparkles, Shield } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { motion } from "framer-motion";
-import { Link } from "react-router-dom";
 
 import FormField from "../components/forms/FormField";
 import { Button } from "../components/ui/button";
@@ -13,8 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../co
 import { Input } from "../components/ui/input";
 import { ThemeToggle } from "../components/ui/theme-toggle";
 import { useAuth } from "../context/AuthContext";
-import { database } from "../lib/firebase";
-import { ref, onValue, DataSnapshot } from "firebase/database";
+import pb from "../lib/pocketbase";
 
 const loginSchema = z.object({
   username: z.string().min(3, "Username minimal 3 karakter"),
@@ -22,26 +19,6 @@ const loginSchema = z.object({
 });
 
 type LoginFormValues = z.infer<typeof loginSchema>;
-
-const firebaseErrorMessage = (error: unknown) => {
-  if (error instanceof FirebaseError) {
-    switch (error.code) {
-      case "auth/user-not-found":
-      case "auth/wrong-password":
-        return "Username atau password tidak valid.";
-      case "auth/too-many-requests":
-        return "Terlalu banyak percobaan login. Coba lagi beberapa saat lagi.";
-      default:
-        return error.message;
-    }
-  }
-
-  if (error instanceof Error) {
-    return error.message;
-  }
-
-  return "Terjadi kesalahan yang tidak diketahui.";
-};
 
 const LoginPage = () => {
   const { signInWithUsername } = useAuth();
@@ -54,21 +31,32 @@ const LoginPage = () => {
   const [logoError, setLogoError] = useState(false);
 
   useEffect(() => {
-    const r = ref(database, "settings/school");
-    const unsubscribe = onValue(r, (snap: DataSnapshot) => {
-      setLogoLoading(true);
-      if (snap.exists()) {
-        const d = snap.val();
-        setSchoolName(d.name || "");
-        setSchoolLogo(d.logoUrl || "");
-      }
-      setLogoLoading(false);
-    }, (error: Error) => {
-      console.error("Firebase read error:", error);
-      setLogoLoading(false);
-    });
+    const fetchSettings = async () => {
+      try {
+        setLogoLoading(true);
+        const records = await pb.collection("settings").getFullList({
+          sort: "created",
+          limit: 1
+        });
 
-    return () => unsubscribe();
+        if (records.length > 0) {
+          const data = records[0];
+          setSchoolName(data.name || "E-Ujian CBT");
+          
+          let logoUrl = data.logoUrl || data.logo || "";
+          if (logoUrl && !logoUrl.startsWith('http') && !logoUrl.startsWith('data:')) {
+            logoUrl = pb.files.getUrl(data, logoUrl);
+          }
+          setSchoolLogo(logoUrl);
+        }
+      } catch (err) {
+        console.error("Gagal memuat settings sekolah:", err);
+      } finally {
+        setLogoLoading(false);
+      }
+    };
+
+    fetchSettings();
   }, []);
 
   const {
@@ -87,9 +75,8 @@ const LoginPage = () => {
     setFormError(null);
     try {
       await signInWithUsername(values.username, values.password);
-    } catch (error) {
-      const message = firebaseErrorMessage(error);
-      setFormError(message);
+    } catch (error: any) {
+      setFormError(error.message || "Gagal login. Periksa kembali username dan password.");
     }
   };
 

@@ -35,7 +35,9 @@ const ClassForm = ({ defaultValues, onSubmit, submitLabel = "Simpan", onCancel }
   });
 
   useEffect(() => {
-    reset((prev) => ({ ...prev, ...defaultValues }));
+    if (defaultValues) {
+      reset(defaultValues);
+    }
   }, [defaultValues, reset]);
 
   const submitHandler = async (values: ClassFormValues) => {

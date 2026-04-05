@@ -1,13 +1,12 @@
 import { useEffect, useState, useMemo } from "react";
-import { 
-  Users, 
-  LayoutTemplate, 
-  BookOpen, 
+import {
+  Users,
+  LayoutTemplate,
+  BookOpen,
   CheckCircle2,
   GraduationCap
 } from "lucide-react";
-import { ref, onValue } from "firebase/database";
-import { database } from "../lib/firebase";
+import pb from "../lib/pocketbase";
 
 import { Card, CardHeader, CardTitle, CardContent } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
@@ -23,59 +22,77 @@ const DashboardPage = () => {
   const [chartData, setChartData] = useState<any[]>([]); // <--- Chart data state
 
   useEffect(() => {
-    // 1. Total Bank Soal (Ujian)
-    const unsubExams = onValue(ref(database, "exams"), (snap) => {
-      setTotalExams(snap.exists() ? Object.keys(snap.val()).length : 0);
-    });
+    const initDashboard = async () => {
+      try {
+        // 1. Total Bank Soal (Ujian)
+        const examsData = await pb.collection('exams').getFullList();
+        setTotalExams(examsData.length);
 
-    // 2. Total Ruang Ujian Aktif & Chart Builders
-    const unsubRooms = onValue(ref(database, "exam_rooms"), (snap) => {
-      if (snap.exists()) {
-        const roomsData = snap.val();
-        const active = Object.values(roomsData).filter((r: any) => r.status !== "archive").length;
+        // 2. Total Ruang Ujian Aktif & Chart Builders
+        const roomsData = await pb.collection('exam_rooms').getFullList();
+        const active = roomsData.filter((r: any) => r.status !== "archive").length;
         setActiveRooms(active);
 
-        // Fetch Attempts to compute chart
-        onValue(ref(database, "attempts"), (attSnap) => {
-           const attemptsData = attSnap.exists() ? attSnap.val() : {};
-           const mappedChart = Object.keys(roomsData)
-             .filter((rk) => roomsData[rk].status !== "archive")
-             .map((rk) => {
-                 const room = roomsData[rk];
-                 const ongoing = Object.keys(attemptsData).filter((ak) => ak.includes(rk) && attemptsData[ak].status === "ongoing").length;
-                 const submitted = Object.keys(attemptsData).filter((ak) => ak.includes(rk) && (attemptsData[ak].status === "submitted" || attemptsData[ak].status === "graded")).length;
-                 return {
-                    name: room.room_name || room.room_code || "Ruang",
-                    Mengerjakan: ongoing,
-                    Selesai: submitted,
-                    total: ongoing + submitted
-                 }
-             })
-             .filter(r => r.total > 0); // Hanya tampilkan yang ada aktivitasnya biar gak penuh/bingung
-           
-           setChartData(mappedChart);
-        });
-      } else {
-        setActiveRooms(0);
-        setChartData([]);
-      }
-    });
+        // 3. fetch Attempts
+        const attemptsData = await pb.collection('attempts').getFullList();
 
-    // 3. student Sedang Aktif Ujian
-    const unsubAttempts = onValue(ref(database, "attempts"), (snap) => {
-      if (snap.exists()) {
-        const data = snap.val();
-        const ongoing = Object.values(data).filter((a: any) => a.status === "ongoing").length;
-        setOngoingStudents(ongoing);
-      } else {
-        setOngoingStudents(0);
+        // Compute unique ongoing students globally
+        const ongoingUnique = new Set();
+        attemptsData.forEach((a: any) => {
+          if (a.status === "ongoing") {
+            ongoingUnique.add(a.studentId || a.student_id);
+          }
+        });
+        setOngoingStudents(ongoingUnique.size);
+
+        // Compute chart data
+        const mappedChart = roomsData
+          .filter((room: any) => room.status !== "archive")
+          .map((room: any) => {
+            const roomAttempts = attemptsData.filter((a: any) => (a.examRoomId === room.id) || (a.exam_room_id === room.id));
+
+            // Count unique students for ongoing and finished
+            const ongoingSet = new Set();
+            const finishedSet = new Set();
+
+            roomAttempts.forEach((a: any) => {
+              const sId = a.studentId || a.student_id;
+              if (!sId) return;
+
+              if (a.status === "ongoing") {
+                ongoingSet.add(sId);
+              } else if (a.status === "finished" || a.status === "submitted" || a.status === "graded") {
+                finishedSet.add(sId);
+              }
+            });
+
+            return {
+              name: room.room_name || room.room_code || "Ruang",
+              Mengerjakan: ongoingSet.size,
+              Selesai: finishedSet.size,
+              total: ongoingSet.size + finishedSet.size
+            }
+          })
+          .filter(r => r.total > 0);
+
+        setChartData(mappedChart);
+
+      } catch (e) {
+        console.error("Dashboard init error:", e);
       }
-    });
+    };
+
+    initDashboard();
+
+    // Subscribe to changes for live updates
+    const unsubExams = pb.collection('exams').subscribe("*", initDashboard);
+    const unsubRooms = pb.collection('exam_rooms').subscribe("*", initDashboard);
+    const unsubAttempts = pb.collection('attempts').subscribe("*", initDashboard);
 
     return () => {
-      unsubExams();
-      unsubRooms();
-      unsubAttempts();
+      unsubExams.then((u: any) => u());
+      unsubRooms.then((u: any) => u());
+      unsubAttempts.then((u: any) => u());
     };
   }, []);
 
@@ -99,41 +116,41 @@ const DashboardPage = () => {
           <CheckCircle2 className="w-3.5 h-3.5 mr-1 animate-pulse" /> Sistem Aktif
         </Badge>
       </div>
-      
+
       {/* 🔴 LIVE MONITORING CARDS */}
       <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
         <div className="bg-card p-5 rounded-2xl border border-slate-200/60 dark:border-slate-800/40 shadow-sm flex items-center justify-between backdrop-blur-sm">
           <div className="flex items-center gap-3.5">
             <div className="p-3 rounded-xl bg-orange-50 dark:bg-orange-950/40 text-orange-600 dark:text-orange-400">
-               <Users className="h-6 w-6 animate-pulse" />
+              <Users className="h-6 w-6 animate-pulse" />
             </div>
             <div>
-               <div className="flex items-center gap-1.5">
-                  <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Siswa Sedang Ujian</p>
-                  <Badge className="bg-orange-500/10 text-orange-600 dark:text-orange-400 border-0 h-4 px-1 text-[9px] font-bold rounded">Live</Badge>
-               </div>
-               <p className="text-2xl font-black text-slate-800 dark:text-white mt-0.5">{ongoingStudents}</p>
+              <div className="flex items-center gap-1.5">
+                <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Siswa Sedang Ujian</p>
+                <Badge className="bg-orange-500/10 text-orange-600 dark:text-orange-400 border-0 h-4 px-1 text-[9px] font-bold rounded">Live</Badge>
+              </div>
+              <p className="text-2xl font-black text-slate-800 dark:text-white mt-0.5">{ongoingStudents}</p>
             </div>
           </div>
         </div>
 
         <div className="bg-card p-5 rounded-2xl border border-slate-200/60 dark:border-slate-800/40 shadow-sm flex items-center gap-3.5 backdrop-blur-sm">
           <div className="p-3 rounded-xl bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400">
-             <LayoutTemplate className="h-6 w-6" />
+            <LayoutTemplate className="h-6 w-6" />
           </div>
           <div>
-             <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Ruang Ujian Aktif</p>
-             <p className="text-2xl font-bold text-slate-800 dark:text-white mt-0.5">{activeRooms}</p>
+            <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Ruang Ujian Aktif</p>
+            <p className="text-2xl font-bold text-slate-800 dark:text-white mt-0.5">{activeRooms}</p>
           </div>
         </div>
 
         <div className="bg-card p-5 rounded-2xl border border-slate-200/60 dark:border-slate-800/40 shadow-sm flex items-center gap-3.5 backdrop-blur-sm">
           <div className="p-3 rounded-xl bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400">
-             <BookOpen className="h-6 w-6" />
+            <BookOpen className="h-6 w-6" />
           </div>
           <div>
-             <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Master Bank Soal</p>
-             <p className="text-2xl font-bold text-slate-800 dark:text-white mt-0.5">{totalExams}</p>
+            <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Master Bank Soal</p>
+            <p className="text-2xl font-bold text-slate-800 dark:text-white mt-0.5">{totalExams}</p>
           </div>
         </div>
       </div>
@@ -141,10 +158,10 @@ const DashboardPage = () => {
       {/* 📊 CHART AKTiVITAS UJiAN */}
       <div className="bg-card p-5 rounded-2xl border border-slate-200/60 dark:border-slate-800/40 shadow-sm backdrop-blur-sm">
         <div className="pb-4">
-           <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
-             <span className="h-2.5 w-2.5 rounded-full bg-blue-500 animate-slow-ping"></span>
-             Aktivitas Pengerjaan Ujian Live (Per Ruang)
-           </h3>
+          <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+            <span className="h-2.5 w-2.5 rounded-full bg-blue-500 animate-slow-ping"></span>
+            Aktivitas Pengerjaan Ujian Live (Per Ruang)
+          </h3>
         </div>
         <div className="h-[280px] w-full mt-2">
           {chartData.length === 0 ? (
@@ -167,48 +184,48 @@ const DashboardPage = () => {
 
       {/* 📊 MASTER DATA Grid */}
       <div className="bg-card p-5 rounded-2xl border border-slate-200/60 dark:border-slate-800/40 shadow-sm backdrop-blur-sm">
-         <h4 className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-4">Ringkasan Master Data</h4>
-         <div className="grid gap-4 sm:gap-6 grid-cols-2 lg:grid-cols-4">
-           <div className="flex items-center gap-3">
-             <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
-               <Users className="h-5 w-5" />
-             </div>
-             <div>
-               <p className="text-[11px] text-slate-400 dark:text-slate-500">Total Guru</p>
-               <p className="text-lg font-bold text-slate-800 dark:text-white leading-none mt-0.5">{totalTeachers}</p>
-             </div>
-           </div>
-           
-           <div className="flex items-center gap-3">
-             <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
-               <LayoutTemplate className="h-5 w-5" />
-             </div>
-             <div>
-               <p className="text-[11px] text-slate-400 dark:text-slate-500">Total Kelas</p>
-               <p className="text-lg font-bold text-slate-800 dark:text-white leading-none mt-0.5">{totalClasses}</p>
-             </div>
-           </div>
+        <h4 className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-4">Ringkasan Master Data</h4>
+        <div className="grid gap-4 sm:gap-6 grid-cols-2 lg:grid-cols-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+              <Users className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-[11px] text-slate-400 dark:text-slate-500">Total Guru</p>
+              <p className="text-lg font-bold text-slate-800 dark:text-white leading-none mt-0.5">{totalTeachers}</p>
+            </div>
+          </div>
 
-           <div className="flex items-center gap-3">
-             <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
-               <BookOpen className="h-5 w-5" />
-             </div>
-             <div>
-               <p className="text-[11px] text-slate-400 dark:text-slate-500">Total Mapel</p>
-               <p className="text-lg font-bold text-slate-800 dark:text-white leading-none mt-0.5">{totalSubjects}</p>
-             </div>
-           </div>
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+              <LayoutTemplate className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-[11px] text-slate-400 dark:text-slate-500">Total Kelas</p>
+              <p className="text-lg font-bold text-slate-800 dark:text-white leading-none mt-0.5">{totalClasses}</p>
+            </div>
+          </div>
 
-           <div className="flex items-center gap-3">
-             <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
-               <GraduationCap className="h-5 w-5" />
-             </div>
-             <div>
-               <p className="text-[11px] text-slate-400 dark:text-slate-500">Total Siswa</p>
-               <p className="text-lg font-bold text-slate-800 dark:text-white leading-none mt-0.5">{totalStudents}</p>
-             </div>
-           </div>
-         </div>
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+              <BookOpen className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-[11px] text-slate-400 dark:text-slate-500">Total Mapel</p>
+              <p className="text-lg font-bold text-slate-800 dark:text-white leading-none mt-0.5">{totalSubjects}</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+              <GraduationCap className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-[11px] text-slate-400 dark:text-slate-500">Total Siswa</p>
+              <p className="text-lg font-bold text-slate-800 dark:text-white leading-none mt-0.5">{totalStudents}</p>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -1,13 +1,11 @@
 import { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { FirebaseError } from "firebase/app";
-import { User, Eye, EyeOff, Sparkles, Shield, ArrowLeft, Save } from "lucide-react";
+import { User, Shield, ArrowLeft, Save, Sparkles } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { motion } from "framer-motion";
 import { Link, useNavigate } from "react-router-dom";
-import { updateProfile } from "firebase/auth";
-import { auth } from "../lib/firebase";
+import pb from "../lib/pocketbase";
 
 import FormField from "../components/forms/FormField";
 import { Button } from "../components/ui/button";
@@ -15,6 +13,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../co
 import { Input } from "../components/ui/input";
 import ProfilePictureUpload from "../components/ui/ProfilePictureUpload";
 import { useAuth } from "../context/AuthContext";
+import { useToast } from "../components/ui/toast";
 
 const profileSchema = z.object({
   displayName: z.string().min(2, "Nama lengkap minimal 2 karakter"),
@@ -23,47 +22,28 @@ const profileSchema = z.object({
 
 type ProfileFormValues = z.infer<typeof profileSchema>;
 
-const firebaseErrorMessage = (error: unknown) => {
-  if (error instanceof FirebaseError) {
-    switch (error.code) {
-      case "auth/requires-recent-login":
-        return "Untuk keamanan, silakan login ulang terlebih dahulu.";
-      case "auth/invalid-email":
-        return "Format email tidak valid.";
-      default:
-        return error.message;
-    }
-  }
-
-  if (error instanceof Error) {
-    return error.message;
-  }
-
-  return "Terjadi kesalahan yang tidak diketahui.";
-};
-
 const ProfilePage = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { addToast } = useToast();
   const [formError, setFormError] = useState<string | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
 
   const {
     register,
     handleSubmit,
-    setValue,
     formState: { errors, isDirty },
   } = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
     defaultValues: {
-      displayName: user?.displayName || "",
+      displayName: user?.name || "",
       email: user?.email || "",
     },
   });
 
   const onSubmit = async (values: ProfileFormValues) => {
     if (!user) {
-      setFormError("User tidak ditemukan. Silakan login ulang.");
+      setFormError("User tidak ditemukan.");
       return;
     }
 
@@ -71,22 +51,26 @@ const ProfilePage = () => {
     setIsUpdating(true);
 
     try {
-      await updateProfile(user, {
-        displayName: values.displayName,
+      await pb.collection("users").update(user.id, {
+        name: values.displayName,
       });
 
-      navigate("/", { replace: true });
-    } catch (error) {
-      const message = firebaseErrorMessage(error);
-      setFormError(message);
+      addToast({
+        title: "Profil Diperbarui",
+        description: "Informasi profil Anda telah berhasil disimpan.",
+        type: "success"
+      });
+    } catch (error: any) {
+      setFormError(error.message || "Gagal memperbarui profil.");
     } finally {
       setIsUpdating(false);
     }
   };
 
   const handleProfileUpdate = (photoURL: string, displayName: string) => {
-    if (photoURL !== user?.photoURL) {
-      // Photo was updated, you might want to refresh the user context
+    if (photoURL !== user?.avatar) {
+      // Photo was updated, trigger a state update via AuthContext which is automatic in PB
+      // but we can refresh just in case if the user wants immediate feedback
       window.location.reload();
     }
   };
@@ -96,7 +80,7 @@ const ProfilePage = () => {
       <div className="flex min-h-screen items-center justify-center">
         <div className="text-center">
           <p className="text-lg text-gray-600">Silakan login terlebih dahulu</p>
-          <Link to="/login" className="text-blue-600 hover:underline">
+          <Link to="/admin/login" className="text-blue-600 hover:underline">
             Kembali ke Login
           </Link>
         </div>
@@ -166,15 +150,15 @@ const ProfilePage = () => {
                 className="flex flex-col items-center gap-6"
               >
                 <ProfilePictureUpload
-                  currentPhotoURL={user.photoURL || ""}
-                  displayName={user.displayName || ""}
+                  currentPhotoURL={user.avatar || ""}
+                  displayName={user.name || ""}
                   onUpdate={handleProfileUpdate}
                   size="lg"
                 />
 
                 <div className="text-center">
                   <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                    {user.displayName || "Admin"}
+                    {user.name || "Admin"}
                   </h3>
                   <p className="text-sm text-gray-600 dark:text-gray-400">
                     {user.email}
@@ -280,4 +264,4 @@ const ProfilePage = () => {
   );
 };
 
-export default ProfilePage;
+export default ProfilePage;

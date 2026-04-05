@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Plus, Users } from "lucide-react";
 import { useExamData } from "../context/ExamDataContext";
 import { Button } from "../components/ui/button";
@@ -125,6 +125,14 @@ const StudentsPage = () => {
     exportStudentToExcel({ students, classes, filename: "data-siswa.xlsx" });
   };
 
+  const defaultValues = useMemo(() => 
+    selectedStudent ? {
+      nisn: selectedStudent.nisn,
+      name: selectedStudent.name,
+      classId: selectedStudent.classId
+    } : { nisn: "", name: "", classId: "" }, 
+  [selectedStudent]);
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between bg-card p-5 rounded-2xl border border-slate-200/60 dark:border-slate-800/40 shadow-sm backdrop-blur-sm">
@@ -155,11 +163,7 @@ const StudentsPage = () => {
               </DialogHeader>
               <StudentForm
                 classes={classes}
-                defaultValues={selectedStudent ? {
-                  nisn: selectedStudent.nisn,
-                  name: selectedStudent.name,
-                  classId: selectedStudent.classId
-                } : undefined}
+                defaultValues={defaultValues}
                 onSubmit={handleSubmitStudent}
                 submitLabel={dialogMode === "edit" ? "Perbarui" : "Simpan"}
                 onCancel={() => setIsDialogOpen(false)}

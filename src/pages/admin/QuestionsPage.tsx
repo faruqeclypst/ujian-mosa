@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Plus, Edit, Trash, Check, Image, ChevronDown, FileText, Download, Eye, FolderOpen } from "lucide-react";
+import { ArrowLeft, Plus, Edit, Trash, Check, Image, ChevronDown, FileText, Download, Eye, FolderOpen, Sparkles, Wand2, RefreshCw, BookOpen } from "lucide-react";
+import { generateQuestionsAI, generateSingleQuestionAI, getTopicSuggestionsAI, parseQuestionsAI } from "../../lib/ai";
 import { Button } from "../../components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../../components/ui/dialog";
 import { DeleteConfirmationDialog } from "../../components/ui/delete-confirmation-dialog";
@@ -8,10 +9,10 @@ import { ConfirmationDialog } from "../../components/ui/confirmation-dialog";
 import pb from "../../lib/pocketbase";
 import { Input } from "../../components/ui/input";
 import FormField from "../../components/forms/FormField";
-import { Card, CardHeader, CardContent, CardTitle } from "../../components/ui/card";
 import { uploadInventoryImage, deleteImageFromStorage } from "../../lib/storage";
 import { ImportButton } from "../../components/ui/import-button";
 import { parseQuestionsFromWord } from "../../lib/questionWordParser";
+import mammoth from "mammoth";
 import ReactQuill, { Quill } from "react-quill";
 import ImageResize from "quill-image-resize-module-react";
 import "react-quill/dist/quill.snow.css";
@@ -20,6 +21,7 @@ Quill.register("modules/imageResize", ImageResize);
 import { useExamData } from "../../context/ExamDataContext";
 import { useAuth } from "../../context/AuthContext";
 import { DataTable } from "../../components/ui/data-table";
+import { useToast } from "../../components/ui/toast";
 export type QuestionType = "pilihan_ganda" | "pilihan_ganda_kompleks" | "menjodohkan" | "benar_salah" | "isian_singkat" | "uraian" | "urutkan" | "drag_drop";
 
 export interface QuestionData {
@@ -104,16 +106,16 @@ const columns = [
     sortable: true,
     render: (v: string, item: QuestionData) => (
       <div className="max-w-lg min-w-[250px]">
-        <div className="line-clamp-2 text-sm font-medium text-slate-800 dark:text-slate-200 leading-relaxed [&_ol]:list-decimal [&_ul]:list-disc [&_ol]:pl-4 [&_ul]:pl-4" dangerouslySetInnerHTML={{ __html: item.text }} />
-        <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+        <div className="line-clamp-2 text-sm font-medium text-slate-800 dark:text-slate-200 leading-relaxed ql-editor !p-0 [&_p]:m-0 [&_ol]:list-decimal [&_ul]:list-disc [&_ol]:pl-4 [&_ul]:pl-4" dangerouslySetInnerHTML={{ __html: item.text }} />
+        <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
           {(item.imageUrl || item.text.includes("<img")) && (
-            <span className="p-1 rounded-md bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400 flex items-center gap-1 font-semibold text-[10px] border border-blue-200 dark:border-blue-800/40">
+            <span className="p-1 px-1.5 rounded-md bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400 flex items-center gap-1 font-bold text-[9px] border border-blue-200 dark:border-blue-800/40 uppercase tracking-tight">
               🖼️ Bergambar
             </span>
           )}
           {item.groupId && (
-            <span className="p-1 rounded-md bg-amber-50 text-amber-600 dark:bg-amber-950/20 dark:text-amber-400 flex items-center gap-1 font-semibold text-[10px] border border-amber-200 dark:border-amber-800/40">
-              🔖 Grup: {item.groupId}
+            <span className="p-1 px-1.5 rounded-md bg-amber-50 text-amber-600 dark:bg-amber-950/20 dark:text-amber-400 flex items-center gap-1 font-bold text-[9px] border border-amber-200 dark:border-amber-800/40 uppercase tracking-tight">
+              🔖 Paket: {item.groupId}
             </span>
           )}
         </div>
@@ -199,19 +201,19 @@ const QuestionsPage = () => {
   });
 
   useEffect(() => {
-    // Pengaturan Jenis Soal (Allowed Question Types)
-    // Untuk sementara kita pakai default (semua aktif) agar tidak memicu error API 400
-    // Jika nanti koleksi 'settings' sudah disesuaikan di PB, bagian ini bisa diaktifkan kembali.
-    setAllowedTypes({
-      pilihan_ganda: true,
-      pilihan_ganda_kompleks: true,
-      menjodohkan: true,
-      benar_salah: true,
-      isian_singkat: true,
-      urutkan: true,
-      drag_drop: true,
-      uraian: true,
-    });
+    const fetchSettings = async () => {
+      try {
+        const records = await pb.collection("settings").getFullList({ limit: 1 });
+        if (records.length > 0) {
+          const data = records[0];
+          const types = data.allowed_types || data.allowed_question_types;
+          if (types) setAllowedTypes(types);
+        }
+      } catch (e) {
+        console.warn("Failed to fetch allowed types from settings:", e);
+      }
+    };
+    fetchSettings();
   }, []);
 
   const [exam, setExam] = useState<any>(null);
@@ -286,6 +288,12 @@ const QuestionsPage = () => {
   const [isGalleryOpen, setIsGalleryOpen] = useState(false);
   const [galleryImages, setGalleryImages] = useState<string[]>([]);
   const [galleryTarget, setGalleryTarget] = useState<{ type: "cover" | "choice" | "batch"; letter?: string; index?: number } | null>(null);
+
+  // 🤖 AI Import State
+  const [isAIImportOpen, setIsAIImportOpen] = useState(false);
+  const [importText, setImportText] = useState("");
+  const [isParsing, setIsParsing] = useState(false);
+  const [parsedResults, setParsedResults] = useState<any[]>([]);
 
   const loadGalleryImages = () => {
     const images = new Set<string>();
@@ -399,6 +407,346 @@ const QuestionsPage = () => {
       showCancel
     });
   };
+
+  // 🪄 AI States
+  const [isAIModalOpen, setIsAIModalOpen] = useState(false);
+  const [isAIGenerating, setIsAIGenerating] = useState(false);
+  const [isAIGeneratingDirect, setIsAIGeneratingDirect] = useState(false);
+  const [isRegeneratingIndex, setIsRegeneratingIndex] = useState<number | null>(null);
+  const [aiTopic, setAiTopic] = useState("");
+  const [aiCount, setAiCount] = useState(5);
+  const [aiLevel, setAiLevel] = useState("");
+  const [aiSubject, setAiSubject] = useState("");
+  const [aiType, setAiType] = useState<any>("pilihan_ganda");
+  const [isAiLiteracy, setIsAiLiteracy] = useState(false);
+  const [aiPassageLength, setAiPassageLength] = useState("sedang");
+  const [aiDifficulty, setAiDifficulty] = useState("sedang"); 
+  const [aiFocus, setAiFocus] = useState("umum");
+
+  const focusDescriptions: Record<string, string> = {
+    umum: "Soal sesuai materi kurikulum sekolah pada umumnya (K13/Merdeka).",
+    akm: "Standar Asesmen Nasional. Fokus pada Literasi, Numerasi, & HOTS kontekstual.",
+    pisa: "Standar Internasional (OECD). Menekankan penalaran tingkat tinggi & aplikasi dunia nyata."
+  };
+
+  const [dynamicSuggestions, setDynamicSuggestions] = useState<string[]>([]);
+  const [isFetchingSuggestions, setIsFetchingSuggestions] = useState(false);
+
+  useEffect(() => {
+    const fetchSuggestions = async () => {
+      if (aiLevel && aiSubject && aiSubject.length > 2) {
+        setIsFetchingSuggestions(true);
+        try {
+          const suggestions = await getTopicSuggestionsAI(
+            aiLevel, 
+            aiSubject, 
+            aiDifficulty, 
+            aiType, 
+            aiFocus, 
+            isAiLiteracy
+          );
+          if (suggestions && suggestions[0] === "AI_RATE_LIMIT") {
+            setDynamicSuggestions([]);
+          } else {
+            setDynamicSuggestions(suggestions);
+          }
+        } catch (err) {
+          console.error("Failed to fetch suggestions:", err);
+        } finally {
+          setIsFetchingSuggestions(false);
+        }
+      } else {
+        setDynamicSuggestions([]);
+      }
+    };
+
+    const timer = setTimeout(fetchSuggestions, 800);
+    return () => clearTimeout(timer);
+  }, [aiLevel, aiSubject, aiDifficulty, aiType, aiFocus, isAiLiteracy]);
+
+  const handleRandomFill = () => {
+    const presets = [
+      { level: "SD Kelas 4", subject: "IPA", topic: "Daur Hidup Kupu-kupu & Metamorfosis" },
+      { level: "SMP Kelas 8", subject: "Matematika", topic: "Teorema Pythagoras & Segitiga Siku-siku" },
+      { level: "SMA Kelas 11", subject: "Sejarah Indonesia", topic: "Dampak Penjajahan Belanda di Indonesia" },
+      { level: "SD Kelas 6", subject: "Bahasa Indonesia", topic: "Cara Membuat Laporan Hasil Pengamatan" },
+      { level: "SMA Kelas 12", subject: "Informatika", topic: "Dampak Sosial Informatika & Keamanan Data" },
+      { level: "SMP Kelas 9", subject: "Bahasa Inggris", topic: "Narrative Text: The Legend of Malin Kundang" }
+    ];
+    const random = presets[Math.floor(Math.random() * presets.length)];
+    setAiLevel(random.level);
+    setAiSubject(random.subject);
+    setAiTopic(random.topic);
+    addToast({
+      type: "info",
+      title: "Form Terisi Otomatis",
+      description: `Preset ${random.subject} Kelas ${random.level} telah dimuat.`,
+      duration: 2000
+    });
+  };
+
+  const handleAIGenerateDirect = async () => {
+    setIsAIGeneratingDirect(true);
+    try {
+      const generated = await generateQuestionsAI(
+        aiTopic || (exam?.subject + " " + (exam?.name?.split(' ')[0] || "")) || "Umum", 
+        aiCount, 
+        aiLevel, 
+        aiSubject || (exam?.subject || ""), 
+        aiType, 
+        isAiLiteracy,
+        aiPassageLength,
+        aiDifficulty,
+        aiFocus
+      );
+      
+      const questionsForReview = generated.map(q => {
+        const choicesBatch: Record<string, { text: string }> = {};
+        let correctKey = "a";
+        if (q.choices) {
+          Object.keys(q.choices).forEach(key => {
+            choicesBatch[key] = { text: q.choices![key].text };
+            if (q.choices![key].isCorrect) correctKey = key;
+          });
+        }
+        return {
+          text: q.text,
+          type: q.type || aiType,
+          choices: choicesBatch,
+          correctKey: correctKey,
+          answerKey: q.answerKey || "",
+          groupId: q.groupId || "",
+          groupText: q.groupText || "",
+          isFromAI: true
+        };
+      });
+
+      setBatchQuestions(questionsForReview);
+      addToast({
+        type: "success",
+        title: "Generasi Selesai",
+        description: `${generated.length} soal baru telah dibuat.`,
+        duration: 3000
+      });
+    } catch (err: any) {
+      console.error("AI Direct Generate Error:", err);
+      if (err.message === "AI_RATE_LIMIT") {
+        showAlert("Limit Tercapai", "Server AI sedang sibuk karena terlalu banyak permintaan. Silakan tunggu sekitar 1-2 menit sebelum mencoba lagi.", "danger");
+      } else {
+        addToast({
+          type: "error",
+          title: "Gagal Generasi",
+          description: err.message || "Gagal meramu paket soal baru.",
+        });
+      }
+    } finally {
+      setIsAIGeneratingDirect(false);
+    }
+  };
+
+  const { addToast } = useToast();
+
+  const handleAIRegenerateSingle = async (index: number) => {
+    setIsRegeneratingIndex(index);
+    try {
+      const q = batchQuestions[index];
+      const regenerated = await generateSingleQuestionAI(
+        aiTopic || (exam?.subject + " " + (exam?.name?.split(' ')[0] || "")) || "Umum",
+        q.type || aiType,
+        aiLevel,
+        aiSubject || (exam?.subject || ""),
+        aiDifficulty,
+        aiFocus,
+        q.groupText || ""
+      );
+
+      const choicesBatch: Record<string, { text: string }> = {};
+      let correctKey = "a";
+      if (regenerated.choices) {
+        Object.keys(regenerated.choices).forEach(key => {
+          choicesBatch[key] = { text: regenerated.choices![key].text };
+          if (regenerated.choices![key].isCorrect) correctKey = key;
+        });
+      }
+
+      const updatedRow = {
+        ...q,
+        text: regenerated.text,
+        choices: choicesBatch,
+        correctKey: correctKey,
+        answerKey: regenerated.answerKey || "",
+        isFromAI: true
+      };
+
+      const updatedBatch = [...batchQuestions];
+      updatedBatch[index] = updatedRow;
+      setBatchQuestions(updatedBatch);
+      addToast({
+        type: "success",
+        title: "Soal Diperbarui",
+        description: `Soal #${index+1} berhasil ditampilkan ulang.`,
+        duration: 3000
+      });
+    } catch (err: any) {
+      console.error("AI Single Regenerate Error:", err);
+      if (err.message === "AI_RATE_LIMIT") {
+        showAlert("Limit Tercapai", "Permintaan terlalu cepat. Silakan tunggu 1 menit agar AI siap kembali.", "danger");
+      } else {
+        addToast({
+          type: "error",
+          title: "Gagal Regenerasi",
+          description: err.message || "AI gagal meramu soal baru.",
+        });
+      }
+    } finally {
+      setIsRegeneratingIndex(null);
+    }
+  };
+
+  const handleAIParse = async () => {
+    if (!importText.trim()) return;
+    setIsParsing(true);
+    try {
+      const results = await parseQuestionsAI(importText, exam?.name || "", exam?.level || "");
+      setParsedResults(results);
+      addToast({
+        title: "Ekstraksi Berhasil",
+        description: `Ditemukan ${results.length} soal. Silakan tinjau sebelum menyimpan.`,
+        type: "success"
+      });
+    } catch (err: any) {
+      addToast({
+        title: "Gagal Menarik Soal",
+        description: err.message === "AI_RATE_LIMIT" ? "Terlalu banyak permintaan. Tunggu 60 detik." : (err.message || "Gagal memproses dokumen."),
+        type: "error"
+      });
+    } finally {
+      setIsParsing(false);
+    }
+  };
+
+  const handleSaveAIImport = async () => {
+    if (parsedResults.length === 0) return;
+    setIsParsing(true);
+    try {
+      const typeMap: Record<string, string> = {
+        pilihan_ganda: "multiple_choice",
+        pilihan_ganda_kompleks: "complex_choice",
+        menjodohkan: "matching",
+        benar_salah: "true_false",
+        isian_singkat: "short_answer",
+        uraian: "essay",
+        urutkan: "sequence",
+        drag_drop: "drag_drop"
+      };
+
+      let count = 0;
+      for (const q of parsedResults) {
+        await pb.collection("questions").create({
+          examId,
+          text: q.text || "Pertanyaan Tanpa Judul",
+          field: typeMap[q.type || "pilihan_ganda"] || "multiple_choice",
+          options: q.choices || {},
+          answerKey: q.answerKey || "",
+          groupId: q.groupId || "",
+          groupText: q.groupText || "",
+          order: (questions.length || 0) + count + 1
+        });
+        count++;
+      }
+      addToast({
+        title: "Import Berhasil",
+        description: `${count} soal telah ditambahkan ke bank soal.`,
+        type: "success"
+      });
+      setIsAIImportOpen(false);
+      setImportText("");
+      setParsedResults([]);
+      loadQuestions();
+    } catch (err: any) {
+      addToast({
+        title: "Gagal Menyimpan",
+        description: err.message || "Beberapa soal mungkin gagal diimpor.",
+        type: "error"
+      });
+    } finally {
+      setIsParsing(false);
+    }
+  };
+
+  const handleAIGenerate = async () => {
+    if (!aiTopic.trim()) {
+      showAlert("Gagal", "Topik soal tidak boleh kosong.", "danger");
+      return;
+    }
+    
+    setIsAIGenerating(true);
+    try {
+      const generated = await generateQuestionsAI(
+        aiTopic, 
+        aiCount, 
+        aiLevel, 
+        aiSubject || (exam?.subject || ""), 
+        aiType, 
+        isAiLiteracy,
+        aiPassageLength,
+        aiDifficulty,
+        aiFocus
+      );
+      
+      if (!generated || generated.length === 0 || !Array.isArray(generated)) {
+        throw new Error("AI tidak menghasilkan format soal yang valid.");
+      }
+
+      // 🪄 NEW SYSTEM: Populate Batch Modal for Review instead of saving directly
+      const questionsForReview = generated.map(q => {
+        const choicesBatch: Record<string, { text: string }> = {};
+        let correctKey = "a";
+        
+        if (q.choices) {
+          Object.keys(q.choices).forEach(key => {
+            choicesBatch[key] = { text: q.choices![key].text };
+            if (q.choices![key].isCorrect) correctKey = key;
+          });
+        }
+
+        return {
+          text: q.text,
+          type: q.type || aiType,
+          choices: choicesBatch,
+          correctKey: correctKey,
+          answerKey: q.answerKey || "",
+          groupId: q.groupId || "",
+          groupText: q.groupText || "",
+          isFromAI: true
+        };
+      });
+
+      setBatchQuestions(questionsForReview);
+      setIsAIModalOpen(false);
+      setIsBatchModalOpen(true);
+      
+      addToast({
+        type: "success",
+        title: "Generasi Selesai",
+        description: `${generated.length} soal telah siap ditinjau.`,
+        duration: 3000
+      });
+    } catch (err: any) {
+      console.error("AI Generate Error:", err);
+      if (err.message === "AI_RATE_LIMIT") {
+        showAlert("Server Sedang Limit", "Terlalu banyak permintaan AI. Silakan jeda sejenak (1 menit) sebelum memulai generasi baru.", "danger");
+      } else {
+        addToast({
+          type: "error",
+          title: "Gagal Generasi AI",
+          description: err.message || "Gagal meramu soal.",
+        });
+      }
+    } finally {
+      setIsAIGenerating(false);
+    }
+  };
   const [batchQuestions, setBatchQuestions] = useState<any[]>([
     { text: "", choices: { a: { text: "" }, b: { text: "" }, c: { text: "" }, d: { text: "" }, e: { text: "" } }, correctKey: "a", imageFile: null }
   ]);
@@ -471,6 +819,8 @@ const QuestionsPage = () => {
 
     setIsSavingBatch(true);
     try {
+      let currentOrder = questions.length + 1;
+      
       for (const q of validQuestions) {
         let imageUrl = q.imageUrl || "";
         if (q.imageFile) {
@@ -496,11 +846,16 @@ const QuestionsPage = () => {
 
         const payload: any = {
           examId,
-          text: `<p>${q.text}</p>`, 
+          // If from AI, text is already formatted. If manual batch, wrap in <p>.
+          text: q.isFromAI ? q.text : `<p>${q.text}</p>`, 
           field: typeMap[q.type || "pilihan_ganda"] || "multiple_choice", 
           options: choicesToSave,
           correctAnswer: q.correctKey,
-          order: questions.length + 1
+          order: currentOrder++,
+          groupId: q.groupId || "",
+          group_id: q.groupId || "", // PocketBase alias
+          groupText: q.groupText || "",
+          group_text: q.groupText || "" // PocketBase alias
         };
 
         if (imageUrl) {
@@ -582,6 +937,113 @@ const QuestionsPage = () => {
     }
   }), [imageHandler]);
 
+  // 🔄 Load Questions dari PocketBase
+  const loadQuestions = useCallback(async () => {
+    if (!examId) return;
+    try {
+      const loaded = await pb.collection('questions').getFullList({
+        filter: `examId = "${examId}"`,
+        sort: 'order,created'
+      });
+
+      const typeMapReverse: Record<string, string> = {
+        multiple_choice: "pilihan_ganda",
+        complex_choice: "pilihan_ganda_kompleks",
+        matching: "menjodohkan",
+        true_false: "benar_salah",
+        short_answer: "isian_singkat",
+        essay: "uraian",
+        sequence: "urutkan",
+        drag_drop: "drag_drop"
+      };
+
+      const mapped = loaded.map(q => {
+        const rawType = q.field || q.type || "pilihan_ganda";
+        const mappedType = (typeMapReverse[rawType] || rawType) as any;
+        const options = q.options || {};
+
+        return {
+          ...q,
+          id: q.id,
+          type: mappedType,
+          text: q.text,
+          imageUrl: q.imageUrl,
+          // Harmonize snake_case to camelCase
+          groupId: q.groupId || q.group_id || "", 
+          groupText: q.groupText || q.group_text || "",
+          // Ensure choices, pairs, items are identified correctly
+          choices: (mappedType === "pilihan_ganda" || mappedType === "pilihan_ganda_kompleks" || mappedType === "benar_salah") 
+            ? options : undefined,
+          pairs: mappedType === "menjodohkan" ? options.pairs : undefined,
+          items: (mappedType === "urutkan" || mappedType === "drag_drop") ? options.items : undefined,
+          answerKey: q.correctAnswer || q.answerKey
+        };
+      });
+
+      setQuestions(mapped as any);
+    } catch (e) {
+      setQuestions([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [examId]);
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsParsing(true);
+    try {
+      let extractedText = "";
+      const extension = file.name.split('.').pop()?.toLowerCase();
+
+      if (extension === "docx") {
+        const arrayBuffer = await file.arrayBuffer();
+        const result = await mammoth.extractRawText({ arrayBuffer });
+        extractedText = result.value;
+      } else if (extension === "pdf") {
+        // 📄 Dynamic Loader for PDF.js to avoid npm install wait if possible
+        let pdfjs = (window as any).pdfjsLib;
+        if (!pdfjs) {
+          addToast({ title: "Menyiapkan PDF Reader", description: "Sedang memuat library PDF, mohon tunggu sebentar...", type: "info" });
+          await new Promise<void>((resolve) => {
+            const script = document.createElement("script");
+            script.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js";
+            script.onload = () => {
+              (window as any).pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js";
+              resolve();
+            };
+            document.head.appendChild(script);
+          });
+          pdfjs = (window as any).pdfjsLib;
+        }
+        
+        const arrayBuffer = await file.arrayBuffer();
+        const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
+        let fullText = "";
+        for (let i = 1; i <= pdf.numPages; i++) {
+          const page = await pdf.getPage(i);
+          const textContent = await page.getTextContent();
+          const pageText = textContent.items.map((item: any) => item.str).join(" ");
+          fullText += pageText + "\n";
+        }
+        extractedText = fullText;
+      }
+
+      if (extractedText) {
+        setImportText(extractedText);
+        addToast({ title: "File Berhasil Dibaca", description: `Ekstraksi teks dari ${file.name} selesai.`, type: "success" });
+      } else {
+        throw new Error("Gagal mengekstrak teks dari file.");
+      }
+    } catch (err: any) {
+      addToast({ title: "Gagal Membaca File", description: err.message || "Pastikan file tidak terkunci atau rusak.", type: "error" });
+    } finally {
+      setIsParsing(false);
+      if (e.target) e.target.value = "";
+    }
+  };
+
   useEffect(() => {
     if (!examId) return;
 
@@ -599,62 +1061,18 @@ const QuestionsPage = () => {
           teacherCode: teacherObj ? teacherObj.code || "" : ""
         });
 
-        // 2. Load Questions dari PocketBase
-        const fetchQuestions = async () => {
-          try {
-            const loaded = await pb.collection('questions').getFullList({
-              filter: `examId = "${examId}"`,
-              sort: 'order,created'
-            });
-
-            const typeMapReverse: Record<string, string> = {
-              multiple_choice: "pilihan_ganda",
-              complex_choice: "pilihan_ganda_kompleks",
-              matching: "menjodohkan",
-              true_false: "benar_salah",
-              short_answer: "isian_singkat",
-              essay: "uraian",
-              sequence: "urutkan",
-              drag_drop: "drag_drop"
-            };
-
-            const mapped = loaded.map(q => {
-              const rawType = q.field || q.type || "pilihan_ganda";
-              const mappedType = (typeMapReverse[rawType] || rawType) as any;
-              const options = q.options || {};
-
-              return {
-                ...q,
-                id: q.id,
-                type: mappedType,
-                text: q.text,
-                imageUrl: q.imageUrl,
-                // Pastikan tabel dan form mengenali choices, pairs, items
-                choices: (mappedType === "pilihan_ganda" || mappedType === "pilihan_ganda_kompleks" || mappedType === "benar_salah") 
-                  ? options : undefined,
-                pairs: mappedType === "menjodohkan" ? options.pairs : undefined,
-                items: (mappedType === "urutkan" || mappedType === "drag_drop") ? options.items : undefined,
-                answerKey: q.correctAnswer || q.answerKey
-              };
-            });
-
-            setQuestions(mapped as any);
-          } catch (e) {
-            setQuestions([]);
-          } finally {
-            setLoading(false);
-          }
-        };
-
-        await fetchQuestions();
+        // 2. Load Questions
+        await loadQuestions();
 
         // 3. Subscribe Realtime
         const unsubscribe = await pb.collection('questions').subscribe("*", (e) => {
-          fetchQuestions();
+          loadQuestions();
         });
 
         return () => {
-          pb.collection('questions').unsubscribe("*");
+          if (pb.authStore.isValid) {
+            pb.collection('questions').unsubscribe("*");
+          }
         };
 
       } catch (error) {
@@ -663,7 +1081,8 @@ const QuestionsPage = () => {
     };
 
     init();
-  }, [examId, subjects, teachers]);
+  }, [examId, subjects, teachers, loadQuestions]);
+
 
   const handleCreateClick = () => {
     setDialogMode("create");
@@ -944,10 +1363,30 @@ const QuestionsPage = () => {
         payload.imageUrl = imageUrl;
       }
 
-      if (formValues.groupId) {
-        payload.groupId = formValues.groupId;
-        payload.groupText = formValues.groupText || "";
+      // 🛡️ LITERALISASI / WACANA (Fix Save Logic + Dual Convention)
+      if (isLiterasiActive) {
+        const gid = formValues.groupId || "";
+        const gtxt = formValues.groupText || "";
+        
+        payload.groupId = gid;
+        payload.group_id = gid; // Snake case fallback
+        payload.groupText = gtxt;
+        payload.group_text = gtxt; // Snake case fallback
+        
+        // Validasi: Wajib ada kode grup jika literasi aktif
+        if (!gid.trim()) {
+           showAlert("Gagal", "Harap isi Kode/Nama Literasi atau pilih literasi yang sudah ada.", "danger");
+           return;
+        }
+      } else {
+        // Jika tidak aktif, pastikan dihapus dari database (khusus Edit)
+        payload.groupId = "";
+        payload.group_id = "";
+        payload.groupText = "";
+        payload.group_text = "";
       }
+      
+      console.log("💾 Menempelkan Payload Soal (Dual Format):", payload);
 
       if (dialogMode === "edit" && selectedQuestion) {
         await pb.collection('questions').update(selectedQuestion.id, payload);
@@ -1264,6 +1703,31 @@ const QuestionsPage = () => {
                     <Plus className="h-4 w-4 text-purple-500" />
                     Tambah Batch
                   </button>
+                  <div className="h-px bg-slate-100 dark:bg-slate-800 my-1 mx-1"></div>
+                   {role === "admin" && (
+                    <>
+                      <button
+                        onClick={() => {
+                          setIsTambahMenuOpen(false);
+                          setIsAIModalOpen(true);
+                        }}
+                        className="flex items-center gap-2.5 p-2 px-3 hover:bg-indigo-50 dark:hover:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 text-sm rounded-lg transition-all font-bold text-left group"
+                      >
+                        <Sparkles className="h-4 w-4 text-indigo-500 group-hover:animate-pulse" />
+                        Generasi AI
+                      </button>
+                      <button
+                        onClick={() => {
+                          setIsTambahMenuOpen(false);
+                          setIsAIImportOpen(true);
+                        }}
+                        className="flex items-center gap-2.5 p-2 px-3 hover:bg-emerald-50 dark:hover:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 text-sm rounded-lg transition-all font-bold text-left group"
+                      >
+                        <FileText className="h-4 w-4 text-emerald-500 group-hover:scale-110" />
+                        Smart AI Import (PDF)
+                      </button>
+                    </>
+                  )}
                 </div>
               )}
             </div>
@@ -1412,7 +1876,7 @@ const QuestionsPage = () => {
                         const val = e.target.value;
                         if (val === "NEW_LITERASI") {
                           setLiterasiMode("create");
-                          setFormValues({ ...formValues, groupId: "", groupText: "" });
+                          setFormValues({ ...formValues, groupId: "", groupText: '<h2 style="text-align:center;">JUDUL WACANA</h2><p><br></p><p style="text-indent: 30px;">Tuliskan isi wacana di sini...</p>' });
                         } else {
                           setLiterasiMode("select");
                           setFormValues({ 
@@ -1692,67 +2156,72 @@ const QuestionsPage = () => {
 
       {/* Dialog Preview Soal */}
       <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
+
         <DialogContent className="max-w-3xl bg-card max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Pratinjau Soal</DialogTitle>
           </DialogHeader>
           {previewQuestion && (
-            <Card className="rounded-xl border shadow-sm mt-3">
-              <CardHeader className="p-4 pb-2">
-                {/* 🛡️ Header Label untuk Literasi */}
-                <div className="text-sm font-semibold text-slate-400 mb-2">
-                  {previewQuestion.groupId && (() => {
-                    const groupQuestions = questions.filter(q => q.groupId === previewQuestion.groupId);
-                    const indexInGroup = groupQuestions.findIndex(q => q.id === previewQuestion.id) + 1;
-                    return (
-                      <span className="text-blue-600 dark:text-blue-400 font-bold text-xs">
-                        {previewQuestion.groupId} - Soal {indexInGroup > 0 ? indexInGroup : 1}
-                      </span>
-                    );
-                  })()}
+            <div className="mt-4 p-6 bg-white dark:bg-slate-900 rounded-2xl border shadow-sm space-y-6 font-sans">
+              <div className="flex justify-between items-center border-b pb-3 border-slate-100 dark:border-slate-800">
+                <div className="flex items-center gap-2">
+                   <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xs shadow-md shadow-blue-200 dark:shadow-none">
+                      {questions.findIndex(q => q.id === previewQuestion.id) + 1}
+                   </div>
+                   <span className="text-xs font-black uppercase tracking-widest text-slate-400">Pratinjau Lembar Ujian</span>
                 </div>
+                {previewQuestion.groupId && (
+                  <span className="text-[10px] font-black bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400 px-3 py-1 rounded-full border border-amber-200 dark:border-amber-800/60 uppercase">
+                    Paket: {previewQuestion.groupId}
+                  </span>
+                )}
+              </div>
 
-                {/* 🔖 Render Literasi Jika Tergabung dalam Grup (Seperti di CBT student) */}
-                {previewQuestion.groupId && (() => {
-                  const firstInGroup = questions.find(q => q.groupId === previewQuestion.groupId);
-                  if (firstInGroup) {
-                    const textToShow = firstInGroup.groupText || firstInGroup.text;
-                    if (!textToShow) return null;
-                    const hasCover = firstInGroup.imageUrl;
+               {previewQuestion.groupId && (() => {
+                const firstWithText = questions.find(q => q.groupId === previewQuestion.groupId && q.groupText);
+                if (firstWithText) {
+                  const textToShow = firstWithText.groupText || "";
+                  const hasCover = firstWithText.imageUrl;
 
-                    return (
-                      <div className="bg-blue-50/20 dark:bg-blue-950/10 p-4 rounded-xl border border-dashed border-blue-200 dark:border-blue-800/40 mb-3 space-y-2">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 bg-blue-50/80 dark:bg-blue-900/20 px-2 py-0.5 rounded-md border border-blue-200 dark:border-blue-800/40 w-fit block">Wacana Literasi</span>
-                        {hasCover && (
-                          <div className="mt-2">
-                            <img src={firstInGroup.imageUrl} className="max-w-sm h-auto mx-auto block rounded-lg border shadow-sm" alt="Cover Literasi" />
-                          </div>
-                        )}
-                        <div 
-                          className={`text-sm sm:text-base leading-relaxed text-slate-700 dark:text-slate-300 [&_img]:max-w-sm [&_img]:mx-auto [&_img]:block font-medium p-0 [&_ol]:list-decimal [&_ul]:list-disc [&_ol]:pl-5 [&_ul]:pl-5 [&_ol]:my-2 [&_ul]:my-2 ql-editor ${hasCover ? "[&_img]:hidden" : ""}`} 
-                          dangerouslySetInnerHTML={{ __html: textToShow }} 
-                        />
+                  return (
+                    <div className="bg-slate-50/50 dark:bg-slate-950/20 p-6 rounded-2xl border border-slate-200/60 dark:border-slate-800/40 space-y-4 shadow-inner">
+                      <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400 mb-2">
+                        <FileText className="w-4 h-4" />
+                        <span className="text-[10px] font-black uppercase tracking-widest">Materi Literasi / Wacana</span>
                       </div>
-                    );
-                  }
-                  return null;
-                })()}
+                      
+                      {hasCover && (
+                        <div className="mb-4 group relative">
+                          <img src={firstWithText.imageUrl} className="max-w-full md:max-w-lg h-auto mx-auto block rounded-xl border-4 border-white dark:border-slate-800 shadow-xl transition-transform group-hover:scale-[1.02]" alt="Cover Literasi" />
+                          <div className="absolute inset-0 rounded-xl bg-gradient-to-t from-black/20 to-transparent pointer-events-none"></div>
+                        </div>
+                      )}
+                      
+                      <div 
+                        className={`text-base sm:text-lg leading-relaxed text-slate-800 dark:text-slate-200 font-serif ql-editor !p-0 selection:bg-blue-100 dark:selection:bg-blue-900/40`} 
+                        dangerouslySetInnerHTML={{ __html: textToShow }} 
+                      />
+                    </div>
+                  );
+                }
+                return null;
+              })()}
 
-                {/* Question Text */}
+              <div className="space-y-4">
                 <div 
-                  className={`ql-editor font-normal text-slate-800 dark:text-white break-words [&_p]:mb-1 [&_ol]:list-decimal [&_ul]:list-disc [&_ol]:pl-5 [&_ul]:pl-5 ${previewQuestion.imageUrl ? "[&_img]:hidden" : ""}`} 
+                  className={`ql-editor !p-0 font-medium text-lg text-slate-900 dark:text-white leading-relaxed break-words [&_strong]:text-blue-600 dark:[&_strong]:text-blue-400 [&_p]:mb-3 [&_ol]:list-decimal [&_ul]:list-disc [&_ol]:pl-6 [&_ul]:pl-6 selection:bg-indigo-100 dark:selection:bg-indigo-900/40`} 
                   dangerouslySetInnerHTML={{ __html: previewQuestion.text }} 
                 />
                 
                 {previewQuestion.imageUrl && (
-                  <div className="mt-2">
-                    <img src={previewQuestion.imageUrl} alt="Gambar Soal" className="max-w-md h-auto rounded-xl border border-slate-200 shadow-sm" />
+                  <div className="relative group">
+                    <img src={previewQuestion.imageUrl} alt="Gambar Soal" className="max-w-full md:max-w-lg h-auto rounded-2xl border-4 border-white dark:border-slate-800 shadow-lg mx-auto" />
+                    <div className="absolute inset-0 rounded-2xl bg-gradient-to-t from-black/10 to-transparent pointer-events-none"></div>
                   </div>
                 )}
-              </CardHeader>
+              </div>
               
-              <CardContent className="p-4 pt-0 space-y-3">
-                {/* PREVIEW SINGLE / MULTIPLE CHOICE / TRUE-FALSE */}
+              <div className="pt-4 space-y-3">
                 {(previewQuestion.type === "pilihan_ganda" || previewQuestion.type === "pilihan_ganda_kompleks" || previewQuestion.type === "benar_salah" || !previewQuestion.type) && Object.keys(previewQuestion.choices || {}).map((cKey, idx) => {
                   const choice = previewQuestion.choices![cKey];
                   if (!choice.text && !choice.imageUrl) return null;
@@ -1760,78 +2229,87 @@ const QuestionsPage = () => {
                   return (
                     <div 
                       key={cKey} 
-                      className={`w-full text-left p-3 rounded-xl border flex items-center gap-3 transition-all ${
+                      className={`w-full text-left p-4 rounded-2xl border-2 flex items-center gap-4 transition-all ${
                         choice.isCorrect 
-                          ? "bg-green-50/80 dark:bg-green-950/40 border-green-200 shadow-sm text-green-700 dark:text-green-400 font-bold" 
-                          : "bg-card border-slate-200 text-slate-700 dark:text-slate-200"
+                          ? "bg-green-50/50 dark:bg-green-950/20 border-green-500/50 shadow-sm shadow-green-100 dark:shadow-none text-green-700 dark:text-green-400" 
+                          : "bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 text-slate-700 dark:text-slate-300"
                       }`}
                     >
-                      <div className={`w-6 h-6 rounded-full border flex items-center justify-center font-bold text-sm ${
-                        choice.isCorrect ? "bg-green-600 border-green-600 text-white" : "border-slate-300 text-slate-500 dark:text-slate-400"
+                      <div className={`w-8 h-8 shrink-0 rounded-xl border-2 flex items-center justify-center font-bold text-sm ${
+                        choice.isCorrect ? "bg-green-600 border-green-600 text-white shadow-lg shadow-green-200 dark:shadow-none" : "border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500"
                       }`}>
                         {String.fromCharCode(65 + idx)}
                       </div>
-                      <div className="flex-1 text-sm font-medium">
-                        <div className={`break-words ql-editor p-0 [&_img]:max-w-[200px] [&_img]:h-auto [&_img]:rounded-lg [&_img]:mt-1 text-inherit ${choice.isCorrect ? "font-bold" : "font-normal"}`} dangerouslySetInnerHTML={{ __html: choice.text }} />
+                      <div className="flex-1 text-sm md:text-base">
+                        <div className={`break-words ql-editor !p-0 [&_img]:max-w-[300px] [&_img]:h-auto [&_img]:rounded-xl [&_img]:mt-2 text-inherit ${choice.isCorrect ? "font-bold" : "font-normal"}`} dangerouslySetInnerHTML={{ __html: choice.text }} />
                         {choice.imageUrl && (
-                          <img src={choice.imageUrl} alt={`Pilihan ${cKey.toUpperCase()}`} className="max-h-[150px] w-auto rounded-lg mt-1 border" />
+                          <img src={choice.imageUrl} alt={`Pilihan ${cKey.toUpperCase()}`} className="max-h-[200px] w-auto rounded-xl mt-2 border shadow-sm" />
                         )}
                       </div>
-                      {choice.isCorrect && <Check className="h-4 w-4 text-green-600 shrink-0 ml-2" />}
+                      {choice.isCorrect && (
+                        <div className="bg-green-600 p-1 rounded-full shadow-lg">
+                          <Check className="h-4 w-4 text-white shrink-0" />
+                        </div>
+                      )}
                     </div>
                   );
                 })}
 
-                {/* PREVIEW MATCHING */}
                 {previewQuestion.type === "menjodohkan" && (
-                  <div className="space-y-2">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase">Pernyataan</span>
-                        {(previewQuestion.pairs || []).map(p => (
-                          <div key={p.id} className="p-2.5 rounded-lg border bg-slate-50 dark:bg-slate-900/30 text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-6 px-2">
+                      <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
+                        <div className="w-1.5 h-1.5 rounded-full bg-slate-300"></div> PERNYATAAN
+                      </div>
+                      <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
+                        <div className="w-1.5 h-1.5 rounded-full bg-green-400"></div> JAWABAN PASANGAN
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      {(previewQuestion.pairs || []).map(p => (
+                        <div key={p.id} className="grid grid-cols-2 gap-4 items-center">
+                          <div className="p-3.5 rounded-2xl border-2 border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 text-sm font-bold text-slate-700 dark:text-slate-300 shadow-sm">
                             {p.left}
                           </div>
-                        ))}
-                      </div>
-                      <div className="space-y-2">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase">Pasangan</span>
-                        {(previewQuestion.pairs || []).map(p => (
-                          <div key={p.id} className="p-2.5 rounded-lg border border-green-200 bg-green-50 dark:bg-green-950/20 text-xs font-bold text-green-700 dark:text-green-400">
-                            {p.right}
+                          <div className="p-3.5 rounded-2xl border-2 border-green-200 dark:border-green-900/40 bg-green-50 dark:bg-green-950/20 text-sm font-black text-green-700 dark:text-green-400 shadow-sm flex items-center gap-2">
+                            <ArrowLeft className="w-3 h-3 rotate-180 opacity-50" /> {p.right}
                           </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* PREVIEW SHORT ANSWER / ESSAY */}
-                {(previewQuestion.type === "isian_singkat" || previewQuestion.type === "uraian") && (
-                  <div className="p-4 rounded-xl border bg-slate-50 dark:bg-slate-900/30 space-y-2">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase">{previewQuestion.type === "isian_singkat" ? "Kunci Jawaban" : "Pedoman Jawaban"}</span>
-                    <div className="text-sm font-bold text-blue-600 dark:text-blue-400">
-                      {previewQuestion.answerKey || "(Belum diisi)"}
-                    </div>
-                  </div>
-                )}
-
-                {/* PREVIEW ORDERING / DRAG DROP */}
-                {(previewQuestion.type === "urutkan" || previewQuestion.type === "drag_drop") && (
-                  <div className="space-y-2">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase">Urutan Yang Benar</span>
-                    <div className="grid grid-cols-1 gap-2">
-                      {(previewQuestion.items || []).map((it, idx) => (
-                        <div key={it.id} className="flex items-center gap-3 p-3 rounded-xl border border-blue-200 bg-blue-50/50 dark:bg-blue-900/20">
-                          <div className="w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xs">{idx + 1}</div>
-                          <span className="text-sm font-bold text-blue-700 dark:text-blue-300">{it.text}</span>
                         </div>
                       ))}
                     </div>
                   </div>
                 )}
-              </CardContent>
-            </Card>
+
+                {(previewQuestion.type === "isian_singkat" || previewQuestion.type === "uraian") && (
+                  <div className="p-6 rounded-3xl border-2 border-dashed border-blue-200 dark:border-blue-900/40 bg-blue-50/30 dark:bg-blue-950/10 space-y-3">
+                    <div className="flex items-center gap-2">
+                       <Check className="w-4 h-4 text-blue-600" />
+                       <span className="text-[10px] font-black text-blue-600/70 dark:text-blue-400/70 uppercase tracking-widest">{previewQuestion.type === "isian_singkat" ? "Kunci Jawaban Otomatis" : "Pedoman Penilaian Guru"}</span>
+                    </div>
+                    <div className="text-lg font-black text-blue-700 dark:text-blue-300 bg-white dark:bg-slate-900 p-4 rounded-2xl border border-blue-100 dark:border-blue-800/40 shadow-sm">
+                      {previewQuestion.answerKey || "(Belum diisi)"}
+                    </div>
+                  </div>
+                )}
+
+                {(previewQuestion.type === "urutkan" || previewQuestion.type === "drag_drop") && (
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2">
+                       <div className="w-2 h-2 rounded-full bg-indigo-500"></div>
+                       <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Urutan Penyelesaian Benar</span>
+                    </div>
+                    <div className="grid grid-cols-1 gap-3">
+                      {(previewQuestion.items || []).map((it, idx) => (
+                        <div key={it.id} className="flex items-center gap-4 p-4 rounded-2xl border-2 border-indigo-100 dark:border-indigo-900/40 bg-indigo-50/30 dark:bg-indigo-950/20 shadow-sm">
+                          <div className="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-black text-sm shadow-lg shadow-indigo-200 dark:shadow-none">{idx + 1}</div>
+                          <span className="text-base font-bold text-indigo-700 dark:text-indigo-300">{it.text}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
           )}
         </DialogContent>
       </Dialog>
@@ -1840,82 +2318,227 @@ const QuestionsPage = () => {
       <Dialog open={isBatchModalOpen} onOpenChange={setIsBatchModalOpen}>
         <DialogContent className="max-w-4xl bg-slate-50 dark:bg-slate-900 max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Tambah Soal Manual (Batch)</DialogTitle>
+            <DialogTitle>Kelola & Tinjau Paket Soal</DialogTitle>
           </DialogHeader>
 
-          <div className="space-y-4 pt-3">
-            {batchQuestions.map((q, index) => (
-              <div key={index} className="bg-card border rounded-xl p-3 shadow-sm relative space-y-2">
-                <div className="flex justify-between items-center">
-                  <span className="font-bold text-slate-400 text-xs">Soal #{index + 1}</span>
-                  {batchQuestions.length > 1 && (
-                    <Button variant="ghost" size="icon" onClick={() => handleRemoveBatchRow(index)} className="h-6 w-6 text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 hover:text-red-600 rounded-lg"><Trash className="h-3 w-3" /></Button>
-                  )}
+          <div className="space-y-6 pt-3">
+            {/* 📖 BATCH LITERACY STIMULUS DISPLAY */}
+            {batchQuestions.length > 0 && batchQuestions[0].groupText && (
+              <div className="bg-blue-50 dark:bg-blue-950/20 border-2 border-blue-200 dark:border-blue-800/40 rounded-3xl p-6 space-y-4 animate-in fade-in slide-in-from-top-4 duration-500">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 rounded-xl bg-blue-600 text-white shadow-lg shadow-blue-200 dark:shadow-none">
+                      <BookOpen className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-black text-blue-900 dark:text-blue-100 uppercase tracking-tight">Wacana Stimulus Literasi</h3>
+                      <p className="text-[10px] text-blue-700/60 dark:text-blue-400/60 font-bold uppercase tracking-widest">Wacana Induk untuk Paket Soal Ini</p>
+                    </div>
+                  </div>
+                  <div className="bg-white/80 dark:bg-slate-900/80 px-4 py-1.5 rounded-full border border-blue-100 dark:border-blue-800/40 shadow-sm">
+                    <span className="text-[10px] font-black text-blue-600 uppercase tracking-tighter">ID: {batchQuestions[0].groupId || 'LIT-NEW'}</span>
+                  </div>
                 </div>
-
-                <div className="bg-card rounded-lg border flex flex-col flex-1">
+                
+                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-blue-100 dark:border-blue-800/40 shadow-inner overflow-hidden">
                   <ReactQuill
                     theme="snow"
-                    value={q.text}
-                    onChange={(content) => updateBatchItem(index, 'text', content)}
-                    placeholder="Tuliskan pertanyaan disini..."
-                    modules={{
-                      toolbar: [
-                        ['bold', 'italic', 'underline'],
-                        [{ 'color': [] }],
-                        ['clean']
-                      ],
+                    value={batchQuestions[0].groupText}
+                    onChange={(content) => {
+                      // Update all questions in batch to share same wacana
+                      const updatedBatch = batchQuestions.map(bq => ({ ...bq, groupText: content }));
+                      setBatchQuestions(updatedBatch);
                     }}
-                    className="[&_.ql-editor]:min-h-[44px] [&_.ql-editor]:py-1 [&_.ql-container]:border-none [&_.ql-toolbar]:border-none [&_.ql-toolbar]:border-b [&_.ql-toolbar]:px-1 [&_.ql-toolbar]:py-0 [&_.ql-formats]:mr-1 text-sm flex-1"
+                    placeholder="Tuliskan wacana literasi di sini..."
+                    className="[&_.ql-editor]:min-h-[250px] [&_.ql-editor_p]:text-indent-[48px] [&_.ql-editor_p]:mb-[1.5rem] [&_.ql-editor_p]:leading-[1.8] [&_.ql-editor_p]:text-justify [&_.ql-container]:border-none [&_.ql-toolbar]:border-none [&_.ql-toolbar]:border-b [&_.ql-toolbar]:bg-slate-50 dark:[&_.ql-toolbar]:bg-slate-800/50"
                   />
                 </div>
-                <div className="flex items-center gap-2 mt-1">
-                  <button
-                    type="button"
-                    className="flex items-center gap-1 cursor-pointer bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-lg h-7 text-[11px] px-2 border border-slate-200 dark:border-slate-800 font-medium transition-all"
-                    onClick={() => {
-                      setGalleryTarget({ type: "batch", index });
-                      setIsPickerOpen(true);
-                    }}
-                  >
-                    <Image className="h-3.5 w-3.5" />
-                    <span>{q.imageFile || q.imageUrl ? "Ganti Gambar" : "Tambah Gambar"}</span>
-                  </button>
-                  {(q.imageFile || q.imageUrl) && (
-                    <div className="flex items-center gap-1.5 border l-2 pl-2">
-                      <img src={q.imageFile ? URL.createObjectURL(q.imageFile) : q.imageUrl} className="h-7 w-auto rounded border" alt="Preview" />
-                      <Button variant="ghost" size="icon" onClick={() => { updateBatchItem(index, 'imageFile', null); updateBatchItem(index, 'imageUrl', ''); }} className="h-5 w-5 text-red-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 p-0"><Trash className="h-3 w-3" /></Button>
+              </div>
+            )}
+
+            {batchQuestions.map((q, index) => (
+              <div key={index} className="bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-3xl p-5 shadow-xl shadow-slate-200/20 dark:shadow-none relative space-y-4 hover:border-indigo-300 dark:hover:border-indigo-800 transition-all duration-300">
+                <div className="flex justify-between items-center bg-slate-50 dark:bg-slate-800/50 -mx-5 -mt-5 p-4 py-3 rounded-t-3xl border-b border-slate-100 dark:border-slate-800">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 flex items-center justify-center font-black text-sm shadow-lg shadow-slate-200 dark:shadow-none">
+                      {index + 1}
                     </div>
-                  )}
+                    <span className="font-black text-slate-800 dark:text-slate-100 text-[10px] uppercase tracking-widest">Unit Soal</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {q.isFromAI && role === "admin" && (
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        onClick={() => handleAIRegenerateSingle(index)} 
+                        disabled={isRegeneratingIndex === index}
+                        className={`h-8 w-8 rounded-xl transition-all ${isRegeneratingIndex === index ? "bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600" : "text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/30 hover:text-indigo-600"}`}
+                        title="Regenerasi butir soal ini saja"
+                      >
+                        <Sparkles className={`h-4 w-4 ${isRegeneratingIndex === index ? "animate-spin" : ""}`} />
+                      </Button>
+                    )}
+                    {batchQuestions.length > 1 && (
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        onClick={() => handleRemoveBatchRow(index)} 
+                        className="h-8 w-8 text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 hover:text-red-600 rounded-xl transition-all"
+                      >
+                        <Trash className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
                 </div>
 
-                <div className="grid grid-cols-5 gap-1.5 border-t pt-2">
-                  {['a', 'b', 'c', 'd', 'e'].map(letter => (
-                    <div key={letter} className="relative">
-                      <input
-                        type="text"
-                        placeholder={`Pil ${letter.toUpperCase()}`}
-                        value={q.choices[letter].text}
-                        onChange={(e) => updateBatchChoice(index, letter, e.target.value)}
-                        className={`w-full text-xs p-2 rounded-lg border border-slate-200/80 dark:border-slate-800/80 focus:outline-none focus:ring-1 focus:ring-blue-600 pr-8 ${q.correctKey === letter ? "bg-green-50/80 dark:bg-green-950/40 border-green-200 dark:border-green-800 font-medium text-green-800 dark:text-green-400" : "bg-card dark:bg-slate-900 text-slate-700 dark:text-slate-200"}`}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => updateBatchItem(index, 'correctKey', letter)}
-                        className={`absolute right-1.5 top-1.5 h-5 w-5 rounded-full flex items-center justify-center border text-[10px] font-bold transition-all ${q.correctKey === letter ? "bg-green-600 text-white border-transparent" : "bg-card dark:bg-slate-800 text-slate-400 dark:text-slate-500 border-slate-200 dark:border-slate-800"}`}
-                      >
-                        {letter.toUpperCase()}
-                      </button>
-                    </div>
-                  ))}
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-1.5 h-6 bg-indigo-500 rounded-full"></div>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Pertanyaan Utama</p>
+                  </div>
+                  <div className="bg-slate-50 dark:bg-slate-800/30 rounded-2xl border border-slate-100 dark:border-slate-800 flex flex-col focus-within:ring-2 focus-within:ring-indigo-500 transition-all">
+                    <ReactQuill
+                      theme="snow"
+                      value={q.text}
+                      onChange={(content) => updateBatchItem(index, 'text', content)}
+                      placeholder="Tuliskan pertanyaan disini..."
+                      modules={{
+                        toolbar: [
+                          ['bold', 'italic', 'underline'],
+                          [{ 'color': [] }],
+                          ['clean']
+                        ],
+                      }}
+                      className="[&_.ql-editor]:min-h-[80px] [&_.ql-editor]:py-3 [&_.ql-container]:border-none [&_.ql-toolbar]:border-none [&_.ql-toolbar]:border-b [&_.ql-toolbar]:px-2 [&_.ql-toolbar]:py-1 [&_.ql-formats]:mr-1 text-sm"
+                    />
+                  </div>
+                  
+                  <div className="flex items-center gap-3 px-1">
+                    <button
+                      type="button"
+                      className="flex items-center gap-2 cursor-pointer bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-xl py-2 px-4 border border-slate-200 dark:border-slate-700 font-bold text-[10px] uppercase tracking-widest transition-all shadow-sm"
+                      onClick={() => {
+                        setGalleryTarget({ type: "batch", index });
+                        setIsPickerOpen(true);
+                      }}
+                    >
+                      <Image className="h-3.5 w-3.5 text-indigo-500" />
+                      <span>{q.imageFile || q.imageUrl ? "Ubah Gambar" : "Sisipkan Gambar"}</span>
+                    </button>
+                    {(q.imageFile || q.imageUrl) && (
+                      <div className="flex items-center gap-2 animate-in zoom-in-95 duration-300">
+                        <div className="relative group">
+                          <img src={q.imageFile ? URL.createObjectURL(q.imageFile) : q.imageUrl} className="h-10 w-auto rounded-xl border-2 border-indigo-100 object-cover shadow-md" alt="Preview" />
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 rounded-xl transition-all flex items-center justify-center">
+                            <span className="text-[8px] text-white font-bold uppercase">Gambar</span>
+                          </div>
+                        </div>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          onClick={() => { updateBatchItem(index, 'imageFile', null); updateBatchItem(index, 'imageUrl', ''); }} 
+                          className="h-8 w-8 text-red-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 p-0 rounded-xl"
+                        >
+                          <Trash className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    )}
+                  </div>
                 </div>
+
+                {(q.type === "pilihan_ganda" || q.type === "pilihan_ganda_kompleks" || q.type === "benar_salah") && (
+                  <div className="space-y-4 pt-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-1.5 h-6 bg-emerald-500 rounded-full"></div>
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Pilihan Jawaban & Kunci</p>
+                    </div>
+                    <div className="flex flex-col gap-2.5">
+                      {['a', 'b', 'c', 'd', 'e'].map(letter => {
+                        if (!q.choices?.[letter]) return null;
+                        const isCorrect = q.correctKey === letter;
+                        return (
+                          <div 
+                            key={letter} 
+                            className={`group relative flex items-center gap-4 p-3 rounded-2xl border transition-all duration-300 ${
+                              isCorrect 
+                                ? "bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-400 shadow-md shadow-emerald-100 dark:shadow-none" 
+                                : "bg-slate-50 dark:bg-slate-800/30 border-slate-100 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700"
+                            }`}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => updateBatchItem(index, 'correctKey', letter)}
+                              className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-sm transition-all shadow-sm ${
+                                isCorrect 
+                                  ? "bg-emerald-600 text-white shadow-emerald-200" 
+                                  : "bg-white dark:bg-slate-700 text-slate-400 dark:text-slate-500 group-hover:text-slate-600 dark:group-hover:text-slate-300"
+                              }`}
+                            >
+                              {letter.toUpperCase()}
+                            </button>
+                            <div className="flex-1">
+                              <input
+                                type="text"
+                                placeholder={`Teks Pilihan ${letter.toUpperCase()}...`}
+                                value={q.choices[letter].text}
+                                onChange={(e) => updateBatchChoice(index, letter, e.target.value)}
+                                className="w-full bg-transparent border-none focus:ring-0 text-sm font-semibold text-slate-700 dark:text-slate-200 placeholder:text-slate-300 dark:placeholder:text-slate-600"
+                              />
+                            </div>
+                            {isCorrect && (
+                              <div className="bg-emerald-600 text-white p-1 rounded-lg animate-in zoom-in-50 duration-300">
+                                <Check className="w-3 h-3" />
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {(q.type === "isian_singkat" || q.type === "uraian") && (
+                  <div className="border-t pt-2">
+                    <input
+                      type="text"
+                      placeholder={q.type === "isian_singkat" ? "Kunci Jawaban Singkat..." : "Pedoman Penilaian..."}
+                      value={q.answerKey || ""}
+                      onChange={(e) => updateBatchItem(index, 'answerKey', e.target.value)}
+                      className="w-full text-xs p-2 rounded-lg border border-slate-200 bg-blue-50/50 dark:bg-blue-900/10 dark:border-slate-800 focus:ring-1 focus:ring-blue-500 outline-none"
+                    />
+                  </div>
+                )}
               </div>
             ))}
 
-            <div className="flex justify-center">
-              <Button type="button" variant="outline" size="sm" onClick={handleAddBatchRow} className="rounded-xl flex items-center gap-1 text-slate-600 text-xs">
-                <Plus className="h-3.5 w-3.5" /> Tambah Soal Lain
+            <div className="flex justify-center gap-3">
+              <Button type="button" variant="outline" size="sm" onClick={handleAddBatchRow} className="rounded-xl flex items-center gap-1 text-slate-600 dark:text-slate-400 text-xs h-9">
+                <Plus className="h-3.5 w-3.5" /> Tambah Manual
               </Button>
+              {role === "admin" && batchQuestions.some(q => q.isFromAI) && (
+                <>
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => setIsAIModalOpen(true)} 
+                    className="rounded-xl flex items-center gap-1.5 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-900/40 hover:bg-indigo-50 dark:hover:bg-indigo-950/30 text-xs h-9"
+                  >
+                    <RefreshCw className="h-3.5 w-3.5" /> Ubah Pengaturan
+                  </Button>
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={handleAIGenerateDirect} 
+                    disabled={isAIGeneratingDirect}
+                    className="rounded-xl flex items-center gap-1.5 bg-indigo-50 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 text-xs h-9"
+                  >
+                    <Sparkles className={`h-3.5 w-3.5 ${isAIGeneratingDirect ? "animate-spin" : ""}`} /> 
+                    {isAIGeneratingDirect ? "Generasi..." : "Regenerasi Langsung"}
+                  </Button>
+                </>
+              )}
             </div>
           </div>
 
@@ -2031,6 +2654,388 @@ const QuestionsPage = () => {
         className="hidden"
         onChange={handleGlobalFileSelect}
       />
+      {/* 🪄 MODAL GENERASI AI */}
+      <Dialog open={isAIModalOpen} onOpenChange={setIsAIModalOpen}>
+        <DialogContent className="max-w-md rounded-3xl p-0 overflow-hidden border-none shadow-2xl">
+          <div className="bg-slate-50 dark:bg-slate-800/50 p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-100 dark:shadow-none">
+                <Sparkles className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <DialogTitle className="text-lg font-black tracking-tight text-slate-900 dark:text-white uppercase leading-none">AI Question Lab</DialogTitle>
+                <p className="text-slate-500 dark:text-slate-400 text-[11px] font-bold mt-1 uppercase tracking-wider">Hasilkan soal berkualitas dalam hitungan detik</p>
+              </div>
+            </div>
+            <Button 
+              type="button"
+              variant="outline" 
+              size="sm" 
+              onClick={handleRandomFill}
+              className="rounded-xl flex items-center gap-2 border-slate-200 dark:border-slate-800 text-indigo-600 dark:text-indigo-400 hover:bg-white dark:hover:bg-slate-800 transition-all shadow-sm h-10 px-4"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              <span className="text-[10px] font-black uppercase tracking-widest">Acak</span>
+            </Button>
+          </div>
+
+          <div className="p-6 space-y-5 bg-white dark:bg-slate-900 max-h-[70vh] overflow-y-auto custom-scrollbar">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField id="aiLevel" label="Jenjang / Kelas" error={undefined}>
+                <Input
+                  value={aiLevel}
+                  onChange={(e) => setAiLevel(e.target.value)}
+                  placeholder="Misal: Kelas 10 SMA"
+                  className="rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-800 h-11 text-xs font-semibold"
+                />
+              </FormField>
+
+              <FormField id="aiSubject" label="Mata Pelajaran" error={undefined}>
+                <Input
+                  value={aiSubject}
+                  onChange={(e) => setAiSubject(e.target.value)}
+                  placeholder="Misal: IPA"
+                  className="rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-800 h-11 text-xs font-semibold"
+                />
+              </FormField>
+            </div>
+
+            <FormField id="aiTopic" label="Topik atau Materi Spesifik" error={undefined}>
+              <textarea
+                value={aiTopic}
+                onChange={(e) => setAiTopic(e.target.value)}
+                placeholder="Misal: Dampak Pencemaran Plastik di Lautan..."
+                className="w-full min-h-[100px] p-4 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-800 focus:ring-2 focus:ring-indigo-500 text-xs resize-none font-medium text-slate-800 dark:text-white placeholder:text-slate-400"
+              />
+              {isFetchingSuggestions ? (
+                <div className="mt-3 flex items-center gap-2 text-[10px] text-slate-400 font-bold uppercase tracking-widest animate-pulse p-2 bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
+                  <RefreshCw className="h-3 w-3 animate-spin text-indigo-500" /> Menganalisis kurikulum & materi...
+                </div>
+              ) : dynamicSuggestions.length > 0 && (
+                <div className="mt-3 flex flex-wrap gap-2 animate-in fade-in slide-in-from-top-2 duration-500">
+                  <div className="flex items-center gap-2 w-full mb-1">
+                    <Sparkles className="h-3 w-3 text-indigo-500" />
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block underline decoration-indigo-200 decoration-2 underline-offset-4">Rekomendasi Materi Berbasis AI :</span>
+                  </div>
+                  {dynamicSuggestions.map((suggestion, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => setAiTopic(String(suggestion))}
+                      className="px-3 py-1.5 rounded-full bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-100 dark:border-indigo-800 text-[10px] font-bold text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-all font-sans shadow-sm hover:shadow"
+                    >
+                      {String(suggestion)}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </FormField>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField id="aiType" label="Tipe Soal" error={undefined}>
+                <select
+                  value={aiType}
+                  onChange={(e) => setAiType(e.target.value)}
+                  className="w-full h-11 px-3 rounded-2xl text-xs font-bold bg-slate-50 dark:bg-slate-800 border-none focus:ring-2 focus:ring-indigo-500 outline-none appearance-none"
+                >
+                  {allowedTypes.pilihan_ganda && <option value="pilihan_ganda">Pilihan Ganda</option>}
+                  {allowedTypes.pilihan_ganda_kompleks && <option value="pilihan_ganda_kompleks">PG Kompleks</option>}
+                  {allowedTypes.benar_salah && <option value="benar_salah">Benar / Salah</option>}
+                  {allowedTypes.isian_singkat && <option value="isian_singkat">Isian Singkat</option>}
+                  {allowedTypes.uraian && <option value="uraian">Uraian / Essay</option>}
+                </select>
+              </FormField>
+
+              <FormField id="aiCount" label="Jumlah Soal" error={undefined}>
+                 <div className="flex items-center gap-3 bg-slate-50 dark:bg-slate-800 p-1 px-3 rounded-2xl h-11">
+                    <button onClick={() => setAiCount(Math.max(1, aiCount - 1))} className="text-slate-400 hover:text-indigo-600 transition-colors font-bold text-lg">-</button>
+                    <input 
+                      type="number" 
+                      value={aiCount} 
+                      onChange={(e) => setAiCount(parseInt(e.target.value) || 1)}
+                      className="w-full text-center bg-transparent font-black text-slate-800 dark:text-white outline-none text-xs [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    />
+                    <button onClick={() => setAiCount(Math.min(20, aiCount + 1))} className="text-slate-400 hover:text-indigo-600 transition-colors font-bold text-lg">+</button>
+                 </div>
+              </FormField>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <FormField id="aiDifficulty" label="Tingkat Kesulitan" error={undefined}>
+                <div className="grid grid-cols-3 gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
+                  {['mudah', 'sedang', 'sulit'].map((d) => (
+                    <button
+                      key={d}
+                      onClick={() => setAiDifficulty(d)}
+                      className={`py-1.5 rounded-lg text-[9px] font-bold uppercase transition-all ${
+                        aiDifficulty === d ? 'bg-white dark:bg-slate-700 text-indigo-600 shadow-sm' : 'text-slate-400'
+                      }`}
+                    >
+                      {d}
+                    </button>
+                  ))}
+                </div>
+              </FormField>
+
+              <FormField id="aiFocus" label="Fokus Standar" error={undefined}>
+                <div className="grid grid-cols-3 gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
+                  {['umum', 'akm', 'pisa'].map((f) => (
+                    <button
+                      key={f}
+                      onClick={() => setAiFocus(f)}
+                      className={`py-1.5 rounded-lg text-[9px] font-bold uppercase transition-all ${
+                        aiFocus === f ? 'bg-white dark:bg-slate-700 text-indigo-600 shadow-sm' : 'text-slate-400'
+                      }`}
+                    >
+                      {f}
+                    </button>
+                  ))}
+                </div>
+                <p className="mt-2 text-[9px] text-slate-500 italic font-medium leading-tight">
+                  {focusDescriptions[aiFocus]}
+                </p>
+              </FormField>
+            </div>
+            <div className="flex flex-col gap-4 p-4 bg-indigo-50/50 dark:bg-indigo-900/10 rounded-2xl border border-indigo-100 dark:border-indigo-800/40">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <p className="text-xs font-bold text-indigo-700 dark:text-indigo-300">Mode Literasi</p>
+                  <p className="text-[10px] text-indigo-600/70 dark:text-indigo-400/70 leading-tight">AI akan membuatkan teks bacaan panjang sebelum soal.</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    className="sr-only peer" 
+                    checked={isAiLiteracy}
+                    onChange={(e) => setIsAiLiteracy(e.target.checked)}
+                  />
+                  <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-indigo-600"></div>
+                </label>
+              </div>
+
+              {isAiLiteracy && (
+                <div className="pt-3 border-t border-indigo-100 dark:border-indigo-800/40 animate-in slide-in-from-top-2 duration-300">
+                  <FormField id="aiPassageLength" label="Panjang Wacana" error={undefined}>
+                    <div className="grid grid-cols-3 gap-2 mt-1">
+                      {['pendek', 'sedang', 'panjang'].map((len) => (
+                        <button
+                          key={len}
+                          type="button"
+                          onClick={() => setAiPassageLength(len)}
+                          className={`py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all border ${
+                            aiPassageLength === len 
+                              ? 'bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-200 dark:shadow-none' 
+                              : 'bg-white dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700 hover:border-indigo-300'
+                          }`}
+                        >
+                          {len}
+                        </button>
+                      ))}
+                    </div>
+                  </FormField>
+                </div>
+              )}
+            </div>
+
+            <DialogFooter className="flex flex-col gap-2 sm:gap-0 sm:flex-row p-0 pt-2 border-t border-slate-100 dark:border-slate-800">
+               <Button
+                variant="ghost"
+                onClick={() => setIsAIModalOpen(false)}
+                className="rounded-xl font-bold uppercase text-xs"
+               >
+                Batal
+               </Button>
+               <Button
+                onClick={handleAIGenerate}
+                disabled={isAIGenerating || !aiTopic.trim()}
+                className="flex-1 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-200 dark:shadow-none font-bold uppercase text-xs group py-6"
+               >
+                {isAIGenerating ? (
+                  <>
+                    <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                    Menyusun naskah soal...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="mr-2 h-4 w-4 group-hover:rotate-12 transition-transform" />
+                    Mulai Generasi
+                  </>
+                )}
+               </Button>
+            </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* 🤖 Smart AI Import Dialog */}
+      <Dialog open={isAIImportOpen} onOpenChange={setIsAIImportOpen}>
+        <DialogContent className="max-w-4xl bg-card max-h-[90vh] overflow-hidden flex flex-col p-0 border-none shadow-2xl">
+          <DialogHeader className="p-6 pb-2 border-b border-slate-100 dark:border-slate-800">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 flex items-center justify-center border border-emerald-100 dark:border-emerald-800/40 shadow-sm">
+                <FileText className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
+              </div>
+              <div>
+                <DialogTitle className="text-xl font-bold text-slate-800 dark:text-slate-100">Smart AI Import</DialogTitle>
+                <p className="text-xs text-slate-500 font-medium tracking-tight">Tempel teks dari PDF/Word, biarkan AI yang merapikannya.</p>
+              </div>
+            </div>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto p-6 pt-2 space-y-6 scrollbar-thin">
+            {parsedResults.length === 0 ? (
+              <div className="space-y-5 animate-in fade-in duration-500">
+                <div className="flex items-center gap-3">
+                   <div className="relative flex-1">
+                      <label className="flex items-center justify-center gap-2 w-full p-4 border-2 border-dashed border-emerald-200 dark:border-emerald-800/40 rounded-2xl bg-emerald-50/30 dark:bg-emerald-950/10 cursor-pointer hover:bg-emerald-50 dark:hover:bg-emerald-950/20 transition-all group">
+                        <Plus className="w-5 h-5 text-emerald-600 group-hover:scale-110 transition-transform" />
+                        <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400">Pilih File PDF / Word</span>
+                        <input type="file" className="hidden" accept=".pdf,.docx" onChange={handleFileUpload} disabled={isParsing} />
+                      </label>
+                   </div>
+                   <div className="text-slate-400 text-xs font-bold">ATAU</div>
+                   <div className="flex-1 text-[10px] text-slate-500 font-medium italic">
+                     Tempel teks secara manual di kotak bawah ini
+                   </div>
+                </div>
+
+                <div className="p-5 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/10 dark:to-indigo-900/10 border border-blue-100/50 dark:border-blue-800/40 rounded-3xl relative overflow-hidden group">
+                  <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:scale-110 transition-transform">
+                    <Sparkles className="w-24 h-24 text-blue-600" />
+                  </div>
+                  <div className="flex gap-4 relative z-10">
+                    <div className="w-10 h-10 rounded-full bg-white dark:bg-slate-800 shadow-sm flex items-center justify-center shrink-0">
+                      <Sparkles className="w-5 h-5 text-blue-600" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-blue-800 dark:text-blue-300">Cara Menggunakan:</p>
+                      <ul className="text-[11px] text-blue-600/80 dark:text-blue-400/80 mt-1.5 space-y-1.5 list-none">
+                        <li className="flex items-start gap-2">
+                          <span className="w-4 h-4 rounded-full bg-blue-100 dark:bg-blue-800 text-[10px] flex items-center justify-center font-bold shrink-0 mt-0.5">1</span>
+                          <span>Buka PDF Anda, tekan <strong>Ctrl + A</strong> (Seleksi) lalu <strong>Ctrl + C</strong> (Salin).</span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <span className="w-4 h-4 rounded-full bg-blue-100 dark:bg-blue-800 text-[10px] flex items-center justify-center font-bold shrink-0 mt-0.5">2</span>
+                          <span>Tempelkan di kotak di bawah ini. AI akan mendeteksi soal & kunci jawaban.</span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <span className="w-4 h-4 rounded-full bg-blue-100 dark:bg-blue-800 text-[10px] flex items-center justify-center font-bold shrink-0 mt-0.5">3</span>
+                          <span>Teks wacana/stimulus pembuka akan otomatis dipisahkan (Mode Literasi).</span>
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+                <div className="relative group">
+                  <textarea
+                    className="w-full h-[400px] p-6 bg-slate-50/50 dark:bg-slate-900/40 border-2 border-slate-100 dark:border-slate-800 rounded-[2.5rem] text-xs font-mono focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 outline-none transition-all resize-none shadow-inner"
+                    placeholder="Contoh: (1) PG : Siapakah proklamator Indonesia? a. Soeharto b. Soekarno* c. Habibie..."
+                    value={importText}
+                    onChange={(e) => setImportText(e.target.value)}
+                  />
+                  {!importText && (
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-30">
+                      <div className="text-center">
+                        <BookOpen className="w-12 h-12 text-slate-300 mx-auto mb-2" />
+                        <p className="text-xs font-bold text-slate-400">Siap Menerima Teks Dokumen</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4 animate-in slide-in-from-bottom-4 duration-500">
+                <div className="flex items-center justify-between sticky top-0 bg-card/80 backdrop-blur-md py-3 z-10 border-b border-slate-100 dark:border-slate-800 -mx-6 px-6">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-black text-slate-800 dark:text-slate-100 uppercase tracking-tighter">Hasil Ekstraksi Cerdas</h3>
+                    <span className="bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800/40">{parsedResults.length} Butir</span>
+                  </div>
+                  <Button variant="ghost" size="sm" onClick={() => setParsedResults([])} className="h-8 text-[10px] font-black uppercase text-slate-400 hover:text-rose-500 transition-colors">Ulangi Proses</Button>
+                </div>
+                <div className="space-y-4 pb-6 mt-4">
+                  {parsedResults.map((q, idx) => (
+                    <div key={idx} className="p-5 border border-slate-200/60 dark:border-slate-800 rounded-3xl bg-card hover:border-indigo-200 dark:hover:border-indigo-900/40 transition-colors shadow-sm">
+                      <div className="flex gap-4">
+                        <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-xs font-black text-slate-400 shrink-0">
+                          {idx + 1}
+                        </div>
+                        <div className="space-y-4 flex-1">
+                           {q.groupText && (
+                             <div className="p-4 bg-indigo-50/30 dark:bg-indigo-950/20 border-l-4 border-indigo-500 rounded-r-2xl mb-2">
+                               <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-2 flex items-center gap-1.5">
+                                 <Plus className="w-3 h-3" /> Literasi / Stimulus Khusus
+                               </p>
+                               <div className="text-[11px] text-slate-700 dark:text-slate-300 leading-relaxed font-medium line-clamp-4 italic" dangerouslySetInnerHTML={{ __html: q.groupText }} />
+                             </div>
+                           )}
+                           <div className="text-sm font-bold text-slate-800 dark:text-slate-100 leading-normal" dangerouslySetInnerHTML={{ __html: q.text }} />
+                           <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 mt-2">
+                             {q.choices && Object.entries(q.choices).map(([key, val]: [string, any]) => (
+                               <div key={key} className={`p-2.5 rounded-xl border flex items-center gap-3 transition-all ${val.isCorrect ? 'bg-emerald-50 border-emerald-200 dark:bg-emerald-950/20 dark:border-emerald-800/40 text-emerald-700 dark:text-emerald-400' : 'bg-slate-50/50 dark:bg-slate-800/40 border-slate-100 dark:border-slate-700 text-slate-500 dark:text-slate-400'}`}>
+                                 <div className={`w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-black uppercase shrink-0 ${val.isCorrect ? 'bg-emerald-500 text-white shadow-md' : 'bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-800'}`}>
+                                   {key}
+                                 </div>
+                                 <span className="text-[11px] font-semibold">{val.text}</span>
+                                 {val.isCorrect && <Check className="w-3.5 h-3.5 ml-auto text-emerald-500 stroke-[3px]" />}
+                               </div>
+                             ))}
+                           </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="p-6 border-t bg-slate-50/50 dark:bg-slate-900/40 gap-3">
+            {parsedResults.length === 0 ? (
+              <Button
+                onClick={handleAIParse}
+                disabled={isParsing || !importText.trim()}
+                className="w-full h-14 bg-emerald-600 hover:bg-emerald-700 text-white rounded-[1.5rem] font-black uppercase text-xs tracking-widest shadow-xl shadow-emerald-200/50 dark:shadow-none transition-all active:scale-95"
+              >
+                {isParsing ? (
+                  <>
+                    <RefreshCw className="mr-2 h-5 w-5 animate-spin" />
+                    Sedang Memilah Dokumen...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="mr-2 h-5 w-5" />
+                    Analisis Dokumen Sekarang
+                  </>
+                )}
+              </Button>
+            ) : (
+              <div className="flex gap-4 w-full">
+                <Button
+                  variant="outline"
+                  onClick={() => setIsAIImportOpen(false)}
+                  className="flex-1 h-14 rounded-[1.5rem] font-bold uppercase text-xs tracking-widest border-2 border-slate-200 dark:border-slate-800 hover:bg-slate-100 transition-all font-black"
+                >
+                  Batal
+                </Button>
+                <Button
+                  onClick={handleSaveAIImport}
+                  disabled={isParsing}
+                  className="flex-[2] h-14 bg-indigo-600 hover:bg-indigo-700 text-white rounded-[1.5rem] font-black uppercase text-xs tracking-widest shadow-xl shadow-indigo-200/50 dark:shadow-none transition-all active:scale-95"
+                >
+                   {isParsing ? (
+                    <RefreshCw className="mr-2 h-5 w-5 animate-spin" />
+                  ) : (
+                    <>
+                      <Check className="mr-2 h-5 w-5" />
+                      Simpan Semuanya ke Bank Soal
+                    </>
+                  )}
+                </Button>
+              </div>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

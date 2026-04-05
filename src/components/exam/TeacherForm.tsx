@@ -55,7 +55,7 @@ const TeacherForm = ({ defaultValues, onSubmit, submitLabel = "Simpan", onCancel
         subjects: defaultValues.subjects || [],
       });
     }
-  }, [defaultValues, reset]);
+  }, [defaultValues?.name, defaultValues?.code, JSON.stringify(defaultValues?.subjects), reset]);
 
   const submitHandler = async (values: TeacherFormValues) => {
     await onSubmit({

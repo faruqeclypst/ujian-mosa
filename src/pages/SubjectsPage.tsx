@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Plus, BookOpen } from "lucide-react";
 import { useExamData } from "../context/ExamDataContext";
 import { Button } from "../components/ui/button";
@@ -111,7 +111,9 @@ const SubjectsPage = () => {
     exportSubjectToExcel({ subjects, filename: "data-mapel.xlsx" });
   };
 
-  const defaultValues = selectedSubject ? { name: selectedSubject.name } : undefined;
+  const defaultValues = useMemo(() => 
+    selectedSubject ? { name: selectedSubject.name } : { name: "" }, 
+  [selectedSubject]);
 
   return (
     <div className="space-y-6">

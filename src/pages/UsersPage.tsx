@@ -213,6 +213,18 @@ const UsersPage = () => {
           </h2>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Atur otorisasi login Admin & Guru.</p>
         </div>
+
+        {/* 🛡️ Info Akun Backup */}
+        <div className="flex-1 max-w-sm bg-blue-50/50 dark:bg-blue-900/10 border border-blue-100/50 dark:border-blue-800/30 p-3 rounded-xl flex items-start gap-3">
+          <ShieldAlert className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
+          <div className="flex flex-col">
+            <h4 className="text-[10px] font-black uppercase text-blue-700 dark:text-blue-400 tracking-widest mb-1">Info Backup/Restore</h4>
+            <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">
+              Akun hasil <b>Impor Database</b> akan memiliki password default: <code className="bg-blue-100 dark:bg-blue-900/40 px-1 rounded text-blue-700 dark:text-blue-300 font-bold">username@mosa</code>. Guru disarankan segera mengganti password demi keamanan.
+            </p>
+          </div>
+        </div>
+
         <div className="flex flex-wrap items-center gap-2">
           <Button size="sm" onClick={handleCreateClick} className="rounded-xl bg-blue-50 hover:bg-blue-100 border border-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 dark:border-blue-800/40 text-blue-700 font-semibold shadow-sm">
             <Plus className="mr-1 h-3.5 w-3.5" />

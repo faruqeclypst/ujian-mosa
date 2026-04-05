@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Plus, Layout } from "lucide-react";
 import { useExamData } from "../context/ExamDataContext";
 import { Button } from "../components/ui/button";
@@ -111,7 +111,9 @@ const ClassesPage = () => {
     exportClassToExcel({ classes, filename: "data-kelas.xlsx" });
   };
 
-  const defaultValues = selectedClass ? { name: selectedClass.name } : undefined;
+  const defaultValues = useMemo(() => 
+    selectedClass ? { name: selectedClass.name } : { name: "" }, 
+  [selectedClass]);
 
   return (
     <div className="space-y-6">

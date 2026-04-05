@@ -18,8 +18,7 @@ import StudentLoginPage from "./pages/student/StudentLoginPage";
 import StudentDashboardPage from "./pages/student/StudentDashboardPage";
 import CBTPage from "./pages/student/CBTPage";
 import ExamResultPage from "./pages/student/ExamResultPage";
-import { database } from "./lib/firebase";
-import { ref, onValue } from "firebase/database";
+import pb from "./lib/pocketbase";
 
 const DashboardPage = lazy(() => import("./pages/DashboardPage"));
 const TeachersPage = lazy(() => import("./pages/TeachersPage"));
@@ -59,17 +58,35 @@ const AppContent = () => {
   const location = useLocation();
 
   useEffect(() => {
-    const configRef = ref(database, "settings/school");
-    return onValue(configRef, (snapshot) => {
-      if (snapshot.exists()) {
-        const data = snapshot.val();
-        if (data.name) {
-          document.title = `E-Ujian - ${data.name}`;
+    const fetchSettings = async () => {
+      try {
+        const records = await pb.collection("settings").getFullList({
+          limit: 1,
+          sort: "created",
+        });
+        
+        if (records.length > 0) {
+          const data = records[0];
+          document.title = data.name ? `E-Ujian - ${data.name}` : "E-Ujian";
+
+          // 🌍 Dynamically set Favicon from school logo
+          if (data.logo) {
+            const link: HTMLLinkElement = document.querySelector("link[rel*='icon']") || document.createElement('link');
+            link.type = 'image/x-icon';
+            link.rel = 'shortcut icon';
+            link.href = data.logo;
+            document.getElementsByTagName('head')[0].appendChild(link);
+          }
         } else {
           document.title = "E-Ujian";
         }
+      } catch (err) {
+        console.error("Gagal memuat judul aplikasi:", err);
+        document.title = "E-Ujian";
       }
-    });
+    };
+
+    fetchSettings();
   }, []);
 
   if (loading) {
@@ -92,10 +109,32 @@ const AppContent = () => {
           } 
         />
         <Route 
+          path="/cbt" 
+          element={
+            <ExambroGuard>
+              <StudentAuthGuard>
+                <CBTPage />
+              </StudentAuthGuard>
+            </ExambroGuard>
+          } 
+        />
+        <Route 
           path="/cbt/:roomId" 
           element={
             <ExambroGuard>
-              {student ? <CBTPage /> : <Navigate to="/" replace />}
+              <StudentAuthGuard>
+                <CBTPage />
+              </StudentAuthGuard>
+            </ExambroGuard>
+          } 
+        />
+        <Route 
+          path="/cbt/result" 
+          element={
+            <ExambroGuard>
+              <StudentAuthGuard>
+                <ExamResultPage />
+              </StudentAuthGuard>
             </ExambroGuard>
           } 
         />
@@ -103,7 +142,9 @@ const AppContent = () => {
           path="/cbt/:roomId/result" 
           element={
             <ExambroGuard>
-              {student ? <ExamResultPage /> : <Navigate to="/" replace />}
+              <StudentAuthGuard>
+                <ExamResultPage />
+              </StudentAuthGuard>
             </ExambroGuard>
           } 
         />

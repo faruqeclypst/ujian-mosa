@@ -15,6 +15,7 @@ interface UserData {
   name: string;
   role: "admin" | "teacher";
   teacherId?: string;
+  avatar?: string;
 }
 
 interface AuthContextValue {
@@ -40,7 +41,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (pb.authStore.isValid && pb.authStore.model) {
         const model = pb.authStore.model;
         // Cek apakah ini login Admin/Guru (dari koleksi 'users')
-        // (Secara default pb.authStore.model berasal dari koleksi terakhir yang login)
         if (model.collectionName === "users") {
           setUser({
             id: model.id,
@@ -48,6 +48,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             name: model.name || model.username,
             role: model.role || "teacher",
             teacherId: model.teacherId,
+            avatar: model.avatar ? pb.files.getUrl(model, model.avatar) : "",
           });
         }
       }

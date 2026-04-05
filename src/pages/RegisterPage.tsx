@@ -1,11 +1,10 @@
 import { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { FirebaseError } from "firebase/app";
 import { Lock, User, Eye, EyeOff, Sparkles, Shield, UserPlus } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { motion } from "framer-motion";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 import FormField from "../components/forms/FormField";
 import { Button } from "../components/ui/button";
@@ -22,29 +21,9 @@ const registerSchema = z.object({
 
 type RegisterFormValues = z.infer<typeof registerSchema>;
 
-const firebaseErrorMessage = (error: unknown) => {
-  if (error instanceof FirebaseError) {
-    switch (error.code) {
-      case "auth/email-already-in-use":
-        return "Username sudah terdaftar. Silakan gunakan nama lain.";
-      case "auth/weak-password":
-        return "Password terlalu lemah. Gunakan kombinasi yang lebih kuat.";
-      case "auth/invalid-email":
-        return "Format username tidak valid.";
-      default:
-        return error.message;
-    }
-  }
-
-  if (error instanceof Error) {
-    return error.message;
-  }
-
-  return "Terjadi kesalahan yang tidak diketahui.";
-};
-
 const RegisterPage = () => {
   const { registerWithUsername } = useAuth();
+  const navigate = useNavigate();
   const [formError, setFormError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
 
@@ -65,9 +44,9 @@ const RegisterPage = () => {
     setFormError(null);
     try {
       await registerWithUsername(values.username, values.password, values.displayName.trim());
-    } catch (error) {
-      const message = firebaseErrorMessage(error);
-      setFormError(message);
+      navigate("/admin/login", { replace: true });
+    } catch (error: any) {
+      setFormError(error.message || "Gagal registrasi.");
     }
   };
 

@@ -323,27 +323,57 @@ const GuidePage = () => {
               </div>
               <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100">6. Konfigurasi Sistem</h2>
             </div>
-            <div className="p-8 bg-white dark:bg-slate-900/40 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-8">
-              <div className="flex gap-5">
-                <div className="w-10 h-10 bg-rose-50 dark:bg-rose-900/20 rounded-xl flex items-center justify-center shrink-0">
-                  <ShieldAlert className="h-5 w-5 text-rose-600 dark:text-rose-400" />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="p-8 bg-white dark:bg-slate-900/40 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-8">
+                <div className="flex gap-5">
+                  <div className="w-10 h-10 bg-rose-50 dark:bg-rose-900/20 rounded-xl flex items-center justify-center shrink-0">
+                    <ShieldAlert className="h-5 w-5 text-rose-600 dark:text-rose-400" />
+                  </div>
+                  <div>
+                    <h4 className="text-base font-bold text-slate-800 dark:text-slate-200 mb-2">Manajemen Akun Guru</h4>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
+                      Setiap guru pengampu wajib memiliki akun personal. Administrator bertanggung jawab atas pemberian akses dan pemulihan kata sandi jika diperlukan. Hak akses admin mencakup seluruh data master sekolah.
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h4 className="text-base font-bold text-slate-800 dark:text-slate-200 mb-2">Manajemen Akun Guru</h4>
-                  <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
-                    Setiap guru pengampu wajib memiliki akun personal. Administrator bertanggung jawab atas pemberian akses dan pemulihan kata sandi jika diperlukan. Hak akses admin mencakup seluruh data master sekolah.
-                  </p>
+                <div className="flex gap-5">
+                  <div className="w-10 h-10 bg-blue-50 dark:bg-blue-900/20 rounded-xl flex items-center justify-center shrink-0">
+                    <ImageIcon className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                  </div>
+                  <div>
+                    <h4 className="text-base font-bold text-slate-800 dark:text-slate-200 mb-2">Visual Branding Sekolah</h4>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
+                      Unggah logo sekolah melalui menu Pengaturan. Perubahan akan merubah tampilan pada kartu login peserta, tajuk navigasi, dan aset dokumen yang dihasilkan oleh sistem.
+                    </p>
+                  </div>
                 </div>
               </div>
-              <div className="flex gap-5">
-                <div className="w-10 h-10 bg-blue-50 dark:bg-blue-900/20 rounded-xl flex items-center justify-center shrink-0">
-                  <ImageIcon className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+
+              <div className="p-8 bg-indigo-600 dark:bg-slate-800 rounded-3xl border border-indigo-500 dark:border-slate-700 shadow-xl text-white relative overflow-hidden group">
+                <div className="absolute top-0 right-0 p-6 opacity-10 group-hover:rotate-12 transition-transform">
+                  <Database size={80} />
                 </div>
-                <div>
-                  <h4 className="text-base font-bold text-slate-800 dark:text-slate-200 mb-2">Visual Branding Sekolah</h4>
-                  <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
-                    Unggah logo sekolah melalui menu Pengaturan. Perubahan akan merubah tampilan pada kartu login peserta, tajuk navigasi, dan aset dokumen yang dihasilkan oleh sistem.
+                <h4 className="text-xl font-black uppercase tracking-tighter mb-4 flex items-center gap-2">
+                  <Database className="h-6 w-6 text-indigo-300" /> Pencadangan Data
+                </h4>
+                <div className="space-y-4 relative z-10">
+                  <p className="text-sm text-indigo-100 dark:text-slate-300 leading-relaxed">
+                    Sistem mendukung pencadangan penuh (Full Backup) melalui file JSON. Ini mencakup Bank Soal, Siswa, Ruang Ujian, dan Akun Pengguna.
                   </p>
+                  <div className="p-4 bg-white/10 dark:bg-black/20 rounded-2xl border border-white/20 dark:border-white/5 space-y-3">
+                    <div className="flex items-start gap-3">
+                      <div className="w-1.5 h-1.5 rounded-full bg-indigo-300 mt-1.5 shrink-0" />
+                      <p className="text-[11px] font-medium leading-tight">Akun hasil impor akan memiliki password default <span className="font-black underline italic">username@mosa</span>.</p>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <div className="w-1.5 h-1.5 rounded-full bg-indigo-300 mt-1.5 shrink-0" />
+                      <p className="text-[11px] font-medium leading-tight">Token Universal tidak ikut dalam ekspor demi menjaga integritas akses kunci ujian.</p>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <div className="w-1.5 h-1.5 rounded-full bg-rose-300 mt-1.5 shrink-0" />
+                      <p className="text-[11px] font-medium leading-tight text-rose-200">Tombol <span className="underline">Hapus Semua Data</span> akan membersihkan seluruh database secara permanen kecuali akun Admin yang sedang aktif digunakan.</p>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -412,20 +442,20 @@ const GuidePage = () => {
                       <div className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-pulse" />
                       <span className="text-[9px] font-black uppercase tracking-[0.2em] text-blue-700 dark:text-blue-200">System Architecture Stack</span>
                     </div>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
-                       {[
-                         { icon: Code, label: "React 18 & TS" },
-                         { icon: Database, label: "Firebase Realtime" },
-                         { icon: LayoutTemplate, label: "Tailwind UI" },
-                         { icon: Cpu, label: "Firebase Cloud" },
-                         { icon: Award, label: "Vite Project" }
-                       ].map((tech) => (
-                         <div key={tech.label} className="flex items-center gap-2 p-2 rounded-xl bg-white/50 dark:bg-white/5 border border-slate-200 dark:border-white/5 hover:border-blue-300 dark:hover:border-white/10 transition-colors">
-                           <tech.icon className="h-3 w-3 shrink-0 text-slate-500 dark:text-white opacity-70" />
-                           <span className="text-[9px] font-bold truncate text-slate-600 dark:text-white">{tech.label}</span>
-                         </div>
-                       ))}
-                    </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+                           {[
+                             { icon: Code, label: "React 18 & TS" },
+                             { icon: Database, label: "PocketBase DB" },
+                             { icon: LayoutTemplate, label: "Tailwind UI" },
+                             { icon: Cpu, label: "Cloudflare R2" },
+                             { icon: Award, label: "Vite Project" }
+                           ].map((tech) => (
+                             <div key={tech.label} className="flex items-center gap-2 p-2 rounded-xl bg-white/50 dark:bg-white/5 border border-slate-200 dark:border-white/5 hover:border-blue-300 dark:hover:border-white/10 transition-colors">
+                               <tech.icon className="h-3 w-3 shrink-0 text-slate-500 dark:text-white opacity-70" />
+                               <span className="text-[9px] font-bold truncate text-slate-600 dark:text-white">{tech.label}</span>
+                             </div>
+                           ))}
+                        </div>
                   </div>
                 </div>
               </CardContent>
