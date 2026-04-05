@@ -4,7 +4,8 @@ import { useStudentAuth } from "../../context/StudentAuthContext";
 import pb from "../../lib/pocketbase";
 import { Card, CardHeader, CardTitle, CardContent } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
-import { ClipboardCheck, FileText, LayoutDashboard, User, BookOpen, Clock } from "lucide-react";
+import { ClipboardCheck, FileText, LayoutDashboard, User, BookOpen, Clock, CheckCircle2, XCircle, Timer, Award, Landmark, CalendarDays, Trophy, ArrowLeft } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 
 interface ExamAttempt {
   status: string;
@@ -21,26 +22,23 @@ const ExamResultPage = () => {
   const { student } = useStudentAuth();
   const navigate = useNavigate();
 
-  // 🛡️ URL MASKING LOGIC
   const [roomId, setRoomId] = useState<string | null>(null);
 
   useEffect(() => {
     if (paramRoomId) {
-      // 1. Jika ada di URL, simpan dan hilangkan dari URL
       sessionStorage.setItem("activeCBTRoomId", paramRoomId);
       setRoomId(paramRoomId);
       navigate("/cbt/result", { replace: true });
     } else {
-      // 2. Jika tidak ada di URL, ambil dari storage
       const saved = sessionStorage.getItem("activeCBTRoomId");
       if (saved) {
         setRoomId(saved);
       } else {
-        // 3. Jika benar-benar tidak ada, kembali ke dashboard
         navigate("/", { replace: true });
       }
     }
   }, [paramRoomId, navigate]);
+
   const [attempt, setAttempt] = useState<ExamAttempt | null>(null);
   const [roomData, setRoomData] = useState<any>(null);
   const [showResult, setShowResult] = useState(true);
@@ -87,20 +85,26 @@ const ExamResultPage = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-white">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-900"></div>
+      <div className="flex items-center justify-center min-h-screen bg-slate-50 dark:bg-slate-950">
+        <div className="flex flex-col items-center gap-3">
+           <div className="animate-spin rounded-full h-12 w-12 border-4 border-slate-800 border-t-transparent shadow-lg shadow-slate-200"></div>
+           <p className="text-xs font-black text-slate-500 uppercase tracking-[0.2em] animate-pulse">Calculating Score...</p>
+        </div>
       </div>
     );
   }
 
   if (!attempt) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen p-4 text-center bg-slate-50">
-        <FileText className="h-16 w-16 text-slate-300 mb-4" />
-        <p className="text-slate-600 font-bold uppercase tracking-tight">Data hasil ujian tidak ditemukan.</p>
-        <Button onClick={() => navigate("/")} variant="outline" className="mt-6">
-           Kembali ke Dashboard
-        </Button>
+      <div className="flex flex-col items-center justify-center min-h-screen p-6 text-center bg-slate-50 dark:bg-slate-950">
+        <div className="p-12 bg-white dark:bg-slate-900 rounded-[40px] shadow-2xl shadow-slate-200 dark:shadow-none flex flex-col items-center border border-slate-100 dark:border-slate-800">
+          <Landmark className="h-20 w-20 text-slate-300 mb-8" />
+          <h2 className="text-2xl font-black text-slate-800 dark:text-white mb-3 uppercase tracking-tight">DATA KOSONG</h2>
+          <p className="text-slate-400 text-sm font-bold max-w-[200px] mb-10 uppercase tracking-widest leading-relaxed">Hasil pengerjaan Anda tidak ditemukan di sistem.</p>
+          <Button onClick={() => navigate("/")} className="w-full bg-slate-800 hover:bg-slate-900 h-14 rounded-2xl font-black uppercase tracking-widest text-xs shadow-lg shadow-slate-200">
+             Back To Dashboard
+          </Button>
+        </div>
       </div>
     );
   }
@@ -108,107 +112,79 @@ const ExamResultPage = () => {
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
-    return `${mins} menit ${secs} detik`;
+    if (mins === 0) return `${secs}dtk`;
+    return `${mins}m ${secs}dtk`;
   };
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] flex items-center justify-center p-4 text-slate-900">
-      <Card className="w-full max-w-2xl bg-white rounded-none border border-slate-200 shadow-sm overflow-hidden">
-        <div className="h-1.5 bg-[#1e293b] w-full" />
-        
-        <CardHeader className="pt-10 pb-6 px-10 border-b border-slate-100">
-          <div className="flex justify-between items-start text-left">
-            <div className="space-y-1">
-              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-tight">LAPORAN HASIL UJIAN ONLINE</span>
-              <CardTitle className="text-2xl font-bold text-[#0f172a]">{roomData?.room_name || "Detail Ujian"}</CardTitle>
-              <div className="flex items-center gap-3 text-slate-500 text-xs">
-                <span className="flex items-center gap-1 font-semibold"><BookOpen className="w-3.5 h-3.5 text-blue-600" /> {roomData?.expand?.examId?.expand?.subjectId?.name || "Mata Pelajaran"}</span>
-                <span>•</span>
-                <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" /> {new Date(attempt.submittedAt || "").toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 font-sans p-4 sm:p-10 flex flex-col items-center justify-start py-12 sm:py-20">
+      <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="w-full max-w-4xl">
+        <Card className="rounded-[40px] sm:rounded-[60px] shadow-2xl shadow-slate-200 dark:shadow-none overflow-hidden border-none relative bg-white dark:bg-slate-900">
+          <div className="absolute top-0 right-0 w-full h-[6px] bg-slate-800" />
+          
+          <div className="p-8 sm:p-20 flex flex-col items-center text-center space-y-8 sm:space-y-12">
+              <div className="w-24 h-24 sm:w-32 sm:h-32 bg-slate-800 rounded-[30px] sm:rounded-[40px] flex items-center justify-center shadow-2xl shadow-slate-200 dark:shadow-none animate-bounce">
+                 <Trophy className="w-12 h-12 sm:w-16 sm:h-16 text-white" />
               </div>
-            </div>
-            <div className="h-12 w-12 bg-blue-50 rounded-lg flex items-center justify-center border border-blue-100">
-               <ClipboardCheck className="text-blue-900 w-6 h-6" />
-            </div>
-          </div>
-        </CardHeader>
-
-        <CardContent className="p-10 space-y-8">
-          <div className="grid grid-cols-2 gap-6 pb-6 border-b border-slate-50">
-             <div className="space-y-1 text-left">
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">Nama Peserta</label>
-                <div className="flex items-center gap-2 text-slate-800 font-bold">
-                   <User className="w-3.5 h-3.5 text-blue-400" />
-                   <span className="text-sm">{student?.name}</span>
-                </div>
-             </div>
-             <div className="space-y-1 text-left">
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">Nomor Induk / NISN</label>
-                <div className="text-slate-800 font-bold text-sm">
-                   {student?.nisn}
-                </div>
-             </div>
-          </div>
-
-          {showResult ? (
-            <div className="space-y-8">
-              <div className="flex items-center justify-between p-8 bg-blue-50/30 border border-blue-100/50 rounded-lg">
-                <div className="space-y-1 text-left">
-                   <h3 className="text-sm font-bold text-[#1e293b] uppercase tracking-tight">Capaian Skor Akhir</h3>
-                   <p className="text-xs text-slate-500 font-medium">Hasil rekapitulasi nilai otomatis.</p>
-                </div>
-                <div className="text-center">
-                  <div className="text-5xl font-bold text-[#1e293b] leading-none tracking-tighter">{attempt.score}</div>
-                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-tight mt-1">Poin / 100</div>
-                </div>
+              
+              <div className="space-y-4">
+                 <div className="inline-block px-4 py-1.5 bg-slate-50 dark:bg-slate-800 rounded-full text-[10px] sm:text-xs font-black text-slate-400 uppercase tracking-[0.3em] border border-slate-100 dark:border-slate-700">Official Exam Result</div>
+                 <h1 className="text-3xl sm:text-5xl font-black text-slate-800 dark:text-white uppercase tracking-tighter leading-tight">Ujian Selesai!</h1>
+                 <p className="text-sm sm:text-lg font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest max-w-md mx-auto leading-relaxed">Selamat! Anda telah menyelesaikan seluruh rangkaian ujian ini dengan baik.</p>
               </div>
 
-              <div className="grid grid-cols-3 gap-6 text-left">
-                 <div className="space-y-1.5">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tight block">Benar</span>
-                    <div className="text-xl font-bold text-emerald-600">{attempt.correct}</div>
-                    <div className="h-1 w-full bg-emerald-100 rounded-full overflow-hidden">
-                       <div className="h-full bg-emerald-500" style={{ width: `${(attempt.correct / (attempt.total || 1)) * 100}%` }} />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 w-full max-w-2xl">
+                 <div className="bg-slate-50 dark:bg-slate-800/50 p-6 sm:p-8 rounded-[30px] sm:rounded-[40px] border border-slate-100 dark:border-slate-800 flex flex-col items-center space-y-4 shadow-sm">
+                    <div className="p-3 sm:p-4 bg-white dark:bg-slate-900 rounded-2xl shadow-inner border border-slate-100 dark:border-slate-800 text-slate-300"><User className="w-6 h-6 sm:w-8 sm:h-8" /></div>
+                    <div className="text-center">
+                      <p className="text-[10px] sm:text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Nama Lengkap</p>
+                      <p className="text-lg sm:text-xl font-black text-slate-800 dark:text-slate-200 uppercase tracking-tight">{student?.name}</p>
                     </div>
                  </div>
-                 <div className="space-y-1.5">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tight block">Salah</span>
-                    <div className="text-xl font-bold text-rose-600">{(attempt.total || 0) - (attempt.correct || 0)}</div>
-                    <div className="h-1 w-full bg-rose-100 rounded-full overflow-hidden">
-                       <div className="h-full bg-rose-500" style={{ width: `${(((attempt.total || 0) - (attempt.correct || 0)) / (attempt.total || 1)) * 100}%` }} />
+                 <div className="bg-slate-50 dark:bg-slate-800/50 p-6 sm:p-8 rounded-[30px] sm:rounded-[40px] border border-slate-100 dark:border-slate-800 flex flex-col items-center space-y-4 shadow-sm">
+                    <div className="p-3 sm:p-4 bg-white dark:bg-slate-900 rounded-2xl shadow-inner border border-slate-100 dark:border-slate-800 text-slate-300"><BookOpen className="w-6 h-6 sm:w-8 sm:h-8" /></div>
+                    <div className="text-center">
+                      <p className="text-[10px] sm:text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Mata Pelajaran</p>
+                      <p className="text-lg sm:text-xl font-black text-slate-800 dark:text-slate-200 uppercase tracking-tight">{roomData?.expand?.examId?.expand?.subjectId?.name || "General Course"}</p>
                     </div>
                  </div>
-                 <div className="space-y-1.5">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tight block">Durasi</span>
-                    <div className="text-[13px] font-bold text-slate-700 leading-[1.75rem]">{attempt.usedTime ? formatTime(attempt.usedTime) : "-"}</div>
-                 </div>
               </div>
-            </div>
-          ) : (
-            <div className="py-12 text-center space-y-4">
-               <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto border border-blue-100">
-                  <ClipboardCheck className="w-8 h-8 text-blue-400" />
-               </div>
-               <div className="space-y-2">
-                  <h3 className="font-bold text-[#1e293b] text-lg uppercase tracking-tight">Jawaban Telah Terkirim</h3>
-                  <p className="text-xs text-slate-500 max-w-xs mx-auto leading-relaxed font-medium">
-                    Terima kasih telah mengikuti ujian. Nilai Anda telah tercatat dengan aman di server kami.
-                  </p>
-               </div>
-            </div>
-          )}
 
-          <div className="pt-8 border-t border-slate-100">
-             <Button onClick={() => navigate("/")} className="w-full bg-[#1e293b] hover:bg-[#0f172a] text-white h-12 rounded-lg font-bold text-[11px] uppercase tracking-widest transition-all active:scale-[0.98] shadow-sm">
-               Kembali ke Dashboard
-             </Button>
+              {showResult && (
+                <div className="grid grid-cols-3 gap-3 sm:gap-6 w-full max-w-2xl">
+                   <div className="bg-slate-50 dark:bg-slate-800/50 p-4 sm:p-7 rounded-[25px] border border-slate-100 dark:border-slate-800 flex flex-col items-center gap-2">
+                      <CheckCircle2 className="w-6 h-6 text-emerald-600" />
+                      <span className="text-xl font-black text-slate-800 dark:text-white tabular-nums">{attempt.correct}</span>
+                   </div>
+                   <div className="bg-slate-50 dark:bg-slate-800/50 p-4 sm:p-7 rounded-[25px] border border-slate-100 dark:border-slate-800 flex flex-col items-center gap-2">
+                      <XCircle className="w-6 h-6 text-rose-600" />
+                      <span className="text-xl font-black text-slate-800 dark:text-white tabular-nums">{(attempt.total || 0) - (attempt.correct || 0)}</span>
+                   </div>
+                   <div className="bg-slate-50 dark:bg-slate-800/50 p-4 sm:p-7 rounded-[25px] border border-slate-100 dark:border-slate-800 flex flex-col items-center gap-2">
+                      <Timer className="w-6 h-6 text-slate-500" />
+                      <span className="text-sm font-black text-slate-800 dark:text-white uppercase tracking-tight">{attempt.usedTime ? formatTime(attempt.usedTime) : "-"}</span>
+                   </div>
+                </div>
+              )}
+
+              <div className="pt-8 w-full max-w-sm">
+                <Button 
+                   onClick={() => navigate('/')} 
+                   className="w-full h-16 sm:h-18 bg-slate-800 hover:bg-slate-900 dark:bg-slate-700 dark:hover:bg-slate-600 text-white font-black text-xs sm:text-sm uppercase tracking-[0.3em] rounded-2xl shadow-xl shadow-slate-200 dark:shadow-none transition-all active:scale-95 group flex items-center justify-center"
+                >
+                   <ArrowLeft className="mr-3 w-5 h-5 group-hover:-translate-x-2 transition-transform" />
+                   Back to Dashboard
+                </Button>
+              </div>
           </div>
-        </CardContent>
-        <div className="bg-slate-50 px-10 py-3 border-t border-slate-100 flex justify-between items-center text-[10px] text-slate-400 font-bold italic">
-           <span>Sistem Informasi Ujian Online</span>
-           <span>Rekapitulasi Otomatis</span>
-        </div>
-      </Card>
+          
+          <div className="bg-slate-50 dark:bg-slate-950/50 p-6 border-t border-slate-100 dark:border-slate-800 text-center">
+              <p className="text-[10px] font-black text-slate-400 dark:text-slate-600 uppercase tracking-[0.4em] opacity-50">
+                 Official E-Exam Portal • Mosa Digital
+              </p>
+          </div>
+        </Card>
+      </motion.div>
     </div>
   );
 };

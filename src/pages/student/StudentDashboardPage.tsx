@@ -4,13 +4,13 @@ import { useStudentAuth } from "../../context/StudentAuthContext";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import pb from "../../lib/pocketbase";
-import { LogOut, KeyRound, Calendar, Clock, ChevronRight, User, BookOpen, AlertCircle, ClipboardCheck } from "lucide-react";
+import { LogOut, KeyRound, Calendar, Clock, ChevronRight, User, BookOpen, AlertCircle, ClipboardCheck, Award } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../../components/ui/dialog";
 import { motion } from "framer-motion";
 
 const getExamTypeColorClass = (type: string) => {
   switch (type?.toLowerCase()) {
-    case "uh": case "ulangan harian": return "bg-blue-50 text-blue-700 border-blue-100";
+    case "uh": case "ulangan harian": return "bg-emerald-50 text-emerald-700 border-emerald-100";
     case "pts": case "tengah semester": return "bg-amber-50 text-amber-700 border-amber-100";
     case "pas": case "akhir semester": return "bg-emerald-50 text-emerald-700 border-emerald-100";
     default: return "bg-slate-50 text-slate-700 border-slate-100";
@@ -62,7 +62,7 @@ const StudentDashboardPage = () => {
         let timeStatus = "upcoming";
         if (now >= start && now <= end) timeStatus = "ongoing";
         else if (now > end) timeStatus = "expired";
-        return { ...room, examTitle: room.room_name || exam?.title || "Ujian", subject: exam?.expand?.subjectId?.name || "Mapel", teacherName: exam?.expand?.teacherId?.name || "-", examType: exam?.examType || "Latihan", timeStatus, startTimeDate: start, endTimeDate: end };
+        return { ...room, examTitle: room.room_name || "Ruang Ujian", examDescription: exam?.title || "Mata Pelajaran", subject: exam?.expand?.subjectId?.name || "Mapel", teacherName: exam?.expand?.teacherId?.name || "-", examType: exam?.examType || "Latihan", timeStatus, startTimeDate: start, endTimeDate: end };
       }).sort((a, b) => {
         const order: any = { "ongoing": 0, "upcoming": 1, "expired": 2 };
         return order[a.timeStatus] - order[b.timeStatus];
@@ -107,58 +107,70 @@ const StudentDashboardPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] dark:bg-slate-950">
-      <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-50 px-4 sm:px-6 h-14 sm:h-16 flex items-center justify-between shadow-sm">
-        <div className="flex items-center gap-3 sm:gap-4">
-          <div className="p-1 sm:p-1.5 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-100 dark:border-slate-700 shrink-0">
-            {schoolLogo ? <img src={schoolLogo} className="h-6 w-6 sm:h-8 sm:w-8 object-contain" alt="Logo" /> : <div className="h-6 w-6 sm:h-8 sm:w-8 bg-slate-200 dark:bg-slate-700 rounded" />}
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 font-sans pb-20 sm:pb-0">
+      <header className="sticky top-0 z-50 bg-white/90 dark:bg-slate-900/90 backdrop-blur-3xl border-b border-slate-100 dark:border-slate-800 h-16 sm:h-20 px-4 sm:px-10 flex items-center justify-between shadow-sm">
+        <div className="flex items-center gap-3">
+           <div className="p-1 sm:p-2 bg-emerald-50 dark:bg-emerald-950/40 rounded-2xl border border-emerald-100/50 dark:border-emerald-800/50 shadow-sm shrink-0">
+            {schoolLogo ? <img src={schoolLogo} className="h-6 w-6 sm:h-9 sm:w-9 object-contain" alt="Logo" /> : <div className="h-6 w-6 sm:h-9 sm:w-9 bg-slate-200 dark:bg-slate-700 rounded-xl animate-pulse" />}
           </div>
           <div className="flex flex-col -space-y-0.5 sm:-space-y-1">
-             <h1 className="text-[13px] sm:text-lg font-extrabold text-[#0f172a] dark:text-white uppercase tracking-tight whitespace-nowrap">
+             <h1 className="text-sm sm:text-lg font-black text-slate-800 dark:text-white uppercase tracking-tight whitespace-nowrap">
                {schoolName}
              </h1>
-             <span className="text-[8px] sm:text-[11px] font-bold text-blue-600/70 dark:text-blue-400/70 uppercase tracking-[0.1em] sm:tracking-[0.2em]">
-               Computer Based Test
+             <span className="text-[8px] sm:text-[10px] font-black text-emerald-600 dark:text-emerald-400/80 uppercase tracking-[0.2em] sm:tracking-[0.3em]">
+               Digital Examination
              </span>
           </div>
         </div>
+        
         <div className="flex items-center gap-2 sm:gap-4">
-           <div className="flex items-center gap-2 sm:gap-3.5 pr-2 sm:pr-3 border-r border-slate-100 dark:border-slate-800">
+           <div className="flex items-center gap-2 sm:gap-4 pr-3 sm:pr-5 border-r border-slate-100 dark:border-slate-800">
               <div className="text-right min-w-0 hidden sm:block">
-                <p className="text-sm font-semibold text-[#0f172a] dark:text-slate-200 leading-none truncate max-w-[150px]">{student?.name}</p>
-                <div className="inline-block px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800 rounded text-[10px] font-bold text-slate-500 mt-1.5 leading-none">
-                  {student?.className}
+                <p className="text-sm font-black text-slate-800 dark:text-slate-200 leading-snug uppercase">{student?.name?.split(" ")[0]}</p>
+                <div className="inline-block px-2 py-0.5 bg-emerald-50 dark:bg-emerald-950/40 rounded-md text-[9px] font-black text-emerald-600 dark:text-emerald-400 mt-2 leading-none uppercase tracking-widest border border-emerald-100/50 dark:border-emerald-800/50 shadow-sm">
+                   Class {student?.className}
                 </div>
               </div>
-              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-blue-50 dark:bg-blue-900/40 flex items-center justify-center border border-blue-100 dark:border-blue-800 shadow-sm shrink-0">
-                 <User className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-emerald-50 dark:bg-emerald-950/40 rounded-xl sm:rounded-2xl flex items-center justify-center border border-emerald-100/50 dark:border-emerald-800/50 shadow-sm group">
+                 <User className="h-5 w-5 sm:h-6 sm:w-6 text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform" />
               </div>
               <div className="text-left min-w-0 block sm:hidden">
-                <p className="text-[13px] font-bold text-[#0f172a] dark:text-slate-200 leading-none truncate max-w-[100px]">{student?.name}</p>
-                <p className="text-[10px] font-semibold text-blue-500 mt-0.5 leading-none">{student?.className}</p>
+                <p className="text-[12px] font-black text-slate-800 dark:text-white leading-tight uppercase">{student?.name?.split(" ")[0]}</p>
+                <p className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 mt-1 uppercase tracking-widest">{student?.className}</p>
               </div>
            </div>
-           <button onClick={logoutStudent} className="p-2 text-rose-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-full transition-all active:scale-90" title="Keluar">
+           <button onClick={logoutStudent} className="p-2.5 text-rose-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-2xl transition-all active:scale-90" title="Sign Out">
               <LogOut className="h-5 w-5" />
            </button>
         </div>
       </header>
 
-      <main className="max-w-2xl mx-auto p-4 sm:p-6 lg:p-8">
-        <div className="space-y-6 sm:space-y-10">
-           {/* Welcome Banner Formal - Compact on Mobile */}
-           <div className="pb-4 sm:pb-8 border-b border-slate-200/60 dark:border-slate-800">
-              <div className="flex flex-col gap-1 sm:gap-2 text-left">
-                 <span className="text-[10px] sm:text-[11px] font-bold text-blue-600 dark:text-blue-400 tracking-wide uppercase">Dashboard Siswa</span>
-                 <h2 className="text-xl sm:text-2xl font-bold text-[#0f172a] dark:text-white tracking-tight leading-tight">
-                    Selamat Mengerjakan, <span className="text-blue-600">{student?.name}</span>
-                 </h2>
-                 <p className="text-[13px] sm:text-base text-slate-500 font-medium leading-normal">Semoga sukses dengan ujian Anda hari ini.</p>
-              </div>
-           </div>
+      <main className="max-w-3xl mx-auto p-4 sm:p-10">
+        <div className="space-y-8 sm:space-y-12">
+           <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="relative bg-emerald-600 rounded-[35px] sm:rounded-[50px] p-8 sm:p-16 overflow-hidden shadow-2xl shadow-emerald-100">
+                  <div className="absolute top-0 right-0 w-1/2 h-full bg-emerald-500/50 skew-x-[-20deg] translate-x-1/2" />
+                  <div className="absolute -bottom-24 -left-24 w-64 h-64 bg-emerald-500/30 rounded-full blur-3xl" />
+                  <div className="relative z-10 flex flex-col sm:flex-row items-center sm:justify-between gap-6">
+                    <div className="relative z-10 max-w-2xl space-y-4 sm:space-y-6">
+                      <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/10 backdrop-blur-md rounded-full text-[10px] font-black text-slate-200 uppercase tracking-widest border border-white/5">
+                         Verified Student Account
+                      </div>
+                      <h2 className="text-2xl sm:text-[32px] font-black text-white tracking-tight leading-tight uppercase">
+                         Halo 👋, <span className="text-slate-300">{student?.name?.split(" ")[0]}</span>
+                      </h2>
+                      <p className="text-[12px] sm:text-sm text-slate-100/70 font-bold uppercase tracking-widest leading-relaxed">Selamat datang di gerbang ujian digital Anda hari ini.</p>
+                    </div>
+                    <div className="w-20 h-20 sm:w-28 sm:h-28 bg-white/10 backdrop-blur-xl rounded-3xl flex items-center justify-center border border-white/10 shadow-2xl shrink-0 group-hover:scale-110 transition-transform">
+                        <ClipboardCheck className="w-10 h-10 sm:w-14 sm:h-14 text-white" />
+                    </div>
+                  </div>
+           </motion.div>
 
-           <div className="space-y-1">
-              <h3 className="text-xs sm:text-sm font-bold text-slate-400 dark:text-slate-500 mb-2 sm:mb-4 uppercase tracking-wider">Jadwal Ujian Aktif</h3>
+           <div className="space-y-2">
+              <div className="flex items-center gap-3 mb-6 px-1">
+                 <div className="w-4 h-4 bg-emerald-600 rounded-full shadow-lg shadow-emerald-200 animate-pulse" />
+                 <h3 className="text-sm sm:text-base font-black text-emerald-900 dark:text-slate-300 uppercase tracking-[0.3em]">Jadwal Ujian Aktif</h3>
+              </div>
            </div>
 
            {loading ? (
@@ -174,88 +186,62 @@ const StudentDashboardPage = () => {
                   const attempt = userAttempts[room.id];
                   const isFinished = attempt && (attempt.status === "finished" || attempt.status === "submitted" || attempt.status === "graded");
                   
-                  // Variasi acak berbasis index agar tiap kartu unik
-                  const rotation = (idx * 37) % 45;
-                  const offsetX = (idx * 59) % 150;
-                  const offsetY = (idx * 83) % 100;
                   const scale = 1.2 + ((idx * 13) % 5) * 0.1;
+                  
+                  // Palette warna dinamis untuk garis vertikal (Emerald, Teal, Lime, Amber, Rose)
+                  const lineColors = ['bg-emerald-600', 'bg-teal-600', 'bg-lime-600', 'bg-amber-600', 'bg-rose-600'];
+                  const myColor = lineColors[idx % lineColors.length];
 
                   return (
                     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} key={room.id} className="group bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm hover:shadow-md transition-all relative overflow-hidden">
                        {/* Aksen Status (Samping) */}
-                       <div className={`absolute top-0 left-0 w-1 h-full z-20 ${
-                         isFinished ? 'bg-slate-300' : (room.timeStatus === 'ongoing' ? 'bg-blue-600' : 'bg-slate-200')
+                       <div className={`absolute top-0 left-0 w-1.5 h-full z-20 ${
+                         isFinished ? 'bg-slate-300' : myColor
                        }`} />
 
-                       {/* Background Pattern Doodle (Bergerak & Acak tiap kartu) */}
-                       <motion.div 
-                          initial={{ rotate: rotation }}
-                          animate={{ 
-                            x: [offsetX, offsetX - 20, offsetX],
-                            y: [offsetY, offsetY - 20, offsetY] 
-                          }}
-                          transition={{ 
-                            duration: 20 + (idx % 10), 
-                            repeat: Infinity, 
-                            ease: "linear" 
-                          }}
-                          className="absolute inset-0 z-0 opacity-[0.06] dark:opacity-[0.02] pointer-events-none overflow-hidden select-none"
-                       >
-                          <svg width="400" height="400" viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg" 
-                             style={{ transform: `scale(${scale})` }}
-                             className="absolute top-0 left-0 w-[250%] h-[250%] origin-center"
-                          >
-                            <path d="M40 40h20v20H40V40zm60 60h20v20h-20v-20zM20 140h10v10H20v-10zm140-100h15v15h-15V40zM80 20h10v10H80V20zm80 140h10v10h-10v-10z" fill="currentColor" fillRule="evenodd" />
-                            <rect x="20" y="80" width="10" height="15" rx="1" fill="currentColor" transform="rotate(-15 20 80)" />
-                            <rect x="150" y="100" width="12" height="18" rx="1" fill="currentColor" transform="rotate(25 150 100)" />
-                            <circle cx="100" cy="40" r="4" fill="currentColor" />
-                            <path d="M120 160l10-5 5 10-10 5z" fill="currentColor" />
-                            <rect x="50" y="150" width="20" height="4" rx="2" fill="currentColor" transform="rotate(45 50 150)" />
-                            <path d="M240 240h20v20h-20v-20zM220 340h10v10h-10v-10z" fill="currentColor" />
-                            <circle cx="300" cy="240" r="4" fill="currentColor" />
-                          </svg>
-                       </motion.div>
-
-                       <div className="p-5 sm:p-7 text-left relative z-10">
-                          <div className="flex flex-col gap-5 sm:gap-6">
-                             <div className="flex justify-between items-start gap-4">
-                                <div className="space-y-1 sm:space-y-1.5 flex-1 min-w-0">
-                                   <span className="text-[11px] sm:text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider block">{room.subject}</span>
-                                   <h3 className="text-lg sm:text-xl font-bold text-[#0f172a] dark:text-white uppercase tracking-tight leading-tight truncate">
-                                      {room.examTitle}
-                                   </h3>
-                                </div>
-                                <div className="flex items-center sm:flex-col sm:items-end gap-2 shrink-0">
-                                   <div className={`text-[10px] sm:text-xs font-bold uppercase px-2 py-0.5 rounded border ${getExamTypeColorClass(room.examType)}`}>
-                                      {room.examType}
-                                   </div>
-                                   <div className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-widest bg-slate-50 dark:bg-slate-800/50 px-2 py-0.5 rounded border border-slate-100 dark:border-slate-800">
-                                      {room.duration}M
-                                   </div>
-                                </div>
+                       <div className="p-4 sm:p-7 text-left relative z-10">
+                          <div className="flex flex-col gap-4 sm:gap-6">
+                             <div className="flex flex-col sm:flex-row justify-between items-start gap-2.5">
+                                 <div className="space-y-0.5 sm:space-y-1.5 flex-1 min-w-0">
+                                    <span className="text-[9px] sm:text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-[0.2em] block opacity-80">{room.subject} • {room.examDescription}</span>
+                                    <h3 className="text-sm sm:text-xl font-extrabold text-[#0f172a] dark:text-white uppercase tracking-tight leading-tight break-words">
+                                       {room.room_name}
+                                    </h3>
+                                 </div>
+                                 <div className="flex items-center gap-2 shrink-0 self-start sm:self-auto">
+                                    <div className={`text-[8px] sm:text-xs font-bold uppercase px-2 py-0.5 rounded-md border shadow-sm ${getExamTypeColorClass(room.examType)}`}>
+                                       {room.examType}
+                                    </div>
+                                    <div className="text-[9px] sm:text-xs font-bold text-emerald-700 dark:text-emerald-300 uppercase tracking-widest bg-emerald-50/80 dark:bg-emerald-900/30 px-2 py-0.5 rounded-md border border-emerald-100/50 dark:border-emerald-800/50 shadow-sm flex items-center gap-1">
+                                       <Clock className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-emerald-600" />
+                                       {room.duration}M • {student?.className}
+                                    </div>
+                                 </div>
                              </div>
 
-                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <div className="space-y-1">
-                                   <label className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-wider block">Guru:</label>
-                                   <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300">
-                                      <User className="w-3.5 h-3.5 text-slate-400" />
-                                      <span className="text-sm sm:text-base font-semibold">{room.teacherName}</span>
-                                   </div>
-                                </div>
-                                <div className="space-y-1">
-                                   <label className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-wider block">Jadwal:</label>
-                                   <div className="flex items-center gap-3 text-slate-700 dark:text-slate-300">
-                                      <div className="flex items-center gap-1.5 font-bold text-[11px] sm:text-sm tabular-nums">
-                                         <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                                         {new Date(room.startTimeDate).toLocaleDateString("id-ID", { day: '2-digit', month: 'short' })}
-                                      </div>
-                                      <div className="flex items-center gap-1.5 font-bold text-[11px] sm:text-sm tabular-nums">
-                                         <Clock className="w-3.5 h-3.5 text-slate-400" />
-                                         {new Date(room.startTimeDate).toLocaleTimeString("id-ID", { hour: '2-digit', minute: '2-digit' })} — {new Date(room.endTimeDate).toLocaleTimeString("id-ID", { hour: '2-digit', minute: '2-digit' })}
-                                      </div>
-                                   </div>
-                                </div>
+                             <div className="grid grid-cols-1 gap-2 sm:gap-4 sm:grid-cols-2">
+                                 <div className="bg-slate-50/50 dark:bg-slate-800/30 p-3 rounded-xl border border-slate-100/50 dark:border-slate-800/50 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                                    <div className="flex items-center gap-2 mb-1">
+                                       <User className="w-3 h-3 text-emerald-500/70" />
+                                       <label className="text-[8px] sm:text-xs font-bold text-slate-400 uppercase tracking-wider block">GURU PENGAMPU</label>
+                                    </div>
+                                    <span className="text-xs sm:text-base font-bold text-slate-700 dark:text-slate-300 ml-5 block leading-tight">{room.teacherName}</span>
+                                 </div>
+                                 <div className="bg-slate-50/50 dark:bg-slate-800/30 p-3 rounded-xl border border-slate-100/50 dark:border-slate-800/50 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                                    <div className="flex items-center gap-2 mb-1">
+                                       <Calendar className="w-3 h-3 text-emerald-500/70" />
+                                       <label className="text-[8px] sm:text-xs font-bold text-slate-400 uppercase tracking-wider block">JADWAL PELAKSANAAN</label>
+                                    </div>
+                                    <div className="ml-5 space-y-1">
+                                       <div className="font-bold text-[10px] sm:text-sm tabular-nums text-slate-700 dark:text-slate-300">
+                                          {new Date(room.startTimeDate).toLocaleDateString("id-ID", { weekday: 'long', day: '2-digit', month: 'short' })}
+                                       </div>
+                                       <div className="flex items-center gap-1.5 font-bold text-[10px] sm:text-sm tabular-nums text-emerald-600 dark:text-emerald-400 bg-emerald-50/50 dark:bg-emerald-900/20 px-2 py-0.5 rounded-md w-fit">
+                                          <Clock className="w-3 h-3" />
+                                          {new Date(room.startTimeDate).toLocaleTimeString("id-ID", { hour: '2-digit', minute: '2-digit' })} — {new Date(room.endTimeDate).toLocaleTimeString("id-ID", { hour: '2-digit', minute: '2-digit' })}
+                                       </div>
+                                    </div>
+                                 </div>
                              </div>
 
                              <div className="w-full pt-4 border-t border-slate-50 dark:border-slate-800/50">
@@ -265,12 +251,12 @@ const StudentDashboardPage = () => {
                                         <ClipboardCheck className="w-4 h-4 text-emerald-500 shrink-0" />
                                         <span className="truncate">Selesai Dikirim</span>
                                      </div>
-                                     <button onClick={() => { sessionStorage.setItem("activeCBTRoomId", room.id); navigate(`/cbt/result`); }} className="text-[11px] sm:text-xs font-bold text-blue-600 hover:underline uppercase tracking-wider whitespace-nowrap ml-2">Detail Hasil</button>
+                                     <button onClick={() => { sessionStorage.setItem("activeCBTRoomId", room.id); navigate(`/cbt/result`); }} className="text-[11px] sm:text-xs font-bold text-emerald-600 hover:underline uppercase tracking-wider whitespace-nowrap ml-2">Detail Hasil</button>
                                   </div>
                                 ) : room.timeStatus === "ongoing" ? (
                                   <Button 
                                     onClick={() => setSelectedRoom(room)}
-                                    className="w-full bg-[#1e293b] hover:bg-[#0f172a] dark:bg-blue-600 dark:hover:bg-blue-500 text-white h-11 sm:h-12 rounded-lg font-bold text-xs sm:text-sm uppercase tracking-widest flex items-center justify-center gap-2 shadow-sm"
+                                    className="w-full bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500 text-white h-11 sm:h-12 rounded-lg font-bold text-xs sm:text-sm uppercase tracking-widest flex items-center justify-center gap-2 shadow-sm"
                                   >
                                     Mulai Ujian <ChevronRight className="w-3.5 h-3.5" />
                                   </Button>
@@ -296,11 +282,11 @@ const StudentDashboardPage = () => {
 
       <Dialog open={!!selectedRoom} onOpenChange={() => { if (!isValidating) setSelectedRoom(null); setTokenInput(""); setTokenError(""); }}>
         <DialogContent className="sm:max-w-md bg-white dark:bg-slate-950 rounded-xl border-none shadow-2xl p-0">
-           <div className="bg-slate-900 px-6 py-8 text-white relative">
+           <div className="bg-emerald-600 px-6 py-8 text-white relative">
               <div className="absolute top-0 right-0 p-4 opacity-10"><KeyRound className="w-16 h-16" /></div>
               <DialogHeader>
                 <DialogTitle className="text-lg font-bold uppercase tracking-tight">Verifikasi Akses</DialogTitle>
-                <p className="text-slate-400 text-[10px] font-semibold uppercase tracking-widest mt-1">Masukkan Token Ruangan</p>
+                <p className="text-emerald-50/80 text-[10px] font-bold uppercase tracking-widest mt-1.5 opacity-90">Masukkan Token Ruangan</p>
               </DialogHeader>
            </div>
            <div className="p-8 space-y-6">
@@ -310,10 +296,10 @@ const StudentDashboardPage = () => {
                     <Input value={tokenInput} onChange={(e) => setTokenInput(e.target.value.toUpperCase())} placeholder="AB123" className="h-12 text-center text-xl font-black tracking-[0.3em] bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 rounded-lg" disabled={isValidating} />
                     {tokenError && <p className="text-rose-500 text-[9px] font-bold mt-2 flex items-center gap-1 uppercase"><AlertCircle className="w-3 h-3" /> {tokenError}</p>}
                  </div>
-                 <div className="bg-blue-50/50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-100 dark:border-blue-800"><p className="text-[10px] text-blue-600 dark:text-blue-400 leading-relaxed font-medium">⚠️ Pastikan koneksi internet stabil sebelum mulai. Pengerjaan Anda akan tercatat secara otomatis.</p></div>
+                 <div className="bg-emerald-50/50 dark:bg-emerald-900/20 p-4 rounded-lg border border-emerald-100 dark:border-emerald-800"><p className="text-[10px] text-emerald-600 dark:text-emerald-400 leading-relaxed font-medium">⚠️ Pastikan koneksi internet stabil sebelum mulai. Pengerjaan Anda akan tercatat secara otomatis.</p></div>
               </div>
               <DialogFooter>
-                <Button onClick={handleValidateToken} disabled={!tokenInput || isValidating} className="w-full h-12 bg-slate-900 dark:bg-blue-600 text-white rounded-lg font-bold uppercase tracking-widest text-[10px] transition-all active:scale-95">{isValidating ? "Memverifikasi..." : "Konfirmasi & Masuk"}</Button>
+                <Button onClick={handleValidateToken} disabled={!tokenInput || isValidating} className="w-full h-12 bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-600 text-white rounded-lg font-bold uppercase tracking-widest text-[10px] transition-all active:scale-95">{isValidating ? "Memverifikasi..." : "Konfirmasi & Masuk"}</Button>
               </DialogFooter>
            </div>
         </DialogContent>

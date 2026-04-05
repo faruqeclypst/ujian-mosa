@@ -104,9 +104,9 @@ const StudentLoginPage = () => {
     <div className="flex items-center justify-center min-h-screen bg-[#f8fafc] overflow-hidden relative font-sans leading-relaxed">
       {/* Dynamic Animated Background */}
       <div className="absolute inset-0 z-0">
-        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-400/20 rounded-full blur-[120px] animate-pulse"></div>
-        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-indigo-400/20 rounded-full blur-[120px] animate-pulse delay-75"></div>
-        <div className="absolute top-[30%] right-[10%] w-[30%] h-[30%] bg-pink-400/10 rounded-full blur-[100px] animate-pulse delay-150"></div>
+        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-emerald-400/20 rounded-full blur-[120px] animate-pulse"></div>
+        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-teal-400/20 rounded-full blur-[120px] animate-pulse delay-75"></div>
+        <div className="absolute top-[30%] right-[10%] w-[30%] h-[30%] bg-lime-400/10 rounded-full blur-[100px] animate-pulse delay-150"></div>
         
         {/* Subtle Grid Pattern */}
         <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-[0.03]"></div>
@@ -118,8 +118,8 @@ const StudentLoginPage = () => {
           <div className="absolute inset-0 bg-white/20 blur-xl rounded-full scale-150 animate-pulse"></div>
           <div className="relative w-32 h-32 md:w-40 md:h-40 bg-white/40 backdrop-blur-md rounded-3xl p-4 shadow-[0_8px_32px_0_rgba(31,38,135,0.07)] border border-white/40 flex items-center justify-center overflow-hidden">
             {logoLoading ? (
-              <div className="w-full h-full bg-slate-100/50 rounded-2xl animate-pulse flex items-center justify-center">
-                <div className="h-10 w-10 rounded-full border-4 border-blue-500/30 border-t-blue-600 animate-spin" />
+              <div className="w-full h-full bg-emerald-100/50 rounded-2xl animate-pulse flex items-center justify-center">
+                <div className="h-10 w-10 rounded-full border-4 border-emerald-500/30 border-t-emerald-600 animate-spin" />
               </div>
             ) : schoolLogo && !logoError ? (
               <img 
@@ -129,7 +129,7 @@ const StudentLoginPage = () => {
                 onError={() => setLogoError(true)}
               />
             ) : (
-              <div className="w-full h-full bg-gradient-to-br from-blue-600 to-indigo-700 flex flex-col items-center justify-center shadow-inner rounded-2xl p-2 text-white">
+              <div className="w-full h-full bg-gradient-to-br from-emerald-600 to-teal-700 flex flex-col items-center justify-center shadow-inner rounded-2xl p-2 text-white">
                 <School size={48} className="mb-1 opacity-90" />
                 <span className="text-xl font-black tracking-tighter">CBT</span>
               </div>
@@ -142,14 +142,14 @@ const StudentLoginPage = () => {
             Portal Ujian Siswa
           </h1>
           <div className="flex items-center justify-center gap-2">
-            <GraduationCap size={18} className="text-blue-600" />
+            <GraduationCap size={18} className="text-emerald-600" />
             <p className="text-slate-500 font-medium text-sm md:text-base">
               {schoolName || "SMAN Modal Bangsa Aceh"}
             </p>
           </div>
         </div>
 
-        <Card className="w-full bg-white/70 backdrop-blur-2xl border border-white/60 shadow-[0_20px_50px_rgba(8,112,184,0.07)] rounded-[32px] overflow-hidden">
+        <Card className="w-full bg-white/70 backdrop-blur-2xl border border-white/60 shadow-[0_20px_50px_rgba(16,185,129,0.07)] rounded-[32px] overflow-hidden">
           <CardContent className="p-8 md:p-10">
             <form onSubmit={handleLogin} className="space-y-6">
               {error && (
@@ -167,7 +167,7 @@ const StudentLoginPage = () => {
                   value={nisn}
                   onChange={(e) => setNisn(e.target.value)} 
                   placeholder="Masukkan nomor induk siswa"
-                  className="bg-white/50 border-slate-200/60 text-slate-800 placeholder:text-slate-400 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 rounded-[20px] h-14 px-5 text-base transition-all duration-300"
+                  className="bg-white/50 border-slate-200/60 text-slate-800 placeholder:text-slate-400 focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 rounded-[20px] h-14 px-5 text-base transition-all duration-300"
                   disabled={loading}
                 />
               </div>
@@ -181,7 +181,7 @@ const StudentLoginPage = () => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="bg-white/50 border-slate-200/60 text-slate-800 placeholder:text-slate-400 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 rounded-[20px] h-14 px-5 text-base transition-all duration-300"
+                  className="bg-white/50 border-slate-200/60 text-slate-800 placeholder:text-slate-400 focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 rounded-[20px] h-14 px-5 text-base transition-all duration-300"
                   disabled={loading}
                 />
               </div>
@@ -189,7 +189,7 @@ const StudentLoginPage = () => {
               <div className="pt-4">
                 <Button 
                   type="submit" 
-                  className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold h-14 rounded-[20px] shadow-lg shadow-blue-500/20 border-0 text-lg transition-all active:scale-[0.98]" 
+                  className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold h-14 rounded-[20px] border-0 text-lg transition-all active:scale-[0.98]" 
                   disabled={loading}
                 >
                   {loading ? (
@@ -213,8 +213,8 @@ const StudentLoginPage = () => {
       <Dialog open={showChangePassModal} onOpenChange={() => {}}>
         <DialogContent className="max-w-md bg-white dark:bg-slate-900 rounded-[32px] p-8" onPointerDownOutside={(e) => e.preventDefault()}>
           <DialogHeader className="mb-6">
-            <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center mb-4 mx-auto">
-              <Lock className="text-blue-600" size={32} />
+            <div className="w-16 h-16 bg-emerald-50 rounded-2xl flex items-center justify-center mb-4 mx-auto">
+              <Lock className="text-emerald-600" size={32} />
             </div>
             <DialogTitle className="text-center text-2xl font-extrabold text-slate-900">Ganti Password Wajib!</DialogTitle>
             <p className="text-slate-500 text-center mt-2 font-medium">
@@ -255,7 +255,7 @@ const StudentLoginPage = () => {
             <div className="pt-2">
               <Button 
                 type="submit" 
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold h-12 rounded-2xl text-lg transition-all" 
+                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-12 rounded-2xl text-lg transition-all" 
                 disabled={isChangingPass}
               >
                 {isChangingPass ? "Menyimpan..." : "Simpan & Lanjutkan"}

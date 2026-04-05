@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Plus, Trash, Edit, RefreshCw, Users, Archive, RotateCw, FileSpreadsheet, BookOpen, ClipboardList, Lock, ChevronDown, Power, PowerOff, Square, CheckCircle2, X } from "lucide-react";
+import { Plus, Trash, Edit, RefreshCw, Users, Archive, RotateCw, FileSpreadsheet, BookOpen, ClipboardList, Lock, Clock, ChevronDown, Power, PowerOff, Square, CheckCircle2, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import * as XLSX from "xlsx-js-style";
 import { Button } from "../../components/ui/button";
@@ -1731,7 +1731,7 @@ const ExamRoomsPage = () => {
                         if (status === "finished") {
                           statusLabel = <span className="text-green-600 font-semibold px-2 py-0.5 bg-green-50 rounded-full border border-green-100">Selesai</span>;
                         } else if (status === "LOCKED") {
-                          statusLabel = <span className="text-red-500 font-bold px-2 py-0.5 bg-red-50 rounded-full border border-red-100 italic">TERKUNCI</span>;
+                          statusLabel = <span className="text-red-500 font-bold px-2 py-0.5 bg-red-50 rounded-full border border-red-100 italic text-[10px]">TERKUNCI</span>;
                         } else {
                           const lastHeartbeat = attempt.lastHeartbeat || (attempt as any).last_heartbeat || null;
                           const lastH = lastHeartbeat ? new Date(lastHeartbeat).getTime() : 0;
