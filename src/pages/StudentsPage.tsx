@@ -110,6 +110,7 @@ const StudentsPage = () => {
         await createStudent({
           nisn: String(row.nisn),
           name: row.name,
+          gender: row.gender,
           classId: row.classId,
         });
       }
@@ -129,8 +130,9 @@ const StudentsPage = () => {
     selectedStudent ? {
       nisn: selectedStudent.nisn,
       name: selectedStudent.name,
+      gender: selectedStudent.gender,
       classId: selectedStudent.classId
-    } : { nisn: "", name: "", classId: "" }, 
+    } : { nisn: "", name: "", gender: "L" as const, classId: "" }, 
   [selectedStudent]);
 
   return (

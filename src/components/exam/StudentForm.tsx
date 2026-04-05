@@ -12,6 +12,7 @@ import type { ClassData } from "../../types/exam";
 const studentSchema = z.object({
   nisn: z.string().min(5, "NISN minimal 5 karakter"),
   name: z.string().min(1, "Nama Siswa wajib diisi"),
+  gender: z.enum(["L", "P"], { required_error: "Gender wajib dipilih" }),
   classId: z.string().min(1, "Kelas wajib dipilih"),
 });
 
@@ -44,6 +45,7 @@ const StudentForm = ({
     defaultValues: {
       nisn: "",
       name: "",
+      gender: "L",
       classId: "",
       ...defaultValues,
     },
@@ -57,17 +59,18 @@ const StudentForm = ({
       reset({
         nisn: defaultValues.nisn || "",
         name: defaultValues.name || "",
+        gender: defaultValues.gender || "L",
         classId: defaultValues.classId || "",
       });
     } else {
-      reset({ nisn: "", name: "", classId: "" });
+      reset({ nisn: "", name: "", gender: "L", classId: "" });
     }
   }, [defaultValues?.nisn, defaultValues?.name, defaultValues?.classId, reset]);
 
   const submitHandler = async (values: StudentFormValues) => {
     await onSubmit(values);
     if (!defaultValues || Object.keys(defaultValues).length === 0) {
-      reset({ nisn: "", name: "", classId: "" });
+      reset({ nisn: "", name: "", gender: "L", classId: "" });
     }
   };
 
@@ -83,6 +86,29 @@ const StudentForm = ({
 
       <FormField id="name" label="Nama Siswa" error={errors.name}>
         <Input id="name" placeholder="Masukkan Nama Siswa" {...register("name")} />
+      </FormField>
+
+      <FormField id="gender" label="Gender" error={errors.gender}>
+        <div className="flex gap-4">
+          <label className="flex items-center gap-2 cursor-pointer group">
+            <input 
+              type="radio" 
+              value="L" 
+              {...register("gender")} 
+              className="w-4 h-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-700 bg-gray-100 dark:bg-gray-800"
+            />
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-300 group-hover:text-blue-600 transition-colors">Laki-laki (L)</span>
+          </label>
+          <label className="flex items-center gap-2 cursor-pointer group">
+            <input 
+              type="radio" 
+              value="P" 
+              {...register("gender")} 
+              className="w-4 h-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-700 bg-gray-100 dark:bg-gray-800"
+            />
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-300 group-hover:text-blue-600 transition-colors">Perempuan (P)</span>
+          </label>
+        </div>
       </FormField>
 
 

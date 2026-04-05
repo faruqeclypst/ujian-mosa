@@ -76,6 +76,7 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
             // Khusus Siswa: Petakan username ke nisn jika perlu
             if (collection === "students") {
               mapped.nisn = item.username || item.nisn;
+              mapped.gender = item.gender || "L";
               mapped.classId = item.classId || item.classid;
             }
             return mapped;
@@ -106,6 +107,7 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
           ...i, 
           id: i.id, 
           nisn: i.username || i.nisn,
+          gender: i.gender || "L",
           classId: i.classId || i.classid || i.class_id 
         } as any;
       }));
@@ -240,6 +242,7 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
       password: defaultPass,
       passwordConfirm: defaultPass,
       name: payload.name,
+      gender: payload.gender || "L",
       classId: payload.classId,
       classid: payload.classId, // backup for lowercase field
     });
@@ -248,6 +251,7 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
     const updateData: any = {};
     if (payload.name) updateData.name = payload.name;
     if (payload.nisn) updateData.username = payload.nisn;
+    if (payload.gender) updateData.gender = payload.gender;
     if (payload.classId) {
       updateData.classId = payload.classId;
       updateData.classid = payload.classId;

@@ -68,6 +68,7 @@ const StudentTable = ({
     },
     { key: "nisn", label: "NISN", sortable: true },
     { key: "name", label: "Nama Siswa", sortable: true },
+    { key: "gender", label: "L/P", className: "w-[60px] text-center" },
     { 
       key: "classId", 
       label: "Kelas", 
