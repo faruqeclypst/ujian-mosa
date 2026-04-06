@@ -1,10 +1,10 @@
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from "react";
 import pb from "../lib/pocketbase";
-import type { 
-  Teacher, TeacherPayload, 
-  ClassData, ClassPayload, 
+import type {
+  Teacher, TeacherPayload,
+  ClassData, ClassPayload,
   SubjectData, SubjectPayload,
-  StudentData, StudentPayload 
+  StudentData, StudentPayload
 } from "../types/exam";
 
 interface ExamDataContextType {
@@ -13,7 +13,7 @@ interface ExamDataContextType {
   subjects: SubjectData[];
   students: StudentData[];
   loading: boolean;
-  
+
   // Teachers
   createTeacher: (payload: TeacherPayload) => Promise<void>;
   updateTeacher: (id: string, payload: Partial<TeacherPayload>) => Promise<void>;
@@ -34,7 +34,7 @@ interface ExamDataContextType {
   updateStudent: (id: string, payload: Partial<StudentPayload>) => Promise<void>;
   deleteStudent: (id: string) => Promise<void>;
   updateStudentClassBatch: (studentIds: string[], newClassId: string) => Promise<void>;
-  
+
   // Universal Token
   universalToken: string;
   timeLeft: string;
@@ -72,7 +72,7 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
           setter(data.map(item => {
             const { id, ...rest } = item;
             const mapped = { id, ...rest } as any;
-            
+
             // Khusus Siswa: Petakan username ke nisn jika perlu
             if (collection === "students") {
               mapped.nisn = item.username || item.nisn;
@@ -90,7 +90,7 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
       setLoading(true);
       // Disable auto-cancellation globally to prevent AbortErrors during parallel fetches
       pb.autoCancellation(false);
-      
+
       // Ambil data awal untuk semua
       const [tData, cData, sMapel, stData] = await Promise.all([
         pb.collection("teachers").getFullList({ sort: '-created' }),
@@ -103,12 +103,12 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
       setClasses(cData.map(i => ({ ...i, id: i.id } as any)));
       setSubjects(sMapel.map(i => ({ ...i, id: i.id } as any)));
       setStudents(stData.map(i => {
-        return { 
-          ...i, 
-          id: i.id, 
+        return {
+          ...i,
+          id: i.id,
           nisn: i.username || i.nisn,
           gender: i.gender || "L",
-          classId: i.classId || i.classid || i.class_id 
+          classId: i.classId || i.classid || i.class_id
         } as any;
       }));
 
@@ -151,14 +151,14 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
           const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
           let token = "";
           for (let i = 0; i < 6; i++) token += chars.charAt(Math.floor(Math.random() * chars.length));
-          
+
           await pb.collection('settings').create({
             universal_token: token,
             universal_token_updated_at: new Date().toISOString()
           });
           fetchSettings();
         }
-      } catch (e) {}
+      } catch (e) { }
     };
 
     fetchSettings();
@@ -185,13 +185,13 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
             const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
             let token = "";
             for (let i = 0; i < 6; i++) token += chars.charAt(Math.floor(Math.random() * chars.length));
-            
+
             await pb.collection('settings').update(records[0].id, {
               universal_token: token,
               universal_token_updated_at: new Date().toISOString()
             });
           }
-        } catch (e) {}
+        } catch (e) { }
       } else {
         const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
         const s = Math.floor((diff % (1000 * 60)) / 1000);
@@ -263,9 +263,9 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
   };
   const updateStudentClassBatch = async (studentIds: string[], newClassId: string) => {
     for (const id of studentIds) {
-      await pb.collection("students").update(id, { 
+      await pb.collection("students").update(id, {
         classId: newClassId,
-        classid: newClassId 
+        classid: newClassId
       });
     }
   };

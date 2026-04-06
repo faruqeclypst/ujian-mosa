@@ -238,7 +238,7 @@ const CBTPage = () => {
       const qRecord = await pb.collection("questions").getFullList({ filter: `examId = "${rData.examId}"`, sort: "order,created" });
       const loaded: Question[] = qRecord.map(q => {
         const tM: any = { "multiple_choice": "pilihan_ganda", "complex_multiple_choice": "pilihan_ganda_kompleks", "short_answer": "isian_singkat", "essay": "uraian", "matching": "menjodohkan", "ordering": "urutkan", "true_false": "benar_salah", "pilihan_ganda": "pilihan_ganda", "pilihan_ganda_kompleks": "pilihan_ganda_kompleks", "isian_singkat": "isian_singkat", "uraian": "uraian", "menjodohkan": "menjodohkan", "urutkan": "urutkan", "benar_salah": "benar_salah" };
-        
+
         let qImg = q.imageUrl || "";
         if (qImg && !qImg.startsWith('http') && !qImg.startsWith('data:')) {
           qImg = pb.files.getUrl(q, qImg);
