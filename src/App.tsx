@@ -70,11 +70,16 @@ const AppContent = () => {
           document.title = data.name ? `E-Ujian - ${data.name}` : "E-Ujian";
 
           // 🌍 Dynamically set Favicon from school logo
-          if (data.logo) {
+          let faviconUrl = data.logoUrl || data.logo || "";
+          if (faviconUrl && !faviconUrl.startsWith('http') && !faviconUrl.startsWith('data:')) {
+            faviconUrl = pb.files.getUrl(data, faviconUrl);
+          }
+
+          if (faviconUrl) {
             const link: HTMLLinkElement = document.querySelector("link[rel*='icon']") || document.createElement('link');
             link.type = 'image/x-icon';
             link.rel = 'shortcut icon';
-            link.href = data.logo;
+            link.href = faviconUrl;
             document.getElementsByTagName('head')[0].appendChild(link);
           }
         } else {

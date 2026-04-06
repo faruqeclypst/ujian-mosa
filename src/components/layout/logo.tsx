@@ -16,9 +16,15 @@ const Logo = () => {
 
         if (records.length > 0) {
           const data = records[0];
+          let logoUrl = data.logoUrl || data.logo || "";
+          
+          if (logoUrl && !logoUrl.startsWith('http') && !logoUrl.startsWith('data:')) {
+            logoUrl = pb.files.getUrl(data, logoUrl);
+          }
+
           setProfile({ 
             name: data.name || "E-Ujian", 
-            logoUrl: data.logoUrl || data.logo || "" 
+            logoUrl: logoUrl
           });
           setLogoError(false);
         }
@@ -32,9 +38,15 @@ const Logo = () => {
     // Subscribe ke perubahan data secara realtime di PocketBase
     pb.collection("settings").subscribe("*", (e) => {
       if (e.action === "update" || e.action === "create") {
+        let logoUrl = e.record.logoUrl || e.record.logo || "";
+        
+        if (logoUrl && !logoUrl.startsWith('http') && !logoUrl.startsWith('data:')) {
+          logoUrl = pb.files.getUrl(e.record, logoUrl);
+        }
+
         setProfile({ 
           name: e.record.name || "E-Ujian", 
-          logoUrl: e.record.logoUrl || e.record.logo || "" 
+          logoUrl: logoUrl
         });
         setLogoError(false);
       }
@@ -73,8 +85,9 @@ const Logo = () => {
             v2.0
           </div>
         </div>
-        <p className="text-xs text-muted-foreground leading-tight mt-0.5 sm:mt-1 font-medium truncate">
-          {profile.name}
+        <p className="text-[10px] text-muted-foreground leading-tight mt-0.5 sm:mt-1 font-medium truncate flex flex-col">
+          <span>{profile.name}</span>
+          <span className="text-[9px] opacity-60">dev: Alfaruq Asri</span>
         </p>
       </div>
     </div>

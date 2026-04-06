@@ -130,9 +130,6 @@ const ExamRoomsPage = () => {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [expandedstudent, setExpandedstudent] = useState<string | null>(null);
 
-  const [limitDialogOpen, setLimitDialogOpen] = useState(false);
-  const [limitNisn, setLimitNisn] = useState("");
-  const [limitValue, setLimitValue] = useState("1");
   const [previewImage, setPreviewImage] = useState<string | null>(null); // <--- Pratinjau Zoom Gambar Logs
 
   const {
@@ -1061,8 +1058,7 @@ const ExamRoomsPage = () => {
     try {
       await pb.collection('attempts').update(attId, {
         status: 'ongoing',
-        cheatCount: 0,
-        cheat_count: 0
+        cheatCount: 0
       });
       handleManualRefreshMonitor();
       showAlert("Berhasil", "Siswa berhasil dibuka kuncinya.", "success");
@@ -1094,34 +1090,7 @@ const ExamRoomsPage = () => {
     });
   };
 
-  const openLimitDialog = (nisn: string) => { setLimitNisn(nisn); setLimitValue("1"); setLimitDialogOpen(true); };
 
-  const handleConfirmAddLimit = async () => {
-    // 🔍 Mencari pengerjaan siswa yang sesuai (Mendukung studentId & student_id)
-    const studentAttempts = attempts.filter(a => (a.studentId === limitNisn) || (a.student_id === limitNisn));
-
-    // 💡 Selalu pilih pengerjaan TERBARU (Latest) agar sesuai dengan tampilan di tabel monitoring
-    const att = studentAttempts.sort((a, b) => {
-      const diff = new Date(b.created || 0).getTime() - new Date(a.created || 0).getTime();
-      return diff !== 0 ? diff : b.id.localeCompare(a.id);
-    })[0];
-
-    if (!att) return;
-    try {
-      const currentLimit = (att.extraCheatLimit !== undefined ? att.extraCheatLimit : (att as any).extra_cheat_limit) || 0;
-      const addedValue = parseInt(limitValue) || 1;
-
-      // Update dengan dual naming untuk kompatibilitas schema
-      await pb.collection('attempts').update(att.id, {
-        extraCheatLimit: currentLimit + addedValue,
-        extra_cheat_limit: currentLimit + addedValue
-      });
-
-      handleManualRefreshMonitor();
-      setLimitDialogOpen(false);
-      showAlert("Berhasil", "Batas toleransi berhasil ditambahkan.", "success");
-    } catch (e) { showAlert("Gagal", "Terjadi kesalahan saat menambah batas.", "danger"); }
-  };
 
   const handleResetCheatCount = async (attId: string) => {
     try {
@@ -1130,10 +1099,7 @@ const ExamRoomsPage = () => {
 
       await pb.collection('attempts').update(attId, {
         cheatCount: 0,
-        cheat_count: 0,
-        status: "ongoing",
-        extraCheatLimit: curExtra + 1,
-        extra_cheat_limit: curExtra + 1
+        status: "ongoing"
       });
       handleManualRefreshMonitor();
       showAlert("Berhasil", "Pelanggaran telah di-reset.", "success");
@@ -1486,31 +1452,6 @@ const ExamRoomsPage = () => {
         isLoading={isDeleting}
       />
 
-      <Dialog open={limitDialogOpen} onOpenChange={setLimitDialogOpen}>
-        <DialogContent className="max-w-sm bg-card">
-          <DialogHeader>
-            <DialogTitle>Tambah Batas Toleransi</DialogTitle>
-          </DialogHeader>
-          <div className="py-3 space-y-3">
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              Tambahkan extra toleransi pelanggaran/kecurangan untuk Siswa ini (dalam angka):
-            </p>
-            <Input
-              type="number"
-              value={limitValue}
-              onChange={(e) => setLimitValue(e.target.value)}
-              min="1"
-              placeholder="Contoh: 1"
-              className="bg-slate-50 dark:bg-slate-800"
-            />
-          </div>
-          <DialogFooter className="flex w-full gap-2">
-            <Button variant="outline" className="flex-1 border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800" onClick={() => setLimitDialogOpen(false)}>Batal</Button>
-            <Button className="flex-1 bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-100 dark:bg-blue-900/40 dark:text-blue-400 dark:hover:bg-blue-900/60 dark:border-blue-800/20 font-semibold" onClick={handleConfirmAddLimit}>Tambahkan</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
       {/* Monitoring Dialog */}
       <Dialog open={isMonitorOpen} onOpenChange={setIsMonitorOpen}>
         <DialogContent className="max-w-[95vw] lg:max-w-6xl w-full bg-card max-h-[95vh] flex flex-col p-4 sm:p-6 overflow-hidden">
@@ -1570,7 +1511,7 @@ const ExamRoomsPage = () => {
                         const ids = Array.isArray(rawIds) ? rawIds : String(rawIds || "").split(",").map(id => id.trim()).filter(Boolean);
                         return ids.includes(c.id);
                       })
-                      .map(c => <option key={c.id} value={c.id}>{c.name}</option>)
+                      .map(c => <option key={c.id} value={c.name}>{c.name}</option>)
                     }
                   </select>
                 </>
@@ -1785,7 +1726,7 @@ const ExamRoomsPage = () => {
                             <TableCell className="text-center text-xs text-slate-500 font-medium tabular-nums">{answeredCount}/{monitorQuestions.length}</TableCell>
                             <TableCell className="text-center">
                               {(() => {
-                                const totalAllowed = (monitorRoom?.cheat_limit || 3) + (attempt?.extraCheatLimit || (attempt as any)?.extra_cheat_limit || 0);
+                                const totalAllowed = (monitorRoom?.cheat_limit || 3);
                                 const currentCount = attempt?.cheatCount !== undefined ? attempt.cheatCount : (attempt as any)?.cheat_count || 0;
                                 return (
                                   <span className={`font-bold tabular-nums text-[11px] ${currentCount > 0 ? "text-red-500" : "text-slate-400"}`}>
@@ -1830,9 +1771,7 @@ const ExamRoomsPage = () => {
                                                 <Lock className="w-3.5 h-3.5 opacity-80" /> Buka Kunci
                                               </button>
                                             )}
-                                            <button onClick={(e) => { e.stopPropagation(); openLimitDialog(student.id); setOpenMenuId(null); }} className="w-full text-left px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-700 text-[10px] font-semibold text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
-                                              <Plus className="w-3.5 h-3.5 opacity-70 text-slate-400" /> + Limit
-                                            </button>
+
                                             {attempt?.status !== "finished" && (
                                               <button onClick={(e) => { e.stopPropagation(); handleForceSubmitStudent(attempt.id); setOpenMenuId(null); }} className="w-full text-left px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-700 text-[10px] font-semibold text-rose-600 dark:text-rose-400 flex items-center gap-1.5 border-b border-slate-100 dark:border-slate-700/60">
                                                 <Square className="w-3.5 h-3.5 opacity-70 fill-current" /> Selesaikan
@@ -2069,9 +2008,8 @@ const ExamRoomsPage = () => {
                           <p className="text-sm font-bold text-slate-700 tabular-nums">{Object.keys(sisAnswers).length}/{monitorQuestions.length}</p>
                         </div>
                         <div className="text-center">
-                          <p className="text-[9px] uppercase font-bold text-slate-400 mb-0.5">Warn</p>
                           <p className="text-sm font-bold text-rose-500 tabular-nums">
-                            {attempt?.cheatCount || 0} / {(monitorRoom?.cheat_limit || 3) + (attempt?.extraCheatLimit || 0)}
+                            {attempt?.cheatCount || 0} / {(monitorRoom?.cheat_limit || 3)}
                           </p>
                         </div>
                       </div>
@@ -2082,11 +2020,11 @@ const ExamRoomsPage = () => {
                             {attempt.status === "LOCKED" && (
                               <Button size="sm" variant="outline" className="h-8 text-[10px] font-bold border-green-200 text-green-700 hover:bg-green-50 rounded-xl px-3" onClick={() => handleUnlockStudent(attempt.id)}>Unlock</Button>
                             )}
-                            <Button size="sm" variant="outline" className="h-8 text-[10px] font-bold border-rose-200 text-rose-700 hover:bg-rose-50 rounded-xl px-3" onClick={() => handleResetSession(attempt.id, student.id, monitorRoom?.id || "")}>Reset</Button>
+                            <Button size="sm" variant="outline" className="h-8 text-[10px] font-bold border-amber-200 text-amber-700 hover:bg-amber-100 rounded-xl px-3" onClick={() => handleResetCheatCount(attempt.id)}>Reset Pelanggaran</Button>
+                            <Button size="sm" variant="outline" className="h-8 text-[10px] font-bold border-rose-200 text-rose-700 hover:bg-rose-50 rounded-xl px-3" onClick={() => handleResetSession(attempt.id, student.id, monitorRoom?.id || "")}>Reset Sesi</Button>
                             {attempt.status !== "submitted" && (
-                              <Button size="sm" variant="outline" className="h-8 text-[10px] font-bold border-amber-200 text-amber-700 hover:bg-amber-50 rounded-xl px-3" onClick={() => handleForceSubmitStudent(attempt.id)}>Submit</Button>
+                              <Button size="sm" variant="outline" className="h-8 text-[10px] font-bold border-blue-200 text-blue-700 hover:bg-blue-50 rounded-xl px-3" onClick={() => handleForceSubmitStudent(attempt.id)}>Submit</Button>
                             )}
-                            <Button size="sm" variant="outline" className="h-8 text-[10px] font-bold border-slate-200 text-slate-700 hover:bg-slate-50 rounded-xl px-3" onClick={() => openLimitDialog(student.id)}>+ Limit</Button>
                           </>
                         )}
                         <Button size="sm" variant="secondary" className="h-8 text-[10px] font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-xl px-3" onClick={() => setExpandedstudent(expandedstudent === student.id ? null : student.id)}>

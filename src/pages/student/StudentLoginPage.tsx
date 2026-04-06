@@ -10,7 +10,7 @@ import { User, Lock, GraduationCap, School } from "lucide-react";
 
 const StudentLoginPage = () => {
   const { loginStudent, student, changePassword } = useStudentAuth();
-  
+
   const [nisn, setNisn] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -39,16 +39,14 @@ const StudentLoginPage = () => {
         if (records.length > 0) {
           const data = records[0];
           setSchoolName(data.name || "E-Ujian CBT");
-          
-          // Handle logo dari logoUrl atau logo (bisa berupa URL atau filename)
+
           let logoUrl = data.logoUrl || data.logo || "";
-          
-          // Jika logo adalah filename (bukan URL), gunakan pb.files.getUrl
           if (logoUrl && !logoUrl.startsWith('http') && !logoUrl.startsWith('data:')) {
             logoUrl = pb.files.getUrl(data, logoUrl);
           }
-          
+
           setSchoolLogo(logoUrl);
+          setLogoError(false);
         }
       } catch (err) {
         console.error("Gagal memuat settings sekolah:", err);
@@ -107,7 +105,7 @@ const StudentLoginPage = () => {
         <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-emerald-400/20 rounded-full blur-[120px] animate-pulse"></div>
         <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-teal-400/20 rounded-full blur-[120px] animate-pulse delay-75"></div>
         <div className="absolute top-[30%] right-[10%] w-[30%] h-[30%] bg-lime-400/10 rounded-full blur-[100px] animate-pulse delay-150"></div>
-        
+
         {/* Subtle Grid Pattern */}
         <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-[0.03]"></div>
       </div>
@@ -122,10 +120,10 @@ const StudentLoginPage = () => {
                 <div className="h-10 w-10 rounded-full border-4 border-emerald-500/30 border-t-emerald-600 animate-spin" />
               </div>
             ) : schoolLogo && !logoError ? (
-              <img 
-                src={schoolLogo} 
-                alt="Logo Sekolah" 
-                className="w-full h-full object-contain filter drop-shadow-md" 
+              <img
+                src={schoolLogo}
+                alt="Logo Sekolah"
+                className="w-full h-full object-contain filter drop-shadow-md"
                 onError={() => setLogoError(true)}
               />
             ) : (
@@ -158,14 +156,14 @@ const StudentLoginPage = () => {
                   {error}
                 </div>
               )}
-              
+
               <div className="space-y-2">
                 <label className="text-sm font-semibold text-slate-700 ml-1 flex items-center gap-2">
                   <User size={14} className="text-slate-400" /> NISN / Username
                 </label>
-                <Input 
+                <Input
                   value={nisn}
-                  onChange={(e) => setNisn(e.target.value)} 
+                  onChange={(e) => setNisn(e.target.value)}
                   placeholder="Masukkan nomor induk siswa"
                   className="bg-white/50 border-slate-200/60 text-slate-800 placeholder:text-slate-400 focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 rounded-[20px] h-14 px-5 text-base transition-all duration-300"
                   disabled={loading}
@@ -176,7 +174,7 @@ const StudentLoginPage = () => {
                 <label className="text-sm font-semibold text-slate-700 ml-1 flex items-center gap-2">
                   <Lock size={14} className="text-slate-400" /> Password
                 </label>
-                <Input 
+                <Input
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -187,9 +185,9 @@ const StudentLoginPage = () => {
               </div>
 
               <div className="pt-4">
-                <Button 
-                  type="submit" 
-                  className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold h-14 rounded-[20px] border-0 text-lg transition-all active:scale-[0.98]" 
+                <Button
+                  type="submit"
+                  className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold h-14 rounded-[20px] border-0 text-lg transition-all active:scale-[0.98]"
                   disabled={loading}
                 >
                   {loading ? (
@@ -204,13 +202,14 @@ const StudentLoginPage = () => {
           </CardContent>
         </Card>
 
-        <p className="mt-8 text-slate-400 text-sm font-medium">
-          © {new Date().getFullYear()} CBT {schoolName}. All rights reserved.
-        </p>
+        <div className="mt-8 flex flex-col items-center gap-1 text-slate-400 text-sm font-medium">
+          <p>© {new Date().getFullYear()} CBT {schoolName}. All rights reserved.</p>
+          <p className="text-[10px] opacity-70">Sistem oleh: Alfaruq Asri, S.Pd., Gr</p>
+        </div>
       </div>
 
       {/* Change Password Dialog */}
-      <Dialog open={showChangePassModal} onOpenChange={() => {}}>
+      <Dialog open={showChangePassModal} onOpenChange={() => { }}>
         <DialogContent className="max-w-md bg-white dark:bg-slate-900 rounded-[32px] p-8" onPointerDownOutside={(e) => e.preventDefault()}>
           <DialogHeader className="mb-6">
             <div className="w-16 h-16 bg-emerald-50 rounded-2xl flex items-center justify-center mb-4 mx-auto">
@@ -232,7 +231,7 @@ const StudentLoginPage = () => {
 
             <div className="space-y-2">
               <label className="text-sm font-semibold text-slate-700 ml-1">Password Baru</label>
-              <Input 
+              <Input
                 type="password"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
@@ -243,7 +242,7 @@ const StudentLoginPage = () => {
 
             <div className="space-y-2">
               <label className="text-sm font-semibold text-slate-700 ml-1">Konfirmasi Password Baru</label>
-              <Input 
+              <Input
                 type="password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
@@ -253,9 +252,9 @@ const StudentLoginPage = () => {
             </div>
 
             <div className="pt-2">
-              <Button 
-                type="submit" 
-                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-12 rounded-2xl text-lg transition-all" 
+              <Button
+                type="submit"
+                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-12 rounded-2xl text-lg transition-all"
                 disabled={isChangingPass}
               >
                 {isChangingPass ? "Menyimpan..." : "Simpan & Lanjutkan"}

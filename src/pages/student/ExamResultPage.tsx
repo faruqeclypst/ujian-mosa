@@ -86,9 +86,11 @@ const ExamResultPage = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-slate-50 dark:bg-slate-950">
-        <div className="flex flex-col items-center gap-3">
-           <div className="animate-spin rounded-full h-12 w-12 border-4 border-slate-800 border-t-transparent shadow-lg shadow-slate-200"></div>
-           <p className="text-xs font-black text-slate-500 uppercase tracking-[0.2em] animate-pulse">Calculating Score...</p>
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-16 h-16 bg-white dark:bg-slate-900 rounded-3xl shadow-xl flex items-center justify-center mb-2 animate-bounce border border-slate-100 dark:border-slate-800">
+            <ClipboardCheck className="w-8 h-8 text-emerald-600" />
+          </div>
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] animate-pulse">Menghitung Skor Anda...</p>
         </div>
       </div>
     );
@@ -97,14 +99,16 @@ const ExamResultPage = () => {
   if (!attempt) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen p-6 text-center bg-slate-50 dark:bg-slate-950">
-        <div className="p-12 bg-white dark:bg-slate-900 rounded-[40px] shadow-2xl shadow-slate-200 dark:shadow-none flex flex-col items-center border border-slate-100 dark:border-slate-800">
-          <Landmark className="h-20 w-20 text-slate-300 mb-8" />
+        <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="p-12 bg-white dark:bg-slate-900 rounded-[40px] shadow-2xl shadow-emerald-100 flex flex-col items-center border border-slate-100 dark:border-slate-800 max-w-sm w-full">
+          <div className="w-20 h-20 bg-rose-50 rounded-3xl flex items-center justify-center mb-8 border border-rose-100">
+            <Landmark className="h-10 w-10 text-rose-300" />
+          </div>
           <h2 className="text-2xl font-black text-slate-800 dark:text-white mb-3 uppercase tracking-tight">DATA KOSONG</h2>
-          <p className="text-slate-400 text-sm font-bold max-w-[200px] mb-10 uppercase tracking-widest leading-relaxed">Hasil pengerjaan Anda tidak ditemukan di sistem.</p>
-          <Button onClick={() => navigate("/")} className="w-full bg-slate-800 hover:bg-slate-900 h-14 rounded-2xl font-black uppercase tracking-widest text-xs shadow-lg shadow-slate-200">
-             Back To Dashboard
+          <p className="text-slate-400 text-xs font-bold mb-10 uppercase tracking-widest leading-relaxed">Hasil pengerjaan Anda tidak ditemukan di sistem.</p>
+          <Button onClick={() => navigate("/")} className="w-full bg-emerald-600 hover:bg-emerald-700 h-14 rounded-2xl font-black uppercase tracking-widest text-xs shadow-lg shadow-emerald-200 text-white">
+            Kembali Ke Dashboard
           </Button>
-        </div>
+        </motion.div>
       </div>
     );
   }
@@ -117,71 +121,98 @@ const ExamResultPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 font-sans p-4 sm:p-10 flex flex-col items-center justify-start py-12 sm:py-20">
-      <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="w-full max-w-4xl">
-        <Card className="rounded-[40px] sm:rounded-[60px] shadow-2xl shadow-slate-200 dark:shadow-none overflow-hidden border-none relative bg-white dark:bg-slate-900">
-          <div className="absolute top-0 right-0 w-full h-[6px] bg-slate-800" />
-          
-          <div className="p-8 sm:p-20 flex flex-col items-center text-center space-y-8 sm:space-y-12">
-              <div className="w-24 h-24 sm:w-32 sm:h-32 bg-slate-800 rounded-[30px] sm:rounded-[40px] flex items-center justify-center shadow-2xl shadow-slate-200 dark:shadow-none animate-bounce">
-                 <Trophy className="w-12 h-12 sm:w-16 sm:h-16 text-white" />
-              </div>
-              
-              <div className="space-y-4">
-                 <div className="inline-block px-4 py-1.5 bg-slate-50 dark:bg-slate-800 rounded-full text-[10px] sm:text-xs font-black text-slate-400 uppercase tracking-[0.3em] border border-slate-100 dark:border-slate-700">Official Exam Result</div>
-                 <h1 className="text-3xl sm:text-5xl font-black text-slate-800 dark:text-white uppercase tracking-tighter leading-tight">Ujian Selesai!</h1>
-                 <p className="text-sm sm:text-lg font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest max-w-md mx-auto leading-relaxed">Selamat! Anda telah menyelesaikan seluruh rangkaian ujian ini dengan baik.</p>
-              </div>
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 font-sans p-4 sm:p-6 flex flex-col items-center justify-center py-6 sm:py-10 relative">
+      {/* Background Decor */}
+      <div className="absolute top-0 left-0 w-full h-full pointer-events-none opacity-5 dark:opacity-20">
+        <div className="absolute top-[-5%] right-[-5%] w-[40%] h-[40%] bg-emerald-300 rounded-full blur-[100px]" />
+        <div className="absolute bottom-[-5%] left-[-5%] w-[40%] h-[40%] bg-blue-300 rounded-full blur-[100px]" />
+      </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 w-full max-w-2xl">
-                 <div className="bg-slate-50 dark:bg-slate-800/50 p-6 sm:p-8 rounded-[30px] sm:rounded-[40px] border border-slate-100 dark:border-slate-800 flex flex-col items-center space-y-4 shadow-sm">
-                    <div className="p-3 sm:p-4 bg-white dark:bg-slate-900 rounded-2xl shadow-inner border border-slate-100 dark:border-slate-800 text-slate-300"><User className="w-6 h-6 sm:w-8 sm:h-8" /></div>
-                    <div className="text-center">
-                      <p className="text-[10px] sm:text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Nama Lengkap</p>
-                      <p className="text-lg sm:text-xl font-black text-slate-800 dark:text-slate-200 uppercase tracking-tight">{student?.name}</p>
-                    </div>
-                 </div>
-                 <div className="bg-slate-50 dark:bg-slate-800/50 p-6 sm:p-8 rounded-[30px] sm:rounded-[40px] border border-slate-100 dark:border-slate-800 flex flex-col items-center space-y-4 shadow-sm">
-                    <div className="p-3 sm:p-4 bg-white dark:bg-slate-900 rounded-2xl shadow-inner border border-slate-100 dark:border-slate-800 text-slate-300"><BookOpen className="w-6 h-6 sm:w-8 sm:h-8" /></div>
-                    <div className="text-center">
-                      <p className="text-[10px] sm:text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Mata Pelajaran</p>
-                      <p className="text-lg sm:text-xl font-black text-slate-800 dark:text-slate-200 uppercase tracking-tight">{roomData?.expand?.examId?.expand?.subjectId?.name || "General Course"}</p>
-                    </div>
-                 </div>
-              </div>
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-2xl relative z-10">
+        <Card className="rounded-[30px] sm:rounded-[40px] shadow-2xl shadow-emerald-100 dark:shadow-none overflow-hidden border-none relative bg-white dark:bg-slate-900 mx-auto">
+          <div className="absolute top-0 left-0 w-full h-[6px] bg-emerald-600" />
 
-              {showResult && (
-                <div className="grid grid-cols-3 gap-3 sm:gap-6 w-full max-w-2xl">
-                   <div className="bg-slate-50 dark:bg-slate-800/50 p-4 sm:p-7 rounded-[25px] border border-slate-100 dark:border-slate-800 flex flex-col items-center gap-2">
-                      <CheckCircle2 className="w-6 h-6 text-emerald-600" />
-                      <span className="text-xl font-black text-slate-800 dark:text-white tabular-nums">{attempt.correct}</span>
-                   </div>
-                   <div className="bg-slate-50 dark:bg-slate-800/50 p-4 sm:p-7 rounded-[25px] border border-slate-100 dark:border-slate-800 flex flex-col items-center gap-2">
-                      <XCircle className="w-6 h-6 text-rose-600" />
-                      <span className="text-xl font-black text-slate-800 dark:text-white tabular-nums">{(attempt.total || 0) - (attempt.correct || 0)}</span>
-                   </div>
-                   <div className="bg-slate-50 dark:bg-slate-800/50 p-4 sm:p-7 rounded-[25px] border border-slate-100 dark:border-slate-800 flex flex-col items-center gap-2">
-                      <Timer className="w-6 h-6 text-slate-500" />
-                      <span className="text-sm font-black text-slate-800 dark:text-white uppercase tracking-tight">{attempt.usedTime ? formatTime(attempt.usedTime) : "-"}</span>
-                   </div>
+          <div className="p-6 sm:p-8 flex flex-col items-center text-center">
+            <div className="relative group mb-6">
+              <div className="absolute inset-0 bg-emerald-400 blur-xl opacity-20 group-hover:opacity-40 transition-opacity rounded-full shadow-2xl" />
+              <div className="relative w-16 h-16 sm:w-20 sm:h-20 bg-emerald-600 rounded-[20px] sm:rounded-[25px] flex items-center justify-center shadow-xl rotate-3 group-hover:rotate-0 transition-transform duration-500">
+                <Trophy className="w-8 h-8 sm:w-10 sm:h-10 text-white" />
+              </div>
+            </div>
+
+            <div className="space-y-1 mb-8">
+              <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-50 dark:bg-emerald-900/30 rounded-full text-[9px] sm:text-[11px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-[0.3em] border border-emerald-100/50 dark:border-emerald-800/50 mb-1">Official Result</div>
+              <h1 className="text-2xl sm:text-3xl font-black text-slate-800 dark:text-white uppercase tracking-tighter leading-tight italic">Ujian Selesai!</h1>
+              <p className="text-[10px] sm:text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em] max-w-sm mx-auto opacity-70">Seluruh rangkaian ujian berhasil diselesaikan.</p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 sm:gap-4 w-full mb-8">
+              <div className="bg-slate-50/50 dark:bg-slate-800/30 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 flex flex-col items-center gap-2 transition-all hover:bg-white dark:hover:bg-slate-800 group">
+                <div className="p-2 sm:p-2.5 bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 text-emerald-600 group-hover:scale-110 transition-transform"><User className="w-4 h-4 sm:w-5 sm:h-5" /></div>
+                <div className="text-center">
+                  <p className="text-[8px] sm:text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Siswa</p>
+                  <p className="text-[11px] sm:text-sm font-black text-slate-800 dark:text-slate-200 uppercase tracking-tight leading-snug">{student?.name}</p>
                 </div>
-              )}
-
-              <div className="pt-8 w-full max-w-sm">
-                <Button 
-                   onClick={() => navigate('/')} 
-                   className="w-full h-16 sm:h-18 bg-slate-800 hover:bg-slate-900 dark:bg-slate-700 dark:hover:bg-slate-600 text-white font-black text-xs sm:text-sm uppercase tracking-[0.3em] rounded-2xl shadow-xl shadow-slate-200 dark:shadow-none transition-all active:scale-95 group flex items-center justify-center"
-                >
-                   <ArrowLeft className="mr-3 w-5 h-5 group-hover:-translate-x-2 transition-transform" />
-                   Back to Dashboard
-                </Button>
               </div>
+              <div className="bg-slate-50/50 dark:bg-slate-800/30 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 flex flex-col items-center gap-2 transition-all hover:bg-white dark:hover:bg-slate-800 group">
+                <div className="p-2 sm:p-2.5 bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 text-emerald-600 group-hover:scale-110 transition-transform"><BookOpen className="w-4 h-4 sm:w-5 sm:h-5" /></div>
+                <div className="text-center">
+                  <p className="text-[8px] sm:text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Mata Pelajaran</p>
+                  <p className="text-[11px] sm:text-sm font-black text-slate-800 dark:text-slate-200 uppercase tracking-tight leading-tight">{roomData?.expand?.examId?.expand?.subjectId?.name || "General Course"}</p>
+                </div>
+              </div>
+            </div>
+
+            {showResult && (
+              <div className="w-full bg-emerald-50/30 dark:bg-emerald-950/10 p-5 sm:p-10 rounded-[30px] border border-emerald-100/50 dark:border-emerald-800/50 mb-8">
+                <div className="grid grid-cols-3 gap-2 sm:gap-6 mb-8">
+                  <div className="flex flex-col items-center gap-2">
+                    <div className="w-10 h-10 bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-emerald-100 flex items-center justify-center text-emerald-600 font-bold"><CheckCircle2 className="w-5 h-5" /></div>
+                    <div className="flex flex-col">
+                      <span className="text-[8px] sm:text-[9px] font-black text-emerald-600 uppercase tracking-widest">Benar</span>
+                      <span className="text-base sm:text-2xl font-black text-slate-800 dark:text-white tabular-nums">{attempt.correct}</span>
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-center gap-2 border-x border-emerald-100/50 dark:border-emerald-800/50">
+                    <div className="w-10 h-10 bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-rose-100 flex items-center justify-center text-rose-600 font-bold"><XCircle className="w-5 h-5" /></div>
+                    <div className="flex flex-col">
+                      <span className="text-[8px] sm:text-[9px] font-black text-rose-600 uppercase tracking-widest">Salah</span>
+                      <span className="text-base sm:text-2xl font-black text-slate-800 dark:text-white tabular-nums">{(attempt.total || 0) - (attempt.correct || 0)}</span>
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-center gap-2">
+                    <div className="w-10 h-10 bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 flex items-center justify-center text-slate-400 font-bold"><Timer className="w-5 h-5" /></div>
+                    <div className="flex flex-col">
+                      <span className="text-[8px] sm:text-[9px] font-black text-slate-400 uppercase tracking-widest">Durasi</span>
+                      <span className="text-[11px] sm:text-xl font-black text-slate-800 dark:text-white uppercase tracking-tighter tabular-nums leading-none">{attempt.usedTime ? formatTime(attempt.usedTime) : "-"}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-8 border-t border-emerald-100/50 dark:border-emerald-800/50">
+                  <p className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] mb-2">SCORE AKHIR</p>
+                  <h2 className="text-6xl sm:text-[84px] font-black text-emerald-600 leading-none tracking-tighter tabular-nums italic">
+                    {attempt.score.toFixed(0)}
+                  </h2>
+                </div>
+              </div>
+            )}
+
+            <div className="w-full max-w-[200px] sm:max-w-[260px]">
+              <Button
+                onClick={() => navigate('/')}
+                className="w-full h-12 sm:h-16 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[12px] uppercase tracking-[0.3em] rounded-2xl shadow-xl shadow-emerald-100 dark:shadow-none transition-all active:scale-95 group flex items-center justify-center"
+              >
+                <ArrowLeft className="mr-3 w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+                Dashboard
+              </Button>
+            </div>
           </div>
-          
-          <div className="bg-slate-50 dark:bg-slate-950/50 p-6 border-t border-slate-100 dark:border-slate-800 text-center">
-              <p className="text-[10px] font-black text-slate-400 dark:text-slate-600 uppercase tracking-[0.4em] opacity-50">
-                 Official E-Exam Portal • Mosa Digital
-              </p>
+
+          <div className="bg-slate-50 dark:bg-slate-950/30 py-4 border-t border-slate-100 dark:border-slate-800 text-center">
+            <p className="text-[9px] font-black text-slate-300 dark:text-slate-600 uppercase tracking-[0.5em]">
+              Official Mosa CBT System
+            </p>
           </div>
         </Card>
       </motion.div>

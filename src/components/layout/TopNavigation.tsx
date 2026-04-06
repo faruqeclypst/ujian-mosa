@@ -11,12 +11,14 @@ import { Input } from "../ui/input";
 import { ThemeToggle } from "../ui/theme-toggle";
 import { cn } from "../../lib/utils";
 import pb from "../../lib/pocketbase";
+import ChangePasswordModal from "../auth/ChangePasswordModal";
 
 const TopNavigation = () => {
   const { user, signOut, usernameFromEmail } = useAuth();
   const { setMobileOpen } = useSidebar();
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
+  const [isCPModalOpen, setIsCPModalOpen] = useState(false);
   const [lockedAttempts, setLockedAttempts] = useState<any[]>([]);
   const [examRooms, setExamRooms] = useState<Record<string, any>>({});
   const [currentTime, setCurrentTime] = useState<string>("");
@@ -308,16 +310,14 @@ const TopNavigation = () => {
                 </Link>
               </div>
               <div
-                className="relative flex cursor-default select-none items-center rounded-sm px-3 sm:px-2 py-2 sm:py-1.5 text-sm outline-none transition-colors focus:bg-accent focus:text-accent-foreground hover:bg-accent touch-manipulation"
-                onClick={() => setIsDropdownOpen(false)}
+                className="relative flex cursor-default select-none items-center rounded-sm px-3 sm:px-2 py-2 sm:py-1.5 text-sm outline-none transition-colors focus:bg-accent focus:text-accent-foreground hover:bg-accent touch-manipulation cursor-pointer"
+                onClick={() => {
+                  setIsDropdownOpen(false);
+                  setIsCPModalOpen(true);
+                }}
               >
-                <Link
-                  to="/admin/change-password"
-                  className="flex items-center cursor-pointer w-full min-h-[44px] sm:min-h-0"
-                >
-                  <Settings className="mr-3 sm:mr-2 h-4 w-4" />
-                  <span>Ubah Password</span>
-                </Link>
+                <Settings className="mr-3 sm:mr-2 h-4 w-4" />
+                <span>Ubah Password</span>
               </div>
               <div className="my-1 h-px bg-muted" />
               <div
@@ -334,6 +334,11 @@ const TopNavigation = () => {
           )}
         </div>
       </div>
+      {/* Password Change Modal */}
+      <ChangePasswordModal 
+        isOpen={isCPModalOpen} 
+        onClose={() => setIsCPModalOpen(false)} 
+      />
     </header>
   );
 };

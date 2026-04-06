@@ -73,17 +73,34 @@ const StudentDashboardPage = () => {
       if (allRooms.length > 0) {
         const attempts = await pb.collection("attempts").getFullList({ filter: `studentId = "${student.id}"` });
         const myStatus: Record<string, any> = {};
-        attempts.forEach(att => { myStatus[att.examRoomId] = att; });
+        let lockedRoomId = "";
+
+        attempts.forEach(att => { 
+          myStatus[att.examRoomId] = att; 
+          if (att.status === "LOCKED") lockedRoomId = att.examRoomId;
+        });
+        
         setUserAttempts(myStatus);
+
+        // 🔥 Jika ada ujian yang TERKUNCI, paksa arahkan kembali ke ruang tersebut
+        if (lockedRoomId) {
+          sessionStorage.setItem("activeCBTRoomId", lockedRoomId);
+          navigate(`/cbt/${lockedRoomId}`, { replace: true });
+          return;
+        }
       }
     } catch (err) { console.error(err); } finally { setLoading(false); }
   };
 
   useEffect(() => {
+    if (!student) return;
     fetchData();
     const unsubR = pb.collection("exam_rooms").subscribe("*", () => fetchData());
     const unsubA = pb.collection("attempts").subscribe("*", () => fetchData());
-    return () => { pb.collection("exam_rooms").unsubscribe(); pb.collection("attempts").unsubscribe(); };
+    return () => { 
+      unsubR.then(u => u()).catch(() => {});
+      unsubA.then(u => u()).catch(() => {});
+    };
   }, [student]);
 
   const handleValidateToken = async () => {
@@ -105,6 +122,17 @@ const StudentDashboardPage = () => {
       navigate(`/cbt`);
     } catch (err: any) { setTokenError(err.message); } finally { setIsValidating(false); }
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center p-4">
+        <div className="w-16 h-16 bg-white dark:bg-slate-900 rounded-3xl shadow-xl flex items-center justify-center mb-6 animate-bounce border border-slate-100 dark:border-slate-800">
+           <ClipboardCheck className="w-8 h-8 text-emerald-600" />
+        </div>
+        <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] animate-pulse">Menyiapkan Sesi Anda...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 font-sans pb-20 sm:pb-0">
@@ -173,9 +201,7 @@ const StudentDashboardPage = () => {
               </div>
            </div>
 
-           {loading ? (
-             <div className="py-20 text-center text-slate-400 text-xs animate-pulse font-bold uppercase tracking-widest">Memuat Data...</div>
-           ) : activeRooms.length === 0 ? (
+           {activeRooms.length === 0 ? (
              <div className="py-20 border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl text-center bg-white dark:bg-slate-900/50">
                 <Calendar className="h-10 w-10 text-slate-200 mx-auto mb-4" />
                 <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase">Tidak ada jadwal aktif</h3>
@@ -185,6 +211,7 @@ const StudentDashboardPage = () => {
                 {activeRooms.map((room, idx) => {
                   const attempt = userAttempts[room.id];
                   const isFinished = attempt && (attempt.status === "finished" || attempt.status === "submitted" || attempt.status === "graded");
+                  const isLocked = attempt && attempt.status === "LOCKED";
                   
                   const scale = 1.2 + ((idx * 13) % 5) * 0.1;
                   
@@ -253,12 +280,20 @@ const StudentDashboardPage = () => {
                                      </div>
                                      <button onClick={() => { sessionStorage.setItem("activeCBTRoomId", room.id); navigate(`/cbt/result`); }} className="text-[11px] sm:text-xs font-bold text-emerald-600 hover:underline uppercase tracking-wider whitespace-nowrap ml-2">Detail Hasil</button>
                                   </div>
+                                ) : isLocked ? (
+                                  <div className="bg-rose-50 dark:bg-rose-950/20 border border-rose-100 dark:border-rose-900/40 p-3 rounded-lg flex items-center justify-between">
+                                     <div className="text-[10px] sm:text-xs font-bold text-rose-600 uppercase flex items-center gap-2 min-w-0">
+                                        <AlertCircle className="w-4 h-4 text-rose-500 shrink-0" />
+                                        <span className="truncate">Ujian Terkunci</span>
+                                     </div>
+                                     <span className="text-[9px] font-bold text-rose-500/70 uppercase tracking-widest ml-2">Hubungi Pengawas</span>
+                                  </div>
                                 ) : room.timeStatus === "ongoing" ? (
                                   <Button 
                                     onClick={() => setSelectedRoom(room)}
                                     className="w-full bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500 text-white h-11 sm:h-12 rounded-lg font-bold text-xs sm:text-sm uppercase tracking-widest flex items-center justify-center gap-2 shadow-sm"
                                   >
-                                    Mulai Ujian <ChevronRight className="w-3.5 h-3.5" />
+                                    {attempt ? "Lanjut Mengerjakan" : "Mulai Ujian"} <ChevronRight className="w-3.5 h-3.5" />
                                   </Button>
                                 ) : room.timeStatus === "expired" ? (
                                   <div className="bg-rose-50/50 dark:bg-rose-950/20 border border-rose-100 dark:border-rose-900/40 py-3 rounded-lg text-center">
