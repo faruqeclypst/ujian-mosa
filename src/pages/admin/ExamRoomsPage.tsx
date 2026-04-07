@@ -1885,7 +1885,7 @@ const ExamRoomsPage = () => {
                                             </span>
                                           </div>
                                           <div className="flex items-center gap-1.5 shrink-0">
-                                            {ansId && (
+                                            {ansId && (q.type === "isian_singkat" || q.type === "uraian") && (
                                               <>
                                                 <Button
                                                   size="icon"
@@ -2086,10 +2086,12 @@ const ExamRoomsPage = () => {
                                         return typeof ansId === 'string' ? ansId.toUpperCase() : "DIJAWAB";
                                       })()}
                                     </span>
-                                    <div className="flex gap-2 mt-1">
-                                      <button onClick={() => handleManualGrade(student.id, q.id, true)} className={`px-2 py-0.5 rounded text-[9px] font-bold border transition-colors ${isCorrect && monitorOverrides[q.id] === true ? "bg-emerald-600 text-white border-emerald-600" : "bg-white text-emerald-600 border-emerald-200 hover:bg-emerald-50"}`}>Jadi Benar</button>
-                                      <button onClick={() => handleManualGrade(student.id, q.id, false)} className={`px-2 py-0.5 rounded text-[9px] font-bold border transition-colors ${!isCorrect && monitorOverrides[q.id] === false ? "bg-rose-600 text-white border-rose-600" : "bg-white text-rose-600 border-rose-200 hover:bg-rose-50"}`}>Jadi Salah</button>
-                                    </div>
+                                    {(q.type === "isian_singkat" || q.type === "uraian") && (
+                                      <div className="flex gap-2 mt-1">
+                                        <button onClick={() => handleManualGrade(student.id, q.id, true)} className={`px-2 py-0.5 rounded text-[9px] font-bold border transition-colors ${isCorrect && monitorOverrides[q.id] === true ? "bg-emerald-600 text-white border-emerald-600" : "bg-white text-emerald-600 border-emerald-200 hover:bg-emerald-50"}`}>Jadi Benar</button>
+                                        <button onClick={() => handleManualGrade(student.id, q.id, false)} className={`px-2 py-0.5 rounded text-[9px] font-bold border transition-colors ${!isCorrect && monitorOverrides[q.id] === false ? "bg-rose-600 text-white border-rose-600" : "bg-white text-rose-600 border-rose-200 hover:bg-rose-50"}`}>Jadi Salah</button>
+                                      </div>
+                                    )}
                                   </div>
                                   {ansId && <span className="text-[10px] font-black">{isCorrect ? "✓ BENAR" : "✗ SALAH"}</span>}
                                 </div>

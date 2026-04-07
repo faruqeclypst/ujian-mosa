@@ -18,6 +18,8 @@ interface StudentAuthContextValue {
   changePassword: (newPassword: string) => Promise<void>;
 }
 
+import { ShieldAlert, LogOut } from "lucide-react";
+
 const StudentAuthContext = createContext<StudentAuthContextValue | undefined>(undefined);
 
 export const StudentAuthProvider = ({ children }: { children: ReactNode }) => {
@@ -103,6 +105,23 @@ export const StudentAuthProvider = ({ children }: { children: ReactNode }) => {
       const classId = model.classId || model.class_id || model.classid || "";
       const classObj = model.expand?.classId || (model.expand as any)?.class_id || (model.expand as any)?.classid;
 
+      // --- LOGIKA SESSION LOCKING ---
+      const newSessionId = crypto.randomUUID();
+      localStorage.setItem("student_session_id", newSessionId);
+      
+      try {
+        // Update activeSessionId di database
+        await pb.collection("students").update(model.id, {
+          activeSessionId: newSessionId
+        });
+        console.log("Session ID updated successfully:", newSessionId);
+      } catch (sessionErr) {
+        console.error("GAGAL UPDATE SESSION ID:", sessionErr);
+        // Tetap lanjut login meskipun session lock gagal (opsional)
+        // throw new Error("Gagal mengaktifkan keamanan sesi. Silakan hubungi admin.");
+      }
+      // ------------------------------
+
       const studentData: StudentUser = {
         id: model.id,
         nisn: model.username,
@@ -141,12 +160,87 @@ export const StudentAuthProvider = ({ children }: { children: ReactNode }) => {
   const logoutStudent = useCallback(() => {
     pb.authStore.clear();
     setstudent(null);
+    localStorage.removeItem("student_session_id"); 
     sessionStorage.clear(); 
   }, []);
+
+  const [isKicked, setIsKicked] = useState(false);
+
+  // --- PEMANTAU SESI GLOBAL (Satu Siswa Satu Device) ---
+  useEffect(() => {
+    if (!student?.id || isKicked) return;
+
+    // 1. Pengecekan Awal
+    const checkInitialSession = async () => {
+      try {
+        const refreshed = await pb.collection("students").getOne(student.id);
+        const serverSessionId = refreshed.activeSessionId;
+        const localSessionId = localStorage.getItem("student_session_id");
+
+        if (serverSessionId && localSessionId && serverSessionId !== localSessionId) {
+          setIsKicked(true);
+        }
+      } catch (err) {}
+    };
+    checkInitialSession();
+
+    // 2. Real-time Monitor
+    const unsubscribe = pb.collection("students").subscribe(student.id, (e) => {
+      if (e.action === "update") {
+        const serverSessionId = e.record.activeSessionId;
+        const localSessionId = localStorage.getItem("student_session_id");
+        if (serverSessionId && localSessionId && serverSessionId !== localSessionId) {
+          setIsKicked(true);
+        }
+      }
+    });
+
+    return () => {
+      unsubscribe.then(u => u());
+    };
+  }, [student?.id, isKicked]);
+  // -----------------------------------------------------
 
   return (
     <StudentAuthContext.Provider value={{ student, loading, loginStudent, logoutStudent, changePassword }}>
       {children}
+
+      {/* MODAL KICKED (SESSION LOCKING) */}
+      {isKicked && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xl animate-in fade-in duration-500">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl border border-emerald-100 dark:border-emerald-900/30 text-center relative overflow-hidden group slide-in-from-bottom-10 animate-in duration-700">
+            {/* Dekorasi Background */}
+            <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-emerald-500 via-emerald-600 to-emerald-500"></div>
+            
+            <div className="relative z-10">
+              <div className="w-20 h-20 bg-emerald-50 dark:bg-emerald-900/20 rounded-[2rem] flex items-center justify-center mx-auto mb-6 rotate-3 group-hover:rotate-0 transition-transform">
+                <ShieldAlert className="w-10 h-10 text-emerald-600 animate-pulse" />
+              </div>
+
+              <h2 className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tighter mb-3">
+                Sesi Berakhir!
+              </h2>
+              
+              <p className="text-slate-500 dark:text-slate-400 text-[13px] font-medium leading-relaxed mb-8 px-2">
+                Akun Anda baru saja terdeteksi login di perangkat lain. <br />
+                <span className="text-emerald-600 font-bold">Demi keamanan, sesi di browser ini telah dimatikan.</span>
+              </p>
+
+              <button
+                onClick={() => {
+                  setIsKicked(false);
+                  logoutStudent();
+                  window.location.href = "/";
+                }}
+                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white h-14 rounded-2xl font-black uppercase tracking-widest text-[11px] shadow-lg shadow-emerald-200 dark:shadow-none hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3"
+              >
+                <LogOut className="w-4 h-4" />
+                Masuk Kembali
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </StudentAuthContext.Provider>
   );
 };

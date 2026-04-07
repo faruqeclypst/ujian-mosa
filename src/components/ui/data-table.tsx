@@ -27,7 +27,7 @@ import {
 
 interface Column<T> {
   key: keyof T | string;
-  label: string;
+  label: React.ReactNode;
   sortable?: boolean;
   filterable?: boolean;
   render?: (value: any, item: T, index?: number) => React.ReactNode;
@@ -180,7 +180,7 @@ export function DataTable<T>({
       // Default CSV export
       const headers = columns
         .filter(col => state.visibleColumns.has(col.key.toString()))
-        .map(col => col.label)
+        .map(col => typeof col.label === 'string' ? col.label : col.key.toString())
         .join(",");
 
       const csvData = state.filteredData.map(item =>

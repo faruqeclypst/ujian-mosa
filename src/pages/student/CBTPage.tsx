@@ -33,6 +33,14 @@ import {
   Check,
   Square
 } from "lucide-react";
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuTrigger, 
+  DropdownMenuSeparator, 
+  DropdownMenuLabel 
+} from "../../components/ui/dropdown-menu";
 import { motion, AnimatePresence, Reorder } from "framer-motion";
 
 interface Question {
@@ -346,6 +354,9 @@ const CBTPage = () => {
   useEffect(() => {
     if (!roomData?.examId || !roomId || !attempt?.id) return;
     const rId = roomId;
+    const sId = student?.id || "";
+
+    // 1. Subscribe ke Questions & Room
     const unsubQuestions = pb.collection("questions").subscribe("*", (e) => { if (e.record.examId === roomData.examId) loadExamData(); });
     const unsubRoom = pb.collection("exam_rooms").subscribe(rId, (e) => {
       if (e.action === "update") {
@@ -354,6 +365,8 @@ const CBTPage = () => {
         if (isOff) navigate("/dashboard");
       }
     });
+
+    // 2. Subscribe ke Attempt
     const unsubAttempt = pb.collection("attempts").subscribe(attempt.id, (e) => {
       if (e.action === "delete") navigate("/dashboard");
       else if (e.action === "update") {
@@ -374,7 +387,12 @@ const CBTPage = () => {
         }
       }
     });
-    return () => { unsubQuestions.then(u => u()); unsubRoom.then(u => u()); unsubAttempt.then(u => u()); };
+
+    return () => { 
+      unsubQuestions.then(u => u()); 
+      unsubRoom.then(u => u()); 
+      unsubAttempt.then(u => u()); 
+    };
   }, [roomData, roomId, attempt, navigate, loadExamData]);
 
   useEffect(() => {
@@ -580,22 +598,22 @@ const CBTPage = () => {
               {Math.floor(timeLeft / 60).toString().padStart(2, "0")}:{(timeLeft % 60).toString().padStart(2, "0")}
             </span>
           </div>
-          <div className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2 rounded-2xl bg-white/50 dark:bg-slate-800/30 border border-slate-100 dark:border-slate-800">
+          <div className="flex items-center justify-center gap-1 sm:gap-2 px-1 sm:px-3 py-1.5 sm:py-2 rounded-2xl bg-white/50 dark:bg-slate-800/30 border border-slate-100 dark:border-slate-800 w-[40px] sm:w-[95px] shrink-0 overflow-hidden">
             {isSyncing ? (
               <div className="flex items-center gap-1.5">
-                <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-ping"></div>
-                <Cloud className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-500 animate-pulse" />
+                <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-ping shrink-0"></div>
+                <Cloud className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-500 animate-pulse shrink-0" />
                 <span className="hidden sm:inline text-[9px] font-black text-blue-600 uppercase tracking-widest">Saved</span>
               </div>
             ) : syncError ? (
               <div className="flex items-center gap-1.5 animate-bounce">
-                <CloudOff className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-rose-500" />
+                <CloudOff className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-rose-500 shrink-0" />
                 <span className="hidden sm:inline text-[9px] font-black text-rose-600 uppercase tracking-widest">Failed</span>
               </div>
             ) : (
-              <div className="flex items-center gap-1.5 opacity-40">
-                <Cloud className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-600" />
-                <span className="hidden sm:inline text-[9px] font-black text-emerald-600 uppercase tracking-widest">Sync</span>
+              <div className="flex items-center gap-1.5">
+                <Wifi className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-500 shrink-0" />
+                <span className="hidden sm:inline text-[9px] font-black text-emerald-600 uppercase tracking-widest">Connect</span>
               </div>
             )}
           </div>
@@ -607,25 +625,45 @@ const CBTPage = () => {
         </div>
 
         <div className="flex items-center gap-2 sm:gap-4 ml-auto">
-          {/* Zoom Controls - Desktop Only */}
+          {/* Zoom Controls */}
           <div className="hidden sm:flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-700">
-            <button onClick={() => setFontSize(p => Math.max(1, p - 0.1))} className="w-8 h-8 flex items-center justify-center rounded-xl bg-white dark:bg-slate-900 text-slate-600 hover:text-emerald-600 transition-colors shadow-sm disabled:opacity-30" disabled={fontSize <= 1}><ZoomOut className="w-4 h-4" /></button>
-            <div className="px-2 text-[10px] font-black text-slate-500 uppercase tracking-widest">{Math.round(fontSize * 100)}%</div>
+            <button onClick={() => setFontSize(p => Math.max(0.5, p - 0.1))} className="w-8 h-8 flex items-center justify-center rounded-xl bg-white dark:bg-slate-900 text-slate-600 hover:text-emerald-600 transition-colors shadow-sm disabled:opacity-30" disabled={fontSize <= 0.5}><ZoomOut className="w-4 h-4" /></button>
+            <div className="px-2 text-[10px] font-black text-slate-500 uppercase tracking-widest w-[45px] text-center">{Math.round(fontSize * 100)}%</div>
             <button onClick={() => setFontSize(p => Math.min(1.5, p + 0.1))} className="w-8 h-8 flex items-center justify-center rounded-xl bg-white dark:bg-slate-900 text-slate-600 hover:text-emerald-600 transition-colors shadow-sm disabled:opacity-30" disabled={fontSize >= 1.5}><ZoomIn className="w-4 h-4" /></button>
           </div>
 
-          <div className="flex items-center gap-3 text-right">
+          <div className="flex items-center gap-x-2 sm:gap-4 ml-1 sm:ml-4 border-l border-slate-100 dark:border-slate-800 pl-2 sm:pl-4">
+            {/* Nama & Kelas */}
             <div className="text-right min-w-0">
-              <p className="font-black text-emerald-800 dark:text-emerald-200 text-[10px] sm:text-xs md:text-sm uppercase tracking-tight leading-snug truncate max-w-[80px] sm:max-w-none">
-                {formatStudentName(student?.name)}
+              <p className="font-black text-slate-800 dark:text-white text-[10px] sm:text-sm uppercase tracking-tight leading-tight truncate max-w-[70px] sm:max-w-none">
+                {student?.name?.split(" ")[0]}
               </p>
-              <p className="text-[8px] sm:text-[9px] font-bold text-emerald-400 uppercase tracking-[0.2em] mt-0.5 sm:mt-1 leading-none">
+              <p className="text-[8px] sm:text-[9px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest mt-0.5 leading-none">
                 {student?.className}
               </p>
             </div>
-            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-emerald-50 dark:bg-emerald-900/30 rounded-2xl sm:rounded-[30%] flex items-center justify-center border border-emerald-100 dark:border-emerald-800 shadow-sm">
-              <User className="h-5 w-5 sm:h-6 sm:w-6 text-emerald-600" />
-            </div>
+
+            {/* Icon Profil (Dropdown) */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <div className="w-9 h-9 sm:w-11 sm:h-11 bg-emerald-50 dark:bg-emerald-950/30 rounded-xl sm:rounded-2xl flex items-center justify-center border border-emerald-100/50 dark:border-emerald-800/50 shadow-sm group cursor-pointer hover:bg-emerald-100 transition-all outline-none">
+                  <User className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform" />
+                </div>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-64 p-2 rounded-2xl border-slate-100 dark:border-slate-800 shadow-2xl z-[100]">
+                <DropdownMenuLabel className="px-3 py-2 flex flex-col gap-0.5">
+                  <span className="text-xs font-black text-slate-800 dark:text-white uppercase truncate">{student?.name}</span>
+                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">SISWA • {student?.className} • NISN {student?.nisn}</span>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator className="my-2 bg-slate-50 dark:bg-slate-800" />
+                <DropdownMenuItem onClick={logoutStudent} className="px-3 py-2.5 rounded-xl text-rose-500 focus:text-rose-600 focus:bg-rose-50 dark:focus:bg-rose-950/30 flex items-center gap-3 cursor-pointer transition-colors group">
+                  <div className="p-1.5 bg-rose-50 dark:bg-rose-900/30 rounded-lg group-focus:bg-rose-100/50 transition-colors">
+                    <LogOut className="h-4 w-4" />
+                  </div>
+                  <span className="text-xs font-black uppercase tracking-widest">Keluar Ujian / Logout</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </header>
@@ -812,8 +850,8 @@ const CBTPage = () => {
 
             {/* Mobile Zoom Controls */}
             <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-2xl border border-slate-200 sm:hidden">
-              <button onClick={() => setFontSize(p => Math.max(1, p - 0.1))} className="w-8 h-8 flex items-center justify-center rounded-xl bg-white text-slate-600 active:bg-emerald-50 shadow-sm" disabled={fontSize <= 1}><ZoomOut className="w-4 h-4" /></button>
-              <div className="px-2 text-[10px] font-black text-slate-500 uppercase">{Math.round(fontSize * 100)}%</div>
+              <button onClick={() => setFontSize(p => Math.max(0.5, p - 0.1))} className="w-8 h-8 flex items-center justify-center rounded-xl bg-white text-slate-600 active:bg-emerald-50 shadow-sm" disabled={fontSize <= 0.5}><ZoomOut className="w-4 h-4" /></button>
+              <div className="px-2 text-[10px] font-black text-slate-500 uppercase w-[35px] text-center">{Math.round(fontSize * 100)}%</div>
               <button onClick={() => setFontSize(p => Math.min(1.5, p + 0.1))} className="w-8 h-8 flex items-center justify-center rounded-xl bg-white text-slate-600 active:bg-emerald-50 shadow-sm" disabled={fontSize >= 1.5}><ZoomIn className="w-4 h-4" /></button>
             </div>
           </div>

@@ -94,93 +94,7 @@ const compressImage = (file: File): Promise<File> => {
   });
 };
 
-const columns = [
-  {
-    key: "index",
-    label: "No",
-    render: (v: any, item: any, index?: number) => (index !== undefined ? index + 1 : 1),
-  },
-  {
-    key: "text",
-    label: "Teks Pertanyaan",
-    sortable: true,
-    render: (v: string, item: QuestionData) => (
-      <div className="max-w-lg min-w-[250px]">
-        <div className="line-clamp-2 text-sm font-medium text-slate-800 dark:text-slate-200 leading-relaxed ql-editor !p-0 [&_p]:m-0 [&_ol]:list-decimal [&_ul]:list-disc [&_ol]:pl-4 [&_ul]:pl-4" dangerouslySetInnerHTML={{ __html: item.text }} />
-        <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
-          {(item.imageUrl || item.text.includes("<img")) && (
-            <span className="p-1 px-1.5 rounded-md bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400 flex items-center gap-1 font-bold text-[9px] border border-blue-200 dark:border-blue-800/40 uppercase tracking-tight">
-              🖼️ Bergambar
-            </span>
-          )}
-          {item.groupId && (
-            <span className="p-1 px-1.5 rounded-md bg-amber-50 text-amber-600 dark:bg-amber-950/20 dark:text-amber-400 flex items-center gap-1 font-bold text-[9px] border border-amber-200 dark:border-amber-800/40 uppercase tracking-tight">
-              🔖 Paket: {item.groupId}
-            </span>
-          )}
-        </div>
-      </div>
-    ),
-  },
-  {
-    key: "type",
-    label: "Tipe Soal",
-    render: (v: string, item: QuestionData) => {
-      const typeLabels: Record<string, string> = {
-        pilihan_ganda: "Pilihan Ganda",
-        pilihan_ganda_kompleks: "PG Kompleks",
-        menjodohkan: "Menjodohkan",
-        benar_salah: "Benar / Salah",
-        isian_singkat: "Isian Singkat",
-        uraian: "Uraian / Esai",
-        urutkan: "Urutkan",
-        drag_drop: "Drag and Drop"
-      };
-      return (
-        <span className="p-1 px-2 rounded-md bg-indigo-50 text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400 text-[10px] font-bold border border-indigo-200 dark:border-indigo-800/40 uppercase">
-          {typeLabels[item.type || "pilihan_ganda"]}
-        </span>
-      );
-    }
-  },
-  {
-    key: "details",
-    label: "Detil Jawaban",
-    render: (v: any, item: QuestionData) => {
-      const type = item.type || "pilihan_ganda";
-      if (type === "pilihan_ganda" || type === "pilihan_ganda_kompleks" || type === "benar_salah") {
-        const keys = Object.keys(item.choices || {});
-        const correctCount = keys.filter(k => item.choices?.[k].isCorrect).length;
-        const correctKeys = keys.filter(k => item.choices?.[k].isCorrect).map(k => k.toUpperCase()).join(", ");
-        
-        return (
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="p-1 px-2 rounded-md bg-slate-50 text-slate-600 dark:bg-slate-800/60 dark:text-slate-300 text-xs border border-slate-200 dark:border-slate-800">{keys.length} Opsi</span>
-            {correctCount > 0 && (
-              <span className="p-1 px-2 text-[11px] font-bold rounded-md bg-green-50 text-green-600 dark:bg-green-950/40 dark:text-green-400 border border-green-200 dark:border-green-800/40">
-                Kunci: {correctKeys}
-              </span>
-            )}
-          </div>
-        );
-      }
-      
-      if (type === "menjodohkan") {
-        return <span className="text-xs text-slate-500">{(item.pairs || []).length} Pasangan</span>;
-      }
-      
-      if (type === "isian_singkat" || type === "uraian") {
-        return <div className="text-xs text-slate-500 line-clamp-1 max-w-[150px]">{item.answerKey || "-"}</div>;
-      }
-      
-      if (type === "urutkan" || type === "drag_drop") {
-        return <span className="text-xs text-slate-500">{(item.items || []).length} Item</span>;
-      }
-      
-      return null;
-    }
-  }
-];
+
 
 const QuestionsPage = () => {
   const { examId } = useParams<{ examId: string }>();
@@ -219,6 +133,7 @@ const QuestionsPage = () => {
   const [exam, setExam] = useState<any>(null);
   const [questions, setQuestions] = useState<QuestionData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isImporting, setIsImporting] = useState(false);
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -283,6 +198,8 @@ const QuestionsPage = () => {
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [questionToDelete, setQuestionToDelete] = useState<QuestionData | null>(null);
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+  const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
   const [isGalleryOpen, setIsGalleryOpen] = useState(false);
@@ -1479,6 +1396,152 @@ const QuestionsPage = () => {
     }
   };
 
+  const handleConfirmBulkDelete = async () => {
+    setIsBulkDeleting(true);
+    try {
+      const selectedQuestions = questions.filter(q => selectedIds.includes(q.id));
+      for (const q of selectedQuestions) {
+        await cleanupQuestionImages(q);
+        await pb.collection('questions').delete(q.id);
+      }
+      setSelectedIds([]);
+      showAlert("Berhasil", `${selectedIds.length} soal berhasil dihapus.`, "success");
+    } catch (error) {
+      showAlert("Gagal", "Gagal menghapus beberapa soal.", "danger");
+    } finally {
+      setIsBulkDeleting(false);
+      setBulkDeleteDialogOpen(false);
+    }
+  };
+
+  const columns = useMemo(() => [
+    {
+      key: "selection",
+      label: (
+        <div className="flex items-center px-1">
+          <input
+            type="checkbox"
+            className="w-4 h-4 rounded border-slate-300 dark:border-slate-700 dark:bg-slate-800 transition-all cursor-pointer accent-indigo-600"
+            checked={questions.length > 0 && selectedIds.length === questions.length}
+            onChange={(e) => {
+              if (e.target.checked) {
+                setSelectedIds(questions.map((q) => q.id));
+              } else {
+                setSelectedIds([]);
+              }
+            }}
+          />
+        </div>
+      ),
+      className: "w-[40px]",
+      render: (_: any, item: QuestionData) => (
+        <div className="flex items-center px-1">
+          <input
+            type="checkbox"
+            className="w-4 h-4 rounded border-slate-300 dark:border-slate-700 dark:bg-slate-800 transition-all cursor-pointer accent-indigo-600"
+            checked={selectedIds.includes(item.id)}
+            onClick={(e) => e.stopPropagation()}
+            onChange={(e) => {
+              if (e.target.checked) {
+                setSelectedIds((prev) => [...prev, item.id]);
+              } else {
+                setSelectedIds((prev) => prev.filter((id) => id !== item.id));
+              }
+            }}
+          />
+        </div>
+      )
+    },
+    {
+      key: "index",
+      label: "No",
+      className: "w-[50px]",
+      render: (v: any, item: any, index?: number) => (index !== undefined ? index + 1 : 1),
+    },
+    {
+      key: "text",
+      label: "Teks Pertanyaan",
+      sortable: true,
+      render: (v: string, item: QuestionData) => (
+        <div className="max-w-lg min-w-[250px]">
+          <div className="line-clamp-2 text-sm font-medium text-slate-800 dark:text-slate-200 leading-relaxed ql-editor !p-0 [&_p]:m-0 [&_ol]:list-decimal [&_ul]:list-disc [&_ol]:pl-4 [&_ul]:pl-4" dangerouslySetInnerHTML={{ __html: item.text }} />
+          <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+            {(item.imageUrl || item.text.includes("<img")) && (
+              <span className="p-1 px-1.5 rounded-md bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400 flex items-center gap-1 font-bold text-[9px] border border-blue-200 dark:border-blue-800/40 uppercase tracking-tight">
+                🖼️ Bergambar
+              </span>
+            )}
+            {item.groupId && (
+              <span className="p-1 px-1.5 rounded-md bg-amber-50 text-amber-600 dark:bg-amber-950/20 dark:text-amber-400 flex items-center gap-1 font-bold text-[9px] border border-amber-200 dark:border-amber-800/40 uppercase tracking-tight">
+                🔖 Paket: {item.groupId}
+              </span>
+            )}
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: "type",
+      label: "Tipe Soal",
+      className: "min-w-[120px]",
+      render: (v: string, item: QuestionData) => {
+        const typeLabels: Record<string, string> = {
+          pilihan_ganda: "Pilihan Ganda",
+          pilihan_ganda_kompleks: "PG Kompleks",
+          menjodohkan: "Menjodohkan",
+          benar_salah: "Benar / Salah",
+          isian_singkat: "Isian Singkat",
+          uraian: "Uraian / Esai",
+          urutkan: "Urutkan",
+          drag_drop: "Drag and Drop"
+        };
+        return (
+          <span className="p-1 px-2 rounded-md bg-indigo-50 text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400 text-[10px] font-bold border border-indigo-200 dark:border-indigo-800/40 uppercase whitespace-nowrap">
+            {typeLabels[item.type || "pilihan_ganda"]}
+          </span>
+        );
+      }
+    },
+    {
+      key: "details",
+      label: "Detil Jawaban",
+      className: "min-w-[150px]",
+      render: (v: any, item: QuestionData) => {
+        const type = item.type || "pilihan_ganda";
+        if (type === "pilihan_ganda" || type === "pilihan_ganda_kompleks" || type === "benar_salah") {
+          const keys = Object.keys(item.choices || {});
+          const correctCount = keys.filter(k => item.choices?.[k].isCorrect).length;
+          const correctKeys = keys.filter(k => item.choices?.[k].isCorrect).map(k => k.toUpperCase()).join(", ");
+          
+          return (
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="p-1 px-2 rounded-md bg-slate-50 text-slate-600 dark:bg-slate-800/60 dark:text-slate-300 text-xs border border-slate-200 dark:border-slate-800 whitespace-nowrap">{keys.length} Opsi</span>
+              {correctCount > 0 && (
+                <span className="p-1 px-2 text-[11px] font-bold rounded-md bg-green-50 text-green-600 dark:bg-green-950/40 dark:text-green-400 border border-green-200 dark:border-green-800/40 whitespace-nowrap">
+                  Kunci: {correctKeys}
+                </span>
+              )}
+            </div>
+          );
+        }
+        
+        if (type === "menjodohkan") {
+          return <span className="text-xs text-slate-500 whitespace-nowrap">{(item.pairs || []).length} Pasangan</span>;
+        }
+        
+        if (type === "isian_singkat" || type === "uraian") {
+          return <div className="text-xs text-slate-500 line-clamp-1 max-w-[150px]">{item.answerKey || "-"}</div>;
+        }
+        
+        if (type === "urutkan" || type === "drag_drop") {
+          return <span className="text-xs text-slate-500 whitespace-nowrap">{(item.items || []).length} Item</span>;
+        }
+        
+        return null;
+      }
+    }
+  ], [questions, selectedIds]);
+
   const handleImportWord = async (file: File) => {
     setIsImporting(true);
     try {
@@ -1659,7 +1722,18 @@ const QuestionsPage = () => {
             </div>
           )}
 
-          {questions.length > 0 && (role === "admin" || exam?.teacherId === teacherId) && (
+          {questions.length > 0 && selectedIds.length > 0 && (role === "admin" || exam?.teacherId === teacherId) && (
+            <Button
+              onClick={() => setBulkDeleteDialogOpen(true)}
+              variant="secondary"
+              size="lg"
+              className="rounded-xl bg-orange-50 text-orange-600 hover:bg-orange-100 border border-orange-100 dark:bg-orange-900/30 dark:text-orange-400 dark:hover:bg-orange-900/50 dark:border-orange-800/30 shadow-sm font-bold flex items-center gap-2"
+            >
+              <Trash className="h-4 w-4" /> Hapus Terpilih ({selectedIds.length})
+            </Button>
+          )}
+
+          {questions.length > 0 && selectedIds.length === 0 && (role === "admin" || exam?.teacherId === teacherId) && (
             <Button
               onClick={() => setDeleteAllDialogOpen(true)}
               variant="secondary"
@@ -3036,6 +3110,15 @@ const QuestionsPage = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <DeleteConfirmationDialog
+        isOpen={bulkDeleteDialogOpen}
+        onClose={() => setBulkDeleteDialogOpen(false)}
+        onConfirm={handleConfirmBulkDelete}
+        title="Hapus Soal Terpilih"
+        description={`Apakah Anda yakin ingin menghapus ${selectedIds.length} soal yang dipilih? Tindakan ini tidak dapat dibatalkan.`}
+        isLoading={isBulkDeleting}
+        itemName={`${selectedIds.length} soal`}
+      />
     </div>
   );
 };
