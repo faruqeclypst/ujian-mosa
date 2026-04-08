@@ -1,8 +1,13 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { SmartImage } from "../../components/ui/smart-image";
 import { useStudentAuth } from "../../context/StudentAuthContext";
 import pb from "../../lib/pocketbase";
 import { Button } from "../../components/ui/button";
+import { Skeleton } from "../../components/ui/skeleton";
+import { ThemeToggle } from "../../components/ui/theme-toggle";
+import { useTheme } from "../../context/ThemeContext";
+import { Sun, Moon, Monitor } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "../../components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "../../components/ui/dialog";
 import {
@@ -108,6 +113,7 @@ const CBTPage = () => {
   const { roomId: paramRoomId } = useParams<{ roomId: string }>();
   const navigate = useNavigate();
   const { student, logoutStudent } = useStudentAuth();
+  const { theme, setTheme } = useTheme();
 
   const [roomId, setRoomId] = useState<string | null>(null);
 
@@ -135,9 +141,13 @@ const CBTPage = () => {
   const [roomData, setRoomData] = useState<any>(null);
   const [timeLeft, setTimeLeft] = useState<number>(0);
   const [isExamOver, setIsExamOver] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(!!document.fullscreenElement);
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
   const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [canFullscreen] = useState(() => !!document.documentElement.requestFullscreen);
+  const [isExamBrowser] = useState(() => /exambrowser|exambro/i.test(navigator.userAgent));
+  
   const [isNavModalOpen, setIsNavModalOpen] = useState(false);
   const [isCheatWarningOpen, setIsCheatWarningOpen] = useState(false);
   const [isLocked, setIsLocked] = useState(false);
@@ -231,6 +241,20 @@ const CBTPage = () => {
       setTargetIndex(idx); setIsSkipNoticeOpen(true); return;
     }
     goToQuestion(idx); setIsNavModalOpen(false);
+  };
+
+  useEffect(() => {
+    const handleFsChange = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener("fullscreenchange", handleFsChange);
+    return () => document.removeEventListener("fullscreenchange", handleFsChange);
+  }, []);
+
+  const goFullscreen = () => {
+    try {
+      if (document.documentElement.requestFullscreen) {
+        document.documentElement.requestFullscreen().catch(() => { });
+      }
+    } catch (e) { }
   };
 
   const loadExamData = useCallback(async () => {
@@ -538,7 +562,59 @@ const CBTPage = () => {
 
   useEffect(() => { if (isExamOver && !loading && attempt?.status === "ongoing") handleSubmitExam(); }, [isExamOver, loading, attempt?.status, handleSubmitExam]);
 
-  if (loading) return <div className="flex items-center justify-center min-h-screen"><div className="animate-spin rounded-full h-10 w-10 border-4 border-emerald-600 border-t-transparent shadow-lg shadow-emerald-100"></div></div>;
+  if (loading) {
+    return (
+      <div className="h-screen h-[100dvh] bg-slate-50 dark:bg-slate-950 flex flex-col overflow-hidden">
+        <header className="sticky top-0 z-50 bg-white/90 dark:bg-slate-900/90 backdrop-blur-3xl border-b border-slate-100 dark:border-slate-800 h-16 sm:h-20 px-4 sm:px-8 flex items-center justify-between shadow-sm">
+           <Skeleton className="h-10 w-24 sm:w-32 rounded-2xl" />
+           <Skeleton className="hidden sm:block h-10 w-40 rounded-2xl" />
+           <div className="flex items-center gap-3">
+              <div className="flex flex-col items-end gap-1">
+                 <Skeleton className="h-3 w-20" />
+                 <Skeleton className="h-2 w-12" />
+              </div>
+              <Skeleton className="h-10 w-10 sm:h-12 sm:w-12 rounded-2xl" />
+           </div>
+        </header>
+
+        <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
+           <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 space-y-4 sm:space-y-6">
+              <div className="bg-white dark:bg-slate-900 rounded-[25px] sm:rounded-[40px] border border-slate-100 dark:border-slate-800 p-6 sm:p-10 space-y-8 shadow-sm">
+                 <div className="flex items-center gap-4">
+                    <Skeleton className="h-12 w-12 sm:h-16 sm:w-16 rounded-[1.5rem] sm:rounded-[2rem]" />
+                    <Skeleton className="h-5 w-32 sm:w-48" />
+                 </div>
+                 <div className="space-y-4">
+                    <Skeleton className="h-5 w-full" />
+                    <Skeleton className="h-5 w-[90%]" />
+                    <Skeleton className="h-5 w-[40%]" />
+                 </div>
+                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 sm:pt-8 border-t border-slate-50 dark:border-slate-800">
+                    {Array.from({ length: 4 }).map((_, i) => (
+                      <Skeleton key={i} className="h-16 sm:h-20 rounded-2xl" />
+                    ))}
+                 </div>
+              </div>
+           </div>
+
+           <div className="lg:w-[320px] xl:w-[380px] bg-white dark:bg-slate-900 border-l border-slate-100 dark:border-slate-800 flex flex-col p-6 gap-6 shadow-2xl relative z-20">
+              <div className="flex items-center justify-between">
+                 <Skeleton className="h-6 w-32" />
+                 <Skeleton className="h-6 w-12 rounded-full" />
+              </div>
+              <div className="grid grid-cols-5 gap-2 sm:gap-3">
+                 {Array.from({ length: 40 }).map((_, i) => (
+                    <Skeleton key={i} className="aspect-square rounded-lg sm:rounded-xl" />
+                 ))}
+              </div>
+              <div className="mt-auto pt-6 border-t border-slate-100 dark:border-slate-800">
+                 <Skeleton className="h-12 sm:h-14 w-full rounded-2xl" />
+              </div>
+           </div>
+        </div>
+      </div>
+    );
+  }
   if (isLocked) return (
     <div className="flex items-center justify-center min-h-screen bg-slate-50 dark:bg-slate-950 p-4">
       <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] shadow-2xl text-center max-w-sm border border-red-100 relative overflow-hidden group">
@@ -590,6 +666,23 @@ const CBTPage = () => {
 
   return (
     <div className="h-screen h-[100dvh] bg-slate-50 dark:bg-slate-950 flex flex-col overflow-hidden select-none font-sans">
+      {canFullscreen && !isExamBrowser && !isFullscreen && !loading && !isLocked && (
+        <div className="fixed inset-0 z-[45] bg-slate-900/90 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center animate-in fade-in duration-300">
+          <div className="w-20 h-20 bg-amber-100/20 rounded-3xl flex items-center justify-center mb-6 border border-amber-500/30">
+            <Maximize2 className="w-10 h-10 text-amber-500 animate-pulse" />
+          </div>
+          <h2 className="text-2xl font-black text-white mb-4 uppercase tracking-tighter">Mode Fokus Diperlukan</h2>
+          <p className="text-slate-300 text-sm font-medium max-w-xs mb-8 leading-relaxed">
+            Untuk menjaga integritas ujian, Anda harus berada dalam mode layar penuh (Full Screen).
+          </p>
+          <Button 
+            onClick={goFullscreen}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white px-8 h-14 rounded-2xl font-black uppercase tracking-widest text-xs shadow-lg shadow-emerald-900/20"
+          >
+            Masuk Mode Full Screen
+          </Button>
+        </div>
+      )}
       <header className="sticky top-0 z-50 bg-white/90 dark:bg-slate-900/90 backdrop-blur-3xl border-b border-slate-100 dark:border-slate-800 h-16 sm:h-20 px-4 sm:px-8 flex items-center justify-between shadow-sm">
         <div className="flex items-center gap-2 sm:gap-4">
           <div className="flex items-center gap-2 sm:gap-3 bg-slate-100 dark:bg-slate-800 px-3 sm:px-4 py-1.5 sm:py-2 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
@@ -656,6 +749,21 @@ const CBTPage = () => {
                   <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">SISWA • {student?.className} • NISN {student?.nisn}</span>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator className="my-2 bg-slate-50 dark:bg-slate-800" />
+                <div className="px-3 py-2 flex flex-col gap-2">
+                  <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest text-center">Personalisasi Tema</span>
+                  <div className="flex items-center justify-between p-1 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-100 dark:border-slate-800">
+                    <button onClick={() => setTheme("light")} className={`flex-1 flex items-center justify-center p-2 rounded-lg transition-all ${theme === 'light' ? 'bg-white dark:bg-slate-800 text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>
+                      <Sun className="h-4 w-4" />
+                    </button>
+                    <button onClick={() => setTheme("dark")} className={`flex-1 flex items-center justify-center p-2 rounded-lg transition-all ${theme === 'dark' ? 'bg-white dark:bg-slate-800 text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>
+                      <Moon className="h-4 w-4" />
+                    </button>
+                    <button onClick={() => setTheme("system")} className={`flex-1 flex items-center justify-center p-2 rounded-lg transition-all ${theme === 'system' ? 'bg-white dark:bg-slate-800 text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>
+                      <Monitor className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+                <DropdownMenuSeparator className="my-2 bg-slate-50 dark:bg-slate-800" />
                 <DropdownMenuItem onClick={logoutStudent} className="px-3 py-2.5 rounded-xl text-rose-500 focus:text-rose-600 focus:bg-rose-50 dark:focus:bg-rose-950/30 flex items-center gap-3 cursor-pointer transition-colors group">
                   <div className="p-1.5 bg-rose-50 dark:bg-rose-900/30 rounded-lg group-focus:bg-rose-100/50 transition-colors">
                     <LogOut className="h-4 w-4" />
@@ -693,7 +801,11 @@ const CBTPage = () => {
 
                 {currentQuestion.imageUrl && (
                   <div className="relative group cursor-zoom-in" onClick={() => setPreviewImage(currentQuestion.imageUrl!)}>
-                    <img src={currentQuestion.imageUrl} className="max-w-full h-auto mx-auto block rounded-2xl border border-slate-100 mb-4 sm:mb-6 transition-transform hover:scale-[1.01]" alt="Soal" />
+                    <SmartImage 
+                      src={currentQuestion.imageUrl} 
+                      className="max-w-full h-auto mx-auto block rounded-2xl border border-slate-100 mb-4 sm:mb-6 transition-transform hover:scale-[1.01]" 
+                      alt="Soal" 
+                    />
                     <div className="absolute inset-0 bg-black/5 opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl flex items-center justify-center">
                       <Maximize2 className="w-8 h-8 text-white drop-shadow-lg" />
                     </div>
@@ -757,7 +869,11 @@ const CBTPage = () => {
                             />
                             {c.imageUrl && (
                               <div className="relative inline-block cursor-zoom-in group mt-4" onClick={(e) => { e.stopPropagation(); setPreviewImage(c.imageUrl!); }}>
-                                <img src={c.imageUrl} className="max-h-[200px] rounded-2xl border border-slate-100 group-hover:brightness-90 transition-all" alt="Choice" />
+                                <SmartImage 
+                                  src={c.imageUrl} 
+                                  className="max-h-[200px] rounded-2xl border border-slate-100 group-hover:brightness-90 transition-all" 
+                                  alt="Choice" 
+                                />
                                 <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                                   <Maximize2 className="w-6 h-6 text-white drop-shadow-md" />
                                 </div>

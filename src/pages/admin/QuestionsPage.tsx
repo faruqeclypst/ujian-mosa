@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, Plus, Edit, Trash, Check, Image, ChevronDown, FileText, Download, Eye, FolderOpen, Sparkles, Wand2, RefreshCw, BookOpen } from "lucide-react";
+import { SmartImage } from "../../components/ui/smart-image";
 import { generateQuestionsAI, generateSingleQuestionAI, getTopicSuggestionsAI, parseQuestionsAI } from "../../lib/ai";
 import { Button } from "../../components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../../components/ui/dialog";
@@ -22,6 +23,9 @@ import { useExamData } from "../../context/ExamDataContext";
 import { useAuth } from "../../context/AuthContext";
 import { DataTable } from "../../components/ui/data-table";
 import { useToast } from "../../components/ui/toast";
+import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
+import { Skeleton } from "../../components/ui/skeleton";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../components/ui/table";
 export type QuestionType = "pilihan_ganda" | "pilihan_ganda_kompleks" | "menjodohkan" | "benar_salah" | "isian_singkat" | "uraian" | "urutkan" | "drag_drop";
 
 export interface QuestionData {
@@ -1810,55 +1814,109 @@ const QuestionsPage = () => {
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center p-8">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-        </div>
+        <Card className="border-none shadow-none bg-transparent">
+          <CardHeader className="px-0">
+            <CardTitle className="text-base font-bold text-slate-800 dark:text-white uppercase tracking-wider">Daftar Soal</CardTitle>
+          </CardHeader>
+          <CardContent className="px-0">
+            <div className="bg-card border rounded-xl shadow-sm border-slate-200/60 dark:border-slate-800 overflow-hidden">
+              <Table>
+                <TableHeader className="bg-slate-50/50 dark:bg-slate-900/50">
+                  <TableRow>
+                    <TableHead className="w-[40px] px-4">
+                      <Skeleton className="h-4 w-4" />
+                    </TableHead>
+                    <TableHead className="w-[50px]">No</TableHead>
+                    <TableHead>Teks Pertanyaan</TableHead>
+                    <TableHead className="min-w-[120px]">Tipe Soal</TableHead>
+                    <TableHead className="min-w-[150px]">Detil Jawaban</TableHead>
+                    <TableHead className="text-right pr-6">Aksi</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <TableRow key={i}>
+                      <TableCell className="px-4"><Skeleton className="h-4 w-4" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-4" /></TableCell>
+                      <TableCell>
+                        <div className="space-y-2 max-w-lg min-w-[250px]">
+                          <Skeleton className="h-4 w-full" />
+                          <div className="flex gap-1.5">
+                            <Skeleton className="h-3 w-20 rounded-md" />
+                            <Skeleton className="h-3 w-24 rounded-md" />
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="h-6 w-24 rounded-md" />
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex gap-1.5">
+                          <Skeleton className="h-5 w-16 rounded-md" />
+                          <Skeleton className="h-5 w-20 rounded-md" />
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right pr-6">
+                        <div className="flex justify-end gap-1.5">
+                          <Skeleton className="h-8 w-8 rounded-lg" />
+                          <Skeleton className="h-8 w-8 rounded-lg" />
+                          <Skeleton className="h-8 w-8 rounded-lg" />
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
       ) : (
         <div className="space-y-4">
+          <div className="bg-white/40 dark:bg-transparent -mb-2">
+            <h3 className="text-base font-bold text-slate-800 dark:text-white uppercase tracking-wider">Daftar Soal</h3>
+          </div>
           {questions.length === 0 ? (
             <div className="text-center p-12 border bg-card rounded-xl text-slate-400">Belum ada soal untuk ujian ini.</div>
           ) : (
-            <div className="space-y-2 mt-4">
-              <div className="bg-card border rounded-xl p-4 shadow-sm border-slate-200/60">
-                <DataTable
-                  data={questions}
-                  columns={columns}
-                  searchPlaceholder="Cari soal..."
-                  emptyMessage="Tidak ada soal ditemukan."
-                  actions={(q: QuestionData) => (
-                    <div className="flex justify-end items-center gap-1.5 whitespace-nowrap">
-                      <button
-                        className="p-1.5 bg-sky-50 text-sky-600 hover:bg-sky-100 rounded-lg dark:bg-sky-900/10 dark:text-sky-400 border border-sky-100 dark:border-sky-800/40"
-                        onClick={() => {
-                          setPreviewQuestion(q);
-                          setIsPreviewOpen(true);
-                        }}
-                        title="Pratinjau Soal"
-                      >
-                        <Eye className="h-4 w-4" />
-                      </button>
-                      {(role === "admin" || exam?.teacherId === teacherId) && (
-                        <>
-                          <button
-                            className="p-1.5 bg-sky-50 text-sky-600 hover:bg-sky-100 rounded-lg dark:bg-sky-900/10 dark:text-sky-400 border border-sky-100 dark:border-sky-800/40"
-                            onClick={() => handleEditClick(q)}
-                            title="Edit Soal"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </button>
-                          <button
-                            className="p-1.5 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-lg dark:bg-rose-900/10 dark:text-rose-400 border border-rose-100 dark:border-rose-800/40"
-                            onClick={() => handleDeleteClick(q)}
-                            title="Hapus Soal"
-                          >
-                            <Trash className="h-4 w-4" />
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  )}
-                />
-              </div>
+            <div className="bg-card border rounded-xl p-4 shadow-sm border-slate-200/60 dark:border-slate-800">
+              <DataTable
+                data={questions}
+                columns={columns}
+                searchPlaceholder="Cari soal..."
+                emptyMessage="Tidak ada soal ditemukan."
+                actions={(q: QuestionData) => (
+                  <div className="flex justify-end items-center gap-1.5 whitespace-nowrap">
+                    <button
+                      className="p-1.5 bg-sky-50 text-sky-600 hover:bg-sky-100 rounded-lg dark:bg-sky-900/10 dark:text-sky-400 border border-sky-100 dark:border-sky-800/40"
+                      onClick={() => {
+                        setPreviewQuestion(q);
+                        setIsPreviewOpen(true);
+                      }}
+                      title="Pratinjau Soal"
+                    >
+                      <Eye className="h-4 w-4" />
+                    </button>
+                    {(role === "admin" || exam?.teacherId === teacherId) && (
+                      <>
+                        <button
+                          className="p-1.5 bg-sky-50 text-sky-600 hover:bg-sky-100 rounded-lg dark:bg-sky-900/10 dark:text-sky-400 border border-sky-100 dark:border-sky-800/40"
+                          onClick={() => handleEditClick(q)}
+                          title="Edit Soal"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </button>
+                        <button
+                          className="p-1.5 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-lg dark:bg-rose-900/10 dark:text-rose-400 border border-rose-100 dark:border-rose-800/40"
+                          onClick={() => handleDeleteClick(q)}
+                          title="Hapus Soal"
+                        >
+                          <Trash className="h-4 w-4" />
+                        </button>
+                      </>
+                    )}
+                  </div>
+                )}
+              />
             </div>
           )}
         </div>
@@ -2266,7 +2324,7 @@ const QuestionsPage = () => {
                       
                       {hasCover && (
                         <div className="mb-4 group relative">
-                          <img src={firstWithText.imageUrl} className="max-w-full md:max-w-lg h-auto mx-auto block rounded-xl border-4 border-white dark:border-slate-800 shadow-xl transition-transform group-hover:scale-[1.02]" alt="Cover Literasi" />
+                          <SmartImage src={firstWithText.imageUrl} className="max-w-full md:max-w-lg h-auto mx-auto block rounded-xl border-4 border-white dark:border-slate-800 shadow-xl transition-transform group-hover:scale-[1.02]" alt="Cover Literasi" />
                           <div className="absolute inset-0 rounded-xl bg-gradient-to-t from-black/20 to-transparent pointer-events-none"></div>
                         </div>
                       )}
@@ -2289,7 +2347,7 @@ const QuestionsPage = () => {
                 
                 {previewQuestion.imageUrl && (
                   <div className="relative group">
-                    <img src={previewQuestion.imageUrl} alt="Gambar Soal" className="max-w-full md:max-w-lg h-auto rounded-2xl border-4 border-white dark:border-slate-800 shadow-lg mx-auto" />
+                    <SmartImage src={previewQuestion.imageUrl} alt="Gambar Soal" className="max-w-full md:max-w-lg h-auto rounded-2xl border-4 border-white dark:border-slate-800 shadow-lg mx-auto" />
                     <div className="absolute inset-0 rounded-2xl bg-gradient-to-t from-black/10 to-transparent pointer-events-none"></div>
                   </div>
                 )}
@@ -2317,7 +2375,7 @@ const QuestionsPage = () => {
                       <div className="flex-1 text-sm md:text-base">
                         <div className={`break-words ql-editor !p-0 [&_img]:max-w-[300px] [&_img]:h-auto [&_img]:rounded-xl [&_img]:mt-2 text-inherit ${choice.isCorrect ? "font-bold" : "font-normal"}`} dangerouslySetInnerHTML={{ __html: choice.text }} />
                         {choice.imageUrl && (
-                          <img src={choice.imageUrl} alt={`Pilihan ${cKey.toUpperCase()}`} className="max-h-[200px] w-auto rounded-xl mt-2 border shadow-sm" />
+                          <SmartImage src={choice.imageUrl} alt={`Pilihan ${cKey.toUpperCase()}`} className="max-h-[200px] w-auto rounded-xl mt-2 border shadow-sm" />
                         )}
                       </div>
                       {choice.isCorrect && (

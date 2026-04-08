@@ -33,6 +33,7 @@ interface ExamDataContextType {
   createStudent: (payload: StudentPayload) => Promise<void>;
   updateStudent: (id: string, payload: Partial<StudentPayload>) => Promise<void>;
   deleteStudent: (id: string) => Promise<void>;
+  deleteStudentsBatch: (studentIds: string[]) => Promise<void>;
   updateStudentClassBatch: (studentIds: string[], newClassId: string) => Promise<void>;
 
   // Universal Token
@@ -269,6 +270,11 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
       });
     }
   };
+  const deleteStudentsBatch = async (studentIds: string[]) => {
+    for (const id of studentIds) {
+      await pb.collection("students").delete(id);
+    }
+  };
 
   return (
     <ExamDataContext.Provider
@@ -277,7 +283,7 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
         createTeacher, updateTeacher, deleteTeacher,
         createClass, updateClass, deleteClass,
         createSubject, updateSubject, deleteSubject,
-        createStudent, updateStudent, deleteStudent, updateStudentClassBatch,
+        createStudent, updateStudent, deleteStudent, updateStudentClassBatch, deleteStudentsBatch,
         universalToken, timeLeft
       }}
     >

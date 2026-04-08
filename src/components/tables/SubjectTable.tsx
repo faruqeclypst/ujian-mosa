@@ -42,7 +42,7 @@ const SubjectTable = ({ subjects, onEdit, onDelete }: SubjectTableProps) => {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base font-semibold">Data Mata Pelajaran</CardTitle>
+        <CardTitle className="text-base font-semibold text-slate-800 dark:text-white">Daftar Mata Pelajaran</CardTitle>
       </CardHeader>
       <CardContent>
         <DataTable

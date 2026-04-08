@@ -1,4 +1,7 @@
 import { useState, useMemo } from "react";
+import { Skeleton } from "../components/ui/skeleton";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
+import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Plus, BookOpen } from "lucide-react";
 import { useExamData } from "../context/ExamDataContext";
 import { Button } from "../components/ui/button";
@@ -155,9 +158,38 @@ const SubjectsPage = () => {
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center p-8">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-        </div>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base font-semibold text-slate-800 dark:text-white">Daftar Mata Pelajaran</CardTitle>
+          </CardHeader>
+          <CardContent>
+             <div className="rounded-xl border border-slate-200/60 dark:border-slate-800 overflow-hidden">
+                <Table>
+                  <TableHeader className="bg-slate-50/50 dark:bg-slate-900/50">
+                    <TableRow>
+                      <TableHead className="w-16 text-center">No</TableHead>
+                      <TableHead>Mata Pelajaran</TableHead>
+                      <TableHead className="text-right">Aksi</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {Array.from({ length: 5 }).map((_, i) => (
+                      <TableRow key={i}>
+                        <TableCell className="text-center"><Skeleton className="h-4 w-4 mx-auto" /></TableCell>
+                        <TableCell><Skeleton className="h-4 w-48" /></TableCell>
+                        <TableCell className="text-right">
+                           <div className="flex justify-end gap-2">
+                              <Skeleton className="h-8 w-8 rounded-lg" />
+                              <Skeleton className="h-8 w-8 rounded-lg" />
+                           </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+             </div>
+          </CardContent>
+        </Card>
       ) : (
         <SubjectTable subjects={subjects} onEdit={handleEditClick} onDelete={handleDeleteClick} />
       )}

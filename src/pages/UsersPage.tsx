@@ -1,4 +1,6 @@
 import { useState, useEffect } from "react";
+import { Skeleton } from "../components/ui/skeleton";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
 import { Plus, ShieldAlert, Trash2, UserCog, Edit2, Mail } from "lucide-react";
 import pb from "../lib/pocketbase";
 import { useAuth } from "../context/AuthContext";
@@ -326,33 +328,70 @@ const UsersPage = () => {
           <CardTitle className="text-base font-semibold">Daftar Akun Login (Email)</CardTitle>
         </CardHeader>
         <CardContent>
-          <DataTable 
-            data={users} 
-            columns={columns} 
-            loading={loading}
-            actions={(item: AppUser) => (
-              <div className="flex items-center gap-1.5 whitespace-nowrap">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => handleEditClick(item)}
-                  className="text-blue-500 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950/30"
-                  title="Edit Akun"
-                >
-                  <Edit2 className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => handleDeleteUser(item.id, item.name)}
-                  className="text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/30"
-                  title="Hapus Akun"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            )}
-          />
+          {loading ? (
+             <div className="rounded-xl border border-slate-200/60 dark:border-slate-800 overflow-hidden">
+                <Table>
+                  <TableHeader className="bg-slate-50/50 dark:bg-slate-900/50">
+                    <TableRow>
+                      <TableHead className="w-16 text-center">No</TableHead>
+                      <TableHead>Pengguna</TableHead>
+                      <TableHead>Hak Akses</TableHead>
+                      <TableHead>Guru Terkait</TableHead>
+                      <TableHead className="text-right">Aksi</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {Array.from({ length: 5 }).map((_, i) => (
+                      <TableRow key={i}>
+                        <TableCell className="text-center"><Skeleton className="h-4 w-4 mx-auto" /></TableCell>
+                        <TableCell>
+                           <div className="space-y-2">
+                              <Skeleton className="h-4 w-48" />
+                              <Skeleton className="h-3 w-32" />
+                           </div>
+                        </TableCell>
+                        <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                        <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                        <TableCell className="text-right">
+                           <div className="flex justify-end gap-2">
+                              <Skeleton className="h-8 w-8 rounded-lg" />
+                              <Skeleton className="h-8 w-8 rounded-lg" />
+                           </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+             </div>
+          ) : (
+            <DataTable 
+              data={users} 
+              columns={columns} 
+              loading={loading}
+              actions={(item: AppUser) => (
+                <div className="flex items-center gap-1.5 whitespace-nowrap">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleEditClick(item)}
+                    className="text-blue-500 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950/30"
+                    title="Edit Akun"
+                  >
+                    <Edit2 className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleDeleteUser(item.id, item.name)}
+                    className="text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/30"
+                    title="Hapus Akun"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
+            />
+          )}
         </CardContent>
       </Card>
     </div>

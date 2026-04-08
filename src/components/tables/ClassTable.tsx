@@ -42,7 +42,7 @@ const ClassTable = ({ classes, onEdit, onDelete }: ClassTableProps) => {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base font-semibold">Data Kelas</CardTitle>
+        <CardTitle className="text-base font-semibold text-slate-800 dark:text-white">Daftar Kelas</CardTitle>
       </CardHeader>
       <CardContent>
         <DataTable

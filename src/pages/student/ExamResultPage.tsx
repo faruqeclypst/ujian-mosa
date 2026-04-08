@@ -4,8 +4,13 @@ import { useStudentAuth } from "../../context/StudentAuthContext";
 import pb from "../../lib/pocketbase";
 import { Card, CardHeader, CardTitle, CardContent } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
-import { ClipboardCheck, FileText, LayoutDashboard, User, BookOpen, Clock, CheckCircle2, XCircle, Timer, Award, Landmark, CalendarDays, Trophy, ArrowLeft } from "lucide-react";
+import { 
+  ClipboardCheck, FileText, User, BookOpen, Clock, 
+  CheckCircle2, XCircle, Timer, Award, Landmark, 
+  CalendarDays, Trophy, ArrowLeft, Sun, Moon 
+} from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { ThemeToggle } from "../../components/ui/theme-toggle";
 
 interface ExamAttempt {
   status: string;
@@ -125,6 +130,12 @@ const ExamResultPage = () => {
       {/* Background Decor */}
       <div className="absolute top-0 left-0 w-full h-full pointer-events-none opacity-5 dark:opacity-20 flex items-center justify-center">
         <div className="w-[80%] h-[40%] bg-emerald-400 rounded-full blur-[120px] opacity-20 -translate-y-1/2" />
+      </div>
+
+      <div className="absolute top-4 right-4 z-50">
+        <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md p-1 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-xl">
+          <ThemeToggle />
+        </div>
       </div>
 
       <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="w-full max-w-xl relative z-10 px-1">

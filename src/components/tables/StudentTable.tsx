@@ -23,8 +23,9 @@ const StudentTable = ({
   onEdit, 
   onDelete,
   filterActions,
-  customActions
-}: StudentTableProps) => {
+  customActions,
+  title = "Daftar Siswa"
+}: StudentTableProps & { title?: string }) => {
 
   const handleSelectAll = (checked: boolean) => {
     const currentIds = students.map((s) => s.id);
@@ -101,7 +102,7 @@ const StudentTable = ({
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between pb-2 border-b mb-4">
-        <CardTitle className="text-lg font-bold text-slate-800 dark:text-slate-100">Daftar Siswa</CardTitle>
+        <CardTitle className="text-lg font-bold text-slate-800 dark:text-slate-100">{title}</CardTitle>
         {students.length > 0 && (
           <div className="flex items-center gap-2">
             <input

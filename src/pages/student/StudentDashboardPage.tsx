@@ -4,10 +4,13 @@ import { useStudentAuth } from "../../context/StudentAuthContext";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import pb from "../../lib/pocketbase";
-import { LogOut, KeyRound, Calendar, Clock, ChevronRight, User, BookOpen, AlertCircle, ClipboardCheck, Award, LogOut as LogoutIcon } from "lucide-react";
+import { LogOut, KeyRound, Calendar, Clock, ChevronRight, User, BookOpen, AlertCircle, ClipboardCheck, Award, LogOut as LogoutIcon, Sun, Moon, Monitor } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../../components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuLabel } from "../../components/ui/dropdown-menu";
 import { motion } from "framer-motion";
+import { Skeleton } from "../../components/ui/skeleton";
+import { ThemeToggle } from "../../components/ui/theme-toggle";
+import { useTheme } from "../../context/ThemeContext";
 
 const getExamTypeColorClass = (type: string) => {
   switch (type?.toLowerCase()) {
@@ -21,6 +24,7 @@ const getExamTypeColorClass = (type: string) => {
 const StudentDashboardPage = () => {
   const navigate = useNavigate();
   const { student, logoutStudent } = useStudentAuth();
+  const { theme, setTheme } = useTheme();
   const [loading, setLoading] = useState(true);
   const [schoolName, setSchoolName] = useState("CBT System");
   const [schoolLogo, setSchoolLogo] = useState("");
@@ -120,20 +124,21 @@ const StudentDashboardPage = () => {
       }
 
       sessionStorage.setItem("activeCBTRoomId", selectedRoom.id);
+      
+      // Memicu Fullscreen (harus dilakukan saat user gesture seperti klik tombol)
+      try {
+        const docEl = document.documentElement;
+        if (docEl.requestFullscreen) {
+          await docEl.requestFullscreen();
+        }
+      } catch (err) {
+        console.warn("Gagal otomatis masuk full screen:", err);
+      }
+
       navigate(`/cbt`);
     } catch (err: any) { setTokenError(err.message); } finally { setIsValidating(false); }
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center p-4">
-        <div className="w-16 h-16 bg-white dark:bg-slate-900 rounded-3xl shadow-xl flex items-center justify-center mb-6 animate-bounce border border-slate-100 dark:border-slate-800">
-          <ClipboardCheck className="w-8 h-8 text-emerald-600" />
-        </div>
-        <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] animate-pulse">Menyiapkan Sesi Anda...</p>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 font-sans pb-20 sm:pb-0">
@@ -181,6 +186,21 @@ const StudentDashboardPage = () => {
                   <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">SISWA • {student?.className} • NISN {student?.nisn}</span>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator className="my-2 bg-slate-50 dark:bg-slate-800" />
+                <div className="px-3 py-2 flex flex-col gap-2">
+                  <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest text-center">Personalisasi Tema</span>
+                  <div className="flex items-center justify-between p-1 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-100 dark:border-slate-800">
+                    <button onClick={() => setTheme("light")} className={`flex-1 flex items-center justify-center p-2 rounded-lg transition-all ${theme === 'light' ? 'bg-white dark:bg-slate-800 text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>
+                      <Sun className="h-4 w-4" />
+                    </button>
+                    <button onClick={() => setTheme("dark")} className={`flex-1 flex items-center justify-center p-2 rounded-lg transition-all ${theme === 'dark' ? 'bg-white dark:bg-slate-800 text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>
+                      <Moon className="h-4 w-4" />
+                    </button>
+                    <button onClick={() => setTheme("system")} className={`flex-1 flex items-center justify-center p-2 rounded-lg transition-all ${theme === 'system' ? 'bg-white dark:bg-slate-800 text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>
+                      <Monitor className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+                <DropdownMenuSeparator className="my-2 bg-slate-50 dark:bg-slate-800" />
                 <DropdownMenuItem onClick={logoutStudent} className="px-3 py-2.5 rounded-xl text-rose-500 focus:text-rose-600 focus:bg-rose-50 dark:focus:bg-rose-950/30 flex items-center gap-3 cursor-pointer transition-colors group">
                   <div className="p-1.5 bg-rose-50 dark:bg-rose-900/30 rounded-lg group-focus:bg-rose-100/50 transition-colors">
                     <LogoutIcon className="h-4 w-4" />
@@ -203,10 +223,19 @@ const StudentDashboardPage = () => {
                 <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/10 backdrop-blur-md rounded-full text-[8px] sm:text-[10px] font-black text-slate-200 uppercase tracking-widest border border-white/5">
                   Verified Student Account
                 </div>
-                <h2 className="text-xl sm:text-[32px] font-black text-white tracking-tight leading-tight uppercase">
-                  Halo, <span className="text-slate-50 font-medium opacity-100">{student?.name?.split(" ")[0]}</span>
-                </h2>
-                <p className="text-[10px] sm:text-sm text-slate-100/70 font-bold uppercase tracking-widest leading-relaxed">Selamat datang di gerbang ujian digital Anda hari ini.</p>
+                {loading ? (
+                  <div className="space-y-4">
+                    <Skeleton className="h-8 w-48 bg-white/20" />
+                    <Skeleton className="h-5 w-64 bg-white/20" />
+                  </div>
+                ) : (
+                  <>
+                    <h2 className="text-xl sm:text-[32px] font-black text-white tracking-tight leading-tight uppercase">
+                      Halo, <span className="text-slate-50 font-medium opacity-100">{student?.name?.split(" ")[0]}</span>
+                    </h2>
+                    <p className="text-[10px] sm:text-sm text-slate-100/70 font-bold uppercase tracking-widest leading-relaxed">Selamat datang di gerbang ujian digital Anda hari ini.</p>
+                  </>
+                )}
               </div>
             </div>
           </motion.div>
@@ -218,7 +247,29 @@ const StudentDashboardPage = () => {
             </div>
           </div>
 
-          {activeRooms.length === 0 ? (
+          {loading ? (
+            <div className="space-y-6">
+              {Array.from({ length: 2 }).map((_, i) => (
+                <div key={i} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 sm:p-7 space-y-6">
+                  <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
+                    <div className="space-y-3 flex-1">
+                      <Skeleton className="h-3 w-32" />
+                      <Skeleton className="h-6 w-3/4" />
+                    </div>
+                    <div className="flex gap-2">
+                      <Skeleton className="h-6 w-16" />
+                      <Skeleton className="h-6 w-24" />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Skeleton className="h-20 rounded-xl" />
+                    <Skeleton className="h-20 rounded-xl" />
+                  </div>
+                  <Skeleton className="h-12 w-full rounded-xl" />
+                </div>
+              ))}
+            </div>
+          ) : activeRooms.length === 0 ? (
             <div className="py-20 border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl text-center bg-white dark:bg-slate-900/50">
               <Calendar className="h-10 w-10 text-slate-200 mx-auto mb-4" />
               <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase">Tidak ada jadwal aktif</h3>

@@ -32,6 +32,7 @@ const SettingsPage = lazy(() => import("./pages/SettingsPage"));
 import ExamsPage from "./pages/admin/ExamsPage";
 import QuestionsPage from "./pages/admin/QuestionsPage";
 import ExamRoomsPage from "./pages/admin/ExamRoomsPage";
+import MonitoringPage from "./pages/admin/MonitoringPage";
 import GuidePage from "./pages/admin/GuidePage";
 
 import { ExamDataProvider } from "./context/ExamDataContext";
@@ -182,6 +183,7 @@ const AppContent = () => {
           <Route path="bank-soal" element={<ExamsPage />} />
           <Route path="bank-soal/:examId/questions" element={<QuestionsPage />} />
           <Route path="ruang-ujian" element={<ExamRoomsPage />} />
+          <Route path="monitoring/:roomId" element={<MonitoringPage />} />
           <Route path="panduan" element={<GuidePage />} />
           <Route path="pengaturan" element={<AdminOnlyRoute><SettingsPage /></AdminOnlyRoute>} />
         </Route>

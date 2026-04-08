@@ -66,7 +66,7 @@ const TeacherTable = ({ teachers, onEdit, onDelete }: TeacherTableProps) => {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base font-semibold">Data Guru</CardTitle>
+        <CardTitle className="text-base font-semibold text-slate-800 dark:text-white">Daftar Guru</CardTitle>
       </CardHeader>
       <CardContent>
         <DataTable

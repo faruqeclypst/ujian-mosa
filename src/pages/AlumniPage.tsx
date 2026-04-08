@@ -1,4 +1,7 @@
 import { useState, useMemo } from "react";
+import { Skeleton } from "../components/ui/skeleton";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
+import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { useExamData } from "../context/ExamDataContext";
 import { Button } from "../components/ui/button";
 import { DeleteConfirmationDialog } from "../components/ui/delete-confirmation-dialog";
@@ -138,62 +141,99 @@ const AlumniPage = () => {
         </div>
       </div>
 
-      <div className="flex items-center justify-between">
-        <div className="flex flex-wrap items-center gap-3">
-          {selectedIds.length > 0 && (
-            <>
-              <Dialog open={isBatchOpen} onOpenChange={setIsBatchOpen}>
-                <DialogTrigger asChild>
-                  <Button variant="default" className="bg-orange-600 hover:bg-orange-700 h-9 text-xs">
-                    <ArrowLeftRight className="mr-2 h-4 w-4" />
-                    Pindah/Kembalikan ke Kelas ({selectedIds.length})
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-md">
-                  <DialogHeader>
-                    <DialogTitle>Kembalikan ke Kelas</DialogTitle>
-                  </DialogHeader>
-                  <p className="text-sm text-muted-foreground">
-                    Pindahkan {selectedIds.length} alumni terpilih ke kelas tujuan.
-                  </p>
+      {selectedIds.length > 0 && (
+        <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center gap-3">
+            <Dialog open={isBatchOpen} onOpenChange={setIsBatchOpen}>
+              <DialogTrigger asChild>
+                <Button variant="default" className="bg-orange-600 hover:bg-orange-700 h-9 text-xs">
+                  <ArrowLeftRight className="mr-2 h-4 w-4" />
+                  Pindah/Kembalikan ke Kelas ({selectedIds.length})
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Kembalikan ke Kelas</DialogTitle>
+                </DialogHeader>
+                <p className="text-sm text-muted-foreground">
+                  Pindahkan {selectedIds.length} alumni terpilih ke kelas tujuan.
+                </p>
+                
+                <div className="space-y-4 pt-4">
+                  <FormField id="batch-class" label="Kelas Tujuan">
+                    <Select value={targetClassId} onChange={(e) => setTargetClassId(e.target.value)}>
+                      <option value="">Pilih Kelas Tujuan</option>
+                      {sortedClasses.map((cls) => (
+                        <option key={cls.id} value={cls.id}>{cls.name}</option>
+                      ))}
+                    </Select>
+                  </FormField>
                   
-                  <div className="space-y-4 pt-4">
-                    <FormField id="batch-class" label="Kelas Tujuan">
-                      <Select value={targetClassId} onChange={(e) => setTargetClassId(e.target.value)}>
-                        <option value="">Pilih Kelas Tujuan</option>
-                        {sortedClasses.map((cls) => (
-                          <option key={cls.id} value={cls.id}>{cls.name}</option>
-                        ))}
-                      </Select>
-                    </FormField>
-                    
-                    <div className="flex justify-end gap-2 pt-2">
-                      <Button variant="outline" onClick={() => setIsBatchOpen(false)}>Batal</Button>
-                      <Button className="bg-blue-600 hover:bg-blue-700 text-white" onClick={handleBatchUpdateClass} disabled={!targetClassId}>
-                        Proses
-                      </Button>
-                    </div>
+                  <div className="flex justify-end gap-2 pt-2">
+                    <Button variant="outline" onClick={() => setIsBatchOpen(false)}>Batal</Button>
+                    <Button className="bg-blue-600 hover:bg-blue-700 text-white" onClick={handleBatchUpdateClass} disabled={!targetClassId}>
+                      Proses
+                    </Button>
                   </div>
-                </DialogContent>
-              </Dialog>
+                </div>
+              </DialogContent>
+            </Dialog>
 
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="hover:bg-green-50 hover:text-green-600 h-9 text-xs border-dashed border-green-200"
-                onClick={handleBatchRestore}
-              >
-                <Check className="mr-1 w-4 h-4" /> Pulihkan Tanpa Kelas
-              </Button>
-            </>
-          )}
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="hover:bg-green-50 hover:text-green-600 h-9 text-xs border-dashed border-green-200"
+              onClick={handleBatchRestore}
+            >
+              <Check className="mr-1 w-4 h-4" /> Pulihkan Tanpa Kelas
+            </Button>
+          </div>
         </div>
-      </div>
+      )}
 
       {loading ? (
-        <div className="flex items-center justify-center p-8">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-        </div>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2 border-b mb-4">
+            <CardTitle className="text-lg font-bold text-slate-800 dark:text-slate-100">Daftar Alumni</CardTitle>
+          </CardHeader>
+          <CardContent>
+             <div className="rounded-xl border border-slate-200/60 dark:border-slate-800 overflow-hidden">
+                <Table>
+                  <TableHeader className="bg-slate-50/50 dark:bg-slate-900/50">
+                    <TableRow>
+                      <TableHead className="w-[40px] text-center">
+                         <div className="h-4 w-4 border border-slate-300 rounded mx-auto" />
+                      </TableHead>
+                      <TableHead className="w-[60px] text-center">No</TableHead>
+                      <TableHead>NISN</TableHead>
+                      <TableHead>Nama Siswa</TableHead>
+                      <TableHead className="w-[60px] text-center">L/P</TableHead>
+                      <TableHead>Kelas</TableHead>
+                      <TableHead className="text-right">Aksi</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {Array.from({ length: 8 }).map((_, i) => (
+                      <TableRow key={i}>
+                        <TableCell className="text-center"><Skeleton className="h-4 w-4 mx-auto" /></TableCell>
+                        <TableCell className="text-center"><Skeleton className="h-4 w-4 mx-auto" /></TableCell>
+                        <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                        <TableCell><Skeleton className="h-4 w-48" /></TableCell>
+                        <TableCell className="text-center"><Skeleton className="h-4 w-4 mx-auto" /></TableCell>
+                        <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                        <TableCell className="text-right">
+                           <div className="flex justify-end gap-2">
+                              <Skeleton className="h-8 w-8 rounded-lg" />
+                              <Skeleton className="h-8 w-8 rounded-lg" />
+                           </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+             </div>
+          </CardContent>
+        </Card>
       ) : (
         <StudentTable 
           students={mappedStudents} 
@@ -202,6 +242,7 @@ const AlumniPage = () => {
           onSelectChange={setSelectedIds} 
           onEdit={() => {}} 
           onDelete={handleDeleteClick} 
+          title="Daftar Alumni"
           customActions={(student) => (
             <div className="flex justify-end gap-2">
               <button 

@@ -105,8 +105,11 @@ export const StudentAuthProvider = ({ children }: { children: ReactNode }) => {
       const classId = model.classId || model.class_id || model.classid || "";
       const classObj = model.expand?.classId || (model.expand as any)?.class_id || (model.expand as any)?.classid;
 
-      // --- LOGIKA SESSION LOCKING ---
-      const newSessionId = crypto.randomUUID();
+      // --- LOGIKA SESSION LOCKING (DEVICE AWARE) ---
+      // Kita gabungkan UUID dengan Fingerprint Perangkat (User Agent)
+      const fingerprint = btoa(navigator.userAgent).substring(0, 16);
+      const newSessionId = `${crypto.randomUUID()}:${fingerprint}`;
+      
       localStorage.setItem("student_session_id", newSessionId);
       
       try {
@@ -117,10 +120,8 @@ export const StudentAuthProvider = ({ children }: { children: ReactNode }) => {
         console.log("Session ID updated successfully:", newSessionId);
       } catch (sessionErr) {
         console.error("GAGAL UPDATE SESSION ID:", sessionErr);
-        // Tetap lanjut login meskipun session lock gagal (opsional)
-        // throw new Error("Gagal mengaktifkan keamanan sesi. Silakan hubungi admin.");
       }
-      // ------------------------------
+      // --------------------------------------------
 
       const studentData: StudentUser = {
         id: model.id,
@@ -166,18 +167,53 @@ export const StudentAuthProvider = ({ children }: { children: ReactNode }) => {
 
   const [isKicked, setIsKicked] = useState(false);
 
-  // --- PEMANTAU SESI GLOBAL (Satu Siswa Satu Device) ---
+  // --- PEMANTAU SESI GLOBAL (DEVICE-AWARE SINGLE SESSION) ---
   useEffect(() => {
     if (!student?.id || isKicked) return;
+
+    const currentFingerprint = btoa(navigator.userAgent).substring(0, 16);
+
+    const handleSessionConflict = (serverSessionId: string, localSessionId: string | null) => {
+      if (!serverSessionId) return false;
+
+      // 1. Jika Local ID kosong (Cache terhapus), tapi Hardware Fingerprint cocok
+      // Maka kita "Adopsi" sesi dari server tersebut.
+      if (!localSessionId) {
+        const [_, serverFingerprint] = serverSessionId.split(":");
+        if (serverFingerprint === currentFingerprint) {
+          localStorage.setItem("student_session_id", serverSessionId);
+          console.log("Session restored from server due to matching fingerprint");
+          return false;
+        }
+      }
+
+      // 2. Jika Local ID ada tapi tidak sama
+      if (localSessionId && serverSessionId !== localSessionId) {
+        const [_, serverFingerprint] = serverSessionId.split(":");
+        
+        // JIKA Fingerprint sama tapi ID berbeda (berarti login baru di tab/jendela lain pada DEVICE YANG SAMA)
+        // Kita lakukan silent-update agar tab ini tidak tertutup.
+        if (serverFingerprint === currentFingerprint) {
+          localStorage.setItem("student_session_id", serverSessionId);
+          console.log("Session updated to match newer tab on same device");
+          return false;
+        }
+
+        // JIKA Fingerprint berbeda (Berarti benar-benar di HP/Laptop lain)
+        return true;
+      }
+
+      return false;
+    };
 
     // 1. Pengecekan Awal
     const checkInitialSession = async () => {
       try {
         const refreshed = await pb.collection("students").getOne(student.id);
-        const serverSessionId = refreshed.activeSessionId;
-        const localSessionId = localStorage.getItem("student_session_id");
+        const serverSid = refreshed.activeSessionId;
+        const localSid = localStorage.getItem("student_session_id");
 
-        if (serverSessionId && localSessionId && serverSessionId !== localSessionId) {
+        if (handleSessionConflict(serverSid, localSid)) {
           setIsKicked(true);
         }
       } catch (err) {}
@@ -187,9 +223,9 @@ export const StudentAuthProvider = ({ children }: { children: ReactNode }) => {
     // 2. Real-time Monitor
     const unsubscribe = pb.collection("students").subscribe(student.id, (e) => {
       if (e.action === "update") {
-        const serverSessionId = e.record.activeSessionId;
-        const localSessionId = localStorage.getItem("student_session_id");
-        if (serverSessionId && localSessionId && serverSessionId !== localSessionId) {
+        const serverSid = e.record.activeSessionId;
+        const localSid = localStorage.getItem("student_session_id");
+        if (handleSessionConflict(serverSid, localSid)) {
           setIsKicked(true);
         }
       }

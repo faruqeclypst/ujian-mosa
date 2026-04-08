@@ -85,9 +85,8 @@ const Logo = () => {
             v2.0
           </div>
         </div>
-        <p className="text-[10px] text-muted-foreground leading-tight mt-0.5 sm:mt-1 font-medium truncate flex flex-col">
-          <span>{profile.name}</span>
-          <span className="text-[9px] opacity-60">dev: Alfaruq Asri</span>
+        <p className="text-[10px] text-muted-foreground leading-tight mt-0.5 sm:mt-1 font-medium truncate">
+          {profile.name}
         </p>
       </div>
     </div>

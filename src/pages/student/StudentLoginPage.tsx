@@ -204,7 +204,6 @@ const StudentLoginPage = () => {
 
         <div className="mt-8 flex flex-col items-center gap-1 text-slate-400 text-sm font-medium">
           <p>© {new Date().getFullYear()} CBT {schoolName}. All rights reserved.</p>
-          <p className="text-[10px] opacity-70">Sistem oleh: Alfaruq Asri, S.Pd., Gr</p>
         </div>
       </div>
 

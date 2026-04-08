@@ -48,7 +48,10 @@ export function downloadStudentImportTemplate(filename = "template-import-siswa.
 export async function parseStudentImportExcel(
   file: File, 
   classes: ClassData[]
-): Promise<{ nisn: string; name: string; gender: "L" | "P"; classId: string }[]> {
+): Promise<{ 
+  results: { nisn: string; name: string; gender: "L" | "P"; classId: string }[],
+  skipped: { nisn: string; name: string; className: string }[]
+}> {
   const buffer = await file.arrayBuffer();
   const wb = XLSX.read(buffer, { type: "array" });
   const ws = wb.Sheets[wb.SheetNames[0]];
@@ -56,6 +59,7 @@ export async function parseStudentImportExcel(
 
   const raw = XLSX.utils.sheet_to_json<Record<string, any>>(ws, { defval: "" });
   const results: { nisn: string; name: string; gender: "L" | "P"; classId: string }[] = [];
+  const skipped: { nisn: string; name: string; className: string }[] = [];
 
   for (const row of raw) {
     const nisn = String(row["NISN"] || "").trim();
@@ -63,22 +67,29 @@ export async function parseStudentImportExcel(
     const genderRaw = String(row["Gender (L/P)"] || "").trim().toUpperCase();
     const className = String(row["Nama Kelas"] || "").trim();
 
-    const gender: "L" | "P" = genderRaw === "P" ? "P" : "L"; // Fallback to L if invalid
+    if (!nisn && !name) continue;
 
-    // Find classId
-    const foundClass = classes.find(c => c.name.toLowerCase() === className.toLowerCase());
+    const gender: "L" | "P" = genderRaw === "P" ? "P" : "L"; 
+
+    // Find classId by name (case-insensitive, trimmed) or by ID directly
+    const foundClass = classes.find(c => 
+      c.name.trim().toLowerCase() === className.toLowerCase() || 
+      c.id === className
+    );
     
-    if (nisn && name && foundClass) {
+    if (foundClass) {
       results.push({
         nisn,
         name,
         gender,
         classId: foundClass.id,
       });
+    } else {
+      skipped.push({ nisn, name, className });
     }
   }
 
-  return results;
+  return { results, skipped };
 }
 
 export function exportStudentToExcel(params: { 

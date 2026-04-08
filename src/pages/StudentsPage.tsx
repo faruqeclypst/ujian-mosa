@@ -1,5 +1,8 @@
 import { useState, useMemo } from "react";
-import { Plus, Users } from "lucide-react";
+import { Skeleton } from "../components/ui/skeleton";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
+import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
+import { Plus, Users, ArrowLeftRight, Trash2, Check } from "lucide-react";
 import { useExamData } from "../context/ExamDataContext";
 import { Button } from "../components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "../components/ui/dialog";
@@ -10,6 +13,8 @@ import { ImportButton } from "../components/ui/import-button";
 import { ExportButton } from "../components/ui/export-button";
 import { ConfirmationDialog } from "../components/ui/confirmation-dialog";
 import { downloadStudentImportTemplate, exportStudentToExcel, parseStudentImportExcel } from "../lib/studentExcel";
+import FormField from "../components/forms/FormField";
+import { Select } from "../components/ui/select";
 import type { StudentData } from "../types/exam";
 
 const StudentsPage = () => {
@@ -25,11 +30,18 @@ const StudentsPage = () => {
   const [isImporting, setIsImporting] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
+  const [isBatchOpen, setIsBatchOpen] = useState(false);
+  const [targetClassId, setTargetClassId] = useState<string>("");
+  const [filterClassId, setFilterClassId] = useState<string>("ALL");
+
   const [alertDialog, setAlertDialog] = useState<{
     isOpen: boolean;
     title: string;
     description: string;
     type: "success" | "danger" | "warning" | "info";
+    onConfirm?: () => void;
+    showCancel?: boolean;
+    confirmLabel?: string;
   }>({
     isOpen: false,
     title: "",
@@ -37,8 +49,8 @@ const StudentsPage = () => {
     type: "info",
   });
 
-  const showAlert = (title: string, description: string, type: "success" | "danger" | "warning" | "info" = "info") => {
-    setAlertDialog({ isOpen: true, title, description, type });
+  const showAlert = (title: string, description: string, type: "success" | "danger" | "warning" | "info" = "info", onConfirm?: () => void, showCancel: boolean = false, confirmLabel: string = "OK") => {
+    setAlertDialog({ isOpen: true, title, description, type, onConfirm, showCancel, confirmLabel });
   };
 
   const handleCreateClick = () => {
@@ -95,15 +107,19 @@ const StudentsPage = () => {
   const handleImportStudents = async (file: File) => {
     setIsImporting(true);
     try {
-      const parsed = await parseStudentImportExcel(file, classes);
-      if (parsed.length === 0) return showAlert("File Kosong", "File yang Anda upload kosong atau tidak valid.", "warning");
+      const { results, skipped } = await parseStudentImportExcel(file, classes);
+      
+      if (results.length === 0 && skipped.length === 0) {
+        return showAlert("File Kosong", "File yang Anda upload kosong atau tidak valid.", "warning");
+      }
       
       // Validasi NISN Duplikat
       const existingNisns = students.map(s => s.nisn);
-      const newEntries = parsed.filter((p: any) => !existingNisns.includes(String(p.nisn)));
+      const newEntries = results.filter((p: any) => !existingNisns.includes(String(p.nisn)));
+      const duplicatesCount = results.length - newEntries.length;
       
-      if (newEntries.length === 0) {
-        return showAlert("Batal", "Semua NISN di file sudah terdaftar.", "warning");
+      if (newEntries.length === 0 && skipped.length === 0) {
+        return showAlert("Batal", `Semua NISN di file (${results.length}) sudah terdaftar.`, "warning");
       }
 
       for (const row of newEntries) {
@@ -114,7 +130,14 @@ const StudentsPage = () => {
           classId: row.classId,
         });
       }
-      showAlert("Import Berhasil", `${newEntries.length} Siswa berhasil diimport.`, "success");
+
+      let message = `${newEntries.length} Siswa berhasil diimport.`;
+      if (duplicatesCount > 0) message += ` ${duplicatesCount} data dilewati karena NISN duplikat.`;
+      if (skipped.length > 0) {
+        message += ` ${skipped.length} data gagal karena Nama Kelas tidak ditemukan di sistem.`;
+      }
+      
+      showAlert("Import Selesai", message, skipped.length > 0 ? "warning" : "success");
     } catch (err: any) {
       showAlert("Gagal Import", err.message || "Gagal mengimport data Siswa.", "danger");
     } finally {
@@ -134,6 +157,73 @@ const StudentsPage = () => {
       classId: selectedStudent.classId
     } : { nisn: "", name: "", gender: "L" as const, classId: "" }, 
   [selectedStudent]);
+
+  const filteredStudents = useMemo(() => {
+    if (filterClassId === "ALL") return students;
+    if (filterClassId === "NONE") return students.filter(s => !s.classId);
+    return students.filter(s => s.classId === filterClassId);
+  }, [students, filterClassId]);
+
+  const { updateStudentClassBatch, deleteStudentsBatch } = useExamData();
+
+  const sortedClasses = useMemo(() => {
+    return [...classes].sort((a, b) => 
+      a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })
+    );
+  }, [classes]);
+
+  const handleBatchUpdateClass = async () => {
+    if (!targetClassId || selectedIds.length === 0) return;
+    try {
+      await updateStudentClassBatch(selectedIds, targetClassId);
+      setIsBatchOpen(false);
+      setSelectedIds([]);
+      setTargetClassId("");
+    } catch (error) {
+      console.error("Gagal memindahkan siswa", error);
+      showAlert("Gagal", "Gagal memindahkan siswa.", "danger");
+    }
+  };
+
+  const handleBatchDelete = async () => {
+    if (selectedIds.length === 0) return;
+    showAlert(
+      "Hapus Siswa Massal",
+      `Apakah Anda yakin ingin menghapus ${selectedIds.length} siswa terpilih? Tindakan ini tidak dapat dibatalkan.`,
+      "danger",
+      async () => {
+        try {
+          await deleteStudentsBatch(selectedIds);
+          setSelectedIds([]);
+        } catch (error) {
+          console.error("Gagal menghapus siswa massal", error);
+          showAlert("Gagal", "Gagal menghapus siswa massal.", "danger");
+        }
+      },
+      true,
+      "Ya, Hapus Semua"
+    );
+  };
+
+  const handleMoveToAlumni = async () => {
+    if (selectedIds.length === 0) return;
+    showAlert(
+      "Pindahkan ke Alumni",
+      `Pindahkan ${selectedIds.length} siswa terpilih ke daftar Alumni (Lulus)?`,
+      "warning",
+      async () => {
+        try {
+          await updateStudentClassBatch(selectedIds, "ALUMNI");
+          setSelectedIds([]);
+        } catch (error) {
+          console.error("Gagal memindahkan ke alumni", error);
+          showAlert("Gagal", "Gagal memindahkan ke alumni.", "danger");
+        }
+      },
+      true,
+      "Ya, Pindahkan"
+    );
+  };
 
   return (
     <div className="space-y-6">
@@ -175,18 +265,131 @@ const StudentsPage = () => {
         </div>
       </div>
 
-      {loading ? (
-        <div className="flex items-center justify-center p-8">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      {selectedIds.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <Dialog open={isBatchOpen} onOpenChange={setIsBatchOpen}>
+            <DialogTrigger asChild>
+              <Button variant="default" className="bg-orange-600 hover:bg-orange-700 h-9 text-xs">
+                <ArrowLeftRight className="mr-2 h-4 w-4" />
+                Pindah Kelas ({selectedIds.length})
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>Pindah Kelas Masal</DialogTitle>
+              </DialogHeader>
+              <p className="text-sm text-muted-foreground">
+                Pindahkan {selectedIds.length} siswa terpilih ke kelas tujuan.
+              </p>
+              
+              <div className="space-y-4 pt-4">
+                <FormField id="batch-class" label="Kelas Tujuan">
+                  <Select value={targetClassId} onChange={(e) => setTargetClassId(e.target.value)}>
+                    <option value="">Pilih Kelas Tujuan</option>
+                    {sortedClasses.map((cls) => (
+                      <option key={cls.id} value={cls.id}>{cls.name}</option>
+                    ))}
+                  </Select>
+                </FormField>
+                
+                <div className="flex justify-end gap-2 pt-2">
+                  <Button variant="outline" onClick={() => setIsBatchOpen(false)}>Batal</Button>
+                  <Button className="bg-blue-600 hover:bg-blue-700 text-white" onClick={handleBatchUpdateClass} disabled={!targetClassId}>
+                    Proses
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          <Button 
+            className="bg-emerald-600 hover:bg-emerald-700 h-9 text-xs"
+            onClick={handleMoveToAlumni}
+          >
+            <Check className="mr-2 h-4 w-4" />
+            Luluskan / Ke Alumni
+          </Button>
+
+          <Button 
+            variant="ghost" 
+            className="text-rose-600 hover:text-rose-700 hover:bg-rose-50 h-9 text-xs"
+            onClick={handleBatchDelete}
+          >
+            <Trash2 className="mr-2 h-4 w-4" />
+            Hapus ({selectedIds.length})
+          </Button>
         </div>
+      )}
+
+      {loading ? (
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2 border-b mb-4">
+            <CardTitle className="text-lg font-bold text-slate-800 dark:text-slate-100">Daftar Siswa</CardTitle>
+          </CardHeader>
+          <CardContent>
+             <div className="rounded-xl border border-slate-200/60 dark:border-slate-800 overflow-hidden">
+                <Table>
+                  <TableHeader className="bg-slate-50/50 dark:bg-slate-900/50">
+                    <TableRow>
+                      <TableHead className="w-[40px] text-center">
+                         <div className="h-4 w-4 border border-slate-300 rounded mx-auto" />
+                      </TableHead>
+                      <TableHead className="w-[60px] text-center">No</TableHead>
+                      <TableHead>NISN</TableHead>
+                      <TableHead>Nama Siswa</TableHead>
+                      <TableHead className="w-[60px] text-center">L/P</TableHead>
+                      <TableHead>Kelas</TableHead>
+                      <TableHead className="text-right">Aksi</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {Array.from({ length: 8 }).map((_, i) => (
+                      <TableRow key={i}>
+                        <TableCell className="text-center"><Skeleton className="h-4 w-4 mx-auto" /></TableCell>
+                        <TableCell className="text-center"><Skeleton className="h-4 w-4 mx-auto" /></TableCell>
+                        <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                        <TableCell><Skeleton className="h-4 w-48" /></TableCell>
+                        <TableCell className="text-center"><Skeleton className="h-4 w-4 mx-auto" /></TableCell>
+                        <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                        <TableCell className="text-right">
+                           <div className="flex justify-end gap-2">
+                              <Skeleton className="h-8 w-8 rounded-lg" />
+                              <Skeleton className="h-8 w-8 rounded-lg" />
+                           </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+             </div>
+          </CardContent>
+        </Card>
       ) : (
         <StudentTable 
-          students={students} 
+          students={filteredStudents} 
           classes={classes} 
           selectedIds={selectedIds}
           onSelectChange={setSelectedIds}
           onEdit={handleEditClick} 
           onDelete={handleDeleteClick} 
+          filterActions={
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider hidden sm:inline">Kelas:</span>
+              <select
+                value={filterClassId}
+                onChange={(e) => setFilterClassId(e.target.value)}
+                className="h-9 min-w-[140px] rounded-xl border border-slate-200 bg-card px-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all cursor-pointer dark:border-slate-800"
+              >
+                <option value="ALL">Semua Kelas</option>
+                <option value="NONE">Tanpa Kelas</option>
+                <optgroup label="Daftar Kelas">
+                  {sortedClasses.map(cls => (
+                    <option key={cls.id} value={cls.id}>{cls.name}</option>
+                  ))}
+                </optgroup>
+              </select>
+            </div>
+          }
         />
       )}
 
@@ -203,12 +406,15 @@ const StudentsPage = () => {
       <ConfirmationDialog
         isOpen={alertDialog.isOpen}
         onClose={() => setAlertDialog({ ...alertDialog, isOpen: false })}
-        onConfirm={() => setAlertDialog({ ...alertDialog, isOpen: false })}
+        onConfirm={() => {
+          if (alertDialog.onConfirm) alertDialog.onConfirm();
+          setAlertDialog({ ...alertDialog, isOpen: false });
+        }}
         title={alertDialog.title}
         description={alertDialog.description}
         type={alertDialog.type}
-        confirmLabel="OK"
-        showCancel={false}
+        confirmLabel={alertDialog.confirmLabel || "OK"}
+        showCancel={alertDialog.showCancel}
       />
     </div>
   );

@@ -12,6 +12,8 @@ import { useNavigate } from "react-router-dom";
 import { useExamData } from "../../context/ExamDataContext";
 import { ConfirmationDialog } from "../../components/ui/confirmation-dialog";
 import { DataTable } from "../../components/ui/data-table";
+import { Skeleton } from "../../components/ui/skeleton";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../components/ui/table";
 
 export interface ExamData {
   id: string;
@@ -73,9 +75,10 @@ const columns = [
 const ExamsPage = () => {
   const navigate = useNavigate();
   const { user, role } = useAuth();
-  const { subjects, teachers } = useExamData();
+  const { subjects, teachers, loading: dataLoading } = useExamData();
   const [exams, setExams] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const isLoading = loading || dataLoading;
   const [activeTab, setActiveTab] = useState<"aktif" | "arsip">("aktif");
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -333,14 +336,53 @@ const ExamsPage = () => {
         </div>
       </div>
 
-      {loading ? (
-        <div className="flex items-center justify-center p-8">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-        </div>
+      {isLoading ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base font-semibold text-slate-800 dark:text-white">Daftar Bank Soal</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="rounded-xl border border-slate-200/60 dark:border-slate-800 overflow-hidden">
+                <Table>
+                  <TableHeader className="bg-slate-50/50 dark:bg-slate-900/50">
+                    <TableRow>
+                      <TableHead className="w-16 text-center">No</TableHead>
+                      <TableHead>Judul Ujian</TableHead>
+                      <TableHead>Mata Pelajaran</TableHead>
+                      <TableHead>Guru Pengampu</TableHead>
+                      <TableHead className="text-right">Aksi</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {Array.from({ length: 8 }).map((_, i) => (
+                      <TableRow key={i}>
+                        <TableCell className="text-center"><Skeleton className="h-4 w-4 mx-auto" /></TableCell>
+                        <TableCell>
+                           <div className="space-y-2">
+                              <Skeleton className="h-4 w-48" />
+                              <Skeleton className="h-3 w-24 rounded-full" />
+                           </div>
+                        </TableCell>
+                        <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                        <TableCell><Skeleton className="h-4 w-36" /></TableCell>
+                        <TableCell className="text-right">
+                           <div className="flex justify-end gap-2">
+                              <Skeleton className="h-8 w-8 rounded-lg" />
+                              <Skeleton className="h-8 w-8 rounded-lg" />
+                              <Skeleton className="h-8 w-8 rounded-lg" />
+                           </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+            </div>
+          </CardContent>
+        </Card>
       ) : (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base font-semibold">Data Bank Soal</CardTitle>
+            <CardTitle className="text-base font-semibold text-slate-800 dark:text-white">Daftar Bank Soal</CardTitle>
           </CardHeader>
           <CardContent>
             <DataTable
