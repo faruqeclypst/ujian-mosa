@@ -135,8 +135,12 @@ export function DataTable<T>({
       });
     }
 
-    setState(prev => ({ ...prev, filteredData: filtered, currentPage: 1 }));
-  }, [data, state.searchTerm, state.sortColumn, state.sortDirection, state.visibleColumns, columns]);
+    setState(prev => {
+      const totalPages = Math.ceil(filtered.length / prev.pageSize);
+      const nextPageIndex = prev.currentPage > totalPages && totalPages > 0 ? totalPages : prev.currentPage;
+      return { ...prev, filteredData: filtered, currentPage: nextPageIndex || 1 };
+    });
+  }, [data, state.searchTerm, state.sortColumn, state.sortDirection, state.visibleColumns, columns, state.pageSize]);
 
   const totalPages = Math.ceil(state.filteredData.length / state.pageSize);
   const startIndex = (state.currentPage - 1) * state.pageSize;
@@ -150,6 +154,7 @@ export function DataTable<T>({
       ...prev,
       sortColumn: prev.sortColumn === column.key ? prev.sortColumn : column.key,
       sortDirection: prev.sortColumn === column.key && prev.sortDirection === "asc" ? "desc" : "asc",
+      currentPage: 1,
     }));
   };
 
@@ -205,7 +210,7 @@ export function DataTable<T>({
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {/* Header */}
       {(title || description) && (
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -224,7 +229,7 @@ export function DataTable<T>({
             <Input
               placeholder={searchPlaceholder}
               value={state.searchTerm}
-              onChange={(e) => setState(prev => ({ ...prev, searchTerm: e.target.value }))}
+              onChange={(e) => setState(prev => ({ ...prev, searchTerm: e.target.value, currentPage: 1 }))}
               className="pl-9 text-sm sm:text-base"
             />
           </div>

@@ -1,16 +1,21 @@
 import { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useStudentAuth } from "../../context/StudentAuthContext";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import pb from "../../lib/pocketbase";
-import { LogOut, KeyRound, Calendar, Clock, ChevronRight, User, BookOpen, AlertCircle, ClipboardCheck, Award, LogOut as LogoutIcon, Sun, Moon, Monitor } from "lucide-react";
+import {
+  Calendar, Clock, ChevronRight, User, AlertCircle,
+  Award, LogOut as LogoutIcon, Sun, Moon, Monitor, KeyRound, ClipboardCheck
+} from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../../components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuLabel } from "../../components/ui/dropdown-menu";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { Skeleton } from "../../components/ui/skeleton";
-import { ThemeToggle } from "../../components/ui/theme-toggle";
 import { useTheme } from "../../context/ThemeContext";
+import { Card, CardHeader, CardContent } from "../../components/ui/card";
+import { Badge } from "../../components/ui/badge";
+import { cn } from "../../lib/utils";
 
 const getExamTypeColorClass = (type: string) => {
   switch (type?.toLowerCase()) {
@@ -36,6 +41,7 @@ const StudentDashboardPage = () => {
 
   const [activeRooms, setActiveRooms] = useState<any[]>([]);
   const [userAttempts, setUserAttempts] = useState<Record<string, any>>({});
+  const [activeTab, setActiveTab] = useState<"active" | "history">("active");
 
   const fetchData = async () => {
     try {
@@ -67,7 +73,19 @@ const StudentDashboardPage = () => {
         let timeStatus = "upcoming";
         if (now >= start && now <= end) timeStatus = "ongoing";
         else if (now > end) timeStatus = "expired";
-        return { ...room, examTitle: room.room_name || "Ruang Ujian", examDescription: exam?.title || "Mata Pelajaran", subject: exam?.expand?.subjectId?.name || "Mapel", teacherName: exam?.expand?.teacherId?.name || "-", examType: exam?.examType || "Latihan", timeStatus, startTimeDate: start, endTimeDate: end };
+        const normalizedRoomName = room.room_name || (room as any).roomName || (room as any).title || (room as any).room_code || "Ruang Utama";
+        return {
+          ...room,
+          room_name: normalizedRoomName,
+          examTitle: normalizedRoomName,
+          examDescription: exam?.title || "Paket Soal",
+          subject: exam?.expand?.subjectId?.name || "Mapel",
+          teacherName: exam?.expand?.teacherId?.name || "-",
+          examType: exam?.examType || "Latihan",
+          timeStatus,
+          startTimeDate: start,
+          endTimeDate: end
+        };
       }).sort((a, b) => {
         const order: any = { "ongoing": 0, "upcoming": 1, "expired": 2 };
         return order[a.timeStatus] - order[b.timeStatus];
@@ -87,7 +105,6 @@ const StudentDashboardPage = () => {
 
         setUserAttempts(myStatus);
 
-        // 🔥 Jika ada ujian yang TERKUNCI, paksa arahkan kembali ke ruang tersebut
         if (lockedRoomId) {
           sessionStorage.setItem("activeCBTRoomId", lockedRoomId);
           navigate(`/cbt/${lockedRoomId}`, { replace: true });
@@ -124,8 +141,7 @@ const StudentDashboardPage = () => {
       }
 
       sessionStorage.setItem("activeCBTRoomId", selectedRoom.id);
-      
-      // Memicu Fullscreen (harus dilakukan saat user gesture seperti klik tombol)
+
       try {
         const docEl = document.documentElement;
         if (docEl.requestFullscreen) {
@@ -139,19 +155,47 @@ const StudentDashboardPage = () => {
     } catch (err: any) { setTokenError(err.message); } finally { setIsValidating(false); }
   };
 
+  const totalActive = activeRooms.filter(r => {
+    const att = userAttempts[r.id];
+    const finished = att && (att.status === "finished" || att.status === "submitted" || att.status === "graded");
+    const expired = r.timeStatus === "expired";
+    return !finished && !expired;
+  }).length;
+
+  const totalFinished = activeRooms.filter(r => {
+    const att = userAttempts[r.id];
+    const finished = att && (att.status === "finished" || att.status === "submitted" || att.status === "graded");
+    const expired = r.timeStatus === "expired";
+    return finished || expired;
+  }).length;
+
+  const [messageIndex, setMessageIndex] = useState(0);
+  useEffect(() => {
+    const timer = setInterval(() => setMessageIndex(p => (p + 1) % 2), 4000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const bannerMessages = [
+    { text: "Anda memiliki", highlight: `${totalActive} agenda ujian aktif`, suffix: "hari ini." },
+    { text: "Tercatat sebanyak", highlight: `${totalFinished} agenda ujian`, suffix: "telah selesai." }
+  ];
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 font-sans pb-20 sm:pb-0">
       <header className="sticky top-0 z-50 bg-white/90 dark:bg-slate-900/90 backdrop-blur-3xl border-b border-slate-100 dark:border-slate-800 h-16 sm:h-20 px-3 sm:px-10 flex items-center justify-between shadow-sm">
         <div className="flex items-center gap-2 sm:gap-3">
           <div className="p-1 sm:p-2 bg-emerald-50 dark:bg-emerald-950/40 rounded-xl sm:rounded-2xl border border-emerald-100/50 dark:border-emerald-800/50 shadow-sm shrink-0">
-            {schoolLogo ? <img src={schoolLogo} className="h-6 w-6 sm:h-9 sm:w-9 object-contain" alt="Logo" /> : <div className="h-6 w-6 sm:h-9 sm:w-9 bg-slate-200 dark:bg-slate-700 rounded-lg animate-pulse" />}
+            {schoolLogo ? (
+              <img src={schoolLogo} className="h-6 w-6 sm:h-9 sm:w-9 object-contain" alt="Logo" />
+            ) : (
+              <img src="/logo-default.png" className="h-6 w-6 sm:h-9 sm:w-9 object-contain opacity-50" alt="Default Logo" />
+            )}
           </div>
-          <div className="flex flex-col -space-y-0.5 sm:-space-y-1 min-[320px]:max-w-[150px] sm:max-w-none">
-            <h1 className="text-xs sm:text-lg font-black text-slate-800 dark:text-white uppercase tracking-tight leading-tight">
+          <div className="flex flex-col -space-y-0.5 sm:-space-y-1 sm:max-w-none justify-center">
+            <h1 className="text-sm sm:text-lg font-black text-slate-800 dark:text-white uppercase tracking-tight leading-tight whitespace-nowrap">
               {schoolName}
             </h1>
-            <span className="text-[7px] sm:text-[10px] font-black text-emerald-600 dark:text-emerald-400/80 uppercase tracking-widest sm:tracking-[0.3em] whitespace-nowrap">
+            <span className="text-[9px] sm:text-[10px] font-black text-emerald-600 dark:text-emerald-400/80 uppercase tracking-widest sm:tracking-[0.3em] whitespace-nowrap">
               Computer Based Test
             </span>
           </div>
@@ -159,7 +203,6 @@ const StudentDashboardPage = () => {
 
         <div className="flex items-center gap-2 sm:gap-4">
           <div className="flex items-center gap-1.5 sm:gap-4 border-slate-100 dark:border-slate-800">
-            {/* Nama & Kelas (Desktop) */}
             <div className="text-right min-w-0 hidden sm:block">
               <p className="text-sm font-black text-slate-800 dark:text-slate-200 leading-snug uppercase">{student?.name?.split(" ")[0]}</p>
               <div className="inline-block px-2 py-0.5 bg-emerald-50 dark:bg-emerald-950/40 rounded-md text-[9px] font-black text-emerald-600 dark:text-emerald-400 mt-2 leading-none uppercase tracking-widest border border-emerald-100/50 dark:border-emerald-800/50 shadow-sm">
@@ -167,13 +210,11 @@ const StudentDashboardPage = () => {
               </div>
             </div>
 
-            {/* Nama & Kelas (Mobile) */}
             <div className="text-right min-w-0 flex flex-col justify-center sm:hidden mr-1">
               <p className="text-[11px] font-black text-slate-800 dark:text-white leading-tight uppercase truncate max-w-[80px]">{student?.name?.split(" ")[0]}</p>
               <p className="text-[8px] font-bold text-emerald-600 dark:text-emerald-400 mt-0.5 uppercase tracking-widest leading-none">{student?.className}</p>
             </div>
 
-            {/* Icon Profil (Kanan) */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <div className="w-10 h-10 sm:w-12 sm:h-12 bg-emerald-50 dark:bg-emerald-950/40 rounded-xl sm:rounded-2xl flex items-center justify-center border border-emerald-100/50 dark:border-emerald-800/50 shadow-sm group cursor-pointer hover:bg-emerald-100 transition-all outline-none">
@@ -213,172 +254,310 @@ const StudentDashboardPage = () => {
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto p-4 sm:p-10">
-        <div className="space-y-8 sm:space-y-12">
-          <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="relative bg-emerald-600 rounded-[30px] sm:rounded-[50px] p-6 sm:p-16 overflow-hidden shadow-2xl shadow-emerald-100 dark:shadow-none">
-            <div className="absolute top-0 right-0 w-1/2 h-full bg-emerald-500/50 skew-x-[-20deg] translate-x-1/2" />
-            <div className="absolute -bottom-24 -left-24 w-64 h-64 bg-emerald-500/30 rounded-full blur-3xl" />
-            <div className="relative z-10 flex flex-col sm:flex-row items-center sm:justify-between gap-6">
-              <div className="relative z-10 max-w-2xl space-y-3 sm:space-y-6 text-center sm:text-left">
-                <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/10 backdrop-blur-md rounded-full text-[8px] sm:text-[10px] font-black text-slate-200 uppercase tracking-widest border border-white/5">
+      <main className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-10">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+          {/* LEFT COLUMN: Exams */}
+          <div className="lg:col-span-8 space-y-8">
+            {/* Desktop Banner */}
+            <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} className="relative bg-emerald-600 rounded-[30px] p-6 sm:p-10 overflow-hidden shadow-2xl shadow-emerald-100 dark:shadow-none hidden lg:block">
+              <div className="absolute top-0 right-0 w-1/2 h-full bg-emerald-500/50 skew-x-[-20deg] translate-x-1/2" />
+              <div className="relative z-10 space-y-4">
+                <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/10 backdrop-blur-md rounded-full text-[10px] font-black text-slate-200 uppercase tracking-widest border border-white/5">
                   Verified Student Account
                 </div>
+                <h2 className="text-3xl font-black text-white tracking-tight leading-tight uppercase">
+                  Selamat Datang Kembali, <br />
+                  <span className="text-emerald-100">{student?.name}</span>
+                </h2>
+                <div className="h-6 overflow-hidden">
+                  <AnimatePresence mode="wait">
+                    <motion.p
+                      key={messageIndex}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      transition={{ duration: 0.5, ease: "anticipate" }}
+                      className="text-xs text-slate-100/70 font-bold uppercase tracking-widest leading-none flex items-center gap-1.5"
+                    >
+                      {bannerMessages[messageIndex].text}
+                      <span className="text-white px-1.5 py-0.5 bg-white/10 rounded">{bannerMessages[messageIndex].highlight}</span>
+                      {bannerMessages[messageIndex].suffix}
+                    </motion.p>
+                  </AnimatePresence>
+                </div>
+              </div>
+            </motion.div>
+
+            {/* Mobile Banner */}
+            <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="relative bg-emerald-600 rounded-[30px] p-6 overflow-hidden shadow-2xl shadow-emerald-100 dark:shadow-none lg:hidden">
+              <div className="absolute top-0 right-0 w-1/2 h-full bg-emerald-500/50 skew-x-[-20deg] translate-x-1/2" />
+              <div className="relative z-10 text-center space-y-3">
+                <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/10 backdrop-blur-md rounded-full text-[8px] font-black text-slate-200 uppercase tracking-widest border border-white/5 mx-auto">
+                  Verified Student Account
+                </div>
+                <h2 className="text-xl font-black text-white tracking-tight leading-tight uppercase">
+                  Halo, {student?.name?.split(" ")[0]}
+                </h2>
+                <div className="h-4 overflow-hidden flex justify-center">
+                  <AnimatePresence mode="wait">
+                    <motion.p
+                      key={messageIndex}
+                      initial={{ opacity: 0, y: 5 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -5 }}
+                      className="text-[9px] text-slate-100/70 font-bold uppercase tracking-widest leading-none"
+                    >
+                      {bannerMessages[messageIndex].highlight} {bannerMessages[messageIndex].suffix}
+                    </motion.p>
+                  </AnimatePresence>
+                </div>
+              </div>
+            </motion.div>
+
+            <div className="space-y-6 text-left">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 px-1">
+                <div className="flex items-center gap-3">
+                  <div className="w-4 h-4 bg-emerald-600 rounded-full shadow-lg shadow-emerald-200 animate-pulse" />
+                  <h3 className="text-sm sm:text-base font-black text-emerald-900 dark:text-slate-300 uppercase tracking-[0.3em]">Agenda Ujian</h3>
+                </div>
+
+                <div className="flex p-1 bg-slate-100 dark:bg-slate-800 rounded-xl w-fit">
+                  <button onClick={() => setActiveTab("active")} className={cn("px-4 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all", activeTab === "active" ? "bg-white dark:bg-slate-900 text-emerald-600 shadow-sm" : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-300")}>
+                    Aktif ({activeRooms.filter(r => {
+                      const att = userAttempts[r.id];
+                      const finished = att && (att.status === "finished" || att.status === "submitted" || att.status === "graded");
+                      const expired = r.timeStatus === "expired";
+                      return !finished && !expired;
+                    }).length})
+                  </button>
+                  <button onClick={() => setActiveTab("history")} className={cn("px-4 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all", activeTab === "history" ? "bg-white dark:bg-slate-900 text-emerald-600 shadow-sm" : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-300")}>
+                    Selesai ({activeRooms.filter(r => {
+                      const att = userAttempts[r.id];
+                      const finished = att && (att.status === "finished" || att.status === "submitted" || att.status === "graded");
+                      const expired = r.timeStatus === "expired";
+                      return finished || expired;
+                    }).length})
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-4">
                 {loading ? (
-                  <div className="space-y-4">
-                    <Skeleton className="h-8 w-48 bg-white/20" />
-                    <Skeleton className="h-5 w-64 bg-white/20" />
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-4">
+                    {Array.from({ length: 4 }).map((_, i) => (
+                      <Skeleton key={i} className="h-48 rounded-2xl" />
+                    ))}
+                  </div>
+                ) : activeRooms.filter(r => {
+                  const att = userAttempts[r.id];
+                  const finished = att && (att.status === "finished" || att.status === "submitted" || att.status === "graded");
+                  const expired = r.timeStatus === "expired";
+                  const isHistory = finished || expired;
+                  return activeTab === "active" ? !isHistory : isHistory;
+                }).length === 0 ? (
+                  <div className="py-20 border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl text-center bg-white dark:bg-slate-900/50">
+                    <Calendar className="h-10 w-10 text-slate-200 mx-auto mb-4" />
+                    <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase">
+                      {activeTab === "active" ? "Tidak ada jadwal aktif" : "Belum ada riwayat ujian"}
+                    </h3>
                   </div>
                 ) : (
-                  <>
-                    <h2 className="text-xl sm:text-[32px] font-black text-white tracking-tight leading-tight uppercase">
-                      Halo, <span className="text-slate-50 font-medium opacity-100">{student?.name?.split(" ")[0]}</span>
-                    </h2>
-                    <p className="text-[10px] sm:text-sm text-slate-100/70 font-bold uppercase tracking-widest leading-relaxed">Selamat datang di gerbang ujian digital Anda hari ini.</p>
-                  </>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-4">
+                    {activeRooms
+                      .filter(r => {
+                        const att = userAttempts[r.id];
+                        const finished = att && (att.status === "finished" || att.status === "submitted" || att.status === "graded");
+                        const expired = r.timeStatus === "expired";
+                        const isHistory = finished || expired;
+                        return activeTab === "active" ? !isHistory : isHistory;
+                      })
+                      .map((room, idx) => {
+                        const attempt = userAttempts[room.id];
+                        const isFinished = attempt && (attempt.status === "finished" || attempt.status === "submitted" || attempt.status === "graded");
+                        const isLocked = attempt && attempt.status === "LOCKED";
+
+                        return (
+                          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: idx * 0.05 }} key={room.id} className="group relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[2.5rem] shadow-sm hover:shadow-2xl hover:border-emerald-200 dark:hover:border-emerald-800/50 transition-all overflow-hidden flex flex-col h-full text-left">
+                            <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-50 dark:bg-emerald-950/20 rounded-full -mr-16 -mt-16 transition-transform group-hover:scale-150 duration-700" />
+                            <div className="p-6 flex-1 flex flex-col relative z-10">
+                              <div className="flex justify-between items-start gap-4 mb-2">
+                                <div className="space-y-0.5">
+                                  <span className="text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">{room.subject}</span>
+                                  <h3 className="text-xl font-black text-slate-800 dark:text-white uppercase leading-tight group-hover:text-emerald-600 transition-colors">
+                                    {room.room_name || "Ruang Ujian"}
+                                  </h3>
+                                </div>
+                                <Badge className={cn("text-[8px] font-black uppercase shrink-0 py-1 px-3 rounded-full border-none shadow-sm", getExamTypeColorClass(room.examType))}>{room.examType}</Badge>
+                              </div>
+
+                              <div className="mt-1 space-y-3 flex-1">
+                                {/* Paket Soal - High Visibility */}
+                                <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800 group-hover:border-emerald-100 dark:group-hover:border-emerald-900/40 transition-colors">
+                                  <div className="flex items-center gap-3">
+                                    <div className="w-8 h-8 rounded-xl bg-white dark:bg-slate-900 flex items-center justify-center border border-slate-200 dark:border-slate-800 shadow-sm">
+                                      <ClipboardCheck className="w-4 h-4 text-emerald-500" />
+                                    </div>
+                                    <div className="flex flex-col">
+                                      <span className="text-[8px] font-black text-emerald-600/70 dark:text-emerald-400/70 uppercase tracking-widest leading-none">Paket Soal</span>
+                                      <span className="text-[11px] font-black text-slate-700 dark:text-slate-200 uppercase mt-1 leading-tight line-clamp-1">{room.examDescription}</span>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-3">
+                                  <div className="flex items-center gap-3">
+                                    <div className="w-8 h-8 rounded-xl bg-emerald-50/50 dark:bg-emerald-950/30 flex items-center justify-center border border-emerald-100/50 dark:border-emerald-800/50 shadow-sm">
+                                      <User className="w-4 h-4 text-emerald-500" />
+                                    </div>
+                                    <div className="flex flex-col">
+                                      <span className="text-[8px] font-black text-emerald-600/70 dark:text-emerald-400/70 uppercase tracking-widest leading-none">Pengampu</span>
+                                      <span className="text-xs font-bold text-slate-700 dark:text-slate-300 truncate max-w-[100px]">{room.teacherName}</span>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-3">
+                                    <div className="w-8 h-8 rounded-xl bg-emerald-50/50 dark:bg-emerald-950/30 flex items-center justify-center border border-emerald-100/50 dark:border-emerald-800/50 shadow-sm">
+                                      <Calendar className="w-4 h-4 text-emerald-500" />
+                                    </div>
+                                    <div className="flex flex-col">
+                                      <span className="text-[8px] font-black text-emerald-600/70 dark:text-emerald-400/70 uppercase tracking-widest leading-none">Hari & Tanggal</span>
+                                      <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                                        {new Date(room.startTimeDate).toLocaleDateString("id-ID", { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-3">
+                                  <div className="flex items-center gap-3">
+                                    <div className="w-8 h-8 rounded-xl bg-emerald-50/50 dark:bg-emerald-950/30 flex items-center justify-center border border-emerald-100/50 dark:border-emerald-800/50 shadow-sm">
+                                      <Clock className="w-4 h-4 text-emerald-500" />
+                                    </div>
+                                    <div className="flex flex-col">
+                                      <span className="text-[8px] font-black text-emerald-600/70 dark:text-emerald-400/70 uppercase tracking-widest leading-none">Durasi</span>
+                                      <span className="text-xs font-bold text-slate-700 dark:text-slate-300">{room.duration} Menit</span>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-3">
+                                    <div className="w-8 h-8 rounded-xl bg-emerald-50/50 dark:bg-emerald-950/30 flex items-center justify-center border border-emerald-100/50 dark:border-emerald-800/50 shadow-sm">
+                                      <Clock className="w-4 h-4 text-emerald-500" />
+                                    </div>
+                                    <div className="flex flex-col">
+                                      <span className="text-[8px] font-black text-emerald-600/70 dark:text-emerald-400/70 uppercase tracking-widest leading-none">Waktu Mulai</span>
+                                      <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Pkl {new Date(room.startTimeDate).toLocaleTimeString("id-ID", { hour: '2-digit', minute: '2-digit' })} WIB</span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="mt-1 pt-2 border-t border-slate-50 dark:border-slate-800/50">
+                                {isFinished ? (
+                                  <div className="group/result flex items-center justify-between w-full h-14 px-5 bg-slate-50/50 dark:bg-slate-800/40 rounded-2xl border border-slate-100 dark:border-slate-800/60 shadow-inner group-hover:bg-white dark:group-hover:bg-slate-900 transition-all">
+                                    <div className="flex items-center gap-3">
+                                      <div className="p-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-800 shadow-sm">
+                                        <Award className="w-4 h-4 text-amber-500" />
+                                      </div>
+                                      <div className="flex flex-col">
+                                        <span className="text-[8px] font-black text-emerald-600 dark:text-emerald-500 uppercase tracking-widest leading-none">Status</span>
+                                        <span className="text-[10px] font-black text-slate-800 dark:text-white uppercase mt-1 leading-none tracking-tight">Selesai</span>
+                                      </div>
+                                    </div>
+                                    <div className="text-right">
+                                      {room.show_result ? (
+                                        <div className="flex flex-col items-end">
+                                          <div className="flex items-center gap-1.5 mb-1 opacity-80">
+                                            <div className="flex items-center gap-1">
+                                              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                                              <span className="text-[8px] font-black text-emerald-600 dark:text-emerald-400">B: {attempt.correct || 0}</span>
+                                            </div>
+                                            <div className="flex items-center gap-1">
+                                              <div className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                                              <span className="text-[8px] font-black text-rose-500 dark:text-rose-400">S: {(attempt.total || 0) - (attempt.correct || 0)}</span>
+                                            </div>
+                                          </div>
+                                          <span className="text-2xl font-black text-slate-800 dark:text-white leading-none tracking-tighter">
+                                            {Number(attempt.score || 0).toFixed(1)}
+                                          </span>
+                                        </div>
+                                      ) : (
+                                        <div className="flex flex-col items-end opacity-60">
+                                          <span className="text-[8px] font-black text-slate-400 uppercase tracking-tighter leading-none">Nilai</span>
+                                          <span className="text-[10px] font-black text-slate-400 uppercase leading-none mt-1 italic tracking-widest">Privat</span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                ) : isLocked ? (
+                                  <div className="h-12 px-4 bg-rose-50 dark:bg-rose-950/20 rounded-2xl flex items-center justify-center gap-3 border border-rose-100 dark:border-rose-900/40">
+                                    <div className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
+                                    <span className="text-[10px] font-black text-rose-600 uppercase tracking-[0.2em]">Akun Terkunci</span>
+                                  </div>
+                                ) : room.timeStatus === "ongoing" ? (
+                                  <Button onClick={() => setSelectedRoom(room)} className="w-full h-12 bg-emerald-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-emerald-200 transition-all active:scale-95 group-hover:bg-emerald-700"> {attempt ? "Lanjutkan Ujian" : "Mulai Pengerjaan"}</Button>
+                                ) : (
+                                  <div className="h-12 px-4 bg-slate-100 dark:bg-slate-800/50 rounded-2xl flex items-center justify-center border border-slate-200 dark:border-slate-700">
+                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{room.timeStatus === "expired" ? "Waktu Habis" : "Belum Dimulai"}</span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </motion.div>
+                        );
+                      })}
+                  </div>
                 )}
               </div>
             </div>
-          </motion.div>
-
-          <div className="space-y-2">
-            <div className="flex items-center gap-3 mb-6 px-1">
-              <div className="w-4 h-4 bg-emerald-600 rounded-full shadow-lg shadow-emerald-200 animate-pulse" />
-              <h3 className="text-sm sm:text-base font-black text-emerald-900 dark:text-slate-300 uppercase tracking-[0.3em]">Jadwal Ujian Aktif</h3>
-            </div>
           </div>
 
-          {loading ? (
-            <div className="space-y-6">
-              {Array.from({ length: 2 }).map((_, i) => (
-                <div key={i} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 sm:p-7 space-y-6">
-                  <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
-                    <div className="space-y-3 flex-1">
-                      <Skeleton className="h-3 w-32" />
-                      <Skeleton className="h-6 w-3/4" />
-                    </div>
-                    <div className="flex gap-2">
-                      <Skeleton className="h-6 w-16" />
-                      <Skeleton className="h-6 w-24" />
-                    </div>
+          <div className="lg:col-span-4 space-y-6 sticky top-28 hidden lg:block text-left">
+            <Card className="rounded-[2.5rem] border-slate-200 dark:border-slate-800 shadow-xl shadow-slate-200/20 dark:shadow-none bg-white dark:bg-slate-900 overflow-hidden">
+              <CardHeader className="p-8 pb-4">
+                <div className="flex items-center gap-4 mb-4">
+                  <div className="w-14 h-14 rounded-2xl bg-emerald-50 dark:bg-emerald-950 flex items-center justify-center border border-emerald-100 dark:border-emerald-800 shadow-sm">
+                    <User className="h-7 w-7 text-emerald-600" />
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <Skeleton className="h-20 rounded-xl" />
-                    <Skeleton className="h-20 rounded-xl" />
+                  <div>
+                    <p className="text-[10px] font-black text-emerald-600/60 dark:text-emerald-400/60 uppercase tracking-widest leading-none">Status Siswa</p>
+                    <h4 className="text-base font-black text-slate-800 dark:text-white mt-1 leading-tight">{student?.name}</h4>
                   </div>
-                  <Skeleton className="h-12 w-full rounded-xl" />
                 </div>
-              ))}
-            </div>
-          ) : activeRooms.length === 0 ? (
-            <div className="py-20 border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl text-center bg-white dark:bg-slate-900/50">
-              <Calendar className="h-10 w-10 text-slate-200 mx-auto mb-4" />
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase">Tidak ada jadwal aktif</h3>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {activeRooms.map((room, idx) => {
-                const attempt = userAttempts[room.id];
-                const isFinished = attempt && (attempt.status === "finished" || attempt.status === "submitted" || attempt.status === "graded");
-                const isLocked = attempt && attempt.status === "LOCKED";
-
-                const scale = 1.2 + ((idx * 13) % 5) * 0.1;
-
-                // Palette warna dinamis untuk garis vertikal (Emerald, Teal, Lime, Amber, Rose)
-                const lineColors = ['bg-emerald-600', 'bg-teal-600', 'bg-lime-600', 'bg-amber-600', 'bg-rose-600'];
-                const myColor = lineColors[idx % lineColors.length];
-
-                return (
-                  <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} key={room.id} className="group bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm hover:shadow-md transition-all relative overflow-hidden">
-                    {/* Aksen Status (Samping) */}
-                    <div className={`absolute top-0 left-0 w-1.5 h-full z-20 ${isFinished ? 'bg-slate-300' : myColor
-                      }`} />
-
-                    <div className="p-4 sm:p-7 text-left relative z-10">
-                      <div className="flex flex-col gap-4 sm:gap-6">
-                        <div className="flex flex-col sm:flex-row justify-between items-start gap-2.5">
-                          <div className="space-y-0.5 sm:space-y-1.5 flex-1 min-w-0">
-                            <span className="text-[9px] sm:text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-[0.2em] block opacity-80">{room.subject} • {room.examDescription}</span>
-                            <h3 className="text-sm sm:text-xl font-extrabold text-[#0f172a] dark:text-white uppercase tracking-tight leading-tight break-words">
-                              {room.room_name}
-                            </h3>
-                          </div>
-                          <div className="flex items-center gap-2 shrink-0 self-start sm:self-auto">
-                            <div className={`text-[8px] sm:text-xs font-bold uppercase px-2 py-0.5 rounded-md border shadow-sm ${getExamTypeColorClass(room.examType)}`}>
-                              {room.examType}
-                            </div>
-                            <div className="text-[9px] sm:text-xs font-bold text-emerald-700 dark:text-emerald-300 uppercase tracking-widest bg-emerald-50/80 dark:bg-emerald-900/30 px-2 py-0.5 rounded-md border border-emerald-100/50 dark:border-emerald-800/50 shadow-sm flex items-center gap-1">
-                              <Clock className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-emerald-600" />
-                              {room.duration}M • {student?.className}
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 gap-2 sm:gap-4 md:grid-cols-2">
-                          <div className="bg-slate-50/50 dark:bg-slate-800/40 p-3 sm:p-4 rounded-xl border border-slate-100/50 dark:border-slate-800/50 transition-colors">
-                            <div className="flex items-center gap-2 mb-1">
-                              <User className="w-3 h-3 text-emerald-500/70" />
-                              <label className="text-[8px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest block">GURU PENGAMPU</label>
-                            </div>
-                            <span className="text-xs sm:text-base font-bold text-slate-700 dark:text-slate-200 block leading-tight truncate px-5 sm:px-0">{room.teacherName}</span>
-                          </div>
-                          <div className="bg-slate-50/50 dark:bg-slate-800/40 p-3 sm:p-4 rounded-xl border border-slate-100/50 dark:border-slate-800/50 transition-colors">
-                            <div className="flex items-center gap-2 mb-1">
-                              <Calendar className="w-3 h-3 text-emerald-500/70" />
-                              <label className="text-[8px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest block">JADWAL PELAKSANAAN</label>
-                            </div>
-                            <div className="px-5 sm:px-0 space-y-1">
-                              <div className="font-bold text-[11px] sm:text-sm tabular-nums text-slate-700 dark:text-slate-200">
-                                {new Date(room.startTimeDate).toLocaleDateString("id-ID", { weekday: 'long', day: '2-digit', month: 'short' })}
-                              </div>
-                              <div className="flex items-center gap-1.5 font-bold text-[9px] sm:text-xs tabular-nums text-emerald-600 dark:text-emerald-400 bg-emerald-50/50 dark:bg-emerald-900/40 px-2 py-0.5 rounded-md w-fit">
-                                <Clock className="w-3 h-3" />
-                                {new Date(room.startTimeDate).toLocaleTimeString("id-ID", { hour: '2-digit', minute: '2-digit' })} — {new Date(room.endTimeDate).toLocaleTimeString("id-ID", { hour: '2-digit', minute: '2-digit' })}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="w-full pt-4 border-t border-slate-50 dark:border-slate-800/50">
-                          {isFinished ? (
-                            <div className="bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700 p-3 rounded-xl flex items-center justify-between">
-                              <div className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase flex items-center gap-2 min-w-0">
-                                <ClipboardCheck className="w-4 h-4 text-emerald-500 shrink-0" />
-                                <span className="truncate italic opacity-70">Ujian Telah Terkirim</span>
-                              </div>
-                              <button onClick={() => { sessionStorage.setItem("activeCBTRoomId", room.id); navigate(`/cbt/result`); }} className="text-[10px] sm:text-xs font-black text-emerald-600 hover:text-emerald-700 uppercase tracking-widest whitespace-nowrap ml-2 bg-white dark:bg-slate-900 px-3 py-1.5 rounded-lg border border-emerald-100 shadow-sm transition-all active:scale-95">Detail Hasil</button>
-                            </div>
-                          ) : isLocked ? (
-                            <div className="bg-rose-50 dark:bg-rose-950/20 border border-rose-100 dark:border-rose-900/40 p-4 rounded-xl flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
-                              <div className="text-xs font-black text-rose-600 uppercase flex items-center gap-2">
-                                <AlertCircle className="w-4 h-4 animate-pulse" />
-                                UJIAN TERKUNCI
-                              </div>
-                              <span className="text-[9px] font-bold text-rose-500/70 uppercase tracking-[0.2em] px-3 py-1 bg-white/50 rounded-full">Harap Lapor Ke Pengawas</span>
-                            </div>
-                          ) : room.timeStatus === "ongoing" ? (
-                            <Button
-                              onClick={() => setSelectedRoom(room)}
-                              className="w-full bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500 text-white h-12 sm:h-14 rounded-xl font-black text-xs sm:text-sm uppercase tracking-[0.2em] flex items-center justify-center gap-2 shadow-lg shadow-emerald-100 dark:shadow-none transition-all active:scale-[0.98]"
-                            >
-                              {attempt ? "Lanjut Mengerjakan" : "Mulai Ujian"} <ChevronRight className="w-4 h-4" />
-                            </Button>
-                          ) : room.timeStatus === "expired" ? (
-                            <div className="bg-rose-50 dark:bg-rose-950/20 border border-rose-100 dark:border-rose-900/40 py-4 rounded-xl text-center">
-                              <span className="text-[10px] sm:text-xs font-black text-rose-600 dark:text-rose-400 uppercase tracking-[0.3em]">WAKTU PELAKSANAAN HABIS</span>
-                            </div>
-                          ) : (
-                            <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-900/40 py-4 rounded-xl text-center">
-                              <span className="text-[10px] sm:text-xs font-black text-amber-600 dark:text-amber-400 uppercase tracking-[0.3em]">UJIAN BELUM DIMULAI</span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
+                <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800 space-y-3">
+                  <div className="flex justify-between items-center text-[10px] font-bold">
+                    <span className="text-emerald-600/70 dark:text-emerald-400/70 uppercase">Kelas Terdaftar</span>
+                    <span className="text-slate-700 dark:text-slate-200 uppercase">{student?.className}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-[10px] font-bold">
+                    <span className="text-emerald-600/70 dark:text-emerald-400/70 uppercase">Username / NISN</span>
+                    <span className="text-slate-700 dark:text-slate-200">{student?.nisn}</span>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="p-8 pt-2 space-y-6">
+                <div className="space-y-4">
+                  <h5 className="text-[10px] font-black text-emerald-600/70 dark:text-emerald-400/70 uppercase tracking-widest flex items-center gap-2">
+                    <Award className="h-3 w-3 text-emerald-500" /> Pencapaian & Statistik
+                  </h5>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="p-4 rounded-[1.5rem] bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-100/50 dark:border-indigo-900/50 text-center">
+                      <p className="text-xl font-black text-indigo-700 dark:text-indigo-400 leading-none">{Object.values(userAttempts).filter(a => a.status !== "ongoing" && a.status !== "LOCKED").length}</p>
+                      <p className="text-[8px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-tighter mt-1">Selesai</p>
                     </div>
-                  </motion.div>
-                );
-              })}
-            </div>
-          )}
+                    <div className="p-4 rounded-[1.5rem] bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-100/50 dark:border-emerald-900/50 text-center">
+                      <p className="text-xl font-black text-emerald-700 dark:text-emerald-400 leading-none">{totalActive}</p>
+                      <p className="text-[8px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-tighter mt-1">Pending</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="pt-6 border-t border-slate-50 dark:border-slate-800/60">
+                  <div className="p-5 bg-gradient-to-br from-emerald-600 to-emerald-700 dark:from-emerald-800 dark:to-emerald-950 rounded-[2rem] text-white overflow-hidden relative group">
+                    <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-125 transition-transform"><AlertCircle className="h-12 w-12" /></div>
+                    <p className="text-[9px] font-black text-emerald-100/60 uppercase tracking-widest mb-1">Pusat Bantuan</p>
+                    <p className="text-xs font-bold leading-relaxed">Ada kendala teknis? Silahkan hubungi pengawas atau proktor ruangan.</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </main>
 
@@ -396,9 +575,9 @@ const StudentDashboardPage = () => {
               <div>
                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 block">Token Ujian</label>
                 <Input value={tokenInput} onChange={(e) => setTokenInput(e.target.value.toUpperCase())} placeholder="AB123" className="h-12 text-center text-xl font-black tracking-[0.3em] bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 rounded-lg" disabled={isValidating} />
-                {tokenError && <p className="text-rose-500 text-[9px] font-bold mt-2 flex items-center gap-1 uppercase"><AlertCircle className="w-3 h-3" /> {tokenError}</p>}
+                {tokenError && <p className="text-rose-500 text-[9px] font-bold mt-2 flex items-center gap-1 uppercase text-left"><AlertCircle className="w-3 h-3" /> {tokenError}</p>}
               </div>
-              <div className="bg-emerald-50/50 dark:bg-emerald-900/20 p-4 rounded-lg border border-emerald-100 dark:border-emerald-800"><p className="text-[10px] text-emerald-600 dark:text-emerald-400 leading-relaxed font-medium">⚠️ Pastikan koneksi internet stabil sebelum mulai. Pengerjaan Anda akan tercatat secara otomatis.</p></div>
+              <div className="bg-emerald-50/50 dark:bg-emerald-900/20 p-4 rounded-lg border border-emerald-100 dark:border-emerald-800 text-left"><p className="text-[10px] text-emerald-600 dark:text-emerald-400 leading-relaxed font-medium">⚠️ Pastikan koneksi internet stabil sebelum mulai. Pengerjaan Anda akan tercatat secara otomatis.</p></div>
             </div>
             <DialogFooter>
               <Button onClick={handleValidateToken} disabled={!tokenInput || isValidating} className="w-full h-12 bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-600 text-white rounded-lg font-bold uppercase tracking-widest text-[10px] transition-all active:scale-95">{isValidating ? "Memverifikasi..." : "Konfirmasi & Masuk"}</Button>

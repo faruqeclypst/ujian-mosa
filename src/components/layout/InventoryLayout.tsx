@@ -28,7 +28,7 @@ const InventoryLayout = ({ children }: InventoryLayoutProps) => {
           transition={{ duration: 0.3, ease: "easeOut" }}
           className={cn(
             "flex-1 overflow-y-auto overflow-x-hidden relative",
-            isCollapsed ? "p-3 sm:p-4 lg:p-8" : "p-3 sm:p-4 lg:p-6"
+            isCollapsed ? "p-3 sm:p-4 lg:p-6" : "p-3 sm:p-4 lg:p-5"
           )}
           style={{ zIndex: 1 }}
         >

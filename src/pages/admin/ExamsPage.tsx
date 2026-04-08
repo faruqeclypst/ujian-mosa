@@ -306,39 +306,48 @@ const ExamsPage = () => {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between bg-card p-5 rounded-2xl border border-slate-200/60 dark:border-slate-800/40 shadow-sm backdrop-blur-sm">
+    <div className="space-y-5">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between bg-card p-4 rounded-2xl border border-slate-200/60 dark:border-slate-800/40 shadow-sm backdrop-blur-sm">
         <div>
-          <h2 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
+          <h2 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
             <BookOpen className="h-5 w-5 text-indigo-500" />
             Bank Soal (Ujian)
           </h2>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Kelola master ujian dan rincian soal Bank Soal.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex bg-slate-100 dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-800/80 p-1 rounded-xl text-xs font-semibold">
-            <button 
-              onClick={() => setActiveTab("aktif")} 
-              className={`px-3 py-1.5 rounded-lg transition-all ${activeTab === "aktif" ? "bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 shadow-sm" : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"}`}
-            >
-              Aktif
-            </button>
-            <button 
-              onClick={() => setActiveTab("arsip")} 
-              className={`px-3 py-1.5 rounded-lg transition-all ${activeTab === "arsip" ? "bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 shadow-sm" : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"}`}
-            >
-              Arsip
-            </button>
-          </div>
-          <Button onClick={handleCreateClick} size="sm" className="rounded-xl bg-blue-50 hover:bg-blue-100 border border-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 dark:border-blue-800/40 text-blue-700 font-semibold shadow-sm">
-            <Plus className="mr-1 h-3.5 w-3.5" /> Tambah Ujian
-          </Button>
+          {isLoading ? (
+            <>
+              <Skeleton className="h-9 w-24 rounded-xl" />
+              <Skeleton className="h-9 w-32 rounded-2xl" />
+            </>
+          ) : (
+            <>
+              <div className="flex bg-slate-100 dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-800/80 p-1 rounded-xl text-xs font-semibold">
+                <button 
+                  onClick={() => setActiveTab("aktif")} 
+                  className={`px-3 py-1.5 rounded-lg transition-all ${activeTab === "aktif" ? "bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 shadow-sm" : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"}`}
+                >
+                  Aktif
+                </button>
+                <button 
+                  onClick={() => setActiveTab("arsip")} 
+                  className={`px-3 py-1.5 rounded-lg transition-all ${activeTab === "arsip" ? "bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 shadow-sm" : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"}`}
+                >
+                  Arsip
+                </button>
+              </div>
+              <Button onClick={handleCreateClick} size="sm" className="rounded-2xl bg-blue-50 hover:bg-blue-100 border border-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 dark:border-blue-800/40 text-blue-700 font-bold shadow-sm h-9 px-4">
+                <Plus className="mr-1 h-3.5 w-3.5" /> Tambah Ujian
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
       {isLoading ? (
         <Card>
-          <CardHeader>
+          <CardHeader className="p-4">
             <CardTitle className="text-base font-semibold text-slate-800 dark:text-white">Daftar Bank Soal</CardTitle>
           </CardHeader>
           <CardContent>
@@ -381,7 +390,7 @@ const ExamsPage = () => {
         </Card>
       ) : (
         <Card>
-          <CardHeader>
+          <CardHeader className="p-4">
             <CardTitle className="text-base font-semibold text-slate-800 dark:text-white">Daftar Bank Soal</CardTitle>
           </CardHeader>
           <CardContent>

@@ -1,13 +1,14 @@
 import { useState, useEffect } from "react";
 import { Skeleton } from "../components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
-import { Plus, ShieldAlert, Trash2, UserCog, Edit2, Mail } from "lucide-react";
+import { Plus, ShieldAlert, Trash2, UserCog, Edit2, Mail, Loader2 } from "lucide-react";
 import pb from "../lib/pocketbase";
 import { useAuth } from "../context/AuthContext";
 import { useExamData } from "../context/ExamDataContext";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "../components/ui/dialog";
+import { Progress } from "../components/ui/progress";
 import FormField from "../components/forms/FormField";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { DataTable } from "../components/ui/data-table";
@@ -37,6 +38,23 @@ const UsersPage = () => {
     name: "",
     role: "teacher" as "admin" | "teacher",
     teacherId: "",
+  });
+
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(null);
+
+  const [batchProgress, setBatchProgress] = useState<{
+    isOpen: boolean;
+    current: number;
+    total: number;
+    message: string;
+    title: string;
+  }>({
+    isOpen: false,
+    current: 0,
+    total: 0,
+    message: "",
+    title: "Proses Data",
   });
 
   const [error, setError] = useState("");
@@ -151,11 +169,105 @@ const UsersPage = () => {
     }
   };
 
+  const handleBatchDelete = async () => {
+    const toDelete = selectedIds.filter(id => id !== currentUser?.id);
+    if (toDelete.length === 0) {
+      alert("Tidak ada akun yang bisa dihapus (Anda tidak bisa menghapus akun sendiri).");
+      return;
+    }
+
+    if (!window.confirm(`Apakah Anda yakin ingin menghapus ${toDelete.length} akun terpilih?`)) return;
+
+    setBatchProgress({
+      isOpen: true,
+      total: toDelete.length,
+      current: 0,
+      message: "Menghapus akun...",
+      title: "Hapus Akun Massal"
+    });
+
+    try {
+      const chunkSize = 5;
+      for (let i = 0; i < toDelete.length; i += chunkSize) {
+        const chunk = toDelete.slice(i, i + chunkSize);
+        await Promise.all(chunk.map(id => pb.collection("users").delete(id)));
+        
+        const currentProcessed = Math.min(i + chunkSize, toDelete.length);
+        setBatchProgress(prev => ({
+          ...prev,
+          current: currentProcessed,
+          message: `Menghapus data akun (${currentProcessed}/${toDelete.length})`
+        }));
+      }
+      setSelectedIds([]);
+      fetchUsers();
+    } catch (err) {
+      console.error("Gagal menghapus akun massal", err);
+      alert("Terjadi kesalahan saat menghapus akun secara massal.");
+    } finally {
+      setBatchProgress(prev => ({ ...prev, isOpen: false }));
+    }
+  };
+
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedIds(users.map(u => u.id));
+    } else {
+      setSelectedIds([]);
+    }
+  };
+
+  const handleSelectOne = (id: string, checked: boolean, index: number, event: any) => {
+    let newSelectedIds = [...selectedIds];
+
+    if (checked && event.nativeEvent.shiftKey && lastSelectedIndex !== null) {
+      const start = Math.min(lastSelectedIndex, index);
+      const end = Math.max(lastSelectedIndex, index);
+      const idsInRange = users.slice(start, end + 1).map(u => u.id);
+      
+      newSelectedIds = Array.from(new Set([...newSelectedIds, ...idsInRange]));
+    } else {
+      if (checked) {
+        if (!newSelectedIds.includes(id)) {
+          newSelectedIds.push(id);
+        }
+      } else {
+        newSelectedIds = newSelectedIds.filter((item) => item !== id);
+      }
+    }
+
+    setSelectedIds(newSelectedIds);
+    setLastSelectedIndex(index);
+  };
+
+  const isAllSelected = users.length > 0 && users.every(u => selectedIds.includes(u.id));
+
   const columns = [
+    {
+      key: "selection",
+      label: (
+        <input
+          type="checkbox"
+          checked={isAllSelected}
+          onChange={(e) => handleSelectAll(e.target.checked)}
+          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-4 w-4 cursor-pointer"
+        />
+      ),
+      render: (_: any, item: AppUser, index?: number) => (
+        <input
+          type="checkbox"
+          checked={selectedIds.includes(item.id)}
+          onChange={(e) => handleSelectOne(item.id, e.target.checked, index ?? 0, e)}
+          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-4 w-4 cursor-pointer"
+        />
+      ),
+      className: "w-[40px] text-center",
+    },
     {
       key: "index",
       label: "No",
       render: (_: any, __: any, index?: number) => (index !== undefined ? index + 1 : 1),
+      className: "w-[60px]",
     },
     {
       key: "name",
@@ -228,12 +340,32 @@ const UsersPage = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <Button size="sm" onClick={handleCreateClick} className="rounded-xl bg-blue-50 hover:bg-blue-100 border border-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 dark:border-blue-800/40 text-blue-700 font-semibold shadow-sm">
-            <Plus className="mr-1 h-3.5 w-3.5" />
-            Tambah Akun (Email)
-          </Button>
+          {loading ? (
+            <>
+              <Skeleton className="h-9 w-28 rounded-2xl" />
+              <Skeleton className="h-9 w-28 rounded-2xl" />
+            </>
+          ) : (
+            <>
+              {selectedIds.length > 0 && (
+            <Button 
+              variant="default" 
+              size="sm"
+              className="bg-rose-600 hover:bg-rose-700 dark:bg-rose-950/40 dark:text-rose-400 dark:border dark:border-rose-800/40 text-white rounded-xl font-bold shadow-lg shadow-rose-500/20 animate-in fade-in zoom-in duration-200 transition-all active:scale-95"
+              onClick={handleBatchDelete}
+            >
+              <Trash2 className="mr-1 h-3.5 w-3.5" />
+              Hapus ({selectedIds.length})
+            </Button>
+          )}
 
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button onClick={() => { setSelectedUser(null); setIsDialogOpen(true); }} size="sm" className="rounded-2xl bg-blue-50 hover:bg-blue-100 border border-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 dark:border-blue-800/40 text-blue-700 font-bold shadow-sm h-9 px-4">
+                <Plus className="mr-1 h-3.5 w-3.5" />
+                Tambah Pengguna
+              </Button>
+            </DialogTrigger>
             <DialogContent className="max-w-md bg-card">
               <DialogHeader>
                 <DialogTitle>{dialogMode === "create" ? "Daftarkan Akun Baru" : "Edit Akun Pengguna"}</DialogTitle>
@@ -320,11 +452,13 @@ const UsersPage = () => {
               </form>
             </DialogContent>
           </Dialog>
+            </>
+          )}
         </div>
       </div>
 
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between border-b pb-4 mb-2">
           <CardTitle className="text-base font-semibold">Daftar Akun Login (Email)</CardTitle>
         </CardHeader>
         <CardContent>
@@ -392,6 +526,41 @@ const UsersPage = () => {
               )}
             />
           )}
+
+          {/* Batch Progress Dialog */}
+          <Dialog open={batchProgress.isOpen} onOpenChange={() => {}}>
+            <DialogContent className="max-w-md bg-card border-none shadow-2xl p-0 overflow-hidden rounded-3xl" hideClose>
+              <div className="bg-indigo-600 p-6 text-white flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="bg-white/20 p-2 rounded-xl">
+                     <Loader2 className="h-5 w-5 animate-spin" />
+                  </div>
+                  <div>
+                    <DialogTitle className="text-lg font-bold text-white tracking-tight">{batchProgress.title}</DialogTitle>
+                    <DialogDescription className="text-indigo-100 text-[10px] text-left">Mohon tunggu hingga proses selesai.</DialogDescription>
+                  </div>
+                </div>
+                <div className="text-right">
+                   <span className="text-2xl font-black text-white/40">{Math.round((batchProgress.current / batchProgress.total) * 100) || 0}%</span>
+                </div>
+              </div>
+              <div className="p-8 space-y-6">
+                <div className="space-y-2">
+                   <div className="flex justify-between items-end mb-1">
+                     <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">{batchProgress.message}</span>
+                     <span className="text-xs font-medium text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">
+                       {batchProgress.current} / {batchProgress.total}
+                     </span>
+                   </div>
+                   <Progress value={(batchProgress.current / batchProgress.total) * 100} className="h-3 bg-slate-100 dark:bg-slate-800" />
+                </div>
+                
+                <p className="text-[10px] text-center text-slate-400 font-medium italic">
+                  * Jangan menutup atau merefresh halaman ini selama proses berlangsung.
+                </p>
+              </div>
+            </DialogContent>
+          </Dialog>
         </CardContent>
       </Card>
     </div>

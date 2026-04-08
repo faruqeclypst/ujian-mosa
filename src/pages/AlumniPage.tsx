@@ -130,14 +130,18 @@ const AlumniPage = () => {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between bg-card p-5 rounded-2xl border border-slate-200/60 dark:border-slate-800/40 shadow-sm backdrop-blur-sm">
         <div>
-          <h2 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
-            <Users className="h-5 w-5 text-blue-500" />
-            Data Alumni
+          <h2 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
+            <Users className="h-5 w-5 text-indigo-500" />
+            Data Alumni / Lulusan
           </h2>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Daftar Siswa yang sudah lulus atau menyelesaikan pendidikan.</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <ExportButton onExport={() => exportStudentToExcel({ students: mappedStudents, classes, filename: "data-alumni.xlsx" })} />
+          {loading ? (
+            <Skeleton className="h-9 w-28 rounded-2xl" />
+          ) : (
+            <ExportButton onExport={() => exportStudentToExcel({ students: mappedStudents, classes, filename: "data-alumni.xlsx" })} />
+          )}
         </div>
       </div>
 

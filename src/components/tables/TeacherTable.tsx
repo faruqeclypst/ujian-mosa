@@ -1,46 +1,97 @@
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { DataTable } from "../ui/data-table";
 import { Button } from "../ui/button";
-import { Badge } from "../ui/badge";
 import type { Teacher } from "../../types/exam";
 import { Edit, Trash } from "lucide-react";
 
 interface TeacherTableProps {
   teachers: Teacher[];
-  onEdit: (t: Teacher) => void;
-  onDelete: (t: Teacher) => void;
+  selectedIds: string[];
+  onSelectChange: (ids: string[]) => void;
+  onEdit: (teacher: Teacher) => void;
+  onDelete: (teacher: Teacher) => void;
 }
 
-const TeacherTable = ({ teachers, onEdit, onDelete }: TeacherTableProps) => {
+const TeacherTable = ({ 
+  teachers, 
+  selectedIds, 
+  onSelectChange, 
+  onEdit, 
+  onDelete 
+}: TeacherTableProps) => {
+  const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(null);
+
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      onSelectChange(teachers.map(t => t.id));
+    } else {
+      onSelectChange([]);
+    }
+  };
+
+  const handleSelectOne = (id: string, checked: boolean, index: number, event: any) => {
+    let newSelectedIds = [...selectedIds];
+
+    if (checked && event.nativeEvent.shiftKey && lastSelectedIndex !== null) {
+      const start = Math.min(lastSelectedIndex, index);
+      const end = Math.max(lastSelectedIndex, index);
+      const idsInRange = teachers.slice(start, end + 1).map(t => t.id);
+      
+      newSelectedIds = Array.from(new Set([...newSelectedIds, ...idsInRange]));
+    } else {
+      if (checked) {
+        if (!newSelectedIds.includes(id)) {
+          newSelectedIds.push(id);
+        }
+      } else {
+        newSelectedIds = newSelectedIds.filter((item) => item !== id);
+      }
+    }
+
+    onSelectChange(newSelectedIds);
+    setLastSelectedIndex(index);
+  };
+
+  const isAllSelected = teachers.length > 0 && teachers.every(t => selectedIds.includes(t.id));
+
   const columns = [
+    {
+      key: "selection",
+      label: (
+        <input
+          type="checkbox"
+          checked={isAllSelected}
+          onChange={(e) => handleSelectAll(e.target.checked)}
+          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-4 w-4 cursor-pointer"
+        />
+      ),
+      render: (_: any, item: Teacher, index?: number) => (
+        <input
+          type="checkbox"
+          checked={selectedIds.includes(item.id)}
+          onChange={(e) => handleSelectOne(item.id, e.target.checked, index ?? 0, e)}
+          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-4 w-4 cursor-pointer"
+        />
+      ),
+      className: "w-[40px] text-center",
+    },
     {
       key: "index",
       label: "No",
       render: (v: any, item: any, index?: number) => (index !== undefined ? index + 1 : 1),
+      className: "w-[60px]",
     },
-    {
-      key: "name",
-      label: "Nama Guru",
-      sortable: true,
-      render: (v: string, item: Teacher) => (
-        <span className="font-medium text-slate-900 dark:text-white">
-          {item.name} {item.code ? <span className="text-slate-400 text-xs font-normal">({item.code})</span> : ""}
-        </span>
-      ),
+    { key: "name", label: "Nama Guru", sortable: true },
+    { 
+      key: "code", 
+      label: "Kode / Inisial",
+      className: "w-[120px]"
     },
-    {
-      key: "subjects",
-      label: "Mapel Utama",
-      sortable: false,
-      render: (value: string[]) => (
-        <div className="flex flex-wrap gap-1">
-          {(value || []).map((m, idx) => (
-            <Badge key={idx} variant="secondary">
-              {m}
-            </Badge>
-          ))}
-        </div>
-      ),
+    { 
+      key: "subjects", 
+      label: "Mapel", 
+      render: (subjects: string[]) => (subjects || []).join(", ")
     },
   ];
 
@@ -65,14 +116,14 @@ const TeacherTable = ({ teachers, onEdit, onDelete }: TeacherTableProps) => {
 
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="p-4">
         <CardTitle className="text-base font-semibold text-slate-800 dark:text-white">Daftar Guru</CardTitle>
       </CardHeader>
       <CardContent>
         <DataTable
           data={teachers}
           columns={columns}
-          searchPlaceholder="Cari nama atau kode guru..."
+          searchPlaceholder="Cari guru..."
           actions={renderActions}
           emptyMessage="Belum ada data guru."
         />

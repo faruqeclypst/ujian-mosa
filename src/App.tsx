@@ -17,7 +17,6 @@ import ExambroGuard from "./components/auth/ExambroGuard";
 import StudentLoginPage from "./pages/student/StudentLoginPage";
 import StudentDashboardPage from "./pages/student/StudentDashboardPage";
 import CBTPage from "./pages/student/CBTPage";
-import ExamResultPage from "./pages/student/ExamResultPage";
 import pb from "./lib/pocketbase";
 
 const DashboardPage = lazy(() => import("./pages/DashboardPage"));
@@ -48,7 +47,7 @@ const StudentAuthGuard = ({ children }: { children: React.ReactNode }) => {
 // Guard for Admin Only Routes
 const AdminOnlyRoute = ({ children }: { children: React.ReactNode }) => {
   const { role, loading } = useAuth();
-  if (loading) return <LoadingScreen />;
+  if (loading) return null;
   if (role !== "admin") return <Navigate to="/admin" replace />;
   return <>{children}</>;
 };
@@ -95,12 +94,12 @@ const AppContent = () => {
     fetchSettings();
   }, []);
 
-  if (loading) {
+  // Check if it's an admin route to decide whether to show a full-screen loader or a shell skeleton
+  const isAdminRoute = location.pathname.startsWith("/admin");
+
+  if (loading && !isAdminRoute) {
     return <LoadingScreen />;
   }
-
-  // Apakah route diakses oleh Guru/Admin
-  const isAdminRoute = location.pathname.startsWith("/admin");
 
   return (
     <Suspense fallback={<LoadingScreen />}>
@@ -134,26 +133,6 @@ const AppContent = () => {
             </ExambroGuard>
           } 
         />
-        <Route 
-          path="/cbt/result" 
-          element={
-            <ExambroGuard>
-              <StudentAuthGuard>
-                <ExamResultPage />
-              </StudentAuthGuard>
-            </ExambroGuard>
-          } 
-        />
-        <Route 
-          path="/cbt/:roomId/result" 
-          element={
-            <ExambroGuard>
-              <StudentAuthGuard>
-                <ExamResultPage />
-              </StudentAuthGuard>
-            </ExambroGuard>
-          } 
-        />
 
         {/* === ADMIN / GURU ROUTES (PREFIX /admin) === */}
         <Route path="/admin/login" element={user ? <Navigate to="/admin" replace /> : <LoginPage />} />
@@ -164,7 +143,7 @@ const AppContent = () => {
         <Route
           path="/admin"
           element={
-            user ? (
+            user || loading ? (
               <ExamDataProvider>
                 <InventoryLayout />
               </ExamDataProvider>

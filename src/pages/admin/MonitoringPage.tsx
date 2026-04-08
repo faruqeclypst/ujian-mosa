@@ -1,17 +1,24 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { 
-  RefreshCw, 
-  Users, 
-  Lock, 
-  ChevronDown, 
-  CheckCircle2, 
-  X, 
-  FileSpreadsheet, 
-  BookOpen, 
+import {
+  RefreshCw,
+  Users,
+  Lock,
+  ChevronDown,
+  CheckCircle2,
+  X,
+  FileSpreadsheet,
+  BookOpen,
   ArrowLeft,
   Search,
   Monitor,
-  Square
+  Square,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  Eye,
+  EyeOff,
+  Settings
 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import * as XLSX from "xlsx-js-style";
@@ -89,11 +96,11 @@ const MonitoringPage = () => {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [expandedstudent, setExpandedstudent] = useState<string | null>(null);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
-  
+
   const [monitorPage, setMonitorPage] = useState(1);
   const [monitorPageSize, setMonitorPageSize] = useState(25);
   const [monitorClassFilter, setMonitorClassFilter] = useState("all");
-  const [monitorSortBy, setMonitorSortBy] = useState<"default" | "nama" | "nilai" | "login">("default");
+  const [monitorSortBy, setMonitorSortBy] = useState<"default" | "nama" | "nilai" | "login" | "status">("status");
   const [monitorTimeLeft, setMonitorTimeLeft] = useState(0);
   const [isMonitorRefreshing, setIsMonitorRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -130,7 +137,7 @@ const MonitoringPage = () => {
   const handleManualRefreshMonitor = useCallback(async (targetRoomId?: string) => {
     const id = targetRoomId || roomId;
     if (!id) return;
-    
+
     setIsMonitorRefreshing(true);
     try {
       // 1. Ambil Data Ruangan jika belum ada
@@ -138,17 +145,17 @@ const MonitoringPage = () => {
       if (!currentRoom) {
         const roomRecord = await pb.collection('exam_rooms').getOne(id);
         const examObj = await pb.collection('exams').getOne(roomRecord.examId).catch(() => null);
-        
+
         // Robust mapping similar to ExamRoomsPage
         const sId = roomRecord.examId || (roomRecord as any).examid || "";
         const roomName = roomRecord.room_name || (roomRecord as any).title || roomRecord.title || "Tanpa Nama";
         const isOff = roomRecord.isDisabled !== undefined ? roomRecord.isDisabled : (roomRecord as any).isActive === false;
-        
+
         // Robust mapping for Class IDs
         const isAllClasses = roomRecord.allClasses || (roomRecord as any).all_classes || false;
         const clsData = roomRecord.classId || (roomRecord as any).classid || (roomRecord as any).classIds || (roomRecord as any).classids || "";
         let classList: string[] = [];
-        
+
         if (!isAllClasses) {
           if (Array.isArray(clsData)) {
             classList = clsData;
@@ -281,10 +288,10 @@ const MonitoringPage = () => {
         });
 
         const unsubQuestions = await pb.collection('questions').subscribe("*", (e) => {
-           if (!isSubscribed) return;
-           if (e.record.examId === monitorRoom?.examId) {
-              setMonitorQuestions([]);
-           }
+          if (!isSubscribed) return;
+          if (e.record.examId === monitorRoom?.examId) {
+            setMonitorQuestions([]);
+          }
         });
 
         if (!isSubscribed) {
@@ -328,7 +335,7 @@ const MonitoringPage = () => {
       onConfirm: async () => {
         try {
           const related = await pb.collection('attempts').getFullList({
-             filter: `studentId = "${sisId}" && examRoomId = "${roomId}"`
+            filter: `studentId = "${sisId}" && examRoomId = "${roomId}"`
           });
           for (const r of related) {
             await pb.collection('attempts').delete(r.id);
@@ -379,7 +386,7 @@ const MonitoringPage = () => {
         if (typeof att.overrides === 'string') currentOverrides = JSON.parse(att.overrides);
         else if (typeof att.overrides === 'object') currentOverrides = { ...att.overrides };
       } catch (e) { currentOverrides = {}; }
-      
+
       const newOverrides = { ...currentOverrides, [qId]: isForcedCorrect };
       const sisAnswers = att.answers || {};
       let correctCount = 0;
@@ -396,16 +403,16 @@ const MonitoringPage = () => {
               const ck = Object.keys(q.choices || {}).find(k => k.toLowerCase() === String(ansId).toLowerCase());
               itemCorrect = ck ? q.choices[ck].isCorrect === true : false;
             } else if (type === "pilihan_ganda_kompleks") {
-               const correctKeys = Object.keys(q.choices || {}).filter(k => q.choices[k].isCorrect).map(k => k.toLowerCase());
-               const studentKeys = Array.isArray(ansId) ? ansId.map(k => String(k).toLowerCase()) : [];
-               itemCorrect = studentKeys.length === correctKeys.length && studentKeys.every(k => correctKeys.includes(k));
+              const correctKeys = Object.keys(q.choices || {}).filter(k => q.choices[k].isCorrect).map(k => k.toLowerCase());
+              const studentKeys = Array.isArray(ansId) ? ansId.map(k => String(k).toLowerCase()) : [];
+              itemCorrect = studentKeys.length === correctKeys.length && studentKeys.every(k => correctKeys.includes(k));
             } else if (type === "isian_singkat") itemCorrect = isFuzzyMatch(ansId, q.answerKey);
             else if (type === "urutkan" || type === "drag_drop") {
-               const co = (q.items || []).map((it: any) => it.id);
-               itemCorrect = Array.isArray(ansId) && ansId.length === co.length && ansId.every((v, i) => v === co[i]);
+              const co = (q.items || []).map((it: any) => it.id);
+              itemCorrect = Array.isArray(ansId) && ansId.length === co.length && ansId.every((v, i) => v === co[i]);
             } else if (type === "menjodohkan") {
-               const pairs = q.pairs || [];
-               itemCorrect = pairs.length > 0 && pairs.every((p: any) => ansId[p.id] === p.right);
+              const pairs = q.pairs || [];
+              itemCorrect = pairs.length > 0 && pairs.every((p: any) => ansId[p.id] === p.right);
             }
           }
         }
@@ -426,43 +433,140 @@ const MonitoringPage = () => {
   const handleExportExcel = () => {
     if (!monitorRoom) return;
     const workbook = XLSX.utils.book_new();
-    const filteredStudents = students.filter(s => {
-      if (monitorRoom?.allClasses) {
+
+    // Helper for answer comparison
+    const checkAns = (q: any, studentAns: any) => {
+      if (!studentAns) return false;
+      const key = q.answerKey || q.correctAnswer;
+      const type = q.type || q.field || "pilihan_ganda";
+
+      if (type === "pilihan_ganda" || type === "benar_salah") {
+        return String(studentAns).toUpperCase() === String(key).toUpperCase();
+      }
+      if (type === "pilihan_ganda_kompleks") {
+        const sArr = Array.isArray(studentAns) ? studentAns : [studentAns];
+        const kArr = Array.isArray(key) ? key : [key];
+        return sArr.length === kArr.length && sArr.every(v => kArr.includes(v));
+      }
+      if (type === "isian_singkat") {
+        return isFuzzyMatch(studentAns, String(key));
+      }
+      return JSON.stringify(studentAns) === JSON.stringify(key);
+    };
+
+    // Prepare style tokens
+    const STYLES = {
+      header: {
+        fill: { fgColor: { rgb: "4F46E5" } }, // Indigo 600
+        font: { color: { rgb: "FFFFFF" }, bold: true, sz: 11 },
+        alignment: { horizontal: "center", vertical: "center" },
+        border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } }
+      },
+      cell: {
+        alignment: { vertical: "center" },
+        border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } }
+      },
+      cellCenter: {
+        alignment: { horizontal: "center", vertical: "center" },
+        border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } }
+      },
+      correct: {
+        font: { color: { rgb: "16A34A" }, bold: true },
+        alignment: { horizontal: "center", vertical: "center" },
+        border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } }
+      },
+      wrong: {
+        font: { color: { rgb: "DC2626" }, bold: true },
+        alignment: { horizontal: "center", vertical: "center" },
+        border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } }
+      },
+      neutral: {
+        font: { color: { rgb: "64748B" } },
+        alignment: { horizontal: "center", vertical: "center" },
+        border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } }
+      }
+    };
+
+    const COL_WIDTHS = [
+      { wch: 4 }, { wch: 15 }, { wch: 30 }, { wch: 12 }, { wch: 10 }, 
+      { wch: 10 }, { wch: 6 }, { wch: 6 }, { wch: 6 }, { wch: 8 }
+    ];
+    monitorQuestions.forEach(() => COL_WIDTHS.push({ wch: 10 }));
+
+    const filteredStudents = students
+      .map(s => ({
+        ...s,
+        className: examClasses.find(c => c.id === s.classId)?.name || "N/A"
+      }))
+      .filter(s => {
+        if (monitorRoom?.allClasses) {
+          if (monitorClassFilter !== "all" && s.className !== monitorClassFilter) return false;
+          return true;
+        }
+        const allowedIds = Array.isArray(monitorRoom?.classId) ? monitorRoom?.classId : String(monitorRoom?.classId || "").split(",");
+        if (!allowedIds.includes(s.classId)) return false;
         if (monitorClassFilter !== "all" && s.className !== monitorClassFilter) return false;
         return true;
-      }
-      if (!monitorRoom?.classId) return false;
-      const allowedIds = Array.isArray(monitorRoom.classId) ? monitorRoom.classId : String(monitorRoom.classId).split(",");
-      if (!allowedIds.includes(s.classId)) return false;
-      if (monitorClassFilter !== "all" && s.className !== monitorClassFilter) return false;
-      return true;
-    }).sort((a, b) => a.name.localeCompare(b.name));
+      })
+      .sort((a, b) => a.name.localeCompare(b.name));
 
-    const header = ["No", "NISN", "Nama Siswa", "Kelas", "Login", "Submit", "Cheat", "Benar", "Salah", "Nilai"];
-    monitorQuestions.forEach((q, idx) => header.push(`Soal ${idx + 1}`));
+    const classesArray = Array.from(new Set(filteredStudents.map(s => s.className))).sort();
 
-    const rows = filteredStudents.map((student, idx) => {
-      const atts = attempts.filter(a => a.studentId === student.id || a.student_id === student.id);
-      const att = atts.sort((ax, bx) => new Date(bx.created).getTime() - new Date(ax.created).getTime())[0];
-      const sisAnswers = att?.answers || {};
-      const score = att?.score || 0;
-      
-      const row = [
-        idx + 1, student.nisn, student.name, student.className || "-",
-        att?.startTime ? new Date(att.startTime).toLocaleTimeString() : "-",
-        att?.submitTime ? new Date(att.submitTime).toLocaleTimeString() : (att?.status === "finished" ? "Selesai" : (att ? "Ongoing" : "-")),
-        att?.cheatCount || 0, att?.correct || 0, monitorQuestions.length - (att?.correct || 0), score.toFixed(1)
-      ];
-      monitorQuestions.forEach(q => {
-        const ans = sisAnswers[q.id];
-        row.push(ans ? (Array.isArray(ans) ? ans.join(",") : String(ans).toUpperCase()) : "-");
+    // Function to build a sheet for a set of students
+    const buildSheet = (groupStudents: any[], sheetName: string) => {
+      const headerRow = ["No", "NISN", "Nama", "Kelas", "Login", "Submit", "Cheat", "B", "S", "Nilai"];
+      monitorQuestions.forEach((_, i) => headerRow.push(`Q${i + 1}`));
+
+      const rows: any[][] = [headerRow.map(h => ({ v: h, s: STYLES.header }))];
+
+      groupStudents.forEach((std, idx) => {
+        const atts = attempts.filter(a => a.studentId === std.id || a.student_id === std.id);
+        const att = atts.sort((ax, bx) => new Date(bx.created).getTime() - new Date(ax.created).getTime())[0];
+        const answers = att?.answers || {};
+        const score = att?.score || 0;
+
+        const row = [
+          { v: idx + 1, s: STYLES.cellCenter },
+          { v: std.nisn, s: STYLES.cellCenter },
+          { v: std.name, s: STYLES.cell },
+          { v: std.className, s: STYLES.cellCenter },
+          { v: att?.startTime ? new Date(att.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "-", s: STYLES.cellCenter },
+          { v: att?.submitTime ? new Date(att.submitTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : (att?.status === "finished" ? "Selesai" : (att ? "Proses" : "-")), s: STYLES.cellCenter },
+          { v: att?.cheatCount || 0, s: STYLES.cellCenter },
+          { v: att?.correct || 0, s: STYLES.correct },
+          { v: monitorQuestions.length - (att?.correct || 0), s: STYLES.wrong },
+          { v: Number(score.toFixed(1)), s: { ...STYLES.cellCenter, font: { bold: true } } }
+        ];
+
+        monitorQuestions.forEach(q => {
+          const ans = answers[q.id];
+          const isCorrect = checkAns(q, ans);
+          const display = ans ? (Array.isArray(ans) ? ans.join(",") : String(ans).toUpperCase()) : "-";
+          row.push({
+            v: display,
+            s: ans ? (isCorrect ? STYLES.correct : STYLES.wrong) : STYLES.neutral
+          });
+        });
+
+        rows.push(row);
       });
-      return row;
+
+      const ws = XLSX.utils.aoa_to_sheet(rows);
+      ws["!cols"] = COL_WIDTHS;
+      XLSX.utils.book_append_sheet(workbook, ws, sheetName.substring(0, 31));
+    };
+
+    // Build Master Sheet if multiple classes
+    if (classesArray.length > 1) {
+      buildSheet(filteredStudents, "SEMUA KELAS");
+    }
+
+    // Build Per-Class Sheets
+    classesArray.forEach(cls => {
+      buildSheet(filteredStudents.filter(s => s.className === cls), cls);
     });
 
-    const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
-    XLSX.utils.book_append_sheet(workbook, ws, "Hasil Monitoring");
-    XLSX.writeFile(workbook, `Monitoring_${monitorRoom.room_name || "Ujian"}.xlsx`);
+    XLSX.writeFile(workbook, `Rekap_${monitorRoom.room_name || "Monitoring"}_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
   const handleForceSubmitAll = () => {
@@ -495,321 +599,563 @@ const MonitoringPage = () => {
   })();
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
-      {/* HEADER SECTION */}
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 bg-card p-6 rounded-3xl border border-slate-200/60 dark:border-slate-800 shadow-sm backdrop-blur-md">
-        <div className="flex items-center gap-4">
-           <Button variant="ghost" size="icon" onClick={() => navigate("/admin/ruang-ujian")} className="rounded-xl border border-slate-100 dark:border-slate-800">
-             <ArrowLeft className="h-4 w-4" />
-           </Button>
-           <div>
+    <div className="space-y-5 animate-in fade-in duration-500">
+      {/* HEADER SECTION - Clean & Professional */}
+      <div className="bg-card p-5 rounded-3xl border border-slate-200/60 dark:border-slate-800 shadow-sm transition-all duration-300">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="flex items-center gap-4">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={() => navigate("/admin/ruang-ujian")} 
+              className="h-10 w-10 rounded-xl border border-slate-200/60 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all shrink-0"
+            >
+              <ArrowLeft className="h-4 w-4 text-slate-600 dark:text-slate-400" />
+            </Button>
+            <div className="space-y-0.5 min-w-0">
               <div className="flex items-center gap-2">
-                <h1 className="text-xl font-bold text-slate-800 dark:text-white truncate max-w-[300px] md:max-w-md">
+                <h1 className="text-xl font-bold text-slate-800 dark:text-white tracking-tight">
                   {isLoading ? <Skeleton className="h-7 w-48" /> : `Monitoring: ${monitorRoom?.room_name || "Tanpa Nama"}`}
                 </h1>
-                {!isLoading && <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>}
+                {!isLoading && (
+                  <div className="flex items-center gap-1.5 px-2 py-0.5 bg-emerald-50 dark:bg-emerald-900/20 rounded-md border border-emerald-100 dark:border-emerald-800/40">
+                    <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">Live</span>
+                  </div>
+                )}
               </div>
-              <p className="text-xs text-slate-500 mt-0.5">
-                {isLoading ? <Skeleton className="h-4 w-64 mt-1" /> : `${monitorRoom?.examTitle} • ${roomClassLabel}`}
-              </p>
-           </div>
-        </div>
-        <div className="flex items-center gap-3 w-full md:w-auto">
-          <div className="flex items-center gap-3 bg-slate-100 dark:bg-slate-900/60 px-4 py-2 rounded-2xl border border-slate-200/60 dark:border-slate-800/40">
-             <div className="flex flex-col items-end">
-               <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest leading-none">Waktu Berjalan</span>
-               <span className="text-lg font-mono font-black text-slate-700 dark:text-slate-200">
-                 {isLoading ? <Skeleton className="h-6 w-12" /> : `${Math.floor(monitorTimeLeft / 60).toString().padStart(2, '0')}:${(monitorTimeLeft % 60).toString().padStart(2, '0')}`}
-               </span>
-             </div>
-             <Button
+              <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
+                <div className="flex items-center gap-1.5">
+                  <BookOpen className="h-3.5 w-3.5 text-blue-500" />
+                  <span className="font-medium truncate max-w-[200px] md:max-w-md">{isLoading ? <Skeleton className="h-3 w-32" /> : monitorRoom?.examTitle}</span>
+                </div>
+                <span className="text-slate-300 dark:text-slate-700">|</span>
+                <div className="flex flex-wrap gap-1">
+                   {(function () {
+                      if (isLoading || !monitorRoom) return <Skeleton className="h-4 w-20 rounded-md" />;
+                      
+                      const ids = Array.isArray(monitorRoom.classId) ? monitorRoom.classId : String(monitorRoom.classId || "").split(",");
+                      if (monitorRoom.allClasses) return <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400">Semua Kelas</span>;
+                      
+                      const names = ids.map(id => examClasses.find(c => c.id === id)?.name).filter(Boolean);
+                      return names.length > 0 ? (
+                        <span className="font-medium truncate max-w-[150px]">{names.join(", ")}</span>
+                      ) : <span className="italic">Tidak ada kelas</span>;
+                    })()}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-4 self-end md:self-center">
+            <div className="flex items-center gap-3 bg-slate-50 dark:bg-slate-900/60 px-3 py-1.5 rounded-2xl border border-slate-200/60 dark:border-slate-800/40">
+              <div className="flex flex-col items-end">
+                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider leading-none">Penyegaran</span>
+                <span className="text-sm font-mono font-bold text-blue-600 dark:text-blue-400 leading-none mt-1">
+                   {isLoading ? "--:--" : `${Math.floor(monitorTimeLeft / 60).toString().padStart(2, '0')}:${(monitorTimeLeft % 60).toString().padStart(2, '0')}`}
+                </span>
+              </div>
+              <Button
                 onClick={() => handleManualRefreshMonitor()}
                 size="icon"
                 variant="ghost"
-                className={`h-10 w-10 rounded-xl hover:bg-white dark:hover:bg-slate-800 ${isMonitorRefreshing ? "animate-spin text-blue-500" : "text-slate-400"}`}
+                className={`h-9 w-9 rounded-xl transition-all ${isMonitorRefreshing ? "text-blue-500" : "text-slate-400 hover:text-blue-500 hover:bg-white dark:hover:bg-slate-800"}`}
               >
-                <RefreshCw className="h-5 w-5" />
-             </Button>
+                <RefreshCw className={`h-4.5 w-4.5 ${isMonitorRefreshing ? "animate-spin" : ""}`} />
+              </Button>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* STATS & FILTER SECTION */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        <div className="lg:col-span-1 space-y-4 sticky top-0 self-start">
-           <div className="bg-card p-5 rounded-3xl border border-slate-200/60 dark:border-slate-800 shadow-sm">
-             <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Ringkasan Sesi</h3>
-             <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                   <div className="flex items-center gap-2">
-                      <Users className="h-4 w-4 text-blue-500" />
-                      <span className="text-sm font-medium text-slate-600 dark:text-slate-400">Total Peserta</span>
-                   </div>
-                   <span className="text-lg font-bold">{isLoading ? <Skeleton className="h-6 w-8" /> : students.filter(s => {
+        {/* SIDEBAR - Enhanced & Integrated */}
+        <div className="lg:col-span-1 space-y-6">
+          <div className="bg-card p-5 rounded-3xl border border-slate-200/60 dark:border-slate-800 shadow-sm space-y-6 h-fit sticky top-24">
+            <div>
+              <h3 className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2 mb-4 pl-1 border-l-2 border-blue-500 ml-1">
+                Ringkasan Sesi
+              </h3>
+              <div className="grid grid-cols-1 gap-3">
+                <div className="flex items-center justify-between p-3 rounded-2xl bg-slate-50/50 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-800/60 group hover:border-blue-200 dark:hover:border-blue-800/40 transition-all">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 rounded-xl bg-blue-50 dark:bg-blue-900/10 text-blue-600 dark:text-blue-400 group-hover:scale-110 transition-transform">
+                      <Users className="h-4 w-4" />
+                    </div>
+                    <span className="text-sm font-medium text-slate-600 dark:text-slate-400">Total Peserta</span>
+                  </div>
+                  <span className="text-lg font-semibold text-slate-800 dark:text-white leading-none">{isLoading ? <Skeleton className="h-5 w-8" /> : (function() {
+                    const filteredArr = students.filter((s) => {
                       if (monitorRoom?.allClasses) return true;
                       const allowedIds = Array.isArray(monitorRoom?.classId) ? monitorRoom?.classId : String(monitorRoom?.classId || "").split(",");
                       return allowedIds.includes(s.classId);
-                   }).length}</span>
+                    });
+                    return filteredArr.length;
+                  })()}</span>
                 </div>
-                <div className="flex items-center justify-between">
-                   <div className="flex items-center gap-2">
-                      <Monitor className="h-4 w-4 text-emerald-500" />
-                      <span className="text-sm font-medium text-slate-600 dark:text-slate-400">Sedang Ujian</span>
-                   </div>
-                   <span className="text-lg font-bold text-emerald-600">{isLoading ? <Skeleton className="h-6 w-8" /> : attempts.filter(a => a.status === "ongoing").length}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                   <div className="flex items-center gap-2">
-                      <Lock className="h-4 w-4 text-rose-500" />
-                      <span className="text-sm font-medium text-slate-600 dark:text-slate-400">Terkunci</span>
-                   </div>
-                   <span className="text-lg font-bold text-rose-600">{isLoading ? <Skeleton className="h-6 w-8" /> : attempts.filter(a => a.status === "LOCKED").length}</span>
-                </div>
-             </div>
-           </div>
 
-           <div className="bg-card p-5 rounded-3xl border border-slate-200/60 dark:border-slate-800 shadow-sm space-y-4">
-              <div className="relative">
-                <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-                <input 
-                  type="text" 
-                  placeholder="Cari siswa..."
-                  className="w-full pl-9 pr-4 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
+                <div className="flex items-center justify-between p-3 rounded-2xl bg-emerald-50/5 dark:bg-emerald-900/5 border border-emerald-50 dark:border-emerald-800/10 group hover:border-emerald-200 dark:hover:border-emerald-800/40 transition-all">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-900/10 text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform">
+                      <Monitor className="h-4 w-4" />
+                    </div>
+                    <span className="text-sm font-medium text-slate-600 dark:text-slate-400">Sedang Ujian</span>
+                  </div>
+                  <span className="text-lg font-semibold text-emerald-600 dark:text-emerald-400 leading-none">{isLoading ? <Skeleton className="h-5 w-6" /> : attempts.filter(a => a.status === 'ongoing').length}</span>
+                </div>
+
+                <div className="flex items-center justify-between p-3 rounded-2xl bg-rose-50/5 dark:bg-rose-900/5 border border-rose-50 dark:border-rose-800/10 group hover:border-rose-200 dark:hover:border-rose-800/40 transition-all">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 rounded-xl bg-rose-50 dark:bg-rose-900/10 text-rose-600 dark:text-rose-400 group-hover:scale-110 transition-transform">
+                      <Lock className="h-4 w-4" />
+                    </div>
+                    <span className="text-sm font-medium text-slate-600 dark:text-slate-400">Terkunci</span>
+                  </div>
+                  <span className="text-lg font-semibold text-rose-600 dark:text-rose-400 leading-none">{isLoading ? <Skeleton className="h-5 w-4" /> : attempts.filter(a => a.status === 'LOCKED').length}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-6 border-t border-slate-100 dark:border-slate-800/60 space-y-5">
+              <div className="space-y-4">
+                <div className="relative group">
+                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
+                  <input
+                    type="text"
+                    placeholder="Cari siswa..."
+                    value={searchQuery}
+                    onChange={(e) => { setSearchQuery(e.target.value); setMonitorPage(1); }}
+                    className="w-full pl-10 pr-4 py-2.5 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 transition-all"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 pl-1">Filter Kelas</label>
+                  <select
+                    value={monitorClassFilter}
+                    onChange={(e) => { setMonitorClassFilter(e.target.value); setMonitorPage(1); }}
+                    className="w-full text-sm font-medium rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900 p-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/10 appearance-none cursor-pointer text-slate-700 dark:text-slate-200"
+                  >
+                    <option value="all">Semua Kelas</option>
+                    {examClasses
+                      .filter(c => {
+                        if (monitorRoom?.allClasses) return true;
+                        const ids = Array.isArray(monitorRoom?.classId) ? monitorRoom?.classId : String(monitorRoom?.classId || "").split(",");
+                        return ids.includes(c.id);
+                      })
+                      .sort((a, b) => a.name.localeCompare(b.name))
+                      .map(c => <option key={c.id} value={c.name}>{c.name}</option>)
+                    }
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 pl-1">Urutan</label>
+                  <select
+                    value={monitorSortBy}
+                    onChange={(e) => { setMonitorSortBy(e.target.value as any); setMonitorPage(1); }}
+                    className="w-full text-sm font-medium rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900 p-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/10 appearance-none cursor-pointer text-slate-700 dark:text-slate-200"
+                  >
+                    <option value="status">Status Ujian</option>
+                    <option value="nama">Nama (A-Z)</option>
+                    <option value="nilai">Nilai Tertinggi</option>
+                    <option value="login">Login Terbaru</option>
+                    <option value="default">Default</option>
+                  </select>
+                </div>
               </div>
 
-              <div className="space-y-3">
-                 <div className="space-y-1">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Filter Kelas</label>
-                    <select
-                        value={monitorClassFilter}
-                        onChange={(e) => { setMonitorClassFilter(e.target.value); setMonitorPage(1); }}
-                        className="w-full text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 p-2.5 focus:outline-none"
-                    >
-                        <option value="all">Semua Kelas</option>
-                        {examClasses
-                          .filter(c => {
-                            if (monitorRoom?.allClasses) return true;
-                            const ids = Array.isArray(monitorRoom?.classId) ? monitorRoom?.classId : String(monitorRoom?.classId || "").split(",");
-                            return ids.includes(c.id);
-                          })
-                          .map(c => <option key={c.id} value={c.name}>{c.name}</option>)
-                        }
-                    </select>
-                 </div>
-                 <div className="space-y-1">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Urutan</label>
-                    <select
-                        value={monitorSortBy}
-                        onChange={(e) => { setMonitorSortBy(e.target.value as any); setMonitorPage(1); }}
-                        className="w-full text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 p-2.5 focus:outline-none"
-                    >
-                        <option value="default">Default</option>
-                        <option value="nama">Nama (A-Z)</option>
-                        <option value="nilai">Nilai Tertinggi</option>
-                        <option value="login">Login Terbaru</option>
-                    </select>
-                 </div>
+              <div className="pt-2 flex flex-col gap-2.5">
+                <Button onClick={handleExportExcel} variant="secondary" className="w-full rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 dark:hover:bg-emerald-900/40 dark:border-emerald-800/40 text-emerald-700 font-semibold shadow-sm transition-all h-10">
+                  <FileSpreadsheet className="mr-2 h-4 w-4" /> Export Excel
+                </Button>
+                <Button onClick={handleForceSubmitAll} variant="secondary" className="w-full rounded-xl bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-100 dark:bg-rose-950/40 dark:text-rose-400 dark:border dark:border-rose-800/30 shadow-sm font-semibold h-10 transition-all">
+                  <Users className="mr-2 h-4 w-4" /> Selesaikan Semua
+                </Button>
               </div>
-
-              <div className="pt-2 flex flex-col gap-2">
-                 <Button onClick={handleExportExcel} variant="outline" className="w-full rounded-xl border-emerald-200 text-emerald-700 hover:bg-emerald-50 text-xs">
-                    <FileSpreadsheet className="mr-2 h-4 w-4" /> Export Excel
-                 </Button>
-                 <Button onClick={handleForceSubmitAll} variant="outline" className="w-full rounded-xl border-orange-200 text-orange-700 hover:bg-orange-50 text-xs">
-                    <Users className="mr-2 h-4 w-4" /> Selesaikan Semua
-                 </Button>
-              </div>
-           </div>
+            </div>
+          </div>
         </div>
 
         <div className="lg:col-span-3">
-           <div className="bg-card rounded-3xl border border-slate-200/60 dark:border-slate-800 shadow-sm overflow-hidden min-h-[500px]">
-              <div className="overflow-x-auto">
-                 <Table>
-                    <TableHeader className="bg-slate-50 dark:bg-slate-900/50">
-                       <TableRow>
-                          <TableHead className="w-12 text-center">No</TableHead>
-                          <TableHead>Nama Siswa</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead className="text-center">Nilai</TableHead>
-                          <TableHead className="text-center">Progres</TableHead>
-                          <TableHead className="text-center">Cheat</TableHead>
-                          <TableHead className="text-right">Aksi</TableHead>
-                       </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                       {isLoading ? (
-                          Array.from({ length: 10 }).map((_, i) => (
-                             <TableRow key={`skele-row-${i}`} className="h-16">
-                                <TableCell className="text-center"><Skeleton className="h-4 w-4 mx-auto" /></TableCell>
-                                <TableCell><Skeleton className="h-5 w-48" /><Skeleton className="h-3 w-32 mt-1.5" /></TableCell>
-                                <TableCell><Skeleton className="h-6 w-16" /></TableCell>
-                                <TableCell className="text-center"><Skeleton className="h-6 w-8 mx-auto" /></TableCell>
-                                <TableCell className="text-center"><Skeleton className="h-5 w-12 mx-auto" /></TableCell>
-                                <TableCell className="text-center"><Skeleton className="h-5 w-6 mx-auto" /></TableCell>
-                                <TableCell className="text-right"><Skeleton className="h-7 w-20 ml-auto" /></TableCell>
-                             </TableRow>
-                          ))
-                       ) : (() => {
-                          const filtered = students
-                            .map(s => ({
-                              ...s,
-                              className: examClasses.find(c => c.id === s.classId)?.name || "-"
-                            }))
-                            .filter((s) => {
-                              // Search Filter
-                              if (searchQuery && !s.name.toLowerCase().includes(searchQuery.toLowerCase()) && !s.nisn.includes(searchQuery)) return false;
-                              
-                              // Class Filter
-                              if (monitorRoom?.allClasses) {
-                                if (monitorClassFilter !== "all" && s.className !== monitorClassFilter) return false;
-                                return true;
-                              }
-                              const allowedIds = Array.isArray(monitorRoom?.classId) ? monitorRoom?.classId : String(monitorRoom?.classId || "").split(",");
-                              if (!allowedIds.includes(s.classId)) return false;
-                              if (monitorClassFilter !== "all" && s.className !== monitorClassFilter) return false;
-                              return true;
-                            })
-                            .sort((a, b) => {
-                              const attA = attempts.find(at => at.studentId === a.id);
-                              const attB = attempts.find(at => at.studentId === b.id);
-                              if (monitorSortBy === "nilai") return (attB?.score || 0) - (attA?.score || 0);
-                              if (monitorSortBy === "login") return (attB?.startTime || 0) - (attA?.startTime || 0);
-                              if (monitorSortBy === "nama") return a.name.localeCompare(b.name);
-                              return 0;
-                            });
+          <div className="bg-card rounded-3xl border border-slate-200/60 dark:border-slate-800 shadow-sm overflow-hidden min-h-[500px]">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader className="bg-slate-50 dark:bg-slate-900/50">
+                  <TableRow>
+                    <TableHead className="w-12 text-center">No</TableHead>
+                    <TableHead 
+                      className="cursor-pointer hover:text-blue-600 transition-colors group"
+                      onClick={() => setMonitorSortBy("nama")}
+                    >
+                      <div className="flex items-center gap-1.5">
+                        Nama Siswa
+                        <ChevronDown className={`h-3 w-3 transition-opacity ${monitorSortBy === 'nama' ? 'opacity-100' : 'opacity-0 group-hover:opacity-40'}`} />
+                      </div>
+                    </TableHead>
+                    <TableHead 
+                      className="cursor-pointer hover:text-blue-600 transition-colors group"
+                      onClick={() => setMonitorSortBy("status")}
+                    >
+                      <div className="flex items-center gap-1.5">
+                        Status
+                        <ChevronDown className={`h-3 w-3 transition-opacity ${monitorSortBy === 'status' ? 'opacity-100' : 'opacity-0 group-hover:opacity-40'}`} />
+                      </div>
+                    </TableHead>
+                    <TableHead 
+                      className="text-center cursor-pointer hover:text-blue-600 transition-colors group"
+                      onClick={() => setMonitorSortBy("nilai")}
+                    >
+                      <div className="flex items-center justify-center gap-1.5">
+                        Nilai
+                        <ChevronDown className={`h-3 w-3 transition-opacity ${monitorSortBy === 'nilai' ? 'opacity-100' : 'opacity-0 group-hover:opacity-40'}`} />
+                      </div>
+                    </TableHead>
+                    <TableHead className="text-center">Progres</TableHead>
+                    <TableHead className="text-center">Cheat</TableHead>
+                    <TableHead className="text-right">Aksi</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {isLoading ? (
+                    Array.from({ length: 10 }).map((_, i) => (
+                      <TableRow key={`skele-row-${i}`} className="h-16">
+                        <TableCell className="text-center"><Skeleton className="h-4 w-4 mx-auto" /></TableCell>
+                        <TableCell><Skeleton className="h-5 w-48" /><Skeleton className="h-3 w-32 mt-1.5" /></TableCell>
+                        <TableCell><Skeleton className="h-6 w-16" /></TableCell>
+                        <TableCell className="text-center"><Skeleton className="h-6 w-8 mx-auto" /></TableCell>
+                        <TableCell className="text-center"><Skeleton className="h-5 w-12 mx-auto" /></TableCell>
+                        <TableCell className="text-center"><Skeleton className="h-5 w-6 mx-auto" /></TableCell>
+                        <TableCell className="text-right"><Skeleton className="h-7 w-20 ml-auto" /></TableCell>
+                      </TableRow>
+                    ))
+                  ) : (() => {
+                    const filtered = students
+                      .map(s => ({
+                        ...s,
+                        className: examClasses.find(c => c.id === s.classId)?.name || "-"
+                      }))
+                      .filter((s) => {
+                        // Search Filter
+                        if (searchQuery && !s.name.toLowerCase().includes(searchQuery.toLowerCase()) && !s.nisn.includes(searchQuery)) return false;
 
-                          const startIndex = (monitorPage - 1) * monitorPageSize;
-                          const currentData = filtered.slice(startIndex, startIndex + monitorPageSize);
+                        // Class Filter
+                        if (monitorRoom?.allClasses) {
+                          if (monitorClassFilter !== "all" && s.className !== monitorClassFilter) return false;
+                          return true;
+                        }
+                        const allowedIds = Array.isArray(monitorRoom?.classId) ? monitorRoom?.classId : String(monitorRoom?.classId || "").split(",");
+                        if (!allowedIds.includes(s.classId)) return false;
+                        if (monitorClassFilter !== "all" && s.className !== monitorClassFilter) return false;
+                        return true;
+                      })
+                      .sort((a, b) => {
+                        const attA = attempts.find(at => at.studentId === a.id);
+                        const attB = attempts.find(at => at.studentId === b.id);
+                        if (monitorSortBy === "nilai") return (attB?.score || 0) - (attA?.score || 0);
+                        if (monitorSortBy === "login") return new Date(attB?.startTime || 0).getTime() - new Date(attA?.startTime || 0).getTime();
+                        if (monitorSortBy === "status") {
+                          const getStatusRank = (status?: string) => {
+                            if (status === "LOCKED") return 3;
+                            if (status === "ongoing") return 2;
+                            if (status === "finished") return 1;
+                            return 0; // Not started
+                          };
+                          const rankA = getStatusRank(attA?.status);
+                          const rankB = getStatusRank(attB?.status);
+                          if (rankA !== rankB) return rankB - rankA;
+                          return a.name.localeCompare(b.name);
+                        }
+                        return a.name.localeCompare(b.name);
+                      });
 
-                          if (currentData.length === 0 && monitorPage === 1) return <TableRow><TableCell colSpan={7} className="h-60 text-center text-slate-400">Siswa tidak ditemukan</TableCell></TableRow>;
+                    const startIndex = (monitorPage - 1) * monitorPageSize;
+                    const currentData = filtered.slice(startIndex, startIndex + monitorPageSize);
 
-                          const rows = currentData.map((student, localIdx) => {
-                             const attempt = attempts.find(a => a.studentId === student.id || a.student_id === student.id);
-                             const sisAnswers = attempt?.answers || {};
-                             const answered = Object.keys(sisAnswers).length;
-                             const isExpanded = expandedstudent === student.id;
+                    if (currentData.length === 0 && monitorPage === 1) return <TableRow><TableCell colSpan={7} className="h-60 text-center text-slate-400">Siswa tidak ditemukan</TableCell></TableRow>;
 
-                             return (
-                               <React.Fragment key={student.id}>
-                                  <TableRow className={`hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors h-16 ${isExpanded ? "bg-blue-50/30 dark:bg-blue-900/10" : ""}`}>
-                                     <TableCell className="text-center text-slate-400 text-xs">{startIndex + localIdx + 1}</TableCell>
-                                     <TableCell>
-                                        <div className="flex flex-col">
-                                           <span className="font-bold text-slate-800 dark:text-slate-100">{student.name}</span>
-                                           <span className="text-[10px] text-slate-500 font-medium">{student.nisn} • {student.className}</span>
-                                        </div>
-                                     </TableCell>
-                                     <TableCell>
-                                        {attempt ? (
-                                           <div className="flex items-center gap-1.5">
-                                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
-                                                attempt.status === "finished" ? "bg-green-50 text-green-700 border-green-200" :
-                                                attempt.status === "LOCKED" ? "bg-rose-50 text-rose-700 border-rose-200" :
-                                                "bg-blue-50 text-blue-700 border-blue-200"
-                                              }`}>
-                                                {attempt.status?.toUpperCase() || "AKTIF"}
-                                              </span>
-                                           </div>
-                                        ) : <span className="text-[10px] text-slate-400 italic">Belum Login</span>}
-                                     </TableCell>
-                                     <TableCell className="text-center font-bold text-indigo-600">
-                                        {attempt?.score !== undefined ? attempt.score : "-"}
-                                     </TableCell>
-                                     <TableCell className="text-center text-xs text-slate-500">
-                                        {answered} / {monitorQuestions.length}
-                                     </TableCell>
-                                     <TableCell className="text-center">
-                                        <span className={`font-bold text-xs ${ (attempt?.cheatCount || 0) > 0 ? "text-rose-500" : "text-slate-400"}`}>
-                                           {attempt?.cheatCount || 0}
-                                        </span>
-                                     </TableCell>
-                                     <TableCell className="text-right">
-                                        <div className="flex justify-end gap-1.5">
-                                           {attempt && (
-                                              <>
-                                                 <Button size="sm" variant="ghost" onClick={() => setExpandedstudent(isExpanded ? null : student.id)} className="h-7 text-[10px] hover:bg-blue-50">
-                                                    {isExpanded ? "Tutup" : "Detail"}
-                                                 </Button>
-                                                 <div className="relative">
-                                                   <Button size="sm" variant="ghost" onClick={() => setOpenMenuId(openMenuId === student.id ? null : student.id)} className="h-7 bg-slate-50 px-2 text-[10px]">Menu</Button>
-                                                   {openMenuId === student.id && (
-                                                      <div className="absolute right-0 mt-1 w-32 bg-white dark:bg-slate-800 border rounded-lg shadow-xl z-30 py-1" onMouseLeave={() => setOpenMenuId(null)}>
-                                                         <button onClick={() => { handleResetCheatCount(attempt.id); setOpenMenuId(null); }} className="w-full text-left px-3 py-1.5 hover:bg-slate-50 text-[10px] text-amber-600 font-bold">Reset Cheat</button>
-                                                         {attempt.status === "LOCKED" && <button onClick={() => { handleUnlockStudent(attempt.id); setOpenMenuId(null); }} className="w-full text-left px-3 py-1.5 hover:bg-slate-50 text-[10px] text-emerald-600 font-bold border-t">Buka Kunci</button>}
-                                                         {attempt.status !== "finished" && <button onClick={() => { handleForceSubmitStudent(attempt.id); setOpenMenuId(null); }} className="w-full text-left px-3 py-1.5 hover:bg-slate-50 text-[10px] text-blue-600 font-bold border-t">Selesaikan</button>}
-                                                         <button onClick={() => { handleResetSession(attempt.id, student.id); setOpenMenuId(null); }} className="w-full text-left px-3 py-1.5 hover:bg-slate-50 text-[10px] text-rose-600 font-bold border-t">Reset Sesi</button>
-                                                      </div>
-                                                   )}
-                                                 </div>
-                                              </>
-                                           )}
-                                        </div>
-                                     </TableCell>
-                                  </TableRow>
-                                  {isExpanded && (
-                                    <TableRow className="bg-slate-50/50 dark:bg-slate-900/40">
-                                       <TableCell colSpan={7} className="p-4">
-                                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                                             {monitorQuestions.map((q, qIdx) => {
-                                                const ans = sisAnswers[q.id];
-                                                const overrides = attempt?.overrides || {};
-                                                const correct = overrides[q.id] !== undefined ? overrides[q.id] : (ans ? (q.type === "isian_singkat" ? isFuzzyMatch(ans, q.answerKey) : q.choices?.[ans]?.isCorrect) : false);
-                                                return (
-                                                  <div key={q.id} className="bg-white dark:bg-slate-800 p-3 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col gap-2">
-                                                     <div className="flex gap-2">
-                                                        <span className="text-[10px] font-black text-slate-400 shrink-0">#{qIdx+1}</span>
-                                                        <div className="text-[11px] font-medium leading-tight text-slate-700 dark:text-slate-300" dangerouslySetInnerHTML={{ __html: q.text }} />
-                                                     </div>
-                                                     <div className={`mt-auto p-2 rounded-lg flex items-center justify-between ${correct ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"}`}>
-                                                        <span className="text-[10px] font-bold">Jawab: {ans ? String(ans).toUpperCase() : "-"}</span>
-                                                        <div className="flex gap-1">
-                                                          {(q.type === "isian_singkat" || q.type === "uraian") && (
-                                                            <>
-                                                              <button onClick={() => handleManualGrade(student.id, q.id, true)} className="p-1 hover:bg-white rounded"><CheckCircle2 className="h-3 w-3" /></button>
-                                                              <button onClick={() => handleManualGrade(student.id, q.id, false)} className="p-1 hover:bg-white rounded"><X className="h-3 w-3" /></button>
-                                                            </>
-                                                          )}
-                                                          <span className="text-[9px] font-black">{correct ? "✓" : "✗"}</span>
-                                                        </div>
-                                                     </div>
-                                                  </div>
-                                                );
-                                             })}
+                    const rows = currentData.map((student, localIdx) => {
+                      const attempt = attempts.find(a => a.studentId === student.id || a.student_id === student.id);
+                      const sisAnswers = attempt?.answers || {};
+                      const answered = Object.keys(sisAnswers).length;
+                      const isExpanded = expandedstudent === student.id;
+
+                      return (
+                        <React.Fragment key={student.id}>
+                          <TableRow className={`hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors h-16 ${isExpanded ? "bg-blue-50/30 dark:bg-blue-900/10" : ""}`}>
+                            <TableCell className="text-center text-slate-400 text-xs">{startIndex + localIdx + 1}</TableCell>
+                            <TableCell>
+                              <div className="flex flex-col">
+                                <span className="font-bold text-slate-800 dark:text-slate-100">{student.name}</span>
+                                <span className="text-[10px] text-slate-500 font-medium">{student.nisn} • {student.className}</span>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              {attempt ? (
+                                <div className="flex items-center gap-1.5">
+                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${attempt.status === "finished" ? "bg-green-50 text-green-700 border-green-200" :
+                                    attempt.status === "LOCKED" ? "bg-rose-50 text-rose-700 border-rose-200" :
+                                      "bg-blue-50 text-blue-700 border-blue-200"
+                                    }`}>
+                                    {attempt.status?.toUpperCase() || "AKTIF"}
+                                  </span>
+                                </div>
+                              ) : <span className="text-[10px] text-slate-400 italic">Belum Login</span>}
+                            </TableCell>
+                            <TableCell className="text-center font-bold text-indigo-600">
+                              {attempt?.score !== undefined ? attempt.score : "-"}
+                            </TableCell>
+                            <TableCell className="text-center text-xs text-slate-500">
+                              {answered} / {monitorQuestions.length}
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <span className={`font-bold text-xs ${(attempt?.cheatCount || 0) > 0 ? "text-rose-500" : "text-slate-400"}`}>
+                                {attempt?.cheatCount || 0}
+                              </span>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex justify-end gap-1.5">
+                                {attempt && (
+                                  <>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => setExpandedstudent(isExpanded ? null : student.id)}
+                                      className={`h-8 px-4 rounded-2xl font-bold text-[10px] transition-all shadow-sm ${isExpanded
+                                        ? "bg-slate-100 text-slate-700 border border-slate-200 hover:bg-slate-200 hover:text-slate-800 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700 dark:hover:bg-slate-700 dark:hover:text-white"
+                                        : "bg-blue-50 text-blue-700 border border-blue-100 hover:bg-blue-100 hover:text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800/40 dark:hover:bg-blue-900/50 dark:hover:text-blue-300"
+                                        }`}
+                                    >
+                                      {isExpanded ? "Tutup" : "Detail"}
+                                    </Button>
+                                    <div className="relative">
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        onClick={() => setOpenMenuId(openMenuId === student.id ? null : student.id)}
+                                        className="h-8 px-3 rounded-2xl bg-indigo-50 text-indigo-700 border border-indigo-100 hover:bg-indigo-100 hover:text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-400 dark:border-indigo-800/40 dark:hover:bg-indigo-900/50 dark:hover:text-indigo-300 shadow-sm transition-all flex items-center gap-1.5 font-bold text-[10px]"
+                                      >
+                                        <Settings className="h-3.5 w-3.5" />
+                                        Menu
+                                      </Button>
+                                      {openMenuId === student.id && (
+                                        <div className="absolute right-0 mt-2 w-40 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-xl z-30 py-1.5 animate-in fade-in zoom-in-95 duration-100" onMouseLeave={() => setOpenMenuId(null)}>
+                                          <div className="px-3 py-1 mb-1 border-b border-slate-50 dark:border-slate-700/50">
+                                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Opsi Siswa</span>
                                           </div>
-                                       </TableCell>
-                                    </TableRow>
-                                  )}
-                               </React.Fragment>
-                             )
-                          });
+                                          <button
+                                            onClick={() => { handleResetCheatCount(attempt.id); setOpenMenuId(null); }}
+                                            className="w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 text-[10px] text-amber-600 dark:text-amber-500 font-bold transition-colors flex items-center gap-2"
+                                          >
+                                            <div className="h-1.5 w-1.5 rounded-full bg-amber-500" /> Reset Cheat
+                                          </button>
+                                          {attempt.status === "LOCKED" && (
+                                            <button
+                                              onClick={() => { handleUnlockStudent(attempt.id); setOpenMenuId(null); }}
+                                              className="w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 text-[10px] text-emerald-600 dark:text-emerald-500 font-bold transition-colors flex items-center gap-2"
+                                            >
+                                              <div className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> Buka Kunci
+                                            </button>
+                                          )}
+                                          {attempt.status !== "finished" && (
+                                            <button
+                                              onClick={() => { handleForceSubmitStudent(attempt.id); setOpenMenuId(null); }}
+                                              className="w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 text-[10px] text-blue-600 dark:text-blue-400 font-bold transition-colors flex items-center gap-2"
+                                            >
+                                              <div className="h-1.5 w-1.5 rounded-full bg-blue-500" /> Selesaikan
+                                            </button>
+                                          )}
+                                          <button
+                                            onClick={() => { handleResetSession(attempt.id, student.id); setOpenMenuId(null); }}
+                                            className="w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 text-[10px] text-rose-600 dark:text-rose-500 font-bold transition-colors flex items-center gap-2"
+                                          >
+                                            <div className="h-1.5 w-1.5 rounded-full bg-rose-500" /> Reset Sesi
+                                          </button>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </>
+                                )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                          {isExpanded && (
+                            <TableRow className="bg-slate-50/50 dark:bg-slate-900/40">
+                              <TableCell colSpan={7} className="p-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                  {monitorQuestions.map((q, qIdx) => {
+                                    const ans = sisAnswers[q.id];
+                                    const overrides = attempt?.overrides || {};
+                                    const correct = overrides[q.id] !== undefined ? overrides[q.id] : (ans ? (q.type === "isian_singkat" ? isFuzzyMatch(ans, q.answerKey) : q.choices?.[ans]?.isCorrect) : false);
+                                    return (
+                                      <div key={q.id} className="bg-white dark:bg-slate-800 p-3 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col gap-2">
+                                        <div className="flex gap-2">
+                                          <span className="text-[10px] font-black text-slate-400 shrink-0">#{qIdx + 1}</span>
+                                          <div className="text-[11px] font-medium leading-tight text-slate-700 dark:text-slate-300" dangerouslySetInnerHTML={{ __html: q.text }} />
+                                        </div>
+                                        <div className={`mt-auto p-2 rounded-lg flex items-center justify-between ${correct ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"}`}>
+                                          <span className="text-[10px] font-bold">Jawab: {ans ? String(ans).toUpperCase() : "-"}</span>
+                                          <div className="flex gap-1">
+                                            {(q.type === "isian_singkat" || q.type === "uraian") && (
+                                              <>
+                                                <button onClick={() => handleManualGrade(student.id, q.id, true)} className="p-1 hover:bg-white rounded"><CheckCircle2 className="h-3 w-3" /></button>
+                                                <button onClick={() => handleManualGrade(student.id, q.id, false)} className="p-1 hover:bg-white rounded"><X className="h-3 w-3" /></button>
+                                              </>
+                                            )}
+                                            <span className="text-[9px] font-black">{correct ? "✓" : "✗"}</span>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </React.Fragment>
+                      )
+                    });
 
-                          // Add empty rows if data < 10
-                          const emptyRowsCount = Math.max(0, 10 - currentData.length);
-                          const emptyRows = Array.from({ length: emptyRowsCount }).map((_, i) => (
-                             <TableRow key={`empty-${i}`} className="h-16 border-slate-50 dark:border-slate-800/20">
-                                <TableCell colSpan={7}>&nbsp;</TableCell>
-                             </TableRow>
-                          ));
+                    // Add empty rows if data < 10
+                    const emptyRowsCount = Math.max(0, 10 - currentData.length);
+                    const emptyRows = Array.from({ length: emptyRowsCount }).map((_, i) => (
+                      <TableRow key={`empty-${i}`} className="h-16 border-slate-50 dark:border-slate-800/20">
+                        <TableCell colSpan={7}>&nbsp;</TableCell>
+                      </TableRow>
+                    ));
 
-                          return [...rows, ...emptyRows];
-                       })()}
-                    </TableBody>
-                 </Table>
-              </div>
+                    return [...rows, ...emptyRows];
+                  })()}
+                </TableBody>
+              </Table>
+            </div>
 
-              {/* PAGINATION */}
-              <div className="p-4 border-t border-slate-100 dark:border-slate-800 flex justify-center">
-                 <div className="flex items-center gap-2">
-                    <Button variant="ghost" size="sm" onClick={() => setMonitorPage(prev => Math.max(1, prev-1))} disabled={monitorPage === 1}>{"<"}</Button>
-                    <span className="text-xs font-bold px-4">Halaman {monitorPage}</span>
-                    <Button variant="ghost" size="sm" onClick={() => setMonitorPage(prev => prev + 1)} disabled={students.length <= monitorPage * monitorPageSize}>{">"}</Button>
-                 </div>
-              </div>
-           </div>
+            {/* PAGINATION */}
+            {(() => {
+              const { filtered } = (function () {
+                const filteredArr = students
+                  .map(s => ({
+                    ...s,
+                    className: examClasses.find(c => c.id === s.classId)?.name || "-"
+                  }))
+                  .filter((s) => {
+                    if (searchQuery && !s.name.toLowerCase().includes(searchQuery.toLowerCase()) && !s.nisn.includes(searchQuery)) return false;
+                    if (monitorRoom?.allClasses) {
+                      if (monitorClassFilter !== "all" && s.className !== monitorClassFilter) return false;
+                      return true;
+                    }
+                    const allowedIds = Array.isArray(monitorRoom?.classId) ? monitorRoom?.classId : String(monitorRoom?.classId || "").split(",");
+                    if (!allowedIds.includes(s.classId)) return false;
+                    if (monitorClassFilter !== "all" && s.className !== monitorClassFilter) return false;
+                    return true;
+                  });
+                return { filtered: filteredArr };
+              })();
+
+              const total = filtered.length;
+              const startIndex = (monitorPage - 1) * monitorPageSize;
+              const totalPages = Math.ceil(total / monitorPageSize);
+
+              if (total === 0) return null;
+
+              return (
+                <div className="flex flex-col gap-3 sm:gap-4 sm:flex-row sm:items-center sm:justify-between bg-slate-50/50 dark:bg-slate-900/40 p-3 sm:p-4 rounded-b-3xl border-t border-slate-200 dark:border-slate-800 shadow-sm">
+                  <div className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 text-center sm:text-left font-medium">
+                    Menampilkan {total > 0 ? startIndex + 1 : 0}-{Math.min(startIndex + monitorPageSize, total)} dari {total} data
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row items-center gap-3 sm:gap-4">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 shrink-0">Baris per halaman:</span>
+                      <select
+                        value={monitorPageSize}
+                        onChange={(e) => { setMonitorPageSize(Number(e.target.value)); setMonitorPage(1); }}
+                        className="h-8 sm:h-9 rounded border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 text-xs sm:text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      >
+                        {[10, 25, 50, 100].map((size) => (
+                          <option key={size} value={size}>
+                            {size}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setMonitorPage(1)}
+                        disabled={monitorPage === 1}
+                        className="h-8 w-8 sm:h-9 sm:w-9 p-0 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30"
+                      >
+                        <ChevronsLeft className="h-3 w-3 sm:h-4 sm:w-4" />
+                        <span className="sr-only">First page</span>
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setMonitorPage(prev => Math.max(1, prev - 1))}
+                        disabled={monitorPage === 1}
+                        className="h-8 w-8 sm:h-9 sm:w-9 p-0 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30"
+                      >
+                        <ChevronLeft className="h-3 w-3 sm:h-4 sm:w-4" />
+                        <span className="sr-only">Previous page</span>
+                      </Button>
+
+                      <div className="flex items-center gap-1">
+                        {(() => {
+                          const pages = [];
+                          const maxVisible = 5;
+                          let start = Math.max(1, monitorPage - 2);
+                          let end = Math.min(totalPages, start + maxVisible - 1);
+                          if (end - start < maxVisible - 1) start = Math.max(1, end - maxVisible + 1);
+
+                          for (let i = start; i <= end; i++) {
+                            pages.push(
+                              <Button
+                                key={i}
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setMonitorPage(i)}
+                                className={`h-8 w-8 sm:h-9 sm:w-9 p-0 text-xs sm:text-sm rounded-lg transition-colors border ${monitorPage === i
+                                  ? "bg-blue-50 text-blue-700 border-blue-100 dark:bg-blue-900/40 dark:text-blue-400 dark:border-blue-800/40 font-bold"
+                                  : "border-transparent bg-transparent hover:bg-slate-100 dark:hover:bg-slate-800"
+                                  }`}
+                              >
+                                {i}
+                              </Button>
+                            );
+                          }
+                          return pages;
+                        })()}
+                      </div>
+
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setMonitorPage(prev => prev + 1)}
+                        disabled={monitorPage === totalPages}
+                        className="h-8 w-8 sm:h-9 sm:w-9 p-0 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30"
+                      >
+                        <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4" />
+                        <span className="sr-only">Next page</span>
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setMonitorPage(totalPages)}
+                        disabled={monitorPage === totalPages}
+                        className="h-8 w-8 sm:h-9 sm:w-9 p-0 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30"
+                      >
+                        <ChevronsRight className="h-3 w-3 sm:h-4 sm:w-4" />
+                        <span className="sr-only">Last page</span>
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
         </div>
       </div>
 
@@ -822,7 +1168,7 @@ const MonitoringPage = () => {
         type={confirmDialog.type}
         confirmLabel={confirmDialog.confirmLabel}
       />
-      
+
       {/* Zoom Image Dialog */}
       <Dialog open={!!previewImage} onOpenChange={() => setPreviewImage(null)}>
         <DialogContent className="max-w-2xl bg-transparent border-none shadow-none">

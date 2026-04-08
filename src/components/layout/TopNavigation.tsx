@@ -5,6 +5,7 @@ import { Link } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { useSidebar } from "../../context/SidebarContext";
 import { useExamData } from "../../context/ExamDataContext";
+import { Skeleton } from "../ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -131,7 +132,7 @@ const TopNavigation = () => {
   const { students, classes, universalToken, timeLeft } = useExamData();
 
   return (
-    <header className="flex w-full items-center gap-2 sm:gap-4 border-b bg-card/95 backdrop-blur-sm px-3 sm:px-6 py-2 sm:py-4 shadow-sm shrink-0 relative z-30">
+    <header className="flex w-full items-center gap-2 sm:gap-4 border-b bg-card/95 backdrop-blur-sm px-3 sm:px-6 py-2 sm:py-3 shadow-sm shrink-0 relative z-30">
       <Button
         variant="ghost"
         size="icon"
@@ -144,7 +145,9 @@ const TopNavigation = () => {
       <div className="flex-1" />
 
       {/* Universal Token */}
-      {universalToken && (
+      {!universalToken && useExamData().loading ? (
+        <Skeleton className="h-8 w-24 rounded-lg hidden sm:block" />
+      ) : universalToken && (
         <div className="flex items-center gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/40 rounded-lg text-amber-700 dark:text-amber-400 shadow-sm shrink-0">
           <span className="text-xs sm:text-sm font-black font-mono tracking-widest tabular-nums">{universalToken}</span>
           {timeLeft && <span className="text-[10px] font-medium text-amber-600 dark:text-amber-500 opacity-80 border-l pl-1.5 border-amber-200 dark:border-amber-800/40">{timeLeft}</span>}
@@ -152,7 +155,9 @@ const TopNavigation = () => {
       )}
 
       {/* Live Clock - Hidden on Mobile */}
-      {currentTime && (
+      {!currentTime ? (
+        <Skeleton className="h-8 w-24 rounded-lg hidden sm:block" />
+      ) : (
         <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 rounded-lg text-slate-600 dark:text-slate-300 shadow-sm shrink-0">
           <Clock className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
           <span className="text-xs sm:text-sm font-semibold tabular-nums tracking-wide">{currentTime}</span>
@@ -259,10 +264,17 @@ const TopNavigation = () => {
         {/* Theme Toggle */}
         <ThemeToggle />
 
-        <div className="hidden text-right md:flex md:flex-col min-w-0">
-          <span className="text-sm font-medium text-foreground truncate">{displayName}</span>
-          <span className="text-xs text-muted-foreground truncate">{user?.email ?? ""}</span>
-        </div>
+        {!user ? (
+          <div className="hidden md:flex md:flex-col gap-2 min-w-0">
+            <Skeleton className="h-4 w-24" />
+            <Skeleton className="h-3 w-32" />
+          </div>
+        ) : (
+          <div className="hidden text-right md:flex md:flex-col min-w-0">
+            <span className="text-sm font-medium text-foreground truncate">{displayName}</span>
+            <span className="text-xs text-muted-foreground truncate">{user?.email ?? ""}</span>
+          </div>
+        )}
 
         {/* Profile Dropdown */}
         <div className="relative" ref={dropdownRef}>

@@ -38,13 +38,13 @@ import {
   Check,
   Square
 } from "lucide-react";
-import { 
-  DropdownMenu, 
-  DropdownMenuContent, 
-  DropdownMenuItem, 
-  DropdownMenuTrigger, 
-  DropdownMenuSeparator, 
-  DropdownMenuLabel 
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+  DropdownMenuLabel
 } from "../../components/ui/dropdown-menu";
 import { motion, AnimatePresence, Reorder } from "framer-motion";
 
@@ -147,7 +147,7 @@ const CBTPage = () => {
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [canFullscreen] = useState(() => !!document.documentElement.requestFullscreen);
   const [isExamBrowser] = useState(() => /exambrowser|exambro/i.test(navigator.userAgent));
-  
+
   const [isNavModalOpen, setIsNavModalOpen] = useState(false);
   const [isCheatWarningOpen, setIsCheatWarningOpen] = useState(false);
   const [isLocked, setIsLocked] = useState(false);
@@ -412,15 +412,15 @@ const CBTPage = () => {
       }
     });
 
-    return () => { 
-      unsubQuestions.then(u => u()); 
-      unsubRoom.then(u => u()); 
-      unsubAttempt.then(u => u()); 
+    return () => {
+      unsubQuestions.then(u => u());
+      unsubRoom.then(u => u());
+      unsubAttempt.then(u => u());
     };
   }, [roomData, roomId, attempt, navigate, loadExamData]);
 
   useEffect(() => {
-    if (loading || isLocked || isExamOver || !roomData || !attempt) return;
+    if (loading || isExamOver || !roomData || !attempt) return;
     const timer = setInterval(() => {
       const st = parseSafeDate(attempt.startTime || attempt.startedAt || attempt.created) || new Date();
       const dur = (roomData.duration || 60) * 60000;
@@ -433,7 +433,7 @@ const CBTPage = () => {
     }, 1000);
     const heartbeat = setInterval(() => { if (attempt?.id) safeUpdateAttempt(attempt.id, { isOnline: true, lastHeartbeat: new Date().toISOString() }); }, 15000);
     return () => { clearInterval(timer); clearInterval(heartbeat); };
-  }, [loading, isLocked, isExamOver, roomData, attempt]);
+  }, [loading, isExamOver, roomData, attempt]);
 
   useEffect(() => {
     if (!attempt?.id || isLocked || isExamOver) return;
@@ -493,7 +493,7 @@ const CBTPage = () => {
   }, []);
 
   const handleSubmitExam = useCallback(async () => {
-    if (!student || !roomId || !attempt || attempt.status !== "ongoing" || isSubmitting) return;
+    if (!student || !roomId || !attempt || (attempt.status !== "ongoing" && attempt.status !== "LOCKED") || isSubmitting) return;
 
     setIsSubmitting(true);
     setLoading(true);
@@ -526,7 +526,7 @@ const CBTPage = () => {
       const pr = `${student.nisn}_${roomId}`;
       sessionStorage.removeItem(`order_${pr}`);
       sessionStorage.removeItem(`currentIndex_${pr}`);
-      navigate(`/cbt/${roomId}/result`);
+      navigate(`/`);
     } catch (e) {
       console.error(e);
       setIsSubmitting(false);
@@ -560,57 +560,57 @@ const CBTPage = () => {
     return () => window.removeEventListener("popstate", handlePopState);
   }, [isLocked]);
 
-  useEffect(() => { if (isExamOver && !loading && attempt?.status === "ongoing") handleSubmitExam(); }, [isExamOver, loading, attempt?.status, handleSubmitExam]);
+  useEffect(() => { if (isExamOver && !loading && (attempt?.status === "ongoing" || attempt?.status === "LOCKED")) handleSubmitExam(); }, [isExamOver, loading, attempt?.status, handleSubmitExam]);
 
   if (loading) {
     return (
       <div className="h-screen h-[100dvh] bg-slate-50 dark:bg-slate-950 flex flex-col overflow-hidden">
         <header className="sticky top-0 z-50 bg-white/90 dark:bg-slate-900/90 backdrop-blur-3xl border-b border-slate-100 dark:border-slate-800 h-16 sm:h-20 px-4 sm:px-8 flex items-center justify-between shadow-sm">
-           <Skeleton className="h-10 w-24 sm:w-32 rounded-2xl" />
-           <Skeleton className="hidden sm:block h-10 w-40 rounded-2xl" />
-           <div className="flex items-center gap-3">
-              <div className="flex flex-col items-end gap-1">
-                 <Skeleton className="h-3 w-20" />
-                 <Skeleton className="h-2 w-12" />
-              </div>
-              <Skeleton className="h-10 w-10 sm:h-12 sm:w-12 rounded-2xl" />
-           </div>
+          <Skeleton className="h-10 w-24 sm:w-32 rounded-2xl" />
+          <Skeleton className="hidden sm:block h-10 w-40 rounded-2xl" />
+          <div className="flex items-center gap-3">
+            <div className="flex flex-col items-end gap-1">
+              <Skeleton className="h-3 w-20" />
+              <Skeleton className="h-2 w-12" />
+            </div>
+            <Skeleton className="h-10 w-10 sm:h-12 sm:w-12 rounded-2xl" />
+          </div>
         </header>
 
         <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
-           <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 space-y-4 sm:space-y-6">
-              <div className="bg-white dark:bg-slate-900 rounded-[25px] sm:rounded-[40px] border border-slate-100 dark:border-slate-800 p-6 sm:p-10 space-y-8 shadow-sm">
-                 <div className="flex items-center gap-4">
-                    <Skeleton className="h-12 w-12 sm:h-16 sm:w-16 rounded-[1.5rem] sm:rounded-[2rem]" />
-                    <Skeleton className="h-5 w-32 sm:w-48" />
-                 </div>
-                 <div className="space-y-4">
-                    <Skeleton className="h-5 w-full" />
-                    <Skeleton className="h-5 w-[90%]" />
-                    <Skeleton className="h-5 w-[40%]" />
-                 </div>
-                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 sm:pt-8 border-t border-slate-50 dark:border-slate-800">
-                    {Array.from({ length: 4 }).map((_, i) => (
-                      <Skeleton key={i} className="h-16 sm:h-20 rounded-2xl" />
-                    ))}
-                 </div>
+          <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 space-y-4 sm:space-y-6">
+            <div className="bg-white dark:bg-slate-900 rounded-[25px] sm:rounded-[40px] border border-slate-100 dark:border-slate-800 p-6 sm:p-10 space-y-8 shadow-sm">
+              <div className="flex items-center gap-4">
+                <Skeleton className="h-12 w-12 sm:h-16 sm:w-16 rounded-[1.5rem] sm:rounded-[2rem]" />
+                <Skeleton className="h-5 w-32 sm:w-48" />
               </div>
-           </div>
+              <div className="space-y-4">
+                <Skeleton className="h-5 w-full" />
+                <Skeleton className="h-5 w-[90%]" />
+                <Skeleton className="h-5 w-[40%]" />
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 sm:pt-8 border-t border-slate-50 dark:border-slate-800">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <Skeleton key={i} className="h-16 sm:h-20 rounded-2xl" />
+                ))}
+              </div>
+            </div>
+          </div>
 
-           <div className="lg:w-[320px] xl:w-[380px] bg-white dark:bg-slate-900 border-l border-slate-100 dark:border-slate-800 flex flex-col p-6 gap-6 shadow-2xl relative z-20">
-              <div className="flex items-center justify-between">
-                 <Skeleton className="h-6 w-32" />
-                 <Skeleton className="h-6 w-12 rounded-full" />
-              </div>
-              <div className="grid grid-cols-5 gap-2 sm:gap-3">
-                 {Array.from({ length: 40 }).map((_, i) => (
-                    <Skeleton key={i} className="aspect-square rounded-lg sm:rounded-xl" />
-                 ))}
-              </div>
-              <div className="mt-auto pt-6 border-t border-slate-100 dark:border-slate-800">
-                 <Skeleton className="h-12 sm:h-14 w-full rounded-2xl" />
-              </div>
-           </div>
+          <div className="lg:w-[320px] xl:w-[380px] bg-white dark:bg-slate-900 border-l border-slate-100 dark:border-slate-800 flex flex-col p-6 gap-6 shadow-2xl relative z-20">
+            <div className="flex items-center justify-between">
+              <Skeleton className="h-6 w-32" />
+              <Skeleton className="h-6 w-12 rounded-full" />
+            </div>
+            <div className="grid grid-cols-5 gap-2 sm:gap-3">
+              {Array.from({ length: 40 }).map((_, i) => (
+                <Skeleton key={i} className="aspect-square rounded-lg sm:rounded-xl" />
+              ))}
+            </div>
+            <div className="mt-auto pt-6 border-t border-slate-100 dark:border-slate-800">
+              <Skeleton className="h-12 sm:h-14 w-full rounded-2xl" />
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -675,7 +675,7 @@ const CBTPage = () => {
           <p className="text-slate-300 text-sm font-medium max-w-xs mb-8 leading-relaxed">
             Untuk menjaga integritas ujian, Anda harus berada dalam mode layar penuh (Full Screen).
           </p>
-          <Button 
+          <Button
             onClick={goFullscreen}
             className="bg-emerald-600 hover:bg-emerald-700 text-white px-8 h-14 rounded-2xl font-black uppercase tracking-widest text-xs shadow-lg shadow-emerald-900/20"
           >
@@ -686,8 +686,8 @@ const CBTPage = () => {
       <header className="sticky top-0 z-50 bg-white/90 dark:bg-slate-900/90 backdrop-blur-3xl border-b border-slate-100 dark:border-slate-800 h-16 sm:h-20 px-4 sm:px-8 flex items-center justify-between shadow-sm">
         <div className="flex items-center gap-2 sm:gap-4">
           <div className="flex items-center gap-2 sm:gap-3 bg-slate-100 dark:bg-slate-800 px-3 sm:px-4 py-1.5 sm:py-2 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
-            <Clock className={`h-4 w-4 sm:h-5 sm:w-5 ${timeLeft < 300 ? "text-rose-500 animate-pulse" : "text-slate-600 dark:text-slate-400"}`} />
-            <span className={`font-mono font-black text-sm sm:text-lg tracking-wider ${timeLeft < 300 ? "text-rose-600" : "text-slate-800 dark:text-slate-100"}`}>
+            <Clock className={`h-4 w-4 sm:h-5 sm:w-5 ${timeLeft < 300 ? "text-rose-500 animate-pulse" : "text-emerald-500 dark:text-emerald-400"}`} />
+            <span className={`font-mono font-black text-sm sm:text-lg tracking-wider ${timeLeft < 300 ? "text-rose-600" : "text-emerald-600 dark:text-emerald-400"}`}>
               {Math.floor(timeLeft / 60).toString().padStart(2, "0")}:{(timeLeft % 60).toString().padStart(2, "0")}
             </span>
           </div>
@@ -706,7 +706,7 @@ const CBTPage = () => {
             ) : (
               <div className="flex items-center gap-1.5">
                 <Wifi className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-500 shrink-0" />
-                <span className="hidden sm:inline text-[9px] font-black text-emerald-600 uppercase tracking-widest">Connect</span>
+                <span className="hidden sm:inline text-[9px] font-black text-emerald-600 uppercase tracking-widest">Connected</span>
               </div>
             )}
           </div>
@@ -801,10 +801,10 @@ const CBTPage = () => {
 
                 {currentQuestion.imageUrl && (
                   <div className="relative group cursor-zoom-in" onClick={() => setPreviewImage(currentQuestion.imageUrl!)}>
-                    <SmartImage 
-                      src={currentQuestion.imageUrl} 
-                      className="max-w-full h-auto mx-auto block rounded-2xl border border-slate-100 mb-4 sm:mb-6 transition-transform hover:scale-[1.01]" 
-                      alt="Soal" 
+                    <SmartImage
+                      src={currentQuestion.imageUrl}
+                      className="max-w-full h-auto mx-auto block rounded-2xl border border-slate-100 mb-4 sm:mb-6 transition-transform hover:scale-[1.01]"
+                      alt="Soal"
                     />
                     <div className="absolute inset-0 bg-black/5 opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl flex items-center justify-center">
                       <Maximize2 className="w-8 h-8 text-white drop-shadow-lg" />
@@ -830,8 +830,8 @@ const CBTPage = () => {
                         dangerouslySetInnerHTML={{ __html: f.groupText || f.text }}
                       />
 
-                      <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex justify-end opacity-50">
-                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest italic">Bacalah teks dengan seksama sebelum memberikan jawaban.</span>
+                      <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex justify-end opacity-50 dark:opacity-100">
+                        <span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest italic">Bacalah teks dengan seksama sebelum memberikan jawaban.</span>
                       </div>
                     </div>
                   );
@@ -869,10 +869,10 @@ const CBTPage = () => {
                             />
                             {c.imageUrl && (
                               <div className="relative inline-block cursor-zoom-in group mt-4" onClick={(e) => { e.stopPropagation(); setPreviewImage(c.imageUrl!); }}>
-                                <SmartImage 
-                                  src={c.imageUrl} 
-                                  className="max-h-[200px] rounded-2xl border border-slate-100 group-hover:brightness-90 transition-all" 
-                                  alt="Choice" 
+                                <SmartImage
+                                  src={c.imageUrl}
+                                  className="max-h-[200px] rounded-2xl border border-slate-100 group-hover:brightness-90 transition-all"
+                                  alt="Choice"
                                 />
                                 <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                                   <Maximize2 className="w-6 h-6 text-white drop-shadow-md" />
@@ -891,7 +891,7 @@ const CBTPage = () => {
                     {Object.keys(currentQuestion.choices || {}).slice(0, 2).map((choiceId, idx) => {
                       const isS = answers[currentQuestion.id] === choiceId; const isB = currentQuestion.choices![choiceId].text.toLowerCase().includes("benar") || idx === 0;
                       return (
-                        <button key={choiceId} onClick={() => handleAnswerSelect(currentQuestion.id, choiceId)} className={`group relative flex flex-col items-center justify-center gap-4 py-8 px-6 rounded-[2.5rem] border-2 transition-all duration-300 active:scale-95 ${isS ? (isB ? "bg-gradient-to-br from-emerald-500 to-emerald-600 border-emerald-400 text-white shadow-xl" : "bg-gradient-to-br from-rose-500 to-rose-600 border-rose-400 text-white shadow-xl") : "bg-white border-slate-100 text-slate-400"}`}><div className={`w-16 h-16 rounded-[1.5rem] flex items-center justify-center ${isS ? "bg-white/20 text-white" : (isB ? "bg-emerald-50 text-emerald-500" : "bg-rose-50 text-rose-500")}`}>{isB ? <CheckCircle2 className="w-9 h-9" strokeWidth={2.5} /> : <X className="w-9 h-9" strokeWidth={2.5} />}</div><span className={`font-black text-sm uppercase tracking-widest ${isS ? "text-white" : "text-slate-700"}`}>{currentQuestion.choices![choiceId].text}</span></button>
+                        <button key={choiceId} onClick={() => handleAnswerSelect(currentQuestion.id, choiceId)} className={`group relative flex flex-col items-center justify-center gap-4 py-8 px-6 rounded-[2.5rem] border-2 transition-all duration-300 active:scale-95 ${isS ? (isB ? "bg-gradient-to-br from-emerald-500 to-emerald-600 border-emerald-400 text-white shadow-xl shadow-emerald-500/20" : "bg-gradient-to-br from-rose-500 to-rose-600 border-rose-400 text-white shadow-xl shadow-rose-500/20") : "bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 text-slate-400 dark:text-slate-600 hover:border-emerald-200 dark:hover:border-emerald-800"}`}><div className={`w-16 h-16 rounded-[1.5rem] flex items-center justify-center transition-colors ${isS ? "bg-white/20 text-white" : (isB ? "bg-emerald-50 dark:bg-emerald-950/30 text-emerald-500" : "bg-rose-50 dark:bg-rose-950/30 text-rose-500")}`}>{isB ? <CheckCircle2 className="w-9 h-9" strokeWidth={2.5} /> : <X className="w-9 h-9" strokeWidth={2.5} />}</div><span className={`font-black text-sm uppercase tracking-widest ${isS ? "text-white" : "text-slate-700 dark:text-slate-300"}`}>{currentQuestion.choices![choiceId].text}</span></button>
                       );
                     })}
                   </div>
@@ -904,18 +904,18 @@ const CBTPage = () => {
                         return (
                           <div key={p.id} className="flex items-stretch gap-2">
                             <div
-                              className="flex-1 p-3 bg-white border rounded-xl font-serif text-slate-800 dark:text-slate-200"
+                              className="flex-1 p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl font-serif text-slate-800 dark:text-slate-200"
                               style={{ fontSize: `${15 * fontSize}px` }}
                             >{p.left}</div>
                             <div className="flex items-center opacity-20"><ArrowRight className="w-4 h-4" /></div>
-                            <div onClick={() => { const n = { ...sA }; delete n[p.id]; handleAnswerSelect(currentQuestion.id, n); }} className={`flex-1 p-1 rounded-xl border-2 border-dashed flex items-center justify-center min-h-[50px] ${v ? "bg-emerald-50/20 border-emerald-400/50" : "bg-slate-50/30 border-slate-200"}`}>{v ? <div className="w-full h-full flex items-center justify-center bg-emerald-600 text-white rounded-lg p-2 font-serif" style={{ fontSize: `${14 * fontSize}px` }}>{v}</div> : <span className="text-[10px] font-bold text-slate-300 uppercase">Drop Disini</span>}</div>
+                            <div onClick={() => { const n = { ...sA }; delete n[p.id]; handleAnswerSelect(currentQuestion.id, n); }} className={`flex-1 p-1 rounded-xl border-2 border-dashed flex items-center justify-center min-h-[50px] transition-colors ${v ? "bg-emerald-50/20 dark:bg-emerald-950/20 border-emerald-400/50" : "bg-slate-50/30 dark:bg-slate-900/30 border-slate-200 dark:border-slate-800"}`}>{v ? <div className="w-full h-full flex items-center justify-center bg-emerald-600 text-white rounded-lg p-2 font-serif shadow-sm" style={{ fontSize: `${14 * fontSize}px` }}>{v}</div> : <span className="text-[10px] font-bold text-slate-300 dark:text-slate-600 uppercase">Drop Disini</span>}</div>
                           </div>
                         );
                       })}
                     </div>
-                    <div className="lg:w-1/3 p-4 bg-slate-50 border rounded-2xl flex flex-wrap gap-2 content-start min-h-[100px]">
+                    <div className="lg:w-1/3 p-4 bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800 rounded-2xl flex flex-wrap gap-2 content-start min-h-[100px]">
                       {(matchingOptions[currentQuestion.id] || []).filter(o => !Object.values(answers[currentQuestion.id] || {}).includes(o)).map(o => (
-                        <button key={o} onClick={() => { const p = (currentQuestion.pairs || []).find(x => !(answers[currentQuestion.id] || {})[x.id]); if (p) handleAnswerSelect(currentQuestion.id, { ...(answers[currentQuestion.id] || {}), [p.id]: o }); }} className="px-3 py-2 bg-white border rounded-xl font-serif text-emerald-600 shadow-sm hover:shadow-md transition-shadow" style={{ fontSize: `${14 * fontSize}px` }}>{o}</button>
+                        <button key={o} onClick={() => { const p = (currentQuestion.pairs || []).find(x => !(answers[currentQuestion.id] || {})[x.id]); if (p) handleAnswerSelect(currentQuestion.id, { ...(answers[currentQuestion.id] || {}), [p.id]: o }); }} className="px-3 py-2 bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-xl font-serif text-emerald-600 dark:text-emerald-400 shadow-sm hover:shadow-md hover:border-emerald-300 transition-all" style={{ fontSize: `${14 * fontSize}px` }}>{o}</button>
                       ))}
                     </div>
                   </div>
@@ -940,29 +940,36 @@ const CBTPage = () => {
 
           <div className="flex flex-wrap gap-2.5 sm:gap-3.5 content-start">
             {questions.map((q, i) => (
-              <button key={q.id} onClick={() => handleNavClick(i)} className={`w-11 h-11 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl flex items-center justify-center font-black text-lg border-2 transition-all active:scale-[0.85] ${i === currentQuestionIndex ? "bg-emerald-600 border-emerald-600 text-white" : answers[q.id] !== undefined ? "bg-emerald-50 border-emerald-100 text-emerald-600" : flaggedQuestions[q.id] ? "bg-amber-50 border-amber-100 text-amber-600" : "bg-slate-50 dark:bg-slate-800 border-slate-100 dark:border-slate-700 text-slate-400"}`}>{i + 1}</button>
+              <button key={q.id} onClick={() => handleNavClick(i)} className={`w-11 h-11 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl flex items-center justify-center font-black text-lg border-2 transition-all active:scale-[0.85] ${i === currentQuestionIndex
+                ? "bg-emerald-600 border-emerald-600 text-white shadow-lg shadow-emerald-600/20"
+                : answers[q.id] !== undefined
+                  ? "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-100 dark:border-emerald-800/60 text-emerald-600 dark:text-emerald-400"
+                  : flaggedQuestions[q.id]
+                    ? "bg-amber-50 dark:bg-amber-950/40 border-amber-100 dark:border-amber-800/60 text-amber-600 dark:text-amber-400"
+                    : "bg-slate-50 dark:bg-slate-800/50 border-slate-100 dark:border-slate-800 text-slate-400 dark:text-slate-500"
+                }`}>{i + 1}</button>
             ))}
           </div>
 
           <div className="mt-auto space-y-4 pt-8 border-t border-slate-100 dark:border-slate-800">
             <div className="grid grid-cols-2 gap-3">
-              <Button variant="outline" disabled={currentQuestionIndex === 0} onClick={() => setCurrentQuestionIndex(prev => prev - 1)} className="h-16 rounded-2xl font-black uppercase tracking-widest text-[12px] border-2 border-emerald-50 text-emerald-600 bg-white hover:bg-emerald-50 transition-colors">Back</Button>
-              <Button onClick={() => currentQuestionIndex === questions.length - 1 ? setIsSubmitModalOpen(true) : handleNextClick()} className={`h-16 text-white font-black uppercase tracking-widest text-[12px] rounded-2xl transition-transform active:scale-95 ${currentQuestionIndex === questions.length - 1 ? "bg-emerald-500 hover:bg-emerald-600" : "bg-emerald-600 hover:bg-emerald-700"}`}>{currentQuestionIndex === questions.length - 1 ? "Kumpulkan" : "Next"}</Button>
+              <Button variant="outline" disabled={currentQuestionIndex === 0} onClick={() => setCurrentQuestionIndex(prev => prev - 1)} className="h-16 rounded-2xl font-black uppercase tracking-widest text-[12px] border-2 border-emerald-50 dark:border-emerald-900/30 text-emerald-600 dark:text-emerald-400 bg-white dark:bg-slate-900 hover:bg-emerald-50 dark:hover:bg-emerald-950 transition-colors">Back</Button>
+              <Button onClick={() => currentQuestionIndex === questions.length - 1 ? setIsSubmitModalOpen(true) : handleNextClick()} className={`h-16 text-white font-black uppercase tracking-widest text-[12px] rounded-2xl transition-transform active:scale-95 shadow-lg ${currentQuestionIndex === questions.length - 1 ? "bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/20" : "bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/20"}`}>{currentQuestionIndex === questions.length - 1 ? "Submit" : "Next"}</Button>
             </div>
           </div>
         </aside>
       </div>
 
       <div className="sticky bottom-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl border-t border-slate-100 dark:border-slate-800 p-4 sm:p-6 lg:hidden flex justify-between items-center z-40">
-        <Button variant="outline" size="sm" disabled={currentQuestionIndex === 0} onClick={() => setCurrentQuestionIndex(p => p - 1)} className="rounded-2xl h-14 px-8 font-black uppercase text-[12px] tracking-[0.2em] border-2 border-emerald-50 bg-white text-emerald-600 active:scale-90 transition-all">Back</Button>
+        <Button variant="outline" size="sm" disabled={currentQuestionIndex === 0} onClick={() => setCurrentQuestionIndex(p => p - 1)} className="rounded-2xl h-14 px-8 font-black uppercase text-[12px] tracking-[0.2em] border-2 border-emerald-50 dark:border-emerald-900/40 bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 active:scale-90 transition-all">Back</Button>
         <Button variant="ghost" className="font-black text-emerald-800 dark:text-emerald-100 uppercase tracking-[0.3em] text-[16px]" onClick={() => setIsNavModalOpen(true)}>{currentQuestionIndex + 1} / {questions.length}</Button>
-        <Button onClick={() => currentQuestionIndex === questions.length - 1 ? setIsSubmitModalOpen(true) : handleNextClick()} size="sm" className="rounded-2xl h-14 px-8 text-white font-black uppercase text-[12px] tracking-[0.2em] bg-emerald-600 active:scale-90 transition-all">{currentQuestionIndex === questions.length - 1 ? "Kumpulkan" : "Next"}</Button>
+        <Button onClick={() => currentQuestionIndex === questions.length - 1 ? setIsSubmitModalOpen(true) : handleNextClick()} size="sm" className="rounded-2xl h-14 px-8 text-white font-black uppercase text-[12px] tracking-[0.2em] bg-emerald-600 dark:bg-emerald-500 active:scale-90 transition-all shadow-lg shadow-emerald-600/20">{currentQuestionIndex === questions.length - 1 ? "Kumpulkan" : "Next"}</Button>
       </div>
 
       <Dialog open={isNavModalOpen} onOpenChange={setIsNavModalOpen}>
-        <DialogContent className="max-w-[calc(100%-2rem)] rounded-3xl p-8 pointer-events-auto border-none">
+        <DialogContent className="max-w-[calc(100%-2rem)] rounded-3xl p-8 pointer-events-auto border-none bg-white dark:bg-slate-950 shadow-2xl">
           <div className="flex items-center justify-between mb-6">
-            <DialogTitle className="text-xl font-black text-emerald-800 uppercase tracking-tighter">Navigasi Soal</DialogTitle>
+            <DialogTitle className="text-xl font-black text-emerald-800 dark:text-emerald-400 uppercase tracking-tighter">Navigasi Soal</DialogTitle>
 
             {/* Mobile Zoom Controls */}
             <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-2xl border border-slate-200 sm:hidden">
@@ -974,24 +981,29 @@ const CBTPage = () => {
 
           <div className="grid grid-cols-4 sm:grid-cols-5 gap-3 sm:gap-4 overflow-y-auto max-h-[60vh] pr-2">
             {questions.map((q, i) => (
-              <button key={q.id} onClick={() => { setCurrentQuestionIndex(i); setIsNavModalOpen(false); }} className={`aspect-square rounded-2xl flex items-center justify-center font-black text-xl border-3 transition-all active:scale-90 ${i === currentQuestionIndex ? "bg-emerald-600 border-emerald-600 text-white shadow-xl shadow-emerald-100" : answers[q.id] !== undefined ? "bg-emerald-50 border-emerald-200 text-emerald-600" : "bg-slate-50 border-slate-100 text-slate-400"}`}>{i + 1}</button>
+              <button key={q.id} onClick={() => { setCurrentQuestionIndex(i); setIsNavModalOpen(false); }} className={`aspect-square rounded-2xl flex items-center justify-center font-black text-xl border-3 transition-all active:scale-90 ${i === currentQuestionIndex
+                ? "bg-emerald-600 border-emerald-600 text-white shadow-xl shadow-emerald-600/20"
+                : answers[q.id] !== undefined
+                  ? "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800/60 text-emerald-600 dark:text-emerald-400"
+                  : "bg-slate-50 dark:bg-slate-900 border-slate-100 dark:border-slate-800 text-slate-400 dark:text-slate-500"
+                }`}>{i + 1}</button>
             ))}
           </div>
         </DialogContent>
       </Dialog>
-      <Dialog open={isResetModalOpen} onOpenChange={() => { }}><DialogContent className="max-w-md rounded-2xl p-6 text-center pointer-events-auto shadow-2xl"><AlertCircle className="w-12 h-12 text-red-600 mx-auto mb-2 animate-bounce" /><DialogTitle className="text-lg font-bold">Sesi Ujian Di-Reset</DialogTitle><p className="text-slate-500 text-sm mt-1">Sesi Anda telah di-reset oleh Pengawas. Silakan login kembali.</p><Button onClick={() => logoutStudent()} className="w-full bg-red-600 text-white rounded-xl h-11 mt-4"><LogOut className="w-4 h-4 mr-2" /> Keluar & Login Ulang</Button></DialogContent></Dialog>
-      <Dialog open={!!previewImage} onOpenChange={() => setPreviewImage(null)}><DialogContent className="max-w-3xl bg-transparent border-none p-0 flex items-center justify-center pointer-events-auto">{previewImage && <img src={previewImage} className="max-w-full max-h-[85vh] rounded-2xl shadow-2xl" alt="Preview" />}</DialogContent></Dialog>
-      <Dialog open={isSubmitModalOpen} onOpenChange={setIsSubmitModalOpen}><DialogContent className="max-w-md rounded-2xl p-6 pointer-events-auto text-center">{isAllAnswered ? (<><CheckCircle2 className="w-12 h-12 text-green-600 mx-auto mb-2" /><DialogTitle className="text-lg font-bold">Kumpulkan Ujian?</DialogTitle><p className="text-slate-500 text-sm mt-1">Yakin ingin mengakhiri sekarang?</p><div className="mt-6 flex gap-2"><Button variant="outline" onClick={() => setIsSubmitModalOpen(false)} className="flex-1 rounded-xl">Batal</Button><Button onClick={() => { setIsSubmitModalOpen(false); handleSubmitExam(); }} className="flex-1 bg-green-600 text-white rounded-xl">Kumpulkan</Button></div></>) : (<><AlertCircle className="w-12 h-12 text-amber-600 mx-auto mb-2" /><DialogTitle className="text-lg font-bold">Belum Selesai</DialogTitle><p className="text-slate-500 text-sm mt-1">Ada {unansweredCount} soal belum dijawab. Yakin?</p><div className="mt-6"><Button onClick={() => setIsSubmitModalOpen(false)} className="w-full bg-amber-600 text-white rounded-xl">Kembali Mengerjakan</Button></div></>)}</DialogContent></Dialog>
-      <Dialog open={isSkipNoticeOpen} onOpenChange={setIsSkipNoticeOpen}><DialogContent className="max-w-xs rounded-[2rem] p-6 pointer-events-auto border-none shadow-2xl text-center"><HelpCircle className="w-14 h-14 text-amber-600 mx-auto mb-4" /><DialogTitle className="text-base font-black uppercase tracking-tight">Soal Belum Dijawab</DialogTitle><p className="text-slate-500 text-[11px] font-medium leading-relaxed">Anda belum memberikan jawaban. Yakin ingin melewati?</p><div className="grid grid-cols-2 gap-3 mt-6"><Button variant="outline" onClick={() => setIsSkipNoticeOpen(false)} className="rounded-xl text-[10px] font-black uppercase tracking-widest border-emerald-100 text-emerald-600">Kembali</Button><Button onClick={() => { if (targetIndex !== null) goToQuestion(targetIndex); setIsSkipNoticeOpen(false); }} className="bg-emerald-600 text-white font-black text-[10px] rounded-xl uppercase tracking-widest">Lompati</Button></div></DialogContent></Dialog>
+      <Dialog open={isResetModalOpen} onOpenChange={() => { }}><DialogContent className="max-w-md rounded-2xl p-6 text-center pointer-events-auto bg-white dark:bg-slate-950 border-none shadow-2xl"><AlertCircle className="w-12 h-12 text-red-600 mx-auto mb-2 animate-bounce" /><DialogTitle className="text-lg font-bold dark:text-white">Sesi Ujian Di-Reset</DialogTitle><p className="text-slate-500 dark:text-slate-400 text-sm mt-1">Sesi Anda telah di-reset oleh Pengawas. Silakan login kembali.</p><Button onClick={() => logoutStudent()} className="w-full bg-red-600 hover:bg-red-700 text-white rounded-xl h-11 mt-4"><LogOut className="w-4 h-4 mr-2" /> Keluar & Login Ulang</Button></DialogContent></Dialog>
+      <Dialog open={!!previewImage} onOpenChange={() => setPreviewImage(null)}><DialogContent className="max-w-3xl bg-transparent border-none p-0 flex items-center justify-center pointer-events-auto shadow-none">{previewImage && <img src={previewImage} className="max-w-full max-h-[85vh] rounded-2xl shadow-2xl border border-white/10" alt="Preview" />}</DialogContent></Dialog>
+      <Dialog open={isSubmitModalOpen} onOpenChange={setIsSubmitModalOpen}><DialogContent className="max-w-md rounded-2xl p-6 pointer-events-auto text-center bg-white dark:bg-slate-950 border-none shadow-2xl">{isAllAnswered ? (<><CheckCircle2 className="w-12 h-12 text-green-600 mx-auto mb-2" /><DialogTitle className="text-lg font-bold dark:text-white">Kumpulkan Ujian?</DialogTitle><p className="text-slate-500 dark:text-slate-400 text-sm mt-1">Yakin ingin mengakhiri sekarang?</p><div className="mt-6 flex gap-2"><Button variant="outline" onClick={() => setIsSubmitModalOpen(false)} className="flex-1 rounded-xl dark:border-slate-800 dark:text-slate-300">Batal</Button><Button onClick={() => { setIsSubmitModalOpen(false); handleSubmitExam(); }} className="flex-1 bg-green-600 hover:bg-green-700 text-white rounded-xl">Kumpulkan</Button></div></>) : (<><AlertCircle className="w-12 h-12 text-amber-600 mx-auto mb-2" /><DialogTitle className="text-lg font-bold dark:text-white">Belum Selesai</DialogTitle><p className="text-slate-500 dark:text-slate-400 text-sm mt-1">Ada {unansweredCount} soal belum dijawab. Yakin?</p><div className="mt-6"><Button onClick={() => setIsSubmitModalOpen(false)} className="w-full bg-amber-600 hover:bg-amber-700 text-white rounded-xl">Kembali Mengerjakan</Button></div></>)}</DialogContent></Dialog>
+      <Dialog open={isSkipNoticeOpen} onOpenChange={setIsSkipNoticeOpen}><DialogContent className="max-w-xs rounded-[2rem] p-6 pointer-events-auto border-none bg-white dark:bg-slate-950 shadow-2xl text-center"><HelpCircle className="w-14 h-14 text-amber-600 mx-auto mb-4" /><DialogTitle className="text-base font-black uppercase tracking-tight dark:text-white">Soal Belum Dijawab</DialogTitle><p className="text-slate-500 dark:text-slate-400 text-[11px] font-medium leading-relaxed">Anda belum memberikan jawaban. Yakin ingin melewati?</p><div className="grid grid-cols-2 gap-3 mt-6"><Button variant="outline" onClick={() => setIsSkipNoticeOpen(false)} className="rounded-xl text-[10px] font-black uppercase tracking-widest border-emerald-100 dark:border-emerald-900/30 text-emerald-600 dark:text-emerald-400">Kembali</Button><Button onClick={() => { if (targetIndex !== null) goToQuestion(targetIndex); setIsSkipNoticeOpen(false); }} className="bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[10px] rounded-xl uppercase tracking-widest shadow-lg shadow-emerald-600/20">Lompati</Button></div></DialogContent></Dialog>
       <Dialog open={isCheatWarningOpen} onOpenChange={setIsCheatWarningOpen}>
         <DialogContent className="max-w-xs rounded-[2rem] p-6 text-center border-none shadow-2xl pointer-events-auto">
           <AlertCircle className="w-16 h-16 text-red-600 mx-auto mb-4 animate-pulse" />
-          <DialogTitle className="text-xl font-black text-red-600 uppercase tracking-tighter">⚠️ Pelanggaran!</DialogTitle>
+          <DialogTitle className="text-xl font-black text-red-600 uppercase tracking-tighter">Pelanggaran!</DialogTitle>
           <div className="space-y-3 mt-2">
-            <p className="text-slate-500 text-xs font-bold leading-relaxed">DILARANG pindah aplikasi atau membuka tab lain selama ujian!</p>
-            <div className="bg-red-50 p-3 rounded-2xl border border-red-100">
-              <span className="text-[10px] uppercase font-black text-red-700 tracking-widest block mb-1">Pelanggaran Anda</span>
-              <span className="text-2xl font-black text-red-600">
+            <p className="text-slate-500 dark:text-slate-400 text-xs font-bold leading-relaxed">DILARANG pindah aplikasi atau membuka tab lain selama ujian!</p>
+            <div className="bg-red-50 dark:bg-red-950/20 p-3 rounded-2xl border border-red-100 dark:border-red-900/30">
+              <span className="text-[10px] uppercase font-black text-red-700 dark:text-red-400 tracking-widest block mb-1">Pelanggaran Anda</span>
+              <span className="text-2xl font-black text-red-600 dark:text-red-500">
                 {(() => {
                   const currentCheat = attempt?.cheatCount || 0;
                   const baseLimit = roomData?.cheat_limit || 3;

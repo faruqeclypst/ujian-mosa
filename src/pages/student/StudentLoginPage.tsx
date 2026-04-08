@@ -6,7 +6,7 @@ import FormField from "../../components/forms/FormField";
 import { Card, CardContent } from "../../components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../../components/ui/dialog";
 import pb from "../../lib/pocketbase";
-import { User, Lock, GraduationCap, School } from "lucide-react";
+import { User, Lock, GraduationCap, School, Eye, EyeOff } from "lucide-react";
 
 const StudentLoginPage = () => {
   const { loginStudent, student, changePassword } = useStudentAuth();
@@ -26,6 +26,8 @@ const StudentLoginPage = () => {
   const [schoolLogo, setSchoolLogo] = useState("");
   const [logoLoading, setLogoLoading] = useState(true);
   const [logoError, setLogoError] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -174,14 +176,23 @@ const StudentLoginPage = () => {
                 <label className="text-sm font-semibold text-slate-700 ml-1 flex items-center gap-2">
                   <Lock size={14} className="text-slate-400" /> Password
                 </label>
-                <Input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="bg-white/50 border-slate-200/60 text-slate-800 placeholder:text-slate-400 focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 rounded-[20px] h-14 px-5 text-base transition-all duration-300"
-                  disabled={loading}
-                />
+                <div className="relative">
+                  <Input
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="bg-white/50 border-slate-200/60 text-slate-800 placeholder:text-slate-400 focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 rounded-[20px] h-14 px-5 pr-12 text-base transition-all duration-300"
+                    disabled={loading}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors focus:outline-none"
+                  >
+                    {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                  </button>
+                </div>
               </div>
 
               <div className="pt-4">
@@ -230,24 +241,35 @@ const StudentLoginPage = () => {
 
             <div className="space-y-2">
               <label className="text-sm font-semibold text-slate-700 ml-1">Password Baru</label>
-              <Input
-                type="password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="Minimal 6 karakter"
-                className="rounded-2xl h-12 bg-slate-50 border-slate-200"
-              />
+              <div className="relative">
+                <Input
+                  type={showNewPassword ? "text" : "password"}
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Minimal 6 karakter"
+                  className="rounded-2xl h-12 bg-slate-50 border-slate-200 pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowNewPassword(!showNewPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                >
+                  {showNewPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
             </div>
 
             <div className="space-y-2">
               <label className="text-sm font-semibold text-slate-700 ml-1">Konfirmasi Password Baru</label>
-              <Input
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="Ulangi password baru"
-                className="rounded-2xl h-12 bg-slate-50 border-slate-200"
-              />
+              <div className="relative">
+                <Input
+                  type={showNewPassword ? "text" : "password"}
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Ulangi password baru"
+                  className="rounded-2xl h-12 bg-slate-50 border-slate-200 pr-10"
+                />
+              </div>
             </div>
 
             <div className="pt-2">

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { DataTable } from "../ui/data-table";
 import { Button } from "../ui/button";
@@ -37,12 +38,30 @@ const StudentTable = ({
     }
   };
 
-  const handleSelectOne = (id: string, checked: boolean) => {
-    if (checked) {
-      onSelectChange([...selectedIds, id]);
+  const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(null);
+
+  const handleSelectOne = (id: string, checked: boolean, index: number, event: any) => {
+    let newSelectedIds = [...selectedIds];
+
+    if (checked && event.nativeEvent.shiftKey && lastSelectedIndex !== null) {
+      const start = Math.min(lastSelectedIndex, index);
+      const end = Math.max(lastSelectedIndex, index);
+      const idsInRange = students.slice(start, end + 1).map(s => s.id);
+      
+      // Merge with existing selections
+      newSelectedIds = Array.from(new Set([...newSelectedIds, ...idsInRange]));
     } else {
-      onSelectChange(selectedIds.filter((item) => item !== id));
+      if (checked) {
+        if (!newSelectedIds.includes(id)) {
+          newSelectedIds.push(id);
+        }
+      } else {
+        newSelectedIds = newSelectedIds.filter((item) => item !== id);
+      }
     }
+
+    onSelectChange(newSelectedIds);
+    setLastSelectedIndex(index);
   };
 
   const isAllSelected = students.length > 0 && students.every(s => selectedIds.includes(s.id));
@@ -50,13 +69,20 @@ const StudentTable = ({
   const columns = [
     {
       key: "selection",
-      label: "",
-      render: (_: any, item: StudentData) => (
+      label: (
+        <input
+          type="checkbox"
+          checked={isAllSelected}
+          onChange={(e) => handleSelectAll(e.target.checked)}
+          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-4 w-4 cursor-pointer"
+        />
+      ),
+      render: (_: any, item: StudentData, index?: number) => (
         <input
           type="checkbox"
           checked={selectedIds.includes(item.id)}
-          onChange={(e) => handleSelectOne(item.id, e.target.checked)}
-          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-4 w-4"
+          onChange={(e) => handleSelectOne(item.id, e.target.checked, index ?? 0, e)}
+          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-4 w-4 cursor-pointer"
         />
       ),
       className: "w-[40px] text-center",
@@ -101,22 +127,8 @@ const StudentTable = ({
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between pb-2 border-b mb-4">
-        <CardTitle className="text-lg font-bold text-slate-800 dark:text-slate-100">{title}</CardTitle>
-        {students.length > 0 && (
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="selectAll"
-              checked={isAllSelected}
-              onChange={(e) => handleSelectAll(e.target.checked)}
-              className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-4 w-4"
-            />
-            <label htmlFor="selectAll" className="text-sm font-medium text-slate-600 dark:text-slate-400 cursor-pointer">
-              Pilih Semua
-            </label>
-          </div>
-        )}
+      <CardHeader className="p-4">
+        <CardTitle className="text-base font-semibold text-slate-800 dark:text-slate-100">{title}</CardTitle>
       </CardHeader>
       <CardContent>
         <DataTable

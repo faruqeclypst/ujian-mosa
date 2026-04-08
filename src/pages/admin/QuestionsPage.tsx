@@ -1,16 +1,17 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Plus, Edit, Trash, Check, Image, ChevronDown, FileText, Download, Eye, FolderOpen, Sparkles, Wand2, RefreshCw, BookOpen } from "lucide-react";
+import { ArrowLeft, Plus, Edit, Trash, Check, Image, ChevronDown, FileText, Download, Eye, FolderOpen, Sparkles, Wand2, RefreshCw, BookOpen, Loader2, FileSpreadsheet, Search } from "lucide-react";
 import { SmartImage } from "../../components/ui/smart-image";
 import { generateQuestionsAI, generateSingleQuestionAI, getTopicSuggestionsAI, parseQuestionsAI } from "../../lib/ai";
 import { Button } from "../../components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../../components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "../../components/ui/dialog";
+import { Progress } from "../../components/ui/progress";
 import { DeleteConfirmationDialog } from "../../components/ui/delete-confirmation-dialog";
 import { ConfirmationDialog } from "../../components/ui/confirmation-dialog";
 import pb from "../../lib/pocketbase";
 import { Input } from "../../components/ui/input";
 import FormField from "../../components/forms/FormField";
-import { uploadInventoryImage, deleteImageFromStorage } from "../../lib/storage";
+import { uploadInventoryImage, deleteImageFromStorage, deleteImagesFromStorage } from "../../lib/storage";
 import { ImportButton } from "../../components/ui/import-button";
 import { parseQuestionsFromWord } from "../../lib/questionWordParser";
 import mammoth from "mammoth";
@@ -138,7 +139,23 @@ const QuestionsPage = () => {
   const [questions, setQuestions] = useState<QuestionData[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(null);
   const [isImporting, setIsImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState(0);
+
+  const [batchProgress, setBatchProgress] = useState<{
+    isOpen: boolean;
+    current: number;
+    total: number;
+    message: string;
+    title: string;
+  }>({
+    isOpen: false,
+    current: 0,
+    total: 0,
+    message: "",
+    title: "Proses Data",
+  });
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [dialogMode, setDialogMode] = useState<"create" | "edit">("create");
@@ -561,6 +578,14 @@ const QuestionsPage = () => {
         drag_drop: "drag_drop"
       };
 
+      setBatchProgress({
+        isOpen: true,
+        total: parsedResults.length,
+        current: 0,
+        message: "Menyiapkan penyimpanan soal AI...",
+        title: "Simpan Soal AI"
+      });
+
       let count = 0;
       for (const q of parsedResults) {
         await pb.collection("questions").create({
@@ -574,14 +599,20 @@ const QuestionsPage = () => {
           order: (questions.length || 0) + count + 1
         });
         count++;
+        const progress = Math.round((count / parsedResults.length) * 100);
+        setImportProgress(progress);
+        setBatchProgress(prev => ({
+          ...prev,
+          current: count,
+          message: `Menyimpan soal AI (${count}/${parsedResults.length})`
+        }));
       }
+      setIsAIImportOpen(false);
       addToast({
         title: "Import Berhasil",
-        description: `${count} soal telah ditambahkan ke bank soal.`,
+        description: `${parsedResults.length} soal berhasil disimpan ke bank soal.`,
         type: "success"
       });
-      setIsAIImportOpen(false);
-      setImportText("");
       setParsedResults([]);
       loadQuestions();
     } catch (err: any) {
@@ -592,6 +623,8 @@ const QuestionsPage = () => {
       });
     } finally {
       setIsParsing(false);
+      setImportProgress(0);
+      setBatchProgress(prev => ({ ...prev, isOpen: false }));
     }
   };
 
@@ -739,8 +772,20 @@ const QuestionsPage = () => {
     };
 
     setIsSavingBatch(true);
+    setImportProgress(0);
+    setBatchProgress({
+      isOpen: true,
+      total: validQuestions.length,
+      current: 0,
+      message: "Menyiapkan penyimpanan batch soal...",
+      title: "Simpan Batch Soal"
+    });
+    // Menutup modal batch agar progress dialog terlihat jelas
+    setIsBatchModalOpen(false);
+
     try {
       let currentOrder = questions.length + 1;
+      let count = 0;
       
       for (const q of validQuestions) {
         let imageUrl = q.imageUrl || "";
@@ -784,13 +829,23 @@ const QuestionsPage = () => {
         }
 
         await pb.collection('questions').create(payload);
+        count++;
+        const progress = Math.round((count / validQuestions.length) * 100);
+        setImportProgress(progress);
+        setBatchProgress(prev => ({
+          ...prev,
+          current: count,
+          message: `Menyimpan soal manual (${count}/${validQuestions.length})`
+        }));
       }
-      setIsBatchModalOpen(false);
       showAlert("Berhasil!", `${validQuestions.length} Soal manual berhasil disimpan.`, "success");
+      loadQuestions();
     } catch (e) {
       showAlert("Gagal Menyimpan", "Terjadi kesalahan saat menyimpan batch soal.", "danger");
     } finally {
       setIsSavingBatch(false);
+      setImportProgress(0);
+      setBatchProgress(prev => ({ ...prev, isOpen: false }));
     }
   };
 
@@ -1321,22 +1376,30 @@ const QuestionsPage = () => {
     }
   };
 
-  const cleanupQuestionImages = async (q: QuestionData) => {
-    const keysToDelete: string[] = [];
+  const getQuestionImageKeys = (q: QuestionData): string[] => {
+    const keys: string[] = [];
     const extractKey = (url: string) => {
-      if (url.includes("/questions/")) return "questions/" + url.split("/questions/")[1].split("?")[0];
+      if (url && url.includes("/questions/")) return "questions/" + url.split("/questions/")[1].split("?")[0];
       return "";
     };
 
-    if (q.imageUrl) keysToDelete.push(extractKey(q.imageUrl));
+    if (q.imageUrl) {
+      const k = extractKey(q.imageUrl);
+      if (k) keys.push(k);
+    }
+    
     if (q.choices) {
       Object.values(q.choices).forEach((c) => {
-        if (c.imageUrl) keysToDelete.push(extractKey(c.imageUrl));
+        if (c.imageUrl) {
+          const k = extractKey(c.imageUrl);
+          if (k) keys.push(k);
+        }
         if (c.text && c.text.includes("/questions/")) {
           const doc = new DOMParser().parseFromString(c.text, "text/html");
           doc.querySelectorAll("img").forEach((img) => {
             const src = img.getAttribute("src") || "";
-            if (src) keysToDelete.push(extractKey(src));
+            const k = extractKey(src);
+            if (k) keys.push(k);
           });
         }
       });
@@ -1345,18 +1408,18 @@ const QuestionsPage = () => {
       const doc = new DOMParser().parseFromString(q.text, "text/html");
       doc.querySelectorAll("img").forEach((img) => {
         const src = img.getAttribute("src") || "";
-        if (src) keysToDelete.push(extractKey(src));
+        const k = extractKey(src);
+        if (k) keys.push(k);
       });
     }
 
-    for (const k of keysToDelete) {
-      if (k) {
-        try {
-          await deleteImageFromStorage(k);
-        } catch (e) {
-          console.error("Gagal menghapus gambar dari storage:", k, e);
-        }
-      }
+    return Array.from(new Set(keys)); // Unique keys only
+  };
+
+  const cleanupQuestionImages = async (q: QuestionData) => {
+    const keys = getQuestionImageKeys(q);
+    if (keys.length > 0) {
+      await deleteImagesFromStorage(keys);
     }
   };
 
@@ -1381,40 +1444,131 @@ const QuestionsPage = () => {
   };
 
   const handleConfirmDeleteAll = async () => {
+    setDeleteAllDialogOpen(false); // Close confirmation immediately
     setIsDeleting(true);
+    setImportProgress(0);
+    setBatchProgress({
+      isOpen: true,
+      total: 1, 
+      current: 0,
+      message: "Menyiapkan pembersihan soal...",
+      title: "Hapus Semua Soal"
+    });
+
     try {
+      if (pb.authStore.isValid) pb.collection('questions').unsubscribe("*");
+
       const allQ = await pb.collection('questions').getFullList({
         filter: `examId = "${examId}"`
       });
 
-      for (const q of allQ) {
-        await cleanupQuestionImages(q as any);
-        await pb.collection('questions').delete(q.id);
+      if (allQ.length === 0) {
+         setBatchProgress(prev => ({ ...prev, isOpen: false }));
+         return;
       }
+
+      setBatchProgress(prev => ({ ...prev, total: allQ.length, message: "Mengumpulkan kunci gambar..." }));
+
+      // 1. Gather all image keys across all questions
+      const allKeys: string[] = [];
+      allQ.forEach(q => {
+        allKeys.push(...getQuestionImageKeys(q as any));
+      });
+      const uniqueKeys = Array.from(new Set(allKeys));
+
+      // 2. Batch Delete Images
+      setBatchProgress(prev => ({ ...prev, message: `Menghapus ${uniqueKeys.length} gambar dari storage...` }));
+      if (uniqueKeys.length > 0) {
+        await deleteImagesFromStorage(uniqueKeys);
+      }
+
+      // 3. Delete Questions in Parallel Chunks
+      setBatchProgress(prev => ({ ...prev, message: "Menghapus data soal dari database..." }));
+      const chunkSize = 10;
+      for (let i = 0; i < allQ.length; i += chunkSize) {
+        const chunk = allQ.slice(i, i + chunkSize);
+        await Promise.all(chunk.map(q => pb.collection('questions').delete(q.id)));
+        
+        const currentProcessed = Math.min(i + chunkSize, allQ.length);
+        const progress = Math.round((currentProcessed / allQ.length) * 100);
+        setImportProgress(progress);
+        setBatchProgress(prev => ({
+          ...prev,
+          current: currentProcessed,
+          message: `Menghapus soal (${currentProcessed}/${allQ.length})`
+        }));
+      }
+
+      if (pb.authStore.isValid) await pb.collection('questions').subscribe("*", () => loadQuestions());
+
+      loadQuestions();
       showAlert("Berhasil", "Semua soal berhasil dikosongkan.", "success");
     } catch (e) {
+      console.error("Delete All Error:", e);
       showAlert("Gagal", "Terjadi kesalahan saat mengosongkan soal.", "danger");
     } finally {
       setIsDeleting(false);
-      setDeleteAllDialogOpen(false);
+      setImportProgress(0);
+      setBatchProgress(prev => ({ ...prev, isOpen: false }));
     }
   };
 
   const handleConfirmBulkDelete = async () => {
+    setBulkDeleteDialogOpen(false); // Close confirmation immediately
     setIsBulkDeleting(true);
+    setImportProgress(0);
+    setBatchProgress({
+      isOpen: true,
+      total: selectedIds.length,
+      current: 0,
+      message: "Menyiapkan penghapusan terpilih...",
+      title: "Hapus Soal Terpilih"
+    });
+
     try {
       const selectedQuestions = questions.filter(q => selectedIds.includes(q.id));
-      for (const q of selectedQuestions) {
-        await cleanupQuestionImages(q);
-        await pb.collection('questions').delete(q.id);
+      if (selectedQuestions.length === 0) {
+        setBatchProgress(prev => ({ ...prev, isOpen: false }));
+        return;
       }
+
+      // 1. Gather keys
+      const allKeys: string[] = [];
+      selectedQuestions.forEach(q => allKeys.push(...getQuestionImageKeys(q)));
+      const uniqueKeys = Array.from(new Set(allKeys));
+
+      // 2. Batch Delete Images
+      setBatchProgress(prev => ({ ...prev, message: "Membersihkan gambar di storage..." }));
+      if (uniqueKeys.length > 0) {
+        await deleteImagesFromStorage(uniqueKeys);
+      }
+
+      // 3. Parallel Delete Records
+      const chunkSize = 10;
+      for (let i = 0; i < selectedQuestions.length; i += chunkSize) {
+        const chunk = selectedQuestions.slice(i, i + chunkSize);
+        await Promise.all(chunk.map(q => pb.collection('questions').delete(q.id)));
+        
+        const currentProcessed = Math.min(i + chunkSize, selectedQuestions.length);
+        const progress = Math.round((currentProcessed / selectedQuestions.length) * 100);
+        setImportProgress(progress);
+        setBatchProgress(prev => ({
+          ...prev,
+          current: currentProcessed,
+          message: `Menghapus soal (${currentProcessed}/${selectedQuestions.length})`
+        }));
+      }
+
       setSelectedIds([]);
-      showAlert("Berhasil", `${selectedIds.length} soal berhasil dihapus.`, "success");
+      loadQuestions();
+      showAlert("Berhasil", `${selectedQuestions.length} soal berhasil dihapus.`, "success");
     } catch (error) {
+      console.error("Bulk Delete Error:", error);
       showAlert("Gagal", "Gagal menghapus beberapa soal.", "danger");
     } finally {
       setIsBulkDeleting(false);
-      setBulkDeleteDialogOpen(false);
+      setImportProgress(0);
+      setBatchProgress(prev => ({ ...prev, isOpen: false }));
     }
   };
 
@@ -1438,20 +1592,14 @@ const QuestionsPage = () => {
         </div>
       ),
       className: "w-[40px]",
-      render: (_: any, item: QuestionData) => (
+      render: (_: any, item: QuestionData, index?: number) => (
         <div className="flex items-center px-1">
           <input
             type="checkbox"
             className="w-4 h-4 rounded border-slate-300 dark:border-slate-700 dark:bg-slate-800 transition-all cursor-pointer accent-indigo-600"
             checked={selectedIds.includes(item.id)}
             onClick={(e) => e.stopPropagation()}
-            onChange={(e) => {
-              if (e.target.checked) {
-                setSelectedIds((prev) => [...prev, item.id]);
-              } else {
-                setSelectedIds((prev) => prev.filter((id) => id !== item.id));
-              }
-            }}
+            onChange={(e) => handleCheckboxChange(item.id, e.target.checked, index ?? 0, e)}
           />
         </div>
       )
@@ -1548,277 +1696,356 @@ const QuestionsPage = () => {
 
   const handleImportWord = async (file: File) => {
     setIsImporting(true);
+    setImportProgress(0);
+    setBatchProgress({
+      isOpen: true,
+      total: 0,
+      current: 0,
+      message: "Menganalisis file Word...",
+      title: "Import file Word"
+    });
+
     try {
       const parsed = await parseQuestionsFromWord(file);
       if (parsed.length === 0) throw new Error("Tidak ada soal yang dikenali dalam file.");
 
-      const duplicates: number[] = [];
+      setBatchProgress(prev => ({ ...prev, total: parsed.length, message: `Menyiapkan import ${parsed.length} soal...` }));
+
       let importedCount = 0;
-
-      const loadedQuestions = await pb.collection('questions').getFullList({
-        filter: `examId = "${examId}"`
-      });
-
       for (let i = 0; i < parsed.length; i++) {
         const q = parsed[i];
+        let imageUrl = q.imageUrl || "";
 
-        // Cek apakah teks soal sudah ada
-        const isDuplicate = (loadedQuestions as any[]).some(
-          (existing) => existing.text.trim().toLowerCase() === q.text.trim().toLowerCase()
-        );
-
-        if (isDuplicate) {
-          duplicates.push(i + 1); // Menggunakan 1-based index untuk nomor soal
-          continue;
-        }
-
-        let imageUrlToSave = q.imageUrl || "";
-        let textToSave = q.text;
-        const choicesToSave = JSON.parse(JSON.stringify(q.choices)); // Deep copy
-
-        const uploadBase64ToR2 = async (base64Data: string, prefix: string) => {
+        if (imageUrl.startsWith("data:image/")) {
           try {
-            const blob = await (await fetch(base64Data)).blob();
-            const ext = blob.type.split("/")[1] || "png";
-            const fileToUpload = new File([blob], `${prefix}_${Date.now()}.${ext}`, { type: blob.type });
-            const uploadSnap = await uploadInventoryImage(`questions/${examId}`, fileToUpload);
-            return uploadSnap.url;
-          } catch (e) {
-            console.error(`Gagal upload base64 image (${prefix}) to R2`, e);
-            return base64Data;
-          }
-        };
-
-        // 🖼️ 1. Upload Gambar Cover Soal (dari q.imageUrl)
-        if (imageUrlToSave && imageUrlToSave.startsWith("data:image/")) {
-          imageUrlToSave = await uploadBase64ToR2(imageUrlToSave, `cover_${i}`);
-        }
-
-        // 🖼️ 2. Scan Teks Soal untuk base64 gambar
-        const doc = new DOMParser().parseFromString(textToSave, "text/html");
-        const imagesInText = doc.querySelectorAll("img[src^='data:image/']");
-        for (let j = 0; j < imagesInText.length; j++) {
-          const imgEl = imagesInText[j];
-          const base64 = imgEl.getAttribute("src")!;
-          const r2Url = await uploadBase64ToR2(base64, `text_${i}_${j}`);
-          imgEl.setAttribute("src", r2Url);
-        }
-        textToSave = doc.body.innerHTML;
-
-        // 🖼️ 3. Upload gambar Pilihan (dari data attribute atau text)
-        for (const cKey in choicesToSave) {
-          const choice = choicesToSave[cKey];
-          // a. Cek imageUrl properti
-          if (choice.imageUrl && choice.imageUrl.startsWith("data:image/")) {
-            choice.imageUrl = await uploadBase64ToR2(choice.imageUrl, `choice_${i}_${cKey}`);
-          } else if (!choice.imageUrl) {
-            delete choice.imageUrl;
-          }
-
-          // b. Cek teks pilihan untuk base64
-          if (choice.text && choice.text.includes("data:image/")) {
-            const cDoc = new DOMParser().parseFromString(choice.text, "text/html");
-            const cImgs = cDoc.querySelectorAll("img[src^='data:image/']");
-            for (let k = 0; k < cImgs.length; k++) {
-              const imgEl = cImgs[k];
-              const base64 = imgEl.getAttribute("src")!;
-              const r2Url = await uploadBase64ToR2(base64, `choice_text_${i}_${cKey}_${k}`);
-              imgEl.setAttribute("src", r2Url);
-            }
-            choice.text = cDoc.body.innerHTML;
+            const blob = await (await fetch(imageUrl)).blob();
+            const file = new File([blob], `word_image_${i}.png`, { type: blob.type });
+            const { url } = await uploadInventoryImage("questions", file);
+            imageUrl = url;
+          } catch (err) {
+            console.error("Gagal upload gambar dari Word:", err);
+            imageUrl = ""; 
           }
         }
 
-        const payload: any = {
+        const choices: Record<string, any> = {};
+        Object.entries(q.choices).forEach(([key, val]) => {
+          choices[key.toLowerCase()] = {
+            text: val.text,
+            isCorrect: val.isCorrect || false,
+            imageUrl: val.imageUrl || ""
+          };
+        });
+
+        const answerKey = Object.entries(q.choices).find(([_, v]) => v.isCorrect)?.[0] || "";
+
+        const payload = {
           examId,
-          text: textToSave,
-          field: "multiple_choice", 
-          options: choicesToSave,
-          correctAnswer: "",
-          order: questions.length + importedCount + 1
+          text: q.text,
+          field: "multiple_choice",
+          options: choices,
+          answerKey: answerKey.toLowerCase(),
+          order: (questions.length || 0) + i + 1,
+          imageUrl: imageUrl
         };
-
-        // Deteksi correctAnswer
-        const correctOnes = Object.keys(choicesToSave).filter(k => choicesToSave[k].isCorrect);
-        payload.correctAnswer = correctOnes.join(",");
-
-        if (imageUrlToSave) {
-          payload.imageUrl = imageUrlToSave;
-        }
 
         await pb.collection('questions').create(payload);
         importedCount++;
+        const progress = Math.round(((i + 1) / parsed.length) * 100);
+        setImportProgress(progress);
+        setBatchProgress(prev => ({
+          ...prev,
+          current: i + 1,
+          message: `Mengimport soal (${i + 1}/${parsed.length})`
+        }));
       }
 
       let message = `${importedCount} soal berhasil diimport.`;
-      if (duplicates.length > 0) {
-        message += `\n\n⚠️ Soal nomor [${duplicates.join(", ")}] dilewati karena sudah ada (Duplikat).`;
-      }
-
-      showAlert("Import Berhasil", message, "success");
+      loadQuestions();
+      showAlert("Berhasil", message, "success");
     } catch (err: any) {
+      console.error("Import Word Error:", err);
       showAlert("Gagal Import", err.message || "Gagal mengimport Word.", "danger");
     } finally {
       setIsImporting(false);
+      setImportProgress(0);
+      setBatchProgress(prev => ({ ...prev, isOpen: false }));
     }
   };
 
+  const handleCheckboxChange = (id: string, checked: boolean, index: number, event: any) => {
+    let newSelectedIds = [...selectedIds];
+
+    if (checked && event.nativeEvent.shiftKey && lastSelectedIndex !== null) {
+      const start = Math.min(lastSelectedIndex, index);
+      const end = Math.max(lastSelectedIndex, index);
+      const idsInRange = questions.slice(start, end + 1).map(s => s.id);
+      
+      newSelectedIds = Array.from(new Set([...newSelectedIds, ...idsInRange]));
+    } else {
+      if (checked) {
+        if (!newSelectedIds.includes(id)) {
+          newSelectedIds.push(id);
+        }
+      } else {
+        newSelectedIds = newSelectedIds.filter((item) => item !== id);
+      }
+    }
+
+    setSelectedIds(newSelectedIds);
+    setLastSelectedIndex(index);
+  };
+
   return (
-    <div className="space-y-6">
-      <div className="relative z-20 flex flex-col gap-4 md:flex-row md:items-center md:justify-between bg-card p-5 rounded-2xl border border-slate-200/60 dark:border-slate-800/40 shadow-sm backdrop-blur-sm">
+    <div className="space-y-5 relative">
+      {/* Global Progress Bar */}
+      {(isImporting || isSavingBatch || isParsing || isDeleting || isBulkDeleting) && (
+        <div className="fixed top-0 left-0 w-full h-1.5 z-[100] bg-slate-100 dark:bg-slate-800 overflow-hidden">
+          <div 
+            className="h-full bg-indigo-600 transition-all duration-300 shadow-[0_0_10px_rgba(79,70,229,0.5)]" 
+            style={{ width: `${importProgress}%` }}
+          />
+        </div>
+      )}
+
+      <div className="relative z-20 flex flex-col gap-3 md:flex-row md:items-center md:justify-between bg-card p-4 rounded-2xl border border-slate-200/60 dark:border-slate-800/40 shadow-sm backdrop-blur-sm">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={() => navigate("/admin/bank-soal")}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h2 className="text-2xl font-semibold text-foreground">Daftar Soal</h2>
+            <h2 className="text-lg font-bold text-foreground">Daftar Soal</h2>
             <p className="text-sm text-muted-foreground">
-              {exam?.title || "Ujian"}
-              {exam?.subject ? ` - ${exam?.subject}` : ""}
-              {exam?.teacherName ? ` - ${exam?.teacherName}` : ""}
-              {exam?.teacherCode ? ` (${exam?.teacherCode})` : ""}
+              {loading ? (
+                <Skeleton className="h-4 w-64 mt-1" />
+              ) : (
+                <>
+                  {exam?.title || "Ujian"}
+                  {exam?.subject ? ` - ${exam?.subject}` : ""}
+                  {exam?.teacherName ? ` - ${exam?.teacherName}` : ""}
+                  {exam?.teacherCode ? ` (${exam?.teacherCode})` : ""}
+                </>
+              )}
             </p>
           </div>
         </div>
+
         <div className="flex gap-2">
-          {/* Tombol Import hanya untuk owner atau admin */}
-          {(role === "admin" || exam?.teacherId === teacherId) && (
-            <div className="relative" ref={importRef}>
-              <Button
-                onClick={() => setIsImportMenuOpen(!isImportMenuOpen)}
-                variant="secondary"
-                size="lg"
-                className="rounded-xl bg-indigo-50 text-indigo-600 hover:bg-indigo-100 border border-indigo-100 dark:bg-indigo-900/30 dark:text-indigo-400 dark:hover:bg-indigo-900/50 dark:border-indigo-800/30 shadow-sm font-semibold"
-              >
-                Import <ChevronDown className={`ml-1 h-4 w-4 transition-transform ${isImportMenuOpen ? "rotate-180" : ""}`} />
-              </Button>
+          {loading ? (
+            <>
+              <Skeleton className="h-9 w-28 rounded-2xl" />
+              <Skeleton className="h-9 w-28 rounded-2xl" />
+              <Skeleton className="h-9 w-28 rounded-2xl" />
+            </>
+          ) : (
+            <>
+              {/* Tombol Import hanya untuk owner atau admin */}
+              {(role === "admin" || exam?.teacherId === teacherId) && (
+                <div className="relative">
+                  {loading ? (
+                    <div className="flex gap-2">
+                       <Skeleton className="h-9 w-24 rounded-2xl" />
+                       <Skeleton className="h-9 w-28 rounded-2xl" />
+                       <Skeleton className="h-9 w-24 rounded-2xl" />
+                    </div>
+                  ) : (
+                    <div className="flex flex-wrap items-center gap-2">
+                      {questions.length > 0 && (
+                        <div className="relative" ref={importRef}>
+                          <Button
+                            onClick={() => setIsImportMenuOpen(!isImportMenuOpen)}
+                            variant="secondary"
+                            size="sm"
+                            className="rounded-2xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 dark:hover:bg-emerald-900/40 dark:border-emerald-800/40 text-emerald-700 font-bold shadow-sm flex items-center gap-1.5 h-9 px-4 transition-all text-xs"
+                          >
+                            <FileSpreadsheet className="h-3.5 w-3.5" />
+                            Import
+                            <ChevronDown className={`ml-0.5 h-3 w-3 transition-transform ${isImportMenuOpen ? "rotate-180" : ""}`} />
+                          </Button>
+                          {isImportMenuOpen && (
+                            <div className="absolute right-0 mt-2 w-72 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl z-50 p-2 flex flex-col gap-1 animate-in fade-in zoom-in-95 duration-200">
+                              <div className="px-3 py-1.5 mb-1 border-b border-slate-50 dark:border-slate-800/50">
+                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">Format Impor</span>
+                              </div>
+                              <label className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-900 transition-all cursor-pointer group">
+                                <div className="h-10 w-10 shrink-0 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                  <FileText className="h-5 w-5" />
+                                </div>
+                                <div className="flex flex-col min-w-0">
+                                  <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">Import dari Word</span>
+                                  <span className="text-[10px] text-slate-400 mt-1">Gunakan template standard (.docx)</span>
+                                </div>
+                                <input type="file" className="hidden" accept=".docx" onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) {
+                                    setIsImportMenuOpen(false);
+                                    handleImportWord(file);
+                                  }
+                                }} />
+                              </label>
+                              
+                              <div className="h-px bg-slate-100 dark:bg-slate-800 my-1 mx-1"></div>
+                              <a 
+                                href="/templates/Template_Soal_Baru.xlsx" 
+                                download="Template_Soal_Baru.xlsx"
+                                onClick={() => setIsImportMenuOpen(false)}
+                                className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-900 transition-all group"
+                              >
+                                <div className="h-10 w-10 shrink-0 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                  <Download className="h-5 w-5" />
+                                </div>
+                                <div className="flex flex-col min-w-0">
+                                  <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">Template Standard</span>
+                                  <span className="text-[10px] text-slate-400 mt-1">Download format Excel</span>
+                                </div>
+                              </a>
+                              <a 
+                                href="/templates/Template_Soal_Tabel.docx" 
+                                download="Template_Soal_Tabel.docx"
+                                onClick={() => setIsImportMenuOpen(false)}
+                                className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-900 transition-all group"
+                              >
+                                <div className="h-10 w-10 shrink-0 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                  <FileSpreadsheet className="h-5 w-5" />
+                                </div>
+                                <div className="flex flex-col min-w-0">
+                                  <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">Template Format Tabel</span>
+                                  <span className="text-[10px] text-slate-400 mt-1">Lebih rapi untuk soal kompleks</span>
+                                </div>
+                              </a>
+                            </div>
+                          )}
+                        </div>
+                      )}
 
-              {isImportMenuOpen && (
-                <div className="absolute right-0 mt-2 w-64 bg-card border border-slate-200 dark:border-slate-800 rounded-xl shadow-lg z-20 p-1 flex flex-col gap-1 animate-in fade-in duration-150">
-                  <ImportButton
-                    onImport={(file) => {
-                      setIsImportMenuOpen(false);
-                      handleImportWord(file);
-                    }}
-                    isLoading={isImporting}
-                    label="Upload file Word"
-                    accept=".docx"
-                    variant="item"
-                  />
-                  <a
-                    href="/templates/Template_Soal.docx"
-                    download="Template_Soal.docx"
-                    onClick={() => setIsImportMenuOpen(false)}
-                    className="flex items-center gap-2 p-2 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-sm rounded-lg transition-all"
-                  >
-                    Download Template
-                  </a>
-                  <a
-                    href="/templates/Template_Soal_Tabel.docx"
-                    download="Template_Soal_Tabel.docx"
-                    onClick={() => setIsImportMenuOpen(false)}
-                    className="flex items-center gap-2 p-2 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-sm rounded-lg transition-all"
-                  >
-                    Download Template (Format Tabel)
-                  </a>
-                </div>
-              )}
-            </div>
-          )}
+                      {questions.length > 0 && selectedIds.length > 0 && (
+                        <Button
+                          onClick={() => setBulkDeleteDialogOpen(true)}
+                          variant="default"
+                          size="sm"
+                          className="bg-orange-600 hover:bg-orange-700 dark:bg-orange-950/40 dark:text-orange-400 dark:border dark:border-orange-800/40 text-white rounded-2xl font-bold shadow-lg shadow-orange-500/20 transition-all active:scale-95 flex items-center gap-2 h-9 px-4 text-xs"
+                        >
+                          <Trash className="h-3.5 w-3.5" />
+                          Hapus ({selectedIds.length})
+                        </Button>
+                      )}
 
-          {questions.length > 0 && selectedIds.length > 0 && (role === "admin" || exam?.teacherId === teacherId) && (
-            <Button
-              onClick={() => setBulkDeleteDialogOpen(true)}
-              variant="secondary"
-              size="lg"
-              className="rounded-xl bg-orange-50 text-orange-600 hover:bg-orange-100 border border-orange-100 dark:bg-orange-900/30 dark:text-orange-400 dark:hover:bg-orange-900/50 dark:border-orange-800/30 shadow-sm font-bold flex items-center gap-2"
-            >
-              <Trash className="h-4 w-4" /> Hapus Terpilih ({selectedIds.length})
-            </Button>
-          )}
+                      {questions.length > 0 && selectedIds.length === 0 && (
+                        <Button
+                          onClick={() => setDeleteAllDialogOpen(true)}
+                          variant="secondary"
+                          size="sm"
+                          className="rounded-2xl bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-100 dark:bg-rose-950/40 dark:text-rose-400 dark:border dark:border-rose-800/30 shadow-sm font-bold h-9 px-4 transition-all text-xs"
+                        >
+                          <Trash className="mr-2 h-3.5 w-3.5" /> Hapus Semua
+                        </Button>
+                      )}
 
-          {questions.length > 0 && selectedIds.length === 0 && (role === "admin" || exam?.teacherId === teacherId) && (
-            <Button
-              onClick={() => setDeleteAllDialogOpen(true)}
-              variant="secondary"
-              size="lg"
-              className="rounded-xl bg-rose-50 text-rose-600 hover:bg-rose-100 border border-rose-100 dark:bg-rose-900/30 dark:text-rose-400 dark:hover:bg-rose-900/50 dark:border-rose-800/30 shadow-sm font-semibold"
-            >
-              <Trash className="mr-2 h-4 w-4" /> Hapus Semua
-            </Button>
-          )}
+                      <div className="relative" ref={tambahRef}>
+                        <Button
+                          onClick={() => setIsTambahMenuOpen(!isTambahMenuOpen)}
+                          variant="secondary"
+                          size="sm"
+                          className="rounded-2xl bg-blue-50 hover:bg-blue-100 border border-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 dark:border-blue-800/40 text-blue-700 font-bold shadow-sm flex items-center gap-1.5 h-9 px-4 transition-all text-xs"
+                        >
+                          <Plus className="h-3.5 w-3.5" />
+                          Tambah
+                          <ChevronDown className={`ml-0.5 h-3 w-3 transition-transform ${isTambahMenuOpen ? "rotate-180" : ""}`} />
+                        </Button>
+                        {isTambahMenuOpen && (
+                          <div className="absolute right-0 mt-2 w-72 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl z-50 p-2 flex flex-col gap-1 animate-in fade-in zoom-in-95 duration-200">
+                            <div className="px-3 py-1.5 mb-1 border-b border-slate-50 dark:border-slate-800/50">
+                              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">Opsi Pembuatan</span>
+                            </div>
+                            
+                            <button
+                              onClick={() => {
+                                setIsTambahMenuOpen(false);
+                                handleCreateClick();
+                              }}
+                              className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-900 transition-all text-left group"
+                            >
+                              <div className="h-10 w-10 shrink-0 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                <Plus className="h-5 w-5" />
+                              </div>
+                              <div className="flex flex-col min-w-0">
+                                <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">Tambah Soal</span>
+                                <span className="text-[10px] text-slate-400 mt-1">Input manual satu per satu</span>
+                              </div>
+                            </button>
 
-          {(role === "admin" || exam?.teacherId === teacherId) && (
-            <div className="relative" ref={tambahRef}>
-              <Button
-                onClick={() => setIsTambahMenuOpen(!isTambahMenuOpen)}
-                variant="secondary"
-                size="lg"
-                className="rounded-xl bg-blue-50 hover:bg-blue-100 border border-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 dark:border-blue-800/40 text-blue-700 font-semibold shadow-sm flex items-center gap-1"
-              >
-                Tambah <ChevronDown className={`h-4 w-4 transition-transform ${isTambahMenuOpen ? "rotate-180" : ""}`} />
-              </Button>
+                            <button
+                              onClick={() => {
+                                setIsTambahMenuOpen(false);
+                                handleBatchCreateClick();
+                              }}
+                              className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-900 transition-all text-left group"
+                            >
+                              <div className="h-10 w-10 shrink-0 rounded-lg bg-purple-50 dark:bg-purple-900/30 text-purple-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                <Plus className="h-5 w-5" />
+                              </div>
+                              <div className="flex flex-col min-w-0">
+                                <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">Tambah Batch</span>
+                                <span className="text-[10px] text-slate-400 mt-1">Tambah banyak soal sekaligus</span>
+                              </div>
+                            </button>
 
-              {isTambahMenuOpen && (
-                <div className="absolute right-0 mt-2 w-48 bg-card border border-slate-200 dark:border-slate-800 rounded-xl shadow-lg z-20 p-1 flex flex-col gap-0.5 animate-in fade-in duration-150">
-                  <button
-                    onClick={() => {
-                      setIsTambahMenuOpen(false);
-                      handleCreateClick();
-                    }}
-                    className="flex items-center gap-2.5 p-2 px-3 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 text-sm rounded-lg transition-all font-medium text-left"
-                  >
-                    <Plus className="h-4 w-4 text-blue-500" />
-                    Tambah Soal
-                  </button>
-                  <button
-                    onClick={() => {
-                      setIsTambahMenuOpen(false);
-                      handleBatchCreateClick();
-                    }}
-                    className="flex items-center gap-2.5 p-2 px-3 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 text-sm rounded-lg transition-all font-medium text-left"
-                  >
-                    <Plus className="h-4 w-4 text-purple-500" />
-                    Tambah Batch
-                  </button>
-                  <div className="h-px bg-slate-100 dark:bg-slate-800 my-1 mx-1"></div>
-                   {role === "admin" && (
-                    <>
-                      <button
-                        onClick={() => {
-                          setIsTambahMenuOpen(false);
-                          setIsAIModalOpen(true);
-                        }}
-                        className="flex items-center gap-2.5 p-2 px-3 hover:bg-indigo-50 dark:hover:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 text-sm rounded-lg transition-all font-bold text-left group"
-                      >
-                        <Sparkles className="h-4 w-4 text-indigo-500 group-hover:animate-pulse" />
-                        Generasi AI
-                      </button>
-                      <button
-                        onClick={() => {
-                          setIsTambahMenuOpen(false);
-                          setIsAIImportOpen(true);
-                        }}
-                        className="flex items-center gap-2.5 p-2 px-3 hover:bg-emerald-50 dark:hover:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 text-sm rounded-lg transition-all font-bold text-left group"
-                      >
-                        <FileText className="h-4 w-4 text-emerald-500 group-hover:scale-110" />
-                        Smart AI Import (PDF)
-                      </button>
-                    </>
+                            <div className="h-px bg-slate-100 dark:bg-slate-800 my-1 mx-1"></div>
+                            
+                            {role === "admin" && (
+                              <>
+                                <button
+                                  onClick={() => {
+                                    setIsTambahMenuOpen(false);
+                                    setIsAIModalOpen(true);
+                                  }}
+                                  className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-900 transition-all text-left group"
+                                >
+                                  <div className="h-10 w-10 shrink-0 rounded-lg bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 flex items-center justify-center group-hover:scale-110 transition-transform shadow-sm">
+                                    <Sparkles className="h-5 w-5" />
+                                  </div>
+                                  <div className="flex flex-col min-w-0">
+                                    <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">Generasi AI</span>
+                                    <span className="text-[10px] text-slate-400 mt-1">Buat soal otomatis dari materi</span>
+                                  </div>
+                                </button>
+
+                                <button
+                                  onClick={() => {
+                                    setIsTambahMenuOpen(false);
+                                    setIsAIImportOpen(true);
+                                  }}
+                                  className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-900 transition-all text-left group"
+                                >
+                                  <div className="h-10 w-10 shrink-0 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 flex items-center justify-center group-hover:scale-110 transition-transform shadow-sm">
+                                    <FileText className="h-5 w-5" />
+                                  </div>
+                                  <div className="flex flex-col min-w-0">
+                                    <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">Smart AI Import (PDF)</span>
+                                    <span className="text-[10px] text-slate-400 mt-1">Ekstrak soal otomatis dari PDF</span>
+                                  </div>
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   )}
                 </div>
               )}
-            </div>
+            </>
           )}
         </div>
       </div>
 
-      {loading ? (
-        <Card className="border-none shadow-none bg-transparent">
-          <CardHeader className="px-0">
-            <CardTitle className="text-base font-bold text-slate-800 dark:text-white uppercase tracking-wider">Daftar Soal</CardTitle>
+      <div className="space-y-3">
+        {loading ? (
+        <Card>
+          <CardHeader className="p-4">
+            <CardTitle className="text-base font-semibold text-slate-800 dark:text-white">Daftar Soal</CardTitle>
           </CardHeader>
-          <CardContent className="px-0">
+          <CardContent>
             <div className="bg-card border rounded-xl shadow-sm border-slate-200/60 dark:border-slate-800 overflow-hidden">
               <Table>
                 <TableHeader className="bg-slate-50/50 dark:bg-slate-900/50">
@@ -1871,53 +2098,55 @@ const QuestionsPage = () => {
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-4">
-          <div className="bg-white/40 dark:bg-transparent -mb-2">
-            <h3 className="text-base font-bold text-slate-800 dark:text-white uppercase tracking-wider">Daftar Soal</h3>
-          </div>
+        <div className="space-y-3">
           {questions.length === 0 ? (
             <div className="text-center p-12 border bg-card rounded-xl text-slate-400">Belum ada soal untuk ujian ini.</div>
           ) : (
-            <div className="bg-card border rounded-xl p-4 shadow-sm border-slate-200/60 dark:border-slate-800">
-              <DataTable
-                data={questions}
-                columns={columns}
-                searchPlaceholder="Cari soal..."
-                emptyMessage="Tidak ada soal ditemukan."
-                actions={(q: QuestionData) => (
-                  <div className="flex justify-end items-center gap-1.5 whitespace-nowrap">
-                    <button
-                      className="p-1.5 bg-sky-50 text-sky-600 hover:bg-sky-100 rounded-lg dark:bg-sky-900/10 dark:text-sky-400 border border-sky-100 dark:border-sky-800/40"
-                      onClick={() => {
-                        setPreviewQuestion(q);
-                        setIsPreviewOpen(true);
-                      }}
-                      title="Pratinjau Soal"
-                    >
-                      <Eye className="h-4 w-4" />
-                    </button>
-                    {(role === "admin" || exam?.teacherId === teacherId) && (
-                      <>
-                        <button
-                          className="p-1.5 bg-sky-50 text-sky-600 hover:bg-sky-100 rounded-lg dark:bg-sky-900/10 dark:text-sky-400 border border-sky-100 dark:border-sky-800/40"
-                          onClick={() => handleEditClick(q)}
-                          title="Edit Soal"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </button>
-                        <button
-                          className="p-1.5 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-lg dark:bg-rose-900/10 dark:text-rose-400 border border-rose-100 dark:border-rose-800/40"
-                          onClick={() => handleDeleteClick(q)}
-                          title="Hapus Soal"
-                        >
-                          <Trash className="h-4 w-4" />
-                        </button>
-                      </>
-                    )}
-                  </div>
-                )}
-              />
-            </div>
+            <Card>
+              <CardHeader className="p-4">
+                <CardTitle className="text-base font-semibold text-slate-800 dark:text-white">Daftar Soal</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <DataTable
+                  data={questions}
+                  columns={columns}
+                  searchPlaceholder="Cari soal..."
+                  emptyMessage="Tidak ada soal ditemukan."
+                  actions={(q: QuestionData) => (
+                    <div className="flex justify-end items-center gap-1.5 whitespace-nowrap">
+                      <button
+                        className="p-1.5 bg-sky-50 text-sky-600 hover:bg-sky-100 rounded-xl dark:bg-sky-900/10 dark:text-sky-400 border border-sky-100 dark:border-sky-800/40 transition-all hover:scale-110"
+                        onClick={() => {
+                          setPreviewQuestion(q);
+                          setIsPreviewOpen(true);
+                        }}
+                        title="Pratinjau Soal"
+                      >
+                        <Search className="h-4 w-4" />
+                      </button>
+                      {(role === "admin" || exam?.teacherId === teacherId) && (
+                        <>
+                          <button
+                            className="p-1.5 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 rounded-xl dark:bg-indigo-900/10 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-800/40 transition-all hover:scale-110"
+                            onClick={() => handleEditClick(q)}
+                            title="Edit Soal"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </button>
+                          <button
+                            className="p-1.5 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-xl dark:bg-rose-900/10 dark:text-rose-400 border border-rose-100 dark:border-rose-800/40 transition-all hover:scale-110"
+                            onClick={() => handleDeleteClick(q)}
+                            title="Hapus Soal"
+                          >
+                            <Trash className="h-4 w-4" />
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  )}
+                />
+              </CardContent>
+            </Card>
           )}
         </div>
       )}
@@ -2280,7 +2509,7 @@ const QuestionsPage = () => {
             </div>
 
             <DialogFooter className="pt-2">
-              <Button type="submit" className="w-full bg-blue-50 hover:bg-blue-100 border border-blue-100 dark:bg-blue-900/40 dark:text-blue-400 dark:hover:bg-blue-900/60 dark:border-blue-800/20 text-blue-700 font-semibold">{dialogMode === "edit" ? "Perbarui" : "Simpan"}</Button>
+              <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl h-11 shadow-lg shadow-blue-500/20">{dialogMode === "edit" ? "Perbarui" : "Simpan"}</Button>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -2677,7 +2906,7 @@ const QuestionsPage = () => {
           <DialogFooter className="pt-2">
             <Button variant="outline" onClick={() => setIsBatchModalOpen(false)} className="border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800">Batal</Button>
             <Button onClick={handleSaveBatch} disabled={isSavingBatch} className="bg-blue-50 hover:bg-blue-100 border border-blue-100 dark:bg-blue-900/40 dark:text-blue-400 dark:hover:bg-blue-900/60 dark:border-blue-800/20 text-blue-700 font-semibold">
-              {isSavingBatch ? "Menyimpan..." : `Simpan ${batchQuestions.length} Soal`}
+              {isSavingBatch ? (importProgress > 0 ? `Menyimpan ${importProgress}%` : "Menyimpan...") : `Simpan ${batchQuestions.length} Soal`}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -3155,7 +3384,7 @@ const QuestionsPage = () => {
                   className="flex-[2] h-14 bg-indigo-600 hover:bg-indigo-700 text-white rounded-[1.5rem] font-black uppercase text-xs tracking-widest shadow-xl shadow-indigo-200/50 dark:shadow-none transition-all active:scale-95"
                 >
                    {isParsing ? (
-                    <RefreshCw className="mr-2 h-5 w-5 animate-spin" />
+                    importProgress > 0 ? `Menyimpan ${importProgress}%` : "Sedang Menyimpan..."
                   ) : (
                     <>
                       <Check className="mr-2 h-5 w-5" />
@@ -3177,8 +3406,44 @@ const QuestionsPage = () => {
         isLoading={isBulkDeleting}
         itemName={`${selectedIds.length} soal`}
       />
+
+      {/* Batch Progress Dialog */}
+      <Dialog open={batchProgress.isOpen} onOpenChange={() => {}}>
+        <DialogContent className="max-w-md bg-card border-none shadow-2xl p-0 overflow-hidden rounded-3xl" hideClose>
+          <div className="bg-indigo-600 p-6 text-white flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="bg-white/20 p-2 rounded-xl">
+                 <Loader2 className="h-5 w-5 animate-spin" />
+              </div>
+              <div>
+                <DialogTitle className="text-lg font-bold text-white">{batchProgress.title}</DialogTitle>
+                <DialogDescription className="text-indigo-100 text-xs">Mohon tunggu hingga proses selesai.</DialogDescription>
+              </div>
+            </div>
+            <div className="text-right">
+               <span className="text-2xl font-black text-white/40">{Math.round((batchProgress.current / batchProgress.total) * 100) || 0}%</span>
+            </div>
+          </div>
+          <div className="p-8 space-y-6">
+            <div className="space-y-2">
+               <div className="flex justify-between items-end mb-1">
+                 <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">{batchProgress.message}</span>
+                 <span className="text-xs font-medium text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">
+                   {batchProgress.current} / {batchProgress.total}
+                 </span>
+               </div>
+               <Progress value={(batchProgress.current / batchProgress.total) * 100} className="h-3 bg-slate-100 dark:bg-slate-800" />
+            </div>
+            
+            <p className="text-[10px] text-center text-slate-400 font-medium italic">
+              * Jangan menutup atau merefresh halaman ini selama proses berlangsung.
+            </p>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
-  );
+  </div>
+);
 };
 
 export default QuestionsPage;

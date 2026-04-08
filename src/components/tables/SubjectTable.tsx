@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { DataTable } from "../ui/data-table";
 import { Button } from "../ui/button";
@@ -6,16 +7,80 @@ import { Edit, Trash } from "lucide-react";
 
 interface SubjectTableProps {
   subjects: SubjectData[];
+  selectedIds: string[];
+  onSelectChange: (ids: string[]) => void;
   onEdit: (subject: SubjectData) => void;
   onDelete: (subject: SubjectData) => void;
 }
 
-const SubjectTable = ({ subjects, onEdit, onDelete }: SubjectTableProps) => {
+const SubjectTable = ({ 
+  subjects, 
+  selectedIds, 
+  onSelectChange, 
+  onEdit, 
+  onDelete 
+}: SubjectTableProps) => {
+  const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(null);
+
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      onSelectChange(subjects.map(s => s.id));
+    } else {
+      onSelectChange([]);
+    }
+  };
+
+  const handleSelectOne = (id: string, checked: boolean, index: number, event: any) => {
+    let newSelectedIds = [...selectedIds];
+
+    if (checked && event.nativeEvent.shiftKey && lastSelectedIndex !== null) {
+      const start = Math.min(lastSelectedIndex, index);
+      const end = Math.max(lastSelectedIndex, index);
+      const idsInRange = subjects.slice(start, end + 1).map(s => s.id);
+      
+      newSelectedIds = Array.from(new Set([...newSelectedIds, ...idsInRange]));
+    } else {
+      if (checked) {
+        if (!newSelectedIds.includes(id)) {
+          newSelectedIds.push(id);
+        }
+      } else {
+        newSelectedIds = newSelectedIds.filter((item) => item !== id);
+      }
+    }
+
+    onSelectChange(newSelectedIds);
+    setLastSelectedIndex(index);
+  };
+
+  const isAllSelected = subjects.length > 0 && subjects.every(s => selectedIds.includes(s.id));
+
   const columns = [
+    {
+      key: "selection",
+      label: (
+        <input
+          type="checkbox"
+          checked={isAllSelected}
+          onChange={(e) => handleSelectAll(e.target.checked)}
+          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-4 w-4 cursor-pointer"
+        />
+      ),
+      render: (_: any, item: SubjectData, index?: number) => (
+        <input
+          type="checkbox"
+          checked={selectedIds.includes(item.id)}
+          onChange={(e) => handleSelectOne(item.id, e.target.checked, index ?? 0, e)}
+          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-4 w-4 cursor-pointer"
+        />
+      ),
+      className: "w-[40px] text-center",
+    },
     {
       key: "index",
       label: "No",
       render: (v: any, item: any, index?: number) => (index !== undefined ? index + 1 : 1),
+      className: "w-[60px]",
     },
     { key: "name", label: "Mata Pelajaran", sortable: true },
   ];
@@ -41,7 +106,7 @@ const SubjectTable = ({ subjects, onEdit, onDelete }: SubjectTableProps) => {
 
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="p-4">
         <CardTitle className="text-base font-semibold text-slate-800 dark:text-white">Daftar Mata Pelajaran</CardTitle>
       </CardHeader>
       <CardContent>

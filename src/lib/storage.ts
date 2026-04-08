@@ -1,4 +1,4 @@
-import { DeleteObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { DeleteObjectCommand, DeleteObjectsCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 
 export async function deleteImageFromStorage(key: string): Promise<void> {
   const config = getConfig();
@@ -12,6 +12,29 @@ export async function deleteImageFromStorage(key: string): Promise<void> {
       Key: key,
     })
   );
+}
+
+export async function deleteImagesFromStorage(keys: string[]): Promise<void> {
+  if (keys.length === 0) return;
+  const config = getConfig();
+  if (import.meta.env.VITE_R2_DEV_INLINE_BASE64 === "true") return;
+  if (!isR2Configured()) return;
+
+  const client = ensureClient();
+  
+  // S3 allows max 1000 keys per DeleteObjects request
+  const chunkSize = 1000;
+  for (let i = 0; i < keys.length; i += chunkSize) {
+    const chunk = keys.slice(i, i + chunkSize);
+    await client.send(
+      new DeleteObjectsCommand({
+        Bucket: config.bucket,
+        Delete: {
+          Objects: chunk.map(key => ({ Key: key })),
+        },
+      })
+    );
+  }
 }
 
 export interface UploadResult {

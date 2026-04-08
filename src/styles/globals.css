@@ -174,3 +174,22 @@ body {
   font-size: 1.5rem !important; /* text-2xl */
 }
 
+/* 🌑 Force light text for rich text content in Dark Mode to ensure readability */
+.dark .ql-editor,
+.dark .ql-editor p,
+.dark .ql-editor span,
+.dark .ql-editor li,
+.dark .ql-editor strong,
+.dark .ql-editor b,
+.dark .ql-editor i,
+.dark .ql-editor em,
+.dark .ql-editor u {
+  color: #ffffff !important; 
+}
+
+/* Handle specific background-colors if any were set in the editor */
+.dark .ql-editor [style*="background-color: black"],
+.dark .ql-editor [style*="background-color: #000000"] {
+  background-color: transparent !important;
+}
+

@@ -23,6 +23,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui/
 import Logo from "./logo";
 import { useAuth } from "../../context/AuthContext";
 import { useSidebar } from "../../context/SidebarContext";
+import { Skeleton } from "../ui/skeleton";
 
 const navigation = [
   { to: "/admin", label: "Dashboard", icon: Home, badge: null },
@@ -59,8 +60,45 @@ const navigation = [
   { to: "/admin/panduan", label: "Panduan", icon: HelpCircle, badge: null }
 ];
 
+const SidebarSkeleton = ({ isCollapsed }: { isCollapsed: boolean }) => {
+  return (
+    <aside className={cn(
+      "hidden lg:flex h-full flex-col bg-gradient-to-b from-slate-50 to-white dark:from-slate-900 dark:to-slate-800 border-r border-slate-200/60 dark:border-slate-700/60 shadow-2xl transition-all duration-300 ease-in-out z-20",
+      isCollapsed ? "w-16 lg:w-16" : "w-64 md:w-72 lg:w-80"
+    )}>
+      <div className={cn(
+        "flex h-20 items-center justify-between px-6 bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm",
+        isCollapsed && "px-3"
+      )}>
+        <Skeleton className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl" />
+        {!isCollapsed && <Skeleton className="h-6 w-32 rounded-md" />}
+      </div>
+      <div className="flex-1 py-6 space-y-8 px-6">
+        <div className="space-y-4">
+          {!isCollapsed && <Skeleton className="h-3 w-20 rounded-md" />}
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="flex items-center gap-4">
+              <Skeleton className="h-10 w-10 rounded-xl shrink-0" />
+              {!isCollapsed && <Skeleton className="h-6 flex-1 rounded-md" />}
+            </div>
+          ))}
+        </div>
+        <div className="space-y-4 pt-4 border-t border-slate-100 dark:border-slate-800">
+           {!isCollapsed && <Skeleton className="h-3 w-24 rounded-md" />}
+           {Array.from({ length: 2 }).map((_, i) => (
+            <div key={i} className="flex items-center gap-4">
+              <Skeleton className="h-10 w-10 rounded-xl shrink-0" />
+              {!isCollapsed && <Skeleton className="h-6 flex-1 rounded-md" />}
+            </div>
+          ))}
+        </div>
+      </div>
+    </aside>
+  );
+};
+
 const Sidebar = () => {
-  const { role } = useAuth();
+  const { role, loading } = useAuth();
   const { isCollapsed, isMobileOpen, toggleCollapsed, closeMobile } = useSidebar();
   
   const [expandedMenus, setExpandedMenus] = React.useState<Record<string, boolean>>({});
@@ -71,18 +109,14 @@ const Sidebar = () => {
 
   const filteredNavigation = React.useMemo(() => {
     if (role === "admin") return navigation;
-
-    return navigation.reduce((acc, item) => {
-      if (item.label === "Master Data") return acc;
-      
-      if (item.label === "Sistem") {
-        return acc;
-      }
-
-      acc.push(item);
-      return acc;
-    }, [] as typeof navigation);
+    
+    // Default/Teacher role: Filter out Master Data and System
+    return navigation.filter(item => 
+      item.label !== "Master Data" && item.label !== "Sistem"
+    );
   }, [role]);
+
+  if (loading) return <SidebarSkeleton isCollapsed={isCollapsed} />;
 
   return (
     <TooltipProvider>

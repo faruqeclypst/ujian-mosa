@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { DataTable } from "../ui/data-table";
 import { Button } from "../ui/button";
@@ -6,16 +7,80 @@ import { Edit, Trash } from "lucide-react";
 
 interface ClassTableProps {
   classes: ClassData[];
+  selectedIds: string[];
+  onSelectChange: (ids: string[]) => void;
   onEdit: (cls: ClassData) => void;
   onDelete: (cls: ClassData) => void;
 }
 
-const ClassTable = ({ classes, onEdit, onDelete }: ClassTableProps) => {
+const ClassTable = ({ 
+  classes, 
+  selectedIds, 
+  onSelectChange, 
+  onEdit, 
+  onDelete 
+}: ClassTableProps) => {
+  const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(null);
+
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      onSelectChange(classes.map(c => c.id));
+    } else {
+      onSelectChange([]);
+    }
+  };
+
+  const handleSelectOne = (id: string, checked: boolean, index: number, event: any) => {
+    let newSelectedIds = [...selectedIds];
+
+    if (checked && event.nativeEvent.shiftKey && lastSelectedIndex !== null) {
+      const start = Math.min(lastSelectedIndex, index);
+      const end = Math.max(lastSelectedIndex, index);
+      const idsInRange = classes.slice(start, end + 1).map(c => c.id);
+      
+      newSelectedIds = Array.from(new Set([...newSelectedIds, ...idsInRange]));
+    } else {
+      if (checked) {
+        if (!newSelectedIds.includes(id)) {
+          newSelectedIds.push(id);
+        }
+      } else {
+        newSelectedIds = newSelectedIds.filter((item) => item !== id);
+      }
+    }
+
+    onSelectChange(newSelectedIds);
+    setLastSelectedIndex(index);
+  };
+
+  const isAllSelected = classes.length > 0 && classes.every(c => selectedIds.includes(c.id));
+
   const columns = [
+    {
+      key: "selection",
+      label: (
+        <input
+          type="checkbox"
+          checked={isAllSelected}
+          onChange={(e) => handleSelectAll(e.target.checked)}
+          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-4 w-4 cursor-pointer"
+        />
+      ),
+      render: (_: any, item: ClassData, index?: number) => (
+        <input
+          type="checkbox"
+          checked={selectedIds.includes(item.id)}
+          onChange={(e) => handleSelectOne(item.id, e.target.checked, index ?? 0, e)}
+          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-4 w-4 cursor-pointer"
+        />
+      ),
+      className: "w-[40px] text-center",
+    },
     {
       key: "index",
       label: "No",
       render: (v: any, item: any, index?: number) => (index !== undefined ? index + 1 : 1),
+      className: "w-[60px]",
     },
     { key: "name", label: "Nama Kelas", sortable: true },
   ];
@@ -41,7 +106,7 @@ const ClassTable = ({ classes, onEdit, onDelete }: ClassTableProps) => {
 
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="p-4">
         <CardTitle className="text-base font-semibold text-slate-800 dark:text-white">Daftar Kelas</CardTitle>
       </CardHeader>
       <CardContent>

@@ -17,13 +17,13 @@ const Logo = () => {
         if (records.length > 0) {
           const data = records[0];
           let logoUrl = data.logoUrl || data.logo || "";
-          
+
           if (logoUrl && !logoUrl.startsWith('http') && !logoUrl.startsWith('data:')) {
             logoUrl = pb.files.getUrl(data, logoUrl);
           }
 
-          setProfile({ 
-            name: data.name || "E-Ujian", 
+          setProfile({
+            name: data.name || "E-Ujian",
             logoUrl: logoUrl
           });
           setLogoError(false);
@@ -39,13 +39,13 @@ const Logo = () => {
     pb.collection("settings").subscribe("*", (e) => {
       if (e.action === "update" || e.action === "create") {
         let logoUrl = e.record.logoUrl || e.record.logo || "";
-        
+
         if (logoUrl && !logoUrl.startsWith('http') && !logoUrl.startsWith('data:')) {
           logoUrl = pb.files.getUrl(e.record, logoUrl);
         }
 
-        setProfile({ 
-          name: e.record.name || "E-Ujian", 
+        setProfile({
+          name: e.record.name || "E-Ujian",
           logoUrl: logoUrl
         });
         setLogoError(false);
@@ -70,9 +70,9 @@ const Logo = () => {
             />
           ) : (
             <img
-              src="https://cdn-icons-png.flaticon.com/512/2913/2913965.png"
+              src="/logo-default.png"
               alt="Logo Default"
-              className="h-full w-full object-contain opacity-50"
+              className="h-full w-full object-contain"
             />
           )}
         </div>
@@ -82,7 +82,7 @@ const Logo = () => {
         <div className="flex items-center gap-2 flex-wrap">
           <h1 className="text-base sm:text-lg font-bold text-foreground leading-none">E-Ujian</h1>
           <div className="px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-xs font-medium rounded shrink-0">
-            v2.0
+            v3.1
           </div>
         </div>
         <p className="text-[10px] text-muted-foreground leading-tight mt-0.5 sm:mt-1 font-medium truncate">

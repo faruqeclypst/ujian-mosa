@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Plus, Trash, Edit, Users, Archive, RotateCw, BookOpen, ClipboardList, Lock, Clock, ChevronDown, Power, PowerOff, Search } from "lucide-react";
+import { Plus, Trash, Edit, Users, Archive, RotateCw, BookOpen, ClipboardList, Lock, Clock, ChevronDown, ChevronRight, Power, PowerOff, Search } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "../../components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../../components/ui/dialog";
@@ -12,8 +12,9 @@ import { useExamData } from "../../context/ExamDataContext";
 import { useAuth } from "../../context/AuthContext";
 import { getExamTypeColorClass } from "./ExamsPage";
 import { ConfirmationDialog } from "../../components/ui/confirmation-dialog";
+import { cn } from "../../lib/utils";
 
-import { DataTable } from "../../components/ui/data-table";
+import { DataTable }  from "../../components/ui/data-table";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../components/ui/table";
 import { Skeleton } from "../../components/ui/skeleton";
 
@@ -43,8 +44,6 @@ export interface ExamRoomData {
   isActive?: boolean;
 }
 
-
-
 const ExamRoomsPage = () => {
   const navigate = useNavigate();
   const { user, role } = useAuth();
@@ -53,7 +52,6 @@ const ExamRoomsPage = () => {
   const [examsLoading, setExamsLoading] = useState(true);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"aktif" | "arsip">("aktif");
-  const [showAdvanced, setShowAdvanced] = useState(false);
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [dialogMode, setDialogMode] = useState<"create" | "edit">("create");
@@ -74,7 +72,6 @@ const ExamRoomsPage = () => {
     show_result: true,
   });
 
-  const [roomSearchQuery, setRoomSearchQuery] = useState("");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [roomToDelete, setRoomToDelete] = useState<ExamRoomData | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -116,11 +113,97 @@ const ExamRoomsPage = () => {
   const [liveBreakdown, setLiveBreakdown] = useState<Record<string, number>>({});
   const [totalOngoing, setTotalOngoing] = useState(0);
 
-  const teacherId = user?.id; // PocketBase user id
+  const teacherId = user?.id;
 
-  // Global click handler removed with openMenuId
+  // Columns definition (matching ExamsPage style)
+  const columns: any[] = [
+    {
+      key: "index",
+      label: "No",
+      render: (_: any, __: any, i?: number) => <div className="text-center font-medium">{(i || 0) + 1}</div>,
+      className: "w-14",
+    },
+    {
+      key: "status",
+      label: "Status",
+      render: (_: any, room: ExamRoomData) => {
+        const now = Date.now();
+        const start = new Date(room.start_time).getTime();
+        const end = new Date(room.end_time).getTime();
 
-  // Sync Live Monitoring Progres (Efficient One-time fetch + Event-based update)
+        let label = "Berjalan";
+        let style = "bg-emerald-50 text-emerald-700 border-emerald-100 dark:bg-emerald-900/10 dark:text-emerald-400 dark:border-emerald-800/40 animate-pulse";
+
+        if (room.status === "archive") {
+          label = "Arsip";
+          style = "bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700";
+        } else if (room.isDisabled) {
+          label = "Nonaktif";
+          style = "bg-rose-50 text-rose-700 border-rose-100 dark:bg-rose-900/10 dark:text-rose-400 dark:border-rose-800/40";
+        } else if (now < start) {
+          label = "Menunggu";
+          style = "bg-blue-50 text-blue-700 border-blue-100 dark:bg-blue-900/10 dark:text-blue-400 dark:border-blue-800/40";
+        } else if (now > end) {
+          label = "Selesai";
+          style = "bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700";
+        }
+
+        return (
+          <span className={cn("inline-flex text-[10px] px-2 py-0.5 rounded-md font-bold uppercase tracking-wider border whitespace-nowrap", style)}>
+            {label}
+          </span>
+        );
+      }
+    },
+    {
+      key: "room_name",
+      label: "Nama Ruangan",
+      sortable: true,
+      render: (v: string, room: ExamRoomData) => (
+        <div className="flex flex-col gap-0.5">
+          <span className="font-bold text-slate-800 dark:text-white text-sm tracking-tight line-clamp-1">{v || "Tanpa Nama"}</span>
+          <span className="text-[10px] text-slate-500 font-medium truncate italic" title={room.examTitle}>{room.examTitle}</span>
+        </div>
+      )
+    },
+    {
+      key: "className",
+      label: "Kelas",
+      render: (v: string, room: ExamRoomData) => (
+        <div className="flex flex-wrap gap-1 max-w-[140px]">
+          {room.allClasses ? (
+            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-100 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800/40">Semua Kelas</span>
+          ) : (
+            (v || "").split(", ").map((cls, idx) => (
+              <span key={idx} className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-600 border border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700">{cls}</span>
+            ))
+          )}
+        </div>
+      )
+    },
+    {
+      key: "info",
+      label: "Info Ujian",
+      render: (_: any, room: ExamRoomData) => (
+        <div className="flex flex-col gap-1 items-start">
+          <div className="flex items-center gap-1.5 text-[10px] font-medium">
+             <span className={`px-1 rounded border border-slate-200 dark:border-slate-800 ${getExamTypeColorClass(room.examType || "UMUM")}`}>{room.examType || "UMUM"}</span>
+             <span className="text-slate-300">|</span>
+             <span className="text-slate-600 dark:text-slate-400">{room.duration}m</span>
+             {liveBreakdown[room.id] > 0 && (
+               <>
+                 <span className="text-slate-300">|</span>
+                 <span className="text-emerald-600 font-bold">{liveBreakdown[room.id]} Aktif</span>
+               </>
+             )}
+          </div>
+          <span className="text-[10px] text-slate-400 truncate max-w-[120px]">{room.teacherName}</span>
+        </div>
+      )
+    }
+  ];
+
+  // Sync Live Monitoring Progres
   useEffect(() => {
     let attemptsCache: Record<string, any> = {};
 
@@ -194,7 +277,6 @@ const ExamRoomsPage = () => {
       try {
         const loaded = await pb.collection('exam_rooms').getFullList({ sort: '-created' });
         const mapped = loaded.map(room => {
-          // Robust field mapping for CamelCase and snake_case
           const sId = room.examId || (room as any).examid || "";
           const startTime = room.start_time || (room as any).startTime || "";
           const endTime = room.end_time || (room as any).endTime || "";
@@ -208,10 +290,7 @@ const ExamRoomsPage = () => {
 
           let className = "Semua Kelas";
           if (!room.allClasses) {
-            // Kita coba ambil dari berbagai kemungkinan field (classId atau classIds)
             const clsData = room.classId || (room as any).classid || (room as any).classIds || (room as any).classids || "";
-
-            // Konversi ke Array ID yang bersih
             let classList: string[] = [];
             if (Array.isArray(clsData)) {
               classList = clsData;
@@ -222,7 +301,6 @@ const ExamRoomsPage = () => {
                 : String(rawCls || "").split(",").map(id => id.trim()).filter(id => id && id !== "all");
             }
 
-            // Cari nama-nama kelasnya
             const foundNames = classList.map(id => {
               const c = (examClasses || []).find(cl => cl.id === id);
               return c ? c.name : null;
@@ -231,7 +309,6 @@ const ExamRoomsPage = () => {
             if (foundNames.length > 0) {
               className = foundNames.join(", ");
             } else {
-              // Jika ID tidak ditemukan namanya, tapi ada ID-nya, tampilkan ID-nya saja sebagai cadangan
               className = classList.length > 0 ? `ID: ${classList[0].substring(0, 5)}...` : "N/A";
             }
           }
@@ -270,114 +347,6 @@ const ExamRoomsPage = () => {
       unsubscribe.then(unsub => unsub());
     };
   }, [subjects, masterTeachers, exams, examClasses]);
-
-  // Monitoring functions removed - moved to MonitoringPage.tsx
-
-  const columns = [
-    {
-      key: "index",
-      label: "No",
-      render: (v: any, item: any, index?: number) => (index !== undefined ? index + 1 : 1),
-    },
-    {
-      key: "examTitle",
-      label: "Ruang / Bank Soal",
-      sortable: true,
-      render: (v: string, item: ExamRoomData) => (
-        <div className="flex flex-col gap-1 items-start">
-          <span className="font-bold text-slate-800 dark:text-slate-100 text-sm">
-            <span className="text-slate-400 font-medium mr-1 select-none">NR:</span>
-            {item.room_name || "Tanpa Nama"}
-          </span>
-          <div className="flex flex-col items-start gap-1 mt-0.5">
-            <span className="text-[10px] text-slate-500 font-medium tracking-wide">
-              <span className="text-slate-400/70 mr-1 select-none font-bold italic">BS:</span>
-              {v}
-            </span>
-            <div className="flex items-center gap-1.5 text-[10px] text-slate-400 font-medium italic">
-              <span>{item.subjectName}</span>
-              <span>•</span>
-              <span>{item.teacherName}</span>
-            </div>
-            {item.examType && (
-              <span className={`text-[9px] mt-1 px-1.5 py-0.5 rounded-md font-semibold border ${getExamTypeColorClass(item.examType)}`}>
-                {item.examType}
-              </span>
-            )}
-          </div>
-        </div>
-      )
-    },
-    {
-      key: "className",
-      label: "Kelas",
-      sortable: true,
-      render: (v: string, item: ExamRoomData) => {
-        if (item.allClasses) {
-          return (
-            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-100 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800/40 shadow-sm">
-              Semua Kelas
-            </span>
-          );
-        }
-        if (!v) return <span className="text-slate-400 text-xs">-</span>;
-        return (
-          <div className="flex flex-wrap gap-1 max-w-[120px]">
-            {v.split(", ").map((cls, idx) => (
-              <span key={idx} className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-700 border border-slate-200 dark:bg-slate-800/80 dark:text-slate-300 dark:border-slate-700">
-                {cls}
-              </span>
-            ))}
-          </div>
-        );
-      }
-    },
-    {
-      key: "duration",
-      label: "Durasi",
-      render: (v: any) => <span className="text-slate-500 font-medium">{(v || "0")} Menit</span>
-    },
-    {
-      key: "start_time",
-      label: "Waktu",
-      render: (v: any, item: ExamRoomData) => {
-        const start = item.start_time ? new Date(item.start_time) : null;
-        const end = item.end_time ? new Date(item.end_time) : null;
-
-        const isValidStart = start && !isNaN(start.getTime());
-        const isValidEnd = end && !isNaN(end.getTime());
-
-        return (
-          <div className="flex flex-col gap-0.5 text-xs text-slate-600 dark:text-slate-300 font-medium whitespace-nowrap">
-            <div className="flex items-center">
-              <span className="w-14">Mulai</span>
-              <span className="mr-1.5">:</span>
-              <span>{isValidStart ? `${start.toLocaleDateString("id-ID", { day: '2-digit', month: '2-digit' })} ${start.toLocaleTimeString("id-ID", { hour: '2-digit', minute: '2-digit' })}` : "-"}</span>
-            </div>
-            <div className="flex items-center">
-              <span className="w-14">Selesai</span>
-              <span className="mr-1.5">:</span>
-              <span>{isValidEnd ? `${end.toLocaleDateString("id-ID", { day: '2-digit', month: '2-digit' })} ${end.toLocaleTimeString("id-ID", { hour: '2-digit', minute: '2-digit' })}` : "-"}</span>
-            </div>
-          </div>
-        );
-      }
-    },
-    {
-      key: "actions",
-      label: "Status",
-      render: (_: any, item: ExamRoomData) => {
-        const now = Date.now();
-        const start = new Date(item.start_time).getTime();
-        const end = new Date(item.end_time).getTime();
-        if (item.status === "archive") return <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded">Arsip</span>;
-        if (item.isDisabled) return <span className="text-[10px] bg-red-100 text-red-500 px-1.5 py-0.5 rounded">Nonaktif</span>;
-        if (now < start) return <span className="text-[10px] bg-blue-100 text-blue-500 px-1.5 py-0.5 rounded">Menunggu</span>;
-        if (now > end) return <span className="text-[10px] bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded">Selesai</span>;
-        return <span className="text-[10px] bg-emerald-100 text-emerald-600 px-1.5 py-0.5 rounded animate-pulse">Berjalan</span>;
-      }
-    }
-  ];
 
   const generateNewToken = () => {
     const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -426,24 +395,6 @@ const ExamRoomsPage = () => {
     setIsDialogOpen(true);
   };
 
-  const handleForceEndRoom = async (room: ExamRoomData) => {
-    setConfirmDialog({
-      isOpen: true,
-      title: "Selesaikan Paksa",
-      description: "Akhiri pengerjaan ruang ujian ini untuk semua siswa sekarang?",
-      type: "danger",
-      confirmLabel: "Akhiri",
-      onConfirm: async () => {
-        try {
-          await pb.collection('exam_rooms').update(room.id, { end_time: new Date().toISOString() });
-          showAlert("Berhasil", "Ruang ujian telah diakhiri.", "success");
-        } catch (e) {
-          showAlert("Gagal", "Gagal mengakhiri ruang.", "danger");
-        }
-      }
-    });
-  };
-
   const handleToggleDisabled = (room: ExamRoomData) => {
     const isCurrentlyActive = room.isActive !== false;
     setConfirmDialog({
@@ -470,21 +421,39 @@ const ExamRoomsPage = () => {
   };
 
   const handleArchiveRoom = async (room: ExamRoomData) => {
-    try {
-      await pb.collection('exam_rooms').update(room.id, { status: "archive" });
-      showAlert("Berhasil", "Ruang diarsipkan.", "success");
-    } catch (e) {
-      showAlert("Gagal", "Gagal mengarsipkan.", "danger");
-    }
+    setConfirmDialog({
+      isOpen: true,
+      title: "Arsipkan Ruangan",
+      description: `Apakah Anda yakin ingin mengarsipkan ruang ujian "${room.room_name || room.examTitle}"?`,
+      type: "warning",
+      confirmLabel: "Arsipkan",
+      onConfirm: async () => {
+        try {
+          await pb.collection('exam_rooms').update(room.id, { status: "archive" });
+          showAlert("Berhasil", "Ruang diarsipkan.", "success");
+        } catch (e) {
+          showAlert("Gagal", "Gagal mengarsipkan.", "danger");
+        }
+      }
+    });
   };
 
   const handleRestoreRoom = async (room: ExamRoomData) => {
-    try {
-      await pb.collection('exam_rooms').update(room.id, { status: null });
-      showAlert("Berhasil", "Ruang dipulihkan.", "success");
-    } catch (e) {
-      showAlert("Gagal", "Gagal memulihkan.", "danger");
-    }
+    setConfirmDialog({
+      isOpen: true,
+      title: "Pulihkan Ruangan",
+      description: `Apakah Anda yakin ingin memulihkan ruang ujian "${room.room_name || room.examTitle}"?`,
+      type: "info",
+      confirmLabel: "Pulihkan",
+      onConfirm: async () => {
+        try {
+          await pb.collection('exam_rooms').update(room.id, { status: null });
+          showAlert("Berhasil", "Ruang dipulihkan.", "success");
+        } catch (e) {
+          showAlert("Gagal", "Gagal memulihkan.", "danger");
+        }
+      }
+    });
   };
 
   const handleDeleteClick = (room: ExamRoomData) => {
@@ -505,7 +474,6 @@ const ExamRoomsPage = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      // Jika Semua Kelas dipilih, kita masukkan seluruh daftar ID kelas yang ada
       const finalClassIds = formValues.allClasses
         ? (examClasses || []).map(c => c.id)
         : formValues.classId.split(",").filter(Boolean);
@@ -518,12 +486,10 @@ const ExamRoomsPage = () => {
         start_time: new Date(formValues.start_time).toISOString(),
         endTime: new Date(formValues.end_time).toISOString(),
         end_time: new Date(formValues.end_time).toISOString(),
-
         classIds: finalClassIds,
         classId: finalClassIds,
         allClasses: formValues.allClasses,
         all_classes: formValues.allClasses,
-
         duration: Number(formValues.duration),
         cheat_limit: Number(formValues.cheat_limit),
         submit_window: Number(formValues.submit_window),
@@ -559,36 +525,47 @@ const ExamRoomsPage = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between bg-card p-5 rounded-2xl border border-slate-200/60 dark:border-slate-800/40 shadow-sm backdrop-blur-sm">
+      {/* Header Bar */}
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between bg-card p-4 rounded-2xl border border-slate-200/60 dark:border-slate-800/40 shadow-sm backdrop-blur-sm">
         <div>
-          <h2 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
+          <h2 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
             <ClipboardList className="h-5 w-5 text-blue-500" />
             Ruang Ujian
           </h2>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Aktifkan dan kelola sesi ujian untuk Siswa.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex bg-slate-100 dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-800/80 p-1 rounded-xl text-xs font-semibold">
-            <button
-              onClick={() => setActiveTab("aktif")}
-              className={`px-3 py-1.5 rounded-lg transition-all ${activeTab === "aktif" ? "bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 shadow-sm" : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"}`}
-            >
-              Aktif
-            </button>
-            <button
-              onClick={() => setActiveTab("arsip")}
-              className={`px-3 py-1.5 rounded-lg transition-all ${activeTab === "arsip" ? "bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 shadow-sm" : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"}`}
-            >
-              Arsip
-            </button>
-          </div>
-          <Button onClick={handleCreateClick} size="sm" className="rounded-xl bg-blue-50 hover:bg-blue-100 border border-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 dark:border-blue-800/40 text-blue-700 font-semibold shadow-sm">
-            <Plus className="mr-1 h-3.5 w-3.5" /> Buka Ruang
-          </Button>
+          {isLoading ? (
+            <>
+              <Skeleton className="h-9 w-24 rounded-xl" />
+              <Skeleton className="h-9 w-32 rounded-2xl" />
+            </>
+          ) : (
+            <>
+              <div className="flex bg-slate-100 dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-800/80 p-1 rounded-xl text-xs font-semibold">
+                <button
+                  onClick={() => setActiveTab("aktif")}
+                  className={`px-3 py-1.5 rounded-lg transition-all ${activeTab === "aktif" ? "bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 shadow-sm" : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"}`}
+                >
+                  Aktif
+                </button>
+                <button
+                  onClick={() => setActiveTab("arsip")}
+                  className={`px-3 py-1.5 rounded-lg transition-all ${activeTab === "arsip" ? "bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 shadow-sm" : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"}`}
+                >
+                  Arsip
+                </button>
+              </div>
+              <Button onClick={handleCreateClick} size="sm" className="rounded-2xl bg-blue-50 hover:bg-blue-100 border border-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 dark:border-blue-800/40 text-blue-700 font-bold shadow-sm h-9 px-4">
+                <Plus className="mr-1 h-3.5 w-3.5" /> Buka Ruang
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
         <div className="bg-card p-4 rounded-2xl border border-slate-200/60 dark:border-slate-800/40 shadow-sm flex items-center justify-between backdrop-blur-sm">
           <div className="flex items-center gap-3">
             <div className="p-2.5 rounded-xl bg-blue-50 dark:bg-blue-900/10 text-blue-600 dark:text-blue-400">
@@ -618,7 +595,6 @@ const ExamRoomsPage = () => {
               {isLoading ? <Skeleton className="h-5 w-8" /> : totalOngoing}
             </p>
           </div>
-
           {/* Hover Breakdown Card */}
           <div className="absolute top-full left-0 right-0 mt-2 z-50 invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-all scale-95 group-hover:scale-100">
             <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl p-3 min-w-[200px] max-h-60 overflow-y-auto">
@@ -662,203 +638,127 @@ const ExamRoomsPage = () => {
         </div>
       </div>
 
-      <div className="flex flex-col md:flex-row gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-          <Input
-            placeholder="Cari ruang ujian..."
-            className="pl-9 rounded-xl bg-card border-slate-200/60 dark:border-slate-800 focus:ring-blue-500/20"
-            value={roomSearchQuery}
-            onChange={(e) => setRoomSearchQuery(e.target.value)}
-          />
-        </div>
-      </div>
-
+      {/* Main Table Section (Matching ExamsPage structure) */}
       {isLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="bg-card rounded-2xl border border-slate-200/60 dark:border-slate-800 p-5 space-y-4">
-              <div className="flex justify-between items-start">
-                <div className="space-y-2">
-                  <Skeleton className="h-5 w-32" />
-                  <Skeleton className="h-3 w-48" />
-                </div>
-                <Skeleton className="h-6 w-16 rounded-lg" />
-              </div>
-              <div className="space-y-2 py-4 border-y border-slate-100 dark:border-slate-800/50">
-                <Skeleton className="h-4 w-full" />
-                <Skeleton className="h-4 w-4/5" />
-              </div>
-              <div className="flex justify-between items-center">
-                <Skeleton className="h-8 w-24 rounded-xl" />
-                <div className="flex gap-2">
-                   <Skeleton className="h-8 w-8 rounded-lg" />
-                   <Skeleton className="h-8 w-8 rounded-lg" />
-                </div>
-              </div>
+        <Card>
+          <CardHeader className="p-4">
+             <CardTitle className="text-base font-semibold text-slate-800 dark:text-white">Daftar Ruang Ujian</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="rounded-xl border border-slate-200/60 dark:border-slate-800 overflow-hidden">
+               <Table>
+                 <TableHeader className="bg-slate-50/50 dark:bg-slate-900/50">
+                   <TableRow>
+                     <TableHead className="w-16 text-center">No</TableHead>
+                     <TableHead>Status</TableHead>
+                     <TableHead>Ruangan / Bank Soal</TableHead>
+                     <TableHead>Kelas</TableHead>
+                     <TableHead className="text-right">Aksi</TableHead>
+                   </TableRow>
+                 </TableHeader>
+                 <TableBody>
+                   {Array.from({ length: 8 }).map((_, i) => (
+                      <TableRow key={i}>
+                        <TableCell className="text-center"><Skeleton className="h-4 w-4 mx-auto" /></TableCell>
+                        <TableCell><Skeleton className="h-5 w-16 rounded-md" /></TableCell>
+                        <TableCell>
+                           <div className="space-y-1.5">
+                             <Skeleton className="h-4 w-48" />
+                             <Skeleton className="h-3 w-32" />
+                           </div>
+                        </TableCell>
+                        <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                        <TableCell className="text-right">
+                           <div className="flex justify-end gap-1.5">
+                             <Skeleton className="h-8 w-8 rounded-lg" />
+                             <Skeleton className="h-8 w-8 rounded-lg" />
+                             <Skeleton className="h-8 w-8 rounded-lg" />
+                           </div>
+                        </TableCell>
+                      </TableRow>
+                   ))}
+                 </TableBody>
+               </Table>
             </div>
-          ))}
-        </div>
+          </CardContent>
+        </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-10">
-          {rooms
-            .filter(r => activeTab === "arsip" ? r.status === "archive" : r.status !== "archive")
-            .filter(r => {
-              const q = roomSearchQuery.toLowerCase();
-              return (r.room_name || "").toLowerCase().includes(q) || 
-                     (r.examTitle || "").toLowerCase().includes(q) || 
-                     (r.subjectName || "").toLowerCase().includes(q);
-            })
-            .map((room) => {
-              const now = Date.now();
-              const start = new Date(room.start_time).getTime();
-              const end = new Date(room.end_time).getTime();
-              
-              let statusLabel = "Berjalan";
-              let statusColor = "bg-emerald-100 text-emerald-600 border-emerald-200 animate-pulse";
-              
-              if (room.status === "archive") {
-                statusLabel = "Arsip";
-                statusColor = "bg-slate-100 text-slate-500 border-slate-200";
-              } else if (room.isDisabled) {
-                statusLabel = "Nonaktif";
-                statusColor = "bg-red-100 text-red-500 border-red-200";
-              } else if (now < start) {
-                statusLabel = "Menunggu";
-                statusColor = "bg-blue-100 text-blue-500 border-blue-200";
-              } else if (now > end) {
-                statusLabel = "Selesai";
-                statusColor = "bg-slate-200 text-slate-600 border-slate-300";
-              }
-              
-              const isValidStart = room.start_time && !isNaN(new Date(room.start_time).getTime());
-              const isValidEnd = room.end_time && !isNaN(new Date(room.end_time).getTime());
+        <Card>
+          <CardHeader className="p-4">
+            <CardTitle className="text-base font-semibold text-slate-800 dark:text-white">Daftar Ruang Ujian</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <DataTable
+              data={rooms.filter(r => activeTab === "arsip" ? r.status === "archive" : r.status !== "archive")}
+              columns={columns}
+              searchPlaceholder="Cari ruang ujian..."
+              emptyMessage={`Belum ada ruang ujian ${activeTab}.`}
+              actions={(room: ExamRoomData) => (
+                <div className="flex justify-end gap-1.5 items-center whitespace-nowrap">
+                  <button
+                    className="p-1.5 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-lg dark:bg-indigo-900/10 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-800/40 transition-colors"
+                    onClick={() => handleMonitorClick(room)}
+                    title="Monitor Ujian"
+                  >
+                    <Search className="h-4 w-4" />
+                  </button>
 
-              return (
-                <div key={room.id} className="group bg-card rounded-2xl border border-slate-200/60 dark:border-slate-800 hover:border-blue-400 dark:hover:border-blue-800 transition-all duration-300 shadow-sm hover:shadow-md overflow-hidden flex flex-col">
-                   <div className="p-5 flex-1 space-y-4">
-                      <div className="flex justify-between items-start gap-3">
-                         <div className="space-y-1 min-w-0">
-                            <h3 className="font-bold text-slate-800 dark:text-white truncate" title={room.room_name}>{room.room_name || "Tanpa Nama"}</h3>
-                            <p className="text-[11px] text-slate-500 font-medium truncate" title={room.examTitle}>{room.examTitle}</p>
-                         </div>
-                         <span className={`shrink-0 text-[10px] px-2 py-0.5 rounded-full font-bold border ${statusColor}`}>
-                            {statusLabel}
-                         </span>
-                      </div>
+                  <button
+                    className="p-1.5 bg-sky-50 text-sky-600 hover:bg-sky-100 rounded-lg dark:bg-sky-900/10 dark:text-sky-400 border border-sky-100 dark:border-sky-800/40 transition-colors"
+                    onClick={() => handleEditClick(room)}
+                    title="Edit Ruangan"
+                  >
+                    <Edit className="h-4 w-4" />
+                  </button>
 
-                      <div className="flex flex-wrap gap-2">
-                         <span className={`text-[9px] px-1.5 py-0.5 rounded-md font-bold border ${getExamTypeColorClass(room.examType || "UMUM")}`}>
-                            {room.examType || "UMUM"}
-                         </span>
-                         <span className="text-[9px] px-1.5 py-0.5 rounded-md font-bold border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-slate-600 dark:text-slate-400">
-                            {room.subjectName || "Mapel -"}
-                         </span>
-                         {room.allClasses ? (
-                           <span className="text-[9px] px-1.5 py-0.5 rounded-md font-bold border border-blue-100 bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800/40">
-                             Semua Kelas
-                           </span>
-                         ) : room.className && (
-                            <span className="text-[9px] px-1.5 py-0.5 rounded-md font-bold border border-slate-200 bg-slate-50 text-slate-600 truncate max-w-[120px]">
-                              {room.className}
-                            </span>
-                         )}
-                      </div>
+                  {(role === "admin" || room.examTeacherId === teacherId) && (
+                    <>
+                      <button
+                        className={cn(
+                          "p-1.5 rounded-lg border transition-colors",
+                          room.isDisabled 
+                            ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border-emerald-100 dark:bg-emerald-900/10 dark:text-emerald-400 dark:border-emerald-800/40" 
+                            : "bg-rose-50 text-rose-700 hover:bg-rose-100 border-rose-100 dark:bg-rose-900/10 dark:text-rose-400 dark:border-rose-800/40"
+                        )}
+                        onClick={() => handleToggleDisabled(room)}
+                        title={room.isDisabled ? "Aktifkan" : "Nonaktifkan"}
+                      >
+                        {room.isDisabled ? <Power className="h-4 w-4" /> : <PowerOff className="h-4 w-4" />}
+                      </button>
 
-                      <div className="py-3 border-y border-slate-100 dark:border-slate-800/50 space-y-2">
-                         <div className="flex items-center justify-between text-[11px]">
-                            <span className="text-slate-400 flex items-center gap-1.5"><Clock className="h-3 w-3" /> Pelaksanaan</span>
-                            <span className="font-mono text-slate-600 dark:text-slate-300">
-                               {isValidStart ? new Date(room.start_time).toLocaleDateString("id-ID", {day:'2-digit', month:'short'}) : "-"} • {room.duration}m
-                            </span>
-                         </div>
-                         <div className="flex items-center justify-between text-[11px]">
-                            <span className="text-slate-400 flex items-center gap-1.5"><Users className="h-3 w-3" /> Siswa Aktif</span>
-                            <span className="font-bold text-emerald-600">{liveBreakdown[room.id] || 0} Ujian</span>
-                         </div>
-                      </div>
-                   </div>
-
-                   <div className="px-5 py-3 bg-slate-50/50 dark:bg-slate-900/40 flex justify-between items-center gap-2">
-                       <Button 
-                         variant="ghost" 
-                         size="sm" 
-                         onClick={() => handleMonitorClick(room)}
-                         className="h-8 text-[11px] font-bold text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl"
-                       >
-                         Lihat Monitoring
-                       </Button>
-                       
-                       <div className="flex items-center gap-1">
+                      {activeTab === "aktif" ? (
+                        <button
+                          className="p-1.5 bg-amber-50 text-amber-700 hover:bg-amber-100 rounded-lg dark:bg-amber-900/10 dark:text-amber-400 border border-amber-100 dark:border-amber-800/40 transition-colors"
+                          onClick={() => handleArchiveRoom(room)}
+                          title="Arsipkan"
+                        >
+                          <Archive className="h-4 w-4" />
+                        </button>
+                      ) : (
+                        <>
                           <button
-                            className="p-1.5 text-slate-400 hover:text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-lg transition-colors"
-                            onClick={() => navigate(`/admin/bank-soal/${room.examId}/questions`)}
-                            title="Bank Soal"
+                            className="p-1.5 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-lg dark:bg-indigo-900/10 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-800/40 transition-colors"
+                            onClick={() => handleRestoreRoom(room)}
+                            title="Pulihkan"
                           >
-                            <BookOpen className="h-4 w-4" />
+                            <RotateCw className="h-4 w-4" />
                           </button>
-
-                          {(role === "admin" || room.examTeacherId === teacherId) && (
-                            <>
-                              <button
-                                className={`p-1.5 rounded-lg transition-colors ${room.isDisabled
-                                  ? "text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
-                                  : "text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40"}`}
-                                onClick={() => handleToggleDisabled(room)}
-                                title={room.isDisabled ? "Aktifkan Ruangan" : "Non-aktifkan"}
-                              >
-                                {room.isDisabled ? <Power className="h-4 w-4" /> : <PowerOff className="h-4 w-4" />}
-                              </button>
-
-                              <button
-                                className="p-1.5 text-slate-400 hover:text-sky-600 hover:bg-sky-50 dark:hover:bg-sky-900/20 rounded-lg transition-colors"
-                                onClick={() => handleEditClick(room)}
-                                title="Edit Ruangan"
-                              >
-                                <Edit className="h-4 w-4" />
-                              </button>
-
-                              {activeTab === "aktif" ? (
-                                <button
-                                  className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded-lg transition-colors"
-                                  onClick={() => handleArchiveRoom(room)}
-                                  title="Arsipkan"
-                                >
-                                  <Archive className="h-4 w-4" />
-                                </button>
-                              ) : (
-                                <button
-                                  className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg transition-colors"
-                                  onClick={() => handleRestoreRoom(room)}
-                                  title="Pulihkan"
-                                >
-                                  <RotateCw className="h-4 w-4" />
-                                </button>
-                              )}
-
-                              {activeTab === "arsip" && (
-                                <button
-                                  className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg transition-colors"
-                                  onClick={() => handleDeleteClick(room)}
-                                  title="Hapus Permanen"
-                                >
-                                  <Trash className="h-4 w-4" />
-                                </button>
-                              )}
-                            </>
-                          )}
-                       </div>
-                   </div>
+                          <button
+                            className="p-1.5 bg-rose-50 text-rose-700 hover:bg-rose-100 rounded-lg dark:bg-rose-900/10 dark:text-rose-400 border border-rose-100 dark:border-rose-800/40 transition-colors"
+                            onClick={() => handleDeleteClick(room)}
+                            title="Hapus Permanen"
+                          >
+                            <Trash className="h-4 w-4" />
+                          </button>
+                        </>
+                      )}
+                    </>
+                  )}
                 </div>
-              );
-            })}
-          {rooms.filter(r => activeTab === "arsip" ? r.status === "archive" : r.status !== "archive").length === 0 && (
-            <div className="col-span-full py-20 text-center bg-slate-50 dark:bg-slate-900/20 rounded-3xl border-2 border-dashed border-slate-100 dark:border-slate-800/50">
-               <ClipboardList className="h-10 w-10 text-slate-300 mx-auto mb-3" />
-               <p className="text-slate-500 font-medium">Belum ada ruang ujian {activeTab}.</p>
-            </div>
-          )}
-        </div>
+              )}
+            />
+          </CardContent>
+        </Card>
       )}
 
       {/* Dialog Create/Edit */}
@@ -956,7 +856,6 @@ const ExamRoomsPage = () => {
               )}
             </div>
 
-
             <div className="grid grid-cols-2 gap-3">
               <FormField id="start_time" label="Waktu Mulai" error={undefined}>
                 <Input type="datetime-local" value={formValues.start_time} onChange={(e) => setFormValues({ ...formValues, start_time: e.target.value })} required />
@@ -965,7 +864,6 @@ const ExamRoomsPage = () => {
                 <Input type="datetime-local" value={formValues.end_time} onChange={(e) => setFormValues({ ...formValues, end_time: e.target.value })} required />
               </FormField>
             </div>
-
 
             <div className="space-y-4 pt-1 border-t mt-4">
               <div className="grid grid-cols-2 gap-3 mt-2">
@@ -1010,13 +908,10 @@ const ExamRoomsPage = () => {
         onClose={() => setDeleteDialogOpen(false)}
         onConfirm={handleConfirmDelete}
         title="Hapus Ruang Ujian"
-        description="Apakah Anda yakin ingin menghapus ruang ujian ini? Data absensi/attempts akan hilang."
+        description="Apakah Anda yakin ingin menghapus ruang ujian ini? Data pengerjaan Siswa akan hilang."
         itemName="Ruang ujian ini"
         isLoading={isDeleting}
       />
-
-      {/* Monitoring Dialogs removed - moved to MonitoringPage.tsx */}
-
 
       <ConfirmationDialog
         isOpen={confirmDialog.isOpen}
@@ -1035,5 +930,3 @@ const ExamRoomsPage = () => {
 };
 
 export default ExamRoomsPage;
-
-

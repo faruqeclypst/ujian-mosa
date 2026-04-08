@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import pb from "../lib/pocketbase";
 import { uploadInventoryImage } from "../lib/storage"; 
+import { Skeleton } from "../components/ui/skeleton";
+import { ThemeToggle } from "../components/ui/theme-toggle";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import FormField from "../components/forms/FormField";
@@ -18,7 +20,8 @@ import {
   FileJson, 
   AlertTriangle,
   RefreshCw,
-  CheckCircle2
+  CheckCircle2,
+  Trash
 } from "lucide-react";
 
 const COLLECTIONS = [
@@ -176,6 +179,7 @@ const SettingsPage = () => {
       const payload: any = {
         name: schoolName,
         logo: finalLogoUrl,
+        logoUrl: finalLogoUrl, // Keep synced
         allowed_types: allowedTypes,
         groq_api_key: groqApiKey,
         ai_model: aiModel
@@ -198,6 +202,13 @@ const SettingsPage = () => {
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleDeleteLogo = () => {
+    setSchoolLogo("");
+    setLogoPreview(null);
+    setLogoFile(null);
+    addToast({ title: "Logo Dihapus", description: "Logo akan dihapus permanen setelah Klik Simpan.", type: "info" });
   };
 
   // 🚀 Backup Logic: Export
@@ -389,13 +400,6 @@ const SettingsPage = () => {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center p-8">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6">
@@ -406,6 +410,31 @@ const SettingsPage = () => {
             Pengaturan Aplikasi
           </h2>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Kelola identitas sekolah, tipe soal, dan backup data.</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {loading ? (
+             <Skeleton className="h-9 w-40 rounded-2xl" />
+          ) : (
+            <Button 
+               form="settings-form"
+               type="submit" 
+               disabled={saving} 
+               size="sm"
+               className="rounded-2xl bg-blue-50 hover:bg-blue-100 border border-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 dark:border-blue-800/40 text-blue-700 font-bold shadow-sm h-9 px-4 transition-all active:scale-95"
+            >
+              {saving ? (
+                <>
+                  <RefreshCw className="mr-2 h-3.5 w-3.5 animate-spin" />
+                  Menyimpan...
+                </>
+              ) : (
+                <>
+                  <Save className="mr-2 h-3.5 w-3.5" />
+                  Simpan Perubahan
+                </>
+              )}
+            </Button>
+          )}
         </div>
       </div>
 
@@ -418,7 +447,7 @@ const SettingsPage = () => {
               </CardTitle>
             </CardHeader>
             <CardContent className="p-6">
-              <form onSubmit={handleSave} className="space-y-4">
+              <form id="settings-form" onSubmit={handleSave} className="space-y-4">
                 <FormField id="schoolName" label="Nama Sekolah" error={undefined}>
                   <Input
                     value={schoolName}
@@ -438,13 +467,29 @@ const SettingsPage = () => {
                       )}
                     </div>
                     <div className="flex-1 space-y-1">
-                      <button
-                        type="button"
-                        onClick={() => setIsPickerOpen(true)}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-white dark:bg-slate-800 border border-slate-200/60 dark:border-slate-800/60 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer shadow-sm transition-all"
-                      >
-                        <Upload className="h-3.5 w-3.5" /> Ganti Logo
-                      </button>
+                      {loading ? (
+                        <Skeleton className="h-8 w-28 rounded-xl" />
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setIsPickerOpen(true)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-blue-50 hover:bg-blue-100 border border-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 dark:border-blue-800/40 text-blue-700 cursor-pointer shadow-sm transition-all active:scale-95"
+                          >
+                            <Upload className="h-3.5 w-3.5" /> Ganti Logo
+                          </button>
+                          {(schoolLogo || logoFile) && (
+                            <button
+                              type="button"
+                              onClick={handleDeleteLogo}
+                              disabled={saving}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-rose-50 hover:bg-rose-100 border border-rose-100 dark:bg-rose-900/30 dark:text-rose-400 dark:hover:bg-rose-900/50 dark:border-rose-800/40 text-rose-700 cursor-pointer shadow-sm transition-all active:scale-95"
+                            >
+                              <Trash className="h-3.5 w-3.5" /> Hapus Logo
+                            </button>
+                          )}
+                        </div>
+                      )}
                       <p className="text-[10px] text-slate-400 dark:text-slate-500">Logo akan disimpan ke Cloudflare R2.</p>
                     </div>
                   </div>
@@ -481,17 +526,6 @@ const SettingsPage = () => {
                     </FormField>
                   </div>
                 </div>
-
-                <div className="pt-4 border-t border-slate-200/60 dark:border-slate-800/40 mt-4 flex justify-end">
-                  <Button 
-                     type="submit" 
-                     disabled={saving} 
-                     className="bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl h-9 gap-1.5"
-                  >
-                    <Save className="h-3.5 w-3.5" />
-                    {saving ? "Menyimpan..." : "Simpan Perubahan"}
-                  </Button>
-                </div>
               </form>
             </CardContent>
           </Card>
@@ -508,17 +542,21 @@ const SettingsPage = () => {
                       <div key={type.id} className="flex items-center justify-between p-3 rounded-xl border border-slate-100 dark:border-slate-800/60 bg-slate-50/50 dark:bg-slate-900/30">
                           <div className="flex flex-col">
                               <span className="text-xs font-bold text-slate-700 dark:text-slate-200">{type.label}</span>
-                              <span className="text-[10px] text-slate-400">{allowedTypes[type.id] ? "Aktif" : "Dinonaktifkan"}</span>
+                              <span className="text-[10px] text-slate-400">{loading ? <Skeleton className="h-3 w-12" /> : (allowedTypes[type.id] ? "Aktif" : "Dinonaktifkan")}</span>
                           </div>
-                          <label className="relative inline-flex items-center cursor-pointer group">
-                              <input 
-                                  type="checkbox" 
-                                  className="sr-only peer" 
-                                  checked={allowedTypes[type.id] || false}
-                                  onChange={(e) => setAllowedTypes(prev => ({ ...prev, [type.id]: e.target.checked }))}
-                              />
-                              <div className="w-11 h-6 bg-slate-200 dark:bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-slate-600 peer-checked:bg-blue-600 shadow-inner group-hover:after:scale-110"></div>
-                          </label>
+                          {loading ? (
+                            <Skeleton className="h-6 w-11 rounded-full" />
+                          ) : (
+                            <label className="relative inline-flex items-center cursor-pointer group">
+                                <input 
+                                    type="checkbox" 
+                                    className="sr-only peer" 
+                                    checked={allowedTypes[type.id] || false}
+                                    onChange={(e) => setAllowedTypes(prev => ({ ...prev, [type.id]: e.target.checked }))}
+                                />
+                                <div className="w-11 h-6 bg-slate-200 dark:bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-slate-600 peer-checked:bg-blue-600 shadow-inner group-hover:after:scale-110"></div>
+                            </label>
+                          )}
                       </div>
                   ))}
               </div>
@@ -527,7 +565,7 @@ const SettingsPage = () => {
         </div>
 
         <div className="space-y-6">
-          <Card className="rounded-2xl border border-slate-200/60 dark:border-slate-800/40 shadow-sm bg-gradient-to-br from-indigo-500 to-blue-700 text-white overflow-hidden relative">
+          <Card className="rounded-2xl border border-slate-200/60 dark:border-slate-800/40 shadow-sm bg-gradient-to-br from-indigo-500 to-blue-700 dark:from-indigo-900 dark:to-slate-950 text-white overflow-hidden relative">
             <div className="absolute top-0 right-0 p-4 opacity-10">
                <Database size={80} />
             </div>
@@ -541,24 +579,33 @@ const SettingsPage = () => {
                 Ekspor seluruh data aplikasi (Soal, Siswa, Hasil Ujian, dll) ke dalam file JSON untuk cadangan atau pindah server.
               </p>
               
-              <div className="space-y-2 pt-2">
-                <Button 
-                  onClick={handleExportDB} 
-                  disabled={isBackupLoading}
-                  className="w-full bg-white/20 hover:bg-white/30 border border-white/30 text-white font-bold rounded-xl h-11 flex items-center justify-center gap-2 transition-all active:scale-95"
-                >
-                  {isBackupLoading ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-                  Ekspor Database (.json)
-                </Button>
+              <div className="flex flex-col gap-3">
+                {loading ? (
+                  <>
+                    <Skeleton className="h-11 w-full rounded-xl" />
+                    <Skeleton className="h-11 w-full rounded-xl" />
+                  </>
+                ) : (
+                  <>
+                    <Button 
+                      onClick={handleExportDB} 
+                      disabled={isBackupLoading}
+                      className="w-full bg-white/20 hover:bg-white/30 border border-white/30 text-white font-bold rounded-xl h-11 flex items-center justify-center gap-2 transition-all active:scale-95"
+                    >
+                      {isBackupLoading ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                      Ekspor Database (.json)
+                    </Button>
 
-                <Button 
-                  onClick={() => fileInputRef.current?.click()} 
-                  disabled={isBackupLoading}
-                  className="w-full bg-white text-blue-700 hover:bg-slate-50 font-bold rounded-xl h-11 flex items-center justify-center gap-2 transition-all active:scale-95 shadow-lg"
-                >
-                  <Upload className="h-4 w-4" />
-                  Impor Database
-                </Button>
+                    <Button 
+                      onClick={() => fileInputRef.current?.click()} 
+                      disabled={isBackupLoading}
+                      className="w-full bg-white text-blue-700 hover:bg-slate-50 font-bold rounded-xl h-11 flex items-center justify-center gap-2 transition-all active:scale-95 shadow-lg"
+                    >
+                      <Upload className="h-4 w-4" />
+                      Impor Database
+                    </Button>
+                  </>
+                )}
                 <input 
                   type="file" 
                   ref={fileInputRef} 
@@ -569,14 +616,38 @@ const SettingsPage = () => {
               </div>
 
               <div className="pt-4 mt-2 border-t border-white/20">
-                <button
-                   disabled={isBackupLoading}
-                   onClick={() => setIsResetConfirmOpen(true)}
-                   className="w-full py-2.5 rounded-xl text-xs font-bold bg-rose-500/80 hover:bg-rose-600 text-white border border-rose-400/50 shadow-sm transition-all"
-                >
-                  Hapus Semua Data
-                </button>
+                {loading ? (
+                  <Skeleton className="h-10 w-full rounded-xl" />
+                ) : (
+                  <button
+                    disabled={isBackupLoading}
+                    onClick={() => setIsResetConfirmOpen(true)}
+                    className="w-full py-2.5 rounded-xl text-xs font-bold bg-white/10 hover:bg-rose-500 border border-white/20 hover:border-rose-400 text-white shadow-sm transition-all"
+                  >
+                    Hapus Semua Data
+                  </button>
+                )}
               </div>
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-2xl border border-slate-200/60 dark:border-slate-800/40 shadow-sm backdrop-blur-sm">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                <ImageIcon className="h-3 w-3" /> Tampilan & Tema
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between p-3 rounded-xl border border-slate-100 dark:border-slate-800/60 bg-slate-50/50 dark:bg-slate-900/30">
+                <div className="flex flex-col">
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-200">Mode Gelap (Dark Mode)</span>
+                  <span className="text-[10px] text-slate-400">Aktifkan tema gelap sistem</span>
+                </div>
+                <ThemeToggle />
+              </div>
+              <p className="text-[10px] text-slate-400 dark:text-slate-500 leading-relaxed px-1">
+                Pengaturan tema bersifat personal dan tersimpan secara lokal pada browser Anda.
+              </p>
             </CardContent>
           </Card>
 
