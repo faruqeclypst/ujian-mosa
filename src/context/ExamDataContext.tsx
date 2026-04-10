@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from "react";
+import { useAuth } from "./AuthContext";
 import pb from "../lib/pocketbase";
 import type {
   Teacher, TeacherPayload,
@@ -53,6 +54,7 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
   const [universalToken, setUniversalToken] = useState("");
   const [tokenUpdatedAt, setTokenUpdatedAt] = useState<any>(null);
   const [timeLeft, setTimeLeft] = useState("--:--");
+  const { role } = useAuth();
 
   // Helper untuk memuai data awal dan subscribe ke perubahan Realtime
   const setupRealtime = useCallback((collection: string, setter: (data: any[]) => void) => {
@@ -171,6 +173,7 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     if (!tokenUpdatedAt) return;
+    let isUpdating = false;
 
     const timer = setInterval(async () => {
       const now = Date.now();
@@ -180,19 +183,31 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
 
       if (diff <= 0) {
         setTimeLeft("00:00");
-        try {
-          const records = await pb.collection('settings').getFullList();
-          if (records.length > 0) {
-            const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-            let token = "";
-            for (let i = 0; i < 6; i++) token += chars.charAt(Math.floor(Math.random() * chars.length));
+        
+        // 🔒 Hanya Admin yang boleh mentrigger update token ke database
+        // Mencegah error 403 atau konflik jika banyak user membuka dashboard
+        if (role?.toLowerCase() === "admin" && !isUpdating) {
+          isUpdating = true;
+          try {
+            // Kita ambil row terbaru
+            const records = await pb.collection('settings').getFullList({ limit: 1 });
+            if (records.length > 0) {
+              const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; 
+              let token = "";
+              for (let i = 0; i < 6; i++) token += chars.charAt(Math.floor(Math.random() * chars.length));
 
-            await pb.collection('settings').update(records[0].id, {
-              universal_token: token,
-              universal_token_updated_at: new Date().toISOString()
-            });
+              await pb.collection('settings').update(records[0].id, {
+                universal_token: token,
+                universal_token_updated_at: new Date().toISOString()
+              });
+              console.log("Token universal diperbarui otomatis:", token);
+            }
+          } catch (e) {
+            console.error("Gagal memperbarui token universal:", e);
+          } finally {
+            isUpdating = false;
           }
-        } catch (e) { }
+        }
       } else {
         const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
         const s = Math.floor((diff % (1000 * 60)) / 1000);
@@ -200,7 +215,7 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
       }
     }, 1000);
     return () => clearInterval(timer);
-  }, [tokenUpdatedAt]);
+  }, [tokenUpdatedAt, role]);
 
   // --- Teacher Actions ---
   const createTeacher = async (payload: TeacherPayload) => {

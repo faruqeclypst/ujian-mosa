@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Plus, Trash, Edit, Users, Archive, RotateCw, BookOpen, ClipboardList, Lock, Clock, ChevronDown, ChevronRight, Power, PowerOff, Search } from "lucide-react";
+import { Plus, Trash, Edit, Users, Archive, RotateCw, BookOpen, ClipboardList, Lock, Clock, ChevronDown, ChevronRight, Power, PowerOff, Search, ShieldAlert } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "../../components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../../components/ui/dialog";
@@ -42,6 +42,7 @@ export interface ExamRoomData {
   teacherName?: string;
   show_result?: boolean;
   isActive?: boolean;
+  is_exambro?: boolean;
 }
 
 const ExamRoomsPage = () => {
@@ -70,6 +71,7 @@ const ExamRoomsPage = () => {
     submit_window: 10,
     room_code: "",
     show_result: true,
+    is_exambro: false,
   });
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -161,7 +163,17 @@ const ExamRoomsPage = () => {
       sortable: true,
       render: (v: string, room: ExamRoomData) => (
         <div className="flex flex-col gap-0.5">
-          <span className="font-bold text-slate-800 dark:text-white text-sm tracking-tight line-clamp-1">{v || "Tanpa Nama"}</span>
+          <div className="flex items-center gap-1.5">
+            <span className="font-bold text-slate-800 dark:text-white text-sm tracking-tight line-clamp-1">{v || "Tanpa Nama"}</span>
+            {room.is_exambro && (
+              <div className="group/shield relative">
+                <ShieldAlert className="h-3 w-3 text-orange-500 fill-orange-500/10" />
+                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-slate-900 text-white text-[8px] font-bold rounded opacity-0 group-hover/shield:opacity-100 transition-opacity whitespace-nowrap z-50 pointer-events-none">
+                  Wajib Exambro
+                </div>
+              </div>
+            )}
+          </div>
           <span className="text-[10px] text-slate-500 font-medium truncate italic" title={room.examTitle}>{room.examTitle}</span>
         </div>
       )
@@ -327,7 +339,8 @@ const ExamRoomsPage = () => {
             examType: (examObj as any)?.examType || (examObj as any)?.examtype || "UMUM",
             subjectName: subjectObj?.name || "N/A",
             teacherName: teacherObj?.name || "N/A",
-            className: className
+            className: className,
+            is_exambro: room.is_exambro || (room as any).isExambro || false
           } as any as ExamRoomData;
         });
 
@@ -371,6 +384,7 @@ const ExamRoomsPage = () => {
       submit_window: 10,
       room_code: "",
       show_result: true,
+      is_exambro: false,
     });
     setIsDialogOpen(true);
   };
@@ -391,6 +405,7 @@ const ExamRoomsPage = () => {
       submit_window: room.submit_window || 0,
       room_code: room.room_code || "",
       show_result: room.show_result !== false,
+      is_exambro: room.is_exambro || false,
     });
     setIsDialogOpen(true);
   };
@@ -495,6 +510,7 @@ const ExamRoomsPage = () => {
         submit_window: Number(formValues.submit_window),
         room_code: formValues.room_code,
         show_result: formValues.show_result,
+        is_exambro: formValues.is_exambro,
         isActive: true,
         status: "active",
         isDisabled: false

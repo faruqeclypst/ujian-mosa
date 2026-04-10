@@ -135,6 +135,8 @@ const QuestionsPage = () => {
     fetchSettings();
   }, []);
 
+
+
   const [exam, setExam] = useState<any>(null);
   const [questions, setQuestions] = useState<QuestionData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -401,6 +403,27 @@ const QuestionsPage = () => {
     const timer = setTimeout(fetchSuggestions, 800);
     return () => clearTimeout(timer);
   }, [aiLevel, aiSubject, aiDifficulty, aiType, aiFocus, isAiLiteracy]);
+
+  useEffect(() => {
+    // 🧮 Render Math using KaTeX Auto-render
+    const renderMath = () => {
+      if ((window as any).renderMathInElement) {
+        (window as any).renderMathInElement(document.body, {
+          delimiters: [
+            { left: "$$", right: "$$", display: true },
+            { left: "$", right: "$", display: false },
+            { left: "\\(", right: "\\)", display: false },
+            { left: "\\[", right: "\\]", display: true }
+          ],
+          throwOnError: false
+        });
+      }
+    };
+    
+    // Jalankan setelah DOM terupdate
+    const timer = setTimeout(renderMath, 500);
+    return () => clearTimeout(timer);
+  }, [questions, isDialogOpen, isPreviewOpen, isBatchModalOpen]);
 
   const handleRandomFill = () => {
     const presets = [
@@ -901,12 +924,13 @@ const QuestionsPage = () => {
         [{ 'align': [] }],
         [{ 'color': [] }, { 'background': [] }],
         [{ 'list': 'ordered' }, { 'list': 'bullet' }],
-        ['image', 'clean']
+        ['image', 'formula', 'clean']
       ],
       handlers: {
         image: imageHandler
       }
     },
+    formula: true,
     imageResize: {
       parchment: Quill.import('parchment'),
       modules: ['Resize', 'DisplaySize', 'Toolbar']

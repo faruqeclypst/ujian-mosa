@@ -683,6 +683,42 @@ const CBTPage = () => {
           </Button>
         </div>
       )}
+
+      {/* Per-Room Exambro Enforcement */}
+      {roomData?.is_exambro && !isExamBrowser && !loading && !isLocked && (
+        <div className="fixed inset-0 z-[60] bg-slate-950 flex flex-col items-center justify-center p-6 text-center animate-in zoom-in-95 duration-500">
+           <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-red-600 via-orange-500 to-red-600 animate-gradient-x"></div>
+           <div className="w-24 h-24 bg-red-100/10 rounded-[35%] flex items-center justify-center mb-8 border border-red-500/30 shadow-2xl shadow-red-500/20">
+             <ShieldAlert className="w-12 h-12 text-red-500 animate-bounce" />
+           </div>
+           <h2 className="text-3xl font-black text-white mb-4 uppercase tracking-tighter">Akses Ruangan Terkunci</h2>
+           <p className="text-slate-400 text-sm font-bold max-w-sm mb-10 leading-relaxed">
+             Ruangan <span className="text-white">"{roomData?.room_name}"</span> membutuhkan aplikasi <span className="text-red-500">EXAMBRO</span> resmi untuk dapat diakses.
+           </p>
+           
+           <div className="bg-white/5 border border-white/10 rounded-3xl p-6 mb-10 w-full max-w-sm text-left">
+             <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3">Info Perangkat:</p>
+             <div className="text-[10px] text-slate-300 font-mono break-all opacity-60 leading-normal">
+               {navigator.userAgent}
+             </div>
+           </div>
+
+           <div className="flex flex-col gap-4 w-full max-w-xs">
+             <Button
+               onClick={() => window.location.reload()}
+               className="bg-white hover:bg-slate-100 text-slate-900 h-14 rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl"
+             >
+               Muat Ulang Halaman
+             </Button>
+             <button
+                onClick={() => navigate("/")}
+                className="text-slate-500 hover:text-white text-[11px] font-bold uppercase tracking-widest transition-colors"
+             >
+                Kembali ke Dashboard
+             </button>
+           </div>
+        </div>
+      )}
       <header className="sticky top-0 z-50 bg-white/90 dark:bg-slate-900/90 backdrop-blur-3xl border-b border-slate-100 dark:border-slate-800 h-16 sm:h-20 px-4 sm:px-8 flex items-center justify-between shadow-sm">
         <div className="flex items-center gap-2 sm:gap-4">
           <div className="flex items-center gap-2 sm:gap-3 bg-slate-100 dark:bg-slate-800 px-3 sm:px-4 py-1.5 sm:py-2 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">

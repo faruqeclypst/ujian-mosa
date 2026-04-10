@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import pb from "../lib/pocketbase";
 import { uploadInventoryImage } from "../lib/storage"; 
+import { AI_MODELS, testAIConnection } from "../lib/ai";
 import { Skeleton } from "../components/ui/skeleton";
 import { ThemeToggle } from "../components/ui/theme-toggle";
 import { Button } from "../components/ui/button";
@@ -44,9 +45,12 @@ const SettingsPage = () => {
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [groqApiKey, setGroqApiKey] = useState("");
-  const [aiModel, setAiModel] = useState("llama-3.1-7b-instant");
+  const [aiModel, setAiModel] = useState(AI_MODELS[0].id);
+  const [isExambroEnabled, setIsExambroEnabled] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [isTestingAI, setIsTestingAI] = useState(false);
+  const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
   const { addToast } = useToast();
 
   const [isPickerOpen, setIsPickerOpen] = useState(false);
@@ -97,7 +101,8 @@ const SettingsPage = () => {
         setSettingsId(data.id);
         setSchoolName(data.name || "E-Ujian");
         setGroqApiKey(data.groq_api_key || "");
-        setAiModel(data.ai_model || "llama-3.1-7b-instant");
+        setAiModel(data.ai_model || AI_MODELS[0].id);
+        setIsExambroEnabled(data.is_exambro_enabled ?? false);
         
         const logoUrl = data.logoUrl || data.logo || "";
         setSchoolLogo(logoUrl);
@@ -112,6 +117,28 @@ const SettingsPage = () => {
       console.error("Settings fetch err", e);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleTestAI = async () => {
+    if (!groqApiKey) {
+      addToast({ title: "Gagal", description: "Masukkan API Key terlebih dahulu.", type: "error" });
+      return;
+    }
+    setIsTestingAI(true);
+    setTestResult(null);
+    try {
+      const res = await testAIConnection(groqApiKey, aiModel);
+      setTestResult(res);
+      if (res.success) {
+        addToast({ title: "Berhasil!", description: "Koneksi AI berjalan lancar.", type: "success" });
+      } else {
+        addToast({ title: "Gagal", description: res.message, type: "error" });
+      }
+    } catch (e) {
+      setTestResult({ success: false, message: "Terjadi kesalahan sistem." });
+    } finally {
+      setIsTestingAI(false);
     }
   };
 
@@ -182,7 +209,8 @@ const SettingsPage = () => {
         logoUrl: finalLogoUrl, // Keep synced
         allowed_types: allowedTypes,
         groq_api_key: groqApiKey,
-        ai_model: aiModel
+        ai_model: aiModel,
+        is_exambro_enabled: isExambroEnabled
       };
 
       if (settingsId) {
@@ -495,34 +523,153 @@ const SettingsPage = () => {
                   </div>
                 </FormField>
 
-                <div className="pt-6 border-t border-slate-200/60 dark:border-slate-800/40 space-y-4">
-                  <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
-                    <RefreshCw className="h-4 w-4 text-blue-500 animate-spin-slow" />
-                    Konfigurasi AI (Beta)
-                  </h4>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400">Gunakan Groq Cloud (Gratis & Cepat) untuk fitur Generate Soal Otomatis. <a href="https://console.groq.com/keys" target="_blank" className="text-blue-600 underline">Dapatkan API Key di sini</a>.</p>
+                <div className="pt-4 border-t border-slate-200/60 dark:border-slate-800/40">
+                  <div className="flex items-center justify-between p-4 rounded-2xl bg-slate-50/50 dark:bg-slate-900/20 border border-slate-100 dark:border-slate-800/40">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2.5 rounded-xl bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400">
+                        <Save className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200">Mode Exambro (Wajib Aplikasi)</h4>
+                        <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">Siswa wajib menggunakan aplikasi Exambro resmi untuk mengakses ujian.</p>
+                      </div>
+                    </div>
+                    {loading ? (
+                      <Skeleton className="h-6 w-11 rounded-full" />
+                    ) : (
+                      <label className="relative inline-flex items-center cursor-pointer group">
+                        <input 
+                          type="checkbox" 
+                          className="sr-only peer" 
+                          checked={isExambroEnabled}
+                          onChange={(e) => setIsExambroEnabled(e.target.checked)}
+                        />
+                        <div className="w-11 h-6 bg-slate-200 dark:bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-slate-600 peer-checked:bg-orange-600 shadow-inner group-hover:after:scale-110"></div>
+                      </label>
+                    )}
+                  </div>
+                </div>
+
+                <div className="pt-6 border-t border-slate-200/60 dark:border-slate-800/40 space-y-6">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-50/50 dark:bg-slate-900/20 p-4 rounded-2xl border border-slate-100 dark:border-slate-800/40">
+                    <div>
+                      <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                        <RefreshCw className="h-4 w-4 text-blue-500 animate-spin-slow" />
+                        Konfigurasi AI (Groq Cloud)
+                      </h4>
+                      <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1">
+                        Generate soal otomatis menggunakan API Groq. 
+                        <a href="https://console.groq.com/keys" target="_blank" className="text-blue-600 dark:text-blue-400 underline ml-1 hover:text-blue-700">Dapatkan API Key Gratis</a>.
+                      </p>
+                    </div>
+                    <Button 
+                      onClick={handleTestAI} 
+                      disabled={isTestingAI || !groqApiKey}
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="rounded-xl h-9 px-4 text-xs font-bold border-blue-100 bg-blue-50/50 text-blue-700 hover:bg-blue-100 dark:border-blue-900/30 dark:bg-blue-900/20 dark:text-blue-400 dark:hover:bg-blue-900/40 transition-all shadow-sm active:scale-95"
+                    >
+                      {isTestingAI ? <RefreshCw className="h-3.5 w-3.5 animate-spin mr-2" /> : <RefreshCw className="h-3.5 w-3.5 mr-2" />}
+                      {isTestingAI ? "Mengecek..." : "Cek Koneksi AI"}
+                    </Button>
+                  </div>
                   
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
                     <FormField id="groqApiKey" label="Groq API Key" error={undefined}>
-                      <Input
-                        type="password"
-                        value={groqApiKey}
-                        onChange={(e) => setGroqApiKey(e.target.value)}
-                        placeholder="gsk_xxxx..."
-                        className="rounded-xl font-mono text-xs"
-                      />
+                      <div className="relative group">
+                        <Input
+                          type="password"
+                          value={groqApiKey}
+                          onChange={(e) => setGroqApiKey(e.target.value)}
+                          placeholder="gsk_xxxx..."
+                          className="rounded-xl font-mono text-xs h-11 pr-10 focus:ring-blue-500/20"
+                        />
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-blue-500">
+                           <Database className="h-4 w-4" />
+                        </div>
+                      </div>
                     </FormField>
 
-                    <FormField id="aiModel" label="Model AI" error={undefined}>
-                      <select
-                        value={aiModel}
-                        onChange={(e) => setAiModel(e.target.value)}
-                        className="w-full h-10 px-3 rounded-xl text-xs font-semibold bg-white dark:bg-slate-950 border border-slate-200/60 dark:border-slate-800 focus:ring-2 focus:ring-indigo-500 outline-none appearance-none"
-                      >
-                        <option value="llama-3.1-7b-instant">Llama 3.1 8B (Sangat Cepat)</option>
-                        <option value="llama-3.1-70b-versatile">Llama 3.1 70B (Sangat Cerdas)</option>
-                        <option value="mixtral-8x7b-32768">Mixtral 8x7B (Seimbang)</option>
-                      </select>
+                    <FormField id="aiModel" label="Pilih Model AI" error={undefined}>
+                      <div className="space-y-3">
+                        <div className="relative">
+                          <select
+                            value={aiModel}
+                            onChange={(e) => setAiModel(e.target.value)}
+                            className="w-full h-11 px-3 rounded-xl text-xs font-bold bg-white dark:bg-slate-950 border border-slate-200/60 dark:border-slate-800 focus:ring-2 focus:ring-blue-500/20 outline-none appearance-none cursor-pointer"
+                          >
+                            <optgroup label="✨ Produksi (Direkomendasikan)">
+                              {AI_MODELS.filter(m => m.status === 'production').map((m) => (
+                                <option key={m.id} value={m.id}>{m.name} ({m.speed})</option>
+                              ))}
+                            </optgroup>
+                            <optgroup label="🧪 Preview (Eksperimental)">
+                              {AI_MODELS.filter(m => m.status === 'preview').map((m) => (
+                                <option key={m.id} value={m.id}>{m.name} ({m.speed})</option>
+                              ))}
+                            </optgroup>
+                          </select>
+                          <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                             <RefreshCw className="h-3.5 w-3.5" />
+                          </div>
+                        </div>
+
+                        {/* Status & Test Results Container */}
+                        <div className="space-y-2">
+                          {AI_MODELS.find(m => m.id === aiModel) && (
+                            <div className={`flex items-start gap-3 p-3 rounded-xl border backdrop-blur-sm transition-all duration-300 ${
+                              AI_MODELS.find(m => m.id === aiModel)?.status === 'production' 
+                                ? 'bg-emerald-50/40 border-emerald-100 text-emerald-800 dark:bg-emerald-500/5 dark:border-emerald-500/20 dark:text-emerald-400' 
+                                : 'bg-amber-50/40 border-amber-100 text-amber-800 dark:bg-amber-500/5 dark:border-amber-500/20 dark:text-amber-400'
+                            }`}>
+                              <div className={`p-1.5 rounded-lg ${
+                                AI_MODELS.find(m => m.id === aiModel)?.status === 'production' 
+                                  ? 'bg-emerald-100 dark:bg-emerald-500/20' 
+                                  : 'bg-amber-100 dark:bg-amber-500/20'
+                              }`}>
+                                {AI_MODELS.find(m => m.id === aiModel)?.status === 'production' ? (
+                                  <CheckCircle2 className="h-3.5 w-3.5" />
+                                ) : (
+                                  <AlertTriangle className="h-3.5 w-3.5" />
+                                )}
+                              </div>
+                              <div className="flex flex-col gap-0.5">
+                                <span className="text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
+                                  {AI_MODELS.find(m => m.id === aiModel)?.status === 'production' ? 'Status: Stabil' : 'Status: Eksperimental'}
+                                  <span className="h-1 w-1 rounded-full bg-current animate-pulse" />
+                                </span>
+                                <span className="text-[9px] font-medium opacity-80 leading-relaxed">
+                                  {AI_MODELS.find(m => m.id === aiModel)?.status === 'production' 
+                                    ? 'Performa optimal untuk ujian massal dan hasil yang konsisten.' 
+                                    : 'Tinjauan awal: Mungkin terjadi gangguan sesaat pada jam sibuk.'}
+                                </span>
+                              </div>
+                            </div>
+                          )}
+
+                          {testResult && (
+                             <div className={`p-3 rounded-xl border animate-in zoom-in-95 duration-300 ${
+                               testResult.success 
+                                ? "bg-blue-50/40 border-blue-100 text-blue-800 dark:bg-blue-500/5 dark:border-blue-500/20 dark:text-blue-400" 
+                                : "bg-rose-50/40 border-rose-100 text-rose-800 dark:bg-rose-500/5 dark:border-rose-500/20 dark:text-rose-400"
+                             }`}>
+                               <div className="flex items-center gap-3">
+                                 {testResult.success ? (
+                                   <div className="h-5 w-5 rounded-full bg-blue-100 dark:bg-blue-500/20 flex items-center justify-center shrink-0">
+                                      <CheckCircle2 className="h-3 w-3" />
+                                   </div>
+                                 ) : (
+                                   <div className="h-5 w-5 rounded-full bg-rose-100 dark:bg-rose-500/20 flex items-center justify-center shrink-0">
+                                      <AlertTriangle className="h-3 w-3" />
+                                   </div>
+                                 )}
+                                 <span className="text-[10px] font-bold leading-tight">{testResult.message}</span>
+                               </div>
+                             </div>
+                          )}
+                        </div>
+                      </div>
                     </FormField>
                   </div>
                 </div>

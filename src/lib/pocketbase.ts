@@ -1,7 +1,14 @@
 import PocketBase from 'pocketbase';
 
 // Gunakan URL lokal untuk development, dan nantinya gunakan environment variable untuk VPS
-const pb = new PocketBase(import.meta.env.VITE_POCKETBASE_URL || 'http://127.0.0.1:8090');
+// Deteksi URL secara dinamis berdasarkan domain yang sedang dibuka
+// Jika di production, dia akan otomatis pakai domain sekolah tersebut (misal: sekolah-a.my.id)
+// Jika di local development, dia akan pakai localhost:8090
+const pbUrl = (typeof window !== 'undefined' && window.location.hostname !== 'localhost') 
+  ? window.location.origin 
+  : (import.meta.env.VITE_POCKETBASE_URL || 'http://127.0.0.1:8090');
+
+const pb = new PocketBase(pbUrl);
 pb.autoCancellation(false);
 
 // Agar tidak perlu mengetik 'pb.collection('users').authWithPassword' berulang kali,

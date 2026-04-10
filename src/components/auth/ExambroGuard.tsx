@@ -24,23 +24,50 @@ declare global {
   }
 }
 
+import pb from "../../lib/pocketbase";
+
 const ExambroGuard = ({ children }: ExambroGuardProps) => {
   const [isExambro, setIsExambro] = useState<boolean | null>(null);
 
   useEffect(() => {
-    const ua = navigator.userAgent.toLowerCase();
+    const checkExambro = async () => {
+      try {
+        // Fetch settings - ideally this would be from a context, but we'll fetch it here for simplicity
+        const records = await pb.collection("settings").getFullList({
+          limit: 1,
+          sort: "created",
+        });
 
-    // 1. Check User Agent
-    const isValidUA = ALLOWED_USER_AGENTS.some((agent) => ua.includes(agent.toLowerCase()));
+        const settings = records[0];
+        const isSettingEnabled = settings?.is_exambro_enabled ?? false;
 
-    // 2. Check for SEB API injection (Modern Safe Exam Browser)
-    const isSEBExtension = typeof window !== 'undefined' && (!!window.SafeExamBrowser);
+        // If global exambro is off, allow all
+        if (!isSettingEnabled) {
+          setIsExambro(true);
+          return;
+        }
 
-    // 3. For development, allow bypass with simple condition or override flag
-    const isDev = import.meta.env.MODE === "development";
-    const bypassGuard = import.meta.env.VITE_DISABLE_EXAMBRO_GUARD === "true";
+        const ua = navigator.userAgent.toLowerCase();
 
-    setIsExambro(isValidUA || isSEBExtension || isDev || bypassGuard);
+        // 1. Check User Agent
+        const isValidUA = ALLOWED_USER_AGENTS.some((agent) => ua.includes(agent.toLowerCase()));
+
+        // 2. Check for SEB API injection (Modern Safe Exam Browser)
+        const isSEBExtension = typeof window !== 'undefined' && (!!window.SafeExamBrowser);
+
+        // 3. For development, allow bypass with simple condition or override flag
+        const isDev = import.meta.env.MODE === "development";
+        const bypassGuard = import.meta.env.VITE_DISABLE_EXAMBRO_GUARD === "true";
+
+        setIsExambro(isValidUA || isSEBExtension || isDev || bypassGuard);
+      } catch (error) {
+        console.error("Error checking exambro settings:", error);
+        // Default to allowed on error to avoid locking out students
+        setIsExambro(true);
+      }
+    };
+
+    checkExambro();
   }, []);
 
   if (isExambro === null) {

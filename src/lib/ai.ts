@@ -11,6 +11,24 @@ export interface AIGeneratedQuestion {
   groupText?: string;
 }
 
+export const AI_MODELS = [
+  { id: "llama-3.1-8b-instant", name: "MetaLlama 3.1 8B", speed: "560 T/SEC", price: "$0.05/0.08 per 1M", status: "production" },
+  { id: "llama-3.3-70b-versatile", name: "MetaLlama 3.3 70B", speed: "280 T/SEC", price: "$0.59/0.79 per 1M", status: "production" },
+  { id: "openai/gpt-oss-120b", name: "OpenAIGPT OSS 120B", speed: "500 T/SEC", price: "$0.15/0.60 per 1M", status: "production" },
+  { id: "openai/gpt-oss-20b", name: "OpenAIGPT OSS 20B", speed: "1000 T/SEC", price: "$0.075/0.30 per 1M", status: "production" },
+  { id: "whisper-large-v3", name: "OpenAIWhisper", speed: "-", price: "$0.111 per hour", status: "production" },
+  { id: "whisper-large-v3-turbo", name: "OpenAIWhisper Large V3 Turbo", speed: "-", price: "$0.04 per hour", status: "production" },
+  { id: "groq/compound", name: "GroqCompound", speed: "450 T/SEC", price: "-", status: "production" },
+  { id: "groq/compound-mini", name: "GroqCompound Mini", speed: "450 T/SEC", price: "-", status: "production" },
+  { id: "canopylabs/orpheus-arabic-saudi", name: "Canopy Labs Orpheus Arabic Saudi", speed: "-", price: "$40.00/1M chars", status: "preview" },
+  { id: "canopylabs/orpheus-v1-english", name: "Canopy Labs Orpheus V1 English", speed: "-", price: "$22.00/1M chars", status: "preview" },
+  { id: "meta-llama/llama-4-scout-17b-16e-instruct", name: "MetaLlama 4 Scout 17B 16E", speed: "750 T/SEC", price: "$0.11/0.34 per 1M", status: "preview" },
+  { id: "meta-llama/llama-prompt-guard-2-22m", name: "MetaLlama Prompt Guard 2 22M", speed: "-", price: "$0.03/0.03 per 1M", status: "preview" },
+  { id: "meta-llama/llama-prompt-guard-2-86m", name: "MetaPrompt Guard 2 86M", speed: "-", price: "$0.04/0.04 per 1M", status: "preview" },
+  { id: "openai/gpt-oss-safeguard-20b", name: "OpenAISafety GPT OSS 20B", speed: "1000 T/SEC", price: "$0.075/0.30 per 1M", status: "preview" },
+  { id: "qwen/qwen3-32b", name: "Alibaba Cloud Qwen3-32B", speed: "400 T/SEC", price: "$0.29/0.59 per 1M", status: "preview" },
+];
+
 export const generateQuestionsAI = async (
   topic: string, 
   count: number = 5, 
@@ -31,7 +49,7 @@ export const generateQuestionsAI = async (
     }
 
     const apiKey = config.groq_api_key;
-    const model = config.ai_model || "llama-3.3-70b-versatile";
+    const model = config.ai_model || AI_MODELS[1].id;
 
     const lengthMap: Record<string, string> = {
       pendek: "sekitar 250-300 kata, lugas & informatif",
@@ -158,7 +176,7 @@ export const generateSingleQuestionAI = async (
     if (!config?.groq_api_key) throw new Error("API Key belum diatur.");
     
     const apiKey = config.groq_api_key;
-    const model = config.ai_model || "llama-3.3-70b-versatile";
+    const model = config.ai_model || AI_MODELS[1].id;
 
     const typeDesc = {
       pilihan_ganda: "Pilihan Ganda Tunggal (5 opsi, 1 benar)",
@@ -228,7 +246,7 @@ export const getTopicSuggestionsAI = async (
     if (!config?.groq_api_key) return [];
     
     const apiKey = config.groq_api_key;
-    const model = config.ai_model || "llama-3.3-70b-versatile";
+    const model = config.ai_model || AI_MODELS[1].id;
 
     const literasiNote = isLiteracy ? "(UTAMAKAN topik yang kaya teks bacaan/fenomena karena Mode Literasi AKTIF)" : "";
     const systemPrompt = `Anda adalah Ahli Kurikulum Nasional. Berikan 5 contoh topik/materi spesifik yang PALING RELEVAN untuk jenjang ${level}, mata pelajaran ${subject}, tingkat kesulitan ${difficulty}, dan standar ${focus.toUpperCase()}.
@@ -279,7 +297,7 @@ export const parseQuestionsAI = async (
     if (!config?.groq_api_key) throw new Error("API Key belum diatur.");
     
     const apiKey = config.groq_api_key;
-    const model = config.ai_model || "llama-3.3-70b-versatile";
+    const model = config.ai_model || AI_MODELS[1].id;
 
     const systemPrompt = `Anda adalah Ahli Digitalisasi Dokumen Pendidikan.
 Tugas: Ekstrak semua soal dari teks mentah (hasil copy-paste PDF/Word) menjadi JSON valid.
@@ -389,5 +407,33 @@ Aturan Ketat: Gunakan HTML untuk formatting (<strong> JANGAN **), pastikan JSON 
     }
     console.error("AI Parser Error:", err);
     throw err;
+  }
+};
+
+export const testAIConnection = async (apiKey: string, modelId: string): Promise<{ success: boolean; message: string }> => {
+  try {
+    if (!apiKey) throw new Error("API Key Kosong");
+    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: modelId,
+        messages: [{ role: "user", content: "hi" }],
+        max_tokens: 5,
+        temperature: 0
+      })
+    });
+
+    if (response.ok) {
+      return { success: true, message: "Koneksi Berhasil! Model aktif dan siap digunakan." };
+    } else {
+      const errorData = await response.json().catch(() => ({}));
+      let msg = errorData.error?.message || `Gagal terhubung (Error ${response.status})`;
+      if (response.status === 401) msg = "API Key tidak valid atau salah.";
+      if (response.status === 404) msg = "Model tidak ditemukan atau sedang tidak tersedia.";
+      return { success: false, message: msg };
+    }
+  } catch (err: any) {
+    return { success: false, message: err.message || "Gagal menghubungi server Groq." };
   }
 };

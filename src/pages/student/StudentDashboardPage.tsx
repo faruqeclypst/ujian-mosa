@@ -130,9 +130,14 @@ const StudentDashboardPage = () => {
     setTokenError("");
     setIsValidating(true);
     try {
-      const settings = await pb.collection("settings").getFullList({ limit: 1 });
-      const globalToken = settings[0]?.universal_token || settings[0]?.global_token || settings[0]?.globalToken;
-      const roomToken = selectedRoom.token;
+      // 🛡️ Ambil data terbaru langsung dari server untuk menghindari token kadaluarsa (Stale Snapshot)
+      const [settingsRecords, freshRoom] = await Promise.all([
+        pb.collection("settings").getFullList({ limit: 1 }),
+        pb.collection("exam_rooms").getOne(selectedRoom.id)
+      ]);
+
+      const globalToken = settingsRecords[0]?.universal_token || settingsRecords[0]?.global_token || settingsRecords[0]?.globalToken;
+      const roomToken = freshRoom.token;
 
       const input = tokenInput.trim().toUpperCase();
 
