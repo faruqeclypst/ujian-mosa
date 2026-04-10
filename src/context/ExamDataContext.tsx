@@ -124,6 +124,7 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
     let unsubscribeTeachers: any, unsubscribeClasses: any, unsubscribeSubjects: any, unsubscribeStudents: any;
 
     const setup = async () => {
+      pb.autoCancellation(false); // Pastikan tidak dibatalkan saat banyak request
       await initAll();
       unsubscribeTeachers = await pb.collection("teachers").subscribe("*", initAll);
       unsubscribeClasses = await pb.collection("classes").subscribe("*", initAll);
@@ -138,36 +139,38 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
       if (unsubscribeSubjects) unsubscribeSubjects();
       if (unsubscribeStudents) unsubscribeStudents();
     };
-  }, [setupRealtime]);
+  }, [initAll]);
 
   // --- Universal Token & Settings Sync ---
   useEffect(() => {
     const fetchSettings = async () => {
       try {
-        const records = await pb.collection('settings').getFullList();
+        pb.autoCancellation(false);
+        const records = await pb.collection('settings').getFullList({ limit: 1, sort: 'created' });
         if (records.length > 0) {
           const s = records[0];
           setUniversalToken(s.universal_token || "");
           setTokenUpdatedAt(s.universal_token_updated_at || s.updated || "");
-        } else {
-          // Auto create if empty (Admin only usually)
-          const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-          let token = "";
-          for (let i = 0; i < 6; i++) token += chars.charAt(Math.floor(Math.random() * chars.length));
-
-          await pb.collection('settings').create({
-            universal_token: token,
-            universal_token_updated_at: new Date().toISOString()
-          });
-          fetchSettings();
+          console.log("⚙️ Settings loaded:", s.universal_token);
         }
-      } catch (e) { }
+      } catch (e) {
+        console.error("❌ Error fetching settings:", e);
+      }
     };
 
     fetchSettings();
-    const unsubscribe = pb.collection('settings').subscribe("*", () => {
-      fetchSettings();
+    
+    // Subscribe ke perubahan dan langsung update state
+    const unsubscribe = pb.collection('settings').subscribe("*", (e) => {
+      console.log("🔔 Settings Subscription Event:", e.action, e.record.universal_token);
+      if (e.action === "update" || e.action === "create") {
+        setUniversalToken(e.record.universal_token || "");
+        setTokenUpdatedAt(e.record.universal_token_updated_at || e.record.updated || "");
+      } else {
+        fetchSettings();
+      }
     });
+
     return () => { unsubscribe.then(unsub => unsub()); };
   }, []);
 
@@ -182,15 +185,25 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
       const diff = nextUpdate - now;
 
       if (diff <= 0) {
-        setTimeLeft("00:00");
+        if (timeLeft !== "00:00") setTimeLeft("00:00");
         
+        // Safety: Jika macet di 00:00 melebihi 3 detik, coba fetch manual
+        if (diff < -3000 && !isUpdating) {
+          console.log("🕒 Timer stuck at 0 (3s), performing safety fetch...");
+          pb.collection('settings').getFullList({ limit: 1, sort: 'created' }).then(recs => {
+            if (recs.length > 0) {
+              setUniversalToken(recs[0].universal_token || "");
+              setTokenUpdatedAt(recs[0].universal_token_updated_at || recs[0].updated || "");
+            }
+          });
+        }
+
         // 🔒 Hanya Admin yang boleh mentrigger update token ke database
-        // Mencegah error 403 atau konflik jika banyak user membuka dashboard
         if (role?.toLowerCase() === "admin" && !isUpdating) {
           isUpdating = true;
           try {
-            // Kita ambil row terbaru
-            const records = await pb.collection('settings').getFullList({ limit: 1 });
+            console.log("♻️ Rotating token...");
+            const records = await pb.collection('settings').getFullList({ limit: 1, sort: 'created' });
             if (records.length > 0) {
               const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; 
               let token = "";
@@ -200,12 +213,11 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
                 universal_token: token,
                 universal_token_updated_at: new Date().toISOString()
               });
-              console.log("Token universal diperbarui otomatis:", token);
             }
           } catch (e) {
-            console.error("Gagal memperbarui token universal:", e);
+            console.error("❌ Regeneration failed:", e);
           } finally {
-            isUpdating = false;
+            setTimeout(() => { isUpdating = false; }, 3000);
           }
         }
       } else {
@@ -215,7 +227,7 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
       }
     }, 1000);
     return () => clearInterval(timer);
-  }, [tokenUpdatedAt, role]);
+  }, [tokenUpdatedAt, role, timeLeft]);
 
   // --- Teacher Actions ---
   const createTeacher = async (payload: TeacherPayload) => {
