@@ -486,7 +486,7 @@ const StudentDashboardPage = () => {
                                       ) : (
                                         <div className="flex flex-col items-end opacity-60">
                                           <span className="text-[8px] font-black text-slate-400 uppercase tracking-tighter leading-none">Nilai</span>
-                                          <span className="text-[10px] font-black text-slate-400 uppercase leading-none mt-1 italic tracking-widest">Privat</span>
+                                          <span className="text-[10px] font-black text-slate-400 uppercase leading-none mt-1 italic tracking-widest">Tidak Ditampilkan</span>
                                         </div>
                                       )}
                                     </div>
