@@ -999,10 +999,10 @@ const CBTPage = () => {
             {questions.map((q, i) => (
               <button key={q.id} onClick={() => handleNavClick(i)} className={`w-11 h-11 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl flex items-center justify-center font-black text-lg border-2 transition-all active:scale-[0.85] ${i === currentQuestionIndex
                 ? "bg-emerald-600 border-emerald-600 text-white shadow-lg shadow-emerald-600/20"
-                : flaggedQuestions[q.id]
-                  ? "bg-amber-500 border-amber-600 text-white shadow-lg shadow-amber-500/20"
-                  : answers[q.id] !== undefined
-                    ? "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-100 dark:border-emerald-800/60 text-emerald-600 dark:text-emerald-400"
+                : answers[q.id] !== undefined
+                  ? "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-100 dark:border-emerald-800/60 text-emerald-600 dark:text-emerald-400"
+                  : flaggedQuestions[q.id]
+                    ? "bg-amber-500 border-amber-600 text-white shadow-lg shadow-amber-500/20"
                     : "bg-slate-50 dark:bg-slate-800/50 border-slate-100 dark:border-slate-800 text-slate-400 dark:text-slate-500"
                 }`}>{i + 1}</button>
             ))}
@@ -1040,10 +1040,10 @@ const CBTPage = () => {
             {questions.map((q, i) => (
               <button key={q.id} onClick={() => { setCurrentQuestionIndex(i); setIsNavModalOpen(false); }} className={`aspect-square rounded-2xl flex items-center justify-center font-black text-xl border-3 transition-all active:scale-90 ${i === currentQuestionIndex
                 ? "bg-emerald-600 border-emerald-600 text-white shadow-xl shadow-emerald-600/20"
-                : flaggedQuestions[q.id]
-                  ? "bg-amber-500 border-amber-600 text-white shadow-xl shadow-amber-500/20"
-                  : answers[q.id] !== undefined
-                    ? "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800/60 text-emerald-600 dark:text-emerald-400"
+                : answers[q.id] !== undefined
+                  ? "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800/60 text-emerald-600 dark:text-emerald-400"
+                  : flaggedQuestions[q.id]
+                    ? "bg-amber-500 border-amber-600 text-white shadow-xl shadow-amber-500/20"
                     : "bg-slate-50 dark:bg-slate-900 border-slate-100 dark:border-slate-800 text-slate-400 dark:text-slate-500"
                 }`}>{i + 1}</button>
             ))}

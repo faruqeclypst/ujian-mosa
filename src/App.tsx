@@ -19,6 +19,8 @@ const StudentDashboardPage = lazy(() => import("./pages/student/StudentDashboard
 const CBTPage = lazy(() => import("./pages/student/CBTPage"));
 import NotFoundPage from "./pages/NotFoundPage";
 import pb from "./lib/pocketbase";
+import { SplashScreen } from "@capacitor/splash-screen";
+import { Capacitor } from "@capacitor/core";
 
 const DashboardPage = lazy(() => import("./pages/DashboardPage"));
 const TeachersPage = lazy(() => import("./pages/TeachersPage"));
@@ -95,6 +97,9 @@ const AppContent = () => {
     };
 
     fetchSettings();
+    if (Capacitor.isNativePlatform()) {
+      SplashScreen.hide().catch(err => console.warn("Splash hide error:", err));
+    }
   }, []);
 
   // Check if it's an admin route to decide whether to show a full-screen loader or a shell skeleton

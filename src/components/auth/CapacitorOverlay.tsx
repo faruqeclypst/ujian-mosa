@@ -46,9 +46,13 @@ const CapacitorOverlay = () => {
     <>
       <motion.div
         drag
+        dragConstraints={{ left: -window.innerWidth + 100, right: 0, top: -window.innerHeight + 100, bottom: 100 }}
+        dragElastic={0.1}
         dragMomentum={false}
+        whileTap={{ scale: 0.9 }}
+        whileDrag={{ scale: 1.1, cursor: "grabbing" }}
         initial={{ x: 0, y: 0 }}
-        className="fixed bottom-48 right-4 z-[9999] flex flex-col items-center gap-2"
+        className="fixed bottom-48 right-4 z-[9999] flex flex-col items-center gap-2 select-none"
         style={{ touchAction: "none" }}
       >
         <AnimatePresence>
