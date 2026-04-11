@@ -15,8 +15,8 @@ import { ToastProvider } from "./components/ui/toast";
 import { StudentAuthProvider, useStudentAuth } from "./context/StudentAuthContext";
 import ExambroGuard from "./components/auth/ExambroGuard";
 import StudentLoginPage from "./pages/student/StudentLoginPage";
-import StudentDashboardPage from "./pages/student/StudentDashboardPage";
-import CBTPage from "./pages/student/CBTPage";
+const StudentDashboardPage = lazy(() => import("./pages/student/StudentDashboardPage"));
+const CBTPage = lazy(() => import("./pages/student/CBTPage"));
 import NotFoundPage from "./pages/NotFoundPage";
 import pb from "./lib/pocketbase";
 
@@ -29,11 +29,11 @@ const AlumniPage = lazy(() => import("./pages/AlumniPage"));
 const UsersPage = lazy(() => import("./pages/UsersPage"));
 const SettingsPage = lazy(() => import("./pages/SettingsPage"));
 
-import ExamsPage from "./pages/admin/ExamsPage";
-import QuestionsPage from "./pages/admin/QuestionsPage";
-import ExamRoomsPage from "./pages/admin/ExamRoomsPage";
-import MonitoringPage from "./pages/admin/MonitoringPage";
-import GuidePage from "./pages/admin/GuidePage";
+const ExamsPage = lazy(() => import("./pages/admin/ExamsPage"));
+const QuestionsPage = lazy(() => import("./pages/admin/QuestionsPage"));
+const ExamRoomsPage = lazy(() => import("./pages/admin/ExamRoomsPage"));
+const MonitoringPage = lazy(() => import("./pages/admin/MonitoringPage"));
+const GuidePage = lazy(() => import("./pages/admin/GuidePage"));
 
 import { ExamDataProvider } from "./context/ExamDataContext";
 
