@@ -45,6 +45,7 @@ const CapacitorOverlay = () => {
   return (
     <>
       <motion.div
+        layout
         drag
         dragConstraints={{ left: -window.innerWidth + 100, right: 0, top: -window.innerHeight + 100, bottom: 100 }}
         dragElastic={0.1}
@@ -58,6 +59,7 @@ const CapacitorOverlay = () => {
         <AnimatePresence>
           {showMenu && (
             <motion.div 
+              layout
               initial={{ opacity: 0, scale: 0.5, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.5, y: 20 }}
