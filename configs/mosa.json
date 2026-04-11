@@ -1,0 +1,6 @@
+{
+  "id": "com.smanmosa.ujian",
+  "name": "E-Ujian MOSA",
+  "serverUrl": "https://exam.sman-modalbangsa.sch.id",
+  "vpsDir": "/home/ujian-mosa"
+}

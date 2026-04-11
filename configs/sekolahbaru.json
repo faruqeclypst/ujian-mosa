@@ -1,0 +1,6 @@
+{
+  "id": "com.sekolahbaru.ujian",
+  "name": "E-Ujian Sekolah Baru",
+  "serverUrl": "https://ujian.sekolahbaru.sch.id",
+  "vpsDir": "/home/ujian-sekolahbaru"
+}
