@@ -3,6 +3,7 @@ import { ReactNode } from "react";
 
 // List of allowed user agents (case-insensitive substrings)
 const ALLOWED_USER_AGENTS = [
+  "mosaexambro",
   "exambro",
   "exambrowser",
   "exambroandroid",

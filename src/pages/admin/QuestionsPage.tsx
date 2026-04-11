@@ -1797,6 +1797,180 @@ const QuestionsPage = () => {
     }
   };
 
+  const handleExportToWord = async () => {
+    if (questions.length === 0) return;
+
+    setBatchProgress({
+      isOpen: true,
+      total: questions.length,
+      current: 0,
+      message: "Sync naskah & gambar... (Mohon Tunggu)",
+      title: "Export ke Word"
+    });
+
+    const cleanForWord = (htmlText: string) => {
+      if (!htmlText) return "";
+      return htmlText
+        .replace(/<p>/gi, "")
+        .replace(/<\/p>/gi, "<br/>")
+        .replace(/<div>/gi, "")
+        .replace(/<\/div>/gi, "<br/>")
+        .replace(/(<br\/>)+$/, "")
+        .trim();
+    };
+
+    const getBase64 = async (url: string): Promise<string> => {
+      if (!url) return "";
+      const r2Domain = "pub-a1193e163fef41c9afc15d1334b8740b.r2.dev";
+      let finalUrl = url;
+      if (url.includes(r2Domain)) {
+        finalUrl = url.replace(/^https?:\/\/pub-a1193e163fef41c9afc15d1334b8740b\.r2\.dev/, "/r2-proxy");
+      } else if (!url.startsWith("http") && !url.startsWith("data:")) {
+        finalUrl = window.location.origin + (url.startsWith("/") ? url : "/" + url);
+      }
+
+      try {
+        const response = await fetch(finalUrl, { cache: 'no-cache' });
+        if (!response.ok) return "";
+        const blob = await response.blob();
+        return new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string || "");
+          reader.readAsDataURL(blob);
+        });
+      } catch (e) {
+        return new Promise((resolve) => {
+          const img = new window.Image();
+          img.crossOrigin = "anonymous";
+          img.onload = () => {
+             const canvas = document.createElement("canvas");
+             canvas.width = img.width; canvas.height = img.height;
+             const ctx = canvas.getContext("2d");
+             ctx?.drawImage(img, 0, 0);
+             resolve(canvas.toDataURL("image/jpeg", 0.7));
+          };
+          img.onerror = () => resolve("");
+          img.src = finalUrl;
+          setTimeout(() => resolve(""), 15000); // 15s timeout untuk gambar besar
+        });
+      }
+    };
+
+    const processHtmlImages = async (htmlInput: string) => {
+      if (!htmlInput) return "";
+      const div = document.createElement('div');
+      div.innerHTML = htmlInput;
+      const imgs = div.getElementsByTagName('img');
+      for (const imgTag of Array.from(imgs)) {
+        const src = imgTag.getAttribute('src');
+        if (src && !src.startsWith('data:')) {
+          const b64 = await getBase64(src);
+          if (b64) imgTag.setAttribute('src', b64);
+          else imgTag.remove();
+        }
+      }
+      return cleanForWord(div.innerHTML);
+    };
+
+    let html = `
+      <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+      <head><meta charset='utf-8'>
+      <style>
+        @page { size: A4; margin: 2cm; }
+        body { font-family: 'Times New Roman', serif; color: #000; font-size: 11pt; }
+        .kop { text-align: center; border-bottom: 2pt solid #000; margin-bottom: 15px; padding-bottom: 5px; }
+        .hanging { padding-left: 25pt; text-indent: -25pt; margin-bottom: 3pt; text-align: left; }
+        .choice { padding-left: 45pt; text-indent: -20pt; margin-bottom: 1pt; text-align: left; }
+        img { display: block; margin: 5pt 0; max-width: 280pt; height: auto; border: none; }
+        .wacana { border: 1pt solid #000; padding: 10pt; margin-bottom: 15pt; background: #f5f5f5; font-style: italic; }
+        .spacer { margin: 0; padding: 0; line-height: 12pt; font-size: 12pt; height: 12pt; }
+        p, div, span { margin: 0; padding: 0; line-height: 1.3; text-align: left; }
+      </style>
+      </head>
+      <body>
+        <div class="kop">
+          <p style="font-size: 14pt; font-weight: bold;">NASKAH SOAL UJIAN</p>
+          <p style="font-size: 12pt;">${exam?.title || "UJIAN CBT"}</p>
+          <p style="font-size: 10pt; font-weight: normal;">Mata Pelajaran: ${exam?.subject || "-"} | Guru: ${exam?.teacherName || "-"}</p>
+        </div>
+        <table border="0" cellpadding="0" cellspacing="0" style="width:100%; font-size: 10pt; margin-bottom: 15pt; border: none; border-collapse: collapse;">
+          <tr>
+            <td width="15%" style="border:none; padding: 2px;">No. Peserta</td><td width="2%" style="border:none;">:</td><td width="33%" style="border:none; border-bottom: 0.5pt solid #000;"></td>
+            <td width="15%" style="border:none; padding: 2px;">Kelas</td><td width="2%" style="border:none;">:</td><td style="border:none;">${exam?.level || "-"}</td>
+          </tr>
+          <tr>
+            <td style="border:none; padding: 2px;">Nama Siswa</td><td>:</td><td style="border:none; border-bottom: 0.5pt solid #000;"></td>
+            <td style="padding: 2px;">Hari/Tgl</td><td>:</td><td>..........................</td>
+          </tr>
+        </table>
+    `;
+
+    let currentGroupId = "";
+    let keys = "";
+
+    for (let i = 0; i < questions.length; i++) {
+        const q = questions[i];
+        setBatchProgress(prev => ({ ...prev, current: i + 1, message: `Memproses soal #${i + 1}...` }));
+
+        if (q.groupId && q.groupId !== currentGroupId && q.groupText) {
+            const cleanWacana = await processHtmlImages(q.groupText || "");
+            html += `<div class="wacana"><b>STIMULUS / BACAAN:</b><br/>${cleanWacana}</div>`;
+            currentGroupId = q.groupId;
+        }
+
+        let qImg = "";
+        if (q.imageUrl) {
+          const b64 = await getBase64(q.imageUrl);
+          if (b64) qImg = `<div style="margin: 5pt 0;"><img src="${b64}" /></div>`;
+        }
+
+        const processedQText = await processHtmlImages(q.text || "");
+        html += `<div class="hanging"><b>${i + 1}.</b> <span>${processedQText}</span>${qImg}</div>`;
+
+        if (q.choices) {
+            for (const letter of ['a', 'b', 'c', 'd', 'e']) {
+                const c = (q.choices as any)[letter];
+                if (c && c.text) {
+                    let cImg = "";
+                    if (c.imageUrl) {
+                      const cb64 = await getBase64(c.imageUrl);
+                      if (cb64) cImg = `<div style="margin: 3pt 0;"><img src="${cb64}" style="max-width: 150pt;" /></div>`;
+                    }
+                    const processedCText = await processHtmlImages(c.text || "");
+                    html += `<div class="choice">${letter.toUpperCase()}. <span>${processedCText}</span>${cImg}</div>`;
+                }
+            }
+            html += `<p class="spacer">&nbsp;</p>`;
+
+            const ans = Object.entries(q.choices).filter(([_, v]) => (v as any).isCorrect).map(([k]) => k.toUpperCase()).join(", ");
+            keys += `<tr><td align="center">${i + 1}</td><td align="center"><b>${ans || "-"}</b></td></tr>`;
+        } else {
+            keys += `<tr><td align="center">${i + 1}</td><td>${q.answerKey || "-"}</td></tr>`;
+            html += `<p class="spacer">&nbsp;</p>`;
+        }
+    }
+
+    html += `
+      <div style="page-break-before: always;"></div>
+      <p align="center" style="font-weight:bold; font-size:14pt; border-bottom:1pt solid #000;">KUNCI JAWABAN</p>
+      <table border="1" style="width:100%; border-collapse:collapse; margin-top:10px;">
+        <tr style="background:#eee;"><th>No</th><th>Jawaban</th></tr>
+        ${keys}
+      </table>
+    </body></html>`;
+
+    const blob = new Blob(['\ufeff', html], { type: 'application/msword' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Naskah_Soal_${exam?.subject || "Ujian"}.doc`;
+    link.click();
+
+    setBatchProgress(prev => ({ ...prev, isOpen: false }));
+    addToast({ title: "Export Sukses", description: "Format sudah diperbaiki & Gambar diproses.", type: "success" });
+    setIsImportMenuOpen(false);
+  };
+
   const handleCheckboxChange = (id: string, checked: boolean, index: number, event: any) => {
     let newSelectedIds = [...selectedIds];
 
@@ -1937,6 +2111,22 @@ const QuestionsPage = () => {
                                   <span className="text-[10px] text-slate-400 mt-1">Lebih rapi untuk soal kompleks</span>
                                 </div>
                               </a>
+
+                              <div className="px-3 py-1.5 mt-2 border-t border-slate-50 dark:border-slate-800/50">
+                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">Export Data</span>
+                              </div>
+                              <button 
+                                onClick={handleExportToWord}
+                                className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-900 transition-all group w-full text-left"
+                              >
+                                <div className="h-10 w-10 shrink-0 rounded-lg bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                  <FileText className="h-5 w-5" />
+                                </div>
+                                <div className="flex flex-col min-w-0">
+                                  <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">Export ke Word</span>
+                                  <span className="text-[10px] text-slate-400 mt-1">Simpan soal ke file .doc</span>
+                                </div>
+                              </button>
                             </div>
                           )}
                         </div>

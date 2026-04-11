@@ -113,28 +113,42 @@ const StudentLoginPage = () => {
       </div>
 
       <div className="w-full max-w-lg mx-auto z-10 p-6 flex flex-col items-center">
-        {/* School Logo Section - Made more prominent */}
-        <div className="mb-8 relative transition-all duration-700 transform hover:scale-105">
-          <div className="absolute inset-0 bg-white/20 blur-xl rounded-full scale-150 animate-pulse"></div>
-          <div className="relative w-32 h-32 md:w-40 md:h-40 bg-white/40 backdrop-blur-md rounded-3xl p-4 shadow-[0_8px_32px_0_rgba(31,38,135,0.07)] border border-white/40 flex items-center justify-center overflow-hidden">
-            {logoLoading ? (
-              <div className="w-full h-full bg-emerald-100/50 rounded-2xl animate-pulse flex items-center justify-center">
-                <div className="h-10 w-10 rounded-full border-4 border-emerald-500/30 border-t-emerald-600 animate-spin" />
+        {/* Logo Section */}
+        <div className="mb-8 flex items-center justify-center gap-4 md:gap-6 relative transition-all duration-700 transform hover:scale-105">
+          {logoLoading ? (
+            <div className="w-32 h-32 md:w-40 md:h-40 flex items-center justify-center">
+              <div className="h-10 w-10 rounded-full border-4 border-emerald-500/30 border-t-emerald-600 animate-spin" />
+            </div>
+          ) : (
+            <>
+              {/* Default Logo */}
+              <div className="relative w-28 h-28 md:w-36 md:h-36 flex items-center justify-center overflow-hidden">
+                <img
+                  src="/logo-default.png"
+                  alt="Logo Default"
+                  className="w-full h-full object-contain filter drop-shadow-sm"
+                />
               </div>
-            ) : schoolLogo && !logoError ? (
-              <img
-                src={schoolLogo}
-                alt="Logo Sekolah"
-                className="w-full h-full object-contain filter drop-shadow-md"
-                onError={() => setLogoError(true)}
-              />
-            ) : (
-              <div className="w-full h-full bg-gradient-to-br from-emerald-600 to-teal-700 flex flex-col items-center justify-center shadow-inner rounded-2xl p-2 text-white">
-                <School size={48} className="mb-1 opacity-90" />
-                <span className="text-xl font-black tracking-tighter">CBT</span>
-              </div>
-            )}
-          </div>
+
+              {schoolLogo && !logoError && (
+                <>
+                  <div className="text-3xl font-black text-emerald-600/50 z-10">×</div>
+                  
+                  {/* School Logo */}
+                  <div className="relative w-28 h-28 md:w-36 md:h-36 flex items-center justify-center overflow-hidden">
+                    <img
+                      src={schoolLogo}
+                      alt="Logo Sekolah"
+                      className="w-full h-full object-contain filter drop-shadow-md"
+                      onError={() => {
+                        if (schoolLogo) setLogoError(true);
+                      }}
+                    />
+                  </div>
+                </>
+              )}
+            </>
+          )}
         </div>
 
         <div className="text-center mb-8">

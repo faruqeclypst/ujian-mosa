@@ -105,6 +105,48 @@ const MonitoringPage = () => {
   const [isMonitorRefreshing, setIsMonitorRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
+  // 📝 Real-time Live Score Calculator
+  const getLiveScore = (sisAnswers: Record<string, any>, attOverrides: Record<string, boolean> = {}) => {
+    if (!sisAnswers || monitorQuestions.length === 0) return 0;
+    
+    let correctCount = 0;
+    monitorQuestions.forEach((q: any) => {
+      let itemCorrect = false;
+      
+      // 1. Check for Manual Overrides (if teacher manually marked it)
+      if (attOverrides[q.id] !== undefined) {
+        itemCorrect = attOverrides[q.id];
+      } else {
+        const ansId = sisAnswers[q.id];
+        if (ansId !== undefined && ansId !== null) {
+          const type = q.type || "pilihan_ganda";
+          
+          if (type === "pilihan_ganda" || type === "benar_salah") {
+            const ck = Object.keys(q.choices || {}).find(k => k.toLowerCase() === String(ansId).toLowerCase());
+            itemCorrect = ck ? q.choices[ck].isCorrect === true : false;
+          } else if (type === "pilihan_ganda_kompleks") {
+            const correctKeys = Object.keys(q.choices || {}).filter(k => q.choices[k].isCorrect).map(k => k.toLowerCase());
+            const studentKeys = Array.isArray(ansId) ? ansId.map(k => String(k).toLowerCase()) : [];
+            itemCorrect = studentKeys.length === correctKeys.length && studentKeys.every(k => correctKeys.includes(k));
+          } else if (type === "isian_singkat") {
+            itemCorrect = isFuzzyMatch(ansId, q.answerKey);
+          } else if (type === "urutkan" || type === "drag_drop") {
+            const co = (q.items || []).map((it: any) => it.id);
+            itemCorrect = Array.isArray(ansId) && ansId.length === co.length && ansId.every((v, i) => v === co[i]);
+          } else if (type === "menjodohkan") {
+            const pairs = q.pairs || [];
+            itemCorrect = pairs.length > 0 && pairs.every((p: any) => ansId[p.id] === p.right);
+          }
+        }
+      }
+      
+      if (itemCorrect) correctCount++;
+    });
+
+    const total = monitorQuestions.length;
+    return total > 0 ? Math.round((correctCount / total) * 100) : 0;
+  };
+
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean;
     title: string;
@@ -902,8 +944,14 @@ const MonitoringPage = () => {
                                 </div>
                               ) : <span className="text-[10px] text-slate-400 italic">Belum Login</span>}
                             </TableCell>
-                            <TableCell className="text-center font-bold text-indigo-600">
-                              {attempt?.score !== undefined ? attempt.score : "-"}
+                            <TableCell className="text-center font-bold">
+                              {(() => {
+                                if (!attempt) return "-";
+                                if (attempt.status === "finished") return <span className="text-emerald-600">{attempt.score}</span>;
+                                
+                                const liveScore = getLiveScore(sisAnswers, attempt.overrides || {});
+                                return <span className="text-indigo-600 animate-pulse-subtle">{liveScore}</span>;
+                              })()}
                             </TableCell>
                             <TableCell className="text-center text-xs text-slate-500">
                               {answered} / {monitorQuestions.length}

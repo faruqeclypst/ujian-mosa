@@ -1,5 +1,5 @@
 {
-  "name": "school-inventory-dashboard",
+  "name": "e-ujian-aa",
   "private": true,
   "version": "0.1.0",
   "type": "module",
@@ -12,6 +12,10 @@
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.515.0",
+    "@capacitor/android": "^8.3.0",
+    "@capacitor/app": "^8.1.0",
+    "@capacitor/cli": "^8.3.0",
+    "@capacitor/core": "^8.3.0",
     "@hookform/resolvers": "^3.3.4",
     "@radix-ui/react-avatar": "^1.0.4",
     "@radix-ui/react-dialog": "^1.0.5",

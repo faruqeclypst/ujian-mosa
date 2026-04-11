@@ -44,7 +44,7 @@ const RegisterPage = () => {
     setFormError(null);
     try {
       await registerWithUsername(values.username, values.password, values.displayName.trim());
-      navigate("/admin/login", { replace: true });
+      navigate("/admin", { replace: true });
     } catch (error: any) {
       setFormError(error.message || "Gagal registrasi.");
     }
@@ -284,7 +284,7 @@ const RegisterPage = () => {
               <p className="text-sm text-gray-600 dark:text-gray-400">
                 Sudah punya akun admin?{" "}
                 <Link
-                  to="/admin/login"
+                  to="/admin"
                   className="font-semibold text-blue-600 hover:text-blue-700 hover:underline transition-colors dark:text-blue-400 dark:hover:text-blue-300"
                 >
                   Masuk di sini

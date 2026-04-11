@@ -172,22 +172,38 @@ const LoginPage = () => {
                 stiffness: 200,
                 damping: 15
               }}
-              className="mx-auto flex h-24 w-24 items-center justify-center relative overflow-hidden"
+              className="mx-auto flex items-center justify-center gap-4 py-2"
             >
               {logoLoading ? (
-                <div className="flex items-center justify-center h-full w-full bg-slate-100 dark:bg-slate-800 rounded-2xl animate-pulse">
+                <div className="flex items-center justify-center h-24 w-24 bg-slate-100 dark:bg-slate-800 rounded-2xl animate-pulse">
                   <div className="h-8 w-8 rounded-full border-2 border-blue-500 border-t-transparent animate-spin" />
                 </div>
-              ) : schoolLogo && !logoError ? (
-                <img
-                  src={schoolLogo}
-                  // alt="Logo Sekolah" 
-                  className="h-full w-full object-contain"
-                  onError={() => setLogoError(true)}
-                />
               ) : (
-                <div className="flex items-center justify-center h-full w-full bg-gradient-to-br from-blue-500 to-blue-700 rounded-2xl shadow-inner">
-                  <Lock className="h-8 w-8 text-white" />
+                <div className="flex items-center justify-center gap-4">
+                  {/* Default Logo */}
+                  <div className="h-20 w-20 md:h-24 md:w-24 flex items-center justify-center p-1">
+                    <img
+                      src="/logo-default.png"
+                      alt="Logo Default" 
+                      className="h-full w-full object-contain"
+                    />
+                  </div>
+
+                  {schoolLogo && !logoError && (
+                    <>
+                      <div className="text-2xl font-black text-blue-500/50 dark:text-blue-400/50">×</div>
+                      <div className="h-20 w-20 md:h-24 md:w-24 flex items-center justify-center p-1">
+                        <img
+                          src={schoolLogo}
+                          alt="Logo Sekolah" 
+                          className="h-full w-full object-contain"
+                          onError={() => {
+                            if (schoolLogo) setLogoError(true);
+                          }}
+                        />
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
             </motion.div>

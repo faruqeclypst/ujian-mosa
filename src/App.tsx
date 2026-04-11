@@ -17,6 +17,7 @@ import ExambroGuard from "./components/auth/ExambroGuard";
 import StudentLoginPage from "./pages/student/StudentLoginPage";
 import StudentDashboardPage from "./pages/student/StudentDashboardPage";
 import CBTPage from "./pages/student/CBTPage";
+import NotFoundPage from "./pages/NotFoundPage";
 import pb from "./lib/pocketbase";
 
 const DashboardPage = lazy(() => import("./pages/DashboardPage"));
@@ -51,6 +52,8 @@ const AdminOnlyRoute = ({ children }: { children: React.ReactNode }) => {
   if (role !== "admin") return <Navigate to="/admin" replace />;
   return <>{children}</>;
 };
+
+import CapacitorOverlay from "./components/auth/CapacitorOverlay";
 
 const AppContent = () => {
   const { user, loading } = useAuth();
@@ -103,6 +106,7 @@ const AppContent = () => {
 
   return (
     <Suspense fallback={<LoadingScreen />}>
+      <CapacitorOverlay />
       <Routes>
         {/* === student ROUTES (HALAMAN UTAMA) === */}
         <Route 
@@ -135,20 +139,21 @@ const AppContent = () => {
         />
 
         {/* === ADMIN / GURU ROUTES (PREFIX /admin) === */}
-        <Route path="/admin/login" element={user ? <Navigate to="/admin" replace /> : <LoginPage />} />
         <Route path="/admin/register" element={user ? <Navigate to="/admin" replace /> : <RegisterPage />} />
-        <Route path="/admin/change-password" element={user ? <ChangePasswordPage /> : <Navigate to="/admin/login" replace />} />
-        <Route path="/admin/profile" element={user ? <ProfilePage /> : <Navigate to="/admin/login" replace />} />
+        <Route path="/admin/change-password" element={user ? <ChangePasswordPage /> : <Navigate to="/admin" replace />} />
+        <Route path="/admin/profile" element={user ? <ProfilePage /> : <Navigate to="/admin" replace />} />
         
         <Route
           path="/admin"
           element={
-            user || loading ? (
+            loading ? (
+              <LoadingScreen />
+            ) : user ? (
               <ExamDataProvider>
                 <InventoryLayout />
               </ExamDataProvider>
             ) : (
-              <Navigate to="/admin/login" replace />
+              <LoginPage />
             )
           }
         >
@@ -167,16 +172,8 @@ const AppContent = () => {
           <Route path="pengaturan" element={<AdminOnlyRoute><SettingsPage /></AdminOnlyRoute>} />
         </Route>
 
-        {/* Fallback */}
-        <Route 
-          path="*" 
-          element={
-            <Navigate 
-              to={isAdminRoute ? "/admin/login" : "/"} 
-              replace 
-            />
-          } 
-        />
+        {/* Fallback - 404 Error Page */}
+        <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </Suspense>
   );

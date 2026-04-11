@@ -80,7 +80,7 @@ const ProfilePage = () => {
       <div className="flex min-h-screen items-center justify-center">
         <div className="text-center">
           <p className="text-lg text-gray-600">Silakan login terlebih dahulu</p>
-          <Link to="/admin/login" className="text-blue-600 hover:underline">
+          <Link to="/admin" className="text-blue-600 hover:underline">
             Kembali ke Login
           </Link>
         </div>

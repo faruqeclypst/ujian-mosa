@@ -579,7 +579,7 @@ const StudentDashboardPage = () => {
             <div className="space-y-4">
               <div>
                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 block">Token Ujian</label>
-                <Input value={tokenInput} onChange={(e) => setTokenInput(e.target.value.toUpperCase())} placeholder="AB123" className="h-12 text-center text-xl font-black tracking-[0.3em] bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 rounded-lg" disabled={isValidating} />
+                <Input value={tokenInput} onChange={(e) => setTokenInput(e.target.value)} placeholder="AB123" className="h-12 text-center text-xl font-black tracking-[0.3em] bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 rounded-lg uppercase" disabled={isValidating} />
                 {tokenError && <p className="text-rose-500 text-[9px] font-bold mt-2 flex items-center gap-1 uppercase text-left"><AlertCircle className="w-3 h-3" /> {tokenError}</p>}
               </div>
               <div className="bg-emerald-50/50 dark:bg-emerald-900/20 p-4 rounded-lg border border-emerald-100 dark:border-emerald-800 text-left"><p className="text-[10px] text-emerald-600 dark:text-emerald-400 leading-relaxed font-medium">⚠️ Pastikan koneksi internet stabil sebelum mulai. Pengerjaan Anda akan tercatat secara otomatis.</p></div>

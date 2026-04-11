@@ -1,5 +1,8 @@
 import { useEffect, useState, useCallback, useRef } from "react";
+import { registerPlugin } from "@capacitor/core";
 import { useParams, useNavigate } from "react-router-dom";
+
+const CheatAlert = registerPlugin<any>("CheatAlert");
 import { SmartImage } from "../../components/ui/smart-image";
 import { useStudentAuth } from "../../context/StudentAuthContext";
 import pb from "../../lib/pocketbase";
@@ -392,7 +395,10 @@ const CBTPage = () => {
 
     // 2. Subscribe ke Attempt
     const unsubAttempt = pb.collection("attempts").subscribe(attempt.id, (e) => {
-      if (e.action === "delete") navigate("/dashboard");
+      if (e.action === "delete") {
+        sessionStorage.removeItem("activeCBTRoomId");
+        navigate("/", { replace: true });
+      }
       else if (e.action === "update") {
         const oldS = attempt.status;
         const newS = (e.record as any).status;
@@ -431,7 +437,19 @@ const CBTPage = () => {
       if (d <= 0) { clearInterval(timer); setTimeLeft(0); setIsExamOver(true); }
       else setTimeLeft(d);
     }, 1000);
-    const heartbeat = setInterval(() => { if (attempt?.id) safeUpdateAttempt(attempt.id, { isOnline: true, lastHeartbeat: new Date().toISOString() }); }, 15000);
+    const heartbeat = setInterval(async () => { 
+      if (attempt?.id) {
+        try {
+          await safeUpdateAttempt(attempt.id, { isOnline: true, lastHeartbeat: new Date().toISOString() });
+        } catch (err: any) {
+          // Jika 404/403 berarti sesi sudah dihapus/reset oleh admin
+          if (err.status === 404 || err.status === 403) {
+            sessionStorage.removeItem("activeCBTRoomId");
+            navigate("/", { replace: true });
+          }
+        }
+      } 
+    }, 15000);
     return () => { clearInterval(timer); clearInterval(heartbeat); };
   }, [loading, isExamOver, roomData, attempt]);
 
@@ -458,8 +476,12 @@ const CBTPage = () => {
 
     const handleCheatDetection = (e: Event) => {
       if (document.visibilityState === "hidden" || e.type === "blur") {
-        if (!cheatTimerRef.current) cheatTimerRef.current = setTimeout(triggerPenalty, 5000);
+        if (!cheatTimerRef.current) {
+          cheatTimerRef.current = setTimeout(triggerPenalty, 5000);
+          try { CheatAlert.startAlarm(); } catch (err) { }
+        }
       } else {
+        try { CheatAlert.stopAlarm(); } catch (err) { }
         if (cheatTimerRef.current) {
           clearTimeout(cheatTimerRef.current);
           cheatTimerRef.current = null;
