@@ -11,6 +11,19 @@ const config: CapacitorConfig = {
   },
   android: {
     overrideUserAgent: 'MosaExambro/1.0 (Android)'
+  },
+  plugins: {
+    SplashScreen: {
+      launchShowDuration: 15000,
+      launchAutoHide: true,
+      launchFadeOutDuration: 300,
+      backgroundColor: "#ffffff",
+      androidSplashResourceName: "splash",
+      androidScaleType: "CENTER_CROP",
+      showSpinner: true,
+      androidSpinnerStyle: "large",
+      spinnerColor: "#059669"
+    }
   }
 };
 

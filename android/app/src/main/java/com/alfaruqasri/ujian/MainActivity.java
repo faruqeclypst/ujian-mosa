@@ -14,6 +14,7 @@ public class MainActivity extends BridgeActivity {
     private android.os.Handler handler = new android.os.Handler();
     private android.os.Handler alarmHandler = new android.os.Handler();
     private boolean isAlarmPlaying = false;
+    private boolean isExiting = false;
     private Runnable alarmRunnable = new Runnable() {
         @Override
         public void run() {
@@ -60,6 +61,25 @@ public class MainActivity extends BridgeActivity {
         public void stopAlarm(com.getcapacitor.PluginCall call) {
             stopRingtone();
             call.resolve();
+        }
+
+        @com.getcapacitor.PluginMethod
+        public void exitApp(com.getcapacitor.PluginCall call) {
+            isExiting = true;
+            try {
+                handler.removeCallbacksAndMessages(null);
+                alarmHandler.removeCallbacksAndMessages(null);
+                isAlarmPlaying = false;
+                stopRingtone();
+                if (blockingLayout != null) {
+                    blockingLayout.setVisibility(android.view.View.GONE);
+                }
+                stopLockTask();
+                finish();
+                call.resolve();
+            } catch (Exception e) {
+                call.reject(e.getMessage());
+            }
         }
     }
 
@@ -126,7 +146,7 @@ public class MainActivity extends BridgeActivity {
     }
 
     private void checkLockTaskOnly() {
-        if (isFinishing()) return; // Jangan cek jika sedang menutup
+        if (isFinishing() || isExiting) return; // Jangan cek jika sedang menutup
         try {
             ActivityManager am = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
             int lockState = am.getLockTaskModeState();
@@ -238,8 +258,17 @@ public class MainActivity extends BridgeActivity {
     // 5. Pastikan Unpin sebelum keluar (Cegah Crash)
     @Override
     public void finish() {
+        isExiting = true; // Tandai sedang keluar agar pengecekan berhenti
         try {
             handler.removeCallbacksAndMessages(null);
+            alarmHandler.removeCallbacksAndMessages(null);
+            isAlarmPlaying = false;
+            stopRingtone();
+            
+            if (blockingLayout != null) {
+                blockingLayout.setVisibility(View.GONE);
+            }
+            
             stopLockTask();
         } catch (Exception e) {}
         

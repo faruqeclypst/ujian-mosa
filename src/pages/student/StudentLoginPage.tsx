@@ -108,8 +108,8 @@ const StudentLoginPage = () => {
         <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-teal-400/20 rounded-full blur-[120px] animate-pulse delay-75"></div>
         <div className="absolute top-[30%] right-[10%] w-[30%] h-[30%] bg-lime-400/10 rounded-full blur-[100px] animate-pulse delay-150"></div>
 
-        {/* Subtle Grid Pattern */}
-        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-[0.03]"></div>
+        {/* Subtle Background Accent */}
+        <div className="absolute inset-0 bg-slate-50/50"></div>
       </div>
 
       <div className="w-full max-w-lg mx-auto z-10 p-6 flex flex-col items-center">

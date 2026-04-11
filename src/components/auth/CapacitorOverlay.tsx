@@ -22,9 +22,20 @@ const CapacitorOverlay = () => {
     window.location.reload();
   };
 
-  const handleExitApp = () => {
+  const handleExitApp = async () => {
     if (password === "quit") {
-      App.exitApp();
+      setDialogType("none");
+      try {
+        if (Capacitor.isNativePlatform()) {
+          // @ts-ignore
+          await (Capacitor.Plugins.CheatAlert as any).exitApp();
+        } else {
+          window.close();
+        }
+      } catch (e) {
+        console.error("Exit failed", e);
+        App.exitApp();
+      }
     } else {
       alert("Password Salah!");
       setPassword("");
