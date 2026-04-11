@@ -5,7 +5,9 @@ const config: CapacitorConfig = {
   appName: 'E-Ujian AA',
   webDir: 'dist',
   server: {
-    androidScheme: 'https'
+    androidScheme: 'https',
+    url: 'https://exam.sman-modalbangsa.sch.id/',
+    cleartext: true
   },
   android: {
     overrideUserAgent: 'MosaExambro/1.0 (Android)'

@@ -37,7 +37,7 @@ const CapacitorOverlay = () => {
         drag
         dragMomentum={false}
         initial={{ x: 0, y: 0 }}
-        className="fixed bottom-32 right-4 z-[9999] flex flex-col items-center gap-2"
+        className="fixed bottom-48 right-4 z-[9999] flex flex-col items-center gap-2"
         style={{ touchAction: "none" }}
       >
         <AnimatePresence>
