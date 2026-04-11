@@ -481,7 +481,6 @@ const CBTPage = () => {
           try { CheatAlert.startAlarm(); } catch (err) { }
         }
       } else {
-        try { CheatAlert.stopAlarm(); } catch (err) { }
         if (cheatTimerRef.current) {
           clearTimeout(cheatTimerRef.current);
           cheatTimerRef.current = null;
@@ -1070,7 +1069,10 @@ const CBTPage = () => {
               </span>
             </div>
           </div>
-          <Button onClick={() => setIsCheatWarningOpen(false)} className="w-full bg-emerald-600 text-white font-black uppercase tracking-widest h-12 rounded-2xl mt-6">SAYA MENGERTI</Button>
+          <Button onClick={() => { 
+            setIsCheatWarningOpen(false);
+            try { CheatAlert.stopAlarm(); } catch (err) { }
+          }} className="w-full bg-emerald-600 text-white font-black uppercase tracking-widest h-12 rounded-2xl mt-6">SAYA MENGERTI</Button>
         </DialogContent>
       </Dialog>
     </div>

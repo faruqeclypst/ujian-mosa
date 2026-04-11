@@ -12,6 +12,17 @@ public class MainActivity extends BridgeActivity {
     private int lastLockState = -1;
     private android.widget.LinearLayout blockingLayout;
     private android.os.Handler handler = new android.os.Handler();
+    private android.os.Handler alarmHandler = new android.os.Handler();
+    private boolean isAlarmPlaying = false;
+    private Runnable alarmRunnable = new Runnable() {
+        @Override
+        public void run() {
+            if (isAlarmPlaying) {
+                playTone();
+                alarmHandler.postDelayed(this, 600);
+            }
+        }
+    };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -157,6 +168,26 @@ public class MainActivity extends BridgeActivity {
     }
 
     private void playRingtone() {
+        if (isAlarmPlaying) return; 
+        isAlarmPlaying = true;
+        alarmHandler.post(alarmRunnable);
+    }
+
+    private void stopRingtone() {
+        isAlarmPlaying = false;
+        alarmHandler.removeCallbacks(alarmRunnable);
+        try {
+            if (toneGenerator != null) {
+                toneGenerator.stopTone();
+            }
+            android.os.Vibrator v = (android.os.Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
+            if (v != null) {
+                v.cancel();
+            }
+        } catch (Exception e) {}
+    }
+
+    private void playTone() {
         try {
             // Booster Volume Alarm
             android.media.AudioManager am = (android.media.AudioManager) getSystemService(Context.AUDIO_SERVICE);
@@ -169,32 +200,20 @@ public class MainActivity extends BridgeActivity {
                 toneGenerator = new android.media.ToneGenerator(android.media.AudioManager.STREAM_ALARM, 100);
             }
             // TONE_SUP_ERROR menghasilkan suara "tit-tit-tit" yang khas error/alarm
-            toneGenerator.startTone(android.media.ToneGenerator.TONE_SUP_ERROR, 800);
+            toneGenerator.startTone(android.media.ToneGenerator.TONE_SUP_ERROR, 400);
 
             // Vibrasi darurat
             android.os.Vibrator v = (android.os.Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
             if (v != null && v.hasVibrator()) {
                 if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                    v.vibrate(android.os.VibrationEffect.createOneShot(800, android.os.VibrationEffect.DEFAULT_AMPLITUDE));
+                    v.vibrate(android.os.VibrationEffect.createOneShot(400, android.os.VibrationEffect.DEFAULT_AMPLITUDE));
                 } else {
-                    v.vibrate(800);
+                    v.vibrate(400);
                 }
             }
         } catch (Exception e) {
             e.printStackTrace();
         }
-    }
-
-    private void stopRingtone() {
-        try {
-            if (toneGenerator != null) {
-                toneGenerator.stopTone();
-            }
-            android.os.Vibrator v = (android.os.Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
-            if (v != null) {
-                v.cancel();
-            }
-        } catch (Exception e) {}
     }
 
     private void makeFullScreen() {

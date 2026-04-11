@@ -237,6 +237,47 @@ export const StudentAuthProvider = ({ children }: { children: ReactNode }) => {
   }, [student?.id, isKicked]);
   // -----------------------------------------------------
 
+  // --- AUTO LOGOUT ON INACTIVITY (5 MINUTES) ---
+  useEffect(() => {
+    if (!student) return;
+
+    const INACTIVITY_LIMIT = 5 * 60 * 1000; // 5 Menit dalam milidetik
+
+    const checkInactivity = () => {
+      const lastActive = localStorage.getItem("last_active_time");
+      if (lastActive) {
+        const diff = Date.now() - parseInt(lastActive, 10);
+        if (diff > INACTIVITY_LIMIT) {
+          console.log("Sesi berakhir karena inaktivitas > 5 menit.");
+          logoutStudent();
+          window.location.href = "/";
+          return true;
+        }
+      }
+      return false;
+    };
+
+    // 1. Cek langsung saat aplikasi dimuat/fokus kembali
+    checkInactivity();
+
+    // 2. Pantau ketika aplikasi pindah ke Background atau Foreground
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        // Simpan waktu saat aplikasi ditinggalkan
+        localStorage.setItem("last_active_time", Date.now().toString());
+      } else {
+        // Cek selisih waktu saat aplikasi dibuka kembali
+        checkInactivity();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [student, logoutStudent]);
+  // -----------------------------------------------------
+
   return (
     <StudentAuthContext.Provider value={{ student, loading, loginStudent, logoutStudent, changePassword }}>
       {children}
