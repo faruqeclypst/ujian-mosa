@@ -51,7 +51,8 @@ const StudentLoginPage = () => {
           setLogoError(false);
         }
       } catch (err) {
-        console.error("Gagal memuat settings sekolah:", err);
+        console.error("Gagal memuat logo siswa (Cek API Rules koleksi settings di PocketBase):", err);
+        setLogoError(true);
       } finally {
         setLogoLoading(false);
       }
@@ -120,34 +121,26 @@ const StudentLoginPage = () => {
               <div className="h-10 w-10 rounded-full border-4 border-emerald-500/30 border-t-emerald-600 animate-spin" />
             </div>
           ) : (
-            <>
-              {/* Default Logo */}
-              <div className="relative w-28 h-28 md:w-36 md:h-36 flex items-center justify-center overflow-hidden">
-                <img
-                  src="/logo-default.png"
-                  alt="Logo Default"
-                  className="w-full h-full object-contain filter drop-shadow-sm"
-                />
-              </div>
-
-              {schoolLogo && !logoError && (
-                <>
-                  <div className="text-3xl font-black text-emerald-600/50 z-10">×</div>
-                  
-                  {/* School Logo */}
-                  <div className="relative w-28 h-28 md:w-36 md:h-36 flex items-center justify-center overflow-hidden">
-                    <img
-                      src={schoolLogo}
-                      alt="Logo Sekolah"
-                      className="w-full h-full object-contain filter drop-shadow-md"
-                      onError={() => {
-                        if (schoolLogo) setLogoError(true);
-                      }}
-                    />
-                  </div>
-                </>
+            <div className="flex items-center justify-center">
+              {schoolLogo && !logoError ? (
+                <div className="relative w-32 h-32 md:w-44 md:h-44 flex items-center justify-center overflow-hidden">
+                  <img
+                    src={schoolLogo}
+                    alt="Logo Sekolah"
+                    className="w-full h-full object-contain filter drop-shadow-md"
+                    onError={() => setLogoError(true)}
+                  />
+                </div>
+              ) : (
+                <div className="relative w-28 h-28 md:w-36 md:h-36 flex items-center justify-center overflow-hidden">
+                  <img
+                    src="/logo-default.png"
+                    alt="Logo Default"
+                    className="w-full h-full object-contain filter drop-shadow-sm"
+                  />
+                </div>
               )}
-            </>
+            </div>
           )}
         </div>
 

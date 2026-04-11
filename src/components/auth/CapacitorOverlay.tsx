@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { RefreshCw, LogOut, X, ShieldAlert } from "lucide-react";
+import { RefreshCw, LogOut, X, MoreHorizontal, ShieldAlert } from "lucide-react";
 import { Capacitor } from "@capacitor/core";
 import { App } from "@capacitor/app";
 import { motion, AnimatePresence } from "framer-motion";
@@ -45,24 +45,16 @@ const CapacitorOverlay = () => {
   return (
     <>
       <motion.div
-        layout
         drag
         dragConstraints={{ left: -window.innerWidth + 100, right: 0, top: -window.innerHeight + 100, bottom: 100 }}
-        dragElastic={0.1}
+        dragElastic={0}
         dragMomentum={false}
-        whileTap={{ scale: 0.9 }}
-        whileDrag={{ scale: 1.1, cursor: "grabbing" }}
-        initial={{ x: 0, y: 0 }}
-        className="fixed bottom-48 right-4 z-[9999] flex flex-col items-center gap-2 select-none"
+        className="fixed bottom-48 right-4 z-[9999] flex flex-col items-end gap-2 select-none"
         style={{ touchAction: "none" }}
       >
         <AnimatePresence>
           {showMenu && (
-            <motion.div 
-              layout
-              initial={{ opacity: 0, scale: 0.5, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.5, y: 20 }}
+            <div 
               className="bg-white dark:bg-slate-900 p-2 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col gap-2 mb-2"
             >
               <button
@@ -79,15 +71,15 @@ const CapacitorOverlay = () => {
               >
                 <LogOut size={18} />
               </button>
-            </motion.div>
+            </div>
           )}
         </AnimatePresence>
 
         <button
           onClick={() => setShowMenu(!showMenu)}
-          className="w-12 h-12 bg-slate-900/90 dark:bg-emerald-600 text-white rounded-full flex items-center justify-center shadow-2xl active:scale-95 transition-all border border-white/20"
+          className="w-12 h-12 bg-slate-900/60 dark:bg-slate-800/60 backdrop-blur-md text-white rounded-full flex items-center justify-center shadow-xl active:scale-90 transition-all border border-white/20 ring-1 ring-black/10"
         >
-          {showMenu ? <X size={20} /> : <div className="font-black text-[10px]">CBT</div>}
+          {showMenu ? <X size={22} className="opacity-80" /> : <MoreHorizontal size={28} className="opacity-90" />}
         </button>
       </motion.div>
 

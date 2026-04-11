@@ -58,8 +58,8 @@ const AdminOnlyRoute = ({ children }: { children: React.ReactNode }) => {
 import CapacitorOverlay from "./components/auth/CapacitorOverlay";
 
 const AppContent = () => {
-  const { user, loading } = useAuth();
-  const { student } = useStudentAuth();
+  const { user, loading: adminLoading } = useAuth();
+  const { student, loading: studentLoading } = useStudentAuth();
   const location = useLocation();
 
   useEffect(() => {
@@ -102,85 +102,87 @@ const AppContent = () => {
     }
   }, []);
 
-  // Check if it's an admin route to decide whether to show a full-screen loader or a shell skeleton
   const isAdminRoute = location.pathname.startsWith("/admin");
-
-  if (loading && !isAdminRoute) {
-    return <LoadingScreen />;
-  }
+  const isGlobalLoading = adminLoading || studentLoading;
 
   return (
-    <Suspense fallback={<LoadingScreen />}>
+    <>
       <CapacitorOverlay />
-      <Routes>
-        {/* === student ROUTES (HALAMAN UTAMA) === */}
-        <Route 
-          path="/" 
-          element={
-            <ExambroGuard>
-              {student ? <StudentDashboardPage /> : <StudentLoginPage />}
-            </ExambroGuard>
-          } 
-        />
-        <Route 
-          path="/cbt" 
-          element={
-            <ExambroGuard>
-              <StudentAuthGuard>
-                <CBTPage />
-              </StudentAuthGuard>
-            </ExambroGuard>
-          } 
-        />
-        <Route 
-          path="/cbt/:roomId" 
-          element={
-            <ExambroGuard>
-              <StudentAuthGuard>
-                <CBTPage />
-              </StudentAuthGuard>
-            </ExambroGuard>
-          } 
-        />
+      {isGlobalLoading && !isAdminRoute ? (
+        <LoadingScreen />
+      ) : (
+        <Suspense fallback={<LoadingScreen />}>
+          <Routes>
+            {/* === student ROUTES (HALAMAN UTAMA) === */}
+            <Route 
+              path="/" 
+              element={
+                <ExambroGuard>
+                  {student ? <StudentDashboardPage /> : <StudentLoginPage />}
+                </ExambroGuard>
+              } 
+            />
+            <Route 
+              path="/cbt" 
+              element={
+                <ExambroGuard>
+                  <StudentAuthGuard>
+                    <CBTPage />
+                  </StudentAuthGuard>
+                </ExambroGuard>
+              } 
+            />
+            <Route 
+              path="/cbt/:roomId" 
+              element={
+                <ExambroGuard>
+                  <StudentAuthGuard>
+                    <CBTPage />
+                  </StudentAuthGuard>
+                </ExambroGuard>
+              } 
+            />
 
-        {/* === ADMIN / GURU ROUTES (PREFIX /admin) === */}
-        <Route path="/admin/register" element={user ? <Navigate to="/admin" replace /> : <RegisterPage />} />
-        <Route path="/admin/change-password" element={user ? <ChangePasswordPage /> : <Navigate to="/admin" replace />} />
-        <Route path="/admin/profile" element={user ? <ProfilePage /> : <Navigate to="/admin" replace />} />
-        
-        <Route
-          path="/admin"
-          element={
-            loading ? (
-              <LoadingScreen />
-            ) : user ? (
-              <ExamDataProvider>
-                <InventoryLayout />
-              </ExamDataProvider>
-            ) : (
-              <LoginPage />
-            )
-          }
-        >
-          <Route index element={<DashboardPage />} />
-          <Route path="subjects" element={<AdminOnlyRoute><SubjectsPage /></AdminOnlyRoute>} />
-          <Route path="teachers" element={<AdminOnlyRoute><TeachersPage /></AdminOnlyRoute>} />
-          <Route path="student" element={<AdminOnlyRoute><StudentsPage /></AdminOnlyRoute>} />
-          <Route path="alumni" element={<AdminOnlyRoute><AlumniPage /></AdminOnlyRoute>} />
-          <Route path="classes" element={<AdminOnlyRoute><ClassesPage /></AdminOnlyRoute>} />
-          <Route path="kelola-akun" element={<AdminOnlyRoute><UsersPage /></AdminOnlyRoute>} />
-          <Route path="bank-soal" element={<ExamsPage />} />
-          <Route path="bank-soal/:examId/questions" element={<QuestionsPage />} />
-          <Route path="ruang-ujian" element={<ExamRoomsPage />} />
-          <Route path="monitoring/:roomId" element={<MonitoringPage />} />
-          <Route path="panduan" element={<GuidePage />} />
-          <Route path="pengaturan" element={<AdminOnlyRoute><SettingsPage /></AdminOnlyRoute>} />
-        </Route>
+            {/* === ADMIN / GURU ROUTES (PREFIX /admin) === */}
+            <Route path="/admin/register" element={user ? <Navigate to="/admin" replace /> : <RegisterPage />} />
+            <Route path="/admin/change-password" element={user ? <ChangePasswordPage /> : <Navigate to="/admin" replace />} />
+            <Route path="/admin/profile" element={user ? <ProfilePage /> : <Navigate to="/admin" replace />} />
+            
+            <Route
+              path="/admin"
+              element={
+                adminLoading ? (
+                  <LoadingScreen />
+                ) : user ? (
+                  <ExamDataProvider>
+                    <InventoryLayout />
+                  </ExamDataProvider>
+                ) : (
+                  <LoginPage />
+                )
+              }
+            >
+              <Route index element={<DashboardPage />} />
+              <Route path="subjects" element={<AdminOnlyRoute><SubjectsPage /></AdminOnlyRoute>} />
+              <Route path="teachers" element={<AdminOnlyRoute><TeachersPage /></AdminOnlyRoute>} />
+              <Route path="student" element={<AdminOnlyRoute><StudentsPage /></AdminOnlyRoute>} />
+              <Route path="alumni" element={<AdminOnlyRoute><AlumniPage /></AdminOnlyRoute>} />
+              <Route path="classes" element={<AdminOnlyRoute><ClassesPage /></AdminOnlyRoute>} />
+              <Route path="kelola-akun" element={<AdminOnlyRoute><UsersPage /></AdminOnlyRoute>} />
+              <Route path="bank-soal" element={<ExamsPage />} />
+              <Route path="bank-soal/:examId/questions" element={<QuestionsPage />} />
+              <Route path="ruang-ujian" element={<ExamRoomsPage />} />
+              <Route path="monitoring/:roomId" element={<MonitoringPage />} />
+              <Route path="panduan" element={<GuidePage />} />
+              <Route path="pengaturan" element={<AdminOnlyRoute><SettingsPage /></AdminOnlyRoute>} />
+            </Route>
 
-        {/* Fallback - 404 Error Page */}
-        <Route path="*" element={<NotFoundPage />} />
-      </Routes>
-    </Suspense>
+            {/* Fallback - 404 Error Page */}
+            <Route path="*" element={<NotFoundPage />} />
+          </Routes>
+        </Suspense>
+      )}
+    </>
   );
 };
 
