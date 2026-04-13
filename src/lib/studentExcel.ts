@@ -1,4 +1,4 @@
-import * as XLSX from "xlsx-js-style";
+import * as XLSX from "xlsx";
 import type { StudentData, ClassData } from "../types/exam";
 
 export const STUDENT_IMPORT_HEADERS = ["NISN", "Nama Siswa", "Gender (L/P)", "Nama Kelas"] as const;

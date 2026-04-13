@@ -16,7 +16,11 @@ export const parseQuestionsFromWord = async (file: File): Promise<ParsedQuestion
 
   const parser = new DOMParser();
   const doc = parser.parseFromString(html, "text/html");
-  const paragraphs = doc.querySelectorAll("p");
+  // Ambil semua p dan td, tapi saring td yang sudah punya p di dalamnya agar tidak double
+  const paragraphs = Array.from(doc.querySelectorAll("p, td")).filter(el => {
+    if (el.tagName === 'TD') return el.querySelectorAll('p').length === 0;
+    return true;
+  });
 
   const questions: ParsedQuestion[] = [];
 
@@ -41,8 +45,8 @@ export const parseQuestionsFromWord = async (file: File): Promise<ParsedQuestion
     if (!textOnly && !imageSrc) return;
 
     // Detect Literasi / Stimulus Start
-    // Format: "LITERASI: teks..." atau "STIMULUS 1: teks..."
-    const literasiMatch = textOnly.match(/^(LITERASI|STIMULUS|TEKS|WACANA)[.\s]*(\d+)?[.\s:]+(.*)/i);
+    // Format: "LITERASI: teks..." atau "STIMULUS 1: teks..." atau "WACANA [1]"
+    const literasiMatch = textOnly.match(/^(LITERASI|STIMULUS|TEKS|WACANA|BACAAN|STIMULI)[.\s]*(\d+)?[:\s\-]*(.*)/i);
     if (literasiMatch) {
         currentGroupId = `GROUP-${literasiMatch[2] || Math.random().toString(36).substr(2, 5).toUpperCase()}`;
         currentGroupText = literasiMatch[3] || "";
@@ -50,8 +54,9 @@ export const parseQuestionsFromWord = async (file: File): Promise<ParsedQuestion
     }
 
     // A. Detect Question Start (Direct "1. Text" or Pending Number)
-    const questionMatch = textOnly.match(/^(\d+)[.\s]+(.+)/);
-    const isJustNumber = textOnly.match(/^(\d+)$/);
+    // Support "1.", "1)", "(1)", "1 "
+    const questionMatch = textOnly.match(/^[\(]?(\d+)[\.\s\)]+(.*)/);
+    const isJustNumber = textOnly.match(/^[\(]?(\d+)[\.\s\)]?$/);
 
     if (questionMatch || isJustNumber) {
       // Save previous question
@@ -106,7 +111,7 @@ export const parseQuestionsFromWord = async (file: File): Promise<ParsedQuestion
     }
 
     // C. Detect Answer Key ("Kunci: A" - bisa di mana saja dalam baris/cell)
-    const answerMatch = textOnly.match(/(Kunci|Answer|Kunci Jawaban)[.\s:]+([A-Ea-e])/i);
+    const answerMatch = textOnly.match(/(Kunci|Answer|Kunci Jawaban|Jawaban)[.\s:]+([A-Ea-e])/i);
     if (answerMatch && currentQuestion) {
       currentAnswerKey = answerMatch[2].toLowerCase();
       return;

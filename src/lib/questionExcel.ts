@@ -1,4 +1,4 @@
-import * as XLSX from "xlsx-js-style";
+import * as XLSX from "xlsx";
 
 export const QUESTION_IMPORT_HEADERS = [
   "Pertanyaan", 
@@ -51,10 +51,7 @@ export function downloadQuestionTemplate(filename = "Template_Soal_Baru.xlsx") {
     }
   };
 
-  for (let c = 0; c < QUESTION_IMPORT_HEADERS.length; c++) {
-    const addr = XLSX.utils.encode_cell({ r: 0, c });
-    if (ws[addr]) (ws[addr] as any).s = headerStyle;
-  }
+  // Styling ignored in community version of xlsx, skipping
 
   (ws as any)["!cols"] = [
     { wch: 50 }, // Pertanyaan
@@ -97,24 +94,32 @@ export async function parseQuestionImportExcel(file: File): Promise<any[]> {
   const raw = XLSX.utils.sheet_to_json<Record<string, any>>(ws, { defval: "" });
   return raw
     .map((row) => {
-      const qText = String(row["Pertanyaan"] || "").trim();
+      // Robust header matching (trimming keys)
+      const cleanRow: Record<string, any> = {};
+      Object.keys(row).forEach(key => {
+        cleanRow[key.trim()] = row[key];
+      });
+
+      const qText = String(cleanRow["Pertanyaan"] || "").trim();
       if (!qText) return null;
 
-      const choices: Record<string, { text: string; isCorrect: boolean }> = {};
+      const choices: Record<string, { text: string; isCorrect: boolean; imageUrl: string }> = {};
       ['A', 'B', 'C', 'D', 'E'].forEach((letter) => {
-        const val = String(row[`Opsi ${letter}`] || "").trim();
+        const val = String(cleanRow[`Opsi ${letter}`] || "").trim();
         choices[letter.toLowerCase()] = {
           text: val,
-          isCorrect: String(row["Kunci Jawaban"] || "").trim().toUpperCase() === letter
+          isCorrect: String(cleanRow["Kunci Jawaban"] || "").trim().toUpperCase() === letter,
+          imageUrl: ""
         };
       });
 
       return {
         text: qText,
-        type: "pilihan_ganda",
+        type: "pilihan_ganda", // UI type
+        field: "multiple_choice", // DB type
         choices: choices,
-        groupId: String(row["GroupId (Literasi)"] || "").trim() || undefined,
-        groupText: String(row["Teks Literasi"] || "").trim() || undefined,
+        groupId: String(cleanRow["GroupId (Literasi)"] || "").trim() || undefined,
+        groupText: String(cleanRow["Teks Literasi"] || "").trim() || undefined,
       };
     })
     .filter((v) => v !== null);

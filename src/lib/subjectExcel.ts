@@ -1,4 +1,4 @@
-import * as XLSX from "xlsx-js-style";
+import * as XLSX from "xlsx";
 
 export const SUBJECT_IMPORT_HEADERS = ["Mata Pelajaran"] as const;
 

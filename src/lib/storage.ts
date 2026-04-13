@@ -2,8 +2,22 @@ import { DeleteObjectCommand, DeleteObjectsCommand, PutObjectCommand, S3Client }
 
 export async function deleteImageFromStorage(key: string): Promise<void> {
   const config = getConfig();
-  if (import.meta.env.VITE_R2_DEV_INLINE_BASE64 === "true") return; // offline skips
+  if (import.meta.env.VITE_R2_DEV_INLINE_BASE64 === "true") return; 
   if (!isR2Configured()) return;
+
+  const workerUrl = import.meta.env.VITE_R2_WORKER_URL;
+  if (workerUrl) {
+    try {
+      const response = await fetch(workerUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key })
+      });
+      if (response.ok) return;
+    } catch (e) {
+      console.warn("Delete via worker failed, falling back to S3 SDK", e);
+    }
+  }
 
   const client = ensureClient();
   await client.send(
@@ -20,9 +34,23 @@ export async function deleteImagesFromStorage(keys: string[]): Promise<void> {
   if (import.meta.env.VITE_R2_DEV_INLINE_BASE64 === "true") return;
   if (!isR2Configured()) return;
 
+  const workerUrl = import.meta.env.VITE_R2_WORKER_URL;
+  if (workerUrl) {
+    try {
+      // If worker supports batch, we could send all. 
+      // Most simple workers take one key, so we loop or send as is if supported.
+      const response = await fetch(workerUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ keys }) // Assuming worker handles {keys: []}
+      });
+      if (response.ok) return;
+    } catch (e) {
+      console.warn("Batch delete via worker failed, falling back to S3 SDK", e);
+    }
+  }
+
   const client = ensureClient();
-  
-  // S3 allows max 1000 keys per DeleteObjects request
   const chunkSize = 1000;
   for (let i = 0; i < keys.length; i += chunkSize) {
     const chunk = keys.slice(i, i + chunkSize);

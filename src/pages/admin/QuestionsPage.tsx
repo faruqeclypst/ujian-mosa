@@ -1510,11 +1510,18 @@ const QuestionsPage = () => {
     if (!questionToDelete) return;
     setIsDeleting(true);
     try {
-      await cleanupQuestionImages(questionToDelete);
+      // 🗑️ Hapus gambar di R2 (Non-blocking: jika gagal tetap hapus record DB)
+      try {
+        await cleanupQuestionImages(questionToDelete);
+      } catch (storageError) {
+        console.warn("Gagal membersihkan gambar dari R2 Storage. Ini mungkin karena masalah CORS setelah ganti domain.", storageError);
+      }
+
       await pb.collection('questions').delete(questionToDelete.id);
       showAlert("Berhasil", "Soal berhasil dihapus.", "success");
     } catch (error) {
-      showAlert("Gagal", "Gagal menghapus soal.", "danger");
+      console.error("Delete Question Error:", error);
+      showAlert("Gagal", "Gagal menghapus data soal dari database.", "danger");
     } finally {
       setIsDeleting(false);
       setDeleteDialogOpen(false);
@@ -1554,10 +1561,14 @@ const QuestionsPage = () => {
       });
       const uniqueKeys = Array.from(new Set(allKeys));
 
-      // 2. Batch Delete Images
+      // 2. Batch Delete Images (Non-blocking)
       setBatchProgress(prev => ({ ...prev, message: `Menghapus ${uniqueKeys.length} gambar dari storage...` }));
       if (uniqueKeys.length > 0) {
-        await deleteImagesFromStorage(uniqueKeys);
+        try {
+          await deleteImagesFromStorage(uniqueKeys);
+        } catch (storageError) {
+          console.warn("R2 Bulk Cleanup failed:", storageError);
+        }
       }
 
       // 3. Delete Questions in Parallel Chunks
@@ -1615,10 +1626,14 @@ const QuestionsPage = () => {
       selectedQuestions.forEach(q => allKeys.push(...getQuestionImageKeys(q)));
       const uniqueKeys = Array.from(new Set(allKeys));
 
-      // 2. Batch Delete Images
+      // 2. Batch Delete Images (Non-blocking)
       setBatchProgress(prev => ({ ...prev, message: "Membersihkan gambar di storage..." }));
       if (uniqueKeys.length > 0) {
-        await deleteImagesFromStorage(uniqueKeys);
+        try {
+          await deleteImagesFromStorage(uniqueKeys);
+        } catch (storageError) {
+          console.warn("R2 Selection Cleanup failed:", storageError);
+        }
       }
 
       // 3. Parallel Delete Records
@@ -1879,12 +1894,14 @@ const QuestionsPage = () => {
         const payload = {
           examId,
           text: q.text,
+          field: q.field || "multiple_choice",
           type: q.type,
           options: q.choices,
           answerKey: Object.entries(q.choices as any).find(([_, v]: any) => v.isCorrect)?.[0] || "a",
-          groupId: q.groupId,
-          groupText: q.groupText,
-          order: (questions.length || 0) + i + 1
+          groupId: q.groupId || "",
+          groupText: q.groupText || "",
+          order: (questions.length || 0) + i + 1,
+          imageUrl: ""
         };
 
         await pb.collection('questions').create(payload);
@@ -2240,40 +2257,30 @@ const QuestionsPage = () => {
                           <DropdownMenuContent align="end" className="w-72 p-2 rounded-2xl shadow-2xl border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 z-[100]">
                             <DropdownMenuLabel className="text-[10px] font-bold uppercase tracking-widest text-slate-400 px-3 py-2 text-left">Kelola Soal</DropdownMenuLabel>
                             
-                            <DropdownMenuItem className="p-0 border-none outline-none focus:bg-transparent hover:bg-transparent cursor-pointer">
-                              <label className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-900 transition-all cursor-pointer group w-full">
-                                <div className="h-10 w-10 shrink-0 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 flex items-center justify-center group-hover:scale-110 transition-transform">
-                                  <FileSpreadsheet className="h-5 w-5" />
-                                </div>
-                                <div className="flex flex-col min-w-0">
-                                  <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">Import dari Excel</span>
-                                  <span className="text-[10px] text-slate-400 mt-1 text-left">Gunakan template XLSX</span>
-                                </div>
-                                <input type="file" className="hidden" accept=".xlsx,.xls" onChange={(e) => {
-                                  const file = e.target.files?.[0];
-                                  if (file) {
-                                    handleImportExcel(file);
-                                  }
-                                }} />
-                              </label>
+                            <DropdownMenuItem 
+                              className="p-2.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-900 transition-all cursor-pointer group flex items-center gap-3"
+                              onClick={() => document.getElementById("excel-import-input")?.click()}
+                            >
+                              <div className="h-10 w-10 shrink-0 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                <FileSpreadsheet className="h-5 w-5" />
+                              </div>
+                              <div className="flex flex-col min-w-0 text-left">
+                                <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">Import dari Excel</span>
+                                <span className="text-[10px] text-slate-400 mt-1">Gunakan template XLSX</span>
+                              </div>
                             </DropdownMenuItem>
 
-                            <DropdownMenuItem className="p-0 border-none outline-none focus:bg-transparent hover:bg-transparent cursor-pointer">
-                              <label className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-900 transition-all cursor-pointer group w-full">
-                                <div className="h-10 w-10 shrink-0 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-600 flex items-center justify-center group-hover:scale-110 transition-transform">
-                                  <FileText className="h-5 w-5" />
-                                </div>
-                                <div className="flex flex-col min-w-0">
-                                  <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">Import dari Word</span>
-                                  <span className="text-[10px] text-slate-400 mt-1 text-left">Pilih file .docx standard</span>
-                                </div>
-                                <input type="file" className="hidden" accept=".docx" onChange={(e) => {
-                                  const file = e.target.files?.[0];
-                                  if (file) {
-                                    handleImportWord(file);
-                                  }
-                                }} />
-                              </label>
+                            <DropdownMenuItem 
+                              className="p-2.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-900 transition-all cursor-pointer group flex items-center gap-3"
+                              onClick={() => document.getElementById("word-import-input")?.click()}
+                            >
+                              <div className="h-10 w-10 shrink-0 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                <FileText className="h-5 w-5" />
+                              </div>
+                              <div className="flex flex-col min-w-0 text-left">
+                                <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">Import dari Word</span>
+                                <span className="text-[10px] text-slate-400 mt-1">Pilih file .docx standard</span>
+                              </div>
                             </DropdownMenuItem>
 
                             {questions.length > 0 && (
@@ -3980,6 +3987,20 @@ const QuestionsPage = () => {
         itemName={`${selectedIds.length} soal`}
       />
 
+      <ConfirmationDialog
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal({ ...confirmModal, isOpen: false })}
+        onConfirm={() => {
+          if (confirmModal.onConfirm) confirmModal.onConfirm();
+          setConfirmModal({ ...confirmModal, isOpen: false });
+        }}
+        title={confirmModal.title}
+        description={confirmModal.description}
+        type={confirmModal.type}
+        confirmLabel={confirmModal.confirmLabel || "OK"}
+        showCancel={confirmModal.showCancel}
+      />
+
       {/* Batch Progress Dialog */}
       <Dialog open={batchProgress.isOpen} onOpenChange={() => {}}>
         <DialogContent className="max-w-md bg-card border-none shadow-2xl p-0 overflow-hidden rounded-3xl" hideClose>
@@ -4014,6 +4035,17 @@ const QuestionsPage = () => {
           </div>
         </DialogContent>
       </Dialog>
+      {/* Hidden inputs for imports moved here for reliability */}
+      <input id="excel-import-input" type="file" className="hidden" accept=".xlsx,.xls" onChange={(e) => {
+        const file = e.target.files?.[0];
+        if (file) handleImportExcel(file);
+        e.target.value = "";
+      }} />
+      <input id="word-import-input" type="file" className="hidden" accept=".docx" onChange={(e) => {
+        const file = e.target.files?.[0];
+        if (file) handleImportWord(file);
+        e.target.value = "";
+      }} />
     </div>
   </div>
 );
