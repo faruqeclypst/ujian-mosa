@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { registerPlugin } from "@capacitor/core";
 import { useParams, useNavigate } from "react-router-dom";
+import { App } from "@capacitor/app";
 
 const CheatAlert = registerPlugin<any>("CheatAlert");
 import { SmartImage } from "../../components/ui/smart-image";
@@ -576,6 +577,34 @@ const CBTPage = () => {
       }
     };
 
+    // 3. Native Capacitor App State Listener (More reliable for Android/iOS)
+    const unsubApp = App.addListener('appStateChange', ({ isActive }) => {
+      if (!isActive) {
+        // App went to background
+        if (!lastLeftTimeRef.current) {
+          lastLeftTimeRef.current = Date.now();
+        }
+        if (!cheatTimerRef.current) {
+          cheatTimerRef.current = setTimeout(triggerPenalty, 5000);
+          try { CheatAlert.startAlarm(); } catch (err) { }
+        }
+      } else {
+        // App returned to foreground
+        if (lastLeftTimeRef.current) {
+          const elapsed = Date.now() - lastLeftTimeRef.current;
+          if (elapsed >= 5000) {
+            triggerPenalty();
+          }
+          lastLeftTimeRef.current = null;
+        }
+        if (cheatTimerRef.current) {
+          clearTimeout(cheatTimerRef.current);
+          cheatTimerRef.current = null;
+        }
+        try { CheatAlert.stopAlarm(); } catch (err) { }
+      }
+    });
+
     const graceTimer = setTimeout(() => {
       document.addEventListener("visibilitychange", handleCheatDetection);
       window.addEventListener("blur", handleCheatDetection);
@@ -584,6 +613,7 @@ const CBTPage = () => {
 
     return () => {
       clearTimeout(graceTimer);
+      unsubApp.then(h => h.remove());
       document.removeEventListener("visibilitychange", handleCheatDetection);
       window.removeEventListener("blur", handleCheatDetection);
       window.removeEventListener("focus", handleCheatDetection);
