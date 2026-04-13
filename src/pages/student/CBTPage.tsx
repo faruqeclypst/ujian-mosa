@@ -414,6 +414,11 @@ const CBTPage = () => {
             sessionStorage.removeItem("activeCBTRoomId");
             navigate("/", { replace: true });
           }
+        } else if (newS === "finished" || newS === "submitted") {
+          console.log("Status changed to finished by admin, submitting locally...");
+          // If admin finishes it, we should trigger local submission to ensure
+          // scores are calculated based on what's currently in the state (if not already)
+          handleSubmitExam();
         }
       }
     });
