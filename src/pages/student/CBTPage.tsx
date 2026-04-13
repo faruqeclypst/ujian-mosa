@@ -451,8 +451,7 @@ const CBTPage = () => {
     const rId = roomId;
     const sId = student?.id || "";
 
-    // 1. Subscribe ke Questions & Room
-    const unsubQuestions = pb.collection("questions").subscribe("*", (e) => { if (e.record.examId === roomData.examId) loadExamData(); });
+    // 1. Subscribe ke Room saja (Questions tidak perlu disubscribe during exam)
     const unsubRoom = pb.collection("exam_rooms").subscribe(rId, (e) => {
       if (e.action === "update") {
         setRoomData((prev: any) => ({ ...prev, ...e.record }));
@@ -489,7 +488,6 @@ const CBTPage = () => {
     });
 
     return () => {
-      unsubQuestions.then(u => u());
       unsubRoom.then(u => u());
       unsubAttempt.then(u => u());
     };
@@ -1080,26 +1078,22 @@ const CBTPage = () => {
           </div>
 
           <div className="flex flex-wrap gap-2.5 sm:gap-3.5 content-start">
-            {questions.map((q, i) => {
-              const isQuestionAnswered = (id: string) => {
-                const ans = answers[id];
-                if (ans === undefined || ans === null) return false;
-                if (typeof ans === 'string') return ans.trim().length > 0;
-                if (Array.isArray(ans)) return ans.length > 0;
-                if (typeof ans === 'object') return Object.keys(ans).length > 0;
-                return true;
-              };
-              return (
-                <button key={q.id} onClick={() => handleNavClick(i)} className={`w-11 h-11 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl flex items-center justify-center font-black text-lg border-2 transition-all active:scale-[0.85] ${i === currentQuestionIndex
-                  ? "bg-emerald-700 border-emerald-700 text-white shadow-lg shadow-emerald-700/30 ring-2 ring-emerald-500 ring-offset-2 dark:ring-offset-slate-900"
-                  : isQuestionAnswered(q.id)
-                    ? "bg-emerald-500 border-emerald-500 text-white shadow-md shadow-emerald-500/20"
-                    : flaggedQuestions[q.id]
-                      ? "bg-amber-500 border-amber-600 text-white shadow-lg shadow-amber-500/20"
-                      : "bg-slate-50 dark:bg-slate-800/50 border-slate-100 dark:border-slate-800 text-slate-400 dark:text-slate-500"
-                  }`}>{i + 1}</button>
-              );
-            })}
+            {questions.map((q, i) => (
+                <button 
+                  key={q.id} 
+                  onClick={() => handleNavClick(i)} 
+                  className={`w-11 h-11 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl flex items-center justify-center font-black text-lg border-2 transition-all active:scale-[0.85] ${i === currentQuestionIndex
+                    ? "bg-emerald-700 border-emerald-700 text-white shadow-lg shadow-emerald-700/30 ring-2 ring-emerald-500 ring-offset-2 dark:ring-offset-slate-900"
+                    : isQuestionAnswered(q.id)
+                      ? "bg-emerald-500 border-emerald-500 text-white shadow-md shadow-emerald-500/20"
+                      : flaggedQuestions[q.id]
+                        ? "bg-amber-500 border-amber-600 text-white shadow-lg shadow-amber-500/20"
+                        : "bg-slate-50 dark:bg-slate-800/50 border-slate-100 dark:border-slate-800 text-slate-400 dark:text-slate-500"
+                    }`}
+                >
+                  {i + 1}
+                </button>
+            ))}
           </div>
 
           <div className="mt-auto space-y-4 pt-8 border-t border-slate-100 dark:border-slate-800">

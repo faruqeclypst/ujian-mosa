@@ -136,14 +136,42 @@ const SubjectsPage = () => {
     try {
       const parsed = await parseSubjectImportExcel(file);
       if (parsed.length === 0) return showAlert("File Kosong", "File yang Anda upload kosong atau tidak valid.", "warning");
-      for (const row of parsed) {
-        await createSubject({ name: row.name });
+      
+      setBatchProgress({
+        isOpen: true,
+        total: parsed.length,
+        current: 0,
+        message: "Memulai import data...",
+        title: "Import Mata Pelajaran"
+      });
+
+      let importedCount = 0;
+      const chunkSize = 10;
+      for (let i = 0; i < parsed.length; i += chunkSize) {
+        const chunk = parsed.slice(i, i + chunkSize);
+        await Promise.all(chunk.map(async (row) => {
+          try {
+            await createSubject({ name: row.name });
+            importedCount++;
+          } catch (err) {
+            console.error("Gagal import mapel:", row.name, err);
+          }
+        }));
+        
+        const currentProcessed = Math.min(i + chunkSize, parsed.length);
+        setBatchProgress(prev => ({
+          ...prev,
+          current: currentProcessed,
+          message: `Mengimport data (${currentProcessed}/${parsed.length})`
+        }));
       }
-      showAlert("Import Berhasil", `${parsed.length} mata pelajaran berhasil diimport.`, "success");
+
+      showAlert("Import Berhasil", `${importedCount} mata pelajaran berhasil diimport.`, "success");
     } catch (err: any) {
       showAlert("Gagal Import", err.message || "Gagal mengimport mata pelajaran.", "danger");
     } finally {
       setIsImporting(false);
+      setBatchProgress(prev => ({ ...prev, isOpen: false }));
     }
   };
 

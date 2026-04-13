@@ -1805,54 +1805,81 @@ const QuestionsPage = () => {
       setBatchProgress(prev => ({ ...prev, total: parsed.length, message: `Menyiapkan import ${parsed.length} soal...` }));
 
       let importedCount = 0;
-      for (let i = 0; i < parsed.length; i++) {
-        const q = parsed[i];
-        let imageUrl = q.imageUrl || "";
+      const chunkSize = 5;
+      
+      for (let i = 0; i < parsed.length; i += chunkSize) {
+        const chunk = parsed.slice(i, i + chunkSize);
+        
+        await Promise.all(chunk.map(async (q, index) => {
+          const actualIndex = i + index;
+          let imageUrl = q.imageUrl || "";
 
-        if (imageUrl.startsWith("data:image/")) {
-          try {
-            const blob = await (await fetch(imageUrl)).blob();
-            const file = new File([blob], `word_image_${i}.png`, { type: blob.type });
-            const { url } = await uploadInventoryImage("questions", file);
-            imageUrl = url;
-          } catch (err) {
-            console.error("Gagal upload gambar dari Word:", err);
-            imageUrl = ""; 
+          // Upload Question Image if Base64
+          if (imageUrl.startsWith("data:image/")) {
+            try {
+              const blob = await (await fetch(imageUrl)).blob();
+              const file = new File([blob], `word_q_${actualIndex}.png`, { type: blob.type });
+              const { url } = await uploadInventoryImage("questions", file);
+              imageUrl = url;
+            } catch (err) {
+              console.error("Gagal upload gambar soal:", err);
+              imageUrl = ""; 
+            }
           }
-        }
 
-        const choices: Record<string, any> = {};
-        Object.entries(q.choices).forEach(([key, val]) => {
-          choices[key.toLowerCase()] = {
-            text: val.text,
-            isCorrect: val.isCorrect || false,
-            imageUrl: val.imageUrl || ""
+          // Upload Choice Images and Map them
+          const choices: Record<string, any> = {};
+          await Promise.all(Object.entries(q.choices).map(async ([key, val]: [string, any]) => {
+            let choiceImgUrl = val.imageUrl || "";
+            if (choiceImgUrl.startsWith("data:image/")) {
+              try {
+                const blob = await (await fetch(choiceImgUrl)).blob();
+                const file = new File([blob], `word_opt_${actualIndex}_${key}.png`, { type: blob.type });
+                const { url } = await uploadInventoryImage("questions", file);
+                choiceImgUrl = url;
+              } catch (err) {
+                console.error(`Gagal upload gambar opsi ${key}:`, err);
+                choiceImgUrl = "";
+              }
+            }
+
+            choices[key.toLowerCase()] = {
+              text: val.text,
+              isCorrect: val.isCorrect || false,
+              imageUrl: choiceImgUrl
+            };
+          }));
+
+          const answerKey = Object.entries(choices).find(([_, v]) => v.isCorrect)?.[0] || "";
+
+          const payload = {
+            examId,
+            text: q.text,
+            field: "multiple_choice",
+            type: "pilihan_ganda",
+            options: choices,
+            answerKey: answerKey.toLowerCase(),
+            groupId: q.groupId || "",
+            groupText: q.groupText || "",
+            order: (questions.length || 0) + actualIndex + 1,
+            imageUrl: imageUrl
           };
-        });
 
-        const answerKey = Object.entries(q.choices).find(([_, v]) => v.isCorrect)?.[0] || "";
+          try {
+            await pb.collection('questions').create(payload);
+            importedCount++;
+          } catch (createErr) {
+            console.error("Gagal membuat soal Word pada index:", actualIndex, createErr);
+          }
+        }));
 
-        const payload = {
-          examId,
-          text: q.text,
-          field: "multiple_choice",
-          type: "pilihan_ganda",
-          options: choices,
-          answerKey: answerKey.toLowerCase(),
-          groupId: q.groupId || "",
-          groupText: q.groupText || "",
-          order: (questions.length || 0) + i + 1,
-          imageUrl: imageUrl
-        };
-
-        await pb.collection('questions').create(payload);
-        importedCount++;
-        const progress = Math.round(((i + 1) / parsed.length) * 100);
+        const currentProcessed = Math.min(i + chunkSize, parsed.length);
+        const progress = Math.round((currentProcessed / parsed.length) * 100);
         setImportProgress(progress);
         setBatchProgress(prev => ({
           ...prev,
-          current: i + 1,
-          message: `Mengimport soal (${i + 1}/${parsed.length})`
+          current: currentProcessed,
+          message: `Mengimport soal (${currentProcessed}/${parsed.length})`
         }));
       }
 
@@ -1889,27 +1916,38 @@ const QuestionsPage = () => {
       setBatchProgress(prev => ({ ...prev, total: parsed.length, message: "Memulai import..." }));
 
       let importedCount = 0;
-      for (let i = 0; i < parsed.length; i++) {
-        const q = parsed[i];
-        const payload = {
-          examId,
-          text: q.text,
-          field: q.field || "multiple_choice",
-          type: q.type,
-          options: q.choices,
-          answerKey: Object.entries(q.choices as any).find(([_, v]: any) => v.isCorrect)?.[0] || "a",
-          groupId: q.groupId || "",
-          groupText: q.groupText || "",
-          order: (questions.length || 0) + i + 1,
-          imageUrl: ""
-        };
+      const chunkSize = 10;
+      for (let i = 0; i < parsed.length; i += chunkSize) {
+        const chunk = parsed.slice(i, i + chunkSize);
+        
+        await Promise.all(chunk.map(async (q, index) => {
+          const actualIndex = i + index;
+          const payload = {
+            examId,
+            text: q.text,
+            field: q.field || "multiple_choice",
+            type: q.type,
+            options: q.choices,
+            answerKey: Object.entries(q.choices as any).find(([_, v]: any) => v.isCorrect)?.[0] || "a",
+            groupId: q.groupId || "",
+            groupText: q.groupText || "",
+            order: (questions.length || 0) + actualIndex + 1,
+            imageUrl: ""
+          };
 
-        await pb.collection('questions').create(payload);
-        importedCount++;
+          try {
+            await pb.collection('questions').create(payload);
+            importedCount++;
+          } catch (createErr) {
+            console.error("Gagal membuat soal pada index:", actualIndex, createErr);
+          }
+        }));
+
+        const currentProcessed = Math.min(i + chunkSize, parsed.length);
         setBatchProgress(prev => ({
           ...prev,
-          current: i + 1,
-          message: `Mengimport soal (${i + 1}/${parsed.length})`
+          current: currentProcessed,
+          message: `Mengimport soal (${currentProcessed}/${parsed.length})`
         }));
       }
 

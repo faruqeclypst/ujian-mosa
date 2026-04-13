@@ -124,12 +124,39 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
     let unsubscribeTeachers: any, unsubscribeClasses: any, unsubscribeSubjects: any, unsubscribeStudents: any;
 
     const setup = async () => {
-      pb.autoCancellation(false); // Pastikan tidak dibatalkan saat banyak request
+      pb.autoCancellation(false);
       await initAll();
-      unsubscribeTeachers = await pb.collection("teachers").subscribe("*", initAll);
-      unsubscribeClasses = await pb.collection("classes").subscribe("*", initAll);
-      unsubscribeSubjects = await pb.collection("subjects").subscribe("*", initAll);
-      unsubscribeStudents = await pb.collection("students").subscribe("*", initAll);
+      
+      // Subscribe with incremental updates instead of initAll (re-fetch everything)
+      unsubscribeTeachers = await pb.collection("teachers").subscribe("*", (e) => {
+        if (e.action === "create") setTeachers(prev => [e.record as any, ...prev]);
+        if (e.action === "update") setTeachers(prev => prev.map(item => item.id === e.record.id ? { ...item, ...e.record } as any : item));
+        if (e.action === "delete") setTeachers(prev => prev.filter(item => item.id !== e.record.id));
+      });
+
+      unsubscribeClasses = await pb.collection("classes").subscribe("*", (e) => {
+        if (e.action === "create") setClasses(prev => [e.record as any, ...prev]);
+        if (e.action === "update") setClasses(prev => prev.map(item => item.id === e.record.id ? { ...item, ...e.record } as any : item));
+        if (e.action === "delete") setClasses(prev => prev.filter(item => item.id !== e.record.id));
+      });
+
+      unsubscribeSubjects = await pb.collection("subjects").subscribe("*", (e) => {
+        if (e.action === "create") setSubjects(prev => [e.record as any, ...prev]);
+        if (e.action === "update") setSubjects(prev => prev.map(item => item.id === e.record.id ? { ...item, ...e.record } as any : item));
+        if (e.action === "delete") setSubjects(prev => prev.filter(item => item.id !== e.record.id));
+      });
+
+      unsubscribeStudents = await pb.collection("students").subscribe("*", (e) => {
+        if (e.action === "create") {
+          const m = { ...e.record, id: e.record.id, nisn: e.record.username || e.record.nisn, gender: e.record.gender || "L", classId: e.record.classId || e.record.classid } as any;
+          setStudents(prev => [m, ...prev]);
+        }
+        if (e.action === "update") {
+          const m = { ...e.record, id: e.record.id, nisn: e.record.username || e.record.nisn, gender: e.record.gender || "L", classId: e.record.classId || e.record.classid } as any;
+          setStudents(prev => prev.map(item => item.id === e.record.id ? m : item));
+        }
+        if (e.action === "delete") setStudents(prev => prev.filter(item => item.id !== e.record.id));
+      });
     };
 
     setup();
@@ -290,16 +317,20 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
     await pb.collection("students").delete(id);
   };
   const updateStudentClassBatch = async (studentIds: string[], newClassId: string) => {
-    for (const id of studentIds) {
-      await pb.collection("students").update(id, {
+    const chunkSize = 10;
+    for (let i = 0; i < studentIds.length; i += chunkSize) {
+      const chunk = studentIds.slice(i, i + chunkSize);
+      await Promise.all(chunk.map(id => pb.collection("students").update(id, {
         classId: newClassId,
         classid: newClassId
-      });
+      })));
     }
   };
   const deleteStudentsBatch = async (studentIds: string[]) => {
-    for (const id of studentIds) {
-      await pb.collection("students").delete(id);
+    const chunkSize = 10;
+    for (let i = 0; i < studentIds.length; i += chunkSize) {
+      const chunk = studentIds.slice(i, i + chunkSize);
+      await Promise.all(chunk.map(id => pb.collection("students").delete(id)));
     }
   };
 

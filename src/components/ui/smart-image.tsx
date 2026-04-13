@@ -38,6 +38,7 @@ export const SmartImage = ({
         <img
           src={src}
           alt={alt || "Image"}
+          loading="lazy"
           className={cn(
             "transition-opacity duration-500 will-change-opacity",
             isLoaded ? "opacity-100" : "opacity-0",

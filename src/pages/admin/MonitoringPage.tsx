@@ -21,7 +21,7 @@ import {
   Settings
 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
-import * as XLSX from "xlsx-js-style";
+import * as XLSX from "xlsx";
 import { Button } from "../../components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../../components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../components/ui/table";
@@ -379,9 +379,13 @@ const MonitoringPage = () => {
           const related = await pb.collection('attempts').getFullList({
             filter: `studentId = "${sisId}" && examRoomId = "${roomId}"`
           });
-          for (const r of related) {
-            await pb.collection('attempts').delete(r.id);
+          
+          const chunkSize = 10;
+          for (let i = 0; i < related.length; i += chunkSize) {
+            const chunk = related.slice(i, i + chunkSize);
+            await Promise.all(chunk.map(r => pb.collection('attempts').delete(r.id)));
           }
+          
           showAlert("Berhasil", "Sesi direset.", "success");
         } catch (e) { showAlert("Gagal", "Error.", "danger"); }
       }
@@ -621,8 +625,15 @@ const MonitoringPage = () => {
       onConfirm: async () => {
         try {
           const ongoing = attempts.filter(a => a.status === "ongoing" || a.status === "LOCKED");
-          for (const a of ongoing) {
-            await pb.collection('attempts').update(a.id, { status: "finished", submitTime: new Date().toISOString() });
+          const chunkSize = 10;
+          for (let i = 0; i < ongoing.length; i += chunkSize) {
+            const chunk = ongoing.slice(i, i + chunkSize);
+            await Promise.all(chunk.map(a => 
+              pb.collection('attempts').update(a.id, { 
+                status: "finished", 
+                submitTime: new Date().toISOString() 
+              })
+            ));
           }
           showAlert("Berhasil", "Seluruh pengerjaan telah diselesaikan.", "success");
         } catch (e) { showAlert("Gagal", "Error.", "danger"); }

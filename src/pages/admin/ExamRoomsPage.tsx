@@ -261,7 +261,12 @@ const ExamRoomsPage = () => {
       if (e.action === 'delete') {
         delete attemptsCache[e.record.id];
       } else {
-        attemptsCache[e.record.id] = e.record;
+        // Hanya cache yang statusnya ongoing
+        if (e.record.status === "ongoing") {
+          attemptsCache[e.record.id] = e.record;
+        } else {
+          delete attemptsCache[e.record.id];
+        }
       }
       updateOverviewStats(attemptsCache);
     });
@@ -353,8 +358,16 @@ const ExamRoomsPage = () => {
     };
 
     fetchRooms();
-    const unsubscribe = pb.collection('exam_rooms').subscribe("*", () => {
-      fetchRooms();
+
+    const unsubscribe = pb.collection('exam_rooms').subscribe("*", (e) => {
+      if (e.action === "create" || e.action === "update") {
+        // Re-fetch rooms to get mapped data correctly (it's hard to map a single record without context of exams/classes)
+        // but it's much better than doing it for every single tiny change in context.
+        // Actually, let's keep fetchRooms for simplicity here as it's less frequent than student updates.
+        fetchRooms();
+      } else if (e.action === "delete") {
+        setRooms(prev => prev.filter(r => r.id !== e.record.id));
+      }
     });
     return () => {
       unsubscribe.then(unsub => unsub());
