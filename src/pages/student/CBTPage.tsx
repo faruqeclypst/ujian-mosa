@@ -464,8 +464,8 @@ const CBTPage = () => {
     const unsubAttempt = pb.collection("attempts").subscribe(attempt.id, (e) => {
       if (e.action === "delete") {
         sessionStorage.removeItem("activeCBTRoomId");
-        setIsResetModalOpen(true); // Tampilkan modal reset dulu agar siswa sadar
-        setTimeout(() => navigate("/", { replace: true }), 3000);
+        setIsResetModalOpen(true);
+        setTimeout(() => { window.location.href = "/"; }, 2500);
       }
       else if (e.action === "update") {
         const oldS = attempt.status;
@@ -480,7 +480,7 @@ const CBTPage = () => {
           localStorage.removeItem(`lock_time_${attempt?.id}`);
           if (oldS === "LOCKED") {
             sessionStorage.removeItem("activeCBTRoomId");
-            navigate("/", { replace: true });
+            window.location.href = "/";
           }
         } else if ((newS === "finished" || newS === "submitted") && !isSubmitting) {
           setIsAdminFinishedModalOpen(true);
@@ -515,7 +515,7 @@ const CBTPage = () => {
           if (err.status === 404 || err.status === 403) {
             sessionStorage.removeItem("activeCBTRoomId");
             setIsResetModalOpen(true);
-            setTimeout(() => navigate("/", { replace: true }), 2000);
+            setTimeout(() => { window.location.href = "/"; }, 2000);
           }
         }
       } 
