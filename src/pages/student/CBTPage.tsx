@@ -39,8 +39,12 @@ import {
   ZoomIn,
   ZoomOut,
   Check,
-  Square
+  Square,
+  Zap,
+  Activity
 } from "lucide-react";
+import { useNetworkStatus } from "../../lib/network";
+import { syncPendingData } from "../../lib/syncManager";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -119,6 +123,7 @@ const CBTPage = () => {
   const { theme, setTheme } = useTheme();
 
   const [roomId, setRoomId] = useState<string | null>(null);
+  const isOnline = useNetworkStatus();
 
   useEffect(() => {
     if (paramRoomId) {
@@ -160,6 +165,7 @@ const CBTPage = () => {
   const [gimmickTimer, setGimmickTimer] = useState<number>(0);
   const [isSkipNoticeOpen, setIsSkipNoticeOpen] = useState(false);
   const [targetIndex, setTargetIndex] = useState<number | null>(null);
+  const [isAdminFinishedModalOpen, setIsAdminFinishedModalOpen] = useState(false);
 
   const saveTimeoutRef = useRef<any>(null);
   const cheatTimerRef = useRef<any>(null);
@@ -190,11 +196,33 @@ const CBTPage = () => {
   const safeUpdateAttempt = async (attId: string, data: any) => {
     setIsSyncing(true);
     setSyncError(false);
+    
+    // Backup locally
+    if (student && roomId) {
+      if (data.answers) {
+        localStorage.setItem(`offline_answers_${student.id}_${roomId}`, JSON.stringify(data.answers));
+      }
+      const currentLocal = localStorage.getItem(`local_attempt_${student.id}_${roomId}`);
+      let updatedAtt = attempt || (currentLocal ? JSON.parse(currentLocal) : {});
+      updatedAtt = { ...updatedAtt, ...data };
+      localStorage.setItem(`local_attempt_${student.id}_${roomId}`, JSON.stringify(updatedAtt));
+    }
+
+    if (!isOnline) {
+      setSyncError(true);
+      setIsSyncing(false);
+      localStorage.setItem(`pending_sync_${student?.id}_${roomId}`, "true");
+      return null;
+    }
+
     const startTime = Date.now();
     try {
-      return await pb.collection("attempts").update(attId, data);
+      const res = await pb.collection("attempts").update(attId, data);
+      localStorage.removeItem(`pending_sync_${student?.id}_${roomId}`);
+      return res;
     } catch (err: any) {
       setSyncError(true);
+      localStorage.setItem(`pending_sync_${student?.id}_${roomId}`, "true");
       throw err;
     } finally {
       const elapsed = Date.now() - startTime;
@@ -202,6 +230,20 @@ const CBTPage = () => {
       setIsSyncing(false);
     }
   };
+
+  const syncAllLocalData = useCallback(async () => {
+    if (!isOnline || !student?.id) return;
+    try {
+      await syncPendingData(student.id);
+      setSyncError(false);
+    } catch (e) {
+      setSyncError(true);
+    }
+  }, [isOnline, student?.id]);
+
+  useEffect(() => {
+    if (isOnline) syncAllLocalData();
+  }, [isOnline, syncAllLocalData]);
 
   const handleAnswerSelect = (questionId: string, value: any) => {
     if (isExamOver || isLocked || !attempt) return;
@@ -291,37 +333,63 @@ const CBTPage = () => {
         return { id: q.id, type: (tM[q.field || q.type] || "pilihan_ganda"), text: q.text, imageUrl: qImg, groupId: q.groupId, groupText: q.groupText, choices, pairs: q.options?.pairs, items: q.options?.items, answerKey: q.answerKey };
       });
 
-      const existingAttempts = await pb.collection("attempts").getFullList({ filter: `studentId = "${student.id}" && examRoomId = "${roomId}"`, sort: "-created" });
+      const localAnswers = localStorage.getItem(`offline_answers_${student.id}_${roomId}`);
+      const localAttData = localStorage.getItem(`local_attempt_${student.id}_${roomId}`);
+
       let att: any = null;
-      if (existingAttempts.length > 0) {
-        att = existingAttempts[0];
-        const status = att.status || (att as any).status;
-        if (status === "finished") { navigate("/cbt/" + roomId + "/result"); return; }
-        if (status === "LOCKED") {
-          setIsLocked(true);
-          sessionStorage.removeItem("activeCBTRoomId");
-        }
-        setAnswers(att.answers || {});
-        safeUpdateAttempt(att.id, { isOnline: true, lastHeartbeat: new Date().toISOString() });
-      } else {
-        if (isCreatingRef.current) return;
-        isCreatingRef.current = true;
-        try {
-          const secondCheck = await pb.collection("attempts").getFullList({ filter: `studentId = "${student.id}" && examRoomId = "${roomId}"` });
-          if (secondCheck.length > 0) { att = secondCheck[0]; }
-          else {
-            att = await pb.collection("attempts").create({
-              examRoomId: roomId,
-              studentId: student.id,
-              status: "ongoing",
-              cheatCount: 0,
-              answers: {},
-              startedAt: new Date().toISOString(),
-              isOnline: true,
-              lastHeartbeat: new Date().toISOString()
-            });
+      try {
+        const existingAttempts = await pb.collection("attempts").getFullList({ filter: `studentId = "${student.id}" && examRoomId = "${roomId}"`, sort: "-created" });
+        if (existingAttempts.length > 0) {
+          att = existingAttempts[0];
+          const status = att.status || (att as any).status;
+          if (status === "finished") { navigate("/cbt/" + roomId + "/result"); return; }
+          if (status === "LOCKED") {
+            setIsLocked(true);
+            sessionStorage.removeItem("activeCBTRoomId");
           }
-        } finally { isCreatingRef.current = false; }
+          
+          let mergedAnswers = att.answers || {};
+          if (localAnswers) {
+            try {
+              const parsedLocal = JSON.parse(localAnswers);
+              mergedAnswers = { ...mergedAnswers, ...parsedLocal };
+            } catch (e) {}
+          }
+          setAnswers(mergedAnswers);
+          safeUpdateAttempt(att.id, { answers: mergedAnswers, isOnline: true, lastHeartbeat: new Date().toISOString() });
+        } else {
+          if (isCreatingRef.current) return;
+          isCreatingRef.current = true;
+          try {
+            const secondCheck = await pb.collection("attempts").getFullList({ filter: `studentId = "${student.id}" && examRoomId = "${roomId}"` });
+            if (secondCheck.length > 0) { att = secondCheck[0]; }
+            else {
+              att = await pb.collection("attempts").create({
+                examRoomId: roomId,
+                studentId: student.id,
+                status: "ongoing",
+                cheatCount: 0,
+                answers: {},
+                startedAt: new Date().toISOString(),
+                isOnline: true,
+                lastHeartbeat: new Date().toISOString()
+              });
+            }
+          } finally { isCreatingRef.current = false; }
+        }
+      } catch (err) {
+        if (!isOnline && localAttData) {
+          try {
+            att = JSON.parse(localAttData);
+            setAnswers(att.answers || {});
+          } catch (e) { throw err; }
+        } else {
+          throw err;
+        }
+      }
+      
+      if (att) {
+        localStorage.setItem(`local_attempt_${student.id}_${roomId}`, JSON.stringify(att));
       }
       setAttempt(att);
 
@@ -414,11 +482,8 @@ const CBTPage = () => {
             sessionStorage.removeItem("activeCBTRoomId");
             navigate("/", { replace: true });
           }
-        } else if (newS === "finished" || newS === "submitted") {
-          console.log("Status changed to finished by admin, submitting locally...");
-          // If admin finishes it, we should trigger local submission to ensure
-          // scores are calculated based on what's currently in the state (if not already)
-          handleSubmitExam();
+        } else if ((newS === "finished" || newS === "submitted") && !isSubmitting) {
+          setIsAdminFinishedModalOpen(true);
         }
       }
     });
@@ -428,7 +493,7 @@ const CBTPage = () => {
       unsubRoom.then(u => u());
       unsubAttempt.then(u => u());
     };
-  }, [roomData, roomId, attempt, navigate, loadExamData]);
+  }, [roomData, roomId, attempt, navigate, loadExamData, isSubmitting]);
 
   useEffect(() => {
     if (loading || isExamOver || !roomData || !attempt) return;
@@ -763,21 +828,25 @@ const CBTPage = () => {
               {Math.floor(timeLeft / 60).toString().padStart(2, "0")}:{(timeLeft % 60).toString().padStart(2, "0")}
             </span>
           </div>
-          <div className="flex items-center justify-center gap-1 sm:gap-2 px-1 sm:px-3 py-1.5 sm:py-2 rounded-2xl bg-white/50 dark:bg-slate-800/30 border border-slate-100 dark:border-slate-800 w-[40px] sm:w-[95px] shrink-0 overflow-hidden">
-            {isSyncing ? (
+          <div className="flex items-center justify-center gap-1 sm:gap-2 px-1 sm:px-3 py-1.5 sm:py-2 rounded-2xl bg-white/50 dark:bg-slate-800/30 border border-slate-100 dark:border-slate-800 min-w-[40px] sm:min-w-[110px] shrink-0 overflow-hidden">
+            {!isOnline ? (
               <div className="flex items-center gap-1.5">
-                <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-ping shrink-0"></div>
-                <Cloud className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-500 animate-pulse shrink-0" />
-                <span className="hidden sm:inline text-[9px] font-black text-blue-600 uppercase tracking-widest">Saved</span>
+                <WifiOff className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-rose-500 shrink-0" />
+                <span className="hidden sm:inline text-[9px] font-black text-rose-600 uppercase tracking-widest">Offline</span>
               </div>
-            ) : syncError ? (
-              <div className="flex items-center gap-1.5 animate-bounce">
-                <CloudOff className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-rose-500 shrink-0" />
-                <span className="hidden sm:inline text-[9px] font-black text-rose-600 uppercase tracking-widest">Failed</span>
+            ) : isSyncing ? (
+              <div className="flex items-center gap-1.5">
+                <RefreshCcw className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-500 animate-spin shrink-0" />
+                <span className="hidden sm:inline text-[9px] font-black text-blue-600 uppercase tracking-widest">Syncing</span>
+              </div>
+            ) : syncError || localStorage.getItem(`pending_sync_${student?.id}_${roomId}`) ? (
+              <div className="flex items-center gap-1.5 animate-pulse">
+                <CloudOff className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-500 shrink-0" />
+                <span className="hidden sm:inline text-[9px] font-black text-amber-600 uppercase tracking-widest">Pending</span>
               </div>
             ) : (
               <div className="flex items-center gap-1.5">
-                <Wifi className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-500 shrink-0" />
+                <Activity className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-500 shrink-0" />
                 <span className="hidden sm:inline text-[9px] font-black text-emerald-600 uppercase tracking-widest">Connected</span>
               </div>
             )}
@@ -1089,6 +1158,31 @@ const CBTPage = () => {
       <Dialog open={!!previewImage} onOpenChange={() => setPreviewImage(null)}><DialogContent className="max-w-3xl bg-transparent border-none p-0 flex items-center justify-center pointer-events-auto shadow-none">{previewImage && <img src={previewImage} className="max-w-full max-h-[85vh] rounded-2xl shadow-2xl border border-white/10" alt="Preview" />}</DialogContent></Dialog>
       <Dialog open={isSubmitModalOpen} onOpenChange={setIsSubmitModalOpen}><DialogContent className="max-w-md rounded-2xl p-6 pointer-events-auto text-center bg-white dark:bg-slate-950 border-none shadow-2xl">{isAllAnswered ? (<><CheckCircle2 className="w-12 h-12 text-green-600 mx-auto mb-2" /><DialogTitle className="text-lg font-bold dark:text-white">Kumpulkan Ujian?</DialogTitle><p className="text-slate-500 dark:text-slate-400 text-sm mt-1">Yakin ingin mengakhiri sekarang?</p><div className="mt-6 flex gap-2"><Button variant="outline" onClick={() => setIsSubmitModalOpen(false)} className="flex-1 rounded-xl dark:border-slate-800 dark:text-slate-300">Batal</Button><Button onClick={() => { setIsSubmitModalOpen(false); handleSubmitExam(); }} className="flex-1 bg-green-600 hover:bg-green-700 text-white rounded-xl">Kumpulkan</Button></div></>) : (<><AlertCircle className="w-12 h-12 text-amber-600 mx-auto mb-2" /><DialogTitle className="text-lg font-bold dark:text-white">Belum Selesai</DialogTitle><p className="text-slate-500 dark:text-slate-400 text-sm mt-1">Ada {unansweredCount} soal belum dijawab. Yakin?</p><div className="mt-6"><Button onClick={() => setIsSubmitModalOpen(false)} className="w-full bg-amber-600 hover:bg-amber-700 text-white rounded-xl">Kembali Mengerjakan</Button></div></>)}</DialogContent></Dialog>
       <Dialog open={isSkipNoticeOpen} onOpenChange={setIsSkipNoticeOpen}><DialogContent className="max-w-xs rounded-[2rem] p-6 pointer-events-auto border-none bg-white dark:bg-slate-950 shadow-2xl text-center"><HelpCircle className="w-14 h-14 text-amber-600 mx-auto mb-4" /><DialogTitle className="text-base font-black uppercase tracking-tight dark:text-white">Soal Belum Dijawab</DialogTitle><p className="text-slate-500 dark:text-slate-400 text-[11px] font-medium leading-relaxed">Anda belum memberikan jawaban. Yakin ingin melewati?</p><div className="grid grid-cols-2 gap-3 mt-6"><Button variant="outline" onClick={() => setIsSkipNoticeOpen(false)} className="rounded-xl text-[10px] font-black uppercase tracking-widest border-emerald-100 dark:border-emerald-900/30 text-emerald-600 dark:text-emerald-400">Kembali</Button><Button onClick={() => { if (targetIndex !== null) goToQuestion(targetIndex); setIsSkipNoticeOpen(false); }} className="bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[10px] rounded-xl uppercase tracking-widest shadow-lg shadow-emerald-600/20">Lompati</Button></div></DialogContent></Dialog>
+      <Dialog open={isAdminFinishedModalOpen} onOpenChange={() => { }}>
+        <DialogContent className="max-w-md rounded-[2.5rem] p-8 text-center pointer-events-auto bg-white dark:bg-slate-950 border-none shadow-2xl">
+          <div className="w-20 h-20 bg-amber-100 dark:bg-amber-900/20 rounded-3xl flex items-center justify-center mx-auto mb-6">
+            <ShieldAlert className="w-10 h-10 text-amber-600 animate-pulse" />
+          </div>
+          <DialogTitle className="text-2xl font-black text-slate-800 dark:text-white uppercase tracking-tighter mb-4">Ujian Selesai!</DialogTitle>
+          <div className="bg-slate-50 dark:bg-slate-900/50 p-6 rounded-3xl border border-slate-100 dark:border-slate-800 mb-6">
+            <p className="text-slate-600 dark:text-slate-400 text-sm font-bold leading-relaxed">
+              Sesi ujian Anda telah diselesaikan oleh <span className="text-emerald-600">Admin/Pengawas</span>. 
+              <br /><br />
+              Semua jawaban Anda telah tersimpan dengan aman ke sistem.
+            </p>
+          </div>
+          <Button 
+            onClick={() => {
+              setIsAdminFinishedModalOpen(false);
+              handleSubmitExam();
+            }} 
+            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl h-14 font-black uppercase tracking-widest text-xs shadow-lg shadow-emerald-500/20 active:scale-95 transition-all"
+          >
+            Selesai & Lihat Hasil
+          </Button>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={isCheatWarningOpen} onOpenChange={setIsCheatWarningOpen}>
         <DialogContent className="max-w-xs rounded-[2rem] p-6 text-center border-none shadow-2xl pointer-events-auto">
           <AlertCircle className="w-16 h-16 text-red-600 mx-auto mb-4 animate-pulse" />

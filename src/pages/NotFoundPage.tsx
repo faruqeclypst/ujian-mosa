@@ -15,15 +15,19 @@ const NotFoundPage = () => {
       </div>
 
       <div className="relative z-10 text-center max-w-lg w-full">
-        {/* Large 404 text with gradient */}
+        {/* Large 404 text with premium glass effect */}
         <motion.div
           initial={{ scale: 0.8, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           transition={{ duration: 0.6, type: "spring" }}
+          className="relative"
         >
-          <h1 className="text-[120px] md:text-[180px] font-black leading-none bg-gradient-to-b from-blue-600 to-indigo-600 bg-clip-text text-transparent opacity-20 dark:opacity-30 select-none">
+          <h1 className="text-[120px] md:text-[200px] font-black leading-none bg-gradient-to-b from-blue-600 via-indigo-600 to-purple-600 bg-clip-text text-transparent opacity-10 dark:opacity-20 select-none blur-[2px]">
             404
           </h1>
+          <div className="absolute inset-0 flex items-center justify-center">
+             <span className="text-6xl md:text-8xl font-black text-slate-900 dark:text-white tracking-tighter drop-shadow-2xl">UPS!</span>
+          </div>
         </motion.div>
 
         {/* Content Section */}
@@ -31,50 +35,53 @@ const NotFoundPage = () => {
           initial={{ y: 20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ delay: 0.3, duration: 0.5 }}
-          className="-mt-10 md:-mt-16"
+          className="-mt-6 md:-mt-10"
         >
-          <div className="mb-6 inline-flex p-3 rounded-2xl bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400">
-            <Home size={32} />
+          <div className="mb-8 inline-flex p-5 rounded-[2rem] bg-white dark:bg-slate-800 shadow-2xl shadow-blue-500/10 border border-blue-50 dark:border-blue-900/30 text-blue-600 dark:text-blue-400">
+            <Home size={40} className="animate-bounce" />
           </div>
           
-          <h2 className="text-3xl md:text-4xl font-extrabold text-slate-900 dark:text-white mb-4 tracking-tight">
-            Ups! Halaman Tidak Ada
+          <h2 className="text-3xl md:text-5xl font-black text-slate-900 dark:text-white mb-4 tracking-tighter uppercase">
+            Halaman Tidak Ditemukan
           </h2>
-          <p className="text-slate-600 dark:text-slate-400 text-base md:text-lg mb-10 max-w-md mx-auto leading-relaxed">
-            Sepertinya Anda tersesat. Halaman yang Anda cari tidak tersedia atau telah dipindahkan ke alamat lain.
+          <p className="text-slate-500 dark:text-slate-400 text-sm md:text-base mb-12 max-w-xs mx-auto font-bold uppercase tracking-widest leading-relaxed opacity-80">
+            Sepertinya Anda tersesat di dimensi yang salah.
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <Button
               asChild
-              className="w-full sm:w-auto rounded-2xl h-14 px-8 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold shadow-lg shadow-blue-500/20 transition-all hover:scale-[1.02] active:scale-95"
+              className="w-full sm:w-auto rounded-3xl h-16 px-10 bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-black uppercase tracking-widest text-xs shadow-2xl transition-all hover:scale-[1.05] active:scale-95 border-none"
             >
-              <Link to="/" className="flex items-center gap-2">
-                <Home size={20} />
-                Kembali ke Beranda
+              <Link to="/" className="flex items-center gap-3">
+                <Home size={18} />
+                Ke Beranda
               </Link>
             </Button>
             
             <Button
               variant="outline"
               onClick={() => window.history.back()}
-              className="w-full sm:w-auto rounded-2xl h-14 px-8 border-slate-200 dark:border-slate-800 bg-white/50 backdrop-blur-sm dark:bg-slate-900/50 font-bold transition-all hover:scale-[1.02] active:scale-95 text-slate-700 dark:text-slate-300"
+              className="w-full sm:w-auto rounded-3xl h-16 px-10 border-2 border-slate-200 dark:border-slate-800 bg-transparent font-black uppercase tracking-widest text-[10px] transition-all hover:scale-[1.05] active:scale-95 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-900"
             >
-              <ArrowLeft size={20} className="mr-2" />
+              <ArrowLeft size={18} className="mr-2" />
               Kembali
             </Button>
           </div>
         </motion.div>
 
         {/* Subtle Footer */}
-        <motion.p 
+        <motion.div 
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.8 }}
-          className="mt-16 text-slate-400 text-sm font-medium"
+          className="mt-20 flex flex-col items-center gap-4"
         >
-          Portal Ujian &copy; {new Date().getFullYear()}
-        </motion.p>
+          <div className="h-1 w-12 bg-gradient-to-r from-transparent via-slate-300 dark:via-slate-700 to-transparent rounded-full" />
+          <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.4em]">
+            Portal E-Ujian &copy; {new Date().getFullYear()}
+          </p>
+        </motion.div>
       </div>
     </div>
   );

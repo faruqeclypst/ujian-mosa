@@ -16,6 +16,7 @@ import { useTheme } from "../../context/ThemeContext";
 import { Card, CardHeader, CardContent } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
 import { cn } from "../../lib/utils";
+import { syncPendingData } from "../../lib/syncManager";
 
 const getExamTypeColorClass = (type: string) => {
   switch (type?.toLowerCase()) {
@@ -163,6 +164,14 @@ const StudentDashboardPage = () => {
       unsubR.then(u => u()).catch(() => { });
       unsubA.then(u => u()).catch(() => { });
     };
+  }, [student?.id]);
+
+  useEffect(() => {
+    if (student?.id && navigator.onLine) {
+      syncPendingData(student.id).then((synced) => {
+        if (synced && synced.length > 0) fetchData(true);
+      });
+    }
   }, [student?.id]);
 
   const handleValidateToken = async () => {
