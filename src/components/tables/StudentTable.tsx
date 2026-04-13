@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { DataTable } from "../ui/data-table";
 import { Button } from "../ui/button";
 import type { StudentData, ClassData } from "../../types/exam";
-import { Edit, Trash } from "lucide-react";
+import { Edit, Trash, Sparkles } from "lucide-react";
 
 interface StudentTableProps {
   students: StudentData[];
@@ -12,6 +12,7 @@ interface StudentTableProps {
   onSelectChange: (ids: string[]) => void;
   onEdit: (student: StudentData) => void;
   onDelete: (student: StudentData) => void;
+  onViewInterest?: (student: StudentData) => void;
   filterActions?: React.ReactNode;
   customActions?: (student: StudentData) => React.ReactNode;
 }
@@ -23,6 +24,7 @@ const StudentTable = ({
   onSelectChange, 
   onEdit, 
   onDelete,
+  onViewInterest,
   filterActions,
   customActions,
   title = "Daftar Siswa"
@@ -107,6 +109,15 @@ const StudentTable = ({
   const renderActions = (student: StudentData) => (
     customActions ? customActions(student) : (
       <div className="flex justify-end gap-2">
+        {onViewInterest && (
+          <button 
+            className="p-1.5 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 rounded-lg dark:bg-indigo-900/10 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-800/40"
+            onClick={() => onViewInterest(student)}
+            title="Lihat Bakat Minat"
+          >
+            <Sparkles className="h-4 w-4" />
+          </button>
+        )}
         <button 
           className="p-1.5 bg-sky-50 text-sky-600 hover:bg-sky-100 rounded-lg dark:bg-sky-900/10 dark:text-sky-400 border border-sky-100 dark:border-sky-800/40"
           onClick={() => onEdit(student)}

@@ -6,7 +6,7 @@ import { Input } from "../../components/ui/input";
 import pb from "../../lib/pocketbase";
 import {
   Calendar, Clock, ChevronRight, User, AlertCircle,
-  Award, LogOut as LogoutIcon, Sun, Moon, Monitor, KeyRound, ClipboardCheck
+  Award, LogOut as LogoutIcon, Sun, Moon, Monitor, KeyRound, ClipboardCheck, Sparkles
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../../components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuLabel } from "../../components/ui/dropdown-menu";
@@ -29,6 +29,8 @@ const getExamTypeColorClass = (type: string) => {
 const StudentDashboardPage = () => {
   const navigate = useNavigate();
   const { student, logoutStudent } = useStudentAuth();
+  const [attempts, setAttempts] = useState<any[]>([]);
+  const [hasInterests, setHasInterests] = useState(false);
   const { theme, setTheme } = useTheme();
   const [loading, setLoading] = useState(true);
   const [schoolName, setSchoolName] = useState("CBT System");
@@ -46,6 +48,19 @@ const StudentDashboardPage = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
+      
+      // Fetch interests status
+      if (student) {
+        try {
+          const interests = await pb.collection("student_interests").getList(1, 1, {
+            filter: `studentId = "${student.id}"`,
+          });
+          setHasInterests(interests.totalItems > 0);
+        } catch (err) {
+          console.error("Failed to check interests", err);
+        }
+      }
+
       const settingsRecords = await pb.collection("settings").getFullList({ limit: 1 });
       if (settingsRecords.length > 0) {
         setSchoolName(settingsRecords[0].name || "CBT System");
@@ -318,6 +333,22 @@ const StudentDashboardPage = () => {
                 </div>
               </div>
             </motion.div>
+            
+            {/* Mobile Feature Link */}
+            <motion.div 
+               initial={{ opacity: 0, scale: 0.9 }}
+               animate={{ opacity: 1, scale: 1 }}
+               onClick={() => navigate("/minat-bakat")}
+               className="lg:hidden p-5 bg-gradient-to-br from-indigo-600 to-indigo-800 rounded-[2.5rem] text-white overflow-hidden relative group shadow-xl active:scale-95 transition-all text-left"
+            >
+              <div className="absolute top-0 right-0 p-4 opacity-10"><Sparkles className="h-10 w-10 rotate-12" /></div>
+              <div className="flex items-center gap-2 mb-1">
+                 <Sparkles className="h-3 w-3 text-yellow-300" />
+                 <p className="text-[8px] font-black text-indigo-100 uppercase tracking-widest">{hasInterests ? "Teranalisis" : "Self Discovery"}</p>
+              </div>
+              <p className="text-sm font-black leading-tight">{hasInterests ? "Lihat Hasil Minat" : "Cek Minat & Bakat"}</p>
+              <p className="text-[9px] font-medium text-indigo-100/70 mt-1">{hasInterests ? "Tinjau kembali potensi karirmu." : "Temukan potensi terbaikmu di sini."}</p>
+            </motion.div>
 
             <div className="space-y-6 text-left">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 px-1">
@@ -554,6 +585,21 @@ const StudentDashboardPage = () => {
                   </div>
                 </div>
                 <div className="pt-6 border-t border-slate-50 dark:border-slate-800/60">
+                   <motion.div 
+                     whileHover={{ scale: 1.02 }}
+                     whileTap={{ scale: 0.98 }}
+                     onClick={() => navigate("/minat-bakat")}
+                     className="p-5 bg-gradient-to-br from-indigo-500 to-indigo-700 dark:from-indigo-800 dark:to-indigo-950 rounded-[2rem] text-white overflow-hidden relative group cursor-pointer shadow-xl shadow-indigo-500/10 mb-4"
+                   >
+                    <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-125 transition-transform"><Sparkles className="h-12 w-12" /></div>
+                    <div className="flex items-center gap-2 mb-1">
+                       <Sparkles className="h-3 w-3 text-yellow-300" />
+                       <p className="text-[9px] font-black text-indigo-100/60 uppercase tracking-widest">{hasInterests ? "Teranalisis" : "Self Discovery"}</p>
+                    </div>
+                    <p className="text-sm font-black leading-tight mb-1">{hasInterests ? "Lihat Hasil Minat & Bakat" : "Tes Minat & Bakat"}</p>
+                    <p className="text-[10px] font-medium text-indigo-100/70 leading-relaxed">{hasInterests ? "Analisis potensimu sudah siap untuk dipelajari kembali." : "Temukan jurusan dan karier impianmu melalui survey kepribadian."}</p>
+                  </motion.div>
+
                   <div className="p-5 bg-gradient-to-br from-emerald-600 to-emerald-700 dark:from-emerald-800 dark:to-emerald-950 rounded-[2rem] text-white overflow-hidden relative group">
                     <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-125 transition-transform"><AlertCircle className="h-12 w-12" /></div>
                     <p className="text-[9px] font-black text-emerald-100/60 uppercase tracking-widest mb-1">Pusat Bantuan</p>

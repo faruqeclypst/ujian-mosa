@@ -3,6 +3,8 @@ import mammoth from "mammoth";
 export interface ParsedQuestion {
   text: string;
   imageUrl?: string;
+  groupId?: string;
+  groupText?: string;
   choices: Record<string, { text: string; imageUrl?: string; isCorrect: boolean }>;
 }
 
@@ -24,17 +26,28 @@ export const parseQuestionsFromWord = async (file: File): Promise<ParsedQuestion
   let currentChoices: Record<string, { text: string; imageUrl?: string; isCorrect: boolean }> = {};
   let currentAnswerKey = "";
 
+  let currentGroupId: string | undefined = undefined;
+  let currentGroupText: string | undefined = undefined;
+
   paragraphs.forEach((p) => {
     const img = p.querySelector("img");
     const imageSrc = img ? img.getAttribute("src") : undefined;
     const textOnly = p.textContent?.trim() || "";
     let line = p.innerHTML?.trim() || "";
-    // line = line.replace(/<img[^>]*>/g, ""); // Cleanup line for storage
 
     // Ignore Headers
     if (textOnly.match(/^(Nama Guru|Kelas|Mapel|Mata Pelajaran)\s*[:]/i)) return;
 
     if (!textOnly && !imageSrc) return;
+
+    // Detect Literasi / Stimulus Start
+    // Format: "LITERASI: teks..." atau "STIMULUS 1: teks..."
+    const literasiMatch = textOnly.match(/^(LITERASI|STIMULUS|TEKS|WACANA)[.\s]*(\d+)?[.\s:]+(.*)/i);
+    if (literasiMatch) {
+        currentGroupId = `GROUP-${literasiMatch[2] || Math.random().toString(36).substr(2, 5).toUpperCase()}`;
+        currentGroupText = literasiMatch[3] || "";
+        return;
+    }
 
     // A. Detect Question Start (Direct "1. Text" or Pending Number)
     const questionMatch = textOnly.match(/^(\d+)[.\s]+(.+)/);
@@ -49,6 +62,8 @@ export const parseQuestionsFromWord = async (file: File): Promise<ParsedQuestion
         questions.push({
           text: currentQuestion.text,
           imageUrl: currentQuestion.imageUrl,
+          groupId: currentGroupId,
+          groupText: currentGroupText,
           choices: { ...currentChoices },
         });
       }
@@ -99,18 +114,6 @@ export const parseQuestionsFromWord = async (file: File): Promise<ParsedQuestion
 
     // D. Fragment Handling (Greedy capture for fragmented text/images)
     if (currentQuestion) {
-        // Greedy Image Capture
-        if (imageSrc) {
-            const letters = Object.keys(currentChoices);
-            if (letters.length > 0) {
-                // Assign to last choice if it doesn't have an image
-                const lastLetter = letters[letters.length - 1];
-                if (!currentChoices[lastLetter].imageUrl) {
-                    currentChoices[lastLetter].imageUrl = imageSrc;
-                }
-            }
-        }
-
         if (pendingNumber && !currentQuestion.text) {
             currentQuestion.text = line;
             pendingNumber = null;
@@ -118,16 +121,16 @@ export const parseQuestionsFromWord = async (file: File): Promise<ParsedQuestion
             currentChoices[pendingLetter].text = line;
             pendingLetter = null;
         } else {
-            // Continuation or Literasi or separate image cell
+            // Continuation for either question or wacana
             if (line) {
                 if (!currentChoices["a"] && !currentAnswerKey) {
-                    currentQuestion.text += "\n\n" + line;
-                } else {
-                    // This could be text continuation for a choice if pendingLetter was null?
-                    // Actually, mammoth usually combines paragraphs in a cell.
+                    currentQuestion.text += " " + line;
                 }
             }
         }
+    } else if (currentGroupText !== undefined) {
+        // If no current question but we have wacana, append to wacana
+        currentGroupText += " " + line;
     }
   });
 
@@ -141,6 +144,8 @@ export const parseQuestionsFromWord = async (file: File): Promise<ParsedQuestion
     questions.push({
       text: lastQuestion.text,
       imageUrl: lastQuestion.imageUrl,
+      groupId: currentGroupId,
+      groupText: currentGroupText,
       choices: { ...currentChoices },
     });
   }

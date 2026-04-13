@@ -14,7 +14,8 @@ import {
   FileSpreadsheet,
   Download,
   Upload,
-  FileText
+  FileText,
+  Sparkles
 } from "lucide-react";
 import { 
   DropdownMenu, 
@@ -38,6 +39,7 @@ import { downloadStudentImportTemplate, exportStudentToExcel, parseStudentImport
 import FormField from "../components/forms/FormField";
 import { Select } from "../components/ui/select";
 import type { StudentData } from "../types/exam";
+import StudentInterestDialog from "../components/exam/StudentInterestDialog";
 
 const StudentsPage = () => {
   const { students, classes, loading, createStudent, updateStudent, deleteStudent } = useExamData();
@@ -51,6 +53,9 @@ const StudentsPage = () => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  
+  const [interestDialogOpen, setInterestDialogOpen] = useState(false);
+  const [studentForInterest, setStudentForInterest] = useState<StudentData | null>(null);
 
   const [isBatchOpen, setIsBatchOpen] = useState(false);
   const [targetClassId, setTargetClassId] = useState<string>("");
@@ -104,6 +109,11 @@ const StudentsPage = () => {
   const handleDeleteClick = (student: StudentData) => {
     setStudentToDelete(student);
     setDeleteDialogOpen(true);
+  };
+
+  const handleViewInterest = (student: StudentData) => {
+    setStudentForInterest(student);
+    setInterestDialogOpen(true);
   };
 
   const closeDialog = () => {
@@ -166,16 +176,22 @@ const StudentsPage = () => {
         title: "Import Data Siswa"
       });
 
+      const failures: string[] = [];
       const chunkSize = 10;
       for (let i = 0; i < newEntries.length; i += chunkSize) {
         const chunk = newEntries.slice(i, i + chunkSize);
         await Promise.all(chunk.map(async (row) => {
-          await createStudent({
-            nisn: String(row.nisn),
-            name: row.name,
-            gender: row.gender,
-            classId: row.classId,
-          });
+          try {
+            await createStudent({
+              nisn: String(row.nisn),
+              name: row.name,
+              gender: row.gender,
+              classId: row.classId,
+            });
+          } catch (err: any) {
+            console.error(`Gagal import siswa ${row.nisn}:`, err);
+            failures.push(`${row.name} (${row.nisn}) - ${err.message || "Error Database"}`);
+          }
         }));
         
         const currentProcessed = Math.min(i + chunkSize, newEntries.length);
@@ -186,13 +202,19 @@ const StudentsPage = () => {
         }));
       }
 
-      let message = `${newEntries.length} Siswa berhasil diimport.`;
+      let message = `${newEntries.length - failures.length} Siswa berhasil diimport.`;
       if (duplicatesCount > 0) message += ` ${duplicatesCount} data dilewati karena NISN duplikat.`;
+      
       if (skipped.length > 0) {
-        message += ` ${skipped.length} data gagal karena Nama Kelas tidak ditemukan di sistem.`;
+        const uniqueSkipped = Array.from(new Set(skipped.map(s => s.className)));
+        message += `\n\n⚠️ ${skipped.length} data gagal karena Kelas [${uniqueSkipped.join(", ")}] tidak ditemukan.`;
       }
       
-      showAlert("Import Selesai", message, skipped.length > 0 ? "warning" : "success");
+      if (failures.length > 0) {
+        message += `\n\n❌ ${failures.length} data gagal disimpan ke database:\n- ${failures.slice(0, 5).join("\n- ")}${failures.length > 5 ? "\n...dan " + (failures.length - 5) + " lainnya" : ""}`;
+      }
+      
+      showAlert("Hasil Import", message, (skipped.length > 0 || failures.length > 0) ? "warning" : "success");
     } catch (err: any) {
       showAlert("Gagal Import", err.message || "Gagal mengimport data Siswa.", "danger");
     } finally {
@@ -353,6 +375,19 @@ const StudentsPage = () => {
 
   return (
     <div className="space-y-5">
+      <input
+        id="student-import-input"
+        type="file"
+        accept=".xlsx,.xls"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) {
+            handleImportStudents(file);
+          }
+          e.target.value = "";
+        }}
+      />
       <div className="relative z-30 flex flex-col gap-3 md:flex-row md:items-center md:justify-between bg-card p-4 rounded-2xl border border-slate-200/60 dark:border-slate-800/40 shadow-sm backdrop-blur-sm">
         <div>
           <h2 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
@@ -382,7 +417,7 @@ const StudentsPage = () => {
                     <DropdownMenuContent align="end" className="w-56 p-2 rounded-2xl shadow-2xl border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 z-[100]">
                       <DropdownMenuLabel className="text-[10px] font-bold uppercase tracking-widest text-slate-400 px-3 py-2">Opsi Massal</DropdownMenuLabel>
                       <DropdownMenuItem 
-                        onClick={() => setIsBatchOpen(true)}
+                        onClick={() => setTimeout(() => setIsBatchOpen(true), 150)}
                         className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 focus:bg-slate-50 dark:focus:bg-slate-900 transition-colors group"
                       >
                         <div className="h-10 w-10 shrink-0 rounded-lg bg-orange-50 dark:bg-orange-900/30 text-orange-600 flex items-center justify-center group-hover:scale-110 transition-transform">
@@ -395,7 +430,7 @@ const StudentsPage = () => {
                       </DropdownMenuItem>
                       
                       <DropdownMenuItem 
-                        onClick={handleMoveToAlumni}
+                        onClick={() => setTimeout(handleMoveToAlumni, 150)}
                         className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 focus:bg-slate-50 dark:focus:bg-slate-900 transition-colors group"
                       >
                         <div className="h-10 w-10 shrink-0 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 flex items-center justify-center group-hover:scale-110 transition-transform">
@@ -431,9 +466,25 @@ const StudentsPage = () => {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56 p-2 rounded-2xl shadow-2xl border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 z-[100]">
                   <DropdownMenuLabel className="text-[10px] font-bold uppercase tracking-widest text-slate-400 px-3 py-2 text-left">Kelola Siswa</DropdownMenuLabel>
-                  <DropdownMenuItem className="p-0 border-none outline-none focus:bg-transparent hover:bg-transparent">
-                    <ImportButton variant="rich" label="Import dari Excel" onImport={handleImportStudents} isLoading={isImporting} />
-                  </DropdownMenuItem>
+                  <div 
+                    className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors group"
+                    onClick={() => {
+                      const input = document.getElementById("student-import-input") as HTMLInputElement;
+                      if (input) {
+                        input.click();
+                      }
+                    }}
+                  >
+                    <div className="h-10 w-10 shrink-0 rounded-lg bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <Upload className="h-5 w-5" />
+                    </div>
+                    <div className="flex flex-col min-w-0">
+                      <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">
+                        {isImporting ? "Mengimport..." : "Import dari Excel"}
+                      </span>
+                      <span className="text-[10px] text-slate-400 mt-1">Unggah file data siswa aktif</span>
+                    </div>
+                  </div>
                   <DropdownMenuItem 
                     onClick={handleExportStudents} 
                     className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 focus:bg-slate-50 dark:focus:bg-slate-900 transition-colors group"
@@ -540,6 +591,7 @@ const StudentsPage = () => {
           onSelectChange={setSelectedIds}
           onEdit={handleEditClick} 
           onDelete={handleDeleteClick} 
+          onViewInterest={handleViewInterest}
           filterActions={
             <div className="flex items-center gap-2">
               <span className="text-xs font-bold text-slate-500 uppercase tracking-wider hidden sm:inline">Kelas:</span>
@@ -585,6 +637,46 @@ const StudentsPage = () => {
         showCancel={alertDialog.showCancel}
       />
 
+      {/* Dialog Pindah Kelas Massal */}
+      <Dialog open={isBatchOpen} onOpenChange={setIsBatchOpen}>
+        <DialogContent className="max-w-md bg-card">
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold text-slate-800 dark:text-white flex items-center gap-2">
+              <ArrowLeftRight className="h-5 w-5 text-orange-500" />
+              Pindah Kelas ({selectedIds.length} Siswa)
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              Pilih kelas baru untuk siswa-siswa yang terpilih.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+             <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Pilih Kelas Tujuan:</label>
+                <select
+                  value={targetClassId}
+                  onChange={(e) => setTargetClassId(e.target.value)}
+                  className="w-full h-10 rounded-xl border border-slate-200 bg-slate-50/50 px-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-orange-500/20 transition-all cursor-pointer dark:bg-slate-900/50 dark:border-slate-800"
+                >
+                  <option value="">-- Pilih Kelas --</option>
+                  {sortedClasses.map(cls => (
+                    <option key={cls.id} value={cls.id}>{cls.name}</option>
+                  ))}
+                </select>
+             </div>
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={() => setIsBatchOpen(false)} className="rounded-xl border-slate-200 dark:border-slate-800">Batal</Button>
+            <Button 
+              disabled={!targetClassId}
+              onClick={handleBatchUpdateClass}
+              className="bg-orange-600 hover:bg-orange-700 text-white rounded-xl shadow-lg shadow-orange-500/20"
+            >
+              Proses Pindah Kelas
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Batch Progress Dialog */}
       <Dialog open={batchProgress.isOpen} onOpenChange={() => {}}>
         <DialogContent className="max-w-md bg-card border-none shadow-2xl p-0 overflow-hidden rounded-3xl" hideClose>
@@ -619,6 +711,16 @@ const StudentsPage = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      <StudentInterestDialog
+        isOpen={interestDialogOpen}
+        onClose={() => {
+          setInterestDialogOpen(false);
+          setStudentForInterest(null);
+        }}
+        studentId={studentForInterest?.id || ""}
+        studentName={studentForInterest?.name || ""}
+      />
     </div>
   );
 };

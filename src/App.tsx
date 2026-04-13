@@ -17,6 +17,7 @@ import ExambroGuard from "./components/auth/ExambroGuard";
 import StudentLoginPage from "./pages/student/StudentLoginPage";
 const StudentDashboardPage = lazy(() => import("./pages/student/StudentDashboardPage"));
 const CBTPage = lazy(() => import("./pages/student/CBTPage"));
+const InterestSurveyPage = lazy(() => import("./pages/student/InterestSurveyPage"));
 import NotFoundPage from "./pages/NotFoundPage";
 import pb from "./lib/pocketbase";
 import { SplashScreen } from "@capacitor/splash-screen";
@@ -138,6 +139,16 @@ const AppContent = () => {
                 <ExambroGuard>
                   <StudentAuthGuard>
                     <CBTPage />
+                  </StudentAuthGuard>
+                </ExambroGuard>
+              } 
+            />
+            <Route 
+              path="/minat-bakat" 
+              element={
+                <ExambroGuard>
+                  <StudentAuthGuard>
+                    <InterestSurveyPage />
                   </StudentAuthGuard>
                 </ExambroGuard>
               } 

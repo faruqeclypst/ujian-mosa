@@ -120,6 +120,21 @@ const blobToDataUrl = (blob: Blob): Promise<string> =>
     reader.readAsDataURL(blob);
   });
 
+const getMimeTypeFromExtension = (fileName: string): string => {
+  const ext = fileName.split(".").pop()?.toLowerCase();
+  const mimeMap: Record<string, string> = {
+    png: "image/png",
+    jpg: "image/jpeg",
+    jpeg: "image/jpeg",
+    webp: "image/webp",
+    gif: "image/gif",
+    svg: "image/svg+xml",
+    ico: "image/x-icon",
+    pdf: "application/pdf",
+  };
+  return (ext && mimeMap[ext]) || "application/octet-stream";
+};
+
 export async function uploadInventoryImage(folder: string, file: File): Promise<UploadResult> {
   // Offline fallback: force inline base64 images if configured (very useful for local tests / isolated networks)
   if (import.meta.env.VITE_R2_DEV_INLINE_BASE64 === "true") {
@@ -152,7 +167,7 @@ export async function uploadInventoryImage(folder: string, file: File): Promise<
       Bucket: config.bucket,
       Key: key,
       Body: bodyBytes,
-      ContentType: file.type || "application/octet-stream",
+      ContentType: file.type || getMimeTypeFromExtension(file.name),
       // ContentLength: bodyBytes.byteLength, // optional: R2 generally infers
     })
   );
@@ -211,7 +226,7 @@ export async function uploadFixedAssetImage(folder: string, file: File): Promise
       Bucket: config.bucket,
       Key: key,
       Body: bodyBytes,
-      ContentType: file.type || "application/octet-stream",
+      ContentType: file.type || getMimeTypeFromExtension(file.name),
     })
   );
 
@@ -237,3 +252,4 @@ export async function uploadFixedAssetImage(folder: string, file: File): Promise
   const normalizedBase = baseUrl.replace(/\/$/, "");
   return { key, url: `${normalizedBase}/${key}` };
 }
+

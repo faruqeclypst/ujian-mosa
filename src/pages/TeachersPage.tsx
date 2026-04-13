@@ -10,7 +10,8 @@ import {
   FileSpreadsheet, 
   Download, 
   ChevronDown,
-  FileText
+  FileText,
+  Upload
 } from "lucide-react";
 import { 
   DropdownMenu, 
@@ -207,6 +208,19 @@ const TeachersPage = () => {
 
   return (
     <div className="space-y-5">
+      <input
+        id="teacher-import-input"
+        type="file"
+        accept=".xlsx,.xls"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) {
+            handleImportTeachers(file);
+          }
+          e.target.value = "";
+        }}
+      />
       <div className="relative z-30 flex flex-col gap-3 md:flex-row md:items-center md:justify-between bg-card p-4 rounded-2xl border border-slate-200/60 dark:border-slate-800/40 shadow-sm backdrop-blur-sm">
         <div>
           <h2 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
@@ -245,9 +259,23 @@ const TeachersPage = () => {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56 p-2 rounded-2xl shadow-2xl border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 z-[100]">
               <DropdownMenuLabel className="text-[10px] font-bold uppercase tracking-widest text-slate-400 px-3 py-2 text-left">Kelola Guru</DropdownMenuLabel>
-              <DropdownMenuItem className="p-0 border-none outline-none focus:bg-transparent hover:bg-transparent">
-                <ImportButton variant="rich" label="Import dari Excel" onImport={handleImportTeachers} isLoading={isImporting} />
-              </DropdownMenuItem>
+              <div 
+                className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors group"
+                onClick={() => {
+                  const input = document.getElementById("teacher-import-input") as HTMLInputElement;
+                  if (input) input.click();
+                }}
+              >
+                <div className="h-10 w-10 shrink-0 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <Upload className="h-5 w-5" />
+                </div>
+                <div className="flex flex-col min-w-0">
+                  <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">
+                    {isImporting ? "Mengimport..." : "Import dari Excel"}
+                  </span>
+                  <span className="text-[10px] text-slate-400 mt-1">Unggah file data guru</span>
+                </div>
+              </div>
               <DropdownMenuItem 
                 onClick={handleExportTeachers} 
                 className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 focus:bg-slate-50 dark:focus:bg-slate-900 transition-colors group"
