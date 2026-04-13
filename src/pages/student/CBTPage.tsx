@@ -169,6 +169,7 @@ const CBTPage = () => {
 
   const saveTimeoutRef = useRef<any>(null);
   const cheatTimerRef = useRef<any>(null);
+  const lastLeftTimeRef = useRef<number | null>(null);
   const isIndexRestored = useRef(false);
   const isCreatingRef = useRef(false);
 
@@ -546,15 +547,32 @@ const CBTPage = () => {
 
     const handleCheatDetection = (e: Event) => {
       if (document.visibilityState === "hidden" || e.type === "blur") {
+        // Record departure time for mobile (where JS might pause)
+        if (!lastLeftTimeRef.current) {
+          lastLeftTimeRef.current = Date.now();
+        }
+
         if (!cheatTimerRef.current) {
           cheatTimerRef.current = setTimeout(triggerPenalty, 5000);
           try { CheatAlert.startAlarm(); } catch (err) { }
         }
       } else {
+        // Returned to app
+        if (lastLeftTimeRef.current) {
+          const elapsed = Date.now() - lastLeftTimeRef.current;
+          // If they were gone for more than 5 seconds while JS was paused
+          if (elapsed >= 5000) {
+            triggerPenalty();
+          }
+          lastLeftTimeRef.current = null;
+        }
+
         if (cheatTimerRef.current) {
           clearTimeout(cheatTimerRef.current);
           cheatTimerRef.current = null;
         }
+
+        try { CheatAlert.stopAlarm(); } catch (err) { }
       }
     };
 
