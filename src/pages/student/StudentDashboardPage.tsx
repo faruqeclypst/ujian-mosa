@@ -45,12 +45,12 @@ const StudentDashboardPage = () => {
   const [userAttempts, setUserAttempts] = useState<Record<string, any>>({});
   const [activeTab, setActiveTab] = useState<"active" | "history">("active");
 
-  const fetchData = async () => {
+  const fetchData = async (isSilent = false) => {
     try {
-      setLoading(true);
+      if (!isSilent) setLoading(true);
       
-      // Fetch interests status
-      if (student) {
+      // Fetch interests status (Skip if already checked)
+      if (student && !hasInterests) {
         try {
           const interests = await pb.collection("student_interests").getList(1, 1, {
             filter: `studentId = "${student.id}"`,
@@ -61,17 +61,21 @@ const StudentDashboardPage = () => {
         }
       }
 
-      const settingsRecords = await pb.collection("settings").getFullList({ limit: 1 });
-      if (settingsRecords.length > 0) {
-        setSchoolName(settingsRecords[0].name || "CBT System");
-        setSchoolLogo(settingsRecords[0].logoUrl || settingsRecords[0].logo || "");
+      // Fetch settings (Skip if already have school info)
+      if (!schoolLogo || schoolName === "CBT System") {
+        const settingsRecords = await pb.collection("settings").getFullList({ limit: 1 });
+        if (settingsRecords.length > 0) {
+          setSchoolName(settingsRecords[0].name || "CBT System");
+          setSchoolLogo(settingsRecords[0].logoUrl || settingsRecords[0].logo || "");
+        }
       }
 
       if (!student) return;
 
       const roomsRecords = await pb.collection("exam_rooms").getFullList({
         expand: "examId,examId.subjectId,examId.teacherId",
-        sort: "-created"
+        sort: "-created",
+        requestKey: null // Prevent cancellation of high-frequency requests
       });
 
       const allRooms = roomsRecords.filter(room => {
@@ -106,10 +110,11 @@ const StudentDashboardPage = () => {
         return order[a.timeStatus] - order[b.timeStatus];
       });
 
-      setActiveRooms(allRooms);
-
       if (allRooms.length > 0) {
-        const attempts = await pb.collection("attempts").getFullList({ filter: `studentId = "${student.id}"` });
+        const attempts = await pb.collection("attempts").getFullList({ 
+          filter: `studentId = "${student.id}"`,
+          requestKey: null 
+        });
         const myStatus: Record<string, any> = {};
         let lockedRoomId = "";
 
@@ -119,26 +124,46 @@ const StudentDashboardPage = () => {
         });
 
         setUserAttempts(myStatus);
+        setActiveRooms(allRooms); // Set rooms AFTER getting attempts status
 
         if (lockedRoomId) {
           sessionStorage.setItem("activeCBTRoomId", lockedRoomId);
           navigate(`/cbt/${lockedRoomId}`, { replace: true });
           return;
         }
+      } else {
+        setActiveRooms([]);
       }
-    } catch (err) { console.error(err); } finally { setLoading(false); }
+    } catch (err) { 
+      console.error("Dashboard fetch error:", err); 
+    } finally { 
+      if (!isSilent) setLoading(false); 
+    }
   };
 
   useEffect(() => {
     if (!student) return;
     fetchData();
-    const unsubR = pb.collection("exam_rooms").subscribe("*", () => fetchData());
-    const unsubA = pb.collection("attempts").subscribe("*", () => fetchData());
+
+    // Subscribe to room changes (Global)
+    const unsubR = pb.collection("exam_rooms").subscribe("*", (e) => {
+      console.log("Room Change Detected, updating UI silently...");
+      fetchData(true);
+    });
+
+    // Subscribe ONLY to this student's attempts to prevent massive load
+    const unsubA = pb.collection("attempts").subscribe("*", (e) => {
+      if (e.record.studentId === student.id) {
+        console.log("My Attempt Change Detected, updating UI silently...");
+        fetchData(true);
+      }
+    });
+
     return () => {
       unsubR.then(u => u()).catch(() => { });
       unsubA.then(u => u()).catch(() => { });
     };
-  }, [student]);
+  }, [student?.id]);
 
   const handleValidateToken = async () => {
     if (!selectedRoom || !student) return;
