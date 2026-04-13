@@ -464,7 +464,8 @@ const CBTPage = () => {
     const unsubAttempt = pb.collection("attempts").subscribe(attempt.id, (e) => {
       if (e.action === "delete") {
         sessionStorage.removeItem("activeCBTRoomId");
-        navigate("/", { replace: true });
+        setIsResetModalOpen(true); // Tampilkan modal reset dulu agar siswa sadar
+        setTimeout(() => navigate("/", { replace: true }), 3000);
       }
       else if (e.action === "update") {
         const oldS = attempt.status;
@@ -513,18 +514,19 @@ const CBTPage = () => {
           // Jika 404/403 berarti sesi sudah dihapus/reset oleh admin
           if (err.status === 404 || err.status === 403) {
             sessionStorage.removeItem("activeCBTRoomId");
-            navigate("/", { replace: true });
+            setIsResetModalOpen(true);
+            setTimeout(() => navigate("/", { replace: true }), 2000);
           }
         }
       } 
-    }, 15000);
+    }, 10000); // Percepat heartbeat ke 10 detik
     return () => { clearInterval(timer); clearInterval(heartbeat); };
   }, [loading, isExamOver, roomData, attempt]);
 
   useEffect(() => {
     if (!attempt?.id || isLocked || isExamOver) return;
     const triggerPenalty = async () => {
-      if (!document.hasFocus() && document.visibilityState === "visible") return;
+      // Dihapus pengecekan focus vs visibility agar cheat tetap terdeteksi saat blur
 
       const currentCheat = attempt?.cheatCount || 0;
       const newCount = currentCheat + 1;
