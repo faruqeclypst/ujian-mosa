@@ -174,6 +174,60 @@ const CBTPage = () => {
   const isIndexRestored = useRef(false);
   const isCreatingRef = useRef(false);
 
+  // 🛡️ Enhanced Screen Wake Lock (WakeLock API + Video Hack)
+  useEffect(() => {
+    let wakeLock: any = null;
+    let videoEl: HTMLVideoElement | null = null;
+    
+    const requestWakeLock = async () => {
+      // 1. Try modern WakeLock API
+      if ('wakeLock' in navigator) {
+        try {
+          wakeLock = await (navigator as any).wakeLock.request('screen');
+        } catch (err: any) {}
+      }
+
+      // 2. Video Hack Fallback (Works on many mobile browsers)
+      if (!videoEl) {
+        videoEl = document.createElement('video');
+        videoEl.setAttribute('playsinline', '');
+        videoEl.setAttribute('muted', '');
+        videoEl.loop = true;
+        videoEl.style.position = 'fixed';
+        videoEl.style.top = '0';
+        videoEl.style.width = '1px';
+        videoEl.style.height = '1px';
+        videoEl.style.opacity = '0.01';
+        videoEl.style.pointerEvents = 'none';
+        videoEl.src = 'data:video/mp4;base64,AAAAHGZ0eXBtcDQyAAAAAG1wNDJpc29tYXZjMQAAAZptb292AAAAbG12aGQAAAAA36Yl/N+mJf8AAAPoAAAAUAAEAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIAAABidHJhazAAAAZcdGtoZAAAAAPfpiX836Yl/AAAAAEAAAAAAAAAUAAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgAAAGBtZGlhAAAAIG1kaGQAAAAA36Yl/N+mJf8AAAPoAAAAUABVWEHAAAAAAAtWhuZGxyAAAAAAAAAAB2aWRlAAAAAAAAAAAAAAAAVmlkZW9IYW5kbGVyAAAAAVxtaW5mAAAAEHZtbmhkAAAAAQAAAAAAACRkaW5mAAAAHGRyZWYAAAAAAAAAAQAAAAx1cmwgAAAAAQAAAURzdGJsAAAAL3N0c2QAAAAAAAAAAQAAAB9hdmMxAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAAAAgACAAAAAkAAABidm9jYwAAAABhdmNDAVQAKv/hABhnVEAq/4C0YIu6u6uX9AAAAAMAAQAAAwAeDBlYm6u7u7urq7u7ur6AAAQAIAAAIAAAAEhzdHRzAAAAAAAAAAEAAAABAAAfQAAAADRzdHNjAAAAAAAAAAEAAAABAAAAAQAAAAEAAAAcc3RzegAAAAAAAAAAAAAAAQAAABAAAAAUc3RjbwAAAAAAAAABAAAAUAAAAGJ1ZHRhAAAAWm1ldGEAAAAAAAAAIWhkbHIAAAAAAAAAAG1kaXIAAAAAAAAAAAAAAAAAAAAAAAAALWlsc3QAAAAjqXRvbwAAABtkYXRhAAAAAQAAAABMYXZmNTkuMjcuMTAw';
+        document.body.appendChild(videoEl);
+      }
+      
+      videoEl.play().catch(() => {});
+    };
+
+    if (!loading && !isExamOver) {
+      requestWakeLock();
+    }
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        requestWakeLock();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      if (wakeLock) wakeLock.release().catch(() => {});
+      if (videoEl) {
+        videoEl.pause();
+        videoEl.parentNode?.removeChild(videoEl);
+      }
+    };
+  }, [loading, isExamOver]);
+
   const [choicesOrder, setChoicesOrder] = useState<Record<string, string[]>>({});
   const [itemsOrder, setItemsOrder] = useState<Record<string, string[]>>({});
   const [matchingOptions, setMatchingOptions] = useState<Record<string, string[]>>({});
@@ -251,6 +305,13 @@ const CBTPage = () => {
     if (isExamOver || isLocked || !attempt) return;
     setAnswers(p => {
       const u = { ...p, [questionId]: value };
+      
+      // 1. SIMPAN KE HP INSTAN (0 DETIK)
+      if (student && roomId) {
+        localStorage.setItem(`offline_answers_${student.id}_${roomId}`, JSON.stringify(u));
+      }
+
+      // 2. BACKUP KE SERVER (TUNGGU 2 DETIK)
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
       saveTimeoutRef.current = setTimeout(() => {
         setIsSyncing(true);
@@ -259,7 +320,7 @@ const CBTPage = () => {
           isOnline: true,
           lastHeartbeat: new Date().toISOString()
         });
-      }, 500);
+      }, 2000);
       return u;
     });
   };
@@ -521,7 +582,7 @@ const CBTPage = () => {
           }
         }
       } 
-    }, 10000); // Percepat heartbeat ke 10 detik
+    }, 30000); // Heartbeat setiap 30 detik
     return () => { clearInterval(timer); clearInterval(heartbeat); };
   }, [loading, isExamOver, roomData, attempt]);
 
@@ -967,7 +1028,36 @@ const CBTPage = () => {
 
       <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
         <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 space-y-4 sm:space-y-6 text-slate-800">
-          {currentQuestion && (
+          {!loading && questions.length === 0 && (
+            <div className="flex flex-col items-center justify-center h-full space-y-6 animate-in fade-in zoom-in duration-500">
+              <div className="w-24 h-24 bg-slate-50 dark:bg-slate-900 rounded-[35%] flex items-center justify-center border border-slate-100 dark:border-slate-800 shadow-inner">
+                <FileText className="w-12 h-12 text-slate-300" />
+              </div>
+              <div className="text-center space-y-2">
+                <h3 className="text-lg font-black text-slate-800 dark:text-white uppercase tracking-tight">Daftar Soal Kosong</h3>
+                <p className="text-sm text-slate-500 dark:text-slate-400 max-w-xs mx-auto">Tidak ditemukan pertanyaan dalam paket soal ini. Silakan hubungi proktor.</p>
+              </div>
+              <Button onClick={() => navigate("/")} variant="outline" className="rounded-2xl h-12 px-8 font-black uppercase text-[10px] tracking-widest border-2">Kembali ke Dashboard</Button>
+            </div>
+          )}
+
+          {!loading && questions.length > 0 && isExamOver && (
+             <div className="flex flex-col items-center justify-center h-full space-y-6 animate-in fade-in zoom-in duration-500">
+              <div className="w-24 h-24 bg-rose-50 dark:bg-rose-950/20 rounded-[35%] flex items-center justify-center border border-rose-100 dark:border-rose-900/30 shadow-inner">
+                <Clock className="w-12 h-12 text-rose-500 animate-pulse" />
+              </div>
+              <div className="text-center space-y-2">
+                <h3 className="text-lg font-black text-rose-600 dark:text-rose-400 uppercase tracking-tight">Waktu Ujian Berakhir</h3>
+                <p className="text-sm text-slate-500 dark:text-slate-400 max-w-xs mx-auto">Sesi Anda telah selesai karena batas waktu pengerjaan telah habis.</p>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <Button onClick={() => handleSubmitExam()} className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl h-12 px-8 font-black uppercase text-[10px] tracking-widest shadow-lg shadow-emerald-500/20">Selesaikan Ujian</Button>
+                <Button onClick={() => navigate("/")} variant="outline" className="rounded-2xl h-12 px-8 font-black uppercase text-[10px] tracking-widest border-2">Ke Dashboard</Button>
+              </div>
+            </div>
+          )}
+
+          {currentQuestion && !isExamOver && (
             <Card className="rounded-[25px] sm:rounded-[35px] border border-slate-100 dark:border-slate-800 overflow-hidden bg-white dark:bg-slate-900 shadow-sm transition-all duration-300">
               <CardHeader className="p-5 sm:p-8 pb-3 sm:pb-4">
                 <div className="relative flex items-center justify-between gap-4 mb-4 sm:mb-6 min-h-[48px] sm:min-h-[56px]">

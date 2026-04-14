@@ -214,38 +214,19 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
       if (diff <= 0) {
         if (timeLeft !== "00:00") setTimeLeft("00:00");
         
-        // Safety: Jika macet di 00:00 melebihi 3 detik, coba fetch manual
-        if (diff < -3000 && !isUpdating) {
-          console.log("🕒 Timer stuck at 0 (3s), performing safety fetch...");
-          pb.collection('settings').getFullList({ limit: 1, sort: 'created' }).then(recs => {
-            if (recs.length > 0) {
-              setUniversalToken(recs[0].universal_token || "");
-              setTokenUpdatedAt(recs[0].universal_token_updated_at || recs[0].updated || "");
-            }
-          });
-        }
-
-        // 🔒 Hanya Admin yang boleh mentrigger update token ke database
-        if (role?.toLowerCase() === "admin" && !isUpdating) {
+        // 🔒 No longer rotating from the frontend admin to avoid conflicts.
+        // Rotation is now handled by the server (pb_hooks/main.pb.js).
+        // Only trigger a safety fetch if we are stuck at 0.
+        if (!isUpdating) {
           isUpdating = true;
           try {
-            console.log("♻️ Rotating token...");
             const records = await pb.collection('settings').getFullList({ limit: 1, sort: 'created' });
             if (records.length > 0) {
-              const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; 
-              let token = "";
-              for (let i = 0; i < 6; i++) token += chars.charAt(Math.floor(Math.random() * chars.length));
-
-              await pb.collection('settings').update(records[0].id, {
-                universal_token: token,
-                universal_token_updated_at: new Date().toISOString()
-              });
+              setUniversalToken(records[0].universal_token || "");
+              setTokenUpdatedAt(records[0].universal_token_updated_at || records[0].updated || "");
             }
-          } catch (e) {
-            console.error("❌ Regeneration failed:", e);
-          } finally {
-            setTimeout(() => { isUpdating = false; }, 3000);
-          }
+          } catch (e) { }
+          finally { setTimeout(() => { isUpdating = false; }, 3000); }
         }
       } else {
         const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));

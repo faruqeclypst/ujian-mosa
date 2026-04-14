@@ -163,6 +163,8 @@ export const StudentAuthProvider = ({ children }: { children: ReactNode }) => {
     setstudent(null);
     localStorage.removeItem("student_session_id"); 
     sessionStorage.clear(); 
+    // Bersihkan URL dan kembali ke halaman login siswa
+    window.location.href = "/";
   }, []);
 
   const [isKicked, setIsKicked] = useState(false);

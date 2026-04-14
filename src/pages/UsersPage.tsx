@@ -4,6 +4,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ".
 import { Plus, ShieldAlert, Trash2, UserCog, Edit2, Mail, Loader2 } from "lucide-react";
 import pb from "../lib/pocketbase";
 import { useAuth } from "../context/AuthContext";
+import { useToast } from "../components/ui/toast";
 import { useExamData } from "../context/ExamDataContext";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -23,6 +24,7 @@ interface AppUser {
 
 const UsersPage = () => {
   const { user: currentUser, role: currentRole } = useAuth();
+  const { addToast } = useToast();
   const { teachers } = useExamData();
   
   const [users, setUsers] = useState<AppUser[]>([]);
@@ -119,11 +121,8 @@ const UsersPage = () => {
     }
 
     setIsSubmitting(true);
-
     try {
       const payload: any = {
-        email: formData.email,
-        username: formData.email.split("@")[0] + "_" + Math.floor(Math.random()*1000), // PB butuh username unik
         name: formData.name,
         role: formData.role,
         teacherId: formData.role === "teacher" ? formData.teacherId : null,
@@ -135,20 +134,31 @@ const UsersPage = () => {
       }
 
       if (dialogMode === "edit" && selectedUser) {
+        if (formData.email !== selectedUser.email) {
+          payload.email = formData.email;
+        }
+
+        console.log("Mengirim data update:", payload);
         await pb.collection("users").update(selectedUser.id, payload);
       } else {
-        await pb.collection("users").create({
-          ...payload,
-          emailVisibility: true,
-        });
+        // Untuk create baru, wajib kirim email & username
+        payload.email = formData.email;
+        payload.emailVisibility = true;
+        payload.username = formData.email.split("@")[0] + "_" + Math.floor(Math.random()*1000);
+        await pb.collection("users").create(payload);
       }
 
       setIsDialogOpen(false);
       fetchUsers();
-      alert(`Akun berhasil ${dialogMode === "edit" ? "diperbarui" : "dibuat"}!`);
+      addToast({
+        type: "success",
+        title: "Berhasil",
+        description: `Akun berhasil ${dialogMode === "edit" ? "diperbarui" : "dibuat"}!`
+      });
     } catch (err: any) {
-      console.error(err);
-      setError(err.message || "Gagal menyimpan data akun.");
+      console.error("DETAIL ERROR DARI PB:", err.data);
+      const detailError = err.data?.data ? JSON.stringify(err.data.data) : "";
+      setError(err.message + " " + detailError);
     } finally {
       setIsSubmitting(false);
     }

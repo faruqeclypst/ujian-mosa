@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { DataTable } from "../ui/data-table";
 import { Button } from "../ui/button";
 import type { StudentData, ClassData } from "../../types/exam";
+import { useAuth } from "../../context/AuthContext";
 import { Edit, Trash, Sparkles } from "lucide-react";
 
 interface StudentTableProps {
@@ -106,6 +107,8 @@ const StudentTable = ({
     },
   ];
 
+  const { role } = useAuth();
+
   const renderActions = (student: StudentData) => (
     customActions ? customActions(student) : (
       <div className="flex justify-end gap-2">
@@ -118,20 +121,24 @@ const StudentTable = ({
             <Sparkles className="h-4 w-4" />
           </button>
         )}
-        <button 
-          className="p-1.5 bg-sky-50 text-sky-600 hover:bg-sky-100 rounded-lg dark:bg-sky-900/10 dark:text-sky-400 border border-sky-100 dark:border-sky-800/40"
-          onClick={() => onEdit(student)}
-          title="Edit Siswa"
-        >
-          <Edit className="h-4 w-4" />
-        </button>
-        <button 
-          className="p-1.5 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-lg dark:bg-rose-900/10 dark:text-rose-400 border border-rose-100 dark:border-rose-800/40"
-          onClick={() => onDelete(student)}
-          title="Hapus Siswa"
-        >
-          <Trash className="h-4 w-4" />
-        </button>
+        {role === "admin" && (
+          <>
+            <button 
+              className="p-1.5 bg-sky-50 text-sky-600 hover:bg-sky-100 rounded-lg dark:bg-sky-900/10 dark:text-sky-400 border border-sky-100 dark:border-sky-800/40"
+              onClick={() => onEdit(student)}
+              title="Edit Siswa"
+            >
+              <Edit className="h-4 w-4" />
+            </button>
+            <button 
+              className="p-1.5 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-lg dark:bg-rose-900/10 dark:text-rose-400 border border-rose-100 dark:border-rose-800/40"
+              onClick={() => onDelete(student)}
+              title="Hapus Siswa"
+            >
+              <Trash className="h-4 w-4" />
+            </button>
+          </>
+        )}
       </div>
     )
   );

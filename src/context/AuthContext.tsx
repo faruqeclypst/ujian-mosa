@@ -91,6 +91,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signOut = useCallback(async () => {
     pb.authStore.clear();
     setUser(null);
+    // Bersihkan URL dan kembali ke halaman login utama
+    window.location.href = "/admin";
   }, []);
 
   const value = useMemo<AuthContextValue>(

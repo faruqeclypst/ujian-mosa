@@ -12,10 +12,12 @@ import { useExamData } from "../../context/ExamDataContext";
 import { useAuth } from "../../context/AuthContext";
 import { getExamTypeColorClass } from "./ExamsPage";
 import { ConfirmationDialog } from "../../components/ui/confirmation-dialog";
+import { useToast } from "../../components/ui/toast";
 import { cn } from "../../lib/utils";
 
 import { DataTable }  from "../../components/ui/data-table";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../components/ui/table";
+
 import { Skeleton } from "../../components/ui/skeleton";
 
 export interface ExamRoomData {
@@ -47,7 +49,8 @@ export interface ExamRoomData {
 
 const ExamRoomsPage = () => {
   const navigate = useNavigate();
-  const { user, role } = useAuth();
+  const { user, role, teacherId } = useAuth();
+  const { addToast } = useToast();
   const [rooms, setRooms] = useState<ExamRoomData[]>([]);
   const [exams, setExams] = useState<any[]>([]);
   const [examsLoading, setExamsLoading] = useState(true);
@@ -102,6 +105,10 @@ const ExamRoomsPage = () => {
   const isLoading = loading || dataLoading || examsLoading;
 
   const showAlert = (title: string, description: string, type: "success" | "danger" | "warning" | "info" = "info") => {
+    if (type === "success" || type === "info") {
+      addToast({ type, title, description, duration: 3000 });
+      return;
+    }
     setConfirmDialog({
       isOpen: true,
       title,
@@ -115,7 +122,11 @@ const ExamRoomsPage = () => {
   const [liveBreakdown, setLiveBreakdown] = useState<Record<string, number>>({});
   const [totalOngoing, setTotalOngoing] = useState(0);
 
-  const teacherId = user?.id;
+  const isOwner = useCallback((room: ExamRoomData) => {
+    if (role === "admin") return true;
+    if (!teacherId) return false;
+    return room.examTeacherId === teacherId || room.examTeacherId === user?.id;
+  }, [role, teacherId, user]);
 
   // Columns definition (matching ExamsPage style)
   const columns: any[] = [
@@ -208,6 +219,28 @@ const ExamRoomsPage = () => {
                  <span className="text-emerald-600 font-bold">{liveBreakdown[room.id]} Aktif</span>
                </>
              )}
+          </div>
+          <div className="flex items-center gap-1.5 text-[9px] text-slate-500 font-bold bg-slate-50 dark:bg-slate-900/40 px-1.5 py-0.5 rounded border border-slate-200/50 dark:border-slate-800/50">
+            <Clock className="h-2.5 w-2.5 text-blue-500" />
+            <span>
+              {(() => {
+                const s = new Date(room.start_time);
+                const e = new Date(room.end_time);
+                if (isNaN(s.getTime()) || isNaN(e.getTime())) return "--:-- - --:--";
+                
+                const sDate = s.toLocaleDateString('id-ID', { day: '2-digit', month: 'short' });
+                const eDate = e.toLocaleDateString('id-ID', { day: '2-digit', month: 'short' });
+                
+                const startTime = `${s.getHours().toString().padStart(2, '0')}:${s.getMinutes().toString().padStart(2, '0')}`;
+                const endTime = `${e.getHours().toString().padStart(2, '0')}:${e.getMinutes().toString().padStart(2, '0')}`;
+                
+                if (sDate === eDate) {
+                  return `${sDate}, ${startTime} - ${endTime}`;
+                } else {
+                  return `${sDate}, ${startTime} - ${eDate}, ${endTime}`;
+                }
+              })()}
+            </span>
           </div>
           <span className="text-[10px] text-slate-400 truncate max-w-[120px]">{room.teacherName}</span>
         </div>
@@ -344,6 +377,7 @@ const ExamRoomsPage = () => {
             examType: (examObj as any)?.examType || (examObj as any)?.examtype || "UMUM",
             subjectName: subjectObj?.name || "N/A",
             teacherName: teacherObj?.name || "N/A",
+            examTeacherId: examObj?.teacherId || (examObj as any)?.teacherid || "",
             className: className,
             is_exambro: room.is_exambro || (room as any).isExambro || false
           } as any as ExamRoomData;
@@ -374,12 +408,6 @@ const ExamRoomsPage = () => {
     };
   }, [subjects, masterTeachers, exams, examClasses]);
 
-  const generateNewToken = () => {
-    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-    let token = "";
-    for (let i = 0; i < 6; i++) token += chars.charAt(Math.floor(Math.random() * chars.length));
-    return token;
-  };
 
   const handleCreateClick = () => {
     setDialogMode("create");
@@ -389,7 +417,7 @@ const ExamRoomsPage = () => {
       examId: exams[0]?.id || "",
       classId: "all",
       allClasses: true,
-      token: generateNewToken(),
+      token: "",
       start_time: "",
       end_time: "",
       duration: 60,
@@ -410,7 +438,7 @@ const ExamRoomsPage = () => {
       examId: room.examId,
       classId: room.allClasses ? "" : (Array.isArray(room.classId) ? room.classId.join(",") : (room.classId || "")),
       allClasses: room.allClasses || false,
-      token: room.token,
+      token: room.token || "",
       start_time: room.start_time && !isNaN(new Date(room.start_time).getTime()) ? new Date(room.start_time).toISOString().slice(0, 16) : "",
       end_time: room.end_time && !isNaN(new Date(room.end_time).getTime()) ? new Date(room.end_time).toISOString().slice(0, 16) : "",
       duration: room.duration,
@@ -543,7 +571,8 @@ const ExamRoomsPage = () => {
   };
 
   const handleMonitorClick = (room: ExamRoomData) => {
-    navigate(`/admin/monitoring/${room.id}`);
+    sessionStorage.setItem("activeMonitoringRoomId", room.id);
+    navigate(`/admin/monitoring`);
   };
 
   const isRoomActive = selectedRoom ? (
@@ -561,7 +590,7 @@ const ExamRoomsPage = () => {
             <ClipboardList className="h-5 w-5 text-blue-500" />
             Ruang Ujian
           </h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Aktifkan dan kelola sesi ujian untuk Siswa.</p>
+          <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Aktifkan dan kelola sesi ujian untuk Siswa.</div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {isLoading ? (
@@ -620,17 +649,17 @@ const ExamRoomsPage = () => {
           </div>
           <div>
             <p className="text-xs text-slate-500 dark:text-slate-400">Siswa Aktif</p>
-            <p className="text-lg font-bold text-slate-800 dark:text-slate-100 mt-0.5 leading-none">
+            <div className="text-lg font-bold text-slate-800 dark:text-slate-100 mt-0.5 leading-none">
               {isLoading ? <Skeleton className="h-5 w-8" /> : totalOngoing}
-            </p>
+            </div>
           </div>
           {/* Hover Breakdown Card */}
           <div className="absolute top-full left-0 right-0 mt-2 z-50 invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-all scale-95 group-hover:scale-100">
             <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl p-3 min-w-[200px] max-h-60 overflow-y-auto">
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 border-b border-slate-100 dark:border-slate-800 pb-1 flex justify-between">
+              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 border-b border-slate-100 dark:border-slate-800 pb-1 flex justify-between">
                 <span>Detail Ruangan Live</span>
                 <span className="text-emerald-500">{totalOngoing} Total</span>
-              </p>
+              </div>
               {Object.keys(liveBreakdown).length === 0 ? (
                 <p className="text-center py-2 text-[10px] text-slate-500">Tidak ada aktifitas</p>
               ) : (
@@ -660,9 +689,9 @@ const ExamRoomsPage = () => {
           </div>
           <div>
             <p className="text-xs text-slate-500 dark:text-slate-400">Total Ruang</p>
-            <p className="text-lg font-bold text-slate-800 dark:text-slate-100 mt-0.5">
+            <div className="text-lg font-bold text-slate-800 dark:text-slate-100 mt-0.5">
               {isLoading ? <Skeleton className="h-7 w-8" /> : rooms.length}
-            </p>
+            </div>
           </div>
         </div>
       </div>
@@ -740,7 +769,7 @@ const ExamRoomsPage = () => {
                     <Edit className="h-4 w-4" />
                   </button>
 
-                  {(role === "admin" || room.examTeacherId === teacherId) && (
+                  {isOwner(room) && (
                     <>
                       <button
                         className={cn(

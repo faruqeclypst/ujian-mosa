@@ -113,9 +113,18 @@ const compressImage = (file: File): Promise<File> => {
 
 
 const QuestionsPage = () => {
-  const { examId } = useParams<{ examId: string }>();
   const navigate = useNavigate();
-  const { role, teacherId } = useAuth();
+  const [examId, setExamId] = useState<string | null>(() => sessionStorage.getItem("activeQuestionsExamId"));
+
+  useEffect(() => {
+    if (!examId) {
+      // Jika nyasar kesini tanpa ID, balikin ke daftar bank soal
+      navigate("/admin/bank-soal", { replace: true });
+    }
+  }, [examId, navigate]);
+
+  const { user, role, teacherId } = useAuth();
+  const { addToast } = useToast();
   const { subjects, teachers } = useExamData();
 
   // 📝 Manage Allowed Question Types
@@ -338,11 +347,15 @@ const QuestionsPage = () => {
   const [confirmModal, setConfirmModal] = useState<any>({ isOpen: false, title: "", description: "", type: "info", confirmLabel: "Ok", onConfirm: () => { } });
 
   const showAlert = (title: string, description: string, type: "success" | "danger" | "warning" | "info" = "info", onConfirm?: () => void, showCancel: boolean = false, confirmLabel: string = "OK") => {
+    if (!onConfirm && !showCancel && (type === "success" || type === "info")) {
+      addToast({ type, title, description, duration: 3000 });
+      return;
+    }
     setConfirmModal({
       isOpen: true,
       title,
       description,
-      type,
+      type: type === "danger" ? "danger" : (type === "warning" ? "warning" : "info"),
       confirmLabel,
       onConfirm: onConfirm || (() => { }),
       showCancel
@@ -506,7 +519,7 @@ const QuestionsPage = () => {
     }
   };
 
-  const { addToast } = useToast();
+
 
   const handleAIRegenerateSingle = async (index: number) => {
     setIsRegeneratingIndex(index);
@@ -1136,6 +1149,13 @@ const QuestionsPage = () => {
 
     init();
   }, [examId, subjects, teachers, loadQuestions]);
+
+  const isOwner = useMemo(() => {
+    if (role === "admin") return true;
+    if (!exam || !teacherId) return false;
+    // Cek ID Guru (baru) atau ID Akun (lama)
+    return exam.teacherId === teacherId || exam.teacherId === user?.id;
+  }, [role, exam, teacherId, user]);
 
 
   const handleCreateClick = () => {
@@ -2474,7 +2494,7 @@ const QuestionsPage = () => {
                         </DialogContent>
                       </Dialog>
 
-                      {questions.length > 0 && selectedIds.length > 0 && (
+                      {questions.length > 0 && selectedIds.length > 0 && isOwner && (
                         <Button
                           onClick={() => setBulkDeleteDialogOpen(true)}
                           variant="default"
@@ -2486,7 +2506,7 @@ const QuestionsPage = () => {
                         </Button>
                       )}
 
-                      {questions.length > 0 && selectedIds.length === 0 && (
+                      {questions.length > 0 && selectedIds.length === 0 && isOwner && (
                         <Button
                           onClick={() => setDeleteAllDialogOpen(true)}
                           variant="secondary"
@@ -2497,7 +2517,8 @@ const QuestionsPage = () => {
                         </Button>
                       )}
 
-                      <DropdownMenu>
+                      {isOwner && (
+                        <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button 
                             variant="secondary" 
@@ -2585,6 +2606,7 @@ const QuestionsPage = () => {
                           )}
                         </DropdownMenuContent>
                       </DropdownMenu>
+                      )}
                     </div>
                   )}
                 </div>
@@ -2679,7 +2701,7 @@ const QuestionsPage = () => {
                       >
                         <Search className="h-4 w-4" />
                       </button>
-                      {(role === "admin" || exam?.teacherId === teacherId) && (
+                      {isOwner && (
                         <>
                           <button
                             className="p-1.5 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 rounded-xl dark:bg-indigo-900/10 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-800/40 transition-all hover:scale-110"

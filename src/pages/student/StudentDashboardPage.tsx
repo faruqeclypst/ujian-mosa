@@ -45,26 +45,66 @@ const StudentDashboardPage = () => {
   const [activeRooms, setActiveRooms] = useState<any[]>([]);
   const [userAttempts, setUserAttempts] = useState<Record<string, any>>({});
   const [activeTab, setActiveTab] = useState<"active" | "history">("active");
+  const [hasPendingSync, setHasPendingSync] = useState(false);
+  const [isSyncingData, setIsSyncingData] = useState(false);
+  const [isFirstLoadState, setIsFirstLoadState] = useState(true);
+  const [displayedName, setDisplayedName] = useState("");
+
+  // ✨ TYPING EFFECT UNTUK NAMA SISWA
+  useEffect(() => {
+    if (!student?.name) return;
+    let i = 0;
+    const fullName = student.name;
+    const timer = setInterval(() => {
+      setDisplayedName(fullName.substring(0, i));
+      i++;
+      if (i > fullName.length) clearInterval(timer);
+    }, 50); // Kecepatan mengetik: 50ms per karakter
+    return () => clearInterval(timer);
+  }, [student?.name]);
+
+  const handleManualSync = async () => {
+    if (!student || isSyncingData || !navigator.onLine) return;
+    setIsSyncingData(true);
+    try {
+      await syncPendingData(student.id);
+      setHasPendingSync(false);
+    } catch (e) {
+      setHasPendingSync(true);
+    } finally {
+      setIsSyncingData(false);
+    }
+  };
+
+  // 🔄 BACKGROUND AUTO-SYNC (TANPA DISADARI SISWA)
+  useEffect(() => {
+    if (!student) return;
+
+    const checkAndSync = async () => {
+      const keys = Object.keys(localStorage);
+      const pendingKeys = keys.filter(k => k.startsWith(`pending_sync_${student.id}_`));
+      const hasPending = pendingKeys.length > 0;
+      
+      setHasPendingSync(hasPending);
+
+      if (hasPending && navigator.onLine && !isSyncingData) {
+        handleManualSync();
+      }
+    };
+
+    checkAndSync();
+    const interval = setInterval(checkAndSync, 10000);
+    return () => clearInterval(interval);
+  }, [student, isSyncingData]);
 
   const fetchData = async (isSilent = false) => {
     try {
-      if (!isSilent) setLoading(true);
+      // Only show full loading on initial mount
+      if (loading && !isSilent) setLoading(true);
       
-      // Fetch interests status (Skip if already checked)
-      if (student && !hasInterests) {
-        try {
-          const interests = await pb.collection("student_interests").getList(1, 1, {
-            filter: `studentId = "${student.id}"`,
-          });
-          setHasInterests(interests.totalItems > 0);
-        } catch (err) {
-          console.error("Failed to check interests", err);
-        }
-      }
-
       // Fetch settings (Skip if already have school info)
       if (!schoolLogo || schoolName === "CBT System") {
-        const settingsRecords = await pb.collection("settings").getFullList({ limit: 1 });
+        const settingsRecords = await pb.collection("settings").getFullList({ limit: 1, requestKey: "dashboard_settings" });
         if (settingsRecords.length > 0) {
           setSchoolName(settingsRecords[0].name || "CBT System");
           setSchoolLogo(settingsRecords[0].logoUrl || settingsRecords[0].logo || "");
@@ -73,12 +113,28 @@ const StudentDashboardPage = () => {
 
       if (!student) return;
 
-      const roomsRecords = await pb.collection("exam_rooms").getFullList({
-        expand: "examId,examId.subjectId,examId.teacherId",
-        sort: "-created",
-        requestKey: null // Prevent cancellation of high-frequency requests
+      // 1. Fetch Rooms and Attempts in Parallel (Faster)
+      const [roomsRecords, attemptsRecords] = await Promise.all([
+        pb.collection("exam_rooms").getFullList({
+          expand: "examId,examId.subjectId,examId.teacherId",
+          sort: "-created",
+          requestKey: "dashboard_rooms"
+        }),
+        pb.collection("attempts").getFullList({ 
+          filter: `studentId = "${student.id}"`,
+          requestKey: "dashboard_attempts"
+        })
+      ]);
+
+      // 2. Map Attempts for lookup
+      const myStatus: Record<string, any> = {};
+      let lockedRoomId = "";
+      attemptsRecords.forEach(att => {
+        myStatus[att.examRoomId] = att;
+        if (att.status === "LOCKED") lockedRoomId = att.examRoomId;
       });
 
+      // 3. Process Rooms
       const allRooms = roomsRecords.filter(room => {
         if (room.isActive === false || room.status === "archive") return false;
         if (room.allClasses) return true;
@@ -111,34 +167,21 @@ const StudentDashboardPage = () => {
         return order[a.timeStatus] - order[b.timeStatus];
       });
 
-      if (allRooms.length > 0) {
-        const attempts = await pb.collection("attempts").getFullList({ 
-          filter: `studentId = "${student.id}"`,
-          requestKey: null 
-        });
-        const myStatus: Record<string, any> = {};
-        let lockedRoomId = "";
+      setUserAttempts(myStatus);
+      setActiveRooms(allRooms);
 
-        attempts.forEach(att => {
-          myStatus[att.examRoomId] = att;
-          if (att.status === "LOCKED") lockedRoomId = att.examRoomId;
-        });
-
-        setUserAttempts(myStatus);
-        setActiveRooms(allRooms); // Set rooms AFTER getting attempts status
-
-        if (lockedRoomId) {
-          sessionStorage.setItem("activeCBTRoomId", lockedRoomId);
-          navigate(`/cbt/${lockedRoomId}`, { replace: true });
-          return;
-        }
-      } else {
-        setActiveRooms([]);
+      // 4. Handle Redirection if locked
+      if (lockedRoomId && !window.location.pathname.includes('/cbt')) {
+        sessionStorage.setItem("activeCBTRoomId", lockedRoomId);
+        navigate(`/cbt`, { replace: true });
+        return;
       }
     } catch (err) { 
       console.error("Dashboard fetch error:", err); 
     } finally { 
-      if (!isSilent) setLoading(false); 
+      setLoading(false);
+      // Tunggu sebentar agar animasi pertama selesai baru matikan state first load
+      setTimeout(() => setIsFirstLoadState(false), 1000);
     }
   };
 
@@ -179,19 +222,35 @@ const StudentDashboardPage = () => {
     setTokenError("");
     setIsValidating(true);
     try {
-      // 🛡️ Ambil data terbaru langsung dari server untuk menghindari token kadaluarsa (Stale Snapshot)
-      const [settingsRecords, freshRoom] = await Promise.all([
-        pb.collection("settings").getFullList({ limit: 1 }),
-        pb.collection("exam_rooms").getOne(selectedRoom.id)
-      ]);
+      // 🛡️ Ambil data terbaru langsung dari server dengan penanganan lebih kuat (Mempertimbangkan API Rules List vs View)
+      let freshRoom;
+      try {
+        const checkList = await pb.collection("exam_rooms").getFullList({
+          filter: `id = "${selectedRoom.id}"`,
+          limit: 1,
+          requestKey: null
+        });
 
-      const globalToken = settingsRecords[0]?.universal_token || settingsRecords[0]?.global_token || settingsRecords[0]?.globalToken;
-      const roomToken = freshRoom.token;
+        if (checkList.length === 0) {
+          fetchData(true);
+          throw new Error("Ruangan ini sudah tidak aktif, sedang di-arsip, atau Anda tidak memiliki akses ke kelas ini lagi.");
+        }
+        freshRoom = checkList[0];
+      } catch (err: any) {
+        if (err.status === 404 || err.message.includes("tidak aktif")) {
+          throw new Error(err.message || "Ruangan tidak ditemukan.");
+        }
+        throw err;
+      }
+
+      const settingsRecords = await pb.collection("settings").getFullList({ limit: 1 });
+      const globalToken = (settingsRecords[0]?.universal_token || settingsRecords[0]?.global_token || settingsRecords[0]?.globalToken || "").toString().trim().toUpperCase();
+      const roomToken = (freshRoom.token || "").toString().trim().toUpperCase();
 
       const input = tokenInput.trim().toUpperCase();
 
       if (input !== globalToken && input !== roomToken) {
-        throw new Error("Token tidak valid");
+        throw new Error("Token yang Anda masukkan belum tepat. Silakan cek kembali.");
       }
 
       sessionStorage.setItem("activeCBTRoomId", selectedRoom.id);
@@ -206,7 +265,11 @@ const StudentDashboardPage = () => {
       }
 
       navigate(`/cbt`);
-    } catch (err: any) { setTokenError(err.message); } finally { setIsValidating(false); }
+    } catch (err: any) { 
+      setTokenError(err.message || "Terjadi kesalahan saat verifikasi."); 
+    } finally { 
+      setIsValidating(false); 
+    }
   };
 
   const totalActive = activeRooms.filter(r => {
@@ -313,17 +376,45 @@ const StudentDashboardPage = () => {
           {/* LEFT COLUMN: Exams */}
           <div className="lg:col-span-8 space-y-8">
             {/* Desktop Banner */}
-            <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} className="relative bg-emerald-600 rounded-[30px] p-6 sm:p-10 overflow-hidden shadow-2xl shadow-emerald-100 dark:shadow-none hidden lg:block">
+            <motion.div 
+              initial={{ opacity: 0, x: -20 }} 
+              animate={{ opacity: 1, x: 0 }} 
+              className="relative bg-emerald-600 rounded-[30px] p-8 sm:p-10 overflow-hidden shadow-2xl shadow-emerald-100 dark:shadow-none hidden lg:block"
+            >
               <div className="absolute top-0 right-0 w-1/2 h-full bg-emerald-500/50 skew-x-[-20deg] translate-x-1/2" />
-              <div className="relative z-10 space-y-4">
+              
+              <div className="relative z-10 space-y-6">
                 <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/10 backdrop-blur-md rounded-full text-[10px] font-black text-slate-200 uppercase tracking-widest border border-white/5">
                   Verified Student Account
                 </div>
-                <h2 className="text-3xl font-black text-white tracking-tight leading-tight uppercase">
-                  Selamat Datang Kembali, <br />
-                  <span className="text-emerald-100">{student?.name}</span>
-                </h2>
-                <div className="h-6 overflow-hidden">
+                
+                {/* 👻 GHOST WRAPPER FOR STABILITY */}
+                <div className="relative">
+                  {/* Invisible Full Name (Reserves Space) */}
+                  <h2 className="text-2xl sm:text-3xl md:text-5xl font-black text-white/0 tracking-tight leading-[1.1] uppercase select-none pointer-events-none">
+                    Selamat Datang Kembali, <br />
+                    <span>{student?.name}</span>
+                  </h2>
+                  
+                  {/* Visible Typing Name (Layered on top) */}
+                  <h2 className="absolute top-0 left-0 w-full text-2xl sm:text-3xl md:text-5xl font-black text-white tracking-tight leading-[1.1] uppercase">
+                    Selamat Datang Kembali, <br />
+                    <span className="inline text-emerald-100">
+                      {displayedName.slice(0, -1)}
+                      <span className="relative inline">
+                        {displayedName.slice(-1)}
+                        {displayedName.length > 0 && (
+                          <span className="absolute left-0 -bottom-1 w-full h-1 bg-emerald-200 animate-pulse rounded-full" />
+                        )}
+                      </span>
+                      {displayedName.length === 0 && (
+                        <span className="inline-block w-4 h-1 bg-emerald-200 animate-pulse align-baseline shadow-sm rounded-full" />
+                      )}
+                    </span>
+                  </h2>
+                </div>
+
+                <div className="relative z-10 h-6 overflow-hidden mt-4">
                   <AnimatePresence mode="wait">
                     <motion.p
                       key={messageIndex}
@@ -331,10 +422,10 @@ const StudentDashboardPage = () => {
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -10 }}
                       transition={{ duration: 0.5, ease: "anticipate" }}
-                      className="text-xs text-slate-100/70 font-bold uppercase tracking-widest leading-none flex items-center gap-1.5"
+                      className="text-[10px] sm:text-xs text-slate-100/70 font-bold uppercase tracking-widest leading-none flex items-center gap-1.5"
                     >
                       {bannerMessages[messageIndex].text}
-                      <span className="text-white px-1.5 py-0.5 bg-white/10 rounded">{bannerMessages[messageIndex].highlight}</span>
+                      <span className="text-white px-2 py-0.5 bg-white/10 rounded-lg">{bannerMessages[messageIndex].highlight}</span>
                       {bannerMessages[messageIndex].suffix}
                     </motion.p>
                   </AnimatePresence>
@@ -385,6 +476,42 @@ const StudentDashboardPage = () => {
             </motion.div>
 
             <div className="space-y-6 text-left">
+              <AnimatePresence>
+        {hasPendingSync && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="overflow-hidden"
+          >
+            <div className="bg-amber-500/10 border-b border-amber-500/20 px-4 sm:px-8 py-3 flex flex-col sm:flex-row items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-amber-500/20 rounded-xl flex items-center justify-center shrink-0">
+                  <AlertCircle className="w-5 h-5 text-amber-500 animate-pulse" />
+                </div>
+                <div className="flex flex-col text-left">
+                  <span className="text-xs font-black text-amber-600 uppercase tracking-widest">Sinkronisasi Diperlukan</span>
+                  <p className="text-[11px] font-bold text-amber-700/70">Waduh! Ada jawaban ujianmu yang belum terkirim ke server karena internet mati tadi.</p>
+                </div>
+              </div>
+              <Button
+                onClick={handleManualSync}
+                disabled={isSyncingData}
+                size="sm"
+                className="bg-amber-500 hover:bg-amber-600 text-white rounded-xl h-9 px-4 font-black uppercase tracking-widest text-[10px] shadow-sm w-full sm:w-auto"
+              >
+                {isSyncingData ? (
+                   <>
+                    <Sparkles className="w-3 h-3 mr-2 animate-spin" />
+                    Mengirim...
+                   </>
+                ) : "Kirim Jawaban Sekarang"}
+              </Button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 px-1">
                 <div className="flex items-center gap-3">
                   <div className="w-4 h-4 bg-emerald-600 rounded-full shadow-lg shadow-emerald-200 animate-pulse" />
@@ -447,7 +574,13 @@ const StudentDashboardPage = () => {
                         const isLocked = attempt && attempt.status === "LOCKED";
 
                         return (
-                          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: idx * 0.05 }} key={room.id} className="group relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[2.5rem] shadow-sm hover:shadow-2xl hover:border-emerald-200 dark:hover:border-emerald-800/50 transition-all overflow-hidden flex flex-col h-full text-left">
+                          <motion.div 
+                            initial={isFirstLoadState ? { opacity: 0, scale: 0.95 } : false} 
+                            animate={{ opacity: 1, scale: 1 }} 
+                            transition={{ delay: isFirstLoadState ? idx * 0.05 : 0 }} 
+                            key={room.id} 
+                            className="group relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[2.5rem] shadow-sm hover:shadow-2xl hover:border-emerald-200 dark:hover:border-emerald-800/50 transition-all overflow-hidden flex flex-col h-full text-left"
+                          >
                             <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-50 dark:bg-emerald-950/20 rounded-full -mr-16 -mt-16 transition-transform group-hover:scale-150 duration-700" />
                             <div className="p-6 flex-1 flex flex-col relative z-10">
                               <div className="flex justify-between items-start gap-4 mb-2">
@@ -517,57 +650,60 @@ const StudentDashboardPage = () => {
                                     </div>
                                   </div>
                                 </div>
-                              </div>
-
-                              <div className="mt-1 pt-2 border-t border-slate-50 dark:border-slate-800/50">
-                                {isFinished ? (
-                                  <div className="group/result flex items-center justify-between w-full h-14 px-5 bg-slate-50/50 dark:bg-slate-800/40 rounded-2xl border border-slate-100 dark:border-slate-800/60 shadow-inner group-hover:bg-white dark:group-hover:bg-slate-900 transition-all">
-                                    <div className="flex items-center gap-3">
-                                      <div className="p-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-800 shadow-sm">
-                                        <Award className="w-4 h-4 text-amber-500" />
-                                      </div>
-                                      <div className="flex flex-col">
-                                        <span className="text-[8px] font-black text-emerald-600 dark:text-emerald-500 uppercase tracking-widest leading-none">Status</span>
-                                        <span className="text-[10px] font-black text-slate-800 dark:text-white uppercase mt-1 leading-none tracking-tight">Selesai</span>
-                                      </div>
-                                    </div>
-                                    <div className="text-right">
-                                      {room.show_result ? (
-                                        <div className="flex flex-col items-end">
-                                          <div className="flex items-center gap-1.5 mb-1 opacity-80">
-                                            <div className="flex items-center gap-1">
-                                              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                                              <span className="text-[8px] font-black text-emerald-600 dark:text-emerald-400">B: {attempt.correct || 0}</span>
-                                            </div>
-                                            <div className="flex items-center gap-1">
-                                              <div className="w-1.5 h-1.5 rounded-full bg-rose-500" />
-                                              <span className="text-[8px] font-black text-rose-500 dark:text-rose-400">S: {(attempt.total || 0) - (attempt.correct || 0)}</span>
-                                            </div>
+                                                <div className="mt-auto pt-4 border-t border-slate-50 dark:border-slate-800/50">
+                                  {isFinished ? (
+                                    <div className="flex flex-col gap-4">
+                                      <div className="flex items-center justify-between">
+                                        <div className="flex gap-2">
+                                          <div className="flex flex-col items-center bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-100 dark:border-emerald-800/50 py-2 px-3 rounded-xl min-w-[50px]">
+                                            <span className="text-[8px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest leading-none mb-1">Benar</span>
+                                            <span className="text-sm font-black text-emerald-700 dark:text-emerald-300">{attempt?.correct || 0}</span>
                                           </div>
-                                          <span className="text-2xl font-black text-slate-800 dark:text-white leading-none tracking-tighter">
-                                            {Number(attempt.score || 0).toFixed(1)}
-                                          </span>
+                                          <div className="flex flex-col items-center bg-rose-50 dark:bg-rose-950/30 border border-rose-100 dark:border-rose-800/50 py-2 px-3 rounded-xl min-w-[50px]">
+                                            <span className="text-[8px] font-black text-rose-600 dark:text-rose-400 uppercase tracking-widest leading-none mb-1">Salah</span>
+                                            <span className="text-sm font-black text-rose-700 dark:text-rose-300">{(room.total_questions || room.totalQuestions || 0) - (attempt?.correct || 0)}</span>
+                                          </div>
                                         </div>
-                                      ) : (
-                                        <div className="flex flex-col items-end opacity-60">
-                                          <span className="text-[8px] font-black text-slate-400 uppercase tracking-tighter leading-none">Nilai</span>
-                                          <span className="text-[10px] font-black text-slate-400 uppercase leading-none mt-1 italic tracking-widest">Tidak Ditampilkan</span>
+                                        <div className="flex flex-col items-end">
+                                          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Nilai Akhir</span>
+                                          <div className="flex items-baseline gap-1">
+                                            <span className="text-3xl font-black text-slate-900 dark:text-white tabular-nums tracking-tighter">
+                                              {Number(attempt?.score || 0).toFixed(1)}
+                                            </span>
+                                            <span className="text-[10px] font-bold text-slate-400">/ 100</span>
+                                          </div>
                                         </div>
-                                      )}
+                                      </div>
+                                      
+                                      <div className="-mx-6 -mb-6 mt-2 px-6 py-3 bg-emerald-500 text-white flex items-center justify-between shadow-inner">
+                                        <span className="text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
+                                          <ClipboardCheck className="w-3.5 h-3.5" />
+                                          Ujian Selesai
+                                        </span>
+                                        <div className="h-4 w-px bg-white/20" />
+                                        <span className="text-[9px] font-black opacity-80 uppercase tracking-widest">Tersimpan di Server</span>
+                                      </div>
                                     </div>
-                                  </div>
-                                ) : isLocked ? (
-                                  <div className="h-12 px-4 bg-rose-50 dark:bg-rose-950/20 rounded-2xl flex items-center justify-center gap-3 border border-rose-100 dark:border-rose-900/40">
-                                    <div className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
-                                    <span className="text-[10px] font-black text-rose-600 uppercase tracking-[0.2em]">Akun Terkunci</span>
-                                  </div>
-                                ) : room.timeStatus === "ongoing" ? (
-                                  <Button onClick={() => setSelectedRoom(room)} className="w-full h-12 bg-emerald-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-emerald-200 transition-all active:scale-95 group-hover:bg-emerald-700"> {attempt ? "Lanjutkan Ujian" : "Mulai Pengerjaan"}</Button>
-                                ) : (
-                                  <div className="h-12 px-4 bg-slate-100 dark:bg-slate-800/50 rounded-2xl flex items-center justify-center border border-slate-200 dark:border-slate-700">
-                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{room.timeStatus === "expired" ? "Waktu Habis" : "Belum Dimulai"}</span>
-                                  </div>
-                                )}
+                                  ) : isLocked ? (
+                                    <div className="h-12 px-4 bg-rose-50 dark:bg-rose-950/20 rounded-2xl flex items-center justify-center gap-3 border border-rose-100 dark:border-rose-900/40">
+                                      <div className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse" />
+                                      <span className="text-[10px] font-black text-rose-600 uppercase tracking-[0.2em]">Akun Terkunci</span>
+                                    </div>
+                                  ) : room.timeStatus === "ongoing" ? (
+                                    <Button 
+                                      onClick={() => setSelectedRoom(room)} 
+                                      className="w-full h-12 bg-emerald-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] shadow-lg shadow-emerald-200 dark:shadow-none transition-all active:scale-95 group-hover:bg-emerald-700"
+                                    > 
+                                      {attempt ? "Lanjutkan Ujian" : "Mulai Pengerjaan"}
+                                    </Button>
+                                  ) : (
+                                    <div className="h-12 px-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl flex items-center justify-center border border-slate-100 dark:border-slate-800">
+                                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                                        {room.timeStatus === "expired" ? "Waktu Telah Habis" : "Menunggu Jadwal Mulai"}
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
                               </div>
                             </div>
                           </motion.div>

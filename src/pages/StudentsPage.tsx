@@ -25,6 +25,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuLabel
 } from "../components/ui/dropdown-menu";
+import { useAuth } from "../context/AuthContext";
 import { useExamData } from "../context/ExamDataContext";
 import { Button } from "../components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "../components/ui/dialog";
@@ -42,6 +43,7 @@ import type { StudentData } from "../types/exam";
 import StudentInterestDialog from "../components/exam/StudentInterestDialog";
 
 const StudentsPage = () => {
+  const { role } = useAuth();
   const { students, classes, loading, createStudent, updateStudent, deleteStudent } = useExamData();
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -404,7 +406,7 @@ const StudentsPage = () => {
             </>
           ) : (
             <>
-              {selectedIds.length > 0 && (
+              {selectedIds.length > 0 && role === "admin" && (
                 <div className="flex items-center gap-1.5 animate-in fade-in zoom-in duration-200">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -443,7 +445,7 @@ const StudentsPage = () => {
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
-
+ 
                   <Button 
                     variant="default"
                     size="sm"
@@ -455,84 +457,88 @@ const StudentsPage = () => {
                   </Button>
                 </div>
               )}
-
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="secondary" size="sm" className="rounded-2xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 dark:hover:bg-emerald-900/40 dark:border-emerald-800/40 text-emerald-700 font-bold shadow-sm transition-all h-9 px-4">
-                    <FileSpreadsheet className="mr-1.5 h-3.5 w-3.5" />
-                    Opsi Data
-                    <ChevronDown className="ml-1.5 h-3 w-3 opacity-50" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56 p-2 rounded-2xl shadow-2xl border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 z-[100]">
-                  <DropdownMenuLabel className="text-[10px] font-bold uppercase tracking-widest text-slate-400 px-3 py-2 text-left">Kelola Siswa</DropdownMenuLabel>
-                  <div 
-                    className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors group"
-                    onClick={() => {
-                      const input = document.getElementById("student-import-input") as HTMLInputElement;
-                      if (input) {
-                        input.click();
-                      }
-                    }}
-                  >
-                    <div className="h-10 w-10 shrink-0 rounded-lg bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 flex items-center justify-center group-hover:scale-110 transition-transform">
-                      <Upload className="h-5 w-5" />
+ 
+              {role === "admin" && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="secondary" size="sm" className="rounded-2xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 dark:hover:bg-emerald-900/40 dark:border-emerald-800/40 text-emerald-700 font-bold shadow-sm transition-all h-9 px-4">
+                      <FileSpreadsheet className="mr-1.5 h-3.5 w-3.5" />
+                      Opsi Data
+                      <ChevronDown className="ml-1.5 h-3 w-3 opacity-50" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56 p-2 rounded-2xl shadow-2xl border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 z-[100]">
+                    <DropdownMenuLabel className="text-[10px] font-bold uppercase tracking-widest text-slate-400 px-3 py-2 text-left">Kelola Siswa</DropdownMenuLabel>
+                    <div 
+                      className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors group"
+                      onClick={() => {
+                        const input = document.getElementById("student-import-input") as HTMLInputElement;
+                        if (input) {
+                          input.click();
+                        }
+                      }}
+                    >
+                      <div className="h-10 w-10 shrink-0 rounded-lg bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <Upload className="h-5 w-5" />
+                      </div>
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">
+                          {isImporting ? "Mengimport..." : "Import dari Excel"}
+                        </span>
+                        <span className="text-[10px] text-slate-400 mt-1">Unggah file data siswa aktif</span>
+                      </div>
                     </div>
-                    <div className="flex flex-col min-w-0">
-                      <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">
-                        {isImporting ? "Mengimport..." : "Import dari Excel"}
-                      </span>
-                      <span className="text-[10px] text-slate-400 mt-1">Unggah file data siswa aktif</span>
-                    </div>
-                  </div>
-                  <DropdownMenuItem 
-                    onClick={handleExportStudents} 
-                    className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 focus:bg-slate-50 dark:focus:bg-slate-900 transition-colors group"
-                  >
-                    <div className="h-10 w-10 shrink-0 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 flex items-center justify-center group-hover:scale-110 transition-transform">
-                      <Download className="h-5 w-5" />
-                    </div>
-                    <div className="flex flex-col min-w-0">
-                      <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">Export ke Excel</span>
-                      <span className="text-[10px] text-slate-400 mt-1">Unduh data siswa aktif</span>
-                    </div>
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator className="my-1 border-slate-100 dark:border-slate-800" />
-                  <DropdownMenuItem 
-                    onClick={() => downloadStudentImportTemplate()} 
-                    className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 focus:bg-slate-50 dark:focus:bg-slate-900 transition-colors group"
-                  >
-                    <div className="h-10 w-10 shrink-0 rounded-lg bg-sky-50 dark:bg-sky-900/30 text-sky-600 flex items-center justify-center group-hover:scale-110 transition-transform">
-                      <FileText className="h-5 w-5" />
-                    </div>
-                    <div className="flex flex-col min-w-0">
-                      <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">Unduh Template</span>
-                      <span className="text-[10px] text-slate-400 mt-1">Format file import Excel</span>
-                    </div>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-
-              <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button onClick={handleCreateClick} size="sm" className="rounded-2xl bg-blue-50 hover:bg-blue-100 border border-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 dark:border-blue-800/40 text-blue-700 font-bold shadow-sm h-9 px-4">
-                    <Plus className="mr-1 h-3.5 w-3.5" />
-                    Tambah Siswa
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-md bg-card">
-                  <DialogHeader>
-                    <DialogTitle className="text-base font-bold text-slate-800 dark:text-white">{dialogMode === "edit" ? "Edit Data Siswa" : "Tambah Data Siswa"}</DialogTitle>
-                  </DialogHeader>
-                  <StudentForm
-                    classes={classes}
-                    defaultValues={defaultValues}
-                    onSubmit={handleSubmitStudent}
-                    submitLabel={dialogMode === "edit" ? "Perbarui" : "Simpan"}
-                    onCancel={() => setIsDialogOpen(false)}
-                  />
-                </DialogContent>
-              </Dialog>
+                    <DropdownMenuItem 
+                      onClick={handleExportStudents} 
+                      className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 focus:bg-slate-50 dark:focus:bg-slate-900 transition-colors group"
+                    >
+                      <div className="h-10 w-10 shrink-0 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <Download className="h-5 w-5" />
+                      </div>
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">Export ke Excel</span>
+                        <span className="text-[10px] text-slate-400 mt-1">Unduh data siswa aktif</span>
+                      </div>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator className="my-1 border-slate-100 dark:border-slate-800" />
+                    <DropdownMenuItem 
+                      onClick={() => downloadStudentImportTemplate()} 
+                      className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 focus:bg-slate-50 dark:focus:bg-slate-900 transition-colors group"
+                    >
+                      <div className="h-10 w-10 shrink-0 rounded-lg bg-sky-50 dark:bg-sky-900/30 text-sky-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <FileText className="h-5 w-5" />
+                      </div>
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">Unduh Template</span>
+                        <span className="text-[10px] text-slate-400 mt-1">Format file import Excel</span>
+                      </div>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+ 
+              {role === "admin" && (
+                <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button onClick={handleCreateClick} size="sm" className="rounded-2xl bg-blue-50 hover:bg-blue-100 border border-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 dark:border-blue-800/40 text-blue-700 font-bold shadow-sm h-9 px-4">
+                      <Plus className="mr-1 h-3.5 w-3.5" />
+                      Tambah Siswa
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-md bg-card">
+                    <DialogHeader>
+                      <DialogTitle className="text-base font-bold text-slate-800 dark:text-white">{dialogMode === "edit" ? "Edit Data Siswa" : "Tambah Data Siswa"}</DialogTitle>
+                    </DialogHeader>
+                    <StudentForm
+                      classes={classes}
+                      defaultValues={defaultValues}
+                      onSubmit={handleSubmitStudent}
+                      submitLabel={dialogMode === "edit" ? "Perbarui" : "Simpan"}
+                      onCancel={() => setIsDialogOpen(false)}
+                    />
+                  </DialogContent>
+                </Dialog>
+              )}
             </>
           )}
         </div>

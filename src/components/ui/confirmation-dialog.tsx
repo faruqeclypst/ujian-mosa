@@ -14,6 +14,7 @@ export interface ConfirmationDialogProps {
   type?: "danger" | "warning" | "info" | "success";
   isLoading?: boolean;
   showCancel?: boolean;
+  requireWord?: string;
 }
 
 export const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
@@ -27,7 +28,15 @@ export const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
   type = "info",
   isLoading = false,
   showCancel = true,
+  requireWord,
 }) => {
+  const [inputValue, setInputValue] = React.useState("");
+
+  React.useEffect(() => {
+    if (isOpen) setInputValue("");
+  }, [isOpen]);
+
+  const isConfirmDisabled = isLoading || (requireWord ? inputValue !== requireWord : false);
   const icons = {
     danger: <AlertOctagon className="h-5 w-5 text-red-600" />,
     warning: <AlertTriangle className="h-5 w-5 text-amber-600" />,
@@ -82,6 +91,19 @@ export const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
           <DialogDescription className="text-base text-gray-600 dark:text-gray-400 text-left leading-relaxed pt-2">
             {description}
           </DialogDescription>
+          {requireWord && (
+            <div className="mt-4 space-y-2">
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Ketik "{requireWord}" untuk melanjutkan:</p>
+              <input
+                type="text"
+                autoFocus
+                className="w-full h-11 px-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-sm font-bold uppercase"
+                placeholder={requireWord}
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value.toUpperCase())}
+              />
+            </div>
+          )}
         </DialogHeader>
 
         <DialogFooter className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end mt-10">
@@ -99,7 +121,7 @@ export const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
           <button
             type="button"
             onClick={onConfirm}
-            disabled={isLoading}
+            disabled={isConfirmDisabled}
             className={`${btnClasses[type]} inline-flex items-center justify-center whitespace-nowrap h-11 px-6 text-sm font-medium rounded-xl transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 disabled:pointer-events-none disabled:opacity-50 active:scale-95 ${!showCancel ? "w-full" : ""}`}
           >
             {isLoading ? "Memuat..." : confirmLabel}

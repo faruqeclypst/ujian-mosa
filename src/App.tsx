@@ -44,7 +44,7 @@ import { ExamDataProvider } from "./context/ExamDataContext";
 const StudentAuthGuard = ({ children }: { children: React.ReactNode }) => {
   const { student, loading } = useStudentAuth();
   if (loading) return <LoadingScreen />;
-  if (!student) return <Navigate to="/student/login" replace />;
+  if (!student) return <Navigate to="/" replace />;
   return <>{children}</>;
 };
 
@@ -176,14 +176,14 @@ const AppContent = () => {
               <Route index element={<DashboardPage />} />
               <Route path="subjects" element={<AdminOnlyRoute><SubjectsPage /></AdminOnlyRoute>} />
               <Route path="teachers" element={<AdminOnlyRoute><TeachersPage /></AdminOnlyRoute>} />
-              <Route path="student" element={<AdminOnlyRoute><StudentsPage /></AdminOnlyRoute>} />
+              <Route path="student" element={<StudentsPage />} />
               <Route path="alumni" element={<AdminOnlyRoute><AlumniPage /></AdminOnlyRoute>} />
               <Route path="classes" element={<AdminOnlyRoute><ClassesPage /></AdminOnlyRoute>} />
               <Route path="kelola-akun" element={<AdminOnlyRoute><UsersPage /></AdminOnlyRoute>} />
               <Route path="bank-soal" element={<ExamsPage />} />
-              <Route path="bank-soal/:examId/questions" element={<QuestionsPage />} />
+              <Route path="bank-soal/questions" element={<QuestionsPage />} />
               <Route path="ruang-ujian" element={<ExamRoomsPage />} />
-              <Route path="monitoring/:roomId" element={<MonitoringPage />} />
+              <Route path="monitoring" element={<MonitoringPage />} />
               <Route path="panduan" element={<GuidePage />} />
               <Route path="pengaturan" element={<AdminOnlyRoute><SettingsPage /></AdminOnlyRoute>} />
             </Route>

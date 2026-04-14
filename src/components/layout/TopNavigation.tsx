@@ -80,13 +80,15 @@ const TopNavigation = () => {
     };
   }, []);
 
-  // Listen for LOCKED attempts and Exam Rooms
   // Listen for LOCKED attempts and Exam Rooms from PocketBase
   useEffect(() => {
-    const fetchData = async () => {
+    let isMounted = true;
+
+    const fetchInitialData = async () => {
       try {
         // Fetch Exam Rooms for names mapping
         const rooms = await pb.collection('exam_rooms').getFullList();
+        if (!isMounted) return;
         const roomsMap: Record<string, any> = {};
         rooms.forEach((r: any) => { roomsMap[r.id] = r; });
         setExamRooms(roomsMap);
@@ -97,6 +99,7 @@ const TopNavigation = () => {
           expand: 'studentId'
         });
         
+        if (!isMounted) return;
         setLockedAttempts(locked.map((a: any) => ({
           id: a.id,
           nisn: a.expand?.studentId?.nisn || a.nisn || "N/A",
@@ -108,11 +111,56 @@ const TopNavigation = () => {
       } catch (e) {}
     };
 
-    fetchData();
-    const unsubRooms = pb.collection('exam_rooms').subscribe("*", fetchData);
-    const unsubAttempts = pb.collection('attempts').subscribe("*", fetchData);
+    fetchInitialData();
+
+    // Subscribe to Exam Rooms
+    const unsubRooms = pb.collection('exam_rooms').subscribe("*", (e) => {
+      if (!isMounted) return;
+      if (e.action === "delete") {
+        setExamRooms(prev => {
+          const next = { ...prev };
+          delete next[e.record.id];
+          return next;
+        });
+      } else {
+        setExamRooms(prev => ({ ...prev, [e.record.id]: e.record }));
+      }
+    });
+
+    // Subscribe to Attempts - ONLY update if status is LOCKED or changing from LOCKED
+    const unsubAttempts = pb.collection('attempts').subscribe("*", (e) => {
+      if (!isMounted) return;
+      
+      const record = e.record as any;
+      const isLocked = record.status === "LOCKED";
+      
+      setLockedAttempts(prev => {
+        const exists = prev.find(a => a.id === record.id);
+        
+        if (e.action === "delete" || !isLocked) {
+          if (exists) return prev.filter(a => a.id !== record.id);
+          return prev;
+        }
+        
+        // It's LOCKED and (create or update)
+        const mapped = {
+          id: record.id,
+          nisn: record.expand?.studentId?.nisn || record.nisn || "N/A",
+          studentId: record.studentId || record.student_id,
+          roomId: record.examRoomId || record.exam_room_id,
+          status: record.status,
+          expand: record.expand
+        };
+
+        if (exists) {
+          return prev.map(a => a.id === record.id ? mapped : a);
+        }
+        return [mapped, ...prev];
+      });
+    });
 
     return () => {
+      isMounted = false;
       unsubRooms.then(un => un());
       unsubAttempts.then(un => un());
     };

@@ -18,7 +18,10 @@ import {
   ChevronsRight,
   Eye,
   EyeOff,
-  Settings
+  Settings,
+  Timer,
+  Clock,
+  Trophy
 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import * as XLSX from "xlsx";
@@ -26,6 +29,7 @@ import { Button } from "../../components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../../components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../components/ui/table";
 import { Skeleton } from "../../components/ui/skeleton";
+import { cn } from "../../lib/utils";
 import pb from "../../lib/pocketbase";
 import { useExamData } from "../../context/ExamDataContext";
 import { useAuth } from "../../context/AuthContext";
@@ -57,6 +61,85 @@ export interface ExamRoomData {
   isActive?: boolean;
 }
 
+// 🕒 Real-time Student Timer Component
+const StudentTimer = ({ attempt, room }: { attempt: any, room: any }) => {
+  const [timeLeft, setTimeLeft] = useState<string>("--:--");
+
+  useEffect(() => {
+    if (!attempt || attempt.status !== "ongoing") {
+      if (attempt?.status === "finished") {
+        const start = new Date(attempt.startedAt || attempt.startTime || attempt.created).getTime();
+        const end = new Date(attempt.submittedAt || attempt.updated || Date.now()).getTime();
+        const diff = Math.max(0, end - start);
+        
+        const hrs = Math.floor(diff / (1000 * 60 * 60));
+        const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+        const secs = Math.floor((diff % (1000 * 60)) / 1000);
+        
+        const timeStr = hrs > 0 
+          ? `${hrs}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}` 
+          : `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        
+        setTimeLeft(`Selesai (${timeStr})`);
+      } else if (attempt?.status === "LOCKED") setTimeLeft("TERKUNCI");
+      else setTimeLeft("--:--");
+      return;
+    }
+
+    const calculateTime = () => {
+      const start = new Date(attempt.startedAt || attempt.startTime || attempt.created).getTime();
+      const durationMs = (room?.duration || 0) * 60 * 1000;
+      const endByDuration = start + durationMs;
+      
+      // Also respect room end_time if it's earlier than duration expiry
+      let finalEnd = endByDuration;
+      if (room?.end_time) {
+        const roomEnd = new Date(room.end_time).getTime();
+        if (roomEnd < finalEnd) finalEnd = roomEnd;
+      }
+
+      const now = Date.now();
+      const diff = finalEnd - now;
+
+      if (diff <= 0) {
+        setTimeLeft("HABIS");
+        return;
+      }
+
+      const hours = Math.floor(diff / (1000 * 60 * 60));
+      const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const secs = Math.floor((diff % (1000 * 60)) / 1000);
+
+      if (hours > 0) {
+        setTimeLeft(`${hours}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`);
+      } else {
+        setTimeLeft(`${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`);
+      }
+    };
+
+    calculateTime();
+    const timer = setInterval(calculateTime, 1000);
+    return () => clearInterval(timer);
+  }, [attempt, room]);
+
+  const iconColor = timeLeft === "HABIS" || timeLeft === "TERKUNCI" ? "text-rose-400" : 
+                    timeLeft.startsWith("Selesai") ? "text-emerald-400" : 
+                    "text-blue-400";
+
+  return (
+    <div className={`flex items-center gap-1.5 px-1.5 py-0.5 rounded-lg bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10 transition-all ${
+      timeLeft === "HABIS" || timeLeft === "TERKUNCI" ? "text-rose-600 border-rose-100 bg-rose-50" : 
+      timeLeft.startsWith("Selesai") ? "text-emerald-600 border-emerald-100 bg-emerald-50" : 
+      "text-blue-600 border-blue-50 bg-blue-50/30"
+    }`}>
+      <Timer className={`h-3 w-3 ${iconColor} ${attempt?.status === "ongoing" ? "animate-pulse" : ""}`} />
+      <span className="font-mono font-bold text-[9px] tracking-tight whitespace-nowrap">
+        {timeLeft}
+      </span>
+    </div>
+  );
+};
+
 // 🛡️ Fuzzy Match Helper for Short Answers
 const isFuzzyMatch = (studentAns: any, correctKey: string) => {
   if (typeof studentAns !== "string" || !correctKey) return false;
@@ -83,12 +166,21 @@ const isFuzzyMatch = (studentAns: any, correctKey: string) => {
 };
 
 const MonitoringPage = () => {
-  const { roomId } = useParams();
   const navigate = useNavigate();
+  const [roomId, setRoomId] = useState<string | null>(() => sessionStorage.getItem("activeMonitoringRoomId"));
+
+  useEffect(() => {
+    if (!roomId) {
+      // Jika nyasar kesini tanpa ID, balikin ke daftar ruangan
+      navigate("/admin/ruang-ujian", { replace: true });
+    }
+  }, [roomId, navigate]);
+
   const { user, role } = useAuth();
   const { classes: examClasses, students, subjects, teachers: masterTeachers, loading: dataLoading } = useExamData();
 
   const [loading, setLoading] = useState(true);
+  const isLoading = loading || dataLoading;
   const [monitorRoom, setMonitorRoom] = useState<ExamRoomData | null>(null);
   const [attempts, setAttempts] = useState<any[]>([]);
   const [monitorQuestions, setMonitorQuestions] = useState<any[]>([]);
@@ -101,9 +193,39 @@ const MonitoringPage = () => {
   const [monitorPageSize, setMonitorPageSize] = useState(25);
   const [monitorClassFilter, setMonitorClassFilter] = useState("all");
   const [monitorSortBy, setMonitorSortBy] = useState<"default" | "nama" | "nilai" | "login" | "status">("status");
+  const [monitorSortOrder, setMonitorSortOrder] = useState<"asc" | "desc">("desc");
+
+  const toggleSort = (key: typeof monitorSortBy) => {
+    if (monitorSortBy === key) {
+      setMonitorSortOrder(prev => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setMonitorSortBy(key);
+      setMonitorSortOrder(key === "nama" ? "asc" : "desc");
+    }
+    setMonitorPage(1);
+  };
   const [monitorTimeLeft, setMonitorTimeLeft] = useState(0);
   const [isMonitorRefreshing, setIsMonitorRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [leaderboardData, setLeaderboardData] = useState<any[]>([]);
+  const [isLeaderboardOpen, setIsLeaderboardOpen] = useState(false);
+  const [isLoadingLeaderboard, setIsLoadingLeaderboard] = useState(false);
+
+  const fetchLeaderboard = async () => {
+    if (!roomId) return;
+    setIsLoadingLeaderboard(true);
+    try {
+      const record = await pb.collection('leaderboards').getFirstListItem(`examRoomId="${roomId}"`);
+      if (record && record.data) {
+        setLeaderboardData(record.data);
+        setIsLeaderboardOpen(true);
+      }
+    } catch (e) {
+      alert("Peringkat belum dikalkulasi server. Tunggu beberapa menit (Cron berjalan setiap 10 menit).");
+    } finally {
+      setIsLoadingLeaderboard(false);
+    }
+  };
 
   // 📝 Real-time Live Score Calculator
   const getLiveScore = (sisAnswers: Record<string, any>, attOverrides: Record<string, boolean> = {}) => {
@@ -147,6 +269,38 @@ const MonitoringPage = () => {
     return total > 0 ? Math.round((correctCount / total) * 100) : 0;
   };
 
+  // 🛡️ Self-Healing Logic: Automatically fix 0 scores for FINISHED attempts
+  useEffect(() => {
+    if (isLoading || attempts.length === 0 || monitorQuestions.length === 0) return;
+
+    const fixScores = async () => {
+      const candidates = attempts.filter(a => 
+        a.status === "finished" && 
+        (a.score === 0 || a.score === undefined || a.score === null) && 
+        Object.keys(a.answers || {}).length > 0
+      );
+
+      if (candidates.length === 0) return;
+
+      // Only fix 5 at a time to prevent rate limiting
+      const chunk = candidates.slice(0, 5);
+      for (const att of chunk) {
+        const score = getLiveScore(att.answers, att.overrides || {});
+        if (score > 0) {
+          try {
+            await pb.collection('attempts').update(att.id, { score: score });
+            console.log(`Self-healed score for ${att.id}: ${score}`);
+          } catch (e) {
+            console.error("Failed to self-heal score", e);
+          }
+        }
+      }
+    };
+
+    const timer = setTimeout(fixScores, 2000);
+    return () => clearTimeout(timer);
+  }, [attempts, monitorQuestions, isLoading]);
+
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean;
     title: string;
@@ -154,6 +308,7 @@ const MonitoringPage = () => {
     type: "info" | "warning" | "danger" | "success";
     confirmLabel: string;
     onConfirm: () => void;
+    requireWord?: string;
   }>({
     isOpen: false,
     title: "",
@@ -348,7 +503,7 @@ const MonitoringPage = () => {
     startSubscribe();
     const polling = setInterval(() => {
       handleManualRefreshMonitor();
-    }, 20000);
+    }, 60000);
 
     return () => {
       isSubscribed = false;
@@ -371,7 +526,7 @@ const MonitoringPage = () => {
     setConfirmDialog({
       isOpen: true,
       title: "Reset Sesi",
-      description: "Hapus permanen progres siswa ini?",
+      description: "Hapus permanen progres pengerjaan siswa ini?",
       type: "danger",
       confirmLabel: "Reset",
       onConfirm: async () => {
@@ -388,6 +543,33 @@ const MonitoringPage = () => {
           
           showAlert("Berhasil", "Sesi direset.", "success");
         } catch (e) { showAlert("Gagal", "Error.", "danger"); }
+      }
+    });
+  };
+
+  const handleResetAllSessions = () => {
+    setConfirmDialog({
+      isOpen: true,
+      title: "RESET SEMUA SESI",
+      description: "Hapus secara PERMANEN semua data progres siswa di ruangan ini? Tindakan ini tidak dapat dibatalkan.",
+      type: "danger",
+      confirmLabel: "RESET SEMUA",
+      requireWord: "RESET",
+      onConfirm: async () => {
+        try {
+          const related = await pb.collection('attempts').getFullList({
+            filter: `examRoomId = "${roomId}"`
+          });
+          
+          const chunkSize = 10;
+          for (let i = 0; i < related.length; i += chunkSize) {
+            const chunk = related.slice(i, i + chunkSize);
+            await Promise.all(chunk.map(r => pb.collection('attempts').delete(r.id)));
+          }
+          
+          handleManualRefreshMonitor();
+          showAlert("Berhasil", "Seluruh sesi di ruangan ini telah di-reset.", "success");
+        } catch (e) { showAlert("Gagal", "Gagal me-reset sesi.", "danger"); }
       }
     });
   };
@@ -411,9 +593,13 @@ const MonitoringPage = () => {
       confirmLabel: "Selesaikan",
       onConfirm: async () => {
         try {
+          const att = attempts.find(a => a.id === attId);
+          const score = getLiveScore(att?.answers || {}, att?.overrides || {});
+          
           await pb.collection('attempts').update(attId, {
             status: "finished",
-            submitTime: new Date().toISOString()
+            submitTime: new Date().toISOString(),
+            score: score
           });
           showAlert("Berhasil", "Siswa dipaksa selesai.", "success");
         } catch (e) { showAlert("Gagal", "Gagal.", "danger"); }
@@ -569,7 +755,12 @@ const MonitoringPage = () => {
         const atts = attempts.filter(a => a.studentId === std.id || a.student_id === std.id);
         const att = atts.sort((ax, bx) => new Date(bx.created).getTime() - new Date(ax.created).getTime())[0];
         const answers = att?.answers || {};
-        const score = att?.score || 0;
+        let score = att?.score || 0;
+        
+        // Fallback for missing scores in finished attempts
+        if (att?.status === "finished" && score === 0) {
+          score = getLiveScore(answers, att?.overrides || {});
+        }
 
         const row = [
           { v: idx + 1, s: STYLES.cellCenter },
@@ -628,12 +819,14 @@ const MonitoringPage = () => {
           const chunkSize = 10;
           for (let i = 0; i < ongoing.length; i += chunkSize) {
             const chunk = ongoing.slice(i, i + chunkSize);
-            await Promise.all(chunk.map(a => 
-              pb.collection('attempts').update(a.id, { 
+            await Promise.all(chunk.map(a => {
+              const score = getLiveScore(a.answers || {}, a.overrides || {});
+              return pb.collection('attempts').update(a.id, { 
                 status: "finished", 
-                submitTime: new Date().toISOString() 
-              })
-            ));
+                submitTime: new Date().toISOString(),
+                score: score
+              });
+            }));
           }
           showAlert("Berhasil", "Seluruh pengerjaan telah diselesaikan.", "success");
         } catch (e) { showAlert("Gagal", "Error.", "danger"); }
@@ -641,7 +834,7 @@ const MonitoringPage = () => {
     });
   };
 
-  const isLoading = loading || dataLoading;
+
 
   const roomClassLabel = (() => {
     if (isLoading || !monitorRoom) return "...";
@@ -720,53 +913,67 @@ const MonitoringPage = () => {
           </div>
         </div>
       </div>
+ 
+      {/* 📊 Session Summary Cards - Now at the Top */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div className="group bg-card p-4 rounded-3xl border border-slate-200/60 dark:border-slate-800 shadow-sm hover:border-blue-500/30 transition-all flex items-center justify-between">
+          <div className="flex items-center gap-3.5">
+            <div className="p-3 rounded-2xl bg-blue-50 dark:bg-blue-900/10 text-blue-600 dark:text-blue-400 group-hover:scale-110 transition-transform">
+              <Users className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-0.5">Total Peserta</p>
+              <h4 className="text-xl font-black text-slate-800 dark:text-white leading-none">
+                {isLoading ? <Skeleton className="h-6 w-12" /> : (function() {
+                  const filteredArr = students.filter((s) => {
+                    if (monitorRoom?.allClasses) return true;
+                    const allowedIds = Array.isArray(monitorRoom?.classId) ? monitorRoom?.classId : String(monitorRoom?.classId || "").split(",");
+                    return allowedIds.includes(s.classId);
+                  });
+                  return filteredArr.length;
+                })()}
+              </h4>
+            </div>
+          </div>
+        </div>
+
+        <div className="group bg-card p-4 rounded-3xl border border-slate-200/60 dark:border-slate-800 shadow-sm hover:border-emerald-500/30 transition-all flex items-center justify-between">
+          <div className="flex items-center gap-3.5">
+            <div className="p-3 rounded-2xl bg-emerald-50 dark:bg-emerald-900/10 text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform">
+              <Monitor className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-0.5">Sedang Ujian</p>
+              <h4 className="text-xl font-black text-emerald-600 dark:text-emerald-400 leading-none">
+                {isLoading ? <Skeleton className="h-6 w-8" /> : attempts.filter(a => a.status === 'ongoing').length}
+              </h4>
+            </div>
+          </div>
+        </div>
+
+        <div className="group bg-card p-4 rounded-3xl border border-slate-200/60 dark:border-slate-800 shadow-sm hover:border-rose-500/30 transition-all flex items-center justify-between">
+          <div className="flex items-center gap-3.5">
+            <div className="p-3 rounded-2xl bg-rose-50 dark:bg-rose-900/10 text-rose-600 dark:text-rose-400 group-hover:scale-110 transition-transform">
+              <Lock className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-0.5">Terkunci</p>
+              <h4 className="text-xl font-black text-rose-600 dark:text-rose-400 leading-none">
+                {isLoading ? <Skeleton className="h-6 w-6" /> : attempts.filter(a => a.status === 'LOCKED').length}
+              </h4>
+            </div>
+          </div>
+        </div>
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {/* SIDEBAR - Enhanced & Integrated */}
         <div className="lg:col-span-1 space-y-6">
           <div className="bg-card p-5 rounded-3xl border border-slate-200/60 dark:border-slate-800 shadow-sm space-y-6 h-fit sticky top-24">
             <div>
-              <h3 className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2 mb-4 pl-1 border-l-2 border-blue-500 ml-1">
-                Ringkasan Sesi
+              <h3 className="text-[10px] font-bold text-slate-400 dark:text-slate-500 flex items-center gap-2 mb-4 uppercase tracking-widest pl-1 border-l-2 border-blue-500 ml-1">
+                Panel Filter & Aksi
               </h3>
-              <div className="grid grid-cols-1 gap-3">
-                <div className="flex items-center justify-between p-3 rounded-2xl bg-slate-50/50 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-800/60 group hover:border-blue-200 dark:hover:border-blue-800/40 transition-all">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2.5 rounded-xl bg-blue-50 dark:bg-blue-900/10 text-blue-600 dark:text-blue-400 group-hover:scale-110 transition-transform">
-                      <Users className="h-4 w-4" />
-                    </div>
-                    <span className="text-sm font-medium text-slate-600 dark:text-slate-400">Total Peserta</span>
-                  </div>
-                  <span className="text-lg font-semibold text-slate-800 dark:text-white leading-none">{isLoading ? <Skeleton className="h-5 w-8" /> : (function() {
-                    const filteredArr = students.filter((s) => {
-                      if (monitorRoom?.allClasses) return true;
-                      const allowedIds = Array.isArray(monitorRoom?.classId) ? monitorRoom?.classId : String(monitorRoom?.classId || "").split(",");
-                      return allowedIds.includes(s.classId);
-                    });
-                    return filteredArr.length;
-                  })()}</span>
-                </div>
-
-                <div className="flex items-center justify-between p-3 rounded-2xl bg-emerald-50/5 dark:bg-emerald-900/5 border border-emerald-50 dark:border-emerald-800/10 group hover:border-emerald-200 dark:hover:border-emerald-800/40 transition-all">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-900/10 text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform">
-                      <Monitor className="h-4 w-4" />
-                    </div>
-                    <span className="text-sm font-medium text-slate-600 dark:text-slate-400">Sedang Ujian</span>
-                  </div>
-                  <span className="text-lg font-semibold text-emerald-600 dark:text-emerald-400 leading-none">{isLoading ? <Skeleton className="h-5 w-6" /> : attempts.filter(a => a.status === 'ongoing').length}</span>
-                </div>
-
-                <div className="flex items-center justify-between p-3 rounded-2xl bg-rose-50/5 dark:bg-rose-900/5 border border-rose-50 dark:border-rose-800/10 group hover:border-rose-200 dark:hover:border-rose-800/40 transition-all">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2.5 rounded-xl bg-rose-50 dark:bg-rose-900/10 text-rose-600 dark:text-rose-400 group-hover:scale-110 transition-transform">
-                      <Lock className="h-4 w-4" />
-                    </div>
-                    <span className="text-sm font-medium text-slate-600 dark:text-slate-400">Terkunci</span>
-                  </div>
-                  <span className="text-lg font-semibold text-rose-600 dark:text-rose-400 leading-none">{isLoading ? <Skeleton className="h-5 w-4" /> : attempts.filter(a => a.status === 'LOCKED').length}</span>
-                </div>
-              </div>
             </div>
 
             <div className="pt-6 border-t border-slate-100 dark:border-slate-800/60 space-y-5">
@@ -810,20 +1017,31 @@ const MonitoringPage = () => {
                     className="w-full text-sm font-medium rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900 p-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/10 appearance-none cursor-pointer text-slate-700 dark:text-slate-200"
                   >
                     <option value="status">Status Ujian</option>
-                    <option value="nama">Nama (A-Z)</option>
-                    <option value="nilai">Nilai Tertinggi</option>
-                    <option value="login">Login Terbaru</option>
+                    <option value="nama">Nama</option>
+                    <option value="nilai">Nilai</option>
+                    <option value="login">Login</option>
                     <option value="default">Default</option>
                   </select>
                 </div>
               </div>
 
               <div className="pt-2 flex flex-col gap-2.5">
+                <Button 
+                  onClick={fetchLeaderboard}
+                  disabled={isLoadingLeaderboard}
+                  variant="secondary" 
+                  className="w-full rounded-xl bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-100 dark:bg-amber-900/20 dark:text-amber-400 dark:hover:bg-amber-900/40 dark:border-amber-800/40 font-semibold shadow-sm transition-all h-10"
+                >
+                  <Trophy className={cn("mr-2 h-4 w-4", isLoadingLeaderboard && "animate-spin")} /> Peringkat Server
+                </Button>
                 <Button onClick={handleExportExcel} variant="secondary" className="w-full rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 dark:hover:bg-emerald-900/40 dark:border-emerald-800/40 text-emerald-700 font-semibold shadow-sm transition-all h-10">
                   <FileSpreadsheet className="mr-2 h-4 w-4" /> Export Excel
                 </Button>
                 <Button onClick={handleForceSubmitAll} variant="secondary" className="w-full rounded-xl bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-100 dark:bg-rose-950/40 dark:text-rose-400 dark:border dark:border-rose-800/30 shadow-sm font-semibold h-10 transition-all">
                   <Users className="mr-2 h-4 w-4" /> Selesaikan Semua
+                </Button>
+                <Button onClick={handleResetAllSessions} variant="secondary" className="w-full rounded-xl bg-orange-50 text-orange-700 hover:bg-orange-100 border border-orange-100 dark:bg-orange-950/40 dark:text-orange-400 dark:border dark:border-orange-800/30 shadow-sm font-semibold h-10 transition-all">
+                  <RefreshCw className="mr-2 h-4 w-4" /> Reset Semua Sesi
                 </Button>
               </div>
             </div>
@@ -838,30 +1056,36 @@ const MonitoringPage = () => {
                   <TableRow>
                     <TableHead className="w-12 text-center">No</TableHead>
                     <TableHead 
-                      className="cursor-pointer hover:text-blue-600 transition-colors group"
-                      onClick={() => setMonitorSortBy("nama")}
+                      className="cursor-pointer hover:text-blue-600 transition-colors group select-none"
+                      onClick={() => toggleSort("nama")}
                     >
                       <div className="flex items-center gap-1.5">
                         Nama Siswa
-                        <ChevronDown className={`h-3 w-3 transition-opacity ${monitorSortBy === 'nama' ? 'opacity-100' : 'opacity-0 group-hover:opacity-40'}`} />
+                        {monitorSortBy === 'nama' ? (
+                          monitorSortOrder === 'asc' ? <ChevronDown className="h-3 w-3 text-blue-600" /> : <ChevronDown className="h-3 w-3 text-blue-600 rotate-180" />
+                        ) : <ChevronDown className="h-3 w-3 opacity-0 group-hover:opacity-40" />}
                       </div>
                     </TableHead>
                     <TableHead 
-                      className="cursor-pointer hover:text-blue-600 transition-colors group"
-                      onClick={() => setMonitorSortBy("status")}
+                      className="cursor-pointer hover:text-blue-600 transition-colors group select-none"
+                      onClick={() => toggleSort("status")}
                     >
                       <div className="flex items-center gap-1.5">
                         Status
-                        <ChevronDown className={`h-3 w-3 transition-opacity ${monitorSortBy === 'status' ? 'opacity-100' : 'opacity-0 group-hover:opacity-40'}`} />
+                        {monitorSortBy === 'status' ? (
+                          monitorSortOrder === 'asc' ? <ChevronDown className="h-3 w-3 text-blue-600" /> : <ChevronDown className="h-3 w-3 text-blue-600 rotate-180" />
+                        ) : <ChevronDown className="h-3 w-3 opacity-0 group-hover:opacity-40" />}
                       </div>
                     </TableHead>
                     <TableHead 
-                      className="text-center cursor-pointer hover:text-blue-600 transition-colors group"
-                      onClick={() => setMonitorSortBy("nilai")}
+                      className="text-center cursor-pointer hover:text-blue-600 transition-colors group select-none"
+                      onClick={() => toggleSort("nilai")}
                     >
                       <div className="flex items-center justify-center gap-1.5">
                         Nilai
-                        <ChevronDown className={`h-3 w-3 transition-opacity ${monitorSortBy === 'nilai' ? 'opacity-100' : 'opacity-0 group-hover:opacity-40'}`} />
+                        {monitorSortBy === 'nilai' ? (
+                          monitorSortOrder === 'asc' ? <ChevronDown className="h-3 w-3 text-blue-600" /> : <ChevronDown className="h-3 w-3 text-blue-600 rotate-180" />
+                        ) : <ChevronDown className="h-3 w-3 opacity-0 group-hover:opacity-40" />}
                       </div>
                     </TableHead>
                     <TableHead className="text-center">Progres</TableHead>
@@ -903,23 +1127,28 @@ const MonitoringPage = () => {
                         return true;
                       })
                       .sort((a, b) => {
-                        const attA = attempts.find(at => at.studentId === a.id);
-                        const attB = attempts.find(at => at.studentId === b.id);
-                        if (monitorSortBy === "nilai") return (attB?.score || 0) - (attA?.score || 0);
-                        if (monitorSortBy === "login") return new Date(attB?.startTime || 0).getTime() - new Date(attA?.startTime || 0).getTime();
-                        if (monitorSortBy === "status") {
+                        const attA = attempts.find(at => at.studentId === a.id || at.student_id === a.id);
+                        const attB = attempts.find(at => at.studentId === b.id || at.student_id === b.id);
+                        
+                        let comparison = 0;
+                        if (monitorSortBy === "nilai") {
+                          comparison = (attA?.score || 0) - (attB?.score || 0);
+                        } else if (monitorSortBy === "login") {
+                          comparison = new Date(attA?.startTime || 0).getTime() - new Date(attB?.startTime || 0).getTime();
+                        } else if (monitorSortBy === "status") {
                           const getStatusRank = (status?: string) => {
                             if (status === "LOCKED") return 3;
                             if (status === "ongoing") return 2;
                             if (status === "finished") return 1;
-                            return 0; // Not started
+                            return 0;
                           };
-                          const rankA = getStatusRank(attA?.status);
-                          const rankB = getStatusRank(attB?.status);
-                          if (rankA !== rankB) return rankB - rankA;
-                          return a.name.localeCompare(b.name);
+                          comparison = getStatusRank(attA?.status) - getStatusRank(attB?.status);
+                        } else if (monitorSortBy === "nama") {
+                          comparison = a.name.localeCompare(b.name);
                         }
-                        return a.name.localeCompare(b.name);
+
+                        if (comparison === 0) comparison = a.name.localeCompare(b.name);
+                        return monitorSortOrder === "asc" ? comparison : -comparison;
                       });
 
                     const startIndex = (monitorPage - 1) * monitorPageSize;
@@ -943,24 +1172,33 @@ const MonitoringPage = () => {
                                 <span className="text-[10px] text-slate-500 font-medium">{student.nisn} • {student.className}</span>
                               </div>
                             </TableCell>
-                            <TableCell>
+                            <TableCell className="text-center">
                               {attempt ? (
-                                <div className="flex items-center gap-1.5">
-                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${attempt.status === "finished" ? "bg-green-50 text-green-700 border-green-200" :
-                                    attempt.status === "LOCKED" ? "bg-rose-50 text-rose-700 border-rose-200" :
-                                      "bg-blue-50 text-blue-700 border-blue-200"
+                                <div className="flex flex-col items-center gap-1.5">
+                                  <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black tracking-wider border shadow-sm ${attempt.status === "finished" ? "bg-emerald-500 text-white border-emerald-400" :
+                                    attempt.status === "LOCKED" ? "bg-rose-500 text-white border-rose-400" :
+                                      "bg-blue-600 text-white border-blue-500"
                                     }`}>
                                     {attempt.status?.toUpperCase() || "AKTIF"}
                                   </span>
+                                  <StudentTimer attempt={attempt} room={monitorRoom} />
                                 </div>
-                              ) : <span className="text-[10px] text-slate-400 italic">Belum Login</span>}
+                              ) : <span className="text-[10px] text-slate-400 font-bold italic">OFFLINE</span>}
                             </TableCell>
                             <TableCell className="text-center font-bold">
                               {(() => {
                                 if (!attempt) return "-";
-                                if (attempt.status === "finished") return <span className="text-emerald-600">{attempt.score}</span>;
                                 
+                                // Calculate live score for display
                                 const liveScore = getLiveScore(sisAnswers, attempt.overrides || {});
+                                
+                                if (attempt.status === "finished") {
+                                  // If status is finished but score is 0, it might be a forced finish without calculation
+                                  // We show the live score if it's > 0 or if the stored score is explicitly 0
+                                  const finalScore = (attempt.score === 0 && liveScore > 0) ? liveScore : (attempt.score || 0);
+                                  return <span className="text-emerald-600">{finalScore}</span>;
+                                }
+                                
                                 return <span className="text-indigo-600 animate-pulse-subtle">{liveScore}</span>;
                               })()}
                             </TableCell>
@@ -1221,12 +1459,94 @@ const MonitoringPage = () => {
       <ConfirmationDialog
         isOpen={confirmDialog.isOpen}
         onClose={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
-        onConfirm={async () => { await confirmDialog.onConfirm(); setConfirmDialog(prev => ({ ...prev, isOpen: false })); }}
+        onConfirm={async () => {
+          await confirmDialog.onConfirm();
+          setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+        }}
         title={confirmDialog.title}
         description={confirmDialog.description}
         type={confirmDialog.type}
         confirmLabel={confirmDialog.confirmLabel}
+        requireWord={confirmDialog.requireWord}
       />
+
+      {/* 🏆 Leaderboard Server Dialog */}
+      <Dialog open={isLeaderboardOpen} onOpenChange={setIsLeaderboardOpen}>
+        <DialogContent className="max-w-3xl bg-card border-none shadow-2xl overflow-hidden p-0">
+          <DialogHeader className="p-6 pb-2">
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-amber-100 dark:bg-amber-900/30 rounded-2xl">
+                <Trophy className="h-6 w-6 text-amber-600" />
+              </div>
+              <div>
+                <DialogTitle className="text-xl font-bold">Peringkat Server (Live)</DialogTitle>
+                <p className="text-xs text-slate-500 italic">Data ini diperbarui otomatis setiap 10 menit oleh server.</p>
+              </div>
+            </div>
+          </DialogHeader>
+
+          <div className="p-6 pt-2 max-h-[70vh] overflow-y-auto">
+            <div className="rounded-2xl border border-slate-100 dark:border-slate-800 overflow-hidden">
+              <Table>
+                <TableHeader className="bg-slate-50 dark:bg-slate-900">
+                  <TableRow>
+                    <TableHead className="w-16 text-center text-[10px] uppercase font-bold tracking-wider">Rank</TableHead>
+                    <TableHead className="text-[10px] uppercase font-bold tracking-wider">Nama Siswa</TableHead>
+                    <TableHead className="text-center text-[10px] uppercase font-bold tracking-wider">Skor</TableHead>
+                    <TableHead className="text-center text-[10px] uppercase font-bold tracking-wider">Waktu</TableHead>
+                    <TableHead className="text-right text-[10px] uppercase font-bold tracking-wider">Selesai</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {leaderboardData
+                    .filter(item => {
+                      if (monitorClassFilter === "all") return true;
+                      
+                      // Cari data siswa di local state 'students' untuk cek kelasnya
+                      const student = students.find(s => s.nisn === item.nisn || s.name === item.name);
+                      if (!student) return true; // Jika tidak ketemu, tetap tampilkan
+                      
+                      const studentClass = examClasses.find(c => c.id === student.classId)?.name;
+                      return studentClass === monitorClassFilter;
+                    })
+                    .map((item: any, idx: number) => (
+                      <TableRow key={idx} className={cn(
+                        idx === 0 ? "bg-amber-50/50 dark:bg-amber-900/10" : 
+                        idx === 1 ? "bg-slate-50/50 dark:bg-slate-900/10" : ""
+                      )}>
+                        <TableCell className="text-center font-bold">
+                          {idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : idx + 1}
+                        </TableCell>
+                      <TableCell>
+                        <div className="flex flex-col">
+                          <span className="font-bold text-sm text-slate-800 dark:text-slate-100 leading-tight">{item.name}</span>
+                          <span className="text-[10px] text-slate-400 font-mono italic">{item.nisn}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <span className="px-2 py-0.5 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 font-bold text-sm border border-blue-100 dark:border-blue-800/40">
+                          {item.score}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-center font-mono text-xs text-slate-600 dark:text-slate-300">
+                        {Math.floor(item.usedTime / 60)}m {item.usedTime % 60}d
+                      </TableCell>
+                      <TableCell className="text-right text-[10px] text-slate-400">
+                        {item.finishedAt ? new Date(item.finishedAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : "-"}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {leaderboardData.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={5} className="h-40 text-center text-slate-400 italic">Data ranking kosong. Pastikan ada siswa yang sudah selesai.</TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Zoom Image Dialog */}
       <Dialog open={!!previewImage} onOpenChange={() => setPreviewImage(null)}>

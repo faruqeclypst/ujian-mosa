@@ -110,10 +110,19 @@ const Sidebar = () => {
   const filteredNavigation = React.useMemo(() => {
     if (role === "admin") return navigation;
     
-    // Default/Teacher role: Filter out Master Data and System
-    return navigation.filter(item => 
-      item.label !== "Master Data" && item.label !== "Sistem"
-    );
+    // Default/Teacher role: Filter out System, but allow Master Data -> Data Siswa only
+    return navigation
+      .filter(item => item.label !== "Sistem")
+      .map(item => {
+        if (item.label === "Master Data") {
+          return {
+            ...item,
+            children: item.children?.filter(child => child.label === "Data Siswa")
+          };
+        }
+        return item;
+      })
+      .filter(item => item.label !== "Master Data" || (item.children && item.children.length > 0));
   }, [role]);
 
   if (loading) return <SidebarSkeleton isCollapsed={isCollapsed} />;

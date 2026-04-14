@@ -14,6 +14,7 @@ import { ConfirmationDialog } from "../../components/ui/confirmation-dialog";
 import { DataTable } from "../../components/ui/data-table";
 import { Skeleton } from "../../components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../components/ui/table";
+import { useToast } from "../../components/ui/toast";
 
 export interface ExamData {
   id: string;
@@ -74,7 +75,8 @@ const columns = [
 
 const ExamsPage = () => {
   const navigate = useNavigate();
-  const { user, role } = useAuth();
+  const { user, role, teacherId } = useAuth();
+  const { addToast } = useToast();
   const { subjects, teachers, loading: dataLoading } = useExamData();
   const [exams, setExams] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -107,16 +109,22 @@ const ExamsPage = () => {
     onConfirm: () => {}
   });
 
-  const showAlert = (title: string, description: string, type: "success" | "danger" | "warning" | "info" = "info") => {
-    setConfirmDialog({
-      isOpen: true,
-      title,
-      description,
-      type,
-      confirmLabel: "OK",
-      onConfirm: () => {}
-    });
+
+
+  const showAlert = (title: string, description: string, type: "success" | "danger" | "warning" | "info" = "info", onConfirm?: () => void) => {
+    if (!onConfirm && (type === "success" || type === "info")) {
+      addToast({ type, title, description });
+      return;
+    }
+    setConfirmDialog({ isOpen: true, title, description, type, confirmLabel: "OK", onConfirm: onConfirm || (() => { }) });
   };
+
+  const isOwner = useCallback((exam: any) => {
+    if (role === "admin") return true;
+    if (!teacherId) return false;
+    // Dukung format lama (user?.id) dan baru (teacherId)
+    return exam.teacherId === teacherId || exam.teacherId === user?.id;
+  }, [role, teacherId, user]);
 
   const handleArchiveExam = (exam: any) => {
     if (activeExamIds.includes(exam.id)) {
@@ -211,10 +219,10 @@ const ExamsPage = () => {
         });
 
         // Filter role jika bukan admin
-        if (role !== "admin" && user?.id) {
+        if (role !== "admin" && teacherId) {
           mapped.sort((a, b) => {
-            const isAOwner = (a as any).teacherId === user.id ? 1 : 0;
-            const isBOwner = (b as any).teacherId === user.id ? 1 : 0;
+            const isAOwner = (a as any).teacherId === teacherId ? 1 : 0;
+            const isBOwner = (b as any).teacherId === teacherId ? 1 : 0;
             return isBOwner - isAOwner;
           });
         }
@@ -241,7 +249,7 @@ const ExamsPage = () => {
     setFormValues({ 
       title: "", 
       subjectId: "", 
-      teacherId: role === "admin" ? "" : (user?.id || ""), 
+      teacherId: role === "admin" ? "" : (teacherId || ""), 
       examType: "Latihan Biasa" 
     });
     setIsDialogOpen(true);
@@ -403,13 +411,16 @@ const ExamsPage = () => {
                 <div className="flex justify-end gap-1.5 items-center whitespace-nowrap">
                   <button 
                     className="p-1.5 bg-purple-50 text-purple-700 hover:bg-purple-100 rounded-lg dark:bg-purple-900/10 dark:text-purple-400 border border-purple-100 dark:border-purple-800/40" 
-                    onClick={() => navigate(`/admin/bank-soal/${exam.id}/questions`)}
+                    onClick={() => {
+                      sessionStorage.setItem("activeQuestionsExamId", exam.id);
+                      navigate(`/admin/bank-soal/questions`);
+                    }}
                     title="Kelola Soal"
                   >
                     <BookOpen className="h-4 w-4" />
                   </button>
                   
-                  {(role === "admin" || exam.teacherId === user?.id) && (
+                  {isOwner(exam) && (
                     <>
                       {activeTab === "aktif" ? (
                         <button 

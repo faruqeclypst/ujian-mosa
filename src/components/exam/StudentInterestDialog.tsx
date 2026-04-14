@@ -156,13 +156,18 @@ const StudentInterestDialog = ({ isOpen, onClose, studentId, studentName }: Stud
 
                         <div className="space-y-4">
                            <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                              <Landmark className="h-4 w-4" /> Jalur Kedinasan:
+                              <Landmark className="h-4 w-4" /> {res.pathTitle}:
                            </h4>
                            <div className="flex gap-4">
                               <div className="w-1 h-auto bg-slate-100 dark:bg-slate-800 rounded-full" />
-                              <p className="text-sm font-bold text-slate-600 dark:text-slate-300 italic leading-relaxed">
-                                {res.kedinasanSaran}
-                              </p>
+                              <div className="space-y-1">
+                                <p className="text-sm font-bold text-slate-600 dark:text-slate-300 italic leading-relaxed">
+                                  {res.pathSaran}
+                                </p>
+                                <p className="text-[10px] text-slate-400 font-medium leading-relaxed">
+                                  {res.pathDetail}
+                                </p>
+                              </div>
                            </div>
                         </div>
 
