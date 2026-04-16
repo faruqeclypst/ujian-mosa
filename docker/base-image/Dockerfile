@@ -7,7 +7,8 @@ RUN apk add --no-cache \
     unzip \
     wget \
     bash \
-    tzdata
+    tzdata \
+    docker-cli
 
 # Set working directory
 WORKDIR /pb
@@ -27,6 +28,10 @@ COPY ./pb_hooks /pb/pb_hooks
 # Copy static frontend files (pre-built)
 # Assuming 'dist' directory exists on the host during build
 COPY ./dist /pb/pb_public
+
+# Copy deployment scripts
+COPY ./docker/scripts /pb/scripts
+RUN chmod +x /pb/scripts/*.sh
 
 # Default environment variables
 ENV PB_PORT=8080

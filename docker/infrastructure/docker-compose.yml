@@ -6,6 +6,7 @@ services:
     volumes:
       - pb_master_data:/pb/pb_data
       - /var/run/docker.sock:/var/run/docker.sock # Allows master to control docker
+      - .:/pb/infrastructure # Allows master to update Caddy config
     environment:
       - PORT=8080
     networks:
