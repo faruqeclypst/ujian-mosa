@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { ReactNode } from "react";
+import { useTenant } from "../../context/TenantContext";
 
 // List of allowed user agents (case-insensitive substrings)
 const ALLOWED_USER_AGENTS = [
@@ -25,15 +26,14 @@ declare global {
   }
 }
 
-import pb from "../../lib/pocketbase";
-
 const ExambroGuard = ({ children }: ExambroGuardProps) => {
   const [isExambro, setIsExambro] = useState<boolean | null>(null);
+  const { pb } = useTenant();
 
   useEffect(() => {
     const checkExambro = async () => {
+      if (!pb) { setIsExambro(true); return; } // No school PB = landing page, allow
       try {
-        // Fetch settings - ideally this would be from a context, but we'll fetch it here for simplicity
         const records = await pb.collection("settings").getFullList({
           limit: 1,
           sort: "created",

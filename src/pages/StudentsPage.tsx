@@ -26,6 +26,7 @@ import {
   DropdownMenuLabel
 } from "../components/ui/dropdown-menu";
 import { useAuth } from "../context/AuthContext";
+import { useTenant } from "../context/TenantContext";
 import { useExamData } from "../context/ExamDataContext";
 import { Button } from "../components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "../components/ui/dialog";
@@ -44,6 +45,7 @@ import StudentInterestDialog from "../components/exam/StudentInterestDialog";
 
 const StudentsPage = () => {
   const { role } = useAuth();
+  const { school } = useTenant();
   const { students, classes, loading, createStudent, updateStudent, deleteStudent } = useExamData();
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -124,6 +126,16 @@ const StudentsPage = () => {
   };
 
   const handleSubmitStudent = async (values: StudentFormValues) => {
+    const quota = school?.student_quota || 250;
+    const planName = school?.plan ? school.plan.charAt(0).toUpperCase() + school.plan.slice(1) : "Free";
+    
+    // Cek Batasan Kuota Hanya Jika Menambah Siswa Baru
+    if (dialogMode === "create") {
+      if (students.length >= quota) {
+        return showAlert("Batas Kuota Tercapai", `Maaf, penambahan gagal. Sekolah Anda hanya memiliki kapasitas kuota untuk Maksimal ${quota} Siswa sesuai paket berlangganan ${planName}. Silakan hubungi tim helpdesk E-Ujian untuk melakukan Upgrade Kuota.`, "warning");
+      }
+    }
+
     try {
       if (dialogMode === "edit" && selectedStudent) {
         await updateStudent(selectedStudent.id, values);
@@ -168,6 +180,17 @@ const StudentsPage = () => {
       
       if (newEntries.length === 0 && skipped.length === 0) {
         return showAlert("Batal", `Semua NISN di file (${results.length}) sudah terdaftar.`, "warning");
+      }
+
+      // Validasi Kapasitas Kuota SaaS
+      const quota = school?.student_quota || 250;
+      const planName = school?.plan ? school.plan.charAt(0).toUpperCase() + school.plan.slice(1) : "Free";
+      if (students.length + newEntries.length > quota) {
+        return showAlert(
+          "Melebihi Kuota Langganan", 
+          `Gagal mengimpor data. Anda mencoba menambahkan ${newEntries.length} siswa baru, tapi sisa kuota paket ${planName} Anda tinggal ${Math.max(0, quota - students.length)} siswa (Batas maksimal: ${quota}). Harap sesuaikan file Excel Anda atau hubungi admin platform untuk Upgrade Kuota.`, 
+          "danger"
+        );
       }
 
       setBatchProgress({
@@ -239,12 +262,14 @@ const StudentsPage = () => {
   [selectedStudent]);
 
   const filteredStudents = useMemo(() => {
-    let result = students;
+    // 🛡️ Filter: Jangan tampilkan siswa yang sudah Lulus (ALUMNI) di daftar Siswa Aktif
+    let result = students.filter(s => s.classId !== "ALUMNI");
+
     if (filterClassId === "NONE") {
        const validClassIds = classes.map(c => c.id);
-       result = students.filter(s => !s.classId || !validClassIds.includes(s.classId));
+       result = result.filter(s => !s.classId || !validClassIds.includes(s.classId));
     } else if (filterClassId !== "ALL") {
-      result = students.filter(s => s.classId === filterClassId);
+      result = result.filter(s => s.classId === filterClassId);
     }
     
     return [...result].sort((a, b) => a.name.localeCompare(b.name));

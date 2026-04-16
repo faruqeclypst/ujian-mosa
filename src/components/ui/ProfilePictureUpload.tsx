@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import pb from "../../lib/pocketbase";
 import { uploadInventoryImage, deleteImageFromStorage } from "../../lib/storage";
 import { useAuth } from "../../context/AuthContext";
+import { useTenant } from "../../context/TenantContext";
 import { useToast } from "../../components/ui/toast";
 
 import { cn } from "../../lib/utils";
@@ -24,6 +25,7 @@ const ProfilePictureUpload = ({
   showUploadButton = true
 }: ProfilePictureUploadProps) => {
   const { user } = useAuth();
+  const { school } = useTenant();
   const { addToast } = useToast();
   const [isUploading, setIsUploading] = useState(false);
   const [previewURL, setPreviewURL] = useState<string | null>(null);
@@ -73,7 +75,8 @@ const ProfilePictureUpload = ({
     setIsUploading(true);
     try {
       // 1. Upload ke Storage (R2/PocketBase via uploadInventoryImage)
-      const uploadRes = await uploadInventoryImage("profiles", file);
+      const schoolFolder = school?.slug || "unknown";
+      const uploadRes = await uploadInventoryImage(`schools/${schoolFolder}/profiles`, file);
       const downloadURL = uploadRes.url;
 
       // 2. Update record user di PocketBase
@@ -218,4 +221,4 @@ const ProfilePictureUpload = ({
   );
 };
 
-export default ProfilePictureUpload;
+export default ProfilePictureUpload;

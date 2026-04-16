@@ -5,11 +5,12 @@ import { Input } from "../../components/ui/input";
 import FormField from "../../components/forms/FormField";
 import { Card, CardContent } from "../../components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../../components/ui/dialog";
-import pb from "../../lib/pocketbase";
+import { useTenant } from "../../context/TenantContext";
 import { User, Lock, GraduationCap, School, Eye, EyeOff } from "lucide-react";
 
 const StudentLoginPage = () => {
   const { loginStudent, student, changePassword } = useStudentAuth();
+  const { pb, school } = useTenant();
 
   const [nisn, setNisn] = useState("");
   const [password, setPassword] = useState("");
@@ -31,6 +32,7 @@ const StudentLoginPage = () => {
 
   useEffect(() => {
     const fetchSettings = async () => {
+      if (!pb) { setLogoLoading(false); return; }
       try {
         setLogoLoading(true);
         const records = await pb.collection("settings").getFullList({

@@ -2,6 +2,8 @@
 @tailwind components;
 @tailwind utilities;
 
+@import "katex/dist/katex.min.css";
+
 :root {
   /* Light theme - Basic Tailwind Colors */
   --background: 0 0% 100%; /* white */
@@ -206,4 +208,32 @@ body {
   50% {
     opacity: 0.6;
   }
+}
+
+/* 🏆 Premium Math & KaTeX Enhancements */
+.premium-math {
+  font-size: 1.05em;
+  line-height: 1.5;
+}
+
+.premium-math .katex {
+  font-size: 1.15em !important;
+  color: inherit;
+  white-space: nowrap;
+}
+
+.premium-math .katex-display {
+  margin: 1.25em 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.5em 0;
+}
+
+/* Fix for small symbols in inline mode when using \displaystyle */
+.premium-math .katex .mtable {
+  vertical-align: middle !important;
+}
+
+.dark .premium-math .katex {
+  color: #f8fafc; /* slate-50 */
 }

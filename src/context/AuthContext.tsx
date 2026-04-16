@@ -7,7 +7,7 @@ import {
   useMemo,
   useState,
 } from "react";
-import pb from "../lib/pocketbase";
+import { useTenant } from "./TenantContext";
 
 interface UserData {
   id: string;
@@ -32,15 +32,20 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
+  const { pb, loading: tenantLoading } = useTenant();
   const [user, setUser] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Sync state dengan PocketBase AuthStore
   useEffect(() => {
+    // Tunggu tenant PB selesai di-resolve sebelum cek auth
+    if (tenantLoading || !pb) {
+      if (!tenantLoading) setLoading(false);
+      return;
+    }
+
     const initAuth = () => {
       if (pb.authStore.isValid && pb.authStore.model) {
         const model = pb.authStore.model;
-        // Cek apakah ini login Admin/Guru (dari koleksi 'users')
         if (model.collectionName === "users") {
           setUser({
             id: model.id,
@@ -51,6 +56,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             avatar: model.avatar ? pb.files.getUrl(model, model.avatar) : "",
           });
         }
+      } else {
+        setUser(null);
       }
       setLoading(false);
     };
@@ -60,40 +67,43 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return pb.authStore.onChange(() => {
       initAuth();
     });
-  }, []);
+  }, [pb, tenantLoading]);
 
-  const signInWithUsername = useCallback(async (username: string, password: string) => {
-    try {
-      // Di PocketBase 'users', login bisa pakai email atau username
-      await pb.collection("users").authWithPassword(username, password);
-    } catch (err: any) {
-      throw new Error(err.message || "Email atau Password Admin salah!");
-    }
-  }, []);
+  const signInWithUsername = useCallback(
+    async (username: string, password: string) => {
+      if (!pb) throw new Error("Koneksi ke sekolah belum tersedia.");
+      try {
+        await pb.collection("users").authWithPassword(username, password);
+      } catch (err: any) {
+        throw new Error(err.message || "Email atau Password Admin salah!");
+      }
+    },
+    [pb]
+  );
 
   const registerWithUsername = useCallback(
     async (username: string, password: string, displayName?: string) => {
+      if (!pb) throw new Error("Koneksi ke sekolah belum tersedia.");
       try {
         await pb.collection("users").create({
           username,
           password,
           passwordConfirm: password,
           name: displayName,
-          role: "teacher", // Default role untuk registrasi baru
+          role: "teacher",
         });
       } catch (err: any) {
         throw new Error("Gagal registrasi: " + err.message);
       }
     },
-    []
+    [pb]
   );
 
   const signOut = useCallback(async () => {
-    pb.authStore.clear();
+    pb?.authStore.clear();
     setUser(null);
-    // Bersihkan URL dan kembali ke halaman login utama
-    window.location.href = "/admin";
-  }, []);
+    window.location.href = `${window.location.origin}/admin`;
+  }, [pb]);
 
   const value = useMemo<AuthContextValue>(
     () => ({

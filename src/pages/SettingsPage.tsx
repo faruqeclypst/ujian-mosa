@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import pb from "../lib/pocketbase";
+import { useTenant } from "../context/TenantContext";
 import { uploadInventoryImage } from "../lib/storage"; 
 import { AI_MODELS, testAIConnection } from "../lib/ai";
 import { Skeleton } from "../components/ui/skeleton";
@@ -39,13 +39,18 @@ const COLLECTIONS = [
 ];
 
 const SettingsPage = () => {
+  const { pb, school } = useTenant();
+  
   const [settingsId, setSettingsId] = useState<string | null>(null);
   const [schoolName, setSchoolName] = useState("");
   const [schoolLogo, setSchoolLogo] = useState("");
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [groqApiKey, setGroqApiKey] = useState("");
+  const [aiGatewayUrl, setAiGatewayUrl] = useState("");
+  const [aiGatewayKey, setAiGatewayKey] = useState("");
   const [aiModel, setAiModel] = useState(AI_MODELS[0].id);
+  const [aiProvider, setAiProvider] = useState("groq");
   const [isExambroEnabled, setIsExambroEnabled] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -89,6 +94,7 @@ const SettingsPage = () => {
   ];
 
   const fetchSettings = async () => {
+    if (!pb) return;
     try {
       setLoading(true);
       const records = await pb.collection("settings").getFullList({
@@ -101,7 +107,10 @@ const SettingsPage = () => {
         setSettingsId(data.id);
         setSchoolName(data.name || "E-Ujian");
         setGroqApiKey(data.groq_api_key || "");
+        setAiGatewayUrl(data.ai_gateway_url || "");
+        setAiGatewayKey(data.ai_gateway_key || "");
         setAiModel(data.ai_model || AI_MODELS[0].id);
+        setAiProvider(data.ai_provider || "groq");
         setIsExambroEnabled(data.is_exambro_enabled ?? false);
         
         const logoUrl = data.logoUrl || data.logo || "";
@@ -128,7 +137,9 @@ const SettingsPage = () => {
     setIsTestingAI(true);
     setTestResult(null);
     try {
-      const res = await testAIConnection(groqApiKey, aiModel);
+      const isOllama = aiProvider === "ollama";
+      const targetKey = isOllama ? (aiGatewayKey || groqApiKey) : groqApiKey;
+      const res = await testAIConnection(targetKey, aiModel, aiGatewayUrl || "https://ollama.com", aiProvider);
       setTestResult(res);
       if (res.success) {
         addToast({ title: "Berhasil!", description: "Koneksi AI berjalan lancar.", type: "success" });
@@ -143,6 +154,7 @@ const SettingsPage = () => {
   };
 
   const loadGalleryImages = async () => {
+    if (!pb) return;
     try {
       const qRecords = await pb.collection("questions").getFullList({
         filter: 'imageUrl != "" || image != ""',
@@ -163,6 +175,18 @@ const SettingsPage = () => {
   useEffect(() => {
     fetchSettings();
   }, []);
+
+  // 🤖 Auto-switch model when provider changes
+  useEffect(() => {
+    if (!loading) {
+      const availableModels = AI_MODELS.filter(m => (m as any).provider === aiProvider);
+      const isCurrentModelValid = availableModels.some(m => m.id === aiModel);
+      
+      if (!isCurrentModelValid && availableModels.length > 0) {
+        setAiModel(availableModels[0].id);
+      }
+    }
+  }, [aiProvider, loading]);
 
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -185,7 +209,9 @@ const SettingsPage = () => {
 
       if (logoFile) {
         try {
-          const uploadRes = await uploadInventoryImage("school", logoFile);
+          // 🛡️ Isolation: Kelompokkan logo berdasarkan slug sekolah
+          const schoolFolder = school?.slug || "unknown";
+          const uploadRes = await uploadInventoryImage(`schools/${schoolFolder}/identity`, logoFile);
           if (uploadRes && uploadRes.url) {
             finalLogoUrl = uploadRes.url;
           }
@@ -203,20 +229,40 @@ const SettingsPage = () => {
         return;
       }
 
+      // 🛡️ Robust Payload: Menghindari error 400 Bad Request karena schema mismatch
       const payload: any = {
-        name: schoolName,
-        logo: finalLogoUrl,
-        logoUrl: finalLogoUrl, // Keep synced
-        allowed_types: allowedTypes,
-        groq_api_key: groqApiKey,
-        ai_model: aiModel,
-        is_exambro_enabled: isExambroEnabled
+        name: schoolName || "E-Ujian",
+        logo: finalLogoUrl || "",
+        logoUrl: finalLogoUrl || "", 
+        allowed_types: allowedTypes || {},
+        // Coba kirim versi snake_case dan camelCase agar kompatibel dengan versi DB manapun di VPS
+        groq_api_key: groqApiKey || "",
+        ai_gateway_url: aiGatewayUrl || "",
+        ai_gateway_key: aiGatewayKey || "",
+        ai_model: aiModel || "llama-3.3-70b-versatile",
+        ai_provider: aiProvider || "groq",
+        is_exambro_enabled: !!isExambroEnabled,
+        // Fallback untuk DB versi baru (camelCase)
+        isExambroEnabled: !!isExambroEnabled,
+        aiModel: aiModel || "llama-3.3-70b-versatile",
+        aiProvider: aiProvider || "groq"
       };
 
-      if (settingsId) {
+      if (!pb) return;
+      
+      const isCreate = !settingsId;
+
+      if (!isCreate) {
         await pb.collection("settings").update(settingsId, payload);
       } else {
-        const created = await pb.collection("settings").create(payload);
+        // 🧪 Generate random 6-char token untuk memenuhi syarat DB
+        const randomToken = Math.random().toString(36).substring(2, 8).toUpperCase();
+        const createPayload = {
+          ...payload,
+          universal_token: randomToken,
+          universal_token_updated_at: new Date().toISOString()
+        };
+        const created = await pb.collection("settings").create(createPayload);
         setSettingsId(created.id);
       }
 
@@ -226,7 +272,15 @@ const SettingsPage = () => {
       fetchSettings();
     } catch (err: any) {
       console.error("Save settings err", err);
-      addToast({ title: "Gagal", description: "Terjadi kesalahan saat menyimpan.", type: "error" });
+      if (err?.status === 404) {
+        addToast({ 
+          title: "Akses Ditolak (404)", 
+          description: "Gagal menyimpan. Pastikan API Rules 'Update' & 'Create' koleksi 'settings' di PocketBase Admin (/_/) diset ke: @request.auth.collectionName = 'users'", 
+          type: "error" 
+        });
+      } else {
+        addToast({ title: "Gagal", description: "Terjadi kesalahan saat menyimpan.", type: "error" });
+      }
     } finally {
       setSaving(false);
     }
@@ -241,6 +295,7 @@ const SettingsPage = () => {
 
   // 🚀 Backup Logic: Export
   const handleExportDB = async () => {
+    if (!pb) return;
     setIsBackupLoading(true);
     try {
       const backupData: Record<string, any[]> = {};
@@ -292,7 +347,7 @@ const SettingsPage = () => {
   };
 
   const executeImport = async () => {
-    if (!importFile) return;
+    if (!importFile || !pb) return;
     setIsBackupLoading(true);
     setImportProgress(0);
     setImportStatus("Membaca File...");
@@ -375,6 +430,7 @@ const SettingsPage = () => {
   const [resetInput, setResetInput] = useState("");
 
   const handleResetDB = async () => {
+    if (!pb) return;
     if (resetInput !== "RESET") {
       addToast({ title: "Gagal", description: "Kata konfirmasi salah.", type: "error" });
       return;
@@ -550,130 +606,165 @@ const SettingsPage = () => {
                   </div>
                 </div>
 
-                <div className="pt-6 border-t border-slate-200/60 dark:border-slate-800/40 space-y-6">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-50/50 dark:bg-slate-900/20 p-4 rounded-2xl border border-slate-100 dark:border-slate-800/40">
-                    <div>
-                      <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
-                        <RefreshCw className="h-4 w-4 text-blue-500 animate-spin-slow" />
-                        Konfigurasi AI (Groq Cloud)
-                      </h4>
-                      <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1">
-                        Generate soal otomatis menggunakan API Groq. 
-                        <a href="https://console.groq.com/keys" target="_blank" className="text-blue-600 dark:text-blue-400 underline ml-1 hover:text-blue-700">Dapatkan API Key Gratis</a>.
-                      </p>
-                    </div>
-                    <Button 
-                      onClick={handleTestAI} 
-                      disabled={isTestingAI || !groqApiKey}
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="rounded-xl h-9 px-4 text-xs font-bold border-blue-100 bg-blue-50/50 text-blue-700 hover:bg-blue-100 dark:border-blue-900/30 dark:bg-blue-900/20 dark:text-blue-400 dark:hover:bg-blue-900/40 transition-all shadow-sm active:scale-95"
-                    >
-                      {isTestingAI ? <RefreshCw className="h-3.5 w-3.5 animate-spin mr-2" /> : <RefreshCw className="h-3.5 w-3.5 mr-2" />}
-                      {isTestingAI ? "Mengecek..." : "Cek Koneksi AI"}
-                    </Button>
-                  </div>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
-                    <FormField id="groqApiKey" label="Groq API Key" error={undefined}>
-                      <div className="relative group">
-                        <Input
-                          type="password"
-                          value={groqApiKey}
-                          onChange={(e) => setGroqApiKey(e.target.value)}
-                          placeholder="gsk_xxxx..."
-                          className="rounded-xl font-mono text-xs h-11 pr-10 focus:ring-blue-500/20"
-                        />
-                        <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-blue-500">
-                           <Database className="h-4 w-4" />
-                        </div>
-                      </div>
-                    </FormField>
+                <div className="pt-6 border-t border-slate-200/60 dark:border-slate-800/40">
+                   <div className="flex flex-col gap-6 bg-slate-50/50 dark:bg-slate-900/20 p-6 rounded-2xl border border-slate-100 dark:border-slate-800/40">
+                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                       <div>
+                         <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                           <RefreshCw className="h-4 w-4 text-blue-500 animate-spin-slow" />
+                           Konfigurasi Mesin AI
+                         </h4>
+                         <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1">
+                           Pilih antara Groq Cloud (Cepat) atau OpenClaw (Agentic/Gratis).
+                         </p>
+                       </div>
+                       <Button 
+                         onClick={handleTestAI} 
+                         disabled={isTestingAI || (aiProvider === "groq" ? !groqApiKey : !aiGatewayKey)}
+                         type="button"
+                         variant="outline"
+                         size="sm"
+                         className="rounded-xl h-9 px-4 text-xs font-bold border-blue-100 bg-blue-50/50 text-blue-700 hover:bg-blue-100 dark:border-blue-900/30 dark:bg-blue-900/20 dark:text-blue-400 dark:hover:bg-blue-900/40 transition-all shadow-sm active:scale-95"
+                       >
+                         {isTestingAI ? <RefreshCw className="h-3.5 w-3.5 animate-spin mr-2" /> : <RefreshCw className="h-3.5 w-3.5 mr-2" />}
+                         {isTestingAI ? "Mengecek..." : "Cek Koneksi AI"}
+                       </Button>
+                     </div>
+
+                     <div className="flex p-1 bg-slate-200/50 dark:bg-slate-800/50 rounded-xl w-fit">
+                        <button 
+                          type="button"
+                          onClick={() => setAiProvider("groq")}
+                          className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${aiProvider === "groq" ? "bg-white dark:bg-slate-700 text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+                        >
+                          Groq Cloud
+                        </button>
+                        <button 
+                          type="button"
+                          onClick={() => setAiProvider("ollama")}
+                          className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${aiProvider === "ollama" ? "bg-white dark:bg-slate-700 text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+                        >
+                          Ollama Cloud
+                        </button>
+                     </div>
+                     
+                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+                       <FormField id="groqApiKey" label="Groq API Key" error={undefined}>
+                         <div className="relative group">
+                           <Input
+                             type="password"
+                             value={groqApiKey}
+                             onChange={(e) => setGroqApiKey(e.target.value)}
+                             placeholder="gsk_xxxx..."
+                             className="rounded-xl font-mono text-xs h-11 pr-10 focus:ring-blue-500/20"
+                           />
+                           <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-blue-500">
+                             <Database className="h-4 w-4" />
+                           </div>
+                         </div>
+                       </FormField>
+
+                       <FormField id="aiGatewayKey" label="Ollama API Key" error={undefined}>
+                         <div className="relative group">
+                           <Input
+                             type="password"
+                             value={aiGatewayKey}
+                             onChange={(e) => setAiGatewayKey(e.target.value)}
+                             placeholder="oc_xxxx..."
+                             className="rounded-xl font-mono text-xs h-11 pr-10 focus:ring-blue-500/20"
+                           />
+                           <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-blue-500">
+                              <Database className="h-4 w-4" />
+                           </div>
+                         </div>
+                       </FormField>
+
+                     </div>
+                   </div>
 
                     <FormField id="aiModel" label="Pilih Model AI" error={undefined}>
-                      <div className="space-y-3">
-                        <div className="relative">
-                          <select
-                            value={aiModel}
-                            onChange={(e) => setAiModel(e.target.value)}
-                            className="w-full h-11 px-3 rounded-xl text-xs font-bold bg-white dark:bg-slate-950 border border-slate-200/60 dark:border-slate-800 focus:ring-2 focus:ring-blue-500/20 outline-none appearance-none cursor-pointer"
-                          >
-                            <optgroup label="✨ Produksi (Direkomendasikan)">
-                              {AI_MODELS.filter(m => m.status === 'production').map((m) => (
-                                <option key={m.id} value={m.id}>{m.name} ({m.speed})</option>
-                              ))}
-                            </optgroup>
-                            <optgroup label="🧪 Preview (Eksperimental)">
-                              {AI_MODELS.filter(m => m.status === 'preview').map((m) => (
-                                <option key={m.id} value={m.id}>{m.name} ({m.speed})</option>
-                              ))}
-                            </optgroup>
-                          </select>
-                          <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
-                             <RefreshCw className="h-3.5 w-3.5" />
-                          </div>
-                        </div>
+                       <div className="space-y-3">
+                         <div className="relative">
+                           <select
+                             value={aiModel}
+                             onChange={(e) => setAiModel(e.target.value)}
+                             className="w-full h-11 px-3 rounded-xl text-xs font-bold bg-white dark:bg-slate-950 border border-slate-200/60 dark:border-slate-800 focus:ring-2 focus:ring-blue-500/20 outline-none appearance-none cursor-pointer"
+                           >
+                             <optgroup label={aiProvider === "groq" ? "🚀 Meta & Qwen (Groq)" : "☁️ Ollama Cloud Models"}>
+                               {AI_MODELS.filter(m => (m as any).provider === aiProvider && m.status?.toLowerCase() === 'production').map((m) => (
+                                 <option key={m.id} value={m.id}>{m.name} ({m.speed})</option>
+                               ))}
+                             </optgroup>
+                             {AI_MODELS.some(m => (m as any).provider === aiProvider && m.status?.toLowerCase() === 'preview') && (
+                               <optgroup label="🧪 Preview (Eksperimental)">
+                                 {AI_MODELS.filter(m => (m as any).provider === aiProvider && m.status?.toLowerCase() === 'preview').map((m) => (
+                                   <option key={m.id} value={m.id}>{m.name} ({m.speed})</option>
+                                 ))}
+                               </optgroup>
+                             )}
+                           </select>
+                           <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                              <RefreshCw className="h-3.5 w-3.5" />
+                           </div>
+                         </div>
 
-                        {/* Status & Test Results Container */}
-                        <div className="space-y-2">
-                          {AI_MODELS.find(m => m.id === aiModel) && (
-                            <div className={`flex items-start gap-3 p-3 rounded-xl border backdrop-blur-sm transition-all duration-300 ${
-                              AI_MODELS.find(m => m.id === aiModel)?.status === 'production' 
-                                ? 'bg-emerald-50/40 border-emerald-100 text-emerald-800 dark:bg-emerald-500/5 dark:border-emerald-500/20 dark:text-emerald-400' 
-                                : 'bg-amber-50/40 border-amber-100 text-amber-800 dark:bg-amber-500/5 dark:border-amber-500/20 dark:text-amber-400'
-                            }`}>
-                              <div className={`p-1.5 rounded-lg ${
-                                AI_MODELS.find(m => m.id === aiModel)?.status === 'production' 
-                                  ? 'bg-emerald-100 dark:bg-emerald-500/20' 
-                                  : 'bg-amber-100 dark:bg-amber-500/20'
-                              }`}>
-                                {AI_MODELS.find(m => m.id === aiModel)?.status === 'production' ? (
-                                  <CheckCircle2 className="h-3.5 w-3.5" />
-                                ) : (
-                                  <AlertTriangle className="h-3.5 w-3.5" />
-                                )}
-                              </div>
-                              <div className="flex flex-col gap-0.5">
-                                <span className="text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
-                                  {AI_MODELS.find(m => m.id === aiModel)?.status === 'production' ? 'Status: Stabil' : 'Status: Eksperimental'}
-                                  <span className="h-1 w-1 rounded-full bg-current animate-pulse" />
-                                </span>
-                                <span className="text-[9px] font-medium opacity-80 leading-relaxed">
-                                  {AI_MODELS.find(m => m.id === aiModel)?.status === 'production' 
-                                    ? 'Performa optimal untuk ujian massal dan hasil yang konsisten.' 
-                                    : 'Tinjauan awal: Mungkin terjadi gangguan sesaat pada jam sibuk.'}
-                                </span>
-                              </div>
-                            </div>
-                          )}
-
-                          {testResult && (
-                             <div className={`p-3 rounded-xl border animate-in zoom-in-95 duration-300 ${
-                               testResult.success 
-                                ? "bg-blue-50/40 border-blue-100 text-blue-800 dark:bg-blue-500/5 dark:border-blue-500/20 dark:text-blue-400" 
-                                : "bg-rose-50/40 border-rose-100 text-rose-800 dark:bg-rose-500/5 dark:border-rose-500/20 dark:text-rose-400"
+                         <div className="space-y-2">
+                           {AI_MODELS.find(m => m.id === aiModel) && (
+                             <div className={`flex items-start gap-3 p-3 rounded-xl border backdrop-blur-sm transition-all duration-300 ${
+                               AI_MODELS.find(m => m.id === aiModel)?.status?.toLowerCase() === 'production' 
+                                 ? 'bg-emerald-50/40 border-emerald-100 text-emerald-800 dark:bg-emerald-500/5 dark:border-emerald-500/20 dark:text-emerald-400' 
+                                 : 'bg-amber-50/40 border-amber-100 text-amber-800 dark:bg-amber-500/5 dark:border-amber-500/20 dark:text-amber-400'
                              }`}>
-                               <div className="flex items-center gap-3">
-                                 {testResult.success ? (
-                                   <div className="h-5 w-5 rounded-full bg-blue-100 dark:bg-blue-500/20 flex items-center justify-center shrink-0">
-                                      <CheckCircle2 className="h-3 w-3" />
-                                   </div>
+                               <div className={`p-1.5 rounded-lg ${
+                                 AI_MODELS.find(m => m.id === aiModel)?.status?.toLowerCase() === 'production' 
+                                   ? 'bg-emerald-100 dark:bg-emerald-500/20' 
+                                   : 'bg-amber-100 dark:bg-amber-500/20'
+                               }`}>
+                                 {AI_MODELS.find(m => m.id === aiModel)?.status?.toLowerCase() === 'production' ? (
+                                   <CheckCircle2 className="h-3.5 w-3.5" />
                                  ) : (
-                                   <div className="h-5 w-5 rounded-full bg-rose-100 dark:bg-rose-500/20 flex items-center justify-center shrink-0">
-                                      <AlertTriangle className="h-3 w-3" />
-                                   </div>
+                                   <AlertTriangle className="h-3.5 w-3.5" />
                                  )}
-                                 <span className="text-[10px] font-bold leading-tight">{testResult.message}</span>
+                               </div>
+                               <div className="flex flex-col gap-0.5">
+                                 <span className="text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
+                                   {AI_MODELS.find(m => m.id === aiModel)?.status?.toLowerCase() === 'production' ? 'Status: Stabil' : 'Status: Eksperimental'}
+                                   <span className="h-1 w-1 rounded-full bg-current animate-pulse" />
+                                 </span>
+                                 <span className="text-[9px] font-medium opacity-80 leading-relaxed">
+                                   {AI_MODELS.find(m => m.id === aiModel)?.status?.toLowerCase() === 'production' 
+                                     ? 'Performa optimal untuk ujian massal dan hasil yang konsisten.' 
+                                     : 'Tinjauan awal: Mungkin terjadi gangguan sesaat pada jam sibuk.'}
+                                 </span>
                                </div>
                              </div>
-                          )}
-                        </div>
-                      </div>
+                           )}
+
+                           {testResult && (
+                              <div className={`p-3 rounded-xl border animate-in zoom-in-95 duration-300 ${
+                                testResult.success 
+                                 ? "bg-blue-50/40 border-blue-100 text-blue-800 dark:bg-blue-500/5 dark:border-blue-500/20 dark:text-blue-400" 
+                                 : "bg-rose-50/40 border-rose-100 text-rose-800 dark:bg-rose-500/5 dark:border-rose-500/20 dark:text-rose-400"
+                              }`}>
+                                <div className="flex items-center gap-3">
+                                  {testResult.success ? (
+                                    <div className="h-5 w-5 rounded-full bg-blue-100 dark:bg-blue-500/20 flex items-center justify-center shrink-0">
+                                       <CheckCircle2 className="h-3 w-3" />
+                                    </div>
+                                  ) : (
+                                    <div className="h-5 w-5 rounded-full bg-rose-100 dark:bg-rose-500/20 flex items-center justify-center shrink-0">
+                                       <AlertTriangle className="h-3 w-3" />
+                                    </div>
+                                  )}
+                                  <span className="text-[10px] font-bold leading-tight">{testResult.message}</span>
+                                </div>
+                              </div>
+                           )}
+                         </div>
+                       </div>
                     </FormField>
-                  </div>
-                </div>
-              </form>
+                   </div>
+                </form>
             </CardContent>
           </Card>
 

@@ -34,6 +34,7 @@ import pb from "../../lib/pocketbase";
 import { useExamData } from "../../context/ExamDataContext";
 import { useAuth } from "../../context/AuthContext";
 import { ConfirmationDialog } from "../../components/ui/confirmation-dialog";
+import { MathText } from "../../components/MathText";
 
 export interface ExamRoomData {
   id: string;
@@ -1288,7 +1289,7 @@ const MonitoringPage = () => {
                                       <div key={q.id} className="bg-white dark:bg-slate-800 p-3 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col gap-2">
                                         <div className="flex gap-2">
                                           <span className="text-[10px] font-black text-slate-400 shrink-0">#{qIdx + 1}</span>
-                                          <div className="text-[11px] font-medium leading-tight text-slate-700 dark:text-slate-300" dangerouslySetInnerHTML={{ __html: q.text }} />
+                                          <MathText content={q.text} className="text-[11px] font-medium leading-tight text-slate-700 dark:text-slate-300" />
                                         </div>
                                         <div className={`mt-auto p-2 rounded-lg flex items-center justify-between ${correct ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"}`}>
                                           <span className="text-[10px] font-bold">Jawab: {ans ? String(ans).toUpperCase() : "-"}</span>

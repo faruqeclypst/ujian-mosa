@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, Plus, Edit, Trash, Check, Image, ChevronDown, FileText, Download, Eye, FolderOpen, Sparkles, Wand2, RefreshCw, BookOpen, Loader2, FileSpreadsheet, Search } from "lucide-react";
+import { MathText } from "../../components/MathText";
 import { SmartImage } from "../../components/ui/smart-image";
-import { generateQuestionsAI, generateSingleQuestionAI, getTopicSuggestionsAI, parseQuestionsAI } from "../../lib/ai";
+import { generateQuestionsAI, generateSingleQuestionAI, getTopicSuggestionsAI, parseQuestionsAI, AI_MODELS } from "../../lib/ai";
 import { Button } from "../../components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "../../components/ui/dialog";
 import { Progress } from "../../components/ui/progress";
@@ -25,6 +26,7 @@ import "react-quill/dist/quill.snow.css";
 Quill.register("modules/imageResize", ImageResize);
 import { useExamData } from "../../context/ExamDataContext";
 import { useAuth } from "../../context/AuthContext";
+import { useTenant } from "../../context/TenantContext";
 import { DataTable } from "../../components/ui/data-table";
 import { useToast } from "../../components/ui/toast";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
@@ -124,6 +126,7 @@ const QuestionsPage = () => {
   }, [examId, navigate]);
 
   const { user, role, teacherId } = useAuth();
+  const { school } = useTenant();
   const { addToast } = useToast();
   const { subjects, teachers } = useExamData();
 
@@ -139,6 +142,8 @@ const QuestionsPage = () => {
     uraian: true,
   });
 
+  const [activeAIConfig, setActiveAIConfig] = useState<{ model: string; provider: string }>({ model: "Unknown", provider: "groq" });
+
   useEffect(() => {
     const fetchSettings = async () => {
       try {
@@ -147,6 +152,11 @@ const QuestionsPage = () => {
           const data = records[0];
           const types = data.allowed_types || data.allowed_question_types;
           if (types) setAllowedTypes(types);
+          
+          setActiveAIConfig({
+             model: data.ai_model || "llama-3.3-70b-versatile",
+             provider: data.ai_provider || "groq"
+          });
         }
       } catch (e) {
         console.warn("Failed to fetch allowed types from settings:", e);
@@ -418,26 +428,6 @@ const QuestionsPage = () => {
     return () => clearTimeout(timer);
   }, [aiLevel, aiSubject, aiDifficulty, aiType, aiFocus, isAiLiteracy]);
 
-  useEffect(() => {
-    // 🧮 Render Math using KaTeX Auto-render
-    const renderMath = () => {
-      if ((window as any).renderMathInElement) {
-        (window as any).renderMathInElement(document.body, {
-          delimiters: [
-            { left: "$$", right: "$$", display: true },
-            { left: "$", right: "$", display: false },
-            { left: "\\(", right: "\\)", display: false },
-            { left: "\\[", right: "\\]", display: true }
-          ],
-          throwOnError: false
-        });
-      }
-    };
-    
-    // Jalankan setelah DOM terupdate
-    const timer = setTimeout(renderMath, 500);
-    return () => clearTimeout(timer);
-  }, [questions, isDialogOpen, isPreviewOpen, isBatchModalOpen]);
 
   const handleRandomFill = () => {
     const presets = [
@@ -1004,6 +994,7 @@ const QuestionsPage = () => {
     }
   }), [imageHandler]);
 
+
   // 🔄 Load Questions dari PocketBase
   const loadQuestions = useCallback(async () => {
     if (!examId) return;
@@ -1110,6 +1101,8 @@ const QuestionsPage = () => {
       if (e.target) e.target.value = "";
     }
   };
+
+
 
   useEffect(() => {
     if (!examId) return;
@@ -1318,7 +1311,9 @@ const QuestionsPage = () => {
           const blob = await (await fetch(base64Data)).blob();
           const ext = blob.type.split("/")[1] || "png";
           const fileToUpload = new File([blob], `${prefix}_${Date.now()}.${ext}`, { type: blob.type });
-          const uploadSnap = await uploadInventoryImage(`questions/${examId}`, fileToUpload);
+          // 🛡️ Isolation: Kelompokkan gambar soal berdasarkan slug sekolah
+          const schoolFolder = school?.slug || "unknown";
+          const uploadSnap = await uploadInventoryImage(`schools/${schoolFolder}/exams/${examId}`, fileToUpload);
           return uploadSnap.url;
         } catch (e) {
           console.error(`Gagal upload base64 image (${prefix}) to R2`, e);
@@ -1340,7 +1335,9 @@ const QuestionsPage = () => {
           const oldKey = extractKey(selectedQuestion.imageUrl);
           if (oldKey) await deleteImageFromStorage(oldKey);
         }
-        const res = await uploadInventoryImage(`questions/${examId}`, fileToUpload);
+        
+        const schoolFolder = school?.slug || "unknown";
+        const res = await uploadInventoryImage(`schools/${schoolFolder}/exams/${examId}`, fileToUpload);
         imageUrl = res.url;
       } else if (imageUrl.startsWith("data:image/")) {
         // Jika dari pratinjau tapi belum diupload
@@ -1373,7 +1370,8 @@ const QuestionsPage = () => {
             const oldKey = extractKey(selectedQuestion.choices[key].imageUrl);
             if (oldKey) await deleteImageFromStorage(oldKey);
           }
-          const res = await uploadInventoryImage(`questions/${examId}`, fileToUpload);
+          const schoolFolder = school?.slug || "unknown";
+          const res = await uploadInventoryImage(`schools/${schoolFolder}/exams/${examId}`, fileToUpload);
           updatedChoices[key].imageUrl = res.url;
         }
       }
@@ -1729,7 +1727,7 @@ const QuestionsPage = () => {
       sortable: true,
       render: (v: string, item: QuestionData) => (
         <div className="max-w-lg min-w-[250px]">
-          <div className="line-clamp-2 text-sm font-medium text-slate-800 dark:text-slate-200 leading-relaxed ql-editor !p-0 [&_p]:m-0 [&_ol]:list-decimal [&_ul]:list-disc [&_ol]:pl-4 [&_ul]:pl-4" dangerouslySetInnerHTML={{ __html: item.text }} />
+          <MathText content={item.text} className="line-clamp-2 text-sm font-medium text-slate-800 dark:text-slate-200 leading-relaxed ql-editor !p-0 [&_p]:m-0 [&_ol]:list-decimal [&_ul]:list-disc [&_ol]:pl-4 [&_ul]:pl-4" />
           <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
             {(item.imageUrl || item.text.includes("<img")) && (
               <span className="p-1 px-1.5 rounded-md bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400 flex items-center gap-1 font-bold text-[9px] border border-blue-200 dark:border-blue-800/40 uppercase tracking-tight">
@@ -2109,10 +2107,31 @@ const QuestionsPage = () => {
       }
     };
 
-    const processHtmlImages = async (htmlInput: string) => {
+    const processHtmlLatexAndImages = async (htmlInput: string) => {
       if (!htmlInput) return "";
+      
+      // 1. Convert LaTeX to online images first
+      let withLatexImages = htmlInput;
+      
+      // Handle display mode $$...$$ or \[...\]
+      const displayRegex = /(\$\$|\\\[)([\s\S]*?)(\$\$|\\\])/g;
+      withLatexImages = withLatexImages.replace(displayRegex, (_, _start, formula) => {
+        const cleanFormula = formula.trim().replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+        return `<div style="text-align:center; margin: 10pt 0;"><img src="https://latex.codecogs.com/png.latex?\\dpi{150}\\bg_white ${encodeURIComponent(cleanFormula)}" alt="math" /></div>`;
+      });
+
+      // Handle inline mode $...$ or \(...\)
+      const inlineRegex = /(\$|\\\()([\s\S]*?)(\$|\\\))/g;
+      withLatexImages = withLatexImages.replace(inlineRegex, (_, _start, formula) => {
+        // Skip if it is actually part of a display math that we already processed (unlikely but safe)
+        const cleanFormula = formula.trim().replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+        return `<img src="https://latex.codecogs.com/png.latex?\\dpi{120}\\bg_white ${encodeURIComponent(cleanFormula)}" style="vertical-align:middle;" alt="math" />`;
+      });
+      
       const div = document.createElement('div');
-      div.innerHTML = htmlInput;
+      div.innerHTML = withLatexImages;
+      
+      // 2. Process all images (including the ones we just added) to Base64
       const imgs = div.getElementsByTagName('img');
       for (const imgTag of Array.from(imgs)) {
         const src = imgTag.getAttribute('src');
@@ -2166,7 +2185,7 @@ const QuestionsPage = () => {
         setBatchProgress(prev => ({ ...prev, current: i + 1, message: `Memproses soal #${i + 1}...` }));
 
         if (q.groupId && q.groupId !== currentGroupId && q.groupText) {
-            const cleanWacana = await processHtmlImages(q.groupText || "");
+            const cleanWacana = await processHtmlLatexAndImages(q.groupText || "");
             html += `<div class="wacana"><b>STIMULUS / BACAAN:</b><br/>${cleanWacana}</div>`;
             currentGroupId = q.groupId;
         }
@@ -2177,7 +2196,7 @@ const QuestionsPage = () => {
           if (b64) qImg = `<div style="margin: 5pt 0;"><img src="${b64}" /></div>`;
         }
 
-        const processedQText = await processHtmlImages(q.text || "");
+        const processedQText = await processHtmlLatexAndImages(q.text || "");
         html += `<div class="hanging"><b>${i + 1}.</b> <span>${processedQText}</span>${qImg}</div>`;
 
         if (q.choices) {
@@ -2189,7 +2208,7 @@ const QuestionsPage = () => {
                       const cb64 = await getBase64(c.imageUrl);
                       if (cb64) cImg = `<div style="margin: 3pt 0;"><img src="${cb64}" style="max-width: 150pt;" /></div>`;
                     }
-                    const processedCText = await processHtmlImages(c.text || "");
+                    const processedCText = await processHtmlLatexAndImages(c.text || "");
                     html += `<div class="choice">${letter.toUpperCase()}. <span>${processedCText}</span>${cImg}</div>`;
                 }
             }
@@ -2839,9 +2858,9 @@ const QuestionsPage = () => {
                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide flex items-center gap-1">
                           🔒 Wacana Terkunci (Hanya Edit di Soal #1 grup ini)
                         </span>
-                        <div 
+                        <MathText 
+                          content={existingLiteracies[formValues.groupId]}
                           className="text-[11px] text-slate-600 dark:text-slate-400 [&_img]:max-w-[30px] line-clamp-2 leading-relaxed" 
-                          dangerouslySetInnerHTML={{ __html: existingLiteracies[formValues.groupId] }} 
                         />
                       </div>
                     )}
@@ -3135,9 +3154,9 @@ const QuestionsPage = () => {
                         </div>
                       )}
                       
-                      <div 
+                      <MathText 
+                        content={textToShow}
                         className={`text-base sm:text-lg leading-relaxed text-slate-800 dark:text-slate-200 font-serif ql-editor !p-0 selection:bg-blue-100 dark:selection:bg-blue-900/40`} 
-                        dangerouslySetInnerHTML={{ __html: textToShow }} 
                       />
                     </div>
                   );
@@ -3146,9 +3165,9 @@ const QuestionsPage = () => {
               })()}
 
               <div className="space-y-4">
-                <div 
+                <MathText 
+                  content={previewQuestion.text}
                   className={`ql-editor !p-0 font-medium text-lg text-slate-900 dark:text-white leading-relaxed break-words [&_strong]:text-blue-600 dark:[&_strong]:text-blue-400 [&_p]:mb-3 [&_ol]:list-decimal [&_ul]:list-disc [&_ol]:pl-6 [&_ul]:pl-6 selection:bg-indigo-100 dark:selection:bg-indigo-900/40`} 
-                  dangerouslySetInnerHTML={{ __html: previewQuestion.text }} 
                 />
                 
                 {previewQuestion.imageUrl && (
@@ -3179,7 +3198,7 @@ const QuestionsPage = () => {
                         {String.fromCharCode(65 + idx)}
                       </div>
                       <div className="flex-1 text-sm md:text-base">
-                        <div className={`break-words ql-editor !p-0 [&_img]:max-w-[300px] [&_img]:h-auto [&_img]:rounded-xl [&_img]:mt-2 text-inherit ${choice.isCorrect ? "font-bold" : "font-normal"}`} dangerouslySetInnerHTML={{ __html: choice.text }} />
+                        <MathText content={choice.text} className={`break-words ql-editor !p-0 [&_img]:max-w-[300px] [&_img]:h-auto [&_img]:rounded-xl [&_img]:mt-2 text-inherit ${choice.isCorrect ? "font-bold" : "font-normal"}`} />
                         {choice.imageUrl && (
                           <SmartImage src={choice.imageUrl} alt={`Pilihan ${cKey.toUpperCase()}`} className="max-h-[200px] w-auto rounded-xl mt-2 border shadow-sm" />
                         )}
@@ -3665,7 +3684,12 @@ const QuestionsPage = () => {
               </div>
               <div>
                 <DialogTitle className="text-lg font-black tracking-tight text-slate-900 dark:text-white uppercase leading-none">AI Question Lab</DialogTitle>
-                <p className="text-slate-500 dark:text-slate-400 text-[11px] font-bold mt-1 uppercase tracking-wider">Hasilkan soal berkualitas dalam hitungan detik</p>
+                <div className="flex items-center gap-1.5 mt-1.5">
+                   <p className="text-slate-500 dark:text-slate-400 text-[10px] font-bold uppercase tracking-wider">Mode:</p>
+                   <span className="px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400 text-[9px] font-black border border-indigo-100 dark:border-indigo-800 uppercase">
+                      {AI_MODELS.find((m: any) => m.id === activeAIConfig.model)?.name || activeAIConfig.model} ({activeAIConfig.provider})
+                   </span>
+                </div>
               </div>
             </div>
             <Button 
@@ -3966,10 +3990,10 @@ const QuestionsPage = () => {
                                <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-2 flex items-center gap-1.5">
                                  <Plus className="w-3 h-3" /> Literasi / Stimulus Khusus
                                </p>
-                               <div className="text-[11px] text-slate-700 dark:text-slate-300 leading-relaxed font-medium line-clamp-4 italic" dangerouslySetInnerHTML={{ __html: q.groupText }} />
+                               <MathText content={q.groupText} className="text-[11px] text-slate-700 dark:text-slate-300 leading-relaxed font-medium line-clamp-4 italic" />
                              </div>
                            )}
-                           <div className="text-sm font-bold text-slate-800 dark:text-slate-100 leading-normal" dangerouslySetInnerHTML={{ __html: q.text }} />
+                           <MathText content={q.text} className="text-sm font-bold text-slate-800 dark:text-slate-100 leading-normal" />
                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 mt-2">
                              {q.choices && Object.entries(q.choices).map(([key, val]: [string, any]) => (
                                <div key={key} className={`p-2.5 rounded-xl border flex items-center gap-3 transition-all ${val.isCorrect ? 'bg-emerald-50 border-emerald-200 dark:bg-emerald-950/20 dark:border-emerald-800/40 text-emerald-700 dark:text-emerald-400' : 'bg-slate-50/50 dark:bg-slate-800/40 border-slate-100 dark:border-slate-700 text-slate-500 dark:text-slate-400'}`}>

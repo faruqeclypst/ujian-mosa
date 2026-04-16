@@ -1,0 +1,52 @@
+[
+  {
+    "name": "super_admins",
+    "type": "auth",
+    "fields": [
+      { "id": "text_name", "name": "name", "type": "text", "required": false, "presentable": true }
+    ],
+    "listRule": "id = @request.auth.id",
+    "viewRule": "id = @request.auth.id",
+    "createRule": null,
+    "updateRule": "id = @request.auth.id",
+    "deleteRule": null
+  },
+  {
+    "name": "schools",
+    "type": "base",
+    "fields": [
+      { "id": "school_name", "name": "name", "type": "text", "required": true, "presentable": true },
+      { "id": "school_slug", "name": "slug", "type": "text", "required": true },
+      { "id": "school_pb_url", "name": "pb_url", "type": "url", "required": true },
+      { "id": "school_email", "name": "contact_email", "type": "email", "required": false },
+      { "id": "school_active", "name": "is_active", "type": "bool", "required": false },
+      { "id": "school_plan", "name": "plan", "type": "select", "required": true, "values": ["free", "basic", "pro"] },
+      { "id": "school_quota", "name": "student_quota", "type": "number", "required": false }
+    ],
+    "listRule": "@request.auth.collectionName = 'super_admins'",
+    "viewRule": "@request.auth.collectionName = 'super_admins'",
+    "createRule": "@request.auth.collectionName = 'super_admins'",
+    "updateRule": "@request.auth.collectionName = 'super_admins'",
+    "deleteRule": "@request.auth.collectionName = 'super_admins'",
+    "indexes": [
+      "CREATE UNIQUE INDEX `idx_slug_unique` ON `schools` (`slug`)"
+    ]
+  },
+  {
+    "name": "school_requests",
+    "type": "base",
+    "fields": [
+      { "id": "req_name", "name": "school_name", "type": "text", "required": true },
+      { "id": "req_slug", "name": "slug_request", "type": "text", "required": true },
+      { "id": "req_email", "name": "contact_email", "type": "email", "required": true },
+      { "id": "req_phone", "name": "contact_phone", "type": "text", "required": false },
+      { "id": "req_address", "name": "address", "type": "text", "required": false },
+      { "id": "req_status", "name": "status", "type": "select", "required": true, "values": ["pending", "approved", "rejected"] }
+    ],
+    "listRule": "@request.auth.collectionName = 'super_admins'",
+    "viewRule": "@request.auth.collectionName = 'super_admins'",
+    "createRule": "",
+    "updateRule": "@request.auth.collectionName = 'super_admins'",
+    "deleteRule": "@request.auth.collectionName = 'super_admins'"
+  }
+]

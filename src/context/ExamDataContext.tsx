@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from "react";
 import { useAuth } from "./AuthContext";
-import pb from "../lib/pocketbase";
+import { useTenant } from "./TenantContext";
+
 import type {
   Teacher, TeacherPayload,
   ClassData, ClassPayload,
@@ -55,6 +56,9 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
   const [tokenUpdatedAt, setTokenUpdatedAt] = useState<any>(null);
   const [timeLeft, setTimeLeft] = useState("--:--");
   const { role } = useAuth();
+  const { pb: tenantPb } = useTenant();
+  const pb = tenantPb!;
+
 
   // Helper untuk memuai data awal dan subscribe ke perubahan Realtime
   const setupRealtime = useCallback((collection: string, setter: (data: any[]) => void) => {

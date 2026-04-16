@@ -1,0 +1,113 @@
+[
+  {
+    "name": "users",
+    "type": "auth",
+    "fields": [
+      { "id": "text_id", "name": "id", "type": "text", "required": true, "primaryKey": true, "system": true },
+      { "name": "name", "type": "text", "required": true },
+      { "name": "role", "type": "select", "required": true, "maxSelect": 1, "values": ["admin", "teacher"] },
+      { "name": "avatar", "type": "file", "maxSelect": 1, "maxSize": 5242880, "mimeTypes": ["image/jpeg", "image/png", "image/webp"] }
+    ]
+  },
+  {
+    "name": "students",
+    "type": "auth",
+    "fields": [
+      { "id": "text_id", "name": "id", "type": "text", "required": true, "primaryKey": true, "system": true },
+      { "name": "name", "type": "text", "required": true },
+      { "name": "gender", "type": "select", "required": true, "values": ["L", "P"] },
+      { "name": "classId", "type": "text", "required": false }
+    ]
+  },
+  {
+    "name": "classes",
+    "type": "base",
+    "fields": [
+      { "id": "text_id", "name": "id", "type": "text", "required": true, "primaryKey": true, "system": true },
+      { "name": "name", "type": "text", "required": true }
+    ],
+    "listRule": ""
+  },
+  {
+    "name": "subjects",
+    "type": "base",
+    "fields": [
+      { "id": "text_id", "name": "id", "type": "text", "required": true, "primaryKey": true, "system": true },
+      { "name": "name", "type": "text", "required": true }
+    ],
+    "listRule": ""
+  },
+  {
+    "name": "exams",
+    "type": "base",
+    "fields": [
+      { "id": "text_id", "name": "id", "type": "text", "required": true, "primaryKey": true, "system": true },
+      { "name": "title", "type": "text", "required": true },
+      { "name": "subjectId", "type": "text", "required": true },
+      { "name": "teacherId", "type": "text", "required": false },
+      { "name": "examType", "type": "select", "values": ["Latihan", "Ulangan", "PTS", "PAS", "US", "Tryout"] }
+    ],
+    "listRule": "@request.auth.id != ''"
+  },
+  {
+    "name": "questions",
+    "type": "base",
+    "fields": [
+      { "id": "text_id", "name": "id", "type": "text", "required": true, "primaryKey": true, "system": true },
+      { "name": "examId", "type": "text", "required": true },
+      { "name": "question", "type": "editor", "required": true },
+      { "name": "optionA", "type": "editor" },
+      { "name": "optionB", "type": "editor" },
+      { "name": "optionC", "type": "editor" },
+      { "name": "optionD", "type": "editor" },
+      { "name": "optionE", "type": "editor" },
+      { "name": "correctAnswer", "type": "select", "values": ["A", "B", "C", "D", "E"] },
+      { "name": "imageUrl", "type": "url" }
+    ],
+    "listRule": "@request.auth.id != ''"
+  },
+  {
+    "name": "exam_rooms",
+    "type": "base",
+    "fields": [
+      { "id": "text_id", "name": "id", "type": "text", "required": true, "primaryKey": true, "system": true },
+      { "name": "room_name", "type": "text", "required": true },
+      { "name": "examId", "type": "text", "required": true },
+      { "name": "classId", "type": "json" },
+      { "name": "start_time", "type": "text" },
+      { "name": "end_time", "type": "text" },
+      { "name": "duration", "type": "number", "required": true },
+      { "name": "isActive", "type": "bool" }
+    ],
+    "listRule": "@request.auth.id != ''"
+  },
+  {
+    "name": "attempts",
+    "type": "base",
+    "fields": [
+      { "id": "text_id", "name": "id", "type": "text", "required": true, "primaryKey": true, "system": true },
+      { "name": "studentId", "type": "text", "required": true },
+      { "name": "examRoomId", "type": "text", "required": true },
+      { "name": "answers", "type": "json" },
+      { "name": "score", "type": "number" },
+      { "name": "status", "type": "select", "values": ["ongoing", "finished", "submitted"] }
+    ],
+    "listRule": "@request.auth.id != ''",
+    "createRule": "@request.auth.collectionName = 'students'"
+  },
+  {
+    "name": "settings",
+    "type": "base",
+    "fields": [
+      { "id": "text_id", "name": "id", "type": "text", "required": true, "primaryKey": true, "system": true },
+      { "name": "name", "type": "text", "required": true },
+      { "name": "logo", "type": "file", "maxSelect": 1 },
+      { "name": "universal_token", "type": "text" },
+      { "name": "primary_color", "type": "text" }
+    ],
+    "listRule": "",
+    "viewRule": "",
+    "createRule": "@request.auth.collectionName = 'users'",
+    "updateRule": "@request.auth.collectionName = 'users'"
+  }
+]

@@ -4,6 +4,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { App } from "@capacitor/app";
 
 const CheatAlert = registerPlugin<any>("CheatAlert");
+import { MathText } from "../../components/MathText";
 import { SmartImage } from "../../components/ui/smart-image";
 import { useStudentAuth } from "../../context/StudentAuthContext";
 import pb from "../../lib/pocketbase";
@@ -1103,10 +1104,9 @@ const CBTPage = () => {
                         <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-[0.2em] text-emerald-500 dark:text-emerald-400">Bacaan</span>
                       </div>
 
-                      <div
-                        className="leading-relaxed text-slate-800 dark:text-slate-200 font-serif ql-editor !p-0 [&_h2]:text-xl sm:[&_h2]:text-2xl [&_h2]:font-black [&_h2]:text-center [&_h2]:mb-6 [&_h2]:text-slate-900 dark:[&_h2]:text-white [&_p]:mb-4 [&_p]:text-justify [&_img]:rounded-2xl [&_img]:mx-auto [&_img]:block [&_img]:shadow-2xl selection:bg-blue-100 overflow-x-hidden break-words [overflow-wrap:anywhere] [white-space:normal!important] [&_*]:break-words [&_*]:whitespace-normal"
-                        style={{ fontSize: `${15 * fontSize}px` }}
-                        dangerouslySetInnerHTML={{ __html: f.groupText || f.text }}
+                      <MathText 
+                        content={f.groupText || f.text}
+                        className={`text-base sm:text-lg leading-relaxed text-slate-800 dark:text-slate-200 font-serif ql-editor !p-0 selection:bg-blue-100 dark:selection:bg-blue-900/40`} 
                       />
 
                       <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex justify-end opacity-50 dark:opacity-100">
@@ -1115,10 +1115,9 @@ const CBTPage = () => {
                     </div>
                   );
                 })()}
-                <div
-                  className="font-serif leading-relaxed text-[#0f172a] dark:text-slate-200 ql-editor p-0 mb-4 sm:mb-6 overflow-x-hidden break-words [overflow-wrap:anywhere] [&_*]:whitespace-normal [&_*]:break-words"
-                  style={{ fontSize: `${18 * fontSize}px` }}
-                  dangerouslySetInnerHTML={{ __html: currentQuestion.text }}
+                <MathText 
+                  content={currentQuestion.text}
+                  className={`ql-editor !p-0 font-medium text-lg text-slate-900 dark:text-white leading-relaxed break-words [&_strong]:text-blue-600 dark:[&_strong]:text-blue-400 [&_p]:mb-3 [&_ol]:list-decimal [&_ul]:list-disc [&_ol]:pl-6 [&_ul]:pl-6 selection:bg-indigo-100 dark:selection:bg-indigo-900/40`} 
                 />
 
                 {(currentQuestion.type === "pilihan_ganda_kompleks" || currentQuestion.type === "menjodohkan" || currentQuestion.type === "urutkan") && (
@@ -1141,11 +1140,7 @@ const CBTPage = () => {
                         <button key={choiceId} onClick={() => { if (isM) { const a = answers[currentQuestion.id] || []; handleAnswerSelect(currentQuestion.id, a.includes(choiceId) ? a.filter((i: any) => i !== choiceId) : [...a, choiceId]); } else handleAnswerSelect(currentQuestion.id, choiceId); }} className={`w-full text-left p-2 sm:p-3 rounded-xl sm:rounded-2xl border-2 flex items-center gap-2.5 sm:gap-4 transition-all outline-none group active:scale-[0.99] ${isS ? "bg-emerald-50 border-emerald-600 dark:bg-emerald-900/30 dark:border-emerald-500" : "bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 hover:border-emerald-200 dark:hover:border-emerald-700"}`}>
                           <div className={`w-8 h-8 sm:w-9 sm:h-9 shrink-0 rounded-lg sm:rounded-xl border flex items-center justify-center font-black text-xs sm:text-sm transition-colors ${isS ? "bg-emerald-600 border-emerald-600 text-white" : "bg-slate-50 dark:bg-slate-900 text-slate-400 border-slate-100 dark:border-slate-800 group-hover:bg-emerald-50 group-hover:text-emerald-900"}`}>{String.fromCharCode(65 + idx)}</div>
                           <div className="flex-1 overflow-hidden">
-                            <div
-                              className="ql-editor !p-0 font-serif text-slate-800 dark:text-slate-200 leading-snug break-words [overflow-wrap:anywhere] [&_p]:m-0"
-                              style={{ fontSize: `${15 * fontSize}px` }}
-                              dangerouslySetInnerHTML={{ __html: c.text }}
-                            />
+                            <MathText content={c.text} className={`break-words ql-editor !p-0 [&_img]:max-w-[300px] [&_img]:h-auto [&_img]:rounded-xl [&_img]:mt-2 text-inherit ${isS ? "font-bold" : "font-normal"}`} />
                             {c.imageUrl && (
                               <div className="relative inline-block cursor-zoom-in group mt-4" onClick={(e) => { e.stopPropagation(); setPreviewImage(c.imageUrl!); }}>
                                 <SmartImage

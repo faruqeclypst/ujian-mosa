@@ -5,12 +5,12 @@ import { Button } from "../../components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../../components/ui/dialog";
 import { DeleteConfirmationDialog } from "../../components/ui/delete-confirmation-dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
-import pb from "../../lib/pocketbase";
 import { Input } from "../../components/ui/input";
 import FormField from "../../components/forms/FormField";
 import { useExamData } from "../../context/ExamDataContext";
 import { useAuth } from "../../context/AuthContext";
 import { getExamTypeColorClass } from "./ExamsPage";
+import { useTenant } from "../../context/TenantContext";
 import { ConfirmationDialog } from "../../components/ui/confirmation-dialog";
 import { useToast } from "../../components/ui/toast";
 import { cn } from "../../lib/utils";
@@ -49,6 +49,7 @@ export interface ExamRoomData {
 
 const ExamRoomsPage = () => {
   const navigate = useNavigate();
+  const { pb } = useTenant();
   const { user, role, teacherId } = useAuth();
   const { addToast } = useToast();
   const [rooms, setRooms] = useState<ExamRoomData[]>([]);
@@ -277,6 +278,7 @@ const ExamRoomsPage = () => {
     };
 
     const initStats = async () => {
+      if (!pb) return;
       try {
         const allAttempts = await pb.collection('attempts').getFullList({
           filter: 'status = "ongoing"'
@@ -290,6 +292,7 @@ const ExamRoomsPage = () => {
 
     initStats();
 
+    if (!pb) return;
     const unsub = pb.collection('attempts').subscribe("*", (e) => {
       if (e.action === 'delete') {
         delete attemptsCache[e.record.id];
@@ -305,11 +308,12 @@ const ExamRoomsPage = () => {
     });
 
     return () => { unsub.then(u => u()); };
-  }, []);
+  }, [pb]);
 
   // Sync Master Exams for Room creation selection
   useEffect(() => {
     const fetchExams = async () => {
+      if (!pb) return;
       try {
         setExamsLoading(true);
         const loaded = await pb.collection('exams').getFullList({ sort: '-created' });
@@ -319,11 +323,12 @@ const ExamRoomsPage = () => {
       }
     };
     fetchExams();
-  }, []);
+  }, [pb]);
 
   // Sync Exam Rooms listing
   useEffect(() => {
     const fetchRooms = async () => {
+      if (!pb) return;
       try {
         const loaded = await pb.collection('exam_rooms').getFullList({ sort: '-created' });
         const mapped = loaded.map(room => {
@@ -393,6 +398,7 @@ const ExamRoomsPage = () => {
 
     fetchRooms();
 
+    if (!pb) return;
     const unsubscribe = pb.collection('exam_rooms').subscribe("*", (e) => {
       if (e.action === "create" || e.action === "update") {
         // Re-fetch rooms to get mapped data correctly (it's hard to map a single record without context of exams/classes)
@@ -406,7 +412,7 @@ const ExamRoomsPage = () => {
     return () => {
       unsubscribe.then(unsub => unsub());
     };
-  }, [subjects, masterTeachers, exams, examClasses]);
+  }, [subjects, masterTeachers, exams, examClasses, pb]);
 
 
   const handleCreateClick = () => {
@@ -462,6 +468,7 @@ const ExamRoomsPage = () => {
       type: isCurrentlyActive ? "warning" : "info",
       confirmLabel: isCurrentlyActive ? "Nonaktifkan" : "Aktifkan",
       onConfirm: async () => {
+        if (!pb) return;
         try {
           const newIsActive = !isCurrentlyActive;
           await pb.collection('exam_rooms').update(room.id, {
@@ -484,6 +491,7 @@ const ExamRoomsPage = () => {
       type: "warning",
       confirmLabel: "Arsipkan",
       onConfirm: async () => {
+        if (!pb) return;
         try {
           await pb.collection('exam_rooms').update(room.id, { status: "archive" });
           showAlert("Berhasil", "Ruang diarsipkan.", "success");
@@ -502,6 +510,7 @@ const ExamRoomsPage = () => {
       type: "info",
       confirmLabel: "Pulihkan",
       onConfirm: async () => {
+        if (!pb) return;
         try {
           await pb.collection('exam_rooms').update(room.id, { status: null });
           showAlert("Berhasil", "Ruang dipulihkan.", "success");
@@ -518,7 +527,7 @@ const ExamRoomsPage = () => {
   };
 
   const handleConfirmDelete = async () => {
-    if (!roomToDelete) return;
+    if (!roomToDelete || !pb) return;
     setIsDeleting(true);
     try {
       await pb.collection('exam_rooms').delete(roomToDelete.id);
@@ -556,6 +565,8 @@ const ExamRoomsPage = () => {
         status: "active",
         isDisabled: false
       };
+
+      if (!pb) return;
 
       if (dialogMode === "edit" && selectedRoom) {
         await pb.collection('exam_rooms').update(selectedRoom.id, data);

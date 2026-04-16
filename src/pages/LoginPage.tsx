@@ -11,7 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../co
 import { Input } from "../components/ui/input";
 import { ThemeToggle } from "../components/ui/theme-toggle";
 import { useAuth } from "../context/AuthContext";
-import pb from "../lib/pocketbase";
+import { useTenant } from "../context/TenantContext";
 
 const loginSchema = z.object({
   username: z.string().min(3, "Username minimal 3 karakter"),
@@ -22,6 +22,8 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 
 const LoginPage = () => {
   const { signInWithUsername } = useAuth();
+  const { pb: tenantPb } = useTenant();
+  const pb = tenantPb;
   const [formError, setFormError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
 
@@ -32,6 +34,7 @@ const LoginPage = () => {
 
   useEffect(() => {
     const fetchSettings = async () => {
+      if (!pb) { setLogoLoading(false); return; }
       try {
         setLogoLoading(true);
         const records = await pb.collection("settings").getFullList({

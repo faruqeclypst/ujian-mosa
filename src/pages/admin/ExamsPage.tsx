@@ -4,10 +4,10 @@ import { Button } from "../../components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../../components/ui/dialog";
 import { DeleteConfirmationDialog } from "../../components/ui/delete-confirmation-dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
-import pb from "../../lib/pocketbase";
 import { Input } from "../../components/ui/input";
 import FormField from "../../components/forms/FormField";
 import { useAuth } from "../../context/AuthContext";
+import { useTenant } from "../../context/TenantContext";
 import { useNavigate } from "react-router-dom";
 import { useExamData } from "../../context/ExamDataContext";
 import { ConfirmationDialog } from "../../components/ui/confirmation-dialog";
@@ -75,6 +75,7 @@ const columns = [
 
 const ExamsPage = () => {
   const navigate = useNavigate();
+  const { pb } = useTenant();
   const { user, role, teacherId } = useAuth();
   const { addToast } = useToast();
   const { subjects, teachers, loading: dataLoading } = useExamData();
@@ -87,7 +88,7 @@ const ExamsPage = () => {
   const [dialogMode, setDialogMode] = useState<"create" | "edit">("create");
   const [selectedExam, setSelectedExam] = useState<ExamData | null>(null);
   const [activeExamIds, setActiveExamIds] = useState<string[]>([]);
-  const [formValues, setFormValues] = useState({ title: "", subjectId: "", teacherId: "", examType: "Latihan Biasa" });
+  const [formValues, setFormValues] = useState({ title: "", subjectId: "", teacherId: "", examType: "Latihan" });
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [examToDelete, setExamToDelete] = useState<ExamData | null>(null);
@@ -139,6 +140,7 @@ const ExamsPage = () => {
       type: "warning",
       confirmLabel: "Arsipkan",
       onConfirm: async () => {
+        if(!pb) return;
         try {
           await pb.collection('exams').update(exam.id, { status: "archive" });
         } catch (e) { 
@@ -156,6 +158,7 @@ const ExamsPage = () => {
       type: "info",
       confirmLabel: "Pulihkan",
       onConfirm: async () => {
+        if (!pb) return;
         try {
           await pb.collection('exams').update(exam.id, { status: null });
         } catch (e) { 
@@ -168,6 +171,7 @@ const ExamsPage = () => {
   // Load active rooms to detect active exams
   useEffect(() => {
     const fetchActiveRooms = async () => {
+      if (!pb) return;
       try {
         const rooms = await pb.collection('exam_rooms').getFullList({
           filter: 'isActive = true'
@@ -180,17 +184,17 @@ const ExamsPage = () => {
 
     fetchActiveRooms();
     // Subscribe ke perubahan ruang ujian
-    pb.collection('exam_rooms').subscribe("*", fetchActiveRooms);
+    pb?.collection('exam_rooms').subscribe("*", fetchActiveRooms);
 
     return () => {
-      pb.collection('exam_rooms').unsubscribe("*");
+      pb?.collection('exam_rooms').unsubscribe("*");
     };
-  }, []);
+  }, [pb]);
 
   // Sync exams data
   useEffect(() => {
     const fetchExams = async () => {
-      if (!subjects.length || !teachers.length) return;
+      if (!subjects.length || !teachers.length || !pb) return;
       
       try {
         const loaded = await pb.collection('exams').getFullList({
@@ -201,7 +205,7 @@ const ExamsPage = () => {
           // Handle possible lowercase field names from PocketBase
           const sId = exam.subjectId || (exam as any).subjectid;
           const tId = exam.teacherId || (exam as any).teacherid;
-          const type = exam.examType || (exam as any).examtype || "Latihan Biasa";
+          const type = exam.examType || (exam as any).examtype || "Latihan";
           
           const subjectObj = subjects.find((s: any) => s.id === sId);
           const teacherObj = teachers.find((t: any) => t.id === tId);
@@ -236,12 +240,12 @@ const ExamsPage = () => {
     };
 
     fetchExams();
-    pb.collection('exams').subscribe("*", fetchExams);
+    pb?.collection('exams').subscribe("*", fetchExams);
 
     return () => {
-      pb.collection('exams').unsubscribe("*");
+      pb?.collection('exams').unsubscribe("*");
     };
-  }, [subjects, teachers, role, user]);
+  }, [subjects, teachers, role, user, pb]);
 
   const handleCreateClick = () => {
     setDialogMode("create");
@@ -250,7 +254,7 @@ const ExamsPage = () => {
       title: "", 
       subjectId: "", 
       teacherId: role === "admin" ? "" : (teacherId || ""), 
-      examType: "Latihan Biasa" 
+      examType: "Latihan" 
     });
     setIsDialogOpen(true);
   };
@@ -262,7 +266,7 @@ const ExamsPage = () => {
       title: exam.title, 
       subjectId: exam.subjectId, 
       teacherId: exam.teacherId || "", 
-      examType: exam.examType || "Latihan Biasa" 
+      examType: exam.examType || "Latihan" 
     });
     setIsDialogOpen(true);
   };
@@ -274,6 +278,7 @@ const ExamsPage = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!pb) return;
     try {
       if (dialogMode === "edit" && selectedExam) {
         await pb.collection('exams').update(selectedExam.id, { ...formValues });
@@ -284,12 +289,12 @@ const ExamsPage = () => {
       }
       setIsDialogOpen(false);
     } catch (error) {
-      showAlert("Gagal", "Gagal menyimpan data ujian.", "danger");
+      showAlert("Gagal", "Gagal menyimpan data ujian. Periksa log browser.", "danger");
     }
   };
 
   const handleConfirmDelete = async () => {
-    if (!examToDelete) return;
+    if (!examToDelete || !pb) return;
     setIsDeleting(true);
     try {
       // 1. Hapus soal terkait (opsional jika menggunakan Relasi cascade di PB)
@@ -483,15 +488,12 @@ const ExamsPage = () => {
                 required
                 className="w-full rounded-md border border-slate-200 dark:border-slate-800 bg-card text-sm p-2"
               >
-                <option value="Latihan Biasa">Latihan Biasa</option>
-                <option value="Ulangan Harian">Ulangan Harian</option>
-                <option value="Ujian Tengah Semester (PTS)">Ujian Tengah Semester (PTS)</option>
-                <option value="Ujian Akhir Semester (PAS / PAT)">Ujian Akhir Semester (PAS / PAT)</option>
-                <option value="Ujian Sekolah (US)">Ujian Sekolah (US)</option>
+                <option value="Latihan">Latihan Biasa</option>
+                <option value="Ulangan">Ulangan Harian</option>
+                <option value="PTS">Ujian Tengah Semester (PTS)</option>
+                <option value="PAS">Ujian Akhir Semester (PAS / PAT)</option>
+                <option value="US">Ujian Sekolah (US)</option>
                 <option value="Tryout">Tryout</option>
-                <option value="Tugas Terstruktur">Tugas Terstruktur</option>
-                <option value="Ujian Praktik">Ujian Praktik</option>
-                <option value="Lainnya">Lainnya</option>
               </select>
             </FormField>
 

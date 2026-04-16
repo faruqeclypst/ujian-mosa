@@ -661,7 +661,7 @@ const StudentDashboardPage = () => {
                                           </div>
                                           <div className="flex flex-col items-center bg-rose-50 dark:bg-rose-950/30 border border-rose-100 dark:border-rose-800/50 py-2 px-3 rounded-xl min-w-[50px]">
                                             <span className="text-[8px] font-black text-rose-600 dark:text-rose-400 uppercase tracking-widest leading-none mb-1">Salah</span>
-                                            <span className="text-sm font-black text-rose-700 dark:text-rose-300">{(room.total_questions || room.totalQuestions || 0) - (attempt?.correct || 0)}</span>
+                                            <span className="text-sm font-black text-rose-700 dark:text-rose-300">{(attempt?.total || 0) - (attempt?.correct || 0)}</span>
                                           </div>
                                         </div>
                                         <div className="flex flex-col items-end">

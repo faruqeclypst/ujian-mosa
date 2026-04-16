@@ -1,15 +1,16 @@
-import { LogOut, Menu, Search, User, Settings, Clock, Bell, ShieldAlert, Unlock, UserX } from "lucide-react";
+import { LogOut, Menu, Search, User, Settings, Clock, Bell, ShieldAlert, Unlock, UserX, Sun, Moon, Monitor } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { Link } from "react-router-dom";
 
 import { useAuth } from "../../context/AuthContext";
 import { useSidebar } from "../../context/SidebarContext";
 import { useExamData } from "../../context/ExamDataContext";
+import { useTenant } from "../../context/TenantContext";
+import { useTheme } from "../../context/ThemeContext";
 import { Skeleton } from "../ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
-import { ThemeToggle } from "../ui/theme-toggle";
 import { cn } from "../../lib/utils";
 import pb from "../../lib/pocketbase";
 import ChangePasswordModal from "../auth/ChangePasswordModal";
@@ -17,9 +18,12 @@ import ChangePasswordModal from "../auth/ChangePasswordModal";
 const TopNavigation = () => {
   const { user, signOut, usernameFromEmail } = useAuth();
   const { setMobileOpen } = useSidebar();
-   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const { school } = useTenant();
+  const { theme, setTheme } = useTheme();
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [isCPModalOpen, setIsCPModalOpen] = useState(false);
+  const [modalTab, setModalTab] = useState<"profile" | "password">("profile");
   const [lockedAttempts, setLockedAttempts] = useState<any[]>([]);
   const [examRooms, setExamRooms] = useState<Record<string, any>>({});
   const [currentTime, setCurrentTime] = useState<string>("");
@@ -309,9 +313,6 @@ const TopNavigation = () => {
           )}
         </div>
 
-        {/* Theme Toggle */}
-        <ThemeToggle />
-
         {!user ? (
           <div className="hidden md:flex md:flex-col gap-2 min-w-0">
             <Skeleton className="h-4 w-24" />
@@ -341,63 +342,139 @@ const TopNavigation = () => {
 
           {/* Dropdown Menu */}
           {isDropdownOpen && (
-            <div className="absolute right-0 mt-2 w-64 sm:w-56 rounded-lg border bg-popover p-1 text-popover-foreground shadow-xl animate-in fade-in-0 zoom-in-95 z-[99999] pointer-events-auto">
-              <div className="flex items-center justify-start gap-3 p-3 sm:p-2">
-                <Avatar className="h-10 w-10 ring-2 ring-background">
+            <div className="absolute right-0 mt-2 w-[280px] rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a] shadow-xl animate-in fade-in-0 zoom-in-95 z-[99999] pointer-events-auto overflow-hidden">
+              {/* Header Profile Info */}
+              <div className="flex items-center justify-start gap-3 p-4 bg-slate-50/50 dark:bg-transparent">
+                <Avatar className="h-10 w-10 ring-2 ring-white dark:ring-slate-800 shadow-sm">
                   <AvatarImage src={(user as any)?.avatar ? pb.getFileUrl(user as any, (user as any).avatar) : undefined} alt={displayName} />
-                  <AvatarFallback className="bg-gradient-to-br from-blue-500 to-blue-600 text-white text-xs">
+                  <AvatarFallback className="bg-gradient-to-br from-blue-500 to-blue-600 text-white font-bold">
                     {initials}
                   </AvatarFallback>
                 </Avatar>
-                <div className="flex flex-col space-y-1 leading-none min-w-0 flex-1">
-                  <p className="font-medium text-sm sm:text-base truncate">{displayName}</p>
-                  <p className="truncate text-xs sm:text-sm text-muted-foreground">
+                <div className="flex flex-col space-y-0.5 min-w-0 flex-1">
+                  <p className="font-bold text-sm text-slate-900 dark:text-slate-100 truncate">{displayName}</p>
+                  <p className="truncate text-xs text-slate-500 dark:text-slate-400">
                     {user?.email ?? ""}
                   </p>
                 </div>
               </div>
-              <div className="my-1 h-px bg-muted" />
-              <div
-                className="relative flex cursor-default select-none items-center rounded-sm px-3 sm:px-2 py-2 sm:py-1.5 text-sm outline-none transition-colors focus:bg-accent focus:text-accent-foreground hover:bg-accent touch-manipulation"
-                onClick={() => setIsDropdownOpen(false)}
-              >
-                <Link
-                  to="/admin/profile"
-                  className="flex items-center cursor-pointer w-full min-h-[44px] sm:min-h-0"
+              
+              <div className="h-px bg-slate-100 dark:bg-slate-800" />
+              
+              {/* Profile Dropdown Plan Badge */}
+              <div className="p-3 bg-amber-50/50 dark:bg-[#1e1b12]">
+                <div className="flex flex-col rounded-lg border border-amber-200/50 dark:border-amber-900/40 bg-white dark:bg-black/20 p-3 shadow-sm">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[11px] font-black text-amber-700 dark:text-amber-500 uppercase tracking-widest leading-none">
+                      {school?.plan ? school.plan.charAt(0).toUpperCase() + school.plan.slice(1) : "Free"} Plan
+                    </span>
+                    <span className="text-[10px] font-bold text-amber-800 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/60 px-2 py-0.5 rounded leading-none">
+                      {students.length}/{school?.student_quota || 50} Siswa
+                    </span>
+                  </div>
+                  <div className="pt-2.5 mt-0.5 border-t border-amber-100 dark:border-amber-900/30 flex flex-col gap-1 text-[10px] text-amber-900/70 dark:text-amber-500/80 font-medium">
+                    <span>Info Upgrade Hubungi:</span>
+                    <span className="text-amber-700 dark:text-amber-400 font-bold block truncate">Alfaruq Asri, S.Pd., Gr</span>
+                    <span className="font-bold truncate">0853-5990-7696</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="h-px bg-slate-100 dark:bg-slate-800" />
+
+              {/* Tampilan (Theme Segmented Control) */}
+              <div className="px-4 py-3">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-2.5">
+                  Tampilan
+                </p>
+                <div className="flex items-center bg-slate-100 dark:bg-slate-900/80 rounded-lg p-1 border border-slate-200/50 dark:border-slate-800/80">
+                  <button
+                    onClick={() => setTheme("light")}
+                    className={cn(
+                      "flex-1 flex justify-center items-center py-1.5 rounded-md transition-all",
+                      theme === "light" 
+                        ? "bg-white text-blue-600 shadow-sm border border-slate-200 dark:border-transparent dark:bg-slate-800 dark:text-white" 
+                        : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+                    )}
+                  >
+                    <Sun className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    onClick={() => setTheme("system")}
+                    className={cn(
+                      "flex-1 flex justify-center items-center py-1.5 rounded-md transition-all",
+                      theme === "system" 
+                        ? "bg-white text-blue-600 shadow-sm border border-slate-200 dark:border-transparent dark:bg-slate-800 dark:text-white" 
+                        : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+                    )}
+                  >
+                    <Monitor className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    onClick={() => setTheme("dark")}
+                    className={cn(
+                      "flex-1 flex justify-center items-center py-1.5 rounded-md transition-all",
+                      theme === "dark" 
+                        ? "bg-white text-blue-600 shadow-sm border border-slate-200 dark:border-transparent dark:bg-slate-800 dark:text-white" 
+                        : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+                    )}
+                  >
+                    <Moon className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="h-px bg-slate-100 dark:bg-slate-800" />
+              
+              <div className="p-1.5">
+                <button
+                  className="flex items-center w-full px-3 py-2.5 text-sm font-medium text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                  onClick={() => {
+                    setIsDropdownOpen(false);
+                    setModalTab("profile");
+                    setIsCPModalOpen(true);
+                  }}
                 >
-                  <User className="mr-3 sm:mr-2 h-4 w-4" />
+                  <User className="mr-3 h-4 w-4 text-slate-400 dark:text-slate-500" />
                   <span>Profil & Nama</span>
-                </Link>
+                </button>
+                
+                <button
+                  className="flex items-center w-full px-3 py-2.5 text-sm font-medium text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                  onClick={() => {
+                    setIsDropdownOpen(false);
+                    setModalTab("password");
+                    setIsCPModalOpen(true);
+                  }}
+                >
+                  <Settings className="mr-3 h-4 w-4 text-slate-400 dark:text-slate-500" />
+                  <span>Ubah Password</span>
+                </button>
               </div>
-              <div
-                className="relative flex cursor-default select-none items-center rounded-sm px-3 sm:px-2 py-2 sm:py-1.5 text-sm outline-none transition-colors focus:bg-accent focus:text-accent-foreground hover:bg-accent touch-manipulation cursor-pointer"
-                onClick={() => {
-                  setIsDropdownOpen(false);
-                  setIsCPModalOpen(true);
-                }}
-              >
-                <Settings className="mr-3 sm:mr-2 h-4 w-4" />
-                <span>Ubah Password</span>
-              </div>
-              <div className="my-1 h-px bg-muted" />
-              <div
-                className="relative flex cursor-default select-none items-center rounded-sm px-3 sm:px-2 py-2 sm:py-1.5 text-sm outline-none transition-colors focus:bg-accent focus:text-accent-foreground hover:bg-accent cursor-pointer text-red-600 focus:text-red-600 touch-manipulation min-h-[44px] sm:min-h-0"
-                onClick={() => {
-                  setIsDropdownOpen(false);
-                  handleSignOut();
-                }}
-              >
-                <LogOut className="mr-3 sm:mr-2 h-4 w-4" />
-                <span>Logout</span>
+              
+              <div className="h-px bg-slate-100 dark:bg-slate-800" />
+              
+              <div className="p-1.5 bg-slate-50/50 dark:bg-transparent">
+                <button
+                  className="flex items-center w-full px-3 py-2 text-sm font-medium text-red-600 dark:text-red-400 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+                  onClick={() => {
+                    setIsDropdownOpen(false);
+                    handleSignOut();
+                  }}
+                >
+                  <LogOut className="mr-3 h-4 w-4" />
+                  <span>Logout</span>
+                </button>
               </div>
             </div>
           )}
         </div>
       </div>
-      {/* Password Change Modal */}
+      {/* Profile & Password Change Modal */}
       <ChangePasswordModal 
         isOpen={isCPModalOpen} 
         onClose={() => setIsCPModalOpen(false)} 
+        defaultTab={modalTab}
       />
     </header>
   );

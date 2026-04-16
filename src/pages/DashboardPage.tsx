@@ -7,7 +7,7 @@ import {
   GraduationCap,
   RefreshCw
 } from "lucide-react";
-import pb from "../lib/pocketbase";
+import { useTenant } from "../context/TenantContext";
 
 import { Card, CardHeader, CardTitle, CardContent } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
@@ -21,6 +21,11 @@ import { cn } from "../lib/utils";
 
 const DashboardPage = () => {
   const { teachers, classes, subjects, students, loading: contextLoading } = useExamData();
+  const { pb: tenantPb, school } = useTenant();
+  const pb = tenantPb!;
+
+  const planName = school?.plan ? school.plan.charAt(0).toUpperCase() + school.plan.slice(1) : "Free";
+  const quota = school?.student_quota || 250;
 
   const [totalExams, setTotalExams] = useState(0);
   const [activeRooms, setActiveRooms] = useState(0);
@@ -214,12 +219,12 @@ const DashboardPage = () => {
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <Badge variant="outline" className="text-emerald-600 border-emerald-100 bg-emerald-50 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-800/30 rounded-full px-3 py-1.5 flex items-center gap-2 font-bold shadow-sm">
+          <Badge variant="outline" className="text-emerald-600 border-emerald-100 bg-emerald-50 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-800/30 rounded-full px-3 py-1.5 flex items-center gap-2 font-bold shadow-sm h-full">
             <span className="relative flex h-2 w-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
             </span>
-            Real-time Connected
+            Connected
           </Badge>
         </div>
       </div>
