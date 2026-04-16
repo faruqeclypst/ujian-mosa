@@ -13,7 +13,7 @@ RUN apk add --no-cache \
 WORKDIR /pb
 
 # PocketBase version
-ARG PB_VERSION=0.22.8
+ARG PB_VERSION=0.36.9
 
 # Download PocketBase
 ADD https://github.com/pocketbase/pocketbase/releases/download/v${PB_VERSION}/pocketbase_${PB_VERSION}_linux_amd64.zip /tmp/pb.zip
