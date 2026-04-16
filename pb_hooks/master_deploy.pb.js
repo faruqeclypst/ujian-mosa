@@ -10,7 +10,8 @@ onRecordAfterCreateSuccess((e) => {
     if (isActive) {
         console.log("[Docker-SaaS] Mencoba deploy sekolah:", slug);
         try {
-            $os.exec("/pb/scripts/deploy-school.sh", slug, domain);
+            // Gunakan .run() untuk mengeksekusi shellnya
+            $os.cmd("/pb/scripts/deploy-school.sh", slug, domain).run();
             console.log("[Docker-SaaS] Sukses Deploy:", slug);
         } catch (err) {
             console.error("[Docker-SaaS] Gagal Deploy:", err.message);
@@ -29,7 +30,9 @@ onRecordAfterUpdateSuccess((e) => {
     if (isActive) {
         console.log("[Docker-SaaS] Memastikan deploy sekolah aktif via Update:", slug);
         try {
-            $os.exec("/pb/scripts/deploy-school.sh", slug, domain);
+            // Gunakan .run()
+            $os.cmd("/pb/scripts/deploy-school.sh", slug, domain).run();
+            console.log("[Docker-SaaS] Berhasil mengeksekusi update:", slug);
         } catch (err) {
             console.error("[Docker-SaaS] Gagal Update Deploy:", err.message);
         }
