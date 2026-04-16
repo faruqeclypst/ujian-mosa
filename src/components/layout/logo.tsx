@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from "react";
-import pb from "../../lib/pocketbase";
+import { useTenant } from "../../context/TenantContext";
 
 const Logo = () => {
+  const { pb, school } = useTenant();
   const [profile, setProfile] = useState({ name: "E-Ujian", logoUrl: "" });
   const [logoError, setLogoError] = useState(false);
 
   useEffect(() => {
+    if (!pb) return;
+
     // Fungsi untuk mengambil data settings dari PocketBase
     const fetchSettings = async () => {
       try {
@@ -36,7 +39,7 @@ const Logo = () => {
     fetchSettings();
 
     // Subscribe ke perubahan data secara realtime di PocketBase
-    pb.collection("settings").subscribe("*", (e) => {
+    const unsubscribe = pb.collection("settings").subscribe("*", (e) => {
       if (e.action === "update" || e.action === "create") {
         let logoUrl = e.record.logoUrl || e.record.logo || "";
 
@@ -53,9 +56,9 @@ const Logo = () => {
     });
 
     return () => {
-      pb.collection("settings").unsubscribe("*");
+      unsubscribe.then(unsub => unsub());
     };
-  }, []);
+  }, [pb]);
 
   return (
     <div className="flex items-center gap-3 sm:gap-4">

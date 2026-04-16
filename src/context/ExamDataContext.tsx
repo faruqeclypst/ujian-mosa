@@ -55,6 +55,7 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
   const [universalToken, setUniversalToken] = useState("");
   const [tokenUpdatedAt, setTokenUpdatedAt] = useState<any>(null);
   const [timeLeft, setTimeLeft] = useState("--:--");
+  const [serverOffset, setServerOffset] = useState(0); // Selisih waktu Server vs Client
   const { role } = useAuth();
   const { pb: tenantPb } = useTenant();
   const pb = tenantPb!;
@@ -177,6 +178,19 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
     const fetchSettings = async () => {
       try {
         pb.autoCancellation(false);
+        
+        // 🕒 Sinkronisasi Waktu Server yang Akurat
+        // Kita ambil jam asli server dari response header
+        const healthResponse = await fetch(`${pb.baseUrl}/api/health`, { method: 'GET' });
+        const serverDateStr = healthResponse.headers.get('Date');
+        if (serverDateStr) {
+          const serverTime = new Date(serverDateStr).getTime();
+          const localTime = Date.now();
+          const offset = localTime - serverTime;
+          setServerOffset(offset);
+          console.log("🕒 Server Time Sync Offset:", offset, "ms");
+        }
+
         const records = await pb.collection('settings').getFullList({ limit: 1, sort: 'created' });
         if (records.length > 0) {
           const s = records[0];
@@ -185,7 +199,7 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
           console.log("⚙️ Settings loaded:", s.universal_token);
         }
       } catch (e) {
-        console.error("❌ Error fetching settings:", e);
+        console.error("❌ Error fetching settings/time:", e);
       }
     };
 
@@ -203,14 +217,15 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
     });
 
     return () => { unsubscribe.then(unsub => unsub()); };
-  }, []);
+  }, [pb]);
 
   useEffect(() => {
     if (!tokenUpdatedAt) return;
     let isUpdating = false;
 
     const timer = setInterval(async () => {
-      const now = Date.now();
+      // Gunakan waktu client yang dikoreksi dengan offset server
+      const now = Date.now() - serverOffset;
       const updatedDate = new Date(tokenUpdatedAt).getTime();
       const nextUpdate = updatedDate + 5 * 60 * 1000;
       const diff = nextUpdate - now;
