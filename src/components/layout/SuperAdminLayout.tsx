@@ -23,6 +23,27 @@ const SuperAdminLayout: React.FC<SuperAdminLayoutProps> = ({ children }) => {
     navigate("/superadmin/login");
   };
 
+  // Mandatory session validation on mount
+  React.useEffect(() => {
+    const validateSession = async () => {
+      if (!masterPb.authStore.isValid) {
+        handleLogout();
+        return;
+      }
+
+      try {
+        // Confirm session with server - ensures fresh validation
+        // This handles cases where password was changed or token revoked
+        await masterPb.collection("super_admins").authRefresh();
+      } catch (err) {
+        console.error("Session stale or invalid:", err);
+        handleLogout();
+      }
+    };
+
+    validateSession();
+  }, [location.pathname]); // Re-validate on navigation to keep it fresh
+
   const navItems = [
     { label: "Dashboard Institusi", icon: LayoutDashboard, path: "/superadmin" },
     { label: "Status Infrastruktur", icon: Database, path: "/superadmin/infra" },

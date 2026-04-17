@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Plus, Edit, Trash, Check, Image, ChevronDown, FileText, Download, Eye, FolderOpen, Sparkles, Wand2, RefreshCw, BookOpen, Loader2, FileSpreadsheet, Search } from "lucide-react";
+import { ArrowLeft, Plus, Edit, Trash, Check, Copy, Image, ChevronDown, FileText, Download, Eye, FolderOpen, Sparkles, Wand2, RefreshCw, BookOpen, Loader2, FileSpreadsheet, Search, X, Bookmark, Forward, CheckCircle2, Menu, Maximize2, HelpCircle } from "lucide-react";
 import { MathText } from "../../components/MathText";
 import { SmartImage } from "../../components/ui/smart-image";
 import { generateQuestionsAI, generateSingleQuestionAI, getTopicSuggestionsAI, parseQuestionsAI, AI_MODELS } from "../../lib/ai";
@@ -24,6 +24,42 @@ import ImageResize from "quill-image-resize-module-react";
 import "react-quill/dist/quill.snow.css";
 
 Quill.register("modules/imageResize", ImageResize);
+
+// 🛠️ REGISTER CUSTOM FORMATS TO PRESERVE INDENTATION (TABS)
+const Parchment = Quill.import('parchment');
+const IndentStyle = new Parchment.Attributor.Style('text-indent', 'text-indent', {
+  scope: Parchment.Scope.BLOCK
+});
+const MarginLeftStyle = new Parchment.Attributor.Style('margin-left', 'margin-left', {
+  scope: Parchment.Scope.BLOCK
+});
+const LineHeightStyle = new Parchment.Attributor.Style('line-height', 'line-height', {
+  scope: Parchment.Scope.BLOCK
+});
+
+Quill.register(IndentStyle, true);
+Quill.register(MarginLeftStyle, true);
+Quill.register(LineHeightStyle, true);
+
+// 📜 FORMATS WHITELIST (Penting agar Quill tidak menghapus tag/style kustom)
+const quillFormats = [
+  'header', 'font', 'size',
+  'bold', 'italic', 'underline', 'strike', 'blockquote',
+  'list', 'bullet', 'indent',
+  'link', 'image', 'video', 'formula',
+  'color', 'background',
+  'align',
+  'text-indent', 'margin-left', 'line-height'
+];
+
+// Allow standard CSS styles that might come from Word/Mammoth
+const AlignStyle = Quill.import('attributors/style/align');
+Quill.register(AlignStyle, true);
+const BackgroundStyle = Quill.import('attributors/style/background');
+Quill.register(BackgroundStyle, true);
+const ColorStyle = Quill.import('attributors/style/color');
+Quill.register(ColorStyle, true);
+
 import { useExamData } from "../../context/ExamDataContext";
 import { useAuth } from "../../context/AuthContext";
 import { useTenant } from "../../context/TenantContext";
@@ -170,6 +206,7 @@ const QuestionsPage = () => {
   const [exam, setExam] = useState<any>(null);
   const [questions, setQuestions] = useState<QuestionData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(null);
   const [isImporting, setIsImporting] = useState(false);
@@ -267,6 +304,7 @@ const QuestionsPage = () => {
   const [isParsing, setIsParsing] = useState(false);
   const [parsedResults, setParsedResults] = useState<any[]>([]);
   const [isLiterasiGuideOpen, setIsLiterasiGuideOpen] = useState(false);
+  const [isMathGuideOpen, setIsMathGuideOpen] = useState(false);
 
   const loadGalleryImages = () => {
     const images = new Set<string>();
@@ -980,11 +1018,23 @@ const QuestionsPage = () => {
         ['bold', 'italic', 'underline', 'strike'],
         [{ 'align': [] }],
         [{ 'color': [] }, { 'background': [] }],
-        [{ 'list': 'ordered' }, { 'list': 'bullet' }],
+        [{ 'list': 'ordered' }, { 'list': 'bullet' }, { 'indent': '-1' }, { 'indent': '+1' }],
         ['image', 'formula', 'clean']
       ],
       handlers: {
         image: imageHandler
+      }
+    },
+    keyboard: {
+      bindings: {
+        tab: {
+          key: 9,
+          handler: function(this: any, range: any, context: any) {
+            if (context.format.list) return true;
+            this.quill.insertText(range.index, "\u00A0\u00A0\u00A0\u00A0"); 
+            return false;
+          }
+        }
       }
     },
     formula: true,
@@ -993,6 +1043,28 @@ const QuestionsPage = () => {
       modules: ['Resize', 'DisplaySize', 'Toolbar']
     }
   }), [imageHandler]);
+
+  const quillModulesChoice = useMemo(() => ({
+    toolbar: [
+      ['bold', 'italic', 'underline'],
+      [{ 'color': [] }],
+      [{ 'indent': '-1' }, { 'indent': '+1' }],
+      ['clean']
+    ],
+    keyboard: {
+      bindings: {
+        tab: {
+          key: 9,
+          handler: function(this: any, range: any, context: any) {
+            this.quill.insertText(range.index, "\u00A0\u00A0\u00A0\u00A0");
+            return false;
+          }
+        }
+      }
+    }
+  }), []);
+
+
 
 
   // 🔄 Load Questions dari PocketBase
@@ -1727,7 +1799,7 @@ const QuestionsPage = () => {
       sortable: true,
       render: (v: string, item: QuestionData) => (
         <div className="max-w-lg min-w-[250px]">
-          <MathText content={item.text} className="line-clamp-2 text-sm font-medium text-slate-800 dark:text-slate-200 leading-relaxed ql-editor !p-0 [&_p]:m-0 [&_ol]:list-decimal [&_ul]:list-disc [&_ol]:pl-4 [&_ul]:pl-4" />
+          <MathText content={item.text} className="line-clamp-2 text-sm font-serif text-slate-800 dark:text-slate-200 leading-relaxed ql-editor !p-0 [&_p]:m-0 [&_ol]:list-decimal [&_ul]:list-disc [&_ol]:pl-4 [&_ul]:pl-4" />
           <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
             {(item.imageUrl || item.text.includes("<img")) && (
               <span className="p-1 px-1.5 rounded-md bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400 flex items-center gap-1 font-bold text-[9px] border border-blue-200 dark:border-blue-800/40 uppercase tracking-tight">
@@ -2245,6 +2317,16 @@ const QuestionsPage = () => {
     addToast({ title: "Export Sukses", description: "Format sudah diperbaiki & Gambar diproses.", type: "success" });
   };
 
+  const copyToClipboard = (text: string, id?: string) => {
+    navigator.clipboard.writeText(text);
+    const key = id || text;
+    setCopiedId(key);
+    
+    setTimeout(() => {
+      setCopiedId(null);
+    }, 2000);
+  };
+
   const handleCheckboxChange = (id: string, checked: boolean, index: number, event: any) => {
     let newSelectedIds = [...selectedIds];
 
@@ -2755,7 +2837,18 @@ const QuestionsPage = () => {
           </DialogHeader>
 
           <form onSubmit={handleSubmit} className="space-y-4 pt-2">
-            <FormField id="text" label="Pertanyaan" error={undefined}>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs font-semibold text-slate-500">Pertanyaan Utama</label>
+              <button 
+                type="button" 
+                onClick={() => setIsMathGuideOpen(true)}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800/40 text-[10px] font-bold hover:bg-amber-100 transition-all shadow-sm"
+              >
+                <Sparkles className="w-3 h-3" />
+                Panduan Rumus
+              </button>
+            </div>
+            <FormField id="text" label="" error={undefined}>
               <div className="bg-card rounded-md border flex flex-col">
                 <ReactQuill
                   key={selectedQuestion ? `edit-${selectedQuestion.id}` : "create-main"}
@@ -2765,8 +2858,17 @@ const QuestionsPage = () => {
                   onChange={(content) => setFormValues({ ...formValues, text: content })}
                   placeholder="Tuliskan pertanyaan disini..."
                   modules={quillModules}
+                  formats={quillFormats}
                   className="[&_.ql-editor]:min-h-[120px] [&_.ql-container]:border-none [&_.ql-toolbar]:border-none [&_.ql-toolbar]:border-b"
                 />
+                {/* Pratinjau Tampilan */}
+                <div className="p-4 bg-slate-50/50 dark:bg-slate-900/30 border-t border-slate-200 dark:border-slate-800 rounded-b-md">
+                   <div className="flex items-center gap-2 mb-2.5 opacity-60">
+                      <div className="w-1.5 h-3 bg-indigo-500 rounded-full"></div>
+                      <p className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Pratinjau Tampilan (Sesuai Ujian)</p>
+                   </div>
+                   <MathText content={formValues.text} className="text-sm font-serif ql-editor !p-0 text-slate-800 dark:text-slate-200 leading-relaxed" />
+                </div>
               </div>
             </FormField>
 
@@ -2833,7 +2935,7 @@ const QuestionsPage = () => {
                         const val = e.target.value;
                         if (val === "NEW_LITERASI") {
                           setLiterasiMode("create");
-                          setFormValues({ ...formValues, groupId: "", groupText: '<h2 style="text-align:center;">JUDUL WACANA</h2><p><br></p><p style="text-indent: 30px;">Tuliskan isi wacana di sini...</p>' });
+                          setFormValues({ ...formValues, groupId: "", groupText: '<h2 style="text-align:center;">JUDUL WACANA</h2><p><br></p><p>Tuliskan isi wacana di sini...</p>' });
                         } else {
                           setLiterasiMode("select");
                           setFormValues({ 
@@ -2886,6 +2988,7 @@ const QuestionsPage = () => {
                             onChange={(content) => setFormValues({ ...formValues, groupText: content })}
                             placeholder="Ketikkan teks wacana literasi di sini..."
                             modules={quillModules}
+                            formats={quillFormats}
                             className="[&_.ql-editor]:min-h-[100px] [&_.ql-container]:border-none [&_.ql-toolbar]:border-none [&_.ql-toolbar]:border-b"
                           />
                         </div>
@@ -2952,15 +3055,16 @@ const QuestionsPage = () => {
                               value={formValues.choices[letter].text}
                               onChange={(content) => handleChoiceChange(letter, 'text', content)}
                               placeholder={`Jawaban ${letter.toUpperCase()} ...`}
-                              modules={{
-                                toolbar: [
-                                  ['bold', 'italic', 'underline'],
-                                  [{ 'color': [] }],
-                                  ['clean']
-                                ],
-                              }}
+                               modules={quillModulesChoice}
+                               formats={quillFormats}
                               className="[&_.ql-editor]:min-h-[42px] [&_.ql-editor]:py-2 [&_.ql-container]:border-none [&_.ql-toolbar]:border-none [&_.ql-toolbar]:border-b [&_.ql-toolbar]:px-1 [&_.ql-toolbar]:py-0 [&_.ql-formats]:mr-1"
                             />
+                            {/* Pratinjau Opsi */}
+                            {formValues.choices[letter].text && (
+                              <div className="p-2 bg-slate-50/50 dark:bg-slate-900/40 border-t border-slate-100 dark:border-slate-800 rounded-b-md">
+                                <MathText content={formValues.choices[letter].text} className="text-[11px] font-serif ql-editor !p-0 text-slate-600 dark:text-slate-400" />
+                              </div>
+                            )}
                           </div>
                           <div className="flex flex-col gap-1.5 shrink-0">
                             <Button
@@ -3111,161 +3215,211 @@ const QuestionsPage = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Dialog Preview Soal */}
+      {/* Dialog Preview Soal (CBT Look) */}
       <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
-
-        <DialogContent className="max-w-3xl bg-card max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Pratinjau Soal</DialogTitle>
-          </DialogHeader>
+        <DialogContent className="max-w-4xl p-0 border-none bg-transparent shadow-none h-[95vh] overflow-hidden scrollbar-hidden" hideClose>
           {previewQuestion && (
-            <div className="mt-4 p-6 bg-white dark:bg-slate-900 rounded-2xl border shadow-sm space-y-6 font-sans">
-              <div className="flex justify-between items-center border-b pb-3 border-slate-100 dark:border-slate-800">
-                <div className="flex items-center gap-2">
-                   <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xs shadow-md shadow-blue-200 dark:shadow-none">
+            <div className="bg-white dark:bg-slate-900 rounded-[40px] shadow-2xl h-full flex flex-col overflow-hidden border border-slate-100 dark:border-slate-800 m-2 sm:m-4 animate-in fade-in zoom-in-95 duration-300">
+               {/* CBT Header Replica - FIXED TOP */}
+               <div className="flex-shrink-0 bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 px-6 sm:px-10 py-5 sm:py-6 flex items-center justify-between z-20 backdrop-blur-md bg-white/90 dark:bg-slate-900/90">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-emerald-600 text-white flex items-center justify-center font-black text-xl sm:text-2xl shadow-xl shadow-emerald-200 dark:shadow-none">
                       {questions.findIndex(q => q.id === previewQuestion.id) + 1}
-                   </div>
-                   <span className="text-xs font-black uppercase tracking-widest text-slate-400">Pratinjau Lembar Ujian</span>
-                </div>
-                {previewQuestion.groupId && (
-                  <span className="text-[10px] font-black bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400 px-3 py-1 rounded-full border border-amber-200 dark:border-amber-800/60 uppercase">
-                    Paket: {previewQuestion.groupId}
-                  </span>
-                )}
-              </div>
-
-               {previewQuestion.groupId && (() => {
-                const firstWithText = questions.find(q => q.groupId === previewQuestion.groupId && q.groupText);
-                if (firstWithText) {
-                  const textToShow = firstWithText.groupText || "";
-                  const hasCover = firstWithText.imageUrl;
-
-                  return (
-                    <div className="bg-slate-50/50 dark:bg-slate-950/20 p-6 rounded-2xl border border-slate-200/60 dark:border-slate-800/40 space-y-4 shadow-inner">
-                      <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400 mb-2">
-                        <FileText className="w-4 h-4" />
-                        <span className="text-[10px] font-black uppercase tracking-widest">Materi Literasi / Wacana</span>
-                      </div>
-                      
-                      {hasCover && (
-                        <div className="mb-4 group relative">
-                          <SmartImage src={firstWithText.imageUrl} className="max-w-full md:max-w-lg h-auto mx-auto block rounded-xl border-4 border-white dark:border-slate-800 shadow-xl transition-transform group-hover:scale-[1.02]" alt="Cover Literasi" />
-                          <div className="absolute inset-0 rounded-xl bg-gradient-to-t from-black/20 to-transparent pointer-events-none"></div>
-                        </div>
-                      )}
-                      
-                      <MathText 
-                        content={textToShow}
-                        className={`text-base sm:text-lg leading-relaxed text-slate-800 dark:text-slate-200 font-serif ql-editor !p-0 selection:bg-blue-100 dark:selection:bg-blue-900/40`} 
-                      />
                     </div>
-                  );
-                }
-                return null;
-              })()}
-
-              <div className="space-y-4">
-                <MathText 
-                  content={previewQuestion.text}
-                  className={`ql-editor !p-0 font-medium text-lg text-slate-900 dark:text-white leading-relaxed break-words [&_strong]:text-blue-600 dark:[&_strong]:text-blue-400 [&_p]:mb-3 [&_ol]:list-decimal [&_ul]:list-disc [&_ol]:pl-6 [&_ul]:pl-6 selection:bg-indigo-100 dark:selection:bg-indigo-900/40`} 
-                />
-                
-                {previewQuestion.imageUrl && (
-                  <div className="relative group">
-                    <SmartImage src={previewQuestion.imageUrl} alt="Gambar Soal" className="max-w-full md:max-w-lg h-auto rounded-2xl border-4 border-white dark:border-slate-800 shadow-lg mx-auto" />
-                    <div className="absolute inset-0 rounded-2xl bg-gradient-to-t from-black/10 to-transparent pointer-events-none"></div>
+                    <div>
+                      <h3 className="text-xs sm:text-sm font-black text-slate-400 uppercase tracking-[0.2em] leading-tight mb-1">Soal Ujian</h3>
+                      <div className="flex items-center gap-2">
+                         <span className="text-sm sm:text-base font-black text-slate-800 dark:text-white uppercase tracking-tight">Pratinjau Siswa</span>
+                         {previewQuestion.groupId && (
+                            <span className="px-2 py-0.5 rounded-md bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800/40 text-[9px] font-black uppercase tracking-widest">Grup: {previewQuestion.groupId}</span>
+                         )}
+                      </div>
+                    </div>
                   </div>
-                )}
-              </div>
-              
-              <div className="pt-4 space-y-3">
-                {(previewQuestion.type === "pilihan_ganda" || previewQuestion.type === "pilihan_ganda_kompleks" || previewQuestion.type === "benar_salah" || !previewQuestion.type) && Object.keys(previewQuestion.choices || {}).map((cKey, idx) => {
-                  const choice = previewQuestion.choices![cKey];
-                  if (!choice.text && !choice.imageUrl) return null;
-                  
-                  return (
-                    <div 
-                      key={cKey} 
-                      className={`w-full text-left p-4 rounded-2xl border-2 flex items-center gap-4 transition-all ${
-                        choice.isCorrect 
-                          ? "bg-green-50/50 dark:bg-green-950/20 border-green-500/50 shadow-sm shadow-green-100 dark:shadow-none text-green-700 dark:text-green-400" 
-                          : "bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 text-slate-700 dark:text-slate-300"
-                      }`}
-                    >
-                      <div className={`w-8 h-8 shrink-0 rounded-xl border-2 flex items-center justify-center font-bold text-sm ${
-                        choice.isCorrect ? "bg-green-600 border-green-600 text-white shadow-lg shadow-green-200 dark:shadow-none" : "border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500"
-                      }`}>
-                        {String.fromCharCode(65 + idx)}
-                      </div>
-                      <div className="flex-1 text-sm md:text-base">
-                        <MathText content={choice.text} className={`break-words ql-editor !p-0 [&_img]:max-w-[300px] [&_img]:h-auto [&_img]:rounded-xl [&_img]:mt-2 text-inherit ${choice.isCorrect ? "font-bold" : "font-normal"}`} />
-                        {choice.imageUrl && (
-                          <SmartImage src={choice.imageUrl} alt={`Pilihan ${cKey.toUpperCase()}`} className="max-h-[200px] w-auto rounded-xl mt-2 border shadow-sm" />
-                        )}
-                      </div>
-                      {choice.isCorrect && (
-                        <div className="bg-green-600 p-1 rounded-full shadow-lg">
-                          <Check className="h-4 w-4 text-white shrink-0" />
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+                  <div className="flex items-center gap-2">
+                    <button className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-slate-50 dark:bg-slate-800 text-slate-400 flex items-center justify-center border border-slate-100 dark:border-slate-700 pointer-events-none">
+                      <Bookmark className="w-5 h-5" />
+                    </button>
+                    <button onClick={() => setIsPreviewOpen(false)} className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-rose-50 dark:bg-rose-950/30 text-rose-500 flex items-center justify-center border border-rose-100 dark:border-rose-800/40 hover:bg-rose-100 transition-colors">
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+               </div>
 
-                {previewQuestion.type === "menjodohkan" && (
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-6 px-2">
-                      <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
-                        <div className="w-1.5 h-1.5 rounded-full bg-slate-300"></div> PERNYATAAN
+               {/* INTERNAL SCROLLABLE CONTENT - HIDDEN SCROLLBAR */}
+               <div className="flex-1 overflow-y-auto scrollbar-hidden p-6 sm:p-10 space-y-8">
+                  {/* Literacy Stimulus (If Any) */}
+                  {previewQuestion.groupId && (() => {
+                    const firstWithText = questions.find(q => q.groupId === previewQuestion.groupId && q.groupText);
+                    if (firstWithText) {
+                      return (
+                        <div className="bg-slate-50 dark:bg-slate-950 p-6 sm:p-8 rounded-[30px] border border-slate-200 dark:border-slate-800 mb-10 space-y-4 relative overflow-hidden group">
+                           <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:rotate-12 transition-transform duration-700">
+                             <FileText className="w-16 h-16 sm:w-20 sm:h-20 text-emerald-800" />
+                           </div>
+
+                           <div className="flex items-center gap-3 mb-4 relative z-10">
+                             <div className="h-5 sm:h-6 w-1 sm:w-1.5 rounded-full bg-emerald-600"></div>
+                             <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-[0.2em] text-emerald-500 dark:text-emerald-400">Bacaan / Stimulus</span>
+                           </div>
+
+                           <MathText 
+                             content={firstWithText.groupText || ""}
+                             className={`leading-relaxed text-slate-800 dark:text-slate-200 font-serif ql-editor !p-0 !overflow-visible selection:bg-blue-100 dark:selection:bg-blue-900/40`} 
+                           />
+
+                           <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex justify-end opacity-50 dark:opacity-100 text-right">
+                             <span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest italic">Bacalah teks dengan seksama sebelum memberikan jawaban.</span>
+                           </div>
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
+
+                  <div className="space-y-6">
+                    {/* Main Question Image */}
+                    {previewQuestion.imageUrl && (
+                      <div className="relative inline-block group">
+                        <SmartImage 
+                          src={previewQuestion.imageUrl} 
+                          className="max-h-[300px] sm:max-h-[450px] rounded-[30px] border-4 border-white dark:border-slate-800 shadow-2xl transition-all group-hover:brightness-95" 
+                          alt="Question" 
+                        />
+                        <div className="absolute inset-0 bg-black/5 opacity-0 group-hover:opacity-100 transition-opacity rounded-[30px] flex items-center justify-center">
+                          <Maximize2 className="w-8 h-8 text-white drop-shadow-lg" />
+                        </div>
                       </div>
-                      <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
-                        <div className="w-1.5 h-1.5 rounded-full bg-green-400"></div> JAWABAN PASANGAN
+                    )}
+
+                    {/* Question Text */}
+                    <MathText 
+                      content={previewQuestion.text}
+                      className={`ql-editor !p-0 !overflow-visible font-serif text-lg sm:text-xl text-slate-800 dark:text-slate-100 leading-relaxed break-words [&_strong]:text-blue-600 dark:[&_strong]:text-blue-400 [&_p]:mb-3 [&_ol]:list-decimal [&_ul]:list-disc [&_ol]:pl-10 [&_ul]:pl-10 selection:bg-indigo-100 dark:selection:bg-indigo-900/40`} 
+                    />
+
+                    {/* Special Type Badge */}
+                    {(previewQuestion.type === "pilihan_ganda_kompleks" || previewQuestion.type === "menjodohkan" || previewQuestion.type === "urutkan") && (
+                      <div className="flex items-center gap-2 mb-6 px-4 py-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/50 rounded-xl w-fit">
+                        <HelpCircle className="w-4 h-4 text-blue-500" />
+                        <span className="text-[10px] sm:text-[11px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest">
+                          {previewQuestion.type === "pilihan_ganda_kompleks" ? "Pilih semua jawaban yang benar" :
+                            previewQuestion.type === "menjodohkan" ? "Pasangkan pernyataan di bawah ini" :
+                              "Urutkan pernyataan dengan benar"}
+                        </span>
                       </div>
-                    </div>
-                    <div className="space-y-2">
-                      {(previewQuestion.pairs || []).map(p => (
-                        <div key={p.id} className="grid grid-cols-2 gap-4 items-center">
-                          <div className="p-3.5 rounded-2xl border-2 border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 text-sm font-bold text-slate-700 dark:text-slate-300 shadow-sm">
-                            {p.left}
+                    )}
+                  </div>
+
+                  {/* Choices Container */}
+                  <div className="space-y-3 pt-4">
+                    {(previewQuestion.type === "pilihan_ganda" || previewQuestion.type === "pilihan_ganda_kompleks" || previewQuestion.type === "benar_salah" || !previewQuestion.type) && (
+                      <div className="space-y-3">
+                        {Object.keys(previewQuestion.choices || {}).map((cKey, idx) => {
+                          const choice = previewQuestion.choices![cKey];
+                          if (!choice.text && !choice.imageUrl) return null;
+                          const isCorrect = choice.isCorrect;
+                          
+                          return (
+                            <div key={cKey} className={`w-full text-left p-2.5 sm:p-4 rounded-2xl sm:rounded-3xl border-2 flex items-center gap-3 sm:gap-5 transition-all outline-none group ${isCorrect ? "bg-emerald-50 border-emerald-600 dark:bg-emerald-900/30 dark:border-emerald-500 shadow-lg shadow-emerald-500/10" : "bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800"}`}>
+                              <div className={`w-9 h-9 sm:w-11 sm:h-11 shrink-0 rounded-xl sm:rounded-2xl border flex items-center justify-center font-black text-sm sm:text-lg transition-colors ${isCorrect ? "bg-emerald-600 border-emerald-600 text-white" : "bg-slate-50 dark:bg-slate-900 text-slate-400 border-slate-100 dark:border-slate-800"}`}>
+                                {String.fromCharCode(65 + idx)}
+                              </div>
+                              <div className="flex-1 py-1 sm:py-2">
+                                <MathText 
+                                  content={choice.text} 
+                                  className={`break-words font-serif ql-editor !p-0 !overflow-visible [&_img]:max-w-[300px] [&_img]:h-auto [&_img]:rounded-xl [&_img]:mt-2 text-inherit ${isCorrect ? "font-bold" : "font-normal"}`} 
+                                />
+                                {choice.imageUrl && (
+                                  <div className="mt-4">
+                                    <SmartImage src={choice.imageUrl} alt="Choice" className="max-h-[200px] rounded-2xl border border-slate-100" />
+                                  </div>
+                                )}
+                              </div>
+                              {isCorrect && <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-emerald-600 text-white flex items-center justify-center shadow-lg"><Check className="w-4 h-4 sm:w-5 sm:h-5 stroke-[4px]" /></div>}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {previewQuestion.type === "menjodohkan" && (
+                      <div className="space-y-4 pt-2">
+                        {(previewQuestion.pairs || []).map(p => (
+                          <div key={p.id} className="flex flex-col sm:flex-row items-stretch gap-4">
+                            <div className="flex-1 p-5 bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 rounded-3xl font-serif text-slate-800 dark:text-slate-200 shadow-sm">
+                              <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Pernyataan</div>
+                              {p.left}
+                            </div>
+                            <div className="hidden sm:flex items-center justify-center text-emerald-500">
+                              <Forward className="w-8 h-8" />
+                            </div>
+                            <div className="flex-1 p-5 bg-emerald-50/50 dark:bg-emerald-950/20 border-2 border-dashed border-emerald-400/50 rounded-3xl font-serif text-emerald-800 dark:text-emerald-400 shadow-inner flex flex-col justify-center">
+                              <div className="text-[10px] font-black text-emerald-600/50 uppercase tracking-widest mb-1.5 flex items-center gap-2">
+                                <CheckCircle2 className="w-3.5 h-3.5" /> Pasangan Benar
+                              </div>
+                              <div className="text-lg font-black">{p.right}</div>
+                            </div>
                           </div>
-                          <div className="p-3.5 rounded-2xl border-2 border-green-200 dark:border-green-900/40 bg-green-50 dark:bg-green-950/20 text-sm font-black text-green-700 dark:text-green-400 shadow-sm flex items-center gap-2">
-                            <ArrowLeft className="w-3 h-3 rotate-180 opacity-50" /> {p.right}
+                        ))}
+                      </div>
+                    )}
+
+                    {(previewQuestion.type === "isian_singkat" || previewQuestion.type === "uraian") && (
+                      <div className="p-8 sm:p-10 rounded-[40px] border-2 border-dashed border-blue-200 dark:border-blue-900/40 bg-blue-50/20 dark:bg-blue-950/20 space-y-4">
+                        <div className="flex items-center gap-3">
+                           <div className="w-10 h-10 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-lg">
+                             <Check className="w-6 h-6 stroke-[3px]" />
+                           </div>
+                           <div>
+                             <span className="text-xs font-black text-blue-600/70 dark:text-blue-400/70 uppercase tracking-widest block">Kunci Jawaban / Pedoman</span>
+                             <span className="text-[10px] text-blue-400 font-bold uppercase tracking-tighter">Hanya terlihat oleh Administrator</span>
+                           </div>
+                        </div>
+                        <div className="text-xl sm:text-2xl font-black text-blue-800 dark:text-blue-300 bg-white dark:bg-slate-900 p-6 sm:p-8 rounded-3xl border border-blue-100 dark:border-blue-800/40 shadow-xl">
+                          {previewQuestion.answerKey || "(Belum diisi)"}
+                        </div>
+                      </div>
+                    )}
+
+                    {(previewQuestion.type === "urutkan" || previewQuestion.type === "drag_drop") && (
+                      <div className="space-y-4 pt-2">
+                        {(previewQuestion.items || []).map((it, idx) => (
+                          <div key={it.id} className="flex items-center gap-5 p-5 rounded-3xl border-2 border-indigo-100 dark:border-indigo-900/40 bg-indigo-50/30 dark:bg-indigo-950/20 shadow-sm group">
+                            <div className="w-12 h-12 rounded-2xl bg-indigo-600 text-white flex items-center justify-center font-black text-xl shadow-xl shadow-indigo-200 dark:shadow-none transition-transform group-hover:rotate-6">
+                              {idx + 1}
+                            </div>
+                            <div className="flex-1">
+                               <div className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-0.5">Urutan Benar</div>
+                               <span className="text-xl font-serif font-black text-indigo-800 dark:text-indigo-300 leading-tight">{it.text}</span>
+                            </div>
+                            <div className="opacity-20"><Menu className="w-6 h-6" /></div>
                           </div>
-                        </div>
-                      ))}
-                    </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                )}
+               </div>
 
-                {(previewQuestion.type === "isian_singkat" || previewQuestion.type === "uraian") && (
-                  <div className="p-6 rounded-3xl border-2 border-dashed border-blue-200 dark:border-blue-900/40 bg-blue-50/30 dark:bg-blue-950/10 space-y-3">
-                    <div className="flex items-center gap-2">
-                       <Check className="w-4 h-4 text-blue-600" />
-                       <span className="text-[10px] font-black text-blue-600/70 dark:text-blue-400/70 uppercase tracking-widest">{previewQuestion.type === "isian_singkat" ? "Kunci Jawaban Otomatis" : "Pedoman Penilaian Guru"}</span>
+               {/* MODAL FOOTER - FIXED BOTTOM */}
+               <div className="flex-shrink-0 bg-slate-50/80 dark:bg-slate-900/80 backdrop-blur-md border-t border-slate-100 dark:border-slate-800 p-6 sm:px-10 flex items-center justify-between z-20">
+                  <div className="flex items-center gap-4">
+                    <div className="flex flex-col">
+                      <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">Tipe Konten</span>
+                      <span className="text-sm font-bold text-slate-700 dark:text-slate-300 capitalize">{previewQuestion.type?.replace("_", " ") || "Pilihan Ganda"}</span>
                     </div>
-                    <div className="text-lg font-black text-blue-700 dark:text-blue-300 bg-white dark:bg-slate-900 p-4 rounded-2xl border border-blue-100 dark:border-blue-800/40 shadow-sm">
-                      {previewQuestion.answerKey || "(Belum diisi)"}
-                    </div>
-                  </div>
-                )}
-
-                {(previewQuestion.type === "urutkan" || previewQuestion.type === "drag_drop") && (
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-2">
-                       <div className="w-2 h-2 rounded-full bg-indigo-500"></div>
-                       <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Urutan Penyelesaian Benar</span>
-                    </div>
-                    <div className="grid grid-cols-1 gap-3">
-                      {(previewQuestion.items || []).map((it, idx) => (
-                        <div key={it.id} className="flex items-center gap-4 p-4 rounded-2xl border-2 border-indigo-100 dark:border-indigo-900/40 bg-indigo-50/30 dark:bg-indigo-950/20 shadow-sm">
-                          <div className="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-black text-sm shadow-lg shadow-indigo-200 dark:shadow-none">{idx + 1}</div>
-                          <span className="text-base font-bold text-indigo-700 dark:text-indigo-300">{it.text}</span>
-                        </div>
-                      ))}
+                    <div className="w-px h-8 bg-slate-200 dark:bg-slate-800"></div>
+                    <div className="flex flex-col">
+                      <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">Status Rendering</span>
+                      <span className="text-sm font-bold text-emerald-600 flex items-center gap-1">
+                        <CheckCircle2 className="w-4 h-4" /> KaTeX Active
+                      </span>
                     </div>
                   </div>
-                )}
-              </div>
+                  <Button onClick={() => setIsPreviewOpen(false)} className="rounded-2xl h-12 px-8 bg-slate-900 hover:bg-black text-white font-bold transition-all shadow-xl shadow-slate-200 dark:shadow-none">
+                     Tutup Pratinjau
+                  </Button>
+               </div>
             </div>
           )}
         </DialogContent>
@@ -3349,9 +3503,19 @@ const QuestionsPage = () => {
                 </div>
 
                 <div className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <div className="w-1.5 h-6 bg-indigo-500 rounded-full"></div>
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Pertanyaan Utama</p>
+                  <div className="flex items-center justify-between px-1">
+                    <div className="flex items-center gap-2">
+                      <div className="w-1.5 h-6 bg-indigo-500 rounded-full"></div>
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Pertanyaan Utama</p>
+                    </div>
+                    <button 
+                      type="button" 
+                      onClick={() => setIsMathGuideOpen(true)}
+                      className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800/40 text-[10px] font-bold hover:bg-amber-100 transition-all shadow-sm"
+                    >
+                      <Sparkles className="w-3 h-3" />
+                      Panduan Rumus
+                    </button>
                   </div>
                   <div className="bg-slate-50 dark:bg-slate-800/30 rounded-2xl border border-slate-100 dark:border-slate-800 flex flex-col focus-within:ring-2 focus-within:ring-indigo-500 transition-all">
                     <ReactQuill
@@ -3359,15 +3523,17 @@ const QuestionsPage = () => {
                       value={q.text}
                       onChange={(content) => updateBatchItem(index, 'text', content)}
                       placeholder="Tuliskan pertanyaan disini..."
-                      modules={{
-                        toolbar: [
-                          ['bold', 'italic', 'underline'],
-                          [{ 'color': [] }],
-                          ['clean']
-                        ],
-                      }}
-                      className="[&_.ql-editor]:min-h-[80px] [&_.ql-editor]:py-3 [&_.ql-container]:border-none [&_.ql-toolbar]:border-none [&_.ql-toolbar]:border-b [&_.ql-toolbar]:px-2 [&_.ql-toolbar]:py-1 [&_.ql-formats]:mr-1 text-sm"
+                      modules={quillModulesChoice}
+                      formats={quillFormats}
+                      className="font-serif [&_.ql-editor]:min-h-[80px] [&_.ql-editor]:py-3 [&_.ql-container]:border-none [&_.ql-toolbar]:border-none [&_.ql-toolbar]:border-b [&_.ql-toolbar]:px-2 [&_.ql-toolbar]:py-1 [&_.ql-formats]:mr-1 text-sm"
                     />
+                    <div className="p-4 bg-indigo-50/30 dark:bg-indigo-950/20 border-t border-slate-100 dark:border-slate-800 rounded-b-2xl">
+                       <div className="flex items-center gap-2 mb-2 opacity-60">
+                          <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
+                          <p className="text-[10px] font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-widest">Pratinjau Live Render</p>
+                       </div>
+                       <MathText content={q.text} className="font-serif ql-editor !p-0 text-sm font-semibold text-slate-800 dark:text-slate-200 leading-relaxed" />
+                    </div>
                   </div>
                   
                   <div className="flex items-center gap-3 px-1">
@@ -3434,13 +3600,24 @@ const QuestionsPage = () => {
                               {letter.toUpperCase()}
                             </button>
                             <div className="flex-1">
-                              <input
-                                type="text"
-                                placeholder={`Teks Pilihan ${letter.toUpperCase()}...`}
-                                value={q.choices[letter].text}
-                                onChange={(e) => updateBatchChoice(index, letter, e.target.value)}
-                                className="w-full bg-transparent border-none focus:ring-0 text-sm font-semibold text-slate-700 dark:text-slate-200 placeholder:text-slate-300 dark:placeholder:text-slate-600"
-                              />
+                              <div className="w-full flex flex-col gap-1.5">
+                                <input
+                                  type="text"
+                                  placeholder={`Teks Pilihan ${letter.toUpperCase()}...`}
+                                  value={q.choices[letter].text}
+                                  onChange={(e) => updateBatchChoice(index, letter, e.target.value)}
+                                  className="w-full bg-transparent border-none focus:ring-0 text-sm font-semibold text-slate-700 dark:text-slate-200 placeholder:text-slate-300 dark:placeholder:text-slate-600 p-0"
+                                />
+                                {q.choices[letter].text && (
+                                  <div className="mt-1.5 p-2 rounded-xl bg-indigo-50/50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800/40 animate-in fade-in slide-in-from-top-1 duration-300">
+                                    <div className="flex items-center gap-1.5 mb-1 opacity-50">
+                                      <Sparkles className="w-3 h-3 text-indigo-500" />
+                                      <p className="text-[8px] font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-widest">Preview Math</p>
+                                    </div>
+                                    <MathText content={q.choices[letter].text} className="text-[11px] font-serif ql-editor !p-0 text-slate-800 dark:text-slate-200" />
+                                  </div>
+                                )}
+                              </div>
                             </div>
                             {isCorrect && (
                               <div className="bg-emerald-600 text-white p-1 rounded-lg animate-in zoom-in-50 duration-300">
@@ -3640,13 +3817,8 @@ const QuestionsPage = () => {
                 value={quickPasteText}
                 onChange={setQuickPasteText}
                 placeholder={"Contoh:\n1. Siapa penemu lampu pijar?\nA. Thomas Alva Edison\nB. Isaac Newton\n...\nJawaban: A"}
-                modules={{
-                  toolbar: [
-                    ['bold', 'italic', 'underline'],
-                    [{ 'color': [] }],
-                    ['clean']
-                  ],
-                }}
+                 modules={quillModulesChoice}
+                 formats={quillFormats}
                 className="quill-paste-area [&_.ql-editor]:min-h-[320px] [&_.ql-editor]:max-h-[500px] [&_.ql-editor]:overflow-y-auto [&_.ql-container]:border-none [&_.ql-toolbar]:border-none [&_.ql-toolbar]:border-b [&_.ql-toolbar]:bg-orange-50/50 dark:[&_.ql-toolbar]:bg-slate-700/50"
               />
               {!quickPasteText.replace(/<[^>]*>/g, '').trim() && (
@@ -4000,7 +4172,7 @@ const QuestionsPage = () => {
                                  <div className={`w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-black uppercase shrink-0 ${val.isCorrect ? 'bg-emerald-500 text-white shadow-md' : 'bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-800'}`}>
                                    {key}
                                  </div>
-                                 <span className="text-[11px] font-semibold">{val.text}</span>
+                                 <MathText content={val.text} className="text-[11px] font-semibold" />
                                  {val.isCorrect && <Check className="w-3.5 h-3.5 ml-auto text-emerald-500 stroke-[3px]" />}
                                </div>
                              ))}
@@ -4117,6 +4289,210 @@ const QuestionsPage = () => {
               * Jangan menutup atau merefresh halaman ini selama proses berlangsung.
             </p>
           </div>
+        </DialogContent>
+      </Dialog>
+      {/* 📘 MODAL PUSAT BANTUAN PENULISAN STEM */}
+      <Dialog open={isMathGuideOpen} onOpenChange={setIsMathGuideOpen}>
+        <DialogContent className="max-w-2xl rounded-[1.5rem] overflow-hidden p-0 border-none shadow-2xl bg-white dark:bg-slate-950">
+          <div className="bg-slate-900 p-8 text-white relative">
+            <BookOpen className="h-16 w-16 opacity-5 absolute right-8 top-8" />
+            <h2 className="text-2xl font-bold mb-1 tracking-tight">Pusat Bantuan Penulisan STEM</h2>
+            <p className="text-slate-400 text-sm font-medium">Dokumentasi format penulisan rumus Matematika, Fisika, dan Kimia.</p>
+          </div>
+          
+          <div className="p-8 space-y-6 max-h-[60vh] overflow-y-auto custom-scrollbar">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Dasar */}
+              <div className="space-y-3">
+                <h3 className="text-[10px] font-black text-indigo-500 uppercase tracking-[0.2em]">Dasar Notasi</h3>
+                <div className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800 space-y-4">
+                  <div>
+                    <p className="text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-2">Penulisan dalam Kalimat</p>
+                    <div className="group relative">
+                      <div className="p-3 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl">
+                        <code className="text-xs font-mono text-indigo-600 dark:text-indigo-400 select-all">$ x = 2 $</code>
+                      </div>
+                      <button 
+                         onClick={() => copyToClipboard("$ x = 2 $")}
+                         className={`absolute right-2 top-1/2 -translate-y-1/2 transition-all p-1.5 rounded-lg text-[10px] font-bold flex items-center gap-1.5 shadow-sm border ${
+                            copiedId === "$ x = 2 $" 
+                            ? "bg-emerald-500 text-white border-emerald-500 opacity-100" 
+                            : "bg-white dark:bg-slate-900 text-slate-500 hover:text-indigo-600 border-slate-200 dark:border-slate-800 opacity-0 group-hover:opacity-100"
+                         }`}
+                      >
+                         {copiedId === "$ x = 2 $" ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                         {copiedId === "$ x = 2 $" ? "Tersalin" : "Salin"}
+                      </button>
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-2">Penulisan Baris Terpisah</p>
+                    <div className="group relative">
+                      <div className="p-3 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl">
+                        <code className="text-xs font-mono text-indigo-600 dark:text-indigo-400 select-all">$$ E = mc^2 $$</code>
+                      </div>
+                      <button 
+                         onClick={() => copyToClipboard("$$ E = mc^2 $$")}
+                         className={`absolute right-2 top-1/2 -translate-y-1/2 transition-all p-1.5 rounded-lg text-[10px] font-bold flex items-center gap-1.5 shadow-sm border ${
+                            copiedId === "$$ E = mc^2 $$" 
+                            ? "bg-emerald-500 text-white border-emerald-500 opacity-100" 
+                            : "bg-white dark:bg-slate-900 text-slate-500 hover:text-indigo-600 border-slate-200 dark:border-slate-800 opacity-0 group-hover:opacity-100"
+                         }`}
+                      >
+                         {copiedId === "$$ E = mc^2 $$" ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                         {copiedId === "$$ E = mc^2 $$" ? "Tersalin" : "Salin"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Kamus Simbol */}
+              <div className="space-y-3">
+                <h3 className="text-[10px] font-black text-indigo-500 uppercase tracking-[0.2em]">Kamus Simbol</h3>
+                <div className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800 space-y-3 text-xs">
+                  <div className="flex justify-between items-center text-[10px] font-bold text-slate-400 uppercase tracking-widest pb-1 border-b border-slate-200">
+                    <span>Simbol</span>
+                    <span className="mr-8">Kode / Hasil</span>
+                  </div>
+                  {[
+                    { label: "Pecahan", code: "\\frac{a}{b}" },
+                    { label: "Akar", code: "\\sqrt{x}" },
+                    { label: "Derajat", code: "30^\\circ" },
+                    { label: "Integral", code: "\\int x \\,dx" },
+                    { label: "Limit", code: "\\lim_{x \\to 0}" }
+                  ].map((item) => (
+                    <div key={item.label} className="group flex justify-between items-center border-b border-slate-200/50 dark:border-slate-800 pb-2.5 text-slate-600 dark:text-slate-400 font-medium">
+                      <div className="flex flex-col">
+                        <span>{item.label}</span>
+                        <div className="mt-1 opacity-80">
+                           <MathText content={`$ ${item.code} $`} />
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <code className="text-indigo-500 font-bold select-all tracking-wide">{item.code}</code>
+                        <button 
+                          onClick={() => copyToClipboard(item.code)}
+                          className={`transition-all p-1.5 rounded shadow-sm border ${
+                            copiedId === item.code 
+                            ? "bg-emerald-500 text-white border-emerald-500 opacity-100" 
+                            : "bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-indigo-600 border-slate-200 dark:border-slate-800 opacity-0 group-hover:opacity-100"
+                          }`}
+                        >
+                          {copiedId === item.code ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-4 pt-2">
+              <h3 className="text-[10px] font-black text-indigo-500 uppercase tracking-[0.2em]">Referensi Lab Sains</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="group p-5 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3 relative">
+                  <div className="flex justify-between items-center">
+                    <p className="text-[10px] font-black text-slate-900 dark:text-slate-100 uppercase tracking-widest">Persamaan Kimia</p>
+                    <MathText content="$ H_2O $" className="text-xs" />
+                  </div>
+                  <div className="p-3 bg-slate-100 dark:bg-slate-800/50 rounded-xl relative group-hover:bg-slate-200 transition-colors">
+                    <code className="text-[10px] text-slate-600 dark:text-slate-400 font-mono italic select-all">
+                      $ H_2O + \dots $
+                    </code>
+                    <button 
+                         onClick={() => copyToClipboard("$ H_2O + \\dots $")}
+                         className={`absolute right-2 top-1/2 -translate-y-1/2 transition-all p-1.5 rounded-lg border shadow-sm flex items-center gap-1.5 text-[10px] font-bold ${
+                           copiedId === "$ H_2O + \\dots $"
+                           ? "bg-emerald-500 text-white border-emerald-500 opacity-100"
+                           : "bg-white dark:bg-slate-900 text-slate-500 hover:text-indigo-600 border-slate-200 dark:border-slate-800 opacity-0 group-hover:opacity-100"
+                         }`}
+                      >
+                         {copiedId === "$ H_2O + \\dots $" ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                         {copiedId === "$ H_2O + \\dots $" ? "Tersalin" : "Salin"}
+                      </button>
+                  </div>
+                  <p className="text-[10px] text-slate-500 leading-relaxed font-medium">Gunakan subscript (_) untuk angka atom.</p>
+                </div>
+                <div className="group p-5 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3 relative">
+                  <div className="flex justify-between items-center">
+                    <p className="text-[10px] font-black text-slate-900 dark:text-slate-100 uppercase tracking-widest">Persamaan Fisika</p>
+                    <MathText content="$ \vec{F} $" className="text-xs" />
+                  </div>
+                  <div className="p-3 bg-slate-100 dark:bg-slate-800/50 rounded-xl relative group-hover:bg-slate-200 transition-colors">
+                    <code className="text-[10px] text-slate-600 dark:text-slate-400 font-mono italic select-all">
+                      $ \vec{"{F}"} = m \cdot \vec{"{a}"} $
+                    </code>
+                     <button 
+                         onClick={() => copyToClipboard("$ \\vec{F} = m \\cdot \\vec{a} $")}
+                         className={`absolute right-2 top-1/2 -translate-y-1/2 transition-all p-1.5 rounded-lg border shadow-sm flex items-center gap-1.5 text-[10px] font-bold ${
+                            copiedId === "$ \\vec{F} = m \\cdot \\vec{a} $"
+                            ? "bg-emerald-500 text-white border-emerald-500 opacity-100"
+                            : "bg-white dark:bg-slate-900 text-slate-500 hover:text-indigo-600 border-slate-200 dark:border-slate-800 opacity-0 group-hover:opacity-100"
+                         }`}
+                      >
+                         {copiedId === "$ \\vec{F} = m \\cdot \\vec{a} $" ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                         {copiedId === "$ \\vec{F} = m \\cdot \\vec{a} $" ? "Tersalin" : "Salin"}
+                      </button>
+                  </div>
+                  <p className="text-[10px] text-slate-500 leading-relaxed font-medium">Gunakan \vec untuk tanda panah vektor.</p>
+                </div>
+              </div>
+            </div>
+
+            {/* NEW SECTION: READY TO COPY EXAMPLES */}
+            <div className="space-y-4 pt-4 border-t border-slate-100 dark:border-slate-800">
+               <h3 className="text-[10px] font-black text-indigo-500 uppercase tracking-[0.2em]">Templat Soal Siap Pakai</h3>
+               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  {[
+                    {
+                      category: "MATEMATIKA",
+                      text: "Hitunglah luas daerah yang dibatasi kurva $ y = x^2 $, sumbu-x, garis $ x = 1 $ dan $ x = 3 $ menggunakan $ \\int_1^3 x^2 \\,dx $?",
+                      preview: "Kalkulus (Integral)"
+                    },
+                    {
+                      category: "FISIKA",
+                      text: "Sebuah benda bermassa $ m = 2 \\text{ kg} $ ditarik dengan gaya $ \\vec{F} = 10 \\text{ N} $. Berapakah percepatan $ \\vec{a} $ benda tersebut?",
+                      preview: "Hukum II Newton"
+                    },
+                    {
+                      category: "KIMIA",
+                      text: "Berapakah jumlah atom hidrogen dalam senyawa $ 2\\text{H}_2\\text{O} $?",
+                      preview: "Molekul Air"
+                    }
+                  ].map((tpl) => (
+                    <button 
+                      key={tpl.preview}
+                      onClick={() => copyToClipboard(tpl.text, tpl.preview)}
+                      className={`group p-4 border rounded-2xl text-left transition-all flex flex-col gap-2 ${
+                        copiedId === tpl.preview 
+                        ? "bg-emerald-50 dark:bg-emerald-950/20 border-emerald-500 shadow-lg shadow-emerald-500/10 scale-[1.02]" 
+                        : "bg-slate-50 dark:bg-slate-900 border-slate-100 dark:border-slate-800 hover:border-indigo-400 dark:hover:border-indigo-600"
+                      }`}
+                    >
+                      <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{tpl.category}</span>
+                      <MathText content={tpl.text} className="text-[11px] line-clamp-3 text-slate-600 dark:text-slate-400 font-serif ql-editor !p-0 leading-relaxed h-[2.5rem]" />
+                      <div className="mt-2 flex items-center justify-between">
+                         <span className="text-[10px] font-bold text-indigo-500">{tpl.preview}</span>
+                         <div className={`px-2 py-0.5 rounded-md text-[9px] font-bold transition-all ${
+                            copiedId === tpl.preview 
+                            ? "bg-emerald-500 text-white opacity-100" 
+                            : "bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 opacity-0 group-hover:opacity-100"
+                         }`}>
+                             {copiedId === tpl.preview ? "TERPEROLEH!" : "SALIN SOAL"}
+                         </div>
+                      </div>
+                    </button>
+                  ))}
+               </div>
+            </div>
+          </div>
+
+          <DialogFooter className="p-8 bg-slate-50 dark:bg-slate-900/50 border-t border-slate-100 dark:border-slate-800">
+            <Button onClick={() => setIsMathGuideOpen(false)} className="w-full h-12 bg-slate-900 hover:bg-black text-white rounded-xl font-bold transition-all shadow-xl shadow-slate-200 dark:shadow-none">
+              Tutup Dokumentasi
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
       {/* Hidden inputs for imports moved here for reliability */}

@@ -104,13 +104,20 @@ export const StudentAuthProvider = ({ children }: { children: ReactNode }) => {
       const classObj = model.expand?.classId || (model.expand as any)?.class_id || (model.expand as any)?.classid;
 
       const fingerprint = btoa(navigator.userAgent).substring(0, 16);
-      const newSessionId = `${crypto.randomUUID()}:${fingerprint}`;
+      // Fallback for non-secure (HTTP) environments where crypto.randomUUID might be undefined
+      const uuid = (typeof crypto !== 'undefined' && crypto.randomUUID) 
+        ? crypto.randomUUID() 
+        : Math.random().toString(36).substring(2, 15);
+      
+      const newSessionId = `${uuid}:${fingerprint}`;
       localStorage.setItem("student_session_id", newSessionId);
 
       try {
+        console.log("Attempting to sync session to server:", newSessionId);
         await pb.collection("students").update(model.id, { activeSessionId: newSessionId });
+        console.log("Session sync successful!");
       } catch (sessionErr) {
-        console.error("GAGAL UPDATE SESSION ID:", sessionErr);
+        console.error("GAGAL UPDATE SESSION ID (Cek API Rules/Field Name):", sessionErr);
       }
 
       setstudent({
@@ -161,19 +168,30 @@ export const StudentAuthProvider = ({ children }: { children: ReactNode }) => {
 
     const handleSessionConflict = (serverSessionId: string, localSessionId: string | null) => {
       if (!serverSessionId) return false;
+      
+      const [_, serverFingerprint] = serverSessionId.split(":");
+      const [localUuid, localFingerprint] = localSessionId ? localSessionId.split(":") : [null, null];
+
+      // Jika sid server ada tapi lokal belum ada
       if (!localSessionId) {
-        const [_, serverFingerprint] = serverSessionId.split(":");
         if (serverFingerprint === currentFingerprint) {
           localStorage.setItem("student_session_id", serverSessionId);
           return false;
         }
+        return true; // Perangkat berbeda
       }
-      if (localSessionId && serverSessionId !== localSessionId) {
-        const [_, serverFingerprint] = serverSessionId.split(":");
+
+      // Jika sid server berbeda dengan lokal
+      if (serverSessionId !== localSessionId) {
+        // Jika sid server berasal dari perangkat yang SAMA (fingerprint cocok)
+        // Kita izinkan sinkronisasi ulang alih-alih kick (penting setelah restore database)
         if (serverFingerprint === currentFingerprint) {
           localStorage.setItem("student_session_id", serverSessionId);
           return false;
         }
+        
+        // Cek apakah localSid kita sebenarnya lebih baru (jika UUID ada dalam urutan tertentu, 
+        // tapi paling aman adalah cek apakah update kita ke server belum sampai)
         return true;
       }
       return false;

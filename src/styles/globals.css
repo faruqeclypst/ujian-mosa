@@ -95,6 +95,13 @@ body {
   .scrollbar-thin::-webkit-scrollbar-thumb:hover {
     background: #94a3b8;
   }
+  .scrollbar-hidden::-webkit-scrollbar {
+    display: none;
+  }
+  .scrollbar-hidden {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
 }
 
 @layer base {
@@ -208,6 +215,14 @@ body {
   50% {
     opacity: 0.6;
   }
+}
+
+.animation-delay-2000 {
+  animation-delay: 2s;
+}
+
+.animation-delay-4000 {
+  animation-delay: 4s;
 }
 
 /* 🏆 Premium Math & KaTeX Enhancements */

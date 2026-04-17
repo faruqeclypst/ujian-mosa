@@ -590,11 +590,15 @@ const CBTPage = () => {
   useEffect(() => {
     if (!attempt?.id || isLocked || isExamOver) return;
     const triggerPenalty = async () => {
-      // Dihapus pengecekan focus vs visibility agar cheat tetap terdeteksi saat blur
+      if (isCheatWarningOpen || isLocked || isExamOver) return;
+      
+      // Clear timers and state immediately to prevent race conditions
+      if (cheatTimerRef.current) clearTimeout(cheatTimerRef.current);
+      cheatTimerRef.current = null;
+      lastLeftTimeRef.current = null;
 
       const currentCheat = attempt?.cheatCount || 0;
       const newCount = currentCheat + 1;
-
       const limit = roomData?.cheat_limit || 3;
 
       try {
@@ -610,6 +614,8 @@ const CBTPage = () => {
 
     const handleCheatDetection = (e: Event) => {
       if (document.visibilityState === "hidden" || e.type === "blur") {
+        if (isCheatWarningOpen || isLocked) return;
+
         // Record departure time for mobile (where JS might pause)
         if (!lastLeftTimeRef.current) {
           lastLeftTimeRef.current = Date.now();
@@ -642,6 +648,8 @@ const CBTPage = () => {
     // 3. Native Capacitor App State Listener (More reliable for Android/iOS)
     const unsubApp = App.addListener('appStateChange', ({ isActive }) => {
       if (!isActive) {
+        if (isCheatWarningOpen || isLocked) return;
+
         // App went to background
         if (!lastLeftTimeRef.current) {
           lastLeftTimeRef.current = Date.now();
@@ -684,7 +692,7 @@ const CBTPage = () => {
         cheatTimerRef.current = null;
       }
     };
-  }, [attempt, roomData, isLocked, isExamOver]);
+  }, [attempt, roomData, isLocked, isExamOver, isCheatWarningOpen]);
 
   useEffect(() => {
     const p = (e: Event) => { e.preventDefault(); return false; };
@@ -1028,7 +1036,10 @@ const CBTPage = () => {
       </header>
 
       <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
-        <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 space-y-4 sm:space-y-6 text-slate-800">
+        <div 
+          className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 space-y-4 sm:space-y-6 text-slate-800"
+          style={{ fontSize: `${fontSize === 1 ? 'inherit' : `${fontSize * 100}%`}` }}
+        >
           {!loading && questions.length === 0 && (
             <div className="flex flex-col items-center justify-center h-full space-y-6 animate-in fade-in zoom-in duration-500">
               <div className="w-24 h-24 bg-slate-50 dark:bg-slate-900 rounded-[35%] flex items-center justify-center border border-slate-100 dark:border-slate-800 shadow-inner">
@@ -1060,7 +1071,7 @@ const CBTPage = () => {
 
           {currentQuestion && !isExamOver && (
             <Card className="rounded-[25px] sm:rounded-[35px] border border-slate-100 dark:border-slate-800 overflow-hidden bg-white dark:bg-slate-900 shadow-sm transition-all duration-300">
-              <CardHeader className="p-5 sm:p-8 pb-3 sm:pb-4">
+              <CardHeader className="p-5 sm:p-8 pb-0">
                 <div className="relative flex items-center justify-between gap-4 mb-4 sm:mb-6 min-h-[48px] sm:min-h-[56px]">
                   <div className="flex items-center gap-3 sm:gap-4">
                     <div className="w-11 h-11 sm:w-14 sm:h-14 bg-emerald-600 text-white rounded-2xl sm:rounded-[35%] flex items-center justify-center font-black text-xl sm:text-2xl shrink-0">{currentQuestionIndex + 1}</div>
@@ -1094,7 +1105,7 @@ const CBTPage = () => {
                 {currentQuestion.groupId && (() => {
                   const f = questions.find(x => x.groupId === currentQuestion.groupId);
                   if (f && (f.groupText || f.text)) return (
-                    <div className="bg-slate-50 dark:bg-slate-950 p-5 sm:p-8 rounded-[30px] border border-slate-200 dark:border-slate-800 mb-4 sm:mb-6 space-y-4 relative overflow-hidden group">
+                    <div className="bg-slate-50 dark:bg-slate-950 p-5 sm:p-8 rounded-[30px] border border-slate-200 dark:border-slate-800 mb-10 sm:mb-14 space-y-4 relative overflow-hidden group">
                       <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:rotate-12 transition-transform duration-700">
                         <FileText className="w-12 h-12 sm:w-20 sm:h-20 text-emerald-800" />
                       </div>
@@ -1106,7 +1117,7 @@ const CBTPage = () => {
 
                       <MathText 
                         content={f.groupText || f.text}
-                        className={`text-base sm:text-lg leading-relaxed text-slate-800 dark:text-slate-200 font-serif ql-editor !p-0 selection:bg-blue-100 dark:selection:bg-blue-900/40`} 
+                        className={`leading-relaxed text-slate-800 dark:text-slate-200 font-serif ql-editor !p-0 selection:bg-blue-100 dark:selection:bg-blue-900/40`} 
                       />
 
                       <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex justify-end opacity-50 dark:opacity-100">
@@ -1115,9 +1126,12 @@ const CBTPage = () => {
                     </div>
                   );
                 })()}
+
+                <div className="h-3 sm:h-4" />
+
                 <MathText 
                   content={currentQuestion.text}
-                  className={`ql-editor !p-0 font-medium text-lg text-slate-900 dark:text-white leading-relaxed break-words [&_strong]:text-blue-600 dark:[&_strong]:text-blue-400 [&_p]:mb-3 [&_ol]:list-decimal [&_ul]:list-disc [&_ol]:pl-6 [&_ul]:pl-6 selection:bg-indigo-100 dark:selection:bg-indigo-900/40`} 
+                  className={`ql-editor !p-0 font-serif text-slate-800 dark:text-slate-200 leading-relaxed break-words [&_strong]:text-blue-600 dark:[&_strong]:text-blue-400 [&_p]:mb-3 [&_ol]:list-decimal [&_ul]:list-disc [&_ol]:pl-6 [&_ul]:pl-6 selection:bg-indigo-100 dark:selection:bg-indigo-900/40`} 
                 />
 
                 {(currentQuestion.type === "pilihan_ganda_kompleks" || currentQuestion.type === "menjodohkan" || currentQuestion.type === "urutkan") && (
@@ -1140,7 +1154,7 @@ const CBTPage = () => {
                         <button key={choiceId} onClick={() => { if (isM) { const a = answers[currentQuestion.id] || []; handleAnswerSelect(currentQuestion.id, a.includes(choiceId) ? a.filter((i: any) => i !== choiceId) : [...a, choiceId]); } else handleAnswerSelect(currentQuestion.id, choiceId); }} className={`w-full text-left p-2 sm:p-3 rounded-xl sm:rounded-2xl border-2 flex items-center gap-2.5 sm:gap-4 transition-all outline-none group active:scale-[0.99] ${isS ? "bg-emerald-50 border-emerald-600 dark:bg-emerald-900/30 dark:border-emerald-500" : "bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 hover:border-emerald-200 dark:hover:border-emerald-700"}`}>
                           <div className={`w-8 h-8 sm:w-9 sm:h-9 shrink-0 rounded-lg sm:rounded-xl border flex items-center justify-center font-black text-xs sm:text-sm transition-colors ${isS ? "bg-emerald-600 border-emerald-600 text-white" : "bg-slate-50 dark:bg-slate-900 text-slate-400 border-slate-100 dark:border-slate-800 group-hover:bg-emerald-50 group-hover:text-emerald-900"}`}>{String.fromCharCode(65 + idx)}</div>
                           <div className="flex-1 overflow-hidden">
-                            <MathText content={c.text} className={`break-words ql-editor !p-0 [&_img]:max-w-[300px] [&_img]:h-auto [&_img]:rounded-xl [&_img]:mt-2 text-inherit ${isS ? "font-bold" : "font-normal"}`} />
+                            <MathText content={c.text} className={`break-words font-serif ql-editor !p-0 [&_img]:max-w-[300px] [&_img]:h-auto [&_img]:rounded-xl [&_img]:mt-2 text-inherit ${isS ? "font-bold" : "font-normal"}`} />
                             {c.imageUrl && (
                               <div className="relative inline-block cursor-zoom-in group mt-4" onClick={(e) => { e.stopPropagation(); setPreviewImage(c.imageUrl!); }}>
                                 <SmartImage
@@ -1206,32 +1220,39 @@ const CBTPage = () => {
             </Card>
           )}
         </div>
-        <aside className="hidden lg:flex w-[320px] bg-white dark:bg-slate-900 border-l border-slate-100 dark:border-slate-800 p-8 flex-col space-y-8 shadow-sm relative z-10 overflow-y-auto">
-          <div className="flex items-center gap-3 mb-2 px-1">
-            <div className="w-3 h-3 bg-emerald-600 rounded-full animate-pulse" />
-            <h3 className="text-[11px] font-black text-emerald-600 uppercase tracking-[0.3em]">Navigasi Soal</h3>
+        <aside className="hidden lg:flex w-[320px] bg-white dark:bg-slate-900 border-l border-slate-100 dark:border-slate-800 flex-col shadow-sm relative z-10 overflow-hidden">
+          {/* Header Navigasi */}
+          <div className="p-5 pb-4">
+            <div className="flex items-center gap-3 mb-2 px-1">
+              <div className="w-3 h-3 bg-emerald-600 rounded-full animate-pulse" />
+              <h3 className="text-[11px] font-black text-emerald-600 uppercase tracking-[0.3em]">Navigasi Soal</h3>
+            </div>
           </div>
 
-          <div className="flex flex-wrap gap-2.5 sm:gap-3.5 content-start">
-            {questions.map((q, i) => (
-                <button 
-                  key={q.id} 
-                  onClick={() => handleNavClick(i)} 
-                  className={`w-11 h-11 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl flex items-center justify-center font-black text-lg border-2 transition-all active:scale-[0.85] ${i === currentQuestionIndex
-                    ? "bg-emerald-700 border-emerald-700 text-white shadow-lg shadow-emerald-700/30 ring-2 ring-emerald-500 ring-offset-2 dark:ring-offset-slate-900"
-                    : isQuestionAnswered(q.id)
-                      ? "bg-emerald-500 border-emerald-500 text-white shadow-md shadow-emerald-500/20"
-                      : flaggedQuestions[q.id]
-                        ? "bg-amber-500 border-amber-600 text-white shadow-lg shadow-amber-500/20"
-                        : "bg-slate-50 dark:bg-slate-800/50 border-slate-100 dark:border-slate-800 text-slate-400 dark:text-slate-500"
-                    }`}
-                >
-                  {i + 1}
-                </button>
-            ))}
+          {/* List Nomor Soal (Scrollable) */}
+          <div className="flex-1 overflow-y-auto px-5 py-2 custom-scrollbar">
+            <div className="grid grid-cols-5 gap-2 content-start">
+              {questions.map((q, i) => (
+                  <button 
+                    key={q.id} 
+                    onClick={() => handleNavClick(i)} 
+                    className={`aspect-square rounded-xl flex items-center justify-center font-black text-xl border-2 transition-all active:scale-[0.85] ${i === currentQuestionIndex
+                      ? "bg-emerald-700 border-emerald-700 text-white shadow-lg shadow-emerald-700/30 ring-2 ring-emerald-500 ring-offset-2 dark:ring-offset-slate-900"
+                      : isQuestionAnswered(q.id)
+                        ? "bg-emerald-500 border-emerald-500 text-white shadow-md shadow-emerald-500/20"
+                        : flaggedQuestions[q.id]
+                          ? "bg-amber-500 border-amber-600 text-white shadow-lg shadow-amber-500/20"
+                          : "bg-slate-50 dark:bg-slate-800/50 border-slate-100 dark:border-slate-800 text-slate-400 dark:text-slate-500"
+                      }`}
+                  >
+                    {i + 1}
+                  </button>
+              ))}
+            </div>
           </div>
 
-          <div className="mt-auto space-y-4 pt-8 border-t border-slate-100 dark:border-slate-800">
+          {/* Footer Tombol (Fixed at Bottom) */}
+          <div className="p-5 pt-6 border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900">
             <div className="grid grid-cols-2 gap-3">
               <Button variant="outline" disabled={currentQuestionIndex === 0} onClick={() => setCurrentQuestionIndex(prev => prev - 1)} className="h-16 rounded-2xl font-black uppercase tracking-widest text-[12px] border-2 border-emerald-50 dark:border-emerald-900/30 text-emerald-600 dark:text-emerald-400 bg-white dark:bg-slate-900 hover:bg-emerald-50 dark:hover:bg-emerald-950 transition-colors">Back</Button>
               <Button onClick={() => currentQuestionIndex === questions.length - 1 ? setIsSubmitModalOpen(true) : handleNextClick()} className={`h-16 text-white font-black uppercase tracking-widest text-[12px] rounded-2xl transition-transform active:scale-95 shadow-lg ${currentQuestionIndex === questions.length - 1 ? "bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/20" : "bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/20"}`}>{currentQuestionIndex === questions.length - 1 ? "Submit" : "Next"}</Button>
@@ -1259,7 +1280,7 @@ const CBTPage = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-4 sm:grid-cols-5 gap-3 sm:gap-4 overflow-y-auto max-h-[60vh] pr-2">
+          <div className="grid grid-cols-5 gap-3 sm:gap-4 overflow-y-auto max-h-[60vh] pr-2">
             {questions.map((q, i) => {
               const isQuestionAnswered = (id: string) => {
                 const ans = answers[id];

@@ -92,7 +92,7 @@ Target: Panjang ${lengthMap[passageLength]}, Kesulitan ${difficulty}.
 FORMAT HTML WAJIB (DILARANG KERAS MENGGUNAKAN MARKDOWN SEPERTI **):
 - <h2 style="text-align:center; color:#1e3a8a; margin-bottom:32px; font-weight:900;">[JUDUL]</h2>
 - WAJIB gunakan beberapa blok <p> untuk setiap paragraf baru (JANGAN DISATUKAN).
-- SETIAP <p> harus memiliki style="text-indent: 48px; margin-bottom: 24px; line-height: 1.8; text-align: justify;".
+- SETIAP <p> harus memiliki style="text-indent: 30px; margin-bottom: 24px; line-height: 1.8; text-align: justify;".
 - Gunakan <strong>...</strong> untuk penebalan teks, JANGAN GUNAKAN **.
 - JANGAN sertakan baris 'Sumber' di bagian akhir.
 
@@ -140,11 +140,12 @@ Hanya berikan teks HTML tersebut tanpa salam pembuka/penutup.`;
 Tugas: Buat ${count} soal ${typeDesc} untuk jenjang ${level} - ${subject} berdasarkan stimulus yang diberikan.
 Kesulitan: ${difficulty}, Fokus: ${focus.toUpperCase()}.
 
-PEDOMAN FORMATTING (SANGAT KETAT):
-1. ZERO TOLERANCE: Dilarang keras menulis simbol matematika (∫, ^, x, f(x), dll) di bagian TEKS SOAL tanpa pembungkus LaTeX \( ... \). 
-2. GAYA PROFESIONAL: Gunakan perintah LaTeX standar seperti \int_{a}^{b}, \frac{a}{b}, \sqrt{x}.
-   Gunakan \displaystyle jika rumus cukup kompleks agar terlihat besar dan jelas.
-   CONTOH: "Hitunglah nilai dari \( \int_{0}^{1} (3x^2 + 2x) dx \)."
+PEDOMAN PENTING: Gunakan DELIMITER MATEMATIKA yang benar:
+- Gunakan $ ... $ untuk SEMUA rumus matematika/kimia/fisika (termasuk simbol tunggal seperti $x$ atau $m$).
+- Gunakan $$ ... $$ untuk rumus yang berada di baris tersendiri (display).
+- JANGAN gunakan \( ... \) atau \[ ... \] karena sering tertukar dengan tanda kurung biasa.
+- Teks murni yang miring tetap gunakan <em>teks</em>.
+
 3. JSON ESCAPING: Setiap garis miring ("\\") dalam LaTeX WAJIB di-escape ganda ("\\\\") di dalam JSON.
 
 STRUKTUR JSON:
@@ -157,9 +158,10 @@ STRUKTUR JSON:
     }
   ]
 }
-Hanya berikan JSON murni. Jangan berikan penjelasan apapun di luar JSON.`;
+Hanya berikan JSON murni. Jangan berikan penjelasan apapun di luar JSON.
+4. TEKS NORMAL: Gunakan <em>...</em> untuk penekanan kata/istilah (italic biasa). Dilarang keras menggunakan LaTeX untuk kata-kata normal.`;
 
-    const mathHint = "\nWAJIB: Gunakan tanda dolar $ ... $ untuk SEMUA simbol matematika (contoh: $\\int_0^2 x^2 dx$ atau $\\frac{1}{2}$).";
+    const mathHint = "\nWAJIB: Gunakan pembungkus LaTeX \\( ... \\) untuk SEMUA rumus/simbol matematika (contoh: \\( \\int_0^2 x^2 dx \\) atau \\( \\frac{1}{2} \\)).";
     const userPrompt = isLiteracy 
       ? `INI ADALAH WACANA STIMULUS:\n${wacanaResult}\n\nBerdasarkan wacana di atas, buatkan ${count} soal ${typeDesc}.${mathHint}`
       : `Buat soal ${typeDesc} untuk jenjang ${level} - ${subject} tentang topik: "${topic}".${mathHint}`;

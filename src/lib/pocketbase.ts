@@ -4,9 +4,43 @@ import PocketBase, { LocalAuthStore } from 'pocketbase';
 // MASTER PocketBase — Registry Sekolah (SaaS Control Plane)
 // Koleksi: schools, school_requests, super_admins
 // ============================================================
+// Custom AuthStore to use sessionStorage for Super Admin
+// This ensures session is cleared when the tab is closed
+class SessionAuthStore extends LocalAuthStore {
+    // In newer SDKs, we can just replace the internal storage reference
+    // if it's available, or manually handle the save/clear.
+    // To be safe and clean, we'll use LocalAuthStore logic but point to sessionStorage
+    save(token: string, model: any) {
+        super.save(token, model);
+        if (typeof window !== 'undefined') {
+            window.sessionStorage.setItem('master_pb_auth', JSON.stringify({ token, model }));
+        }
+    }
+
+    clear() {
+        super.clear();
+        if (typeof window !== 'undefined') {
+            window.sessionStorage.removeItem('master_pb_auth');
+        }
+    }
+
+    loadFromStorage() {
+        if (typeof window !== 'undefined') {
+            const data = window.sessionStorage.getItem('master_pb_auth');
+            if (data) {
+                const parsed = JSON.parse(data);
+                super.save(parsed.token, parsed.model);
+            }
+        }
+    }
+}
+
+const sessionStore = new SessionAuthStore();
+sessionStore.loadFromStorage();
+
 export const masterPb = new PocketBase(
   import.meta.env.VITE_MASTER_PB_URL || 'http://127.0.0.1:8090',
-  new LocalAuthStore('master_pb_auth')
+  sessionStore
 );
 masterPb.autoCancellation(false);
 
