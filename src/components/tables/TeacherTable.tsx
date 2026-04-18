@@ -3,7 +3,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { DataTable } from "../ui/data-table";
 import { Button } from "../ui/button";
 import type { Teacher } from "../../types/exam";
-import { Edit, Trash } from "lucide-react";
+import { Edit, Trash, KeyRound, User } from "lucide-react";
+import { Avatar, AvatarFallback } from "../ui/avatar";
+import { Badge } from "../ui/badge";
 
 interface TeacherTableProps {
   teachers: Teacher[];
@@ -11,6 +13,7 @@ interface TeacherTableProps {
   onSelectChange: (ids: string[]) => void;
   onEdit: (teacher: Teacher) => void;
   onDelete: (teacher: Teacher) => void;
+  onResetPassword: (teacherId: string) => void;
 }
 
 const TeacherTable = ({ 
@@ -18,7 +21,8 @@ const TeacherTable = ({
   selectedIds, 
   onSelectChange, 
   onEdit, 
-  onDelete 
+  onDelete,
+  onResetPassword
 }: TeacherTableProps) => {
   const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(null);
 
@@ -82,17 +86,52 @@ const TeacherTable = ({
       render: (v: any, item: any, index?: number) => (index !== undefined ? index + 1 : 1),
       className: "w-[60px]",
     },
-    { key: "name", label: "Nama Guru", sortable: true },
     { 
       key: "code", 
-      label: "Kode / Inisial",
-      className: "w-[120px]"
+      label: "Kode",
+      className: "w-[100px] text-left",
+      render: (code: string) => (
+        <span className="inline-flex items-center justify-start px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-[11px] font-black tracking-widest border border-slate-200/50 dark:border-slate-700/50">
+          {code || "???"}
+        </span>
+      )
+    },
+    { 
+      key: "name", 
+      label: "Nama Guru", 
+      sortable: true,
+      render: (name: string, teacher: Teacher) => (
+        <div className="flex items-center gap-3">
+          <Avatar className="h-9 w-9 border-2 border-white dark:border-slate-800 shadow-sm">
+            <AvatarFallback className="bg-gradient-to-br from-indigo-500 to-blue-600 text-white text-[10px] font-bold">
+              {(name || "U").split(" ").map(n => n[0]).join("").substring(0, 2).toUpperCase()}
+            </AvatarFallback>
+          </Avatar>
+          <div className="flex flex-col">
+            <span className="font-bold text-slate-700 dark:text-slate-200 leading-tight">{name}</span>
+            <span className="text-[11px] text-slate-400 font-medium">@{teacher.username}</span>
+          </div>
+        </div>
+      )
     },
     { 
       key: "subjects", 
-      label: "Mapel", 
-      render: (subjects: string[]) => (subjects || []).join(", ")
+      label: "Mata Pelajaran", 
+      render: (subjects: string[]) => (
+        <div className="flex flex-wrap gap-1.5">
+          {(!subjects || subjects.length === 0) ? (
+            <span className="text-slate-300 dark:text-slate-700 italic text-[10px]">Belum diatur</span>
+          ) : (
+            subjects.map((sub, i) => (
+              <Badge key={i} variant="secondary" className="bg-indigo-50/50 hover:bg-indigo-100/80 text-indigo-700 dark:bg-indigo-950/30 dark:text-indigo-400 border-indigo-100/50 dark:border-indigo-800/30 text-[10px] font-bold px-2 py-0 border rounded-md">
+                {sub}
+              </Badge>
+            ))
+          )}
+        </div>
+      )
     },
+
   ];
 
   const renderActions = (teacher: Teacher) => (
@@ -103,6 +142,13 @@ const TeacherTable = ({
         title="Edit Guru"
       >
         <Edit className="h-4 w-4" />
+      </button>
+      <button 
+        className="p-1.5 bg-amber-50 text-amber-600 hover:bg-amber-100 rounded-lg dark:bg-amber-900/10 dark:text-amber-400 border border-amber-100 dark:border-amber-800/40"
+        onClick={() => onResetPassword(teacher.id)}
+        title="Reset Password Guru"
+      >
+        <KeyRound className="h-4 w-4" />
       </button>
       <button 
         className="p-1.5 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-lg dark:bg-rose-900/10 dark:text-rose-400 border border-rose-100 dark:border-rose-800/40"

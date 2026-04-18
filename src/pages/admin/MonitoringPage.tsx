@@ -21,7 +21,8 @@ import {
   Settings,
   Timer,
   Clock,
-  Trophy
+  Trophy,
+  ShieldAlert
 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import * as XLSX from "xlsx";
@@ -178,7 +179,7 @@ const MonitoringPage = () => {
   }, [roomId, navigate]);
 
   const { user, role } = useAuth();
-  const { classes: examClasses, students, subjects, teachers: masterTeachers, loading: dataLoading } = useExamData();
+  const { classes: examClasses, students, subjects, teachers: masterTeachers, teacherFullAccess, loading: dataLoading } = useExamData();
 
   const [loading, setLoading] = useState(true);
   const isLoading = loading || dataLoading;
@@ -1038,12 +1039,16 @@ const MonitoringPage = () => {
                 <Button onClick={handleExportExcel} variant="secondary" className="w-full rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 dark:hover:bg-emerald-900/40 dark:border-emerald-800/40 text-emerald-700 font-semibold shadow-sm transition-all h-10">
                   <FileSpreadsheet className="mr-2 h-4 w-4" /> Export Excel
                 </Button>
-                <Button onClick={handleForceSubmitAll} variant="secondary" className="w-full rounded-xl bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-100 dark:bg-rose-950/40 dark:text-rose-400 dark:border dark:border-rose-800/30 shadow-sm font-semibold h-10 transition-all">
-                  <Users className="mr-2 h-4 w-4" /> Selesaikan Semua
-                </Button>
-                <Button onClick={handleResetAllSessions} variant="secondary" className="w-full rounded-xl bg-orange-50 text-orange-700 hover:bg-orange-100 border border-orange-100 dark:bg-orange-950/40 dark:text-orange-400 dark:border dark:border-orange-800/30 shadow-sm font-semibold h-10 transition-all">
-                  <RefreshCw className="mr-2 h-4 w-4" /> Reset Semua Sesi
-                </Button>
+                {(role === "admin" || (role === "teacher" && teacherFullAccess)) && (
+                  <>
+                    <Button onClick={handleForceSubmitAll} variant="secondary" className="w-full rounded-xl bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-100 dark:bg-rose-950/40 dark:text-rose-400 dark:border dark:border-rose-800/30 shadow-sm font-semibold h-10 transition-all">
+                      <Users className="mr-2 h-4 w-4" /> Selesaikan Semua
+                    </Button>
+                    <Button onClick={handleResetAllSessions} variant="secondary" className="w-full rounded-xl bg-orange-50 text-orange-700 hover:bg-orange-100 border border-orange-100 dark:bg-orange-950/40 dark:text-orange-400 dark:border dark:border-orange-800/30 shadow-sm font-semibold h-10 transition-all">
+                      <Users className="mr-2 h-4 w-4" /> Reset Semua Sesi
+                    </Button>
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -1055,7 +1060,7 @@ const MonitoringPage = () => {
               <Table>
                 <TableHeader className="bg-slate-50 dark:bg-slate-900/50">
                   <TableRow>
-                    <TableHead className="w-12 text-center">No</TableHead>
+                    <TableHead className="w-10 text-center text-[10px]">No</TableHead>
                     <TableHead 
                       className="cursor-pointer hover:text-blue-600 transition-colors group select-none"
                       onClick={() => toggleSort("nama")}
@@ -1068,10 +1073,10 @@ const MonitoringPage = () => {
                       </div>
                     </TableHead>
                     <TableHead 
-                      className="cursor-pointer hover:text-blue-600 transition-colors group select-none"
+                      className="w-32 text-center cursor-pointer hover:text-blue-600 transition-colors group select-none"
                       onClick={() => toggleSort("status")}
                     >
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center justify-center gap-1.5">
                         Status
                         {monitorSortBy === 'status' ? (
                           monitorSortOrder === 'asc' ? <ChevronDown className="h-3 w-3 text-blue-600" /> : <ChevronDown className="h-3 w-3 text-blue-600 rotate-180" />
@@ -1079,7 +1084,7 @@ const MonitoringPage = () => {
                       </div>
                     </TableHead>
                     <TableHead 
-                      className="text-center cursor-pointer hover:text-blue-600 transition-colors group select-none"
+                      className="w-20 text-center cursor-pointer hover:text-blue-600 transition-colors group select-none"
                       onClick={() => toggleSort("nilai")}
                     >
                       <div className="flex items-center justify-center gap-1.5">
@@ -1089,8 +1094,7 @@ const MonitoringPage = () => {
                         ) : <ChevronDown className="h-3 w-3 opacity-0 group-hover:opacity-40" />}
                       </div>
                     </TableHead>
-                    <TableHead className="text-center">Progres</TableHead>
-                    <TableHead className="text-center">Cheat</TableHead>
+                    <TableHead className="text-center w-32 text-[10px]">Monitoring</TableHead>
                     <TableHead className="text-right">Aksi</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -1098,12 +1102,11 @@ const MonitoringPage = () => {
                   {isLoading ? (
                     Array.from({ length: 10 }).map((_, i) => (
                       <TableRow key={`skele-row-${i}`} className="h-16">
-                        <TableCell className="text-center"><Skeleton className="h-4 w-4 mx-auto" /></TableCell>
+                        <TableCell className="text-center"><Skeleton className="h-3 w-3 mx-auto" /></TableCell>
                         <TableCell><Skeleton className="h-5 w-48" /><Skeleton className="h-3 w-32 mt-1.5" /></TableCell>
                         <TableCell><Skeleton className="h-6 w-16" /></TableCell>
                         <TableCell className="text-center"><Skeleton className="h-6 w-8 mx-auto" /></TableCell>
-                        <TableCell className="text-center"><Skeleton className="h-5 w-12 mx-auto" /></TableCell>
-                        <TableCell className="text-center"><Skeleton className="h-5 w-6 mx-auto" /></TableCell>
+                        <TableCell className="text-center px-1"><Skeleton className="h-6 w-12 mx-auto" /></TableCell>
                         <TableCell className="text-right"><Skeleton className="h-7 w-20 ml-auto" /></TableCell>
                       </TableRow>
                     ))
@@ -1166,7 +1169,7 @@ const MonitoringPage = () => {
                       return (
                         <React.Fragment key={student.id}>
                           <TableRow className={`hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors h-16 ${isExpanded ? "bg-blue-50/30 dark:bg-blue-900/10" : ""}`}>
-                            <TableCell className="text-center text-slate-400 text-xs">{startIndex + localIdx + 1}</TableCell>
+                            <TableCell className="text-center text-slate-400 text-[10px] px-1">{startIndex + localIdx + 1}</TableCell>
                             <TableCell>
                               <div className="flex flex-col">
                                 <span className="font-bold text-slate-800 dark:text-slate-100">{student.name}</span>
@@ -1176,7 +1179,7 @@ const MonitoringPage = () => {
                             <TableCell className="text-center">
                               {attempt ? (
                                 <div className="flex flex-col items-center gap-1.5">
-                                  <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black tracking-wider border shadow-sm ${attempt.status === "finished" ? "bg-emerald-500 text-white border-emerald-400" :
+                                  <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold tracking-tight border shadow-sm ${attempt.status === "finished" ? "bg-emerald-500 text-white border-emerald-400" :
                                     attempt.status === "LOCKED" ? "bg-rose-500 text-white border-rose-400" :
                                       "bg-blue-600 text-white border-blue-500"
                                     }`}>
@@ -1186,57 +1189,55 @@ const MonitoringPage = () => {
                                 </div>
                               ) : <span className="text-[10px] text-slate-400 font-bold italic">OFFLINE</span>}
                             </TableCell>
-                            <TableCell className="text-center font-bold">
+                            <TableCell className="text-center text-[11px] font-bold">
                               {(() => {
                                 if (!attempt) return "-";
-                                
-                                // Calculate live score for display
                                 const liveScore = getLiveScore(sisAnswers, attempt.overrides || {});
-                                
                                 if (attempt.status === "finished") {
-                                  // If status is finished but score is 0, it might be a forced finish without calculation
-                                  // We show the live score if it's > 0 or if the stored score is explicitly 0
                                   const finalScore = (attempt.score === 0 && liveScore > 0) ? liveScore : (attempt.score || 0);
                                   return <span className="text-emerald-600">{finalScore}</span>;
                                 }
-                                
                                 return <span className="text-indigo-600 animate-pulse-subtle">{liveScore}</span>;
                               })()}
                             </TableCell>
-                            <TableCell className="text-center text-xs text-slate-500">
-                              {answered} / {monitorQuestions.length}
-                            </TableCell>
-                            <TableCell className="text-center">
-                              <span className={`font-bold text-xs ${(attempt?.cheatCount || 0) > 0 ? "text-rose-500" : "text-slate-400"}`}>
-                                {attempt?.cheatCount || 0}
-                              </span>
+                            <TableCell className="text-center px-1">
+                              <div className="flex items-center justify-center gap-1.5 text-[11px] font-bold">
+                                <span className="text-slate-600 font-bold">{answered}/{monitorQuestions.length}</span>
+                                <span className="text-slate-200">|</span>
+                                <span className={cn((attempt?.cheatCount || 0) > 0 ? "text-rose-600" : "text-slate-400")}>
+                                  C: {attempt?.cheatCount || 0}
+                                </span>
+                              </div>
                             </TableCell>
                             <TableCell className="text-right">
                               <div className="flex justify-end gap-1.5">
                                 {attempt && (
                                   <>
                                     <Button
-                                      size="sm"
+                                      size="icon"
                                       variant="ghost"
                                       onClick={() => setExpandedstudent(isExpanded ? null : student.id)}
-                                      className={`h-8 px-4 rounded-2xl font-bold text-[10px] transition-all shadow-sm ${isExpanded
+                                      className={`h-8 w-8 rounded-xl transition-all shadow-sm ${isExpanded
                                         ? "bg-slate-100 text-slate-700 border border-slate-200 hover:bg-slate-200 hover:text-slate-800 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700 dark:hover:bg-slate-700 dark:hover:text-white"
                                         : "bg-blue-50 text-blue-700 border border-blue-100 hover:bg-blue-100 hover:text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800/40 dark:hover:bg-blue-900/50 dark:hover:text-blue-300"
                                         }`}
+                                      title={isExpanded ? "Tutup" : "Detail"}
                                     >
-                                      {isExpanded ? "Tutup" : "Detail"}
+                                      {isExpanded ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                                     </Button>
                                     <div className="relative">
-                                      <Button
-                                        size="sm"
-                                        variant="ghost"
-                                        onClick={() => setOpenMenuId(openMenuId === student.id ? null : student.id)}
-                                        className="h-8 px-3 rounded-2xl bg-indigo-50 text-indigo-700 border border-indigo-100 hover:bg-indigo-100 hover:text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-400 dark:border-indigo-800/40 dark:hover:bg-indigo-900/50 dark:hover:text-indigo-300 shadow-sm transition-all flex items-center gap-1.5 font-bold text-[10px]"
-                                      >
-                                        <Settings className="h-3.5 w-3.5" />
-                                        Menu
-                                      </Button>
-                                      {openMenuId === student.id && (
+                                      {(role === "admin" || (role === "teacher" && teacherFullAccess)) && (
+                                        <Button
+                                          size="icon"
+                                          variant="ghost"
+                                          onClick={() => setOpenMenuId(openMenuId === student.id ? null : student.id)}
+                                          className="h-8 w-8 rounded-xl bg-indigo-50 text-indigo-700 border border-indigo-100 hover:bg-indigo-100 hover:text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-400 dark:border-indigo-800/40 dark:hover:bg-indigo-900/50 dark:hover:text-indigo-300 shadow-sm transition-all"
+                                          title="Menu Opsi"
+                                        >
+                                          <Settings className="h-4 w-4" />
+                                        </Button>
+                                      )}
+                                      {(role === "admin" || (role === "teacher" && teacherFullAccess)) && openMenuId === student.id && (
                                         <div className="absolute right-0 mt-2 w-40 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-xl z-30 py-1.5 animate-in fade-in zoom-in-95 duration-100" onMouseLeave={() => setOpenMenuId(null)}>
                                           <div className="px-3 py-1 mb-1 border-b border-slate-50 dark:border-slate-700/50">
                                             <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Opsi Siswa</span>
@@ -1294,7 +1295,7 @@ const MonitoringPage = () => {
                                         <div className={`mt-auto p-2 rounded-lg flex items-center justify-between ${correct ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"}`}>
                                           <span className="text-[10px] font-bold">Jawab: {ans ? String(ans).toUpperCase() : "-"}</span>
                                           <div className="flex gap-1">
-                                            {(q.type === "isian_singkat" || q.type === "uraian") && (
+                                            {(role === "admin" || (role === "teacher" && teacherFullAccess)) && (q.type === "isian_singkat" || q.type === "uraian") && (
                                               <>
                                                 <button onClick={() => handleManualGrade(student.id, q.id, true)} className="p-1 hover:bg-white rounded"><CheckCircle2 className="h-3 w-3" /></button>
                                                 <button onClick={() => handleManualGrade(student.id, q.id, false)} className="p-1 hover:bg-white rounded"><X className="h-3 w-3" /></button>

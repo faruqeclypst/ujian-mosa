@@ -2,6 +2,7 @@ export interface Teacher {
   id: string;
   name: string;
   code?: string;
+  username: string;
   subjects: string[];
   createdAt: number;
 }
@@ -33,6 +34,7 @@ export interface StudentData {
   className?: string; // Tambahan untuk mempermudah tampilan
   createdAt: number;
   password?: string; // Untuk PocketBase Auth
+  hasChangedPassword?: boolean;
 }
 
 export type StudentPayload = Omit<StudentData, "id" | "createdAt">;

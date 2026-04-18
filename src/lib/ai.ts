@@ -11,6 +11,48 @@ export interface AIGeneratedQuestion {
   groupText?: string;
 }
 
+/**
+ * 🛠️ Robust JSON Parser & Repair
+ * Mencoba memproses output AI yang seringkali rusak karena karakter spesial atau LaTeX.
+ */
+const robustJSONParse = (text: string): any => {
+  let clean = text.trim();
+  
+  // 1. Ekstrak blok JSON terpaku
+  const firstBrace = clean.indexOf('{');
+  const lastBrace = clean.lastIndexOf('}');
+  if (firstBrace !== -1 && lastBrace !== -1) {
+    clean = clean.substring(firstBrace, lastBrace + 1);
+  }
+
+  try {
+    // Jalur cepat: Jika AI memberikan JSON murni (seperti Groq json_object)
+    return JSON.parse(clean);
+  } catch (e) {
+    console.warn("Standard JSON parse failed, attempting repair heuristics...");
+    
+    try {
+      // Jalur pemulihan: Masalah umum AI adalah newline di tengah string
+      // dan backslash LaTeX yang tidak di-escape dalam JSON
+      let repaired = clean
+        .replace(/\n/g, "\\n") // Ganti newline asli dengan \n literal
+        .replace(/\\(?!["\\\/bfnrtu])/g, "\\\\"); // Escape backslash yang bukan bagian dari JSON control chars
+      
+      // Kembalikan karakter bracket yang mungkin rusak karena replace \n
+      repaired = repaired.replace(/\\n\s*}/g, "}")
+                         .replace(/\\n\s*]/g, "]")
+                         .replace(/{\\n/g, "{")
+                         .replace(/\[\\n/g, "[");
+
+      return JSON.parse(repaired);
+    } catch (err) {
+      console.error("Critical JSON Parsing Error:", err);
+      // Fallback terakhir: Coba regex primitif untuk mengekstrak field teks jika diperlukan (opsional)
+      throw new Error("AI memberikan format data yang tidak bisa dibaca sistem.");
+    }
+  }
+};
+
 export const AI_MODELS = [
   // --- GROQ CLOUD (Official Production Models) ---
   { id: "llama-3.3-70b-versatile", name: "Llama 3.3 70B (Versatile Expert)", speed: "High Performance", status: "production", provider: "groq" },
@@ -38,6 +80,55 @@ export const AI_MODELS = [
   { id: "gemma3:4b", name: "Gemma 3 4B (Small)", speed: "Eco-Friendly", status: "production", provider: "ollama" },
 ];
 
+/**
+ * 🧠 Helper untuk mengambil konfigurasi AI yang dinamis.
+ * Prioritas:
+ * 1. API Key milik User sendiri (jika ada di Profile)
+ * 2. API Key Admin (hanya jika User adalah Admin)
+ */
+const getAIConfig = async () => {
+  const user = pb.authStore.model;
+  const userApiKey = (user as any)?.ai_api_key;
+  const userRole = (user as any)?.role || "teacher";
+
+  const settings = await pb.collection("settings").getFullList({ limit: 1 });
+  const config = settings[0];
+
+  // 1. PRIORITAS UTAMA UNTUK ADMIN: Selalu gunakan key dari Pengaturan Global (Settings)
+  // Ini agar Admin tidak bingung saat mengganti provider di halaman Settings
+  if (userRole === "admin") {
+    const isOllama = config?.ai_provider === "ollama";
+    const apiKey = isOllama ? (config?.ai_gateway_key || config?.groq_api_key) : config?.groq_api_key;
+    
+    if (!apiKey) throw new Error("API Key belum diatur di Pengaturan Aplikasi.");
+    
+    return {
+      apiKey,
+      isOllama,
+      model: config?.ai_model || AI_MODELS[0].id,
+      baseUrl: isOllama ? (pb.baseUrl + "/api/ai-proxy") : "https://api.groq.com/openai/v1",
+      provider: config?.ai_provider || "groq"
+    };
+  }
+
+  // 2. UNTUK GURU: Gunakan API Key pribadi dari Profile
+  if (userApiKey && userApiKey.trim() !== "") {
+    const userProvider = (user as any)?.ai_provider || config?.ai_provider || "groq";
+    const isOllama = userProvider === "ollama";
+    return {
+      apiKey: userApiKey,
+      isOllama,
+      model: (user as any)?.ai_model || config?.ai_model || AI_MODELS[0].id,
+      baseUrl: isOllama ? (pb.baseUrl + "/api/ai-proxy") : "https://api.groq.com/openai/v1",
+      provider: userProvider
+    };
+  }
+
+  // 3. Jika Guru belum mengatur API Key, tampilkan pesan error edukatif
+  throw new Error("Bapak/Ibu Guru wajib mengatur API Key AI sendiri di menu 'Profil' untuk menggunakan fitur ini.");
+};
+
+
 export const generateQuestionsAI = async (
   topic: string, 
   count: number = 5, 
@@ -50,21 +141,7 @@ export const generateQuestionsAI = async (
   focus: string = "umum"
 ): Promise<AIGeneratedQuestion[]> => {
   try {
-    const settings = await pb.collection("settings").getFullList({ limit: 1 });
-    const config = settings[0];
-    
-    // 🧠 Dynamic API Configuration
-    const isOllama = config?.ai_provider === "ollama";
-    const apiKey = isOllama ? (config?.ai_gateway_key || config?.groq_api_key) : config?.groq_api_key;
-    const baseUrl = isOllama 
-      ? (pb.baseUrl + "/api/ai-proxy") 
-      : "https://api.groq.com/openai/v1";
-
-    if (!apiKey) {
-      throw new Error("API Key belum diatur di Pengaturan Aplikasi.");
-    }
-
-    const model = (config?.ai_model || AI_MODELS[0].id);
+    const { apiKey, isOllama, model, baseUrl } = await getAIConfig();
     console.log(`🚀 [AI ENGINE] Menggunakan Model: ${model} via ${isOllama ? 'OLLAMA PROXY' : 'GROQ DIRECT'}`);
 
     const lengthMap: Record<string, string> = {
@@ -136,35 +213,43 @@ Hanya berikan teks HTML tersebut tanpa salam pembuka/penutup.`;
     }
 
     // 🎯 STEP 2: GENERATE QUESTIONS
-    const systemPrompt = `Anda adalah Ahli Evaluasi Pendidikan & Ahli Matematika/Sains.
-Tugas: Buat ${count} soal ${typeDesc} untuk jenjang ${level} - ${subject} berdasarkan stimulus yang diberikan.
+    const systemPrompt = `Anda adalah Ahli Evaluasi Pendidikan & Spesialis Kurikulum.
+Tugas: Buat ${count} soal ${typeDesc} untuk jenjang ${level} - ${subject}.
 Kesulitan: ${difficulty}, Fokus: ${focus.toUpperCase()}.
 
-PEDOMAN PENTING: Gunakan DELIMITER MATEMATIKA yang benar:
-- Gunakan $ ... $ untuk SEMUA rumus matematika/kimia/fisika (termasuk simbol tunggal seperti $x$ atau $m$).
-- Gunakan $$ ... $$ untuk rumus yang berada di baris tersendiri (display).
-- JANGAN gunakan \( ... \) atau \[ ... \] karena sering tertukar dengan tanda kurung biasa.
-- Teks murni yang miring tetap gunakan <em>teks</em>.
+PEDOMAN FORMAT:
+1. GUNAKAN TEKS POLOS: Utamakan teks biasa tanpa tag HTML (seperti <em>, <p>, atau <strong>) agar editor tetap bersih.
+2. EKSAKTA (Matematika/Sains): Gunakan $ ... $ untuk rumus inline dan $$ ... $$ untuk rumus display. JANGAN gunakan LaTeX jika materi tidak relevan.
+3. JANGAN gunakan markdown seperti ** atau __.
+4. JSON ESCAPING: Setiap garis miring ("\\") dalam LaTeX WAJIB di-escape ganda ("\\\\") di dalam JSON.
 
-3. JSON ESCAPING: Setiap garis miring ("\\") dalam LaTeX WAJIB di-escape ganda ("\\\\") di dalam JSON.
-
-STRUKTUR JSON:
+STRUKTUR JSON (WAJIB):
 {
   "questions": [
     {
-      "text": "Pertanyaan dalam HTML dengan LaTeX \( ... \)",
+      "text": "Teks pertanyaan (Gunakan $ untuk rumus)",
       "choices": { "a": { "text": "...", "isCorrect": true }, ... },
-      "answerKey": "..."
+      "answerKey": "Kunci jawaban"
     }
   ]
 }
-Hanya berikan JSON murni. Jangan berikan penjelasan apapun di luar JSON.
-4. TEKS NORMAL: Gunakan <em>...</em> untuk penekanan kata/istilah (italic biasa). Dilarang keras menggunakan LaTeX untuk kata-kata normal.`;
+Hanya berikan JSON murni tanpa penjelasan.`;
 
-    const mathHint = "\nWAJIB: Gunakan pembungkus LaTeX \\( ... \\) untuk SEMUA rumus/simbol matematika (contoh: \\( \\int_0^2 x^2 dx \\) atau \\( \\frac{1}{2} \\)).";
+    const mathHint = (subject.toLowerCase().includes('matematika') || subject.toLowerCase().includes('ipa') || subject.toLowerCase().includes('fisika') || subject.toLowerCase().includes('kimia') || subject.toLowerCase().includes('ekonomi')) 
+      ? "\nGunakan pembungkus LaTeX $ ... $ untuk rumus/simbol matematika." 
+      : "";
+
+    const programmingHint = (subject.toLowerCase().includes('pemrograman') || subject.toLowerCase().includes('it') || subject.toLowerCase().includes('informatika') || subject.toLowerCase().includes('coding'))
+      ? `\nKONTEN PEMROGRAMAN: Sangat disarankan untuk menyertakan potongan kode (code snippets) di dalam teks pertanyaan maupun pilihan jawaban. Gunakan tag <pre class="ql-syntax" data-language="NAMA_BAHASA">...</pre> untuk setiap potongan kode program. GANTI NAMA_BAHASA dengan bahasa yang sesuai (misal: javascript, python, cpp, html, css). DILARANG MENGGUNAKAN "auto".`
+      : "";
+
+    const arabicHint = (subject.toLowerCase().includes('agama') || subject.toLowerCase().includes('arab') || subject.toLowerCase().includes('islam') || subject.toLowerCase().includes('quran'))
+      ? `\nKONTEN ARAB/AGAMA: WAJIB menyertakan potongan ayat Al-Qur'an atau Hadits dalam teks Arab asli (ber-harakat lengkap). DILARANG KERAS menggunakan tanda kutip jenis apapun (" ' « ») di sekitar ayat. Biarkan ayat bersih.`
+      : "";
+
     const userPrompt = isLiteracy 
-      ? `INI ADALAH WACANA STIMULUS:\n${wacanaResult}\n\nBerdasarkan wacana di atas, buatkan ${count} soal ${typeDesc}.${mathHint}`
-      : `Buat soal ${typeDesc} untuk jenjang ${level} - ${subject} tentang topik: "${topic}".${mathHint}`;
+      ? `INI ADALAH WACANA STIMULUS:\n${wacanaResult}\n\nBerdasarkan wacana di atas, buatkan ${count} soal ${typeDesc}.${mathHint}${programmingHint}${arabicHint}`
+      : `Buat soal ${typeDesc} untuk jenjang ${level} - ${subject} tentang topik: "${topic}".${mathHint}${programmingHint}${arabicHint}`;
 
     let responseQuestions;
     if (isOllama) {
@@ -207,21 +292,7 @@ Hanya berikan JSON murni. Jangan berikan penjelasan apapun di luar JSON.
     
     if (!contentQs) throw new Error("AI tidak memberikan respon teks yang valid.");
 
-    let cleanContent = contentQs.trim();
-    
-    // 🔍 Smart JSON Extraction: Find the first { and last }
-    const firstBrace = cleanContent.indexOf('{');
-    const lastBrace = cleanContent.lastIndexOf('}');
-    if (firstBrace !== -1 && lastBrace !== -1) {
-        cleanContent = cleanContent.substring(firstBrace, lastBrace + 1);
-    }
-    
-    // 🔥 Radical Fix for LaTeX
-    cleanContent = cleanContent.replace(/\\/g, "\\\\")
-                               .replace(/\\\\\\\\/g, "\\\\")
-                               .replace(/\\(?=["\\\/bfnrtu])/g, "\\");
-
-    const parsed = JSON.parse(cleanContent);
+    const parsed = robustJSONParse(contentQs);
     const questionsRaw = parsed.questions || parsed.data || parsed.soal || (Array.isArray(parsed) ? parsed : []);
 
     if (questionsRaw.length === 0) throw new Error("Format soal tidak valid.");
@@ -250,18 +321,8 @@ export const generateSingleQuestionAI = async (
   existingWacana: string = ""
 ): Promise<AIGeneratedQuestion> => {
   try {
-    const settings = await pb.collection("settings").getFullList({ limit: 1 });
-    const config = settings[0];
-    if (!config?.groq_api_key) throw new Error("API Key belum diatur.");
-    
-    // 🧠 Dynamic API Configuration
-    const isOllama = config?.ai_provider === "ollama";
-    const apiKey = isOllama ? (config?.ai_gateway_key || config?.groq_api_key) : config?.groq_api_key;
-    const baseUrl = isOllama 
-      ? (pb.baseUrl + "/api/ai-proxy") 
-      : "https://api.groq.com/openai/v1";
-
-    const model = (config?.ai_model || AI_MODELS[0].id).replace("openclaw/", "");
+    const { apiKey, isOllama, model, baseUrl } = await getAIConfig();
+    const cleanModel = model.replace("openclaw/", "");
 
     const typeDesc = {
       pilihan_ganda: "Pilihan Ganda Tunggal (5 opsi, 1 benar)",
@@ -275,17 +336,30 @@ export const generateSingleQuestionAI = async (
 Tugas: Buat TEPAT SATU butir soal ${typeDesc} untuk jenjang ${level} - ${subject}.
 Kesulitan: ${difficulty}, Fokus: ${focus.toUpperCase()}.
 
-STRUKTUR JSON (WAJIB):
+PEDOMAN FORMAT:
+1. GUNAKAN TEKS POLOS: Utamakan teks biasa tanpa tag HTML (seperti <em> atau <strong>) agar editor tetap bersih.
+2. EKSAKTA: Gunakan $ ... $ untuk rumus matematika. JANGAN gunakan jika tidak relevan.
+3. JANGAN gunakan markdown (**).
+
+STRUKTUR JSON:
 {
-  "text": "Pertanyaan (HTML)",
+  "text": "Teks pertanyaan",
   "choices": { "a": { "text": "...", "isCorrect": true }, ... },
-  "answerKey": "Kunci (untuk isian/uraian)"
+  "answerKey": "Kunci jawaban"
 }
-Aturan: Variasikan struktur kalimat (jangan kaku), dilarang menggunakan markdown **.`;
+Hanya berikan JSON murni.`;
+
+    const programmingHint = (subject.toLowerCase().includes('pemrograman') || subject.toLowerCase().includes('it') || subject.toLowerCase().includes('informatika') || subject.toLowerCase().includes('coding'))
+      ? `\nKONTEN PEMROGRAMAN: Sangat disarankan untuk menyertakan potongan kode (code snippets) di dalam teks pertanyaan maupun pilihan jawaban. Gunakan tag <pre class="ql-syntax" data-language="NAMA_BAHASA">...</pre> untuk setiap potongan kode program. GANTI NAMA_BAHASA dengan bahasa yang sesuai (misal: javascript, python, cpp, html, css). DILARANG MENGGUNAKAN "auto".`
+      : "";
+
+    const arabicHint = (subject.toLowerCase().includes('agama') || subject.toLowerCase().includes('arab') || subject.toLowerCase().includes('islam') || subject.toLowerCase().includes('quran'))
+      ? `\nKONTEN ARAB/AGAMA: WAJIB menyertakan potongan ayat Al-Qur'an atau Hadits dalam teks Arab asli (ber-harakat lengkap). DILARANG KERAS menggunakan tanda kutip jenis apapun (" ' « ») di sekitar ayat. Biarkan ayat bersih.`
+      : "";
 
     const userPrompt = existingWacana 
-      ? `INI ADALAH WACANA STIMULUS:\n${existingWacana}\n\nBerdasarkan wacana di atas, BUAT TEPAT SATU soal ${typeDesc}. JANGAN menggunakan placeholder.`
-      : `Buat TEPAT SATU soal ${typeDesc} tentang materi/topik: "${topic}". JANGAN menggunakan placeholder.`;
+      ? `INI ADALAH WACANA STIMULUS:\n${existingWacana}\n\nBerdasarkan wacana di atas, BUAT TEPAT SATU soal ${typeDesc}. JANGAN menggunakan placeholder.${programmingHint}${arabicHint}`
+      : `Buat TEPAT SATU soal ${typeDesc} tentang materi/topik: "${topic}". JANGAN menggunakan placeholder.${programmingHint}${arabicHint}`;
 
     let response;
     if (isOllama) {
@@ -326,20 +400,7 @@ Aturan: Variasikan struktur kalimat (jangan kaku), dilarang menggunakan markdown
     const data = await response.json();
     const content = isOllama ? data.message.content : data.choices[0].message.content;
     
-    let cleanContent = content.trim();
-    // 🔍 Smart Extraction
-    const firstBrace = cleanContent.indexOf('{');
-    const lastBrace = cleanContent.lastIndexOf('}');
-    if (firstBrace !== -1 && lastBrace !== -1) {
-        cleanContent = cleanContent.substring(firstBrace, lastBrace + 1);
-    }
-
-    // 🔥 Radical Fix for LaTeX
-    cleanContent = cleanContent.replace(/\\/g, "\\\\")
-                               .replace(/\\\\\\\\/g, "\\\\")
-                               .replace(/\\(?=["\\\/bfnrtu])/g, "\\");
-
-    const result = JSON.parse(cleanContent);
+    const result = robustJSONParse(content);
     
     return {
       ...result,
@@ -361,15 +422,7 @@ export const getTopicSuggestionsAI = async (
   isLiteracy: boolean = false
 ): Promise<string[]> => {
   try {
-    const settings = await pb.collection("settings").getFullList({ limit: 1 });
-    const config = settings[0];
-    if (!config?.groq_api_key) return [];
-    
-    const isOllama = config?.ai_provider === "ollama";
-    const apiKey = isOllama ? (config?.ai_gateway_key || config?.groq_api_key) : config?.groq_api_key;
-    const baseUrl = isOllama ? (pb.baseUrl + "/api/ai-proxy") : "https://api.groq.com/openai/v1";
-
-    const model = (config?.ai_model || AI_MODELS[0].id);
+    const { apiKey, isOllama, model, baseUrl } = await getAIConfig();
     console.log(`💡 [AI TOPIC] Menyarankan topik menggunakan: ${model}`);
 
     const literasiNote = isLiteracy ? "(UTAMAKAN topik yang kaya teks bacaan/fenomena karena Mode Literasi AKTIF)" : "";
@@ -438,15 +491,7 @@ export const parseQuestionsAI = async (
   level: string = "Umum"
 ): Promise<AIGeneratedQuestion[]> => {
   try {
-    const settings = await pb.collection("settings").getFullList({ limit: 1 });
-    const config = settings[0];
-    if (!config?.groq_api_key) throw new Error("API Key belum diatur.");
-    
-    const isOllama = config?.ai_provider === "ollama";
-    const apiKey = isOllama ? (config?.ai_gateway_key || config?.groq_api_key) : config?.groq_api_key;
-    const baseUrl = isOllama ? (pb.baseUrl + "/api/ai-proxy") : "https://api.groq.com/openai/v1";
-
-    const model = (config?.ai_model || AI_MODELS[0].id);
+    const { apiKey, isOllama, model, baseUrl } = await getAIConfig();
 
     const systemPrompt = `Anda adalah Ahli Digitalisasi Dokumen Pendidikan.
 Tugas: Ekstrak semua soal dari teks mentah (hasil copy-paste PDF/Word) menjadi JSON valid.

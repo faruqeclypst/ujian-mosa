@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { DataTable } from "../ui/data-table";
 import { Button } from "../ui/button";
 import type { ClassData } from "../../types/exam";
-import { Edit, Trash } from "lucide-react";
+import { Edit, Trash, GraduationCap } from "lucide-react";
 
 interface ClassTableProps {
   classes: ClassData[];
@@ -82,7 +82,14 @@ const ClassTable = ({
       render: (v: any, item: any, index?: number) => (index !== undefined ? index + 1 : 1),
       className: "w-[60px]",
     },
-    { key: "name", label: "Nama Kelas", sortable: true },
+    { 
+      key: "name", 
+      label: "Nama Kelas", 
+      sortable: true,
+      render: (name: string) => (
+        <span className="font-bold text-slate-700 dark:text-slate-200">{name}</span>
+      )
+    },
   ];
 
   const renderActions = (cls: ClassData) => (

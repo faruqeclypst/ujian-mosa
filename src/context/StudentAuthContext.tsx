@@ -18,7 +18,10 @@ interface StudentAuthContextValue {
   changePassword: (newPassword: string) => Promise<void>;
 }
 
-import { ShieldAlert, LogOut } from "lucide-react";
+import { ShieldAlert, LogOut, Lock } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../components/ui/dialog";
+import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
 
 const StudentAuthContext = createContext<StudentAuthContextValue | undefined>(undefined);
 
@@ -26,6 +29,12 @@ export const StudentAuthProvider = ({ children }: { children: ReactNode }) => {
   const { pb, loading: tenantLoading } = useTenant();
   const [student, setstudent] = useState<StudentUser | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // States for mandatory password change
+  const [newPass, setNewPass] = useState("");
+  const [confirmPass, setConfirmPass] = useState("");
+  const [passError, setPassError] = useState("");
+  const [isChangingPass, setIsChangingPass] = useState(false);
 
   useEffect(() => {
     if (tenantLoading || !pb) {
@@ -43,7 +52,7 @@ export const StudentAuthProvider = ({ children }: { children: ReactNode }) => {
           name: model.name || "-",
           classId: model.classId || model.classid || (model as any).class_id || (model as any).class || "",
           className: (model as any).className || (model as any).class_name || "-",
-          hasChangedPassword: true
+          hasChangedPassword: model.hasChangedPassword || false
         });
 
         try {
@@ -78,8 +87,11 @@ export const StudentAuthProvider = ({ children }: { children: ReactNode }) => {
             className: classObj?.name || classObj?.nama || (classObj as any)?.classname || "-",
             hasChangedPassword: refreshed.hasChangedPassword,
           });
-        } catch (e) {
-          console.warn("Background sync failed:", e);
+        } catch (err: any) {
+          if (err.status === 404) {
+             logoutStudent();
+          }
+          console.warn("Background sync failed:", err);
         }
       }
       setLoading(false);
@@ -145,7 +157,8 @@ export const StudentAuthProvider = ({ children }: { children: ReactNode }) => {
         passwordConfirm: newPassword,
         hasChangedPassword: true,
       });
-      setstudent((prev) => prev ? { ...prev, hasChangedPassword: true } : null);
+      // Force logout setelah ganti password agar user login ulang dengan sesi bersih
+      logoutStudent();
     } catch (err: any) {
       throw new Error("Gagal mengganti password: " + err.message);
     }
@@ -156,7 +169,7 @@ export const StudentAuthProvider = ({ children }: { children: ReactNode }) => {
     setstudent(null);
     localStorage.removeItem("student_session_id");
     sessionStorage.clear();
-    window.location.href = `${window.location.origin}/exam`;
+    window.location.replace(`${window.location.origin}/exam`);
   }, [pb]);
 
   const [isKicked, setIsKicked] = useState(false);
@@ -209,14 +222,27 @@ export const StudentAuthProvider = ({ children }: { children: ReactNode }) => {
 
     const unsubscribe = pb.collection("students").subscribe(student.id, (e) => {
       if (e.action === "update") {
+        // 1. Check for session conflict (existing)
         const serverSid = e.record.activeSessionId;
         const localSid = localStorage.getItem("student_session_id");
         if (handleSessionConflict(serverSid, localSid)) setIsKicked(true);
+
+        // 2. Check for Admin Reset (Kicked)
+        if (e.record.hasChangedPassword === false) {
+          logoutStudent();
+        } else {
+          // Sync data if changed (prevent UI from lagging)
+          setstudent(prev => prev ? { 
+            ...prev, 
+            name: e.record.name, 
+            hasChangedPassword: e.record.hasChangedPassword 
+          } : null);
+        }
       }
     });
 
     return () => { unsubscribe.then(u => u()); };
-  }, [student?.id, isKicked, pb]);
+  }, [student?.id, student?.hasChangedPassword, isKicked, pb]);
 
   return (
     <StudentAuthContext.Provider value={{ student, loading, loginStudent, logoutStudent, changePassword }}>
@@ -248,6 +274,7 @@ export const StudentAuthProvider = ({ children }: { children: ReactNode }) => {
           </div>
         </div>
       )}
+
     </StudentAuthContext.Provider>
   );
 };

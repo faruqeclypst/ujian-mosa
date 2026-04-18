@@ -46,7 +46,7 @@ import StudentInterestDialog from "../components/exam/StudentInterestDialog";
 const StudentsPage = () => {
   const { role } = useAuth();
   const { school } = useTenant();
-  const { students, classes, loading, createStudent, updateStudent, deleteStudent } = useExamData();
+  const { students, classes, loading, createStudent, updateStudent, deleteStudent, resetStudentPassword } = useExamData();
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [dialogMode, setDialogMode] = useState<"create" | "edit">("create");
@@ -147,6 +147,26 @@ const StudentsPage = () => {
       console.error("Gagal menyimpan data Siswa", error);
       showAlert("Gagal", "Gagal menyimpan data Siswa.", "danger");
     }
+  };
+
+  const handleResetPassword = async (student: StudentData) => {
+    showAlert(
+      "Reset Password",
+      `Apakah Anda yakin ingin mereset password siswa ${student.name} menjadi default (12345678)? Siswa akan diminta mengganti password saat login berikutnya.`,
+      "warning",
+      async () => {
+        try {
+          await resetStudentPassword(student.id);
+          showAlert("Berhasil", `Password siswa ${student.name} berhasil direset menjadi 12345678.`, "success");
+        } catch (error: any) {
+          console.error("Gagal mereset password", error);
+          const errorMsg = error.data?.message || error.message || "Gagal mereset password siswa.";
+          showAlert("Gagal", `Gagal mereset password siswa: ${errorMsg}. Pastikan field 'hasChangedPassword' sudah ada di PocketBase dan Rules Update mengizinkan Admin.`, "danger");
+        }
+      },
+      true,
+      "Ya, Reset"
+    );
   };
 
   const handleConfirmDelete = async () => {
@@ -622,6 +642,7 @@ const StudentsPage = () => {
           onSelectChange={setSelectedIds}
           onEdit={handleEditClick} 
           onDelete={handleDeleteClick} 
+          onResetPassword={role === "admin" ? handleResetPassword : undefined}
           onViewInterest={handleViewInterest}
           filterActions={
             <div className="flex items-center gap-2">

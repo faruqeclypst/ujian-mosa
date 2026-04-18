@@ -105,7 +105,7 @@ const SchoolAppContent = () => {
               path="/exam"
               element={
                 <ExambroGuard>
-                  {student ? <StudentDashboardPage /> : <StudentLoginPage />}
+                  {student && student.hasChangedPassword ? <StudentDashboardPage /> : <StudentLoginPage />}
                 </ExambroGuard>
               }
             />
@@ -144,7 +144,7 @@ const SchoolAppContent = () => {
               element={
                 adminLoading ? (
                   <LoadingScreen />
-                ) : user ? (
+                ) : (user && user.hasChangedPassword) ? (
                   <ExamDataProvider>
                     <InventoryLayout />
                   </ExamDataProvider>

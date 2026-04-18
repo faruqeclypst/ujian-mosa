@@ -1,7 +1,6 @@
 import { useState, useRef } from "react";
 import { Camera, X, Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import pb from "../../lib/pocketbase";
 import { uploadInventoryImage, deleteImageFromStorage } from "../../lib/storage";
 import { useAuth } from "../../context/AuthContext";
 import { useTenant } from "../../context/TenantContext";
@@ -25,7 +24,7 @@ const ProfilePictureUpload = ({
   showUploadButton = true
 }: ProfilePictureUploadProps) => {
   const { user } = useAuth();
-  const { school } = useTenant();
+  const { school, pb } = useTenant();
   const { addToast } = useToast();
   const [isUploading, setIsUploading] = useState(false);
   const [previewURL, setPreviewURL] = useState<string | null>(null);
@@ -70,7 +69,7 @@ const ProfilePictureUpload = ({
   };
 
   const uploadToStorage = async (file: File) => {
-    if (!user) return;
+    if (!user || !pb) return;
 
     setIsUploading(true);
     try {
@@ -105,7 +104,7 @@ const ProfilePictureUpload = ({
   };
 
   const handleRemovePhoto = async () => {
-    if (!user || !currentPhotoURL) return;
+    if (!user || !pb || !currentPhotoURL) return;
 
     setIsUploading(true);
     try {

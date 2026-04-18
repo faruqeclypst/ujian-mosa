@@ -52,6 +52,7 @@ const SettingsPage = () => {
   const [aiModel, setAiModel] = useState(AI_MODELS[0].id);
   const [aiProvider, setAiProvider] = useState("groq");
   const [isExambroEnabled, setIsExambroEnabled] = useState(false);
+  const [teacherFullAccess, setTeacherFullAccess] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [isTestingAI, setIsTestingAI] = useState(false);
@@ -112,6 +113,7 @@ const SettingsPage = () => {
         setAiModel(data.ai_model || AI_MODELS[0].id);
         setAiProvider(data.ai_provider || "groq");
         setIsExambroEnabled(data.is_exambro_enabled ?? false);
+        setTeacherFullAccess(data.teacher_full_access || false);
         
         const logoUrl = data.logoUrl || data.logo || "";
         setSchoolLogo(logoUrl);
@@ -242,8 +244,10 @@ const SettingsPage = () => {
         ai_model: aiModel || "llama-3.3-70b-versatile",
         ai_provider: aiProvider || "groq",
         is_exambro_enabled: !!isExambroEnabled,
+        teacher_full_access: !!teacherFullAccess,
         // Fallback untuk DB versi baru (camelCase)
         isExambroEnabled: !!isExambroEnabled,
+        teacherFullAccess: !!teacherFullAccess,
         aiModel: aiModel || "llama-3.3-70b-versatile",
         aiProvider: aiProvider || "groq"
       };
@@ -390,8 +394,7 @@ const SettingsPage = () => {
                 // 🔐 Khusus koleksi Auth (students & users), butuh password saat Create
                 const isAuthCollection = ["students", "users"].includes(collectionName);
                 if (isAuthCollection) {
-                  const username = (cleanData as any).username || (cleanData as any).nisn || id;
-                  const defaultPass = `${username}@mosa`;
+                  const defaultPass = "12345678";
                   createData.password = defaultPass;
                   createData.passwordConfirm = defaultPass;
                 }
@@ -601,6 +604,33 @@ const SettingsPage = () => {
                           onChange={(e) => setIsExambroEnabled(e.target.checked)}
                         />
                         <div className="w-11 h-6 bg-slate-200 dark:bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-slate-600 peer-checked:bg-orange-600 shadow-inner group-hover:after:scale-110"></div>
+                      </label>
+                    )}
+                  </div>
+                </div>
+
+                <div className="pt-4 border-t border-slate-200/60 dark:border-slate-800/40">
+                  <div className="flex items-center justify-between p-4 rounded-2xl bg-slate-50/50 dark:bg-slate-900/20 border border-slate-100 dark:border-slate-800/40">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400">
+                        <CheckCircle2 className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200">Full Akses Guru</h4>
+                        <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">Izinkan Guru mengelola Ruang & Menghapus Sesi untuk semua kategori ujian (Ulangan, PTS, PAS, dll).</p>
+                      </div>
+                    </div>
+                    {loading ? (
+                      <Skeleton className="h-6 w-11 rounded-full" />
+                    ) : (
+                      <label className="relative inline-flex items-center cursor-pointer group">
+                        <input 
+                          type="checkbox" 
+                          className="sr-only peer" 
+                          checked={teacherFullAccess}
+                          onChange={(e) => setTeacherFullAccess(e.target.checked)}
+                        />
+                        <div className="w-11 h-6 bg-slate-200 dark:bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-slate-600 peer-checked:bg-amber-600 shadow-inner group-hover:after:scale-110"></div>
                       </label>
                     )}
                   </div>

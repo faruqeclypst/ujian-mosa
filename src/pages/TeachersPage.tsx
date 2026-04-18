@@ -22,6 +22,7 @@ import {
   DropdownMenuLabel
 } from "../components/ui/dropdown-menu";
 import { useExamData } from "../context/ExamDataContext";
+import { useTenant } from "../context/TenantContext";
 import { Button } from "../components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "../components/ui/dialog";
 import { Progress } from "../components/ui/progress";
@@ -35,7 +36,8 @@ import { downloadTeacherImportTemplate, exportTeacherToExcel, parseTeacherImport
 import type { Teacher } from "../types/exam";
 
 const TeachersPage = () => {
-  const { teachers, loading, createTeacher, updateTeacher, deleteTeacher } = useExamData();
+  const { teachers, loading, createTeacher, updateTeacher, deleteTeacher, resetUserPassword } = useExamData();
+  const { pb } = useTenant();
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [dialogMode, setDialogMode] = useState<"create" | "edit">("create");
@@ -131,6 +133,111 @@ const TeachersPage = () => {
     }
   };
 
+  const handleResetPassword = async (teacherId: string) => {
+    const teacher = teachers.find(t => t.id === teacherId);
+    if (!teacher) return;
+
+    showAlert(
+      "Reset Password Guru",
+      `Apakah Anda yakin ingin mereset password untuk guru ${teacher.name}? Password akan dikembalikan ke default "12345678".`,
+      "warning",
+      async () => {
+        if (!pb) return;
+        try {
+          // Find the corresponding user account
+          let userRec = null;
+          try {
+            userRec = await pb.collection("users").getFirstListItem(`teacherId="${teacherId}"`);
+          } catch (e: any) {
+            if (e.status !== 404) throw e;
+          }
+
+          if (userRec) {
+            await resetUserPassword(userRec.id);
+            showAlert("Berhasil", `Password guru ${teacher.name} berhasil direset menjadi 12345678.`, "success");
+          } else {
+            // Re-create user account if missing (e.g. after data restore)
+            const defaultPass = "12345678";
+            const username = teacher.username || teacher.code || teacher.name.toLowerCase().replace(/\s+/g, "_") + "_" + Math.floor(Math.random() * 1000);
+            
+            await pb.collection("users").create({
+              username: username,
+              password: defaultPass,
+              passwordConfirm: defaultPass,
+              name: teacher.name,
+              role: "teacher",
+              teacherId: teacherId,
+              hasChangedPassword: false,
+            });
+            
+            showAlert("Berhasil Dipulihkan", `Akun login guru ${teacher.name} yang sempat hilang telah dibuat kembali dengan password default 12345678.`, "success");
+          }
+        } catch (error: any) {
+          console.error("Gagal reset password", error);
+          const errorMsg = error.data?.message || error.message || "Gagal mereset password guru.";
+          showAlert("Gagal", errorMsg, "danger");
+        }
+      },
+      true,
+      "Ya, Reset"
+    );
+  };
+
+  const handleSyncAllUsers = async () => {
+    showAlert(
+      "Sinkronkan Semua Akun Guru",
+      "Sistem akan memeriksa semua guru dan membuatkan akun login (users) bagi guru yang belum memilikinya. Username akan diambil dari kode guru/nama, dan password default adalah 12345678.",
+      "info",
+      async () => {
+        setBatchProgress({
+          isOpen: true,
+          total: teachers.length,
+          current: 0,
+          message: "Memulai sinkronisasi...",
+          title: "Sinkronisasi Akun Guru"
+        });
+
+        let createdCount = 0;
+        try {
+          for (let i = 0; i < teachers.length; i++) {
+            const teacher = teachers[i];
+            setBatchProgress(prev => ({ ...prev, current: i, message: `Memeriksa ${teacher.name}...` }));
+            
+            if (!pb) continue;
+            try {
+              await pb.collection("users").getFirstListItem(`teacherId="${teacher.id}"`);
+            } catch (e: any) {
+              if (e.status === 404 && pb) {
+                // User missing, create it
+                const defaultPass = "12345678";
+                const username = teacher.username || teacher.code || teacher.name.toLowerCase().replace(/\s+/g, "_") + "_" + Math.floor(Math.random() * 1000);
+                
+                await pb.collection("users").create({
+                  username: username,
+                  password: defaultPass,
+                  passwordConfirm: defaultPass,
+                  name: teacher.name,
+                  role: "teacher",
+                  teacherId: teacher.id,
+                  hasChangedPassword: false,
+                });
+                createdCount++;
+              }
+            }
+          }
+          showAlert("Selesai", `${createdCount} akun guru baru berhasil dibuat/dipulihkan.`, "success");
+        } catch (err: any) {
+          console.error("Sync all err", err);
+          showAlert("Gagal", "Terjadi kesalahan saat sinkronisasi massal.", "danger");
+        } finally {
+          setBatchProgress(prev => ({ ...prev, isOpen: false }));
+        }
+      },
+      true,
+      "Mulai Sinkron"
+    );
+  };
+
   const handleImportTeachers = async (file: File) => {
     setIsImporting(true);
     try {
@@ -140,6 +247,7 @@ const TeachersPage = () => {
         await createTeacher({
           name: row.name,
           code: row.code,
+          username: row.code || row.name.toLowerCase().replace(/\s+/g, "_") + "_" + Math.floor(Math.random() * 1000),
           subjects: row.subjects,
         });
       }
@@ -201,9 +309,10 @@ const TeachersPage = () => {
       ? {
           name: selectedTeacher.name,
           code: selectedTeacher.code || "",
+          username: selectedTeacher.username || "",
           subjects: selectedTeacher.subjects || [],
         }
-      : { name: "", code: "", subjects: [] },
+      : { name: "", code: "", username: "", subjects: [] },
   [selectedTeacher]);
 
   return (
@@ -301,6 +410,19 @@ const TeachersPage = () => {
                   <span className="text-[10px] text-slate-400 mt-1">Format file import Excel</span>
                 </div>
               </DropdownMenuItem>
+              <DropdownMenuSeparator className="my-1 border-slate-100 dark:border-slate-800" />
+              <DropdownMenuItem 
+                onClick={handleSyncAllUsers} 
+                className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 focus:bg-slate-50 dark:focus:bg-slate-900 transition-colors group"
+              >
+                <div className="h-10 w-10 shrink-0 rounded-lg bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <Users className="h-5 w-5" />
+                </div>
+                <div className="flex flex-col min-w-0">
+                  <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">Sinkronkan Akun</span>
+                  <span className="text-[10px] text-slate-400 mt-1">Pulihkan akun login yang hilang</span>
+                </div>
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
 
@@ -372,6 +494,7 @@ const TeachersPage = () => {
           onSelectChange={setSelectedIds}
           onEdit={handleEditClick} 
           onDelete={handleDeleteClick} 
+          onResetPassword={handleResetPassword}
         />
       )}
 

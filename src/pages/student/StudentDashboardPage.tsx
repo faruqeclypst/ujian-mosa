@@ -6,7 +6,8 @@ import { Input } from "../../components/ui/input";
 import pb from "../../lib/pocketbase";
 import {
   Calendar, Clock, ChevronRight, User, AlertCircle,
-  Award, LogOut as LogoutIcon, Sun, Moon, Monitor, KeyRound, ClipboardCheck, Sparkles
+  Award, LogOut as LogoutIcon, Sun, Moon, Monitor, KeyRound, ClipboardCheck, Sparkles,
+  Lock
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../../components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuLabel } from "../../components/ui/dropdown-menu";
@@ -49,6 +50,14 @@ const StudentDashboardPage = () => {
   const [isSyncingData, setIsSyncingData] = useState(false);
   const [isFirstLoadState, setIsFirstLoadState] = useState(true);
   const [displayedName, setDisplayedName] = useState("");
+  
+  // Change Password Modal
+  const [isChangePassOpen, setIsChangePassOpen] = useState(false);
+  const [newPass, setNewPass] = useState("");
+  const [confirmPass, setConfirmPass] = useState("");
+  const [passError, setPassError] = useState("");
+  const [isChangingPass, setIsChangingPass] = useState(false);
+  const { changePassword } = useStudentAuth();
 
   // ✨ TYPING EFFECT UNTUK NAMA SISWA
   useEffect(() => {
@@ -358,6 +367,13 @@ const StudentDashboardPage = () => {
                     </button>
                   </div>
                 </div>
+                <DropdownMenuSeparator className="my-2 bg-slate-50 dark:bg-slate-800" />
+                <DropdownMenuItem onClick={() => setIsChangePassOpen(true)} className="px-3 py-2.5 rounded-xl text-slate-600 dark:text-slate-300 focus:bg-slate-50 dark:focus:bg-slate-900/50 flex items-center gap-3 cursor-pointer transition-colors group">
+                  <div className="p-1.5 bg-slate-100 dark:bg-slate-800 rounded-lg group-focus:bg-emerald-50 dark:group-focus:bg-emerald-900/20 transition-colors">
+                    <KeyRound className="h-4 w-4" />
+                  </div>
+                  <span className="text-xs font-black uppercase tracking-widest">Ganti Password</span>
+                </DropdownMenuItem>
                 <DropdownMenuSeparator className="my-2 bg-slate-50 dark:bg-slate-800" />
                 <DropdownMenuItem onClick={logoutStudent} className="px-3 py-2.5 rounded-xl text-rose-500 focus:text-rose-600 focus:bg-rose-50 dark:focus:bg-rose-950/30 flex items-center gap-3 cursor-pointer transition-colors group">
                   <div className="p-1.5 bg-rose-50 dark:bg-rose-900/30 rounded-lg group-focus:bg-rose-100/50 transition-colors">
@@ -802,6 +818,91 @@ const StudentDashboardPage = () => {
             </div>
             <DialogFooter>
               <Button onClick={handleValidateToken} disabled={!tokenInput || isValidating} className="w-full h-12 bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-600 text-white rounded-lg font-bold uppercase tracking-widest text-[10px] transition-all active:scale-95">{isValidating ? "Memverifikasi..." : "Konfirmasi & Masuk"}</Button>
+            </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Manual Change Password Dialog */}
+      <Dialog open={isChangePassOpen} onOpenChange={(open) => { if (!isChangingPass) setIsChangePassOpen(open); setPassError(""); setNewPass(""); setConfirmPass(""); }}>
+        <DialogContent className="sm:max-w-md bg-white dark:bg-slate-950 rounded-3xl border-none shadow-2xl p-0 overflow-hidden">
+          <div className="bg-emerald-600 px-8 py-10 text-white relative">
+            <div className="absolute top-0 right-0 p-4 opacity-10"><Lock className="w-20 h-20" /></div>
+            <DialogHeader>
+              <DialogTitle className="text-2xl font-black uppercase tracking-tight">Ganti Password</DialogTitle>
+              <p className="text-emerald-50/80 text-xs font-bold uppercase tracking-widest mt-2 opacity-90">Perbarui keamanan akun Anda</p>
+            </DialogHeader>
+          </div>
+          <div className="p-8 space-y-6">
+            <div className="space-y-5">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest ml-1">Password Baru</label>
+                <div className="relative">
+                  <Input 
+                    type="password"
+                    value={newPass} 
+                    onChange={(e) => setNewPass(e.target.value)} 
+                    placeholder="Minimal 6 karakter" 
+                    className="h-14 bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 rounded-2xl px-5 font-bold" 
+                    disabled={isChangingPass} 
+                  />
+                  <KeyRound className="absolute right-5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-300" />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest ml-1">Konfirmasi Password Baru</label>
+                <div className="relative">
+                  <Input 
+                    type="password"
+                    value={confirmPass} 
+                    onChange={(e) => setConfirmPass(e.target.value)} 
+                    placeholder="Ulangi password baru" 
+                    className="h-14 bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 rounded-2xl px-5 font-bold" 
+                    disabled={isChangingPass} 
+                  />
+                  <Lock className="absolute right-5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-300" />
+                </div>
+              </div>
+              {passError && (
+                <div className="p-4 bg-rose-50 dark:bg-rose-950/20 border border-rose-100 dark:border-rose-900/40 rounded-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top-2">
+                  <AlertCircle className="w-4 h-4 text-rose-500 shrink-0" />
+                  <p className="text-[10px] font-black text-rose-600 uppercase tracking-wide leading-tight">{passError}</p>
+                </div>
+              )}
+            </div>
+            <DialogFooter className="flex-col sm:flex-row gap-3">
+              <Button 
+                variant="ghost" 
+                onClick={() => setIsChangePassOpen(false)} 
+                className="h-14 rounded-2xl font-black text-[10px] uppercase tracking-widest text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                disabled={isChangingPass}
+              >
+                Batal
+              </Button>
+              <Button 
+                onClick={async () => {
+                  setPassError("");
+                  if (newPass.length < 6) return setPassError("Password minimal 6 karakter!");
+                  if (newPass !== confirmPass) return setPassError("Konfirmasi password tidak cocok!");
+                  
+                  setIsChangingPass(true);
+                  try {
+                    await changePassword(newPass);
+                    setIsChangePassOpen(false);
+                    // Reset fields
+                    setNewPass("");
+                    setConfirmPass("");
+                  } catch (err: any) {
+                    setPassError(err.message || "Gagal mengganti password.");
+                  } finally {
+                    setIsChangingPass(false);
+                  }
+                }}
+                className="flex-1 h-14 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] shadow-lg shadow-emerald-200 dark:shadow-none transition-all active:scale-95"
+                disabled={isChangingPass}
+              >
+                {isChangingPass ? "Memproses..." : "Simpan Password"}
+              </Button>
             </DialogFooter>
           </div>
         </DialogContent>

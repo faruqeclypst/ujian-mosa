@@ -8,6 +8,7 @@ import { motion } from "framer-motion";
 import FormField from "../components/forms/FormField";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../components/ui/dialog";
 import { Input } from "../components/ui/input";
 import { ThemeToggle } from "../components/ui/theme-toggle";
 import { useAuth } from "../context/AuthContext";
@@ -21,11 +22,18 @@ const loginSchema = z.object({
 type LoginFormValues = z.infer<typeof loginSchema>;
 
 const LoginPage = () => {
-  const { signInWithUsername } = useAuth();
+  const { signInWithUsername, user, changePassword } = useAuth();
   const { pb: tenantPb } = useTenant();
   const pb = tenantPb;
   const [formError, setFormError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+
+  // For change password modal (Guru)
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [changePassError, setChangePassError] = useState("");
+  const [isChangingPass, setIsChangingPass] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
 
   const [schoolName, setSchoolName] = useState("");
   const [schoolLogo, setSchoolLogo] = useState("");
@@ -333,6 +341,88 @@ const LoginPage = () => {
           </CardContent>
         </Card>
       </motion.div>
+
+      {/* Mandatory Change Password Dialog for Teachers */}
+      <Dialog open={!!(user && !user.hasChangedPassword)} onOpenChange={() => { }}>
+        <DialogContent className="sm:max-w-md bg-white dark:bg-slate-900 rounded-[32px] p-8 border-none shadow-2xl" onPointerDownOutside={(e) => e.preventDefault()}>
+          <DialogHeader className="mb-6">
+            <div className="w-16 h-16 bg-blue-50 dark:bg-blue-900/20 rounded-2xl flex items-center justify-center mb-4 mx-auto">
+              <Lock className="text-blue-600 animate-pulse" size={32} />
+            </div>
+            <DialogTitle className="text-center text-2xl font-extrabold text-slate-900 dark:text-white">Ganti Password Wajib!</DialogTitle>
+            <p className="text-slate-500 text-center mt-2 font-medium">
+              Ini adalah login pertama Anda (atau password di-reset). Demi keamanan, silakan perbarui password Anda.
+            </p>
+          </DialogHeader>
+
+          <form 
+            onSubmit={async (e) => {
+              e.preventDefault();
+              setChangePassError("");
+              if (newPassword.length < 6) return setChangePassError("Password baru minimal 6 karakter!");
+              if (newPassword !== confirmPassword) return setChangePassError("Konfirmasi password tidak cocok!");
+              
+              setIsChangingPass(true);
+              try {
+                await changePassword(newPassword);
+              } catch (err: any) {
+                setChangePassError(err.message || "Gagal mengubah password.");
+              } finally {
+                setIsChangingPass(false);
+              }
+            }} 
+            className="space-y-6"
+          >
+            {changePassError && (
+              <div className="bg-red-50 border border-red-100 text-red-600 text-sm px-4 py-3 rounded-2xl flex items-center gap-2">
+                <div className="w-1 h-1 rounded-full bg-red-500" />
+                {changePassError}
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 ml-1">Password Baru</label>
+              <div className="relative">
+                <Input
+                  type={showNewPassword ? "text" : "password"}
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Minimal 6 karakter"
+                  className="rounded-2xl h-12 bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-gray-700 pr-10 transition-all focus:ring-2 focus:ring-blue-500/20"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowNewPassword(!showNewPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                >
+                  {showNewPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 ml-1">Konfirmasi Password Baru</label>
+              <Input
+                type={showNewPassword ? "text" : "password"}
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="Ulangi password baru"
+                className="rounded-2xl h-12 bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-gray-700 transition-all focus:ring-2 focus:ring-blue-500/20"
+              />
+            </div>
+
+            <div className="pt-2">
+              <Button
+                type="submit"
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold h-12 rounded-2xl text-lg transition-all shadow-lg hover:shadow-blue-200 dark:hover:shadow-none"
+                disabled={isChangingPass}
+              >
+                {isChangingPass ? "Menyimpan..." : "Simpan & Lanjutkan"}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

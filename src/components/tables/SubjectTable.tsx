@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { DataTable } from "../ui/data-table";
 import { Button } from "../ui/button";
 import type { SubjectData } from "../../types/exam";
-import { Edit, Trash } from "lucide-react";
+import { Edit, Trash, BookOpen } from "lucide-react";
 
 interface SubjectTableProps {
   subjects: SubjectData[];
@@ -82,7 +82,14 @@ const SubjectTable = ({
       render: (v: any, item: any, index?: number) => (index !== undefined ? index + 1 : 1),
       className: "w-[60px]",
     },
-    { key: "name", label: "Mata Pelajaran", sortable: true },
+    { 
+      key: "name", 
+      label: "Mata Pelajaran", 
+      sortable: true,
+      render: (name: string) => (
+        <span className="font-bold text-slate-700 dark:text-slate-200">{name}</span>
+      )
+    },
   ];
 
   const renderActions = (subject: SubjectData) => (

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Plus, Trash, Edit, Users, Archive, RotateCw, BookOpen, ClipboardList, Lock, Clock, ChevronDown, ChevronRight, Power, PowerOff, Search, ShieldAlert } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "../../components/ui/button";
@@ -19,6 +19,8 @@ import { DataTable }  from "../../components/ui/data-table";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../components/ui/table";
 
 import { Skeleton } from "../../components/ui/skeleton";
+import { Avatar, AvatarFallback } from "../../components/ui/avatar";
+import { Badge } from "../../components/ui/badge";
 
 export interface ExamRoomData {
   id: string;
@@ -100,7 +102,7 @@ const ExamRoomsPage = () => {
 
   const {
     classes: examClasses, subjects, teachers: masterTeachers,
-    universalToken, timeLeft, loading: dataLoading
+    universalToken, timeLeft, teacherFullAccess, loading: dataLoading
   } = useExamData();
 
   const isLoading = loading || dataLoading || examsLoading;
@@ -124,130 +126,129 @@ const ExamRoomsPage = () => {
   const [totalOngoing, setTotalOngoing] = useState(0);
 
   const isOwner = useCallback((room: ExamRoomData) => {
-    if (role === "admin") return true;
-    if (!teacherId) return false;
-    return room.examTeacherId === teacherId || room.examTeacherId === user?.id;
-  }, [role, teacherId, user]);
+    const is_admin = role === "admin";
+    const is_teacher_full = role === "teacher" && teacherFullAccess;
+    const room_teacher_id = room.examTeacherId;
+    const my_teacher_id = teacherId || user?.id;
+    
+    const owner_match = room_teacher_id === my_teacher_id;
+    
+    console.log(`DEBUG: Access check -> role: ${role}, fullAccess: ${teacherFullAccess}, isOwner: ${owner_match}, myID: ${my_teacher_id}, roomOwnerID: ${room_teacher_id}`);
+
+    if (is_admin) return true;
+    if (is_teacher_full) {
+      return owner_match;
+    }
+    return false;
+  }, [role, teacherFullAccess, teacherId, user?.id]);
+
+  const canCreate = role === "admin" || (role === "teacher" && teacherFullAccess);
 
   // Columns definition (matching ExamsPage style)
-  const columns: any[] = [
+  const columns = useMemo(() => [
     {
       key: "index",
       label: "No",
       render: (_: any, __: any, i?: number) => <div className="text-center font-medium">{(i || 0) + 1}</div>,
-      className: "w-14",
+      className: "w-12",
     },
     {
-      key: "status",
-      label: "Status",
+      key: "room_name",
+      label: "Ruangan & Pengampu",
+      sortable: true,
+      render: (v: string, room: ExamRoomData) => (
+        <div className="flex flex-col gap-0.5">
+          <div className="flex items-center gap-2">
+            <span className="font-bold text-slate-800 dark:text-white text-sm tracking-tight">{v || "Tanpa Nama"}</span>
+            {room.is_exambro && <ShieldAlert className="h-3 w-3 text-orange-500" />}
+          </div>
+          <div className="flex items-center gap-2 whitespace-nowrap overflow-hidden">
+             <span className="text-[10px] font-bold text-slate-600 dark:text-slate-400 leading-none">{room.teacherName}</span>
+             <span className="text-slate-300 dark:text-slate-700">|</span>
+             <span className="text-[10px] font-bold text-slate-400 truncate" title={room.examTitle}>{room.examTitle}</span>
+          </div>
+        </div>
+      )
+    },
+    {
+      key: "schedule",
+      label: "Jadwal & Status",
       render: (_: any, room: ExamRoomData) => {
         const now = Date.now();
         const start = new Date(room.start_time).getTime();
         const end = new Date(room.end_time).getTime();
 
-        let label = "Berjalan";
-        let style = "bg-emerald-50 text-emerald-700 border-emerald-100 dark:bg-emerald-900/10 dark:text-emerald-400 dark:border-emerald-800/40 animate-pulse";
+        let statusLabel = "Berjalan";
+        let statusStyle = "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800/40 animate-pulse";
 
         if (room.status === "archive") {
-          label = "Arsip";
-          style = "bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700";
+          statusLabel = "Arsip";
+          statusStyle = "bg-slate-50 text-slate-500 border-slate-200 dark:bg-slate-800/50 dark:text-slate-400 dark:border-slate-700";
         } else if (room.isDisabled) {
-          label = "Nonaktif";
-          style = "bg-rose-50 text-rose-700 border-rose-100 dark:bg-rose-900/10 dark:text-rose-400 dark:border-rose-800/40";
+          statusLabel = "Nonaktif";
+          statusStyle = "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-400 dark:border-rose-800/40";
         } else if (now < start) {
-          label = "Menunggu";
-          style = "bg-blue-50 text-blue-700 border-blue-100 dark:bg-blue-900/10 dark:text-blue-400 dark:border-blue-800/40";
+          statusLabel = "Menunggu";
+          statusStyle = "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-800/40";
         } else if (now > end) {
-          label = "Selesai";
-          style = "bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700";
+          statusLabel = "Selesai";
+          statusStyle = "bg-slate-50 text-slate-500 border-slate-200 dark:bg-slate-800/50 dark:text-slate-400 dark:border-slate-700";
         }
 
         return (
-          <span className={cn("inline-flex text-[10px] px-2 py-0.5 rounded-md font-bold uppercase tracking-wider border whitespace-nowrap", style)}>
-            {label}
-          </span>
+          <div className="flex flex-col gap-1.5">
+            <div className="flex items-center gap-1.5">
+              <span className={cn("inline-flex text-[9px] px-1.5 py-0 rounded font-black uppercase tracking-wider border whitespace-nowrap", statusStyle)}>
+                {statusLabel}
+              </span>
+              <span className={cn("text-[9px] px-1 py-0 rounded font-black uppercase tracking-widest border bg-slate-50 dark:bg-slate-900", getExamTypeColorClass(room.examType || "UMUM"))}>
+                {room.examType || "UMUM"}
+              </span>
+            </div>
+            <div className="flex flex-col gap-0.5 text-slate-500 dark:text-slate-400 font-bold text-[10px]">
+               <div className="flex items-center gap-1.5 whitespace-nowrap">
+                 <span>
+                    {(() => {
+                      const s = new Date(room.start_time);
+                      const e = new Date(room.end_time);
+                      if (isNaN(s.getTime()) || isNaN(e.getTime())) return "--:-- - --:--";
+                      const sDate = s.toLocaleDateString('id-ID', { day: '2-digit', month: 'short' });
+                      const eDate = e.toLocaleDateString('id-ID', { day: '2-digit', month: 'short' });
+                      const sTime = `${s.getHours().toString().padStart(2, '0')}:${s.getMinutes().toString().padStart(2, '0')}`;
+                      const eTime = `${e.getHours().toString().padStart(2, '0')}:${e.getMinutes().toString().padStart(2, '0')}`;
+                      return sDate === eDate ? `${sDate}, ${sTime} - ${eTime}` : `${sDate} ${sTime} - ${eDate} ${eTime}`;
+                    })()}
+                 </span>
+                 <span className="text-slate-300">|</span>
+                 <span className="text-blue-600 dark:text-blue-400">{room.duration}m</span>
+               </div>
+               {liveBreakdown[room.id] > 0 && (
+                 <div className="text-emerald-600 font-black animate-pulse opacity-80">
+                   {liveBreakdown[room.id]} SISWA SEDANG MENGERJAKAN
+                 </div>
+               )}
+            </div>
+          </div>
         );
       }
     },
     {
-      key: "room_name",
-      label: "Nama Ruangan",
-      sortable: true,
-      render: (v: string, room: ExamRoomData) => (
-        <div className="flex flex-col gap-0.5">
-          <div className="flex items-center gap-1.5">
-            <span className="font-bold text-slate-800 dark:text-white text-sm tracking-tight line-clamp-1">{v || "Tanpa Nama"}</span>
-            {room.is_exambro && (
-              <div className="group/shield relative">
-                <ShieldAlert className="h-3 w-3 text-orange-500 fill-orange-500/10" />
-                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-slate-900 text-white text-[8px] font-bold rounded opacity-0 group-hover/shield:opacity-100 transition-opacity whitespace-nowrap z-50 pointer-events-none">
-                  Wajib Exambro
-                </div>
-              </div>
-            )}
-          </div>
-          <span className="text-[10px] text-slate-500 font-medium truncate italic" title={room.examTitle}>{room.examTitle}</span>
-        </div>
-      )
-    },
-    {
       key: "className",
       label: "Kelas",
+      className: "w-24",
       render: (v: string, room: ExamRoomData) => (
-        <div className="flex flex-wrap gap-1 max-w-[140px]">
+        <div className="flex flex-wrap gap-1">
           {room.allClasses ? (
-            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-100 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800/40">Semua Kelas</span>
+            <Badge variant="outline" className="text-[9px] font-black uppercase bg-blue-50/50 text-blue-600 border-blue-100">Semua</Badge>
           ) : (
             (v || "").split(", ").map((cls, idx) => (
-              <span key={idx} className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-600 border border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700">{cls}</span>
+              <Badge key={idx} variant="secondary" className="px-1.5 py-0 rounded text-[9px] font-bold bg-slate-100 text-slate-600 border-transparent">{cls}</Badge>
             ))
           )}
         </div>
       )
-    },
-    {
-      key: "info",
-      label: "Info Ujian",
-      render: (_: any, room: ExamRoomData) => (
-        <div className="flex flex-col gap-1 items-start">
-          <div className="flex items-center gap-1.5 text-[10px] font-medium">
-             <span className={`px-1 rounded border border-slate-200 dark:border-slate-800 ${getExamTypeColorClass(room.examType || "UMUM")}`}>{room.examType || "UMUM"}</span>
-             <span className="text-slate-300">|</span>
-             <span className="text-slate-600 dark:text-slate-400">{room.duration}m</span>
-             {liveBreakdown[room.id] > 0 && (
-               <>
-                 <span className="text-slate-300">|</span>
-                 <span className="text-emerald-600 font-bold">{liveBreakdown[room.id]} Aktif</span>
-               </>
-             )}
-          </div>
-          <div className="flex items-center gap-1.5 text-[9px] text-slate-500 font-bold bg-slate-50 dark:bg-slate-900/40 px-1.5 py-0.5 rounded border border-slate-200/50 dark:border-slate-800/50">
-            <Clock className="h-2.5 w-2.5 text-blue-500" />
-            <span>
-              {(() => {
-                const s = new Date(room.start_time);
-                const e = new Date(room.end_time);
-                if (isNaN(s.getTime()) || isNaN(e.getTime())) return "--:-- - --:--";
-                
-                const sDate = s.toLocaleDateString('id-ID', { day: '2-digit', month: 'short' });
-                const eDate = e.toLocaleDateString('id-ID', { day: '2-digit', month: 'short' });
-                
-                const startTime = `${s.getHours().toString().padStart(2, '0')}:${s.getMinutes().toString().padStart(2, '0')}`;
-                const endTime = `${e.getHours().toString().padStart(2, '0')}:${e.getMinutes().toString().padStart(2, '0')}`;
-                
-                if (sDate === eDate) {
-                  return `${sDate}, ${startTime} - ${endTime}`;
-                } else {
-                  return `${sDate}, ${startTime} - ${eDate}, ${endTime}`;
-                }
-              })()}
-            </span>
-          </div>
-          <span className="text-[10px] text-slate-400 truncate max-w-[120px]">{room.teacherName}</span>
-        </div>
-      )
     }
-  ];
+  ], [masterTeachers, liveBreakdown, rooms]);
 
   // Sync Live Monitoring Progres
   useEffect(() => {
@@ -331,41 +332,41 @@ const ExamRoomsPage = () => {
       if (!pb) return;
       try {
         const loaded = await pb.collection('exam_rooms').getFullList({ sort: '-created' });
+        console.log("DEBUG: Rooms count loaded:", loaded.length);
+        console.log("DEBUG: Current User TeacherID:", teacherId);
+        
         const mapped = loaded.map(room => {
           const sId = room.examId || (room as any).examid || "";
+          const examObj = exams.find(e => e.id === sId);
+          const eTeacherId = examObj?.teacherId || (examObj as any)?.teacherid || "";
+          
+          if (!examObj) console.warn("DEBUG: Exam object not found for room:", room.id);
+          else console.log(`DEBUG: Room "${room.room_name || room.title}" -> ExamTeacherID: "${eTeacherId}"`);
+
           const startTime = room.start_time || (room as any).startTime || "";
           const endTime = room.end_time || (room as any).endTime || "";
           const roomName = room.room_name || (room as any).title || room.title || "";
           const clsId = room.classId || (room as any).classIds || "";
           const isOff = room.isDisabled !== undefined ? room.isDisabled : (room as any).isActive === false;
 
-          const examObj = exams.find(e => e.id === sId);
           const subjectObj = subjects.find(s => s.id === (examObj?.subjectId || (examObj as any)?.subjectid));
-          const teacherObj = masterTeachers.find(t => t.id === (examObj?.teacherId || (examObj as any)?.teacherid));
+          const teacherObj = masterTeachers.find(t => t.id === eTeacherId);
 
           let className = "Semua Kelas";
+          // ... (logika penentuan nama kelas tetap sama)
           if (!room.allClasses) {
             const clsData = room.classId || (room as any).classid || (room as any).classIds || (room as any).classids || "";
             let classList: string[] = [];
-            if (Array.isArray(clsData)) {
-              classList = clsData;
-            } else if (typeof clsData === 'string' && clsData.length > 0) {
-              const rawCls = clsData;
-              classList = Array.isArray(rawCls)
-                ? rawCls
-                : String(rawCls || "").split(",").map(id => id.trim()).filter(id => id && id !== "all");
-            }
+            if (Array.isArray(clsData)) classList = clsData;
+            else if (typeof clsData === 'string' && clsData.length > 0) classList = clsData.split(",").map(id => id.trim()).filter(id => id && id !== "all");
 
             const foundNames = classList.map(id => {
               const c = (examClasses || []).find(cl => cl.id === id);
               return c ? c.name : null;
             }).filter(Boolean);
 
-            if (foundNames.length > 0) {
-              className = foundNames.join(", ");
-            } else {
-              className = classList.length > 0 ? `ID: ${classList[0].substring(0, 5)}...` : "N/A";
-            }
+            if (foundNames.length > 0) className = foundNames.join(", ");
+            else className = classList.length > 0 ? `ID: ${classList[0].substring(0, 5)}...` : "N/A";
           }
 
           const { id, ...rest } = room;
@@ -382,7 +383,7 @@ const ExamRoomsPage = () => {
             examType: (examObj as any)?.examType || (examObj as any)?.examtype || "UMUM",
             subjectName: subjectObj?.name || "N/A",
             teacherName: teacherObj?.name || "N/A",
-            examTeacherId: examObj?.teacherId || (examObj as any)?.teacherid || "",
+            examTeacherId: eTeacherId,
             className: className,
             is_exambro: room.is_exambro || (room as any).isExambro || false
           } as any as ExamRoomData;
@@ -625,9 +626,11 @@ const ExamRoomsPage = () => {
                   Arsip
                 </button>
               </div>
-              <Button onClick={handleCreateClick} size="sm" className="rounded-2xl bg-blue-50 hover:bg-blue-100 border border-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 dark:border-blue-800/40 text-blue-700 font-bold shadow-sm h-9 px-4">
-                <Plus className="mr-1 h-3.5 w-3.5" /> Buka Ruang
-              </Button>
+              {canCreate && (
+                <Button onClick={handleCreateClick} size="sm" className="rounded-2xl bg-blue-50 hover:bg-blue-100 border border-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 dark:border-blue-800/40 text-blue-700 font-bold shadow-sm h-9 px-4">
+                  <Plus className="mr-1 h-3.5 w-3.5" /> Buka Ruang
+                </Button>
+              )}
             </>
           )}
         </div>
@@ -758,7 +761,18 @@ const ExamRoomsPage = () => {
           </CardHeader>
           <CardContent>
             <DataTable
-              data={rooms.filter(r => activeTab === "arsip" ? r.status === "archive" : r.status !== "archive")}
+              data={rooms.filter(r => {
+                const isCorrectTab = activeTab === "arsip" ? r.status === "archive" : r.status !== "archive";
+                if (!isCorrectTab) return false;
+                
+                // Jika Guru, hanya tampilkan yang miliknya
+                if (role === "teacher") {
+                  return r.examTeacherId === teacherId;
+                }
+                
+                // Admin tampilkan semua
+                return true;
+              })}
               columns={columns}
               searchPlaceholder="Cari ruang ujian..."
               emptyMessage={`Belum ada ruang ujian ${activeTab}.`}
@@ -772,13 +786,15 @@ const ExamRoomsPage = () => {
                     <Search className="h-4 w-4" />
                   </button>
 
-                  <button
-                    className="p-1.5 bg-sky-50 text-sky-600 hover:bg-sky-100 rounded-lg dark:bg-sky-900/10 dark:text-sky-400 border border-sky-100 dark:border-sky-800/40 transition-colors"
-                    onClick={() => handleEditClick(room)}
-                    title="Edit Ruangan"
-                  >
-                    <Edit className="h-4 w-4" />
-                  </button>
+                  {isOwner(room) && (
+                    <button
+                      className="p-1.5 bg-sky-50 text-sky-600 hover:bg-sky-100 rounded-lg dark:bg-sky-900/10 dark:text-sky-400 border border-sky-100 dark:border-sky-800/40 transition-colors"
+                      onClick={() => handleEditClick(room)}
+                      title="Edit Ruangan"
+                    >
+                      <Edit className="h-4 w-4" />
+                    </button>
+                  )}
 
                   {isOwner(room) && (
                     <>

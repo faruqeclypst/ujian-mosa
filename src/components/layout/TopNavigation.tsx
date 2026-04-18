@@ -1,4 +1,4 @@
-import { LogOut, Menu, Search, User, Settings, Clock, Bell, ShieldAlert, Unlock, UserX, Sun, Moon, Monitor } from "lucide-react";
+import { LogOut, Menu, Search, User, Settings, Clock, Bell, ShieldAlert, Unlock, UserX, Sun, Moon, Monitor, Sparkles } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { Link } from "react-router-dom";
 
@@ -14,6 +14,7 @@ import { Input } from "../ui/input";
 import { cn } from "../../lib/utils";
 import pb from "../../lib/pocketbase";
 import ChangePasswordModal from "../auth/ChangePasswordModal";
+import AISettingsModal from "../auth/AISettingsModal";
 
 const TopNavigation = () => {
   const { user, signOut, usernameFromEmail } = useAuth();
@@ -23,6 +24,7 @@ const TopNavigation = () => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [isCPModalOpen, setIsCPModalOpen] = useState(false);
+  const [isAIModalOpen, setIsAIModalOpen] = useState(false);
   const [modalTab, setModalTab] = useState<"profile" | "password">("profile");
   const [lockedAttempts, setLockedAttempts] = useState<any[]>([]);
   const [examRooms, setExamRooms] = useState<Record<string, any>>({});
@@ -181,14 +183,14 @@ const TopNavigation = () => {
     }
   };
 
-  const { students, classes, universalToken, timeLeft } = useExamData();
+  const { teachers, students, classes, universalToken, timeLeft } = useExamData();
 
   return (
     <header className="flex w-full items-center gap-2 sm:gap-4 border-b bg-card/95 backdrop-blur-sm px-3 sm:px-6 py-2 sm:py-3 shadow-sm shrink-0 relative z-30">
       <Button
         variant="ghost"
         size="icon"
-        className="md:hidden shrink-0 touch-manipulation hover:bg-accent"
+        className="lg:hidden shrink-0 touch-manipulation hover:bg-accent"
         onClick={() => setMobileOpen(true)}
       >
         <Menu className="h-5 w-5" />
@@ -353,8 +355,8 @@ const TopNavigation = () => {
                 </Avatar>
                 <div className="flex flex-col space-y-0.5 min-w-0 flex-1">
                   <p className="font-bold text-sm text-slate-900 dark:text-slate-100 truncate">{displayName}</p>
-                  <p className="truncate text-xs text-slate-500 dark:text-slate-400">
-                    {user?.email ?? ""}
+                  <p className="truncate text-[11px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-tight">
+                    {teachers.find(t => t.id === (user as any)?.teacherId)?.subjects || user?.email || ""}
                   </p>
                 </div>
               </div>
@@ -438,6 +440,17 @@ const TopNavigation = () => {
                   <User className="mr-3 h-4 w-4 text-slate-400 dark:text-slate-500" />
                   <span>Profil & Nama</span>
                 </button>
+
+                <button
+                  className="flex items-center w-full px-3 py-2.5 text-sm font-medium text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                  onClick={() => {
+                    setIsDropdownOpen(false);
+                    setIsAIModalOpen(true);
+                  }}
+                >
+                  <Sparkles className="mr-3 h-4 w-4 text-blue-500 dark:text-blue-400" />
+                  <span>Pengaturan AI</span>
+                </button>
                 
                 <button
                   className="flex items-center w-full px-3 py-2.5 text-sm font-medium text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
@@ -475,6 +488,12 @@ const TopNavigation = () => {
         isOpen={isCPModalOpen} 
         onClose={() => setIsCPModalOpen(false)} 
         defaultTab={modalTab}
+      />
+
+      {/* Dedicated AI Configuration Modal */}
+      <AISettingsModal
+        isOpen={isAIModalOpen}
+        onClose={() => setIsAIModalOpen(false)}
       />
     </header>
   );

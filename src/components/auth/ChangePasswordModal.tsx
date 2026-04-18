@@ -4,13 +4,14 @@ import { Lock, Eye, EyeOff, Sparkles, Shield, RefreshCw, User, Mail, Camera } fr
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { motion, AnimatePresence } from "framer-motion";
-import pb from "../../lib/pocketbase";
+import { AI_MODELS } from "../../lib/ai";
 
 import FormField from "../forms/FormField";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import ProfilePictureUpload from "../ui/ProfilePictureUpload";
 import { useAuth } from "../../context/AuthContext";
+import { useTenant } from "../../context/TenantContext";
 import { useToast } from "../ui/toast";
 import {
   Dialog,
@@ -47,6 +48,7 @@ interface ProfileSettingsModalProps {
 
 const ChangePasswordModal = ({ isOpen, onClose, defaultTab = "profile" }: ProfileSettingsModalProps) => {
   const { user } = useAuth();
+  const { pb } = useTenant();
   const { addToast } = useToast();
   
   const [activeTab, setActiveTab] = useState<"profile" | "password">(defaultTab);
@@ -81,6 +83,7 @@ const ChangePasswordModal = ({ isOpen, onClose, defaultTab = "profile" }: Profil
     register: registerProfile,
     handleSubmit: handleSubmitProfile,
     reset: resetProfile,
+    watch: watchProfile,
     formState: { errors: profileErrors, isSubmitting: isSubmittingProfile, isDirty: isProfileDirty },
   } = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
@@ -91,13 +94,15 @@ const ChangePasswordModal = ({ isOpen, onClose, defaultTab = "profile" }: Profil
 
   useEffect(() => {
     if (user && isOpen) {
-      resetProfile({ displayName: user.name || "" });
+      resetProfile({ 
+        displayName: user.name || "",
+      });
     }
   }, [user, isOpen, resetProfile]);
 
   const onPasswordSubmit = async (values: ChangePasswordFormValues) => {
-    if (!user) {
-      setFormError("User tidak ditemukan.");
+    if (!user || !pb) {
+      setFormError("Koneksi tidak tersedia atau user tidak ditemukan.");
       return;
     }
 
@@ -125,8 +130,8 @@ const ChangePasswordModal = ({ isOpen, onClose, defaultTab = "profile" }: Profil
   };
 
   const onProfileSubmit = async (values: ProfileFormValues) => {
-    if (!user) {
-      setFormError("User tidak ditemukan.");
+    if (!user || !pb) {
+      setFormError("Koneksi tidak tersedia atau user tidak ditemukan.");
       return;
     }
 

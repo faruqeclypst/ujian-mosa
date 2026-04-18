@@ -6,6 +6,11 @@
       { "id": "text_id", "name": "id", "type": "text", "required": true, "primaryKey": true, "system": true },
       { "name": "name", "type": "text", "required": true },
       { "name": "role", "type": "select", "required": true, "maxSelect": 1, "values": ["admin", "teacher"] },
+      { "name": "teacherId", "type": "text" },
+      { "name": "ai_api_key", "type": "text" },
+      { "name": "ai_provider", "type": "text" },
+      { "name": "ai_model", "type": "text" },
+      { "name": "hasChangedPassword", "type": "bool" },
       { "name": "avatar", "type": "file", "maxSelect": 1, "maxSize": 5242880, "mimeTypes": ["image/jpeg", "image/png", "image/webp"] }
     ]
   },
@@ -16,7 +21,9 @@
       { "id": "text_id", "name": "id", "type": "text", "required": true, "primaryKey": true, "system": true },
       { "name": "name", "type": "text", "required": true },
       { "name": "gender", "type": "select", "required": true, "values": ["L", "P"] },
-      { "name": "classId", "type": "text", "required": false }
+      { "name": "classId", "type": "text", "required": false },
+      { "name": "classid", "type": "text", "required": false },
+      { "name": "hasChangedPassword", "type": "bool", "required": false }
     ]
   },
   {
@@ -103,7 +110,13 @@
       { "name": "name", "type": "text", "required": true },
       { "name": "logo", "type": "file", "maxSelect": 1 },
       { "name": "universal_token", "type": "text" },
-      { "name": "primary_color", "type": "text" }
+      { "name": "primary_color", "type": "text" },
+      { "name": "ai_provider", "type": "text" },
+      { "name": "ai_model", "type": "text" },
+      { "name": "groq_api_key", "type": "text" },
+      { "name": "ai_gateway_key", "type": "text" },
+      { "name": "ai_gateway_url", "type": "text" },
+      { "name": "teacher_full_access", "type": "bool" }
     ],
     "listRule": "",
     "viewRule": "",

@@ -11,6 +11,7 @@ import FormField from "../forms/FormField";
 const teacherSchema = z.object({
   name: z.string().min(1, "Nama guru wajib diisi"),
   code: z.string().optional(),
+  username: z.string().min(3, "Username minimal 3 karakter untuk login"),
   subjects: z.array(z.string()).min(1, "Pilih minimal 1 mata pelajaran"),
 });
 
@@ -19,6 +20,7 @@ export type TeacherFormValues = z.infer<typeof teacherSchema>;
 export interface TeacherSubmitPayload {
   name: string;
   code?: string;
+  username: string;
   subjects: string[];
 }
 
@@ -43,6 +45,7 @@ const TeacherForm = ({ defaultValues, onSubmit, submitLabel = "Simpan", onCancel
     defaultValues: {
       name: "",
       code: "",
+      username: "",
       subjects: [],
     },
   });
@@ -52,20 +55,22 @@ const TeacherForm = ({ defaultValues, onSubmit, submitLabel = "Simpan", onCancel
       reset({
         name: defaultValues.name || "",
         code: defaultValues.code || "",
+        username: defaultValues.username || "",
         subjects: defaultValues.subjects || [],
       });
     }
-  }, [defaultValues?.name, defaultValues?.code, JSON.stringify(defaultValues?.subjects), reset]);
+  }, [defaultValues?.name, defaultValues?.code, defaultValues?.username, JSON.stringify(defaultValues?.subjects), reset]);
 
   const submitHandler = async (values: TeacherFormValues) => {
     await onSubmit({
       name: values.name,
       code: values.code || "",
+      username: values.username,
       subjects: values.subjects,
     });
     
     if (!defaultValues || Object.keys(defaultValues).length === 0) {
-      reset({ name: "", code: "", subjects: [] });
+      reset({ name: "", code: "", username: "", subjects: [] });
     }
   };
 
@@ -77,6 +82,11 @@ const TeacherForm = ({ defaultValues, onSubmit, submitLabel = "Simpan", onCancel
 
       <FormField id="code" label="Kode Guru (Opsional)" error={errors.code}>
         <Input id="code" placeholder="Contoh: AA, BB, dll." {...register("code")} />
+      </FormField>
+
+      <FormField id="username" label="Username Login" error={errors.username}>
+        <Input id="username" placeholder="Masukkan username untuk login guru" {...register("username")} />
+        <p className="text-[10px] text-slate-400 mt-1">* Guru akan login menggunakan username ini dan password default 12345678</p>
       </FormField>
       
       <FormField id="subjects" label="Mata Pelajaran (Bisa pilih lebih dari satu)" error={errors.subjects as any}>

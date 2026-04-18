@@ -35,12 +35,15 @@ interface ExamDataContextType {
   createStudent: (payload: StudentPayload) => Promise<void>;
   updateStudent: (id: string, payload: Partial<StudentPayload>) => Promise<void>;
   deleteStudent: (id: string) => Promise<void>;
+  resetStudentPassword: (id: string) => Promise<void>;
+  resetUserPassword: (userId: string) => Promise<void>;
   deleteStudentsBatch: (studentIds: string[]) => Promise<void>;
   updateStudentClassBatch: (studentIds: string[], newClassId: string) => Promise<void>;
 
   // Universal Token
   universalToken: string;
   timeLeft: string;
+  teacherFullAccess: boolean;
 }
 
 const ExamDataContext = createContext<ExamDataContextType | undefined>(undefined);
@@ -55,7 +58,8 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
   const [universalToken, setUniversalToken] = useState("");
   const [tokenUpdatedAt, setTokenUpdatedAt] = useState<any>(null);
   const [timeLeft, setTimeLeft] = useState("--:--");
-  const [serverOffset, setServerOffset] = useState(0); // Selisih waktu Server vs Client
+  const [serverOffset, setServerOffset] = useState(0); 
+  const [teacherFullAccess, setTeacherFullAccess] = useState(false);
   const { role } = useAuth();
   const { pb: tenantPb } = useTenant();
   const pb = tenantPb!;
@@ -86,6 +90,7 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
               mapped.nisn = item.username || item.nisn;
               mapped.gender = item.gender || "L";
               mapped.classId = item.classId || item.classid;
+              mapped.hasChangedPassword = item.hasChangedPassword || false;
             }
             return mapped;
           }));
@@ -116,7 +121,8 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
           id: i.id,
           nisn: i.username || i.nisn,
           gender: i.gender || "L",
-          classId: i.classId || i.classid || i.class_id
+          classId: i.classId || i.classid || i.class_id,
+          hasChangedPassword: i.hasChangedPassword || false
         } as any;
       }));
 
@@ -134,30 +140,39 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
       
       // Subscribe with incremental updates instead of initAll (re-fetch everything)
       unsubscribeTeachers = await pb.collection("teachers").subscribe("*", (e) => {
-        if (e.action === "create") setTeachers(prev => [e.record as any, ...prev]);
+        if (e.action === "create") {
+          setTeachers(prev => prev.find(i => i.id === e.record.id) ? prev : [e.record as any, ...prev]);
+        }
         if (e.action === "update") setTeachers(prev => prev.map(item => item.id === e.record.id ? { ...item, ...e.record } as any : item));
         if (e.action === "delete") setTeachers(prev => prev.filter(item => item.id !== e.record.id));
       });
 
       unsubscribeClasses = await pb.collection("classes").subscribe("*", (e) => {
-        if (e.action === "create") setClasses(prev => [e.record as any, ...prev]);
+        if (e.action === "create") {
+          setClasses(prev => prev.find(i => i.id === e.record.id) ? prev : [e.record as any, ...prev]);
+        }
         if (e.action === "update") setClasses(prev => prev.map(item => item.id === e.record.id ? { ...item, ...e.record } as any : item));
         if (e.action === "delete") setClasses(prev => prev.filter(item => item.id !== e.record.id));
       });
 
       unsubscribeSubjects = await pb.collection("subjects").subscribe("*", (e) => {
-        if (e.action === "create") setSubjects(prev => [e.record as any, ...prev]);
+        if (e.action === "create") {
+          setSubjects(prev => prev.find(i => i.id === e.record.id) ? prev : [e.record as any, ...prev]);
+        }
         if (e.action === "update") setSubjects(prev => prev.map(item => item.id === e.record.id ? { ...item, ...e.record } as any : item));
         if (e.action === "delete") setSubjects(prev => prev.filter(item => item.id !== e.record.id));
       });
 
       unsubscribeStudents = await pb.collection("students").subscribe("*", (e) => {
         if (e.action === "create") {
-          const m = { ...e.record, id: e.record.id, nisn: e.record.username || e.record.nisn, gender: e.record.gender || "L", classId: e.record.classId || e.record.classid } as any;
-          setStudents(prev => [m, ...prev]);
+          setStudents(prev => {
+            if (prev.find(i => i.id === e.record.id)) return prev;
+            const m = { ...e.record, id: e.record.id, nisn: e.record.username || e.record.nisn, gender: e.record.gender || "L", classId: e.record.classId || e.record.classid } as any;
+            return [m, ...prev];
+          });
         }
         if (e.action === "update") {
-          const m = { ...e.record, id: e.record.id, nisn: e.record.username || e.record.nisn, gender: e.record.gender || "L", classId: e.record.classId || e.record.classid } as any;
+          const m = { ...e.record, id: e.record.id, nisn: e.record.username || e.record.nisn, gender: e.record.gender || "L", classId: e.record.classId || e.record.classid, hasChangedPassword: e.record.hasChangedPassword || false } as any;
           setStudents(prev => prev.map(item => item.id === e.record.id ? m : item));
         }
         if (e.action === "delete") setStudents(prev => prev.filter(item => item.id !== e.record.id));
@@ -171,7 +186,7 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
       if (unsubscribeSubjects) unsubscribeSubjects();
       if (unsubscribeStudents) unsubscribeStudents();
     };
-  }, [initAll]);
+  }, []);
 
   // --- Universal Token & Settings Sync ---
   useEffect(() => {
@@ -196,7 +211,8 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
           const s = records[0];
           setUniversalToken(s.universal_token || "");
           setTokenUpdatedAt(s.universal_token_updated_at || s.updated || "");
-          console.log("⚙️ Settings loaded:", s.universal_token);
+          setTeacherFullAccess(s.teacher_full_access ?? s.teacherFullAccess ?? false);
+          console.log("⚙️ Settings loaded:", s.universal_token, "FullAccess:", s.teacher_full_access ?? s.teacherFullAccess);
         }
       } catch (e) {
         console.error("❌ Error fetching settings/time:", e);
@@ -211,6 +227,7 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
       if (e.action === "update" || e.action === "create") {
         setUniversalToken(e.record.universal_token || "");
         setTokenUpdatedAt(e.record.universal_token_updated_at || e.record.updated || "");
+        setTeacherFullAccess(e.record.teacher_full_access ?? e.record.teacherFullAccess ?? false);
       } else {
         fetchSettings();
       }
@@ -258,13 +275,60 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
 
   // --- Teacher Actions ---
   const createTeacher = async (payload: TeacherPayload) => {
-    await pb.collection("teachers").create(payload);
+    const defaultPass = "12345678";
+    
+    // 1. Create Teacher Data Record (including username)
+    const teacherRecord = await pb.collection("teachers").create(payload);
+    
+    // 2. Create Auth User Record for the Teacher using the provided username
+    try {
+      await pb.collection("users").create({
+        username: payload.username,
+        password: defaultPass,
+        passwordConfirm: defaultPass,
+        name: payload.name,
+        role: "teacher",
+        teacherId: teacherRecord.id,
+        hasChangedPassword: false,
+      });
+    } catch (err) {
+      console.warn("User account might already exist or failed:", err);
+    }
   };
+  
   const updateTeacher = async (id: string, payload: Partial<TeacherPayload>) => {
     await pb.collection("teachers").update(id, payload);
+    // Also update name/username in users if changed
+    try {
+      const userRec = await pb.collection("users").getFirstListItem(`teacherId="${id}"`);
+      if (userRec) {
+        const updateData: any = {};
+        if (payload.name) updateData.name = payload.name;
+        if (payload.username) updateData.username = payload.username;
+        
+        if (Object.keys(updateData).length > 0) {
+          await pb.collection("users").update(userRec.id, updateData);
+        }
+      }
+    } catch (e) {}
   };
+  
   const deleteTeacher = async (id: string) => {
+    // Delete user account first if exists
+    try {
+      const userRec = await pb.collection("users").getFirstListItem(`teacherId="${id}"`);
+      if (userRec) await pb.collection("users").delete(userRec.id);
+    } catch (e) {}
     await pb.collection("teachers").delete(id);
+  };
+
+  const resetUserPassword = async (userId: string) => {
+    const defaultPass = "12345678";
+    await pb.collection("users").update(userId, {
+      password: defaultPass,
+      passwordConfirm: defaultPass,
+      hasChangedPassword: false,
+    });
   };
 
   // --- Class Actions ---
@@ -291,7 +355,7 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
 
   // --- Student Actions ---
   const createStudent = async (payload: StudentPayload) => {
-    const defaultPass = payload.password || `${payload.nisn}@mosa`;
+    const defaultPass = "12345678";
     await pb.collection("students").create({
       username: payload.nisn,
       password: defaultPass,
@@ -300,6 +364,7 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
       gender: payload.gender || "L",
       classId: payload.classId,
       classid: payload.classId, // backup for lowercase field
+      hasChangedPassword: false,
     });
   };
   const updateStudent = async (id: string, payload: Partial<StudentPayload>) => {
@@ -315,6 +380,14 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
   };
   const deleteStudent = async (id: string) => {
     await pb.collection("students").delete(id);
+  };
+  const resetStudentPassword = async (id: string) => {
+    const defaultPass = "12345678";
+    await pb.collection("students").update(id, {
+      password: defaultPass,
+      passwordConfirm: defaultPass,
+      hasChangedPassword: false,
+    });
   };
   const updateStudentClassBatch = async (studentIds: string[], newClassId: string) => {
     const chunkSize = 10;
@@ -341,8 +414,8 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
         createTeacher, updateTeacher, deleteTeacher,
         createClass, updateClass, deleteClass,
         createSubject, updateSubject, deleteSubject,
-        createStudent, updateStudent, deleteStudent, updateStudentClassBatch, deleteStudentsBatch,
-        universalToken, timeLeft
+        createStudent, updateStudent, deleteStudent, resetStudentPassword, resetUserPassword, updateStudentClassBatch, deleteStudentsBatch,
+        universalToken, timeLeft, teacherFullAccess
       }}
     >
       {children}

@@ -122,8 +122,12 @@ const InterestSurveyPage = () => {
       console.log("✅ Data Minat Bakat Berhasil Disinkronkan");
     } catch (err: any) {
       console.error("❌ Gagal Sinkronisasi Data:", err);
-      const errorDetail = err.response?.data ? JSON.stringify(err.response.data) : err.message;
-      alert("Gagal sinkronisasi ke database! \n\nDetail Error: " + errorDetail + "\n\nPastikan field miScores, topMI, dan hollandCode sudah ada di PocketBase.");
+      // Ambil detail error spesifik field dari PocketBase jika ada
+      const fieldErrors = err.response?.data?.data;
+      const errorMsg = err.response?.data?.message || err.message;
+      const errorDetail = fieldErrors ? JSON.stringify(fieldErrors, null, 2) : (err.response?.data ? JSON.stringify(err.response.data, null, 2) : err.message);
+      
+      alert(`Gagal sinkronisasi ke database!\n\nStatus: ${err.status}\nMessage: ${errorMsg}\n\nDetail Field: ${errorDetail}\n\nSaran: Coba Logout dan Login kembali untuk memperbarui sesi.`);
     } finally {
       setIsSaving(false);
     }

@@ -367,55 +367,86 @@ export function DataTable<T>({
         </Table>
         </div>
         
-        {/* Mobile Card View */}
-        <div className="sm:hidden space-y-3 p-4">
+        {/* 📱 Premium Mobile Card View */}
+        <div className="sm:hidden space-y-4 p-4 bg-slate-50/50 dark:bg-slate-950/20">
           {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-              <span className="ml-2 text-sm">Memuat...</span>
+            <div className="flex flex-col items-center justify-center py-12 gap-3">
+               <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-500 border-t-transparent" />
+               <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Memuat Data...</span>
             </div>
           ) : currentData.length === 0 ? (
-            <div className="text-center py-8 text-sm text-muted-foreground">
-              {emptyMessage}
+            <div className="text-center py-12 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-3xl">
+              <p className="text-sm text-slate-400 font-medium">{emptyMessage}</p>
             </div>
           ) : (
-            currentData.map((item, index) => (
-              <div
-                key={index}
-                className={cn(
-                  "bg-card border rounded-lg p-4 space-y-3 shadow-sm",
-                  onRowClick && "cursor-pointer hover:bg-muted/50 transition-colors"
-                )}
-                onClick={() => onRowClick?.(item)}
-              >
-                {columns
-                  .filter(col => state.visibleColumns.has(col.key.toString()) && col.key !== 'index')
-                  .map((column, colIndex) => {
-                    const value = column.key.toString().split('.').reduce((obj: any, key) => obj?.[key], item);
-                    return (
-                      <div key={column.key.toString()} className="flex justify-between items-start gap-3">
-                        <span className="text-sm font-medium text-muted-foreground min-w-0 flex-shrink-0">
-                          {column.label}:
-                        </span>
-                        <div className="text-sm text-right min-w-0 flex-1">
-                          {column.render
-                            ? column.render(value, item, index)
-                            : value?.toString() || "-"
-                          }
-                        </div>
-                      </div>
-                    );
-                  })
-                }
-                {actions && (
-                  <div className="pt-3 mt-3 border-t border-muted">
-                    <div className="flex items-center justify-end gap-2">
-                      {actions(item)}
-                    </div>
+            currentData.map((item, index) => {
+              // Ambil kolom pertama sebagai "Hero" (Judul Kartu)
+              const heroCol = columns.find(c => c.key !== 'selection' && c.key !== 'index');
+              const otherCols = columns.filter(c => c.key !== 'selection' && c.key !== 'index' && c.key !== heroCol?.key);
+
+              return (
+                <div
+                  key={index}
+                  className={cn(
+                    "relative overflow-hidden bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 rounded-3xl p-5 shadow-sm transition-all active:scale-[0.98]",
+                    onRowClick && "cursor-pointer hover:border-blue-500/50"
+                  )}
+                  onClick={() => onRowClick?.(item)}
+                >
+                  {/* Index Badge */}
+                  <div className="absolute top-0 right-0 px-3 py-1 bg-slate-100 dark:bg-slate-800 rounded-bl-xl text-[10px] font-black text-slate-400">
+                    #{startIndex + index + 1}
                   </div>
-                )}
-              </div>
-            ))
+
+                  {/* Hero Section (Title) */}
+                  {heroCol && (
+                    <div className="mb-4 pb-4 border-b border-slate-100 dark:border-slate-800">
+                      <div className="text-xs font-black uppercase text-blue-600 dark:text-blue-400 tracking-widest mb-1.5 flex items-center gap-2">
+                         <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                         {heroCol.label}
+                      </div>
+                      <div className="text-base font-bold text-slate-800 dark:text-slate-100">
+                        {heroCol.render
+                          ? heroCol.render(heroCol.key.toString().split('.').reduce((obj: any, key) => obj?.[key], item), item, startIndex + index)
+                          : heroCol.key.toString().split('.').reduce((obj: any, key) => obj?.[key], item)?.toString() || "-"
+                        }
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Details Grid */}
+                  <div className="grid grid-cols-1 gap-y-3">
+                    {otherCols
+                      .filter(col => state.visibleColumns.has(col.key.toString()))
+                      .map((column) => {
+                        const value = column.key.toString().split('.').reduce((obj: any, key) => obj?.[key], item);
+                        return (
+                          <div key={column.key.toString()} className="flex flex-col gap-0.5">
+                            <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">
+                              {column.label}
+                            </span>
+                            <div className="text-[13px] font-semibold text-slate-600 dark:text-slate-300">
+                              {column.render
+                                ? column.render(value, item, startIndex + index)
+                                : value?.toString() || "-"
+                              }
+                            </div>
+                          </div>
+                        );
+                      })
+                    }
+                  </div>
+
+                  {/* Actions (Floating-like at bottom right) */}
+                  {actions && (
+                    <div className="mt-6 flex justify-end items-center gap-2 pt-4 border-t border-slate-50 dark:border-slate-800/50">
+                       <span className="text-[10px] font-bold text-slate-300 uppercase mr-auto tracking-tighter">Opsi Baris</span>
+                       {actions(item)}
+                    </div>
+                  )}
+                </div>
+              );
+            })
           )}
         </div>
       </div>

@@ -6,6 +6,7 @@ import { z } from "zod";
 import { motion } from "framer-motion";
 import { Link, useNavigate } from "react-router-dom";
 import pb from "../lib/pocketbase";
+import { testAIConnection, AI_MODELS } from "../lib/ai";
 
 import FormField from "../components/forms/FormField";
 import { Button } from "../components/ui/button";
@@ -18,6 +19,9 @@ import { useToast } from "../components/ui/toast";
 const profileSchema = z.object({
   displayName: z.string().min(2, "Nama lengkap minimal 2 karakter"),
   email: z.string().email("Format email tidak valid").optional(),
+  ai_api_key: z.string().optional(),
+  ai_provider: z.string().optional(),
+  ai_model: z.string().optional(),
 });
 
 type ProfileFormValues = z.infer<typeof profileSchema>;
@@ -28,16 +32,22 @@ const ProfilePage = () => {
   const { addToast } = useToast();
   const [formError, setFormError] = useState<string | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [isTestingAI, setIsTestingAI] = useState(false);
+  const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
 
   const {
     register,
     handleSubmit,
+    watch,
     formState: { errors, isDirty },
   } = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
     defaultValues: {
       displayName: user?.name || "",
       email: user?.email || "",
+      ai_api_key: (user as any)?.ai_api_key || "",
+      ai_provider: (user as any)?.ai_provider || "groq",
+      ai_model: (user as any)?.ai_model || "",
     },
   });
 
@@ -53,6 +63,9 @@ const ProfilePage = () => {
     try {
       await pb.collection("users").update(user.id, {
         name: values.displayName,
+        ai_api_key: values.ai_api_key,
+        ai_provider: values.ai_provider,
+        ai_model: values.ai_model,
       });
 
       addToast({
@@ -64,6 +77,40 @@ const ProfilePage = () => {
       setFormError(error.message || "Gagal memperbarui profil.");
     } finally {
       setIsUpdating(false);
+    }
+  };
+
+  const handleTestAI = async () => {
+    const aiKey = watch("ai_api_key");
+    if (!aiKey) {
+      addToast({ title: "Gagal", description: "Masukkan API Key terlebih dahulu.", type: "error" });
+      return;
+    }
+
+    setIsTestingAI(true);
+    setTestResult(null);
+
+    try {
+      const settings = await pb.collection("settings").getFullList({ limit: 1 });
+      const config = settings[0];
+
+      // 🚀 Use selected provider/model if available
+      const provider = watch("ai_provider") || config?.ai_provider || "groq";
+      const modelId = watch("ai_model") || config?.ai_model || AI_MODELS[0].id;
+      const customUrl = config?.ai_gateway_url || "https://ollama.com";
+
+      const res = await testAIConnection(aiKey, modelId, customUrl, provider);
+      setTestResult(res);
+
+      if (res.success) {
+        addToast({ title: "Berhasil!", description: "API Key valid dan terkoneksi.", type: "success" });
+      } else {
+        addToast({ title: "Koneksi Gagal", description: res.message, type: "error" });
+      }
+    } catch (e) {
+      setTestResult({ success: false, message: "Terjadi kesalahan sistem saat mencoba koneksi." });
+    } finally {
+      setIsTestingAI(false);
     }
   };
 
@@ -203,6 +250,65 @@ const ProfilePage = () => {
                     Email tidak dapat diubah
                   </p>
                 </FormField>
+
+                {/* AI API Key Field */}
+                <FormField id="ai_api_key" label="AI API Key (Opsional)">
+                  <div className="flex gap-2">
+                    <div className="relative flex-1 group">
+                      <Sparkles className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-blue-500" />
+                      <Input
+                        id="ai_api_key"
+                        type="password"
+                        placeholder="gsk_xxxx atau API Key AI lainnya"
+                        className="pl-10 rounded-xl border-gray-200 bg-gray-50/50 transition-all focus:bg-white focus:ring-2 focus:ring-blue-500/20 dark:border-gray-700 dark:bg-gray-800/50 dark:focus:bg-gray-800"
+                        {...register("ai_api_key")}
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleTestAI}
+                      disabled={isTestingAI}
+                      className="rounded-xl border-blue-100 bg-blue-50 text-blue-700 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400 h-10 px-4 whitespace-nowrap"
+                    >
+                      {isTestingAI ? (
+                        <div className="h-4 w-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                      ) : (
+                         "Cek Key"
+                      )}
+                    </Button>
+                  </div>
+                  <p className="text-[10px] text-gray-500 mt-1">
+                    Bagi Guru, wajib mengisi API Key sendiri untuk menggunakan fitur AI.
+                  </p>
+                  {testResult && (
+                    <p className={`text-[10px] mt-1 font-bold ${testResult.success ? 'text-emerald-600' : 'text-rose-600'}`}>
+                      {testResult.success ? "✓ Koneksi Berhasil" : `✗ ${testResult.message}`}
+                    </p>
+                  )}
+                </FormField>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField id="ai_provider" label="Provider AI">
+                    <select
+                      {...register("ai_provider")}
+                      className="w-full h-11 rounded-xl border border-gray-200 bg-gray-50/50 text-sm px-3 dark:border-gray-700 dark:bg-gray-800 transition-all focus:bg-white focus:ring-2 focus:ring-blue-500/20 outline-none"
+                    >
+                      <option value="groq">Groq Cloud</option>
+                      <option value="ollama">Ollama (Lokal)</option>
+                    </select>
+                  </FormField>
+                  <FormField id="ai_model" label="Model AI">
+                    <select
+                      {...register("ai_model")}
+                      className="w-full h-11 rounded-xl border border-gray-200 bg-gray-50/50 text-sm px-3 dark:border-gray-700 dark:bg-gray-800 transition-all focus:bg-white focus:ring-2 focus:ring-blue-500/20 outline-none"
+                    >
+                      {AI_MODELS.filter(m => m.provider === (watch("ai_provider") || "groq")).map(m => (
+                        <option key={m.id} value={m.id}>{m.name}</option>
+                      ))}
+                    </select>
+                  </FormField>
+                </div>
 
                 {/* Error Message */}
                 {formError && (

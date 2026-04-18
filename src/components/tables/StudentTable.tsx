@@ -4,7 +4,10 @@ import { DataTable } from "../ui/data-table";
 import { Button } from "../ui/button";
 import type { StudentData, ClassData } from "../../types/exam";
 import { useAuth } from "../../context/AuthContext";
-import { Edit, Trash, Sparkles } from "lucide-react";
+import { Edit, Trash, Sparkles, KeyRound } from "lucide-react";
+import { Avatar, AvatarFallback } from "../ui/avatar";
+import { Badge } from "../ui/badge";
+import { cn } from "../../lib/utils";
 
 interface StudentTableProps {
   students: StudentData[];
@@ -13,6 +16,7 @@ interface StudentTableProps {
   onSelectChange: (ids: string[]) => void;
   onEdit: (student: StudentData) => void;
   onDelete: (student: StudentData) => void;
+  onResetPassword?: (student: StudentData) => void;
   onViewInterest?: (student: StudentData) => void;
   filterActions?: React.ReactNode;
   customActions?: (student: StudentData) => React.ReactNode;
@@ -25,6 +29,7 @@ const StudentTable = ({
   onSelectChange, 
   onEdit, 
   onDelete,
+  onResetPassword,
   onViewInterest,
   filterActions,
   customActions,
@@ -96,14 +101,63 @@ const StudentTable = ({
       render: (_: any, __: any, index?: number) => (index !== undefined ? index + 1 : 1),
       className: "w-[60px]",
     },
-    { key: "nisn", label: "NISN", sortable: true },
-    { key: "name", label: "Nama Siswa", sortable: true },
-    { key: "gender", label: "L/P", className: "w-[60px] text-center" },
+    { 
+      key: "nisn", 
+      label: "NISN", 
+      sortable: true,
+      className: "w-[120px] text-left",
+      render: (nisn: string) => (
+        <span className="inline-flex items-center justify-start px-2 py-0.5 rounded-lg bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-[11px] font-black tracking-widest border border-slate-200/50 dark:border-slate-700/50">
+          {nisn || "???"}
+        </span>
+      )
+    },
+    { 
+      key: "name", 
+      label: "Nama Siswa", 
+      sortable: true,
+      render: (name: string, student: StudentData) => (
+        <div className="flex items-center gap-3">
+          <Avatar className="h-9 w-9 border-2 border-white dark:border-slate-800 shadow-sm">
+            <AvatarFallback className={cn(
+              "text-white text-[10px] font-bold",
+              student.gender === "L" ? "bg-gradient-to-br from-blue-500 to-cyan-600" : "bg-gradient-to-br from-rose-400 to-pink-600"
+            )}>
+              {(name || "S").split(" ").map(n => n[0]).join("").substring(0, 2).toUpperCase()}
+            </AvatarFallback>
+          </Avatar>
+          <div className="flex flex-col">
+            <span className="font-bold text-slate-700 dark:text-slate-200 leading-tight">{name}</span>
+            <span className="text-[11px] text-slate-400 font-medium">@{student.nisn}</span>
+          </div>
+        </div>
+      )
+    },
+    { 
+      key: "gender", 
+      label: "L/P", 
+      className: "w-[60px] text-center",
+      render: (gender: string) => (
+        <Badge variant="outline" className={cn(
+          "w-7 h-7 flex items-center justify-center p-0 rounded-full font-black text-[10px]",
+          gender === "L" ? "bg-blue-50 text-blue-600 border-blue-100 dark:bg-blue-900/20 dark:text-blue-400" : "bg-rose-50 text-rose-600 border-rose-100 dark:bg-rose-900/20 dark:text-rose-400"
+        )}>
+          {gender}
+        </Badge>
+      )
+    },
     { 
       key: "classId", 
       label: "Kelas", 
       sortable: true,
-      render: (classId: string) => classes.find(c => c.id === classId)?.name || "Tanpa Kelas"
+      render: (classId: string) => {
+        const cls = classes.find(c => c.id === classId);
+        return (
+          <Badge variant="secondary" className="bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border-transparent text-[10px] font-bold px-2 py-0.5">
+            {cls?.name || "Tanpa Kelas"}
+          </Badge>
+        );
+      }
     },
   ];
 
@@ -130,6 +184,15 @@ const StudentTable = ({
             >
               <Edit className="h-4 w-4" />
             </button>
+            {role === "admin" && onResetPassword && (
+              <button 
+                className="p-1.5 bg-amber-50 text-amber-600 hover:bg-amber-100 rounded-lg dark:bg-amber-900/10 dark:text-amber-400 border border-amber-100 dark:border-amber-800/40"
+                onClick={() => onResetPassword(student)}
+                title="Reset Password ke Default (12345678)"
+              >
+                <KeyRound className="h-4 w-4" />
+              </button>
+            )}
             <button 
               className="p-1.5 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-lg dark:bg-rose-900/10 dark:text-rose-400 border border-rose-100 dark:border-rose-800/40"
               onClick={() => onDelete(student)}

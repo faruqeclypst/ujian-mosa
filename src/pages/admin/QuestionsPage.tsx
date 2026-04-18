@@ -48,7 +48,7 @@ const quillFormats = [
   'list', 'bullet', 'indent',
   'link', 'image', 'video', 'formula',
   'color', 'background',
-  'align',
+  'align', 'code-block',
   'text-indent', 'margin-left', 'line-height'
 ];
 
@@ -164,7 +164,7 @@ const QuestionsPage = () => {
   const { user, role, teacherId } = useAuth();
   const { school } = useTenant();
   const { addToast } = useToast();
-  const { subjects, teachers } = useExamData();
+  const { subjects, teachers, teacherFullAccess } = useExamData();
 
   // 📝 Manage Allowed Question Types
   const [allowedTypes, setAllowedTypes] = useState<Record<string, boolean>>({
@@ -1019,7 +1019,7 @@ const QuestionsPage = () => {
         [{ 'align': [] }],
         [{ 'color': [] }, { 'background': [] }],
         [{ 'list': 'ordered' }, { 'list': 'bullet' }, { 'indent': '-1' }, { 'indent': '+1' }],
-        ['image', 'formula', 'clean']
+        ['image', 'formula', 'code-block', 'clean']
       ],
       handlers: {
         image: imageHandler
@@ -1049,7 +1049,7 @@ const QuestionsPage = () => {
       ['bold', 'italic', 'underline'],
       [{ 'color': [] }],
       [{ 'indent': '-1' }, { 'indent': '+1' }],
-      ['clean']
+      ['code-block', 'clean']
     ],
     keyboard: {
       bindings: {
@@ -1217,10 +1217,12 @@ const QuestionsPage = () => {
 
   const isOwner = useMemo(() => {
     if (role === "admin") return true;
+    if (teacherFullAccess) return true;
     if (!exam || !teacherId) return false;
-    // Cek ID Guru (baru) atau ID Akun (lama)
-    return exam.teacherId === teacherId || exam.teacherId === user?.id;
-  }, [role, exam, teacherId, user]);
+    // Cek ID Guru (baru) atau ID Akun (lama) dan handle casing
+    const examTeacherId = exam.teacherId || exam.teacherid;
+    return examTeacherId === teacherId || examTeacherId === user?.id;
+  }, [role, exam, teacherId, user, teacherFullAccess]);
 
 
   const handleCreateClick = () => {
@@ -2394,7 +2396,7 @@ const QuestionsPage = () => {
           ) : (
             <>
               {/* Tombol Import hanya untuk owner atau admin */}
-              {(role === "admin" || exam?.teacherId === teacherId) && (
+              {isOwner && (
                 <div className="relative">
                   {loading ? (
                     <div className="flex gap-2">
@@ -2675,9 +2677,9 @@ const QuestionsPage = () => {
 
                           <DropdownMenuSeparator className="my-1 border-slate-100 dark:border-slate-800" />
                           
-                          {role === "admin" && (
+                          {(role === "admin" || (role === "teacher" && user?.ai_api_key)) && (
                             <>
-                              <DropdownMenuLabel className="text-[10px] font-bold uppercase tracking-widest text-slate-400 px-3 py-1.5 text-left">Kesejutan AI</DropdownMenuLabel>
+                              <DropdownMenuLabel className="text-[10px] font-bold uppercase tracking-widest text-slate-400 px-3 py-1.5 text-left">Fitur Cerdas AI</DropdownMenuLabel>
                               <DropdownMenuItem 
                                 onClick={() => setIsAIModalOpen(true)}
                                 className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 focus:bg-slate-50 dark:focus:bg-slate-900 transition-colors group"
@@ -3217,9 +3219,9 @@ const QuestionsPage = () => {
 
       {/* Dialog Preview Soal (CBT Look) */}
       <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
-        <DialogContent className="max-w-4xl p-0 border-none bg-transparent shadow-none h-[95vh] overflow-hidden scrollbar-hidden" hideClose>
+        <DialogContent className="max-w-4xl p-0 h-[92vh] sm:h-[95vh] w-[95vw] sm:w-full bg-white dark:bg-slate-900 rounded-[32px] sm:rounded-[40px] shadow-2xl flex flex-col overflow-hidden border border-slate-100 dark:border-slate-800 animate-in fade-in zoom-in-95 duration-300" hideClose>
           {previewQuestion && (
-            <div className="bg-white dark:bg-slate-900 rounded-[40px] shadow-2xl h-full flex flex-col overflow-hidden border border-slate-100 dark:border-slate-800 m-2 sm:m-4 animate-in fade-in zoom-in-95 duration-300">
+            <>
                {/* CBT Header Replica - FIXED TOP */}
                <div className="flex-shrink-0 bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 px-6 sm:px-10 py-5 sm:py-6 flex items-center justify-between z-20 backdrop-blur-md bg-white/90 dark:bg-slate-900/90">
                   <div className="flex items-center gap-4">
@@ -3420,7 +3422,7 @@ const QuestionsPage = () => {
                      Tutup Pratinjau
                   </Button>
                </div>
-            </div>
+            </>
           )}
         </DialogContent>
       </Dialog>
@@ -3532,7 +3534,7 @@ const QuestionsPage = () => {
                           <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
                           <p className="text-[10px] font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-widest">Pratinjau Live Render</p>
                        </div>
-                       <MathText content={q.text} className="font-serif ql-editor !p-0 text-sm font-semibold text-slate-800 dark:text-slate-200 leading-relaxed" />
+                       <MathText content={q.text} className="font-serif ql-editor !p-0 text-base text-slate-800 dark:text-slate-200 leading-relaxed [&_p]:mb-3" />
                     </div>
                   </div>
                   
@@ -3614,7 +3616,7 @@ const QuestionsPage = () => {
                                       <Sparkles className="w-3 h-3 text-indigo-500" />
                                       <p className="text-[8px] font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-widest">Preview Math</p>
                                     </div>
-                                    <MathText content={q.choices[letter].text} className="text-[11px] font-serif ql-editor !p-0 text-slate-800 dark:text-slate-200" />
+                                    <MathText content={q.choices[letter].text} className="text-base font-serif ql-editor !p-0 text-slate-800 dark:text-slate-200" />
                                   </div>
                                 )}
                               </div>

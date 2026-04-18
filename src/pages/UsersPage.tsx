@@ -26,7 +26,7 @@ const UsersPage = () => {
   const { user: currentUser, role: currentRole } = useAuth();
   const { addToast } = useToast();
   const { teachers } = useExamData();
-  
+
   const [users, setUsers] = useState<AppUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -38,8 +38,7 @@ const UsersPage = () => {
     email: "",
     password: "",
     name: "",
-    role: "teacher" as "admin" | "teacher",
-    teacherId: "",
+    role: "admin" as "admin" | "teacher",
   });
 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -66,6 +65,7 @@ const UsersPage = () => {
       setLoading(true);
       const records = await pb.collection("users").getFullList({
         sort: "-created",
+        filter: 'role="admin"',
       });
       setUsers(records.map(r => {
         const tid = r.teacherId || (r as any).teacherid || "";
@@ -94,7 +94,7 @@ const UsersPage = () => {
   const handleCreateClick = () => {
     setDialogMode("create");
     setSelectedUser(null);
-    setFormData({ email: "", password: "", name: "", role: "teacher", teacherId: "" });
+    setFormData({ email: "", password: "", name: "", role: "admin" });
     setIsDialogOpen(true);
   };
 
@@ -103,10 +103,9 @@ const UsersPage = () => {
     setSelectedUser(user);
     setFormData({
       email: user.email || "",
-      password: "", 
+      password: "",
       name: user.name || "",
-      role: user.role || "teacher",
-      teacherId: user.teacherId || "",
+      role: user.role || "admin",
     });
     setIsDialogOpen(true);
   };
@@ -125,26 +124,32 @@ const UsersPage = () => {
       const payload: any = {
         name: formData.name,
         role: formData.role,
-        teacherId: formData.role === "teacher" ? formData.teacherId : null,
       };
 
-      if (formData.password) {
-        payload.password = formData.password;
-        payload.passwordConfirm = formData.password;
-      }
-
       if (dialogMode === "edit" && selectedUser) {
+        if (formData.password) {
+          payload.password = formData.password;
+          payload.passwordConfirm = formData.password;
+        }
         if (formData.email !== selectedUser.email) {
           payload.email = formData.email;
         }
-
-        console.log("Mengirim data update:", payload);
         await pb.collection("users").update(selectedUser.id, payload);
       } else {
-        // Untuk create baru, wajib kirim email & username
+        // Untuk create baru
+        const defaultPass = "12345678";
+        payload.password = formData.password || defaultPass;
+        payload.passwordConfirm = formData.password || defaultPass;
         payload.email = formData.email;
         payload.emailVisibility = true;
-        payload.username = formData.email.split("@")[0] + "_" + Math.floor(Math.random()*1000);
+        payload.hasChangedPassword = false;
+        payload.role = "admin";
+
+        // Ambil bagian depan email sebagai username dasar
+        const emailPrefix = formData.email.split("@")[0].replace(/[^a-zA-Z0-0]/g, "");
+        // Tambahkan suffix acak pendek untuk menjamin keunikan
+        payload.username = emailPrefix + Math.floor(Math.random() * 1000);
+
         await pb.collection("users").create(payload);
       }
 
@@ -166,11 +171,11 @@ const UsersPage = () => {
 
   const handleDeleteUser = async (id: string, name: string) => {
     if (id === currentUser?.id) {
-       alert("Anda tidak bisa menghapus akun Anda sendiri.");
-       return;
+      alert("Anda tidak bisa menghapus akun Anda sendiri.");
+      return;
     }
     if (!window.confirm(`Apakah Anda yakin ingin menghapus akun ${name}?`)) return;
-    
+
     try {
       await pb.collection("users").delete(id);
       fetchUsers();
@@ -201,7 +206,7 @@ const UsersPage = () => {
       for (let i = 0; i < toDelete.length; i += chunkSize) {
         const chunk = toDelete.slice(i, i + chunkSize);
         await Promise.all(chunk.map(id => pb.collection("users").delete(id)));
-        
+
         const currentProcessed = Math.min(i + chunkSize, toDelete.length);
         setBatchProgress(prev => ({
           ...prev,
@@ -234,7 +239,7 @@ const UsersPage = () => {
       const start = Math.min(lastSelectedIndex, index);
       const end = Math.max(lastSelectedIndex, index);
       const idsInRange = users.slice(start, end + 1).map(u => u.id);
-      
+
       newSelectedIds = Array.from(new Set([...newSelectedIds, ...idsInRange]));
     } else {
       if (checked) {
@@ -297,23 +302,13 @@ const UsersPage = () => {
       label: "Hak Akses",
       sortable: true,
       render: (v: string) => (
-        <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold border ${
-          v === "admin" 
-            ? "bg-rose-50 text-rose-700 border-rose-100 dark:bg-rose-950/20 dark:text-rose-400" 
+        <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold border ${v === "admin"
+            ? "bg-rose-50 text-rose-700 border-rose-100 dark:bg-rose-950/20 dark:text-rose-400"
             : "bg-blue-50 text-blue-700 border-blue-100 dark:bg-blue-950/20 dark:text-blue-400"
-        }`}>
+          }`}>
           {v === "admin" ? "ADMINISTRATOR" : "GURU / PENGAWAS"}
         </span>
       )
-    },
-    {
-      key: "teacherId",
-      label: "Guru Terkait",
-      render: (v: string) => {
-        if (!v) return <span className="text-slate-400 text-xs">-</span>;
-        const teacher = teachers.find(t => t.id === v);
-        return <span className="text-xs font-medium text-slate-600 dark:text-slate-300">{teacher?.name || "N/A"}</span>;
-      }
     }
   ];
 
@@ -344,7 +339,7 @@ const UsersPage = () => {
           <div className="flex flex-col">
             <h4 className="text-[10px] font-black uppercase text-blue-700 dark:text-blue-400 tracking-widest mb-1">Info Backup/Restore</h4>
             <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">
-              Akun hasil <b>Impor Database</b> akan memiliki password default: <code className="bg-blue-100 dark:bg-blue-900/40 px-1 rounded text-blue-700 dark:text-blue-300 font-bold">username@mosa</code>. Guru disarankan segera mengganti password demi keamanan.
+              Seluruh akun baru (Admin, Guru, Siswa) maupun hasil <b>Impor Database</b> memiliki password default: <code className="bg-blue-100 dark:bg-blue-900/40 px-1 rounded text-blue-700 dark:text-blue-300 font-bold">12345678</code>.
             </p>
           </div>
         </div>
@@ -358,110 +353,99 @@ const UsersPage = () => {
           ) : (
             <>
               {selectedIds.length > 0 && (
-            <Button 
-              variant="default" 
-              size="sm"
-              className="bg-rose-600 hover:bg-rose-700 dark:bg-rose-950/40 dark:text-rose-400 dark:border dark:border-rose-800/40 text-white rounded-xl font-bold shadow-lg shadow-rose-500/20 animate-in fade-in zoom-in duration-200 transition-all active:scale-95"
-              onClick={handleBatchDelete}
-            >
-              <Trash2 className="mr-1 h-3.5 w-3.5" />
-              Hapus ({selectedIds.length})
-            </Button>
-          )}
+                <Button
+                  variant="default"
+                  size="sm"
+                  className="bg-rose-600 hover:bg-rose-700 dark:bg-rose-950/40 dark:text-rose-400 dark:border dark:border-rose-800/40 text-white rounded-xl font-bold shadow-lg shadow-rose-500/20 animate-in fade-in zoom-in duration-200 transition-all active:scale-95"
+                  onClick={handleBatchDelete}
+                >
+                  <Trash2 className="mr-1 h-3.5 w-3.5" />
+                  Hapus ({selectedIds.length})
+                </Button>
+              )}
 
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button onClick={() => { setSelectedUser(null); setIsDialogOpen(true); }} size="sm" className="rounded-2xl bg-blue-50 hover:bg-blue-100 border border-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 dark:border-blue-800/40 text-blue-700 font-bold shadow-sm h-9 px-4">
-                <Plus className="mr-1 h-3.5 w-3.5" />
-                Tambah Pengguna
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-md bg-card">
-              <DialogHeader>
-                <DialogTitle>{dialogMode === "create" ? "Daftarkan Akun Baru" : "Edit Akun Pengguna"}</DialogTitle>
-              </DialogHeader>
-              <form onSubmit={handleSaveUser} className="space-y-4 pt-4">
-                {error && <p className="text-xs text-red-500 bg-red-50 dark:bg-red-900/20 p-2 rounded border border-red-100 dark:border-red-800/40">{error}</p>}
-                
-                <FormField id="role" label="Role / Hak Akses" error={undefined}>
-                  <select 
-                    value={formData.role}
-                    onChange={(e) => setFormData(prev => ({ ...prev, role: e.target.value as any, teacherId: "", name: "" }))}
-                    className="w-full rounded-md border border-slate-200 dark:border-slate-800 bg-card text-sm p-2"
-                  >
-                    <option value="teacher">Guru / Pengawas</option>
-                    <option value="admin">Administrator</option>
-                  </select>
-                </FormField>
-
-                {formData.role === "teacher" && (
-                  <FormField id="teacherId" label="Pilih Guru Pengampu (Sinkronisasi)" error={undefined}>
-                    <select
-                      value={formData.teacherId}
-                      onChange={(e) => {
-                        const tid = e.target.value;
-                        const tName = teachers.find(t => t.id === tid)?.name || "";
-                        setFormData(prev => ({ ...prev, teacherId: tid, name: tName }));
-                      }}
-                      required
-                      className="w-full rounded-md border border-slate-200 dark:border-slate-800 bg-card text-sm p-2"
-                    >
-                      <option value="">-- Pilih Guru --</option>
-                      {teachers.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                    </select>
-                  </FormField>
-                )}
-
-                <FormField id="name" label="Nama Lengkap" error={undefined}>
-                  <Input 
-                    value={formData.name}
-                    onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                    placeholder={formData.role === "admin" ? "Contoh: Administrator Utama" : "Pilih Guru Terlebih Dahulu"}
-                    required
-                    readOnly={formData.role === "teacher" && formData.teacherId !== ""}
-                    className={formData.role === "teacher" ? "bg-slate-50 dark:bg-slate-900/40 font-semibold text-blue-600 dark:text-blue-400" : ""}
-                  />
-                </FormField>
-
-                <FormField id="email" label="Email (Digunakan untuk login)" error={undefined}>
-                  <Input 
-                    type="email"
-                    value={formData.email}
-                    onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
-                    placeholder="Contoh: novia@mosa.cbt"
-                    required
-                  />
-                </FormField>
-
-                <FormField id="password" label="Password" error={undefined}>
-                  <Input 
-                    type="password"
-                    value={formData.password}
-                    onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
-                    placeholder={dialogMode === "edit" ? "Kosongkan jika tidak ingin diubah" : "Minimal 8 karakter"}
-                    required={dialogMode === "create"}
-                  />
-                </FormField>
-
-                <DialogFooter className="pt-4 border-t border-slate-100 dark:border-slate-800/60 mt-4">
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    onClick={() => setIsDialogOpen(false)}
-                  >
-                    Batal
+              <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button onClick={() => { setSelectedUser(null); setIsDialogOpen(true); }} size="sm" className="rounded-2xl bg-blue-50 hover:bg-blue-100 border border-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 dark:border-blue-800/40 text-blue-700 font-bold shadow-sm h-9 px-4">
+                    <Plus className="mr-1 h-3.5 w-3.5" />
+                    Tambah Pengguna
                   </Button>
-                  <Button 
-                    type="submit" 
-                    disabled={isSubmitting}
-                    className="bg-blue-600 hover:bg-blue-700 text-white font-semibold"
-                  >
-                    {isSubmitting ? "Menyimpan..." : (dialogMode === "create" ? "Buat Akun Email" : "Perbarui Akun Email")}
-                  </Button>
-                </DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
+                </DialogTrigger>
+                <DialogContent className="max-w-md bg-card">
+                  <DialogHeader>
+                    <DialogTitle>{dialogMode === "create" ? "Daftarkan Akun Baru" : "Edit Akun Pengguna"}</DialogTitle>
+                  </DialogHeader>
+                  <form onSubmit={handleSaveUser} className="space-y-5 pt-4">
+                    {error && (
+                      <div className="bg-red-50 border border-red-100 text-red-600 text-xs px-4 py-3 rounded-2xl flex items-center gap-2 animate-in fade-in slide-in-from-top-1">
+                        <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                        {error}
+                      </div>
+                    )}
+
+                    <FormField id="role" label="Role / Hak Akses" error={undefined}>
+                      <div className="relative group">
+                        <select
+                          value={formData.role}
+                          onChange={(e) => setFormData(prev => ({ ...prev, role: e.target.value as any, name: "" }))}
+                          className="w-full h-12 px-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 text-sm font-medium focus:ring-2 focus:ring-blue-500/20 transition-all appearance-none cursor-pointer group-hover:bg-white dark:group-hover:bg-slate-900"
+                        >
+                          <option value="admin">Administrator</option>
+                        </select>
+                        <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                          <UserCog size={16} />
+                        </div>
+                      </div>
+                    </FormField>
+
+                    <FormField id="name" label="Nama Lengkap" error={undefined}>
+                      <Input
+                        value={formData.name}
+                        onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                        placeholder="Contoh: Administrator Utama"
+                        required
+                        className="h-12 px-4 rounded-2xl border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 focus:bg-white dark:focus:bg-slate-900 transition-all font-medium"
+                      />
+                    </FormField>
+
+                    <FormField id="email" label="Email (Digunakan untuk login)" error={undefined}>
+                      <Input
+                        type="email"
+                        value={formData.email}
+                        onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                        placeholder="Contoh: alfaruqasri98@gmail.com"
+                        required
+                        className="h-12 px-4 rounded-2xl border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 focus:bg-white dark:focus:bg-slate-900 transition-all font-medium"
+                      />
+                    </FormField>
+
+                    <DialogFooter className="pt-6 border-t border-slate-100 dark:border-slate-800/60 mt-6 gap-3">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setIsDialogOpen(false)}
+                        className="h-12 px-6 rounded-2xl border-slate-200 dark:border-slate-800 font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-900 transition-all"
+                      >
+                        Batal
+                      </Button>
+                      <Button
+                        type="submit"
+                        disabled={isSubmitting}
+                        className="h-12 px-8 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-lg shadow-blue-500/20 active:scale-95 transition-all flex-1 md:flex-none"
+                      >
+                        {isSubmitting ? (
+                          <div className="flex items-center gap-2">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            <span>Memproses...</span>
+                          </div>
+                        ) : (
+                          dialogMode === "create" ? "Buat Akun Email" : "Perbarui Akun Email"
+                        )}
+                      </Button>
+                    </DialogFooter>
+                  </form>
+                </DialogContent>
+              </Dialog>
             </>
           )}
         </div>
@@ -473,44 +457,44 @@ const UsersPage = () => {
         </CardHeader>
         <CardContent>
           {loading ? (
-             <div className="rounded-xl border border-slate-200/60 dark:border-slate-800 overflow-hidden">
-                <Table>
-                  <TableHeader className="bg-slate-50/50 dark:bg-slate-900/50">
-                    <TableRow>
-                      <TableHead className="w-16 text-center">No</TableHead>
-                      <TableHead>Pengguna</TableHead>
-                      <TableHead>Hak Akses</TableHead>
-                      <TableHead>Guru Terkait</TableHead>
-                      <TableHead className="text-right">Aksi</TableHead>
+            <div className="rounded-xl border border-slate-200/60 dark:border-slate-800 overflow-hidden">
+              <Table>
+                <TableHeader className="bg-slate-50/50 dark:bg-slate-900/50">
+                  <TableRow>
+                    <TableHead className="w-16 text-center">No</TableHead>
+                    <TableHead>Pengguna</TableHead>
+                    <TableHead>Hak Akses</TableHead>
+                    <TableHead>Guru Terkait</TableHead>
+                    <TableHead className="text-right">Aksi</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <TableRow key={i}>
+                      <TableCell className="text-center"><Skeleton className="h-4 w-4 mx-auto" /></TableCell>
+                      <TableCell>
+                        <div className="space-y-2">
+                          <Skeleton className="h-4 w-48" />
+                          <Skeleton className="h-3 w-32" />
+                        </div>
+                      </TableCell>
+                      <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <Skeleton className="h-8 w-8 rounded-lg" />
+                          <Skeleton className="h-8 w-8 rounded-lg" />
+                        </div>
+                      </TableCell>
                     </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {Array.from({ length: 5 }).map((_, i) => (
-                      <TableRow key={i}>
-                        <TableCell className="text-center"><Skeleton className="h-4 w-4 mx-auto" /></TableCell>
-                        <TableCell>
-                           <div className="space-y-2">
-                              <Skeleton className="h-4 w-48" />
-                              <Skeleton className="h-3 w-32" />
-                           </div>
-                        </TableCell>
-                        <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                        <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-                        <TableCell className="text-right">
-                           <div className="flex justify-end gap-2">
-                              <Skeleton className="h-8 w-8 rounded-lg" />
-                              <Skeleton className="h-8 w-8 rounded-lg" />
-                           </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-             </div>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           ) : (
-            <DataTable 
-              data={users} 
-              columns={columns} 
+            <DataTable
+              data={users}
+              columns={columns}
               loading={loading}
               actions={(item: AppUser) => (
                 <div className="flex items-center gap-1.5 whitespace-nowrap">
@@ -538,12 +522,12 @@ const UsersPage = () => {
           )}
 
           {/* Batch Progress Dialog */}
-          <Dialog open={batchProgress.isOpen} onOpenChange={() => {}}>
+          <Dialog open={batchProgress.isOpen} onOpenChange={() => { }}>
             <DialogContent className="max-w-md bg-card border-none shadow-2xl p-0 overflow-hidden rounded-3xl" hideClose>
               <div className="bg-indigo-600 p-6 text-white flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="bg-white/20 p-2 rounded-xl">
-                     <Loader2 className="h-5 w-5 animate-spin" />
+                    <Loader2 className="h-5 w-5 animate-spin" />
                   </div>
                   <div>
                     <DialogTitle className="text-lg font-bold text-white tracking-tight">{batchProgress.title}</DialogTitle>
@@ -551,20 +535,20 @@ const UsersPage = () => {
                   </div>
                 </div>
                 <div className="text-right">
-                   <span className="text-2xl font-black text-white/40">{Math.round((batchProgress.current / batchProgress.total) * 100) || 0}%</span>
+                  <span className="text-2xl font-black text-white/40">{Math.round((batchProgress.current / batchProgress.total) * 100) || 0}%</span>
                 </div>
               </div>
               <div className="p-8 space-y-6">
                 <div className="space-y-2">
-                   <div className="flex justify-between items-end mb-1">
-                     <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">{batchProgress.message}</span>
-                     <span className="text-xs font-medium text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">
-                       {batchProgress.current} / {batchProgress.total}
-                     </span>
-                   </div>
-                   <Progress value={(batchProgress.current / batchProgress.total) * 100} className="h-3 bg-slate-100 dark:bg-slate-800" />
+                  <div className="flex justify-between items-end mb-1">
+                    <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">{batchProgress.message}</span>
+                    <span className="text-xs font-medium text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">
+                      {batchProgress.current} / {batchProgress.total}
+                    </span>
+                  </div>
+                  <Progress value={(batchProgress.current / batchProgress.total) * 100} className="h-3 bg-slate-100 dark:bg-slate-800" />
                 </div>
-                
+
                 <p className="text-[10px] text-center text-slate-400 font-medium italic">
                   * Jangan menutup atau merefresh halaman ini selama proses berlangsung.
                 </p>

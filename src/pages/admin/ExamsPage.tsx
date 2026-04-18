@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Plus, BookOpen, Trash, Edit, Archive, RotateCw } from "lucide-react";
 import { Button } from "../../components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../../components/ui/dialog";
@@ -15,6 +15,9 @@ import { DataTable } from "../../components/ui/data-table";
 import { Skeleton } from "../../components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../components/ui/table";
 import { useToast } from "../../components/ui/toast";
+import { Avatar, AvatarFallback } from "../../components/ui/avatar";
+import { Badge } from "../../components/ui/badge";
+import { cn } from "../../lib/utils";
 
 export interface ExamData {
   id: string;
@@ -40,45 +43,13 @@ export const getExamTypeColorClass = (type: string) => {
   }
 };
 
-const columns = [
-  {
-    key: "index",
-    label: "No",
-    render: (v: any, item: any, index?: number) => (index !== undefined ? index + 1 : 1),
-  },
-  {
-    key: "title",
-    label: "Judul Ujian",
-    sortable: true,
-    render: (v: string, item: any) => (
-      <div className="flex flex-col items-start gap-1">
-        <span className="font-medium text-slate-800 dark:text-slate-100">{v}</span>
-        {item.examType && (
-          <span className={`text-[10px] px-2 py-0.5 rounded-md font-semibold border ${getExamTypeColorClass(item.examType)}`}>
-            {item.examType}
-          </span>
-        )}
-      </div>
-    )
-  },
-  {
-    key: "subjectName",
-    label: "Mata Pelajaran",
-    sortable: true,
-  },
-  {
-    key: "teacherName",
-    label: "Guru Pengampu",
-    sortable: true,
-  }
-];
 
 const ExamsPage = () => {
   const navigate = useNavigate();
   const { pb } = useTenant();
   const { user, role, teacherId } = useAuth();
   const { addToast } = useToast();
-  const { subjects, teachers, loading: dataLoading } = useExamData();
+  const { subjects, teachers, teacherFullAccess, loading: dataLoading } = useExamData();
   const [exams, setExams] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const isLoading = loading || dataLoading;
@@ -93,6 +64,61 @@ const ExamsPage = () => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [examToDelete, setExamToDelete] = useState<ExamData | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  const columns = useMemo(() => [
+    {
+      key: "index",
+      label: "No",
+      render: (v: any, item: any, index?: number) => (index !== undefined ? index + 1 : 1),
+      className: "w-[60px]",
+    },
+    {
+      key: "title",
+      label: "Judul Bank Soal",
+      sortable: true,
+      render: (v: string, item: any) => (
+        <div className="flex flex-col min-w-0">
+          <span className="font-bold text-slate-800 dark:text-slate-100 truncate leading-tight">{v}</span>
+          {item.examType && (
+            <div className="mt-1">
+              <span className={cn("text-[9px] px-1.5 py-0 rounded font-black uppercase tracking-wider border", getExamTypeColorClass(item.examType))}>
+                {item.examType}
+              </span>
+            </div>
+          )}
+        </div>
+      )
+    },
+    {
+      key: "subjectName",
+      label: "Mata Pelajaran",
+      sortable: true,
+      render: (name: string) => (
+        <span className="text-sm font-semibold text-slate-600 dark:text-slate-300">{name}</span>
+      )
+    },
+    {
+      key: "teacherName",
+      label: "Guru Pengampu",
+      sortable: true,
+      render: (name: string, exam: any) => {
+        const teacher = teachers.find((t: any) => t.id === exam.teacherId);
+        return (
+          <div className="flex items-center gap-2">
+            <Avatar className="h-7 w-7 border border-slate-200 dark:border-slate-800">
+              <AvatarFallback className="bg-gradient-to-br from-indigo-500 to-blue-600 text-white text-[10px] font-bold">
+              {(name || "U").split(" ").map(n => n[0]).join("").substring(0, 2).toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+            <div className="flex flex-col">
+               <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">{name}</span>
+               <span className="text-[10px] text-slate-400 font-medium">{teacher?.code || "No Code"}</span>
+            </div>
+          </div>
+        );
+      }
+    }
+  ], [teachers]);
 
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean;
@@ -122,10 +148,12 @@ const ExamsPage = () => {
 
   const isOwner = useCallback((exam: any) => {
     if (role === "admin") return true;
+    if (teacherFullAccess) return true;
     if (!teacherId) return false;
-    // Dukung format lama (user?.id) dan baru (teacherId)
-    return exam.teacherId === teacherId || exam.teacherId === user?.id;
-  }, [role, teacherId, user]);
+    // Dukung format lama (user?.id) dan baru (teacherId) serta case sensitivity
+    const examTeacherId = exam.teacherId || exam.teacherid;
+    return examTeacherId === teacherId || examTeacherId === user?.id;
+  }, [role, teacherId, user, teacherFullAccess]);
 
   const handleArchiveExam = (exam: any) => {
     if (activeExamIds.includes(exam.id)) {
@@ -194,7 +222,7 @@ const ExamsPage = () => {
   // Sync exams data
   useEffect(() => {
     const fetchExams = async () => {
-      if (!subjects.length || !teachers.length || !pb) return;
+      if (!pb) return;
       
       try {
         const loaded = await pb.collection('exams').getFullList({
@@ -272,6 +300,10 @@ const ExamsPage = () => {
   };
 
   const handleDeleteClick = (exam: ExamData) => {
+    if (activeExamIds.includes(exam.id)) {
+      showAlert("Peringatan", "Batal menghapus karena Bank Soal ini sedang digunakan di Ruang Ujian aktif.", "warning");
+      return;
+    }
     setExamToDelete(exam);
     setDeleteDialogOpen(true);
   };

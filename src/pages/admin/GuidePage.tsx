@@ -363,7 +363,7 @@ const GuidePage = () => {
                   <div className="p-4 bg-white/10 dark:bg-black/20 rounded-2xl border border-white/20 dark:border-white/5 space-y-3">
                     <div className="flex items-start gap-3">
                       <div className="w-1.5 h-1.5 rounded-full bg-indigo-300 mt-1.5 shrink-0" />
-                      <p className="text-[11px] font-medium leading-tight">Akun hasil impor akan memiliki password default <span className="font-black underline italic">username@mosa</span>.</p>
+                      <p className="text-[11px] font-medium leading-tight">Akun hasil impor akan memiliki password default <span className="font-black underline italic">12345678</span>.</p>
                     </div>
                     <div className="flex items-start gap-3">
                       <div className="w-1.5 h-1.5 rounded-full bg-indigo-300 mt-1.5 shrink-0" />

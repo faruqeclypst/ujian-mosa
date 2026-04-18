@@ -186,7 +186,6 @@ body {
 /* 🌑 Force light text for rich text content in Dark Mode to ensure readability */
 .dark .ql-editor,
 .dark .ql-editor p,
-.dark .ql-editor span,
 .dark .ql-editor li,
 .dark .ql-editor strong,
 .dark .ql-editor b,
@@ -251,4 +250,55 @@ body {
 
 .dark .premium-math .katex {
   color: #f8fafc; /* slate-50 */
+}
+
+/* 💻 Premium Syntax Highlighting Styles for Quill Editor & Previews */
+.ql-container .ql-editor pre.ql-syntax,
+.ql-container .ql-editor pre,
+.ql-editor pre.ql-syntax,
+.ql-editor pre,
+.ql-editor code {
+  background-color: #1e1e1e; /* VS Code Dark Plus background */
+  color: #d4d4d4; /* Standard VS Code text light gray */
+  border-radius: 1rem;
+  padding: 0.75rem;
+  font-family: 'JetBrains Mono', 'Fira Code', 'Menlo', 'Monaco', 'Consolas', monospace;
+  font-size: 0.825rem;
+  line-height: 1.4;
+  margin: 0.5rem 0;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  overflow-x: auto;
+  tab-size: 4;
+  white-space: pre; 
+  position: relative;
+  display: block;
+  width: 100%;
+}
+
+/* Specific styling for the editor container to look more like a coding env */
+.ql-editor pre.ql-syntax::before,
+.ql-editor pre::before {
+  display: none !important;
+}
+
+/* Light mode fallback - Clean Slate Style with higher specificity */
+:root:not(.dark) .ql-editor pre.ql-syntax,
+:root:not(.dark) .ql-editor pre,
+:root:not(.dark) pre.ql-syntax,
+:root:not(.dark) .math-content pre {
+  background-color: #ffffff !important; /* Pure White */
+  color: #1e293b !important; /* slate-800 */
+  border: 1px solid #e2e8f0 !important; /* slate-200 */
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05) !important;
+}
+
+/* 🧪 FORCE KILL any internal black backgrounds from SyntaxHighlighter in Light Mode 
+   And prevent redundant borders inside the preview segments */
+:root:not(.dark) .math-content pre,
+:root:not(.dark) .math-content code,
+:root:not(.dark) .math-content .arabic-text {
+  background: transparent !important;
+  color: #1e293b;
+  border: none !important;
+  box-shadow: none !important;
 }
