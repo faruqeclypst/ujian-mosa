@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
-import { BarChart3, TrendingUp, Users, Activity, CalendarDays, ExternalLink } from "lucide-react";
+import { BarChart3, Users, CalendarDays, Activity, TrendingUp } from "lucide-react";
 import SuperAdminLayout from "../../components/layout/SuperAdminLayout";
 import { masterPb } from "../../lib/pocketbase";
+import { cn } from "../../lib/utils";
 
 interface ChartDay {
   label: string;
@@ -22,25 +23,23 @@ const SuperAdminAnalyticsPage = () => {
     const fetchAnalytics = async () => {
       try {
         const [schoolsRes, requestsRes] = await Promise.all([
-          masterPb.collection("schools").getList(1, 1000, { filter: 'is_active=true' }),
-          masterPb.collection("school_requests").getList(1, 1000)
+          masterPb.collection("schools").getList(1, 1000, { filter: "is_active=true" }),
+          masterPb.collection("school_requests").getList(1, 1000),
         ]);
 
         const totalQuota = schoolsRes.items.reduce((acc, curr) => acc + (curr.student_quota || 250), 0);
 
-        // Menghitung data grafik untuk 14 Hari Terakhir dari kolom 'created'
         const last14Days = Array.from({ length: 14 }).map((_, i) => {
           const d = new Date();
           d.setDate(d.getDate() - (13 - i));
-          return d.toISOString().split('T')[0];
+          return d.toISOString().split("T")[0];
         });
 
         const chartData = last14Days.map(date => {
           const schoolCount = schoolsRes.items.filter(s => s.created.startsWith(date)).length;
           const reqCount = requestsRes.items.filter(r => r.created.startsWith(date)).length;
-          // Format label tanggal (contoh: "14 Apr")
           const dObj = new Date(date);
-          const label = `${dObj.getDate()} ${dObj.toLocaleString('id-ID', { month: 'short' })}`;
+          const label = `${dObj.getDate()} ${dObj.toLocaleString("id-ID", { month: "short" })}`;
           return { label, count: schoolCount + reqCount };
         });
 
@@ -49,130 +48,142 @@ const SuperAdminAnalyticsPage = () => {
         setStats({
           schoolsCount: schoolsRes.totalItems,
           requestsCount: requestsRes.totalItems,
-          totalQuota: totalQuota,
-          chartData: chartData,
+          totalQuota,
+          chartData,
           maxChartCount: maxCount,
-          loading: false
+          loading: false,
         });
       } catch (err) {
-        console.error("Terjadi kesalahan saat memuat analitik", err);
+        console.error(err);
         setStats(s => ({ ...s, loading: false }));
       }
     };
-
     fetchAnalytics();
   }, []);
 
+  const statCards = [
+    {
+      label: "Total Sekolah Aktif",
+      value: stats.schoolsCount,
+      icon: CalendarDays,
+      color: "text-blue-600",
+      bg: "bg-blue-50",
+      sub: "Dari seluruh kluster tenant",
+    },
+    {
+      label: "Total Kuota Siswa",
+      value: stats.totalQuota.toLocaleString("id-ID"),
+      icon: Users,
+      color: "text-amber-600",
+      bg: "bg-amber-50",
+      sub: "Kapasitas global termanage",
+    },
+    {
+      label: "Antrean Pendaftaran",
+      value: stats.requestsCount,
+      icon: Activity,
+      color: "text-emerald-600",
+      bg: "bg-emerald-50",
+      sub: "Histori pendaftar mendarat",
+    },
+  ];
+
+  const isEmpty = stats.chartData.every(d => d.count === 0);
+
   return (
     <SuperAdminLayout>
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
-          <h2 className="text-3xl font-extrabold tracking-tight text-slate-900 mb-1">
-            Statistik Server
-          </h2>
-          <p className="text-slate-500 font-medium text-sm">Analitik penggunaan sistem as a service E-Ujian.</p>
+          <h2 className="text-xl font-bold text-slate-900">Statistik Server</h2>
+          <p className="text-slate-500 text-sm mt-0.5">Analitik penggunaan sistem E-Ujian SaaS.</p>
         </div>
-        <div className="flex items-center gap-2 bg-white border border-slate-200 p-1 rounded-xl shadow-sm">
-          <button className="px-4 py-2 text-sm font-bold rounded-lg bg-slate-100 text-slate-800">Semua Waktu</button>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex flex-col justify-between">
-          <div className="flex items-start justify-between mb-4">
-            <div>
-              <p className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">Total Sekolah Aktif</p>
-              <h3 className="text-4xl font-black text-slate-900">{stats.loading ? "--" : stats.schoolsCount}</h3>
-            </div>
-            <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center text-blue-600">
-              <CalendarDays size={24} />
-            </div>
-          </div>
-          <div className="flex items-center gap-2 text-blue-600 text-sm font-bold mt-2">
-            Dari seluruh kluster tenant
-          </div>
-        </div>
-
-        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex flex-col justify-between">
-          <div className="flex items-start justify-between mb-4">
-            <div>
-               <p className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">Total Kuota Tersedia</p>
-               <h3 className="text-4xl font-black text-slate-900">{stats.loading ? "--" : stats.totalQuota.toLocaleString('id-ID')}</h3>
-            </div>
-            <div className="w-12 h-12 bg-amber-50 rounded-xl flex items-center justify-center text-amber-600">
-              <Users size={24} />
-            </div>
-          </div>
-          <div className="flex items-center gap-2 text-amber-600 text-sm font-bold mt-2">
-            Total siswa termanage secara global
-          </div>
-        </div>
-
-        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex flex-col justify-between">
-          <div className="flex items-start justify-between mb-4">
-            <div>
-               <p className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">Antrean Pendaftaran</p>
-               <h3 className="text-4xl font-black text-slate-900">{stats.loading ? "--" : stats.requestsCount}</h3>
-            </div>
-            <div className="w-12 h-12 bg-emerald-50 rounded-xl flex items-center justify-center text-emerald-600">
-              <Activity size={24} />
-            </div>
-          </div>
-          <div className="flex items-center gap-2 text-emerald-600 text-sm font-bold mt-2">
-            Histori pendaftar mendarat
-          </div>
+        <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-xl w-fit">
+          <button className="px-4 py-2 text-sm font-semibold rounded-lg bg-white text-slate-800 shadow-sm">
+            Semua Waktu
+          </button>
         </div>
       </div>
 
-      <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-        <div className="flex items-center justify-between mb-8 pb-4 border-b border-slate-100">
-          <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-            <BarChart3 size={20} className="text-blue-600" /> Tren Aktivitas Registrasi (14 Hari Terakhir)
+      {/* Stats */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+        {statCards.map((card, i) => (
+          <div key={i} className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">{card.label}</p>
+                <h3 className="text-3xl font-bold text-slate-900">
+                  {stats.loading ? <span className="text-slate-300">–</span> : card.value}
+                </h3>
+              </div>
+              <div className={cn("w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0", card.bg)}>
+                <card.icon size={22} className={card.color} />
+              </div>
+            </div>
+            <div className={cn("flex items-center gap-1.5 text-xs font-semibold", card.color)}>
+              <TrendingUp size={12} />
+              {card.sub}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Chart */}
+      <div className="bg-white border border-slate-200 rounded-xl p-5 sm:p-6 shadow-sm">
+        <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-100">
+          <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+            <BarChart3 size={18} className="text-blue-600" />
+            Tren Aktivitas Registrasi
           </h3>
+          <span className="text-xs font-medium text-slate-400 bg-slate-100 px-3 py-1 rounded-full">14 Hari Terakhir</span>
         </div>
 
-        {/* Real Chart Visualization using mapped data */}
-        <div className="h-64 flex items-end justify-between gap-1 sm:gap-2 pb-2">
+        {/* Bar chart */}
+        <div className="h-48 sm:h-64 flex items-end justify-between gap-1 sm:gap-1.5 pb-2">
           {stats.loading ? (
-            <div className="w-full flex items-center justify-center text-slate-400 font-bold h-full">Memuat Grafik...</div>
-          ) : stats.chartData.every(d => d.count === 0) ? (
-            <div className="w-full flex items-center justify-center text-slate-400 font-bold h-full">Belum ada aktivitas dalam 14 hari terakhir.</div>
+            <div className="w-full flex items-center justify-center text-slate-400 text-sm font-medium h-full">
+              Memuat data...
+            </div>
+          ) : isEmpty ? (
+            <div className="w-full flex flex-col items-center justify-center h-full gap-3 text-slate-400">
+              <BarChart3 size={40} className="opacity-30" />
+              <p className="text-sm font-medium">Belum ada aktivitas dalam 14 hari terakhir</p>
+            </div>
           ) : (
             stats.chartData.map((data, i) => {
-              const heightPercent = Math.max((data.count / stats.maxChartCount) * 100, 2); // minimal 2% height agar tetap terlihat ada batang meski nol jika dipaksa
+              const heightPercent = Math.max((data.count / stats.maxChartCount) * 100, 4);
+              const isToday = i === stats.chartData.length - 1;
               return (
                 <div key={i} className="h-full w-full flex flex-col justify-end items-center group relative">
-                  {/* Tooltip pada hover */}
-                  <div className="opacity-0 group-hover:opacity-100 absolute -top-8 bg-slate-800 text-white text-[10px] sm:text-xs font-bold px-2 py-1 rounded transition-opacity whitespace-nowrap z-10 pointer-events-none">
-                    {data.count} Registrasi
-                  </div>
-                  <div 
-                    className={`w-full max-w-[40px] rounded-t-lg relative overflow-hidden transition-all duration-500 cursor-pointer ${data.count > 0 ? 'bg-blue-100 group-hover:bg-blue-200' : 'bg-slate-50'}`}
-                    style={{ height: `${data.count > 0 ? heightPercent : 0}%` }}
-                  >
-                    <div 
-                      className="absolute bottom-0 w-full bg-blue-500 rounded-t-lg" 
-                      style={{ height: `${data.count > 0 ? heightPercent * 0.8 : 0}%` }} 
-                    />
-                  </div>
+                  {/* Tooltip */}
+                  {data.count > 0 && (
+                    <div className="opacity-0 group-hover:opacity-100 absolute -top-8 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[10px] font-bold px-2 py-1 rounded-lg transition-opacity whitespace-nowrap z-10 pointer-events-none shadow-lg">
+                      {data.count} registrasi
+                    </div>
+                  )}
+                  <div
+                    className={cn(
+                      "w-full max-w-[32px] rounded-t-md transition-all duration-500 relative overflow-hidden",
+                      data.count > 0
+                        ? isToday ? "bg-blue-600" : "bg-blue-200 group-hover:bg-blue-300"
+                        : "bg-slate-100"
+                    )}
+                    style={{ height: `${data.count > 0 ? heightPercent : 4}%` }}
+                  />
                 </div>
               );
             })
           )}
         </div>
-        <div className="flex justify-between text-[10px] sm:text-xs font-bold text-slate-400 pt-3 border-t border-slate-100 mt-2 px-1">
-          {!stats.loading && stats.chartData.length > 0 && (
-            <>
-              <span className="hidden sm:inline">{stats.chartData[0].label}</span>
-              <span className="sm:hidden">{stats.chartData[0].label.split(' ')[0]}</span>
-              
-              <span className="hidden sm:inline">{stats.chartData[Math.floor(stats.chartData.length / 2)].label}</span>
-              <span className="sm:hidden">{stats.chartData[Math.floor(stats.chartData.length / 2)].label.split(' ')[0]}</span>
 
-              <span className="text-slate-600">Hari Ini</span>
-            </>
-          )}
-        </div>
+        {/* X-axis labels */}
+        {!stats.loading && stats.chartData.length > 0 && (
+          <div className="flex justify-between text-[10px] font-medium text-slate-400 pt-2 border-t border-slate-100 mt-2">
+            <span>{stats.chartData[0]?.label}</span>
+            <span>{stats.chartData[Math.floor(stats.chartData.length / 2)]?.label}</span>
+            <span className="text-blue-600 font-bold">Hari Ini</span>
+          </div>
+        )}
       </div>
     </SuperAdminLayout>
   );

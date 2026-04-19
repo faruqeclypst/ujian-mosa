@@ -9,7 +9,9 @@ import { Input } from "../components/ui/input";
 import FormField from "../components/forms/FormField";
 import { Card, CardHeader, CardTitle, CardContent } from "../components/ui/card";
 import { useToast } from "../components/ui/toast";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "../components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "../components/ui/dialog";
+import { Badge } from "../components/ui/badge";
+import { cn } from "../lib/utils";
 import { 
   Upload, 
   Save, 
@@ -22,7 +24,13 @@ import {
   AlertTriangle,
   RefreshCw,
   CheckCircle2,
-  Trash
+  Trash,
+  Settings,
+  Cpu,
+  Monitor,
+  HelpCircle,
+  LayoutTemplate,
+  Zap
 } from "lucide-react";
 
 const COLLECTIONS = [
@@ -51,6 +59,9 @@ const SettingsPage = () => {
   const [aiGatewayKey, setAiGatewayKey] = useState("");
   const [aiModel, setAiModel] = useState(AI_MODELS[0].id);
   const [aiProvider, setAiProvider] = useState("groq");
+  
+  const [remoteModels, setRemoteModels] = useState<any[]>([]);
+  const [isLoadingModels, setIsLoadingModels] = useState(false);
   const [isExambroEnabled, setIsExambroEnabled] = useState(false);
   const [teacherFullAccess, setTeacherFullAccess] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -61,7 +72,7 @@ const SettingsPage = () => {
 
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [isGalleryOpen, setIsGalleryOpen] = useState(false);
-  const [galleryImages, setGalleryImages] = useState<string[]>([]);
+  const [galleryGroups, setGalleryGroups] = useState<{title: string; images: string[]}[]>([]);
 
   // 📝 Backup States
   const [isBackupLoading, setIsBackupLoading] = useState(false);
@@ -132,15 +143,14 @@ const SettingsPage = () => {
   };
 
   const handleTestAI = async () => {
-    if (!groqApiKey) {
+    const targetKey = aiProvider === "groq" ? groqApiKey : aiGatewayKey;
+    if (!targetKey) {
       addToast({ title: "Gagal", description: "Masukkan API Key terlebih dahulu.", type: "error" });
       return;
     }
     setIsTestingAI(true);
     setTestResult(null);
     try {
-      const isOllama = aiProvider === "ollama";
-      const targetKey = isOllama ? (aiGatewayKey || groqApiKey) : groqApiKey;
       const res = await testAIConnection(targetKey, aiModel, aiGatewayUrl || "https://ollama.com", aiProvider);
       setTestResult(res);
       if (res.success) {
@@ -157,14 +167,80 @@ const SettingsPage = () => {
 
   const loadGalleryImages = async () => {
     if (!pb) return;
+    const userGroups: Record<string, Set<string>> = {
+      "Gambar Admin / Sistem": new Set(),
+    };
+
     try {
-      const qRecords = await pb.collection("questions").getFullList({
-        filter: 'imageUrl != "" || image != ""',
-        limit: 20
+      const examToTeacher: Record<string, string> = {};
+      const teacherMap: Record<string, string> = {};
+
+      try {
+        const [examsData, teachersData] = await Promise.all([
+            pb.collection("exams").getFullList(),
+            pb.collection("teachers").getFullList()
+        ]);
+
+        examsData.forEach(ex => {
+            examToTeacher[ex.id] = ex.teacherId || ex.teacherid;
+        });
+
+        teachersData.forEach((t: any) => {
+            teacherMap[t.id] = t.name;
+        });
+      } catch (e) {
+        console.warn("Gagal mengambil mapping guru untuk galeri.");
+      }
+
+      const pRes = await pb.collection("questions").getList(1, 100, {
+        filter: 'imageUrl != ""',
+        sort: '-created'
       });
-      const images = qRecords.map(q => q.imageUrl || q.image);
-      setGalleryImages(images.filter(Boolean));
+      const qRecords = pRes.items || [];
+
+      const extractHtmlImages = (html: string, uploadName: string) => {
+        if (!html || !html.includes("<img")) return;
+        try {
+          const doc = new DOMParser().parseFromString(html, "text/html");
+          doc.querySelectorAll("img").forEach(img => {
+            const src = img.getAttribute("src");
+            if (src && !src.startsWith("data:")) userGroups[uploadName].add(src);
+          });
+        } catch(e) {}
+      };
+
+      qRecords.forEach((q: any) => {
+        let uploaderName = "Gambar Admin / Sistem";
+        if (q.examId) {
+            const tId = examToTeacher[q.examId];
+            if (tId && teacherMap[tId]) {
+                uploaderName = `Dari: ${teacherMap[tId]}`;
+            }
+        }
+        if (!userGroups[uploaderName]) userGroups[uploaderName] = new Set();
+        if (q.imageUrl) userGroups[uploaderName].add(q.imageUrl);
+        extractHtmlImages(q.text, uploaderName);
+
+        if (q.options) {
+          Object.values(q.options).forEach((c: any) => {
+            if (c.imageUrl) userGroups[uploaderName].add(c.imageUrl);
+            extractHtmlImages(c.text, uploaderName);
+          });
+        }
+        if (q.choices) {
+          Object.values(q.choices).forEach((c: any) => {
+            if (c.imageUrl) userGroups[uploaderName].add(c.imageUrl);
+            extractHtmlImages(c.text, uploaderName);
+          });
+        }
+      });
     } catch (e) { console.error("Gallery err", e); }
+
+    const arr: { title: string; images: string[] }[] = Object.keys(userGroups)
+        .map(key => ({ title: key, images: Array.from(userGroups[key]) }))
+        .filter(g => g.images.length > 0);
+
+    setGalleryGroups(arr);
   };
 
   const handlePickGallery = (url: string) => {
@@ -178,17 +254,105 @@ const SettingsPage = () => {
     fetchSettings();
   }, []);
 
-  // 🤖 Auto-switch model when provider changes
   useEffect(() => {
-    if (!loading) {
-      const availableModels = AI_MODELS.filter(m => (m as any).provider === aiProvider);
-      const isCurrentModelValid = availableModels.some(m => m.id === aiModel);
-      
-      if (!isCurrentModelValid && availableModels.length > 0) {
+    if (loading) return;
+
+    if (aiProvider === "groq" || aiProvider === "ollama") {
+      const availableModels = AI_MODELS.filter((m: any) => m.provider === aiProvider);
+      setRemoteModels(availableModels);
+      if (!availableModels.some(m => m.id === aiModel) && availableModels.length > 0) {
         setAiModel(availableModels[0].id);
       }
+      return;
     }
-  }, [aiProvider, loading]);
+
+    if (aiProvider === "custom") {
+       setRemoteModels([]); // allow typing
+       return;
+    }
+
+    // 🚀 ANTI-CORS: Jangan panggil fetch langsung untuk provider yang memblokir Browser (CORS)
+    const corsRestricted = ["cloudflare", "google", "huggingface", "github"];
+    if (corsRestricted.includes(aiProvider)) {
+       const fallback = AI_MODELS.filter((m: any) => m.provider === aiProvider);
+       setRemoteModels(fallback);
+       if (!fallback.some(m => m.id === aiModel) && fallback.length > 0) {
+          setAiModel(fallback[0].id);
+       }
+       return;
+    }
+
+    const key = aiProvider === "groq" ? groqApiKey : aiGatewayKey;
+    if (!key) {
+      setRemoteModels([]);
+      return;
+    }
+
+    const fetchModels = async () => {
+      setIsLoadingModels(true);
+      try {
+        let baseUrl = "";
+        switch(aiProvider) {
+           case "google": baseUrl = "https://generativelanguage.googleapis.com/v1beta/openai"; break;
+           case "openrouter": baseUrl = "https://openrouter.ai/api/v1"; break;
+           case "together": baseUrl = "https://api.together.xyz/v1"; break;
+           case "huggingface": baseUrl = "https://api-inference.huggingface.co/v1"; break;
+           case "fireworks": baseUrl = "https://api.fireworks.ai/inference/v1"; break;
+           case "github": baseUrl = "https://models.inference.ai.azure.com"; break;
+           case "cloudflare": 
+              if (!aiGatewayUrl) { setIsLoadingModels(false); return; }
+              baseUrl = `https://api.cloudflare.com/client/v4/accounts/${aiGatewayUrl}/ai/v1`; 
+              break;
+        }
+        
+        if (!baseUrl) {
+           setIsLoadingModels(false); return;
+        }
+
+        const res = await fetch(`${baseUrl}/models`, {
+          headers: {
+            "Authorization": `Bearer ${key}`
+          }
+        });
+        
+        if (res.ok) {
+           const data = await res.json();
+           const items = data.data || data.models || data;
+           if (Array.isArray(items)) {
+             const models = items.map((m: any) => ({
+               id: m.id,
+               name: m.name || m.id,
+               speed: "Remote API",
+               provider: aiProvider
+             }));
+             models.sort((a: any, b: any) => a.name.localeCompare(b.name));
+             setRemoteModels(models);
+             
+             if (!models.find((m: any) => m.id === aiModel) && models.length > 0) {
+                setAiModel(models[0].id);
+             }
+           }
+        } else {
+           // Silent fallback for 401/403/CORS
+           const fallback = AI_MODELS.filter((m: any) => m.provider === aiProvider);
+           if (fallback.length > 0) setRemoteModels(fallback);
+        }
+      } catch (err) {
+        // Suppress console error for expected CORS blocks on local dev
+        const fallback = AI_MODELS.filter((m: any) => m.provider === aiProvider);
+        setRemoteModels(fallback);
+        
+        if (!fallback.find((m: any) => m.id === aiModel) && fallback.length > 0) {
+           setAiModel(fallback[0].id);
+        }
+      } finally {
+        setIsLoadingModels(false);
+      }
+    };
+
+    const timeout = setTimeout(fetchModels, 800);
+    return () => clearTimeout(timeout);
+  }, [aiProvider, aiGatewayKey, groqApiKey, aiGatewayUrl, loading]);
 
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -211,7 +375,6 @@ const SettingsPage = () => {
 
       if (logoFile) {
         try {
-          // 🛡️ Isolation: Kelompokkan logo berdasarkan slug sekolah
           const schoolFolder = school?.slug || "unknown";
           const uploadRes = await uploadInventoryImage(`schools/${schoolFolder}/identity`, logoFile);
           if (uploadRes && uploadRes.url) {
@@ -231,25 +394,22 @@ const SettingsPage = () => {
         return;
       }
 
-      // 🛡️ Robust Payload: Menghindari error 400 Bad Request karena schema mismatch
       const payload: any = {
         name: schoolName || "E-Ujian",
         logo: finalLogoUrl || "",
         logoUrl: finalLogoUrl || "", 
         allowed_types: allowedTypes || {},
-        // Coba kirim versi snake_case dan camelCase agar kompatibel dengan versi DB manapun di VPS
         groq_api_key: groqApiKey || "",
         ai_gateway_url: aiGatewayUrl || "",
         ai_gateway_key: aiGatewayKey || "",
         ai_model: aiModel || "llama-3.3-70b-versatile",
         ai_provider: aiProvider || "groq",
+        aiProvider: aiProvider || "groq",
         is_exambro_enabled: !!isExambroEnabled,
         teacher_full_access: !!teacherFullAccess,
-        // Fallback untuk DB versi baru (camelCase)
         isExambroEnabled: !!isExambroEnabled,
         teacherFullAccess: !!teacherFullAccess,
-        aiModel: aiModel || "llama-3.3-70b-versatile",
-        aiProvider: aiProvider || "groq"
+        aiModel: aiModel || "llama-3.3-70b-versatile"
       };
 
       if (!pb) return;
@@ -259,7 +419,6 @@ const SettingsPage = () => {
       if (!isCreate) {
         await pb.collection("settings").update(settingsId, payload);
       } else {
-        // 🧪 Generate random 6-char token untuk memenuhi syarat DB
         const randomToken = Math.random().toString(36).substring(2, 8).toUpperCase();
         const createPayload = {
           ...payload,
@@ -279,7 +438,7 @@ const SettingsPage = () => {
       if (err?.status === 404) {
         addToast({ 
           title: "Akses Ditolak (404)", 
-          description: "Gagal menyimpan. Pastikan API Rules 'Update' & 'Create' koleksi 'settings' di PocketBase Admin (/_/) diset ke: @request.auth.collectionName = 'users'", 
+          description: "Gagal menyimpan. Pastikan API Rules 'Update' & 'Create' koleksi 'settings' diset dengan benar.", 
           type: "error" 
         });
       } else {
@@ -297,7 +456,7 @@ const SettingsPage = () => {
     addToast({ title: "Logo Dihapus", description: "Logo akan dihapus permanen setelah Klik Simpan.", type: "info" });
   };
 
-  // 🚀 Backup Logic: Export
+  // 🚀 Backup Logic
   const handleExportDB = async () => {
     if (!pb) return;
     setIsBackupLoading(true);
@@ -307,8 +466,6 @@ const SettingsPage = () => {
       for (const collectionName of COLLECTIONS) {
         try {
           const records = await pb.collection(collectionName).getFullList();
-          
-          // 🛡️ Filter data sensitif/dinamis agar tidak merusak DB saat impor
           const cleanedRecords = records.map(record => {
             const r = { ...record };
             if (collectionName === "settings") {
@@ -317,7 +474,6 @@ const SettingsPage = () => {
             }
             return r;
           });
-
           backupData[collectionName] = cleanedRecords;
         } catch (e) {
           console.warn(`Export skipping ${collectionName}:`, e);
@@ -341,7 +497,6 @@ const SettingsPage = () => {
     }
   };
 
-  // 🚀 Backup Logic: Import
   const handleImportDB = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -363,7 +518,6 @@ const SettingsPage = () => {
       const totalCollections = Object.keys(data).length;
       let processed = 0;
 
-      // Gunakan urutan COLLECTIONS agar relasi (foreign key) aman
       for (const collectionName of COLLECTIONS) {
         if (!data[collectionName]) continue;
 
@@ -371,27 +525,23 @@ const SettingsPage = () => {
         const records = data[collectionName];
         
         for (const recordData of records) {
-          // 🧹 Bersihkan data dari meta-fields PocketBase yang dilarang dikirim kembali
           const { 
             id, created, updated, 
             collectionId, collectionName: _unusedName, expand,
             ...cleanData 
           } = recordData;
 
-          // Hapus juga field sistem lain jika ada (biasanya diawali @)
           Object.keys(cleanData).forEach(key => {
             if (key.startsWith("@")) delete (cleanData as any)[key];
           });
 
           try {
-            // Update jika ada, Create jika tidak ada. ID tetap sama agar relasi terjaga.
             try {
               await pb.collection(collectionName).update(id, cleanData);
             } catch (e: any) {
               if (e.status === 404) {
                 const createData: any = { id, ...cleanData };
                 
-                // 🔐 Khusus koleksi Auth (students & users), butuh password saat Create
                 const isAuthCollection = ["students", "users"].includes(collectionName);
                 if (isAuthCollection) {
                   const defaultPass = "12345678";
@@ -405,8 +555,7 @@ const SettingsPage = () => {
               }
             }
           } catch (e: any) {
-            const errorDetails = e.data?.data ? JSON.stringify(e.data.data) : (e.message || "Unknown Error");
-            console.error(`Gagal impor record ${id} di ${collectionName}:`, errorDetails);
+            console.error(`Gagal impor record ${id} di ${collectionName}`);
           }
         }
         
@@ -428,7 +577,6 @@ const SettingsPage = () => {
     }
   };
 
-  // 🚀 Backup Logic: Reset DB
   const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
   const [resetInput, setResetInput] = useState("");
 
@@ -444,7 +592,6 @@ const SettingsPage = () => {
     setImportStatus("Mulai Pembersihan...");
 
     try {
-      // Urutan terbalik agar menghapus anak (attempts) sebelum bapak (exam_rooms)
       const REVERSE_COLLECTIONS = [...COLLECTIONS].reverse();
       const totalCollections = REVERSE_COLLECTIONS.length;
       let processed = 0;
@@ -452,13 +599,9 @@ const SettingsPage = () => {
       for (const colName of REVERSE_COLLECTIONS) {
         setImportStatus(`Membersihkan: ${colName}...`);
         
-        // Ambil semua records per batch atau langsung (PocketBase default max 200, but getFullList handles it)
         const records = await pb.collection(colName).getFullList({ fields: 'id' });
         
         for (const r of records) {
-          // Jangan hapus Admin yang sedang login (jika colName === 'users')
-          // Namun di aplikasi ini, admin ada di sistem Auth 'users', sedangkan data lain di koleksi terpisah
-          // Kita pastikan tidak menghapus user saat ini
           const currentAdminId = pb.authStore.model?.id;
           if (colName === "users" && r.id === currentAdminId) continue;
           
@@ -487,635 +630,577 @@ const SettingsPage = () => {
     }
   };
 
-
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between bg-card p-5 rounded-2xl border border-slate-200/60 dark:border-slate-800/40 shadow-sm backdrop-blur-sm">
-        <div>
-          <h2 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
-            <Save className="h-5 w-5 text-indigo-500" />
-            Pengaturan Aplikasi
-          </h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Kelola identitas sekolah, tipe soal, dan backup data.</p>
+    <div className="space-y-6 pb-20 max-w-6xl mx-auto animate-in fade-in duration-500">
+      
+      {/* ── Page Header ── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 px-5 py-4 sm:px-6 sm:py-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none" />
+        
+        <div className="flex items-center gap-4 relative z-10">
+          <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center flex-shrink-0 shadow-md shadow-blue-500/20">
+            <Settings size={20} className="text-white" />
+          </div>
+          <div>
+            <h1 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white tracking-tight">
+              Pengaturan Sistem
+            </h1>
+            <p className="text-[11px] sm:text-xs font-medium text-slate-500 dark:text-slate-400 mt-0.5">
+              Kelola branding institusi, konfigurasi server, dan pencadangan.
+            </p>
+          </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+
+        <div className="relative z-10 flex shrink-0">
           {loading ? (
-             <Skeleton className="h-9 w-40 rounded-2xl" />
+             <Skeleton className="h-10 w-40 rounded-xl" />
           ) : (
             <Button 
                form="settings-form"
                type="submit" 
                disabled={saving} 
-               size="sm"
-               className="rounded-2xl bg-blue-50 hover:bg-blue-100 border border-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 dark:border-blue-800/40 text-blue-700 font-bold shadow-sm h-9 px-4 transition-all active:scale-95"
+               className="w-full sm:w-auto rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-sm shadow-blue-500/20 h-10 px-5 transition-all active:scale-95"
             >
               {saving ? (
-                <>
-                  <RefreshCw className="mr-2 h-3.5 w-3.5 animate-spin" />
-                  Menyimpan...
-                </>
+                <><RefreshCw className="mr-2 h-4 w-4 animate-spin" /> Menyimpan...</>
               ) : (
-                <>
-                  <Save className="mr-2 h-3.5 w-3.5" />
-                  Simpan Perubahan
-                </>
+                <><Save className="mr-2 h-4 w-4" /> Simpan Pengaturan</>
               )}
             </Button>
           )}
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+        {/* ── Left Column: Form & Tools ── */}
         <div className="lg:col-span-2 space-y-6">
-          <Card className="rounded-2xl border border-slate-200/60 dark:border-slate-800/40 shadow-sm backdrop-blur-sm">
-            <CardHeader className="border-b border-slate-200/60 dark:border-slate-800/40 pb-4">
-              <CardTitle className="text-base font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
-                 <Building className="h-4 w-4 text-slate-400" /> Profil Sekolah
+          <Card className="rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900 overflow-hidden">
+            <CardHeader className="p-5 border-b border-slate-100 dark:border-slate-800">
+              <CardTitle className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 flex items-center gap-2">
+                 <Building size={14} /> Profil Institusi
               </CardTitle>
             </CardHeader>
-            <CardContent className="p-6">
-              <form id="settings-form" onSubmit={handleSave} className="space-y-4">
-                <FormField id="schoolName" label="Nama Sekolah" error={undefined}>
-                  <Input
-                    value={schoolName}
-                    onChange={(e) => setSchoolName(e.target.value)}
-                    placeholder="Masukkan nama sekolah"
-                    className="rounded-xl font-semibold"
-                  />
-                </FormField>
-
-                <FormField id="schoolLogo" label="Logo Sekolah" error={undefined}>
-                  <div className="flex items-center gap-4">
-                    <div className="h-16 w-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800/40 flex items-center justify-center relative overflow-hidden flex-shrink-0">
+            <CardContent className="p-5">
+              <form id="settings-form" onSubmit={handleSave} className="space-y-6">
+                
+                {/* Logo & Name */}
+                <div className="flex flex-col sm:flex-row gap-5">
+                  <div className="w-full sm:w-24 group relative">
+                    <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-widest mb-1.5 block">Logo</label>
+                    <div className="w-24 h-24 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border-2 border-dashed border-slate-200 dark:border-slate-700 flex flex-col items-center justify-center overflow-hidden relative cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors mx-auto sm:mx-0">
                       {logoPreview ? (
-                        <img src={logoPreview} alt="Logo Preview" className="h-full w-full object-contain p-2" />
+                        <img src={logoPreview} alt="Logo" className="w-full h-full object-contain p-2" />
                       ) : (
-                        <Upload className="h-5 w-5 text-slate-400" />
+                        <ImageIcon size={24} className="text-slate-400" />
                       )}
+                      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                        <Upload size={16} className="text-white" />
+                      </div>
+                      <input 
+                        type="file" 
+                        accept="image/*" 
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                        onChange={handleLogoChange}
+                        title="Upload Logo"
+                      />
                     </div>
-                    <div className="flex-1 space-y-1">
-                      {loading ? (
-                        <Skeleton className="h-8 w-28 rounded-xl" />
-                      ) : (
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => setIsPickerOpen(true)}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-blue-50 hover:bg-blue-100 border border-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 dark:border-blue-800/40 text-blue-700 cursor-pointer shadow-sm transition-all active:scale-95"
-                          >
-                            <Upload className="h-3.5 w-3.5" /> Ganti Logo
-                          </button>
-                          {(schoolLogo || logoFile) && (
-                            <button
-                              type="button"
-                              onClick={handleDeleteLogo}
-                              disabled={saving}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-rose-50 hover:bg-rose-100 border border-rose-100 dark:bg-rose-900/30 dark:text-rose-400 dark:hover:bg-rose-900/50 dark:border-rose-800/40 text-rose-700 cursor-pointer shadow-sm transition-all active:scale-95"
+                    {logoPreview && (
+                      <button 
+                        type="button" 
+                        onClick={handleDeleteLogo}
+                        className="text-[10px] text-red-500 hover:text-red-700 font-bold block mt-2 text-center w-24"
+                      >
+                        Hapus Logo
+                      </button>
+                    )}
+                  </div>
+                  
+                  <div className="flex-1 space-y-4">
+                    <FormField id="schoolName" label="Nama Sekolah / Institusi Utama" error={undefined}>
+                      <Input
+                        value={schoolName}
+                        onChange={(e) => setSchoolName(e.target.value)}
+                        placeholder="Contoh: SMA Negeri 1 Banda Aceh"
+                        className="rounded-xl font-semibold h-11 border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900"
+                      />
+                    </FormField>
+                    
+                    <div className="flex items-center gap-2">
+                       <button
+                         type="button"
+                         onClick={() => setIsPickerOpen(true)}
+                         className="px-4 py-2 bg-blue-50 dark:bg-slate-800 text-blue-600 dark:text-slate-200 hover:bg-blue-100 dark:hover:bg-slate-700 border border-transparent dark:border-slate-700 rounded-xl text-xs font-bold transition-colors flex items-center gap-2"
+                       >
+                         <FolderOpen size={14} /> Pilih dari Galeri Server
+                       </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                  <div className="flex items-center justify-between p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40 hover:border-slate-300 dark:hover:border-slate-700 transition-colors group">
+                    <div className="flex items-start gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center shrink-0 text-orange-600 dark:text-orange-500">
+                        <Monitor size={16} />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200 leading-none">Wajib Exambro</h4>
+                        <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 leading-tight pr-4">Blokir browser biasa, wajib pakai aplikasi resmi.</p>
+                      </div>
+                    </div>
+                    {loading ? (
+                      <Skeleton className="h-6 w-11 rounded-full shrink-0" />
+                    ) : (
+                      <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                        <input type="checkbox" className="sr-only peer" checked={isExambroEnabled} onChange={(e) => setIsExambroEnabled(e.target.checked)} />
+                        <div className="w-11 h-6 bg-slate-200 dark:bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-600"></div>
+                      </label>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-between p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40 hover:border-slate-300 dark:hover:border-slate-700 transition-colors group">
+                    <div className="flex items-start gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center shrink-0 text-emerald-600 dark:text-emerald-500">
+                        <CheckCircle2 size={16} />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200 leading-none">Akses Guru Penuh</h4>
+                        <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 leading-tight pr-4">Guru bisa buat ruang dan reset ujian siswa secara mandiri.</p>
+                      </div>
+                    </div>
+                    {loading ? (
+                      <Skeleton className="h-6 w-11 rounded-full shrink-0" />
+                    ) : (
+                      <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                        <input type="checkbox" className="sr-only peer" checked={teacherFullAccess} onChange={(e) => setTeacherFullAccess(e.target.checked)} />
+                        <div className="w-11 h-6 bg-slate-200 dark:bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
+                      </label>
+                    )}
+                  </div>
+                </div>
+
+                {/* ── AI Engine Config ── */}
+                <div className="pt-6 border-t border-slate-100 dark:border-slate-800">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                     <div className="flex items-center gap-2">
+                       <Cpu size={16} className="text-indigo-500" />
+                       <h4 className="text-sm font-bold text-slate-900 dark:text-white">API Gen-AI Engine</h4>
+                     </div>
+                     <div className="w-full sm:w-64">
+                       <select 
+                         value={aiProvider}
+                         onChange={(e) => {
+                           setAiProvider(e.target.value);
+                           setAiModel("");
+                         }}
+                         className="w-full h-9 px-3 rounded-xl text-xs font-bold bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none cursor-pointer text-slate-800 dark:text-slate-200"
+                       >
+                         <option value="groq">Groq Cloud</option>
+                         <option value="ollama">Ollama (Local / Proxy)</option>
+                         <option value="google">Google AI Studio (Gemini)</option>
+                         <option value="openrouter">OpenRouter</option>
+                         <option value="together">Together AI</option>
+                         <option value="huggingface">Hugging Face (Serverless)</option>
+                         <option value="fireworks">Fireworks AI</option>
+                         <option value="github">GitHub Models</option>
+                         <option value="cloudflare">Cloudflare Workers AI</option>
+                         <option value="custom">Custom Endpoint (Lainnya)</option>
+                       </select>
+                     </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                     {(aiProvider === "custom" || aiProvider === "cloudflare") && (
+                       <div className="sm:col-span-2">
+                         <FormField id="aiGatewayUrl" label={aiProvider === "cloudflare" ? "Cloudflare Account ID" : "Base URL (OpenAI Compatible)"} error={undefined}>
+                            <Input
+                              type="text"
+                              value={aiGatewayUrl}
+                              onChange={(e) => setAiGatewayUrl(e.target.value)}
+                              placeholder={aiProvider === "cloudflare" ? "Masukkan Account ID Cloudflare..." : "Contoh: https://openrouter.ai/api/v1"}
+                              className="rounded-xl h-11 text-xs font-mono bg-white dark:bg-slate-900"
+                            />
+                         </FormField>
+                       </div>
+                     )}
+
+                     <FormField id="apiKey" label={aiProvider === "groq" ? "Kunci API Groq" : "API Key"} error={undefined}>
+                        <Input
+                          type="password"
+                          value={aiProvider === "groq" ? groqApiKey : aiGatewayKey}
+                          onChange={(e) => aiProvider === "groq" ? setGroqApiKey(e.target.value) : setAiGatewayKey(e.target.value)}
+                          placeholder={aiProvider === "groq" ? "gsk_xxxxxxx" : "API Key..."}
+                          className="rounded-xl h-11 text-xs font-mono"
+                        />
+                     </FormField>
+                     
+                     <FormField id="aiModel" label={isLoadingModels ? "Memuat Model..." : "Model Kecerdasan (LLM)"} error={undefined}>
+                        <div className="relative">
+                          {remoteModels.length > 0 && aiProvider !== "custom" ? (
+                            <select
+                              value={aiModel}
+                              onChange={(e) => setAiModel(e.target.value)}
+                              className="w-full h-11 px-3 rounded-xl text-xs font-bold bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 focus:ring-2 focus:ring-blue-500/20 outline-none appearance-none cursor-pointer"
+                              disabled={isLoadingModels}
                             >
-                              <Trash className="h-3.5 w-3.5" /> Hapus Logo
-                            </button>
+                              <optgroup label={`Model ${aiProvider.toUpperCase()}`}>
+                                {remoteModels.map((m: any) => (
+                                  <option key={m.id} value={m.id}>{m.name} {m.speed && `(${m.speed})`}</option>
+                                ))}
+                              </optgroup>
+                            </select>
+                          ) : (
+                             <Input
+                               type="text"
+                               value={aiModel}
+                               onChange={(e) => setAiModel(e.target.value)}
+                               placeholder={isLoadingModels ? "Mencari model..." : aiProvider === "custom" ? "Masukkan ID model..." : "Ketik ID Model secara manual"}
+                               className="rounded-xl h-11 text-xs font-bold"
+                             />
                           )}
                         </div>
-                      )}
-                      <p className="text-[10px] text-slate-400 dark:text-slate-500">Logo akan disimpan ke Cloudflare R2.</p>
-                    </div>
-                  </div>
-                </FormField>
+                     </FormField>
 
-                <div className="pt-4 border-t border-slate-200/60 dark:border-slate-800/40">
-                  <div className="flex items-center justify-between p-4 rounded-2xl bg-slate-50/50 dark:bg-slate-900/20 border border-slate-100 dark:border-slate-800/40">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2.5 rounded-xl bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400">
-                        <Save className="h-5 w-5" />
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200">Mode Exambro (Wajib Aplikasi)</h4>
-                        <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">Siswa wajib menggunakan aplikasi Exambro resmi untuk mengakses ujian.</p>
-                      </div>
-                    </div>
-                    {loading ? (
-                      <Skeleton className="h-6 w-11 rounded-full" />
-                    ) : (
-                      <label className="relative inline-flex items-center cursor-pointer group">
-                        <input 
-                          type="checkbox" 
-                          className="sr-only peer" 
-                          checked={isExambroEnabled}
-                          onChange={(e) => setIsExambroEnabled(e.target.checked)}
-                        />
-                        <div className="w-11 h-6 bg-slate-200 dark:bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-slate-600 peer-checked:bg-orange-600 shadow-inner group-hover:after:scale-110"></div>
-                      </label>
-                    )}
-                  </div>
-                </div>
-
-                <div className="pt-4 border-t border-slate-200/60 dark:border-slate-800/40">
-                  <div className="flex items-center justify-between p-4 rounded-2xl bg-slate-50/50 dark:bg-slate-900/20 border border-slate-100 dark:border-slate-800/40">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400">
-                        <CheckCircle2 className="h-5 w-5" />
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200">Full Akses Guru</h4>
-                        <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">Izinkan Guru mengelola Ruang & Menghapus Sesi untuk semua kategori ujian (Ulangan, PTS, PAS, dll).</p>
-                      </div>
-                    </div>
-                    {loading ? (
-                      <Skeleton className="h-6 w-11 rounded-full" />
-                    ) : (
-                      <label className="relative inline-flex items-center cursor-pointer group">
-                        <input 
-                          type="checkbox" 
-                          className="sr-only peer" 
-                          checked={teacherFullAccess}
-                          onChange={(e) => setTeacherFullAccess(e.target.checked)}
-                        />
-                        <div className="w-11 h-6 bg-slate-200 dark:bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-slate-600 peer-checked:bg-amber-600 shadow-inner group-hover:after:scale-110"></div>
-                      </label>
-                    )}
-                  </div>
-                </div>
-
-                <div className="pt-6 border-t border-slate-200/60 dark:border-slate-800/40">
-                   <div className="flex flex-col gap-6 bg-slate-50/50 dark:bg-slate-900/20 p-6 rounded-2xl border border-slate-100 dark:border-slate-800/40">
-                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                       <div>
-                         <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
-                           <RefreshCw className="h-4 w-4 text-blue-500 animate-spin-slow" />
-                           Konfigurasi Mesin AI
-                         </h4>
-                         <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1">
-                           Pilih antara Groq Cloud (Cepat) atau OpenClaw (Agentic/Gratis).
-                         </p>
-                       </div>
+                     <div className="sm:col-span-2 pt-1 flex justify-end">
                        <Button 
-                         onClick={handleTestAI} 
-                         disabled={isTestingAI || (aiProvider === "groq" ? !groqApiKey : !aiGatewayKey)}
-                         type="button"
+                         type="button" onClick={handleTestAI} disabled={isTestingAI || (aiProvider === "groq" ? !groqApiKey : !aiGatewayKey)}
                          variant="outline"
-                         size="sm"
-                         className="rounded-xl h-9 px-4 text-xs font-bold border-blue-100 bg-blue-50/50 text-blue-700 hover:bg-blue-100 dark:border-blue-900/30 dark:bg-blue-900/20 dark:text-blue-400 dark:hover:bg-blue-900/40 transition-all shadow-sm active:scale-95"
+                         className="h-9 px-4 rounded-xl text-xs font-bold border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800"
                        >
-                         {isTestingAI ? <RefreshCw className="h-3.5 w-3.5 animate-spin mr-2" /> : <RefreshCw className="h-3.5 w-3.5 mr-2" />}
-                         {isTestingAI ? "Mengecek..." : "Cek Koneksi AI"}
+                         {isTestingAI ? <RefreshCw size={14} className="animate-spin mr-2" /> : <RefreshCw size={14} className="mr-2" />}
+                         Pinging Server
                        </Button>
                      </div>
-
-                     <div className="flex p-1 bg-slate-200/50 dark:bg-slate-800/50 rounded-xl w-fit">
-                        <button 
-                          type="button"
-                          onClick={() => setAiProvider("groq")}
-                          className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${aiProvider === "groq" ? "bg-white dark:bg-slate-700 text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
-                        >
-                          Groq Cloud
-                        </button>
-                        <button 
-                          type="button"
-                          onClick={() => setAiProvider("ollama")}
-                          className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${aiProvider === "ollama" ? "bg-white dark:bg-slate-700 text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
-                        >
-                          Ollama Cloud
-                        </button>
-                     </div>
-                     
-                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
-                       <FormField id="groqApiKey" label="Groq API Key" error={undefined}>
-                         <div className="relative group">
-                           <Input
-                             type="password"
-                             value={groqApiKey}
-                             onChange={(e) => setGroqApiKey(e.target.value)}
-                             placeholder="gsk_xxxx..."
-                             className="rounded-xl font-mono text-xs h-11 pr-10 focus:ring-blue-500/20"
-                           />
-                           <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-blue-500">
-                             <Database className="h-4 w-4" />
-                           </div>
-                         </div>
-                       </FormField>
-
-                       <FormField id="aiGatewayKey" label="Ollama API Key" error={undefined}>
-                         <div className="relative group">
-                           <Input
-                             type="password"
-                             value={aiGatewayKey}
-                             onChange={(e) => setAiGatewayKey(e.target.value)}
-                             placeholder="oc_xxxx..."
-                             className="rounded-xl font-mono text-xs h-11 pr-10 focus:ring-blue-500/20"
-                           />
-                           <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-blue-500">
-                              <Database className="h-4 w-4" />
-                           </div>
-                         </div>
-                       </FormField>
-
-                     </div>
-                   </div>
-
-                    <FormField id="aiModel" label="Pilih Model AI" error={undefined}>
-                       <div className="space-y-3">
-                         <div className="relative">
-                           <select
-                             value={aiModel}
-                             onChange={(e) => setAiModel(e.target.value)}
-                             className="w-full h-11 px-3 rounded-xl text-xs font-bold bg-white dark:bg-slate-950 border border-slate-200/60 dark:border-slate-800 focus:ring-2 focus:ring-blue-500/20 outline-none appearance-none cursor-pointer"
-                           >
-                             <optgroup label={aiProvider === "groq" ? "🚀 Meta & Qwen (Groq)" : "☁️ Ollama Cloud Models"}>
-                               {AI_MODELS.filter(m => (m as any).provider === aiProvider && m.status?.toLowerCase() === 'production').map((m) => (
-                                 <option key={m.id} value={m.id}>{m.name} ({m.speed})</option>
-                               ))}
-                             </optgroup>
-                             {AI_MODELS.some(m => (m as any).provider === aiProvider && m.status?.toLowerCase() === 'preview') && (
-                               <optgroup label="🧪 Preview (Eksperimental)">
-                                 {AI_MODELS.filter(m => (m as any).provider === aiProvider && m.status?.toLowerCase() === 'preview').map((m) => (
-                                   <option key={m.id} value={m.id}>{m.name} ({m.speed})</option>
-                                 ))}
-                               </optgroup>
-                             )}
-                           </select>
-                           <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
-                              <RefreshCw className="h-3.5 w-3.5" />
-                           </div>
-                         </div>
-
-                         <div className="space-y-2">
-                           {AI_MODELS.find(m => m.id === aiModel) && (
-                             <div className={`flex items-start gap-3 p-3 rounded-xl border backdrop-blur-sm transition-all duration-300 ${
-                               AI_MODELS.find(m => m.id === aiModel)?.status?.toLowerCase() === 'production' 
-                                 ? 'bg-emerald-50/40 border-emerald-100 text-emerald-800 dark:bg-emerald-500/5 dark:border-emerald-500/20 dark:text-emerald-400' 
-                                 : 'bg-amber-50/40 border-amber-100 text-amber-800 dark:bg-amber-500/5 dark:border-amber-500/20 dark:text-amber-400'
-                             }`}>
-                               <div className={`p-1.5 rounded-lg ${
-                                 AI_MODELS.find(m => m.id === aiModel)?.status?.toLowerCase() === 'production' 
-                                   ? 'bg-emerald-100 dark:bg-emerald-500/20' 
-                                   : 'bg-amber-100 dark:bg-amber-500/20'
-                               }`}>
-                                 {AI_MODELS.find(m => m.id === aiModel)?.status?.toLowerCase() === 'production' ? (
-                                   <CheckCircle2 className="h-3.5 w-3.5" />
-                                 ) : (
-                                   <AlertTriangle className="h-3.5 w-3.5" />
-                                 )}
-                               </div>
-                               <div className="flex flex-col gap-0.5">
-                                 <span className="text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
-                                   {AI_MODELS.find(m => m.id === aiModel)?.status?.toLowerCase() === 'production' ? 'Status: Stabil' : 'Status: Eksperimental'}
-                                   <span className="h-1 w-1 rounded-full bg-current animate-pulse" />
-                                 </span>
-                                 <span className="text-[9px] font-medium opacity-80 leading-relaxed">
-                                   {AI_MODELS.find(m => m.id === aiModel)?.status?.toLowerCase() === 'production' 
-                                     ? 'Performa optimal untuk ujian massal dan hasil yang konsisten.' 
-                                     : 'Tinjauan awal: Mungkin terjadi gangguan sesaat pada jam sibuk.'}
-                                 </span>
-                               </div>
-                             </div>
-                           )}
-
-                           {testResult && (
-                              <div className={`p-3 rounded-xl border animate-in zoom-in-95 duration-300 ${
-                                testResult.success 
-                                 ? "bg-blue-50/40 border-blue-100 text-blue-800 dark:bg-blue-500/5 dark:border-blue-500/20 dark:text-blue-400" 
-                                 : "bg-rose-50/40 border-rose-100 text-rose-800 dark:bg-rose-500/5 dark:border-rose-500/20 dark:text-rose-400"
-                              }`}>
-                                <div className="flex items-center gap-3">
-                                  {testResult.success ? (
-                                    <div className="h-5 w-5 rounded-full bg-blue-100 dark:bg-blue-500/20 flex items-center justify-center shrink-0">
-                                       <CheckCircle2 className="h-3 w-3" />
-                                    </div>
-                                  ) : (
-                                    <div className="h-5 w-5 rounded-full bg-rose-100 dark:bg-rose-500/20 flex items-center justify-center shrink-0">
-                                       <AlertTriangle className="h-3 w-3" />
-                                    </div>
-                                  )}
-                                  <span className="text-[10px] font-bold leading-tight">{testResult.message}</span>
-                                </div>
-                              </div>
-                           )}
-                         </div>
-                       </div>
-                    </FormField>
-                   </div>
-                </form>
+                  </div>
+                  
+                  {/* Test Results Message */}
+                  {testResult && (
+                    <div className={cn("mt-4 p-3 rounded-xl border text-xs font-bold flex items-center gap-2", testResult.success ? "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800" : "bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 border-red-200 dark:border-red-800")}>
+                      {testResult.success ? <CheckCircle2 size={16} /> : <AlertTriangle size={16} />}
+                      {testResult.message}
+                    </div>
+                  )}
+                </div>
+              </form>
             </CardContent>
           </Card>
 
-          <Card className="rounded-2xl border border-slate-200/60 dark:border-slate-800/40 shadow-sm backdrop-blur-sm">
-            <CardHeader className="border-b border-slate-200/60 dark:border-slate-800/40 pb-4">
-              <CardTitle className="text-base font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
-                 <RefreshCw className="h-4 w-4 text-slate-400" /> Manajemen Tipe Soal
+          <Card className="rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900 overflow-hidden">
+            <CardHeader className="p-5 border-b border-slate-100 dark:border-slate-800">
+              <CardTitle className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 flex items-center gap-2">
+                 <LayoutTemplate size={14} /> Kustomisasi Soal
               </CardTitle>
             </CardHeader>
-            <CardContent className="p-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {questionTypes.map((type) => (
-                      <div key={type.id} className="flex items-center justify-between p-3 rounded-xl border border-slate-100 dark:border-slate-800/60 bg-slate-50/50 dark:bg-slate-900/30">
-                          <div className="flex flex-col">
-                              <span className="text-xs font-bold text-slate-700 dark:text-slate-200">{type.label}</span>
-                              <span className="text-[10px] text-slate-400">{loading ? <Skeleton className="h-3 w-12" /> : (allowedTypes[type.id] ? "Aktif" : "Dinonaktifkan")}</span>
-                          </div>
-                          {loading ? (
-                            <Skeleton className="h-6 w-11 rounded-full" />
-                          ) : (
-                            <label className="relative inline-flex items-center cursor-pointer group">
-                                <input 
-                                    type="checkbox" 
-                                    className="sr-only peer" 
-                                    checked={allowedTypes[type.id] || false}
-                                    onChange={(e) => setAllowedTypes(prev => ({ ...prev, [type.id]: e.target.checked }))}
-                                />
-                                <div className="w-11 h-6 bg-slate-200 dark:bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-slate-600 peer-checked:bg-blue-600 shadow-inner group-hover:after:scale-110"></div>
-                            </label>
-                          )}
-                      </div>
-                  ))}
+            <CardContent className="p-5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                {questionTypes.map((type) => (
+                  <div key={type.id} className="flex items-center justify-between p-3 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                      <span className="text-xs font-bold text-slate-700 dark:text-slate-300">{type.label}</span>
+                      {loading ? (
+                        <Skeleton className="h-5 w-9 rounded-full" />
+                      ) : (
+                        <label className="relative inline-flex items-center cursor-pointer">
+                            <input 
+                                type="checkbox" className="sr-only peer" 
+                                checked={allowedTypes[type.id] || false}
+                                onChange={(e) => setAllowedTypes(prev => ({ ...prev, [type.id]: e.target.checked }))}
+                            />
+                            <div className="w-9 h-5 bg-slate-200 dark:bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                        </label>
+                      )}
+                  </div>
+                ))}
               </div>
             </CardContent>
           </Card>
         </div>
 
+        {/* ── Right Column: Danger Zone & Theme ── */}
         <div className="space-y-6">
-          <Card className="rounded-2xl border border-slate-200/60 dark:border-slate-800/40 shadow-sm bg-gradient-to-br from-indigo-500 to-blue-700 dark:from-indigo-900 dark:to-slate-950 text-white overflow-hidden relative">
-            <div className="absolute top-0 right-0 p-4 opacity-10">
+          <Card className="rounded-2xl border border-slate-200 dark:border-indigo-500/20 shadow-sm bg-gradient-to-br from-indigo-600 to-blue-700 dark:from-indigo-950/80 dark:to-slate-900 text-white overflow-hidden relative">
+            <div className="absolute top-0 right-0 p-4 opacity-10 dark:opacity-5">
                <Database size={80} />
             </div>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base font-bold flex items-center gap-2">
-                 <Database className="h-5 w-5" /> Backup & Restore
+            <CardHeader className="p-5 pb-2 relative z-10">
+              <CardTitle className="text-sm font-bold flex items-center gap-2 text-indigo-50 dark:text-indigo-200">
+                 <Database size={16} /> Manajemen Database
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <p className="text-xs opacity-90 leading-relaxed">
-                Ekspor seluruh data aplikasi (Soal, Siswa, Hasil Ujian, dll) ke dalam file JSON untuk cadangan atau pindah server.
+            <CardContent className="p-5 relative z-10 space-y-4">
+              <p className="text-[11px] font-medium text-indigo-100 dark:text-slate-300 leading-relaxed bg-white/10 dark:bg-slate-800/80 p-3 rounded-xl border border-transparent dark:border-slate-700/50">
+                Amankan data di akhir semester dengan melakukan pencadangan JSON dan hapus riwayat secara total untuk meringankan performa.
               </p>
               
-              <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-2.5">
                 {loading ? (
                   <>
-                    <Skeleton className="h-11 w-full rounded-xl" />
-                    <Skeleton className="h-11 w-full rounded-xl" />
+                    <Skeleton className="h-10 w-full rounded-xl bg-white/20 dark:bg-slate-800" />
+                    <Skeleton className="h-10 w-full rounded-xl bg-white/20 dark:bg-slate-800" />
                   </>
                 ) : (
                   <>
                     <Button 
-                      onClick={handleExportDB} 
-                      disabled={isBackupLoading}
-                      className="w-full bg-white/20 hover:bg-white/30 border border-white/30 text-white font-bold rounded-xl h-11 flex items-center justify-center gap-2 transition-all active:scale-95"
+                      onClick={handleExportDB} disabled={isBackupLoading}
+                      className="w-full bg-white/10 hover:bg-white/20 dark:bg-indigo-500/20 dark:hover:bg-indigo-500/40 dark:text-indigo-300 text-white font-bold text-xs h-10 rounded-xl transition-all"
                     >
-                      {isBackupLoading ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-                      Ekspor Database (.json)
+                      {isBackupLoading ? <RefreshCw size={14} className="animate-spin mr-2" /> : <Download size={14} className="mr-2" />}
+                      Eksport File Backup (.json)
                     </Button>
-
                     <Button 
-                      onClick={() => fileInputRef.current?.click()} 
-                      disabled={isBackupLoading}
-                      className="w-full bg-white text-blue-700 hover:bg-slate-50 font-bold rounded-xl h-11 flex items-center justify-center gap-2 transition-all active:scale-95 shadow-lg"
+                      onClick={() => fileInputRef.current?.click()} disabled={isBackupLoading}
+                      className="w-full bg-white text-indigo-600 hover:bg-slate-50 dark:bg-slate-800 dark:text-blue-400 dark:hover:bg-slate-700 dark:hover:text-blue-300 dark:border dark:border-slate-700 font-bold text-xs h-10 rounded-xl shadow-lg dark:shadow-none transition-all"
                     >
-                      <Upload className="h-4 w-4" />
-                      Impor Database
+                      <Upload size={14} className="mr-2" /> Restore Database
                     </Button>
+                    <input type="file" ref={fileInputRef} onChange={handleImportDB} accept=".json" className="hidden" />
                   </>
                 )}
-                <input 
-                  type="file" 
-                  ref={fileInputRef} 
-                  onChange={handleImportDB} 
-                  accept=".json" 
-                  className="hidden" 
-                />
               </div>
 
-              <div className="pt-4 mt-2 border-t border-white/20">
-                {loading ? (
-                  <Skeleton className="h-10 w-full rounded-xl" />
-                ) : (
-                  <button
-                    disabled={isBackupLoading}
-                    onClick={() => setIsResetConfirmOpen(true)}
-                    className="w-full py-2.5 rounded-xl text-xs font-bold bg-white/10 hover:bg-rose-500 border border-white/20 hover:border-rose-400 text-white shadow-sm transition-all"
-                  >
-                    Hapus Semua Data
-                  </button>
-                )}
+              <div className="pt-4 border-t border-white/20 mt-2">
+                <button
+                  disabled={isBackupLoading} onClick={() => setIsResetConfirmOpen(true)}
+                  className="w-full py-2.5 rounded-xl text-[11px] font-black uppercase tracking-widest bg-rose-500 hover:bg-rose-600 text-white shadow-sm transition-all text-center border-b-4 border-rose-700 active:border-b-0 active:translate-y-1"
+                >
+                  Hapus Seluruh Data
+                </button>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="rounded-2xl border border-slate-200/60 dark:border-slate-800/40 shadow-sm backdrop-blur-sm">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                <ImageIcon className="h-3 w-3" /> Tampilan & Tema
+          <Card className="rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900">
+            <CardHeader className="p-5 pb-3">
+              <CardTitle className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 flex items-center gap-2">
+                <ImageIcon size={14} /> Preferensi Visual
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between p-3 rounded-xl border border-slate-100 dark:border-slate-800/60 bg-slate-50/50 dark:bg-slate-900/30">
-                <div className="flex flex-col">
-                  <span className="text-xs font-bold text-slate-700 dark:text-slate-200">Mode Gelap (Dark Mode)</span>
-                  <span className="text-[10px] text-slate-400">Aktifkan tema gelap sistem</span>
+            <CardContent className="p-5 pt-0">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-sm font-bold text-slate-800 dark:text-slate-200 block">Mode Gelap</span>
+                  <span className="text-[10px] font-medium text-slate-400">Sinkron dengan sistem Anda</span>
                 </div>
                 <ThemeToggle />
               </div>
-              <p className="text-[10px] text-slate-400 dark:text-slate-500 leading-relaxed px-1">
-                Pengaturan tema bersifat personal dan tersimpan secara lokal pada browser Anda.
-              </p>
             </CardContent>
           </Card>
+          
+          {/* ── Active AI Status Card ── */}
+          {!loading && (
+            <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 overflow-hidden shadow-sm">
+              <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-800 flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">AI Aktif Sekarang</span>
+              </div>
+              <div className="p-4 space-y-3">
+                {/* Provider */}
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Provider</span>
+                  <span className={cn(
+                    "text-[10px] font-black px-2.5 py-1 rounded-full",
+                    aiProvider === "groq" ? "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400" :
+                    aiProvider === "cloudflare" ? "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400" :
+                    aiProvider === "google" ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" :
+                    aiProvider === "openrouter" ? "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400" :
+                    aiProvider === "ollama" ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" :
+                    "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                  )}>
+                    {{
+                      groq: "⚡ Groq Cloud",
+                      cloudflare: "☁️ Cloudflare AI",
+                      google: "🔵 Google Gemini",
+                      openrouter: "🔀 OpenRouter",
+                      together: "🤝 Together AI",
+                      huggingface: "🤗 Hugging Face",
+                      fireworks: "🎆 Fireworks AI",
+                      github: "🐙 GitHub Models",
+                      ollama: "🦙 Ollama (Local)",
+                      custom: "⚙️ Custom Endpoint",
+                    }[aiProvider] || aiProvider}
+                  </span>
+                </div>
 
-          <Card className="rounded-2xl border border-slate-200/60 dark:border-slate-800/40 shadow-sm backdrop-blur-sm">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                <AlertTriangle className="h-3 w-3" /> Info Penting
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ul className="text-[10px] text-slate-500 space-y-2 list-disc pl-4">
-                 <li>Impor data akan <b>menimpa</b> data dengan ID yang sama.</li>
-                 <li>Pastikan file backup bersumber dari aplikasi E-Ujian yang sama.</li>
-                 <li>Proses impor mungkin memakan waktu beberapa menit jika data sangat besar.</li>
-              </ul>
-            </CardContent>
-          </Card>
+                {/* Model */}
+                <div className="flex items-start justify-between gap-2">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider shrink-0 mt-0.5">Model</span>
+                  <span className="text-[10px] font-bold text-slate-700 dark:text-slate-300 text-right font-mono break-all leading-tight">{
+                    aiModel
+                      ? (AI_MODELS.find(m => m.id === aiModel)?.name || aiModel)
+                      : <span className="text-slate-400 italic">Belum dipilih</span>
+                  }</span>
+                </div>
+
+                {/* Mode */}
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Mode</span>
+                  {aiProvider === "groq" ? (
+                    <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 flex items-center gap-1">
+                      <Zap size={9} /> Direct API
+                    </span>
+                  ) : (
+                    <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400 flex items-center gap-1">
+                      🔒 Via Proxy
+                    </span>
+                  )}
+                </div>
+
+                {/* Speed badge if model found */}
+                {AI_MODELS.find(m => m.id === aiModel)?.speed && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Kecepatan</span>
+                    <span className="text-[10px] font-bold text-slate-600 dark:text-slate-400">
+                      {AI_MODELS.find(m => m.id === aiModel)?.speed}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Info Card */}
+          <div className="p-4 rounded-2xl bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 flex gap-3 text-blue-800 dark:text-blue-300">
+             <HelpCircle size={16} className="shrink-0 mt-0.5 opacity-70" />
+             <p className="text-[11px] font-medium leading-relaxed">
+               Gunakan tab 'Panduan' untuk dokumentasi penggunaan lengkap. Segala modifikasi pada panel ini langsung berdampak seluas aplikasi institusi Anda.
+             </p>
+          </div>
         </div>
       </div>
 
+      {/* ── Dialog Modals ── */}
       <Dialog open={isPickerOpen} onOpenChange={setIsPickerOpen}>
-        <DialogContent className="max-w-sm bg-card p-4">
-          <DialogHeader>
-            <DialogTitle className="text-sm font-bold">Pilih Sumber Gambar</DialogTitle>
-          </DialogHeader>
-          <div className="flex flex-col gap-2 pt-2">
+        <DialogContent className="max-w-sm rounded-[2rem] p-5 border border-slate-200 dark:border-slate-800 shadow-xl bg-white dark:bg-slate-900">
+          <DialogTitle className="text-lg font-bold text-center mb-4">Pilih Sumber Logo</DialogTitle>
+          <DialogDescription className="sr-only">Choose logo source</DialogDescription>
+          <div className="grid grid-cols-2 gap-3">
             <button
-              type="button"
-              className="flex items-center gap-2.5 justify-start p-3 w-full rounded-xl bg-slate-50/80 hover:bg-slate-100 dark:bg-slate-900/50 dark:hover:bg-slate-800 border border-slate-200/80 dark:border-slate-800 transition-all text-slate-700 dark:text-slate-200"
-              onClick={() => { setIsPickerOpen(false); document.getElementById("logoInput")?.click(); }}
+              type="button" onClick={() => { setIsPickerOpen(false); document.getElementById("logoInput")?.click(); }}
+              className="flex flex-col items-center justify-center p-6 bg-slate-50 dark:bg-slate-800 rounded-2xl hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300"
             >
-              <div className="p-2 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-800/40 text-indigo-600 dark:text-indigo-400">
-                <ImageIcon className="h-4 w-4" />
-              </div>
-              <div className="flex flex-col items-start">
-                  <span className="font-semibold text-xs text-left">Unggah Gambar Baru</span>
-                  <span className="text-[10px] text-slate-400">Menuju Cloudflare R2</span>
-              </div>
+              <Upload size={24} className="mb-3 text-indigo-500" />
+              <span className="text-xs font-bold text-center">Buka Browser<br/>File Sistem</span>
             </button>
             <button
-              type="button"
-              className="flex items-center gap-2.5 justify-start p-3 w-full rounded-xl bg-slate-50/80 hover:bg-slate-100 dark:bg-slate-900/50 dark:hover:bg-slate-800 border border-slate-200/80 dark:border-slate-800 transition-all text-slate-700 dark:text-slate-200"
-              onClick={() => { setIsPickerOpen(false); setIsGalleryOpen(true); loadGalleryImages(); }}
+              type="button" onClick={() => { setIsPickerOpen(false); setIsGalleryOpen(true); loadGalleryImages(); }}
+              className="flex flex-col items-center justify-center p-6 bg-slate-50 dark:bg-slate-800 rounded-2xl hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300"
             >
-              <div className="p-2 rounded-lg bg-blue-50 dark:bg-blue-950/40 border border-blue-100 dark:border-blue-800/40 text-blue-600 dark:text-blue-400">
-                <FolderOpen className="h-4 w-4" />
-              </div>
-              <div className="flex flex-col items-start">
-                  <span className="font-semibold text-xs text-left">Ambil Dari Galeri</span>
-                  <span className="text-[10px] text-slate-400">Gunakan yang sudah di-upload</span>
-              </div>
+              <FolderOpen size={24} className="mb-3 text-blue-500" />
+              <span className="text-xs font-bold text-center">Cloud Galeri<br/>E-Ujian</span>
             </button>
           </div>
         </DialogContent>
       </Dialog>
 
       <Dialog open={isGalleryOpen} onOpenChange={setIsGalleryOpen}>
-        <DialogContent className="max-w-2xl bg-card max-h-[80vh] overflow-y-auto">
-          <DialogHeader className="border-b pb-3">
-            <DialogTitle className="text-base font-bold flex items-center gap-2">
-              <FolderOpen className="h-4 w-4 text-blue-500" /> Galeri Media
+        <DialogContent className="max-w-3xl rounded-3xl p-0 border border-slate-200 dark:border-slate-800 shadow-xl bg-white dark:bg-slate-900 overflow-hidden flex flex-col">
+          <div className="p-6 border-b border-slate-100 dark:border-slate-800">
+            <DialogTitle className="text-sm font-bold flex items-center gap-2">
+              <FolderOpen size={16} className="text-blue-500" /> Galeri Gambar Server
             </DialogTitle>
-          </DialogHeader>
-          <div className="py-4 text-left">
-            {!galleryImages.length ? (
-              <div className="text-center py-8 text-slate-400 text-sm italic underline">Belum ada gambar yang ditemukan.</div>
+            <DialogDescription className="text-[10px] sm:text-xs text-slate-500 mt-1 font-medium">Gambar dari koleksi soal-soal di server Anda.</DialogDescription>
+          </div>
+          <div className="p-6 bg-slate-50/50 dark:bg-slate-950/40 max-h-[60vh] overflow-y-auto custom-scrollbar space-y-8">
+            {galleryGroups.length === 0 ? (
+              <div className="text-center py-10 font-bold text-slate-400 text-xs">Belum ada media gambar tersimpan di server.</div>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {galleryImages.map((src, idx) => (
-                  <div 
-                    key={idx} 
-                    className="group relative cursor-pointer aspect-square rounded-xl border border-slate-200/60 dark:border-slate-800/80 bg-slate-100 dark:bg-slate-900 overflow-hidden hover:shadow-md transition-all flex items-center justify-center p-2"
-                    onClick={() => handlePickGallery(src)}
-                  >
-                    <img src={src} alt="Gallery item" className="max-h-full max-w-full object-contain" />
-                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all">
-                      <span className="text-white text-xs font-semibold bg-blue-600 px-2 py-1 rounded-md">Gunakan</span>
-                    </div>
+              galleryGroups.map((group, gIdx) => (
+                <div key={gIdx} className="space-y-4">
+                  <h3 className="text-[10px] sm:text-xs font-black uppercase tracking-widest text-indigo-500 pl-2 border-l-2 border-indigo-500 flex items-center gap-2">
+                    {group.title} <span className="text-slate-400 font-medium">({group.images.length})</span>
+                  </h3>
+                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
+                    {group.images.map((src, idx) => (
+                      <div key={idx} className="aspect-square bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden cursor-pointer group relative shadow-sm" onClick={() => handlePickGallery(src)}>
+                        <img src={src} className="w-full h-full object-contain p-2" alt="Media" />
+                        <div className="absolute inset-0 bg-blue-600/90 items-center justify-center hidden group-hover:flex transition-all">
+                          <span className="text-white text-[10px] font-black tracking-widest uppercase">Pilih</span>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
+                </div>
+              ))
             )}
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* 🛡️ Import Confirmation Dialog */}
-      <Dialog open={isImportConfirmOpen} onOpenChange={(val) => {
-        console.log("Import Dialog Triggered, state:", val);
-        if (!isBackupLoading) setIsImportConfirmOpen(val);
-      }}>
-        <DialogContent className="z-[100] max-w-md rounded-[2rem] p-6 text-center border border-slate-200 dark:border-slate-800 shadow-2xl bg-white dark:bg-slate-900">
+      <Dialog open={isImportConfirmOpen} onOpenChange={(val) => { if (!isBackupLoading) setIsImportConfirmOpen(val); }}>
+        <DialogContent className="z-[100] max-w-sm rounded-[2rem] p-6 text-center border-0 shadow-2xl bg-white dark:bg-slate-900">
           <DialogDescription className="sr-only">Konfirmasi pemulihan database dari file JSON.</DialogDescription>
           <div className="flex flex-col items-center gap-4">
             {isBackupLoading ? (
-              <div className="relative h-24 w-24 flex items-center justify-center">
-                <div className="absolute inset-0 border-4 border-blue-100 rounded-full"></div>
-                <div 
-                  className="absolute inset-0 border-4 border-blue-600 rounded-full border-t-transparent animate-spin"
-                  style={{ clipPath: 'polygon(0 0, 100% 0, 100% 100%, 0 100%)' }}
-                ></div>
-                <span className="text-lg font-black text-blue-600">{importProgress}%</span>
-              </div>
+              <div className="h-16 w-16 mb-2 rounded-full border-[3px] border-blue-100 dark:border-blue-900 border-t-blue-600 animate-spin" />
             ) : (
-              <FileJson className="w-16 h-16 text-blue-600 mb-2" />
+              <div className="w-16 h-16 rounded-full bg-blue-50 dark:bg-blue-900/20 text-blue-600 flex items-center justify-center mb-2">
+                <FileJson size={32} />
+              </div>
             )}
-            
-            <DialogTitle className="text-xl font-black text-slate-800 dark:text-white uppercase tracking-tight">
-              {isBackupLoading ? "Sedang Memulihkan..." : "Konfirmasi Impor"}
+            <DialogTitle className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight">
+              {isBackupLoading ? "Memulihkan..." : "Impor Backup"}
             </DialogTitle>
             
             {!isBackupLoading ? (
               <>
-                <p className="text-slate-500 dark:text-slate-400 text-xs font-medium leading-relaxed">
-                  Apakah Anda yakin ingin memulihkan database dari file <span className="font-bold text-slate-800 dark:text-slate-200">{importFile?.name}</span>?
-                  Data lama dengan ID yang sama akan ditimpa.
-                </p>
-                <div className="bg-amber-50 dark:bg-amber-950/20 p-3 rounded-2xl border border-amber-100 dark:border-amber-900/30 flex items-start gap-2 text-left">
-                  <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
-                  <p className="text-[10px] text-amber-700 dark:text-amber-400 font-bold leading-tight">Proses ini tidak dapat dibatalkan. Disarankan untuk melakukan Ekspor Backup data saat ini terlebih dahulu.</p>
+                <p className="text-xs text-slate-500 font-medium">Lanjutkan pemulihan dari file <b>{importFile?.name}</b>?</p>
+                <div className="bg-amber-50 dark:bg-amber-900/20 p-3 rounded-xl border border-amber-100 dark:border-amber-800 w-full text-left flex gap-2">
+                  <AlertTriangle size={14} className="text-amber-600 shrink-0 mt-0.5" />
+                  <p className="text-[10px] text-amber-700 dark:text-amber-400 font-bold leading-tight">Data dengan ID serupa akan langsung ditimpa permanen.</p>
                 </div>
-                <div className="grid grid-cols-2 gap-3 w-full mt-4">
-                  <Button variant="outline" onClick={() => { setIsImportConfirmOpen(false); setImportFile(null); }} className="rounded-xl h-11 font-bold text-xs">Batal</Button>
-                  <Button onClick={executeImport} className="bg-blue-600 text-white rounded-xl h-11 font-bold text-xs shadow-lg shadow-blue-200">Lanjutkan</Button>
+                <div className="grid grid-cols-2 gap-3 w-full mt-2">
+                  <Button variant="outline" onClick={() => { setIsImportConfirmOpen(false); setImportFile(null); }} className="rounded-xl h-10 text-xs font-bold">Batal</Button>
+                  <Button onClick={executeImport} className="bg-blue-600 text-white rounded-xl h-10 text-xs font-bold shadow-md">Lanjutkan</Button>
                 </div>
               </>
             ) : (
-              <div className="w-full space-y-2 mt-4">
-                <div className="h-2 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+              <div className="w-full pt-2">
+                <div className="h-2 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden mb-2">
                    <div className="h-full bg-blue-600 transition-all duration-300" style={{ width: `${importProgress}%` }}></div>
                 </div>
-                <p className="text-[10px] font-bold text-blue-600 animate-pulse">{importStatus}</p>
+                <p className="text-[10px] font-bold text-slate-500">{importProgress}% • {importStatus}</p>
               </div>
             )}
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* ⚠️ Reset Database Confirmation Dialog */}
-      <Dialog open={isResetConfirmOpen} onOpenChange={(val) => {
-        console.log("Reset Dialog Triggered, state:", val);
-        if (!isBackupLoading) setIsResetConfirmOpen(val);
-      }}>
-        <DialogContent className="z-[100] max-w-md rounded-[2rem] p-6 text-center border border-slate-200 dark:border-slate-800 shadow-2xl bg-white dark:bg-slate-900 pointer-events-auto">
+      <Dialog open={isResetConfirmOpen} onOpenChange={(val) => { if (!isBackupLoading) setIsResetConfirmOpen(val); }}>
+        <DialogContent className="z-[100] max-w-sm rounded-[2rem] p-6 text-center border-0 shadow-2xl bg-white dark:bg-slate-900">
           <DialogDescription className="sr-only">Tindakan berbahaya untuk menghapus seluruh data database.</DialogDescription>
-          {/* Animated Background Pulse */}
-          <div className="absolute -top-24 -left-24 w-48 h-48 bg-rose-500/10 rounded-full animate-ping opacity-20"></div>
+          <div className="absolute top-0 right-0 w-32 h-32 bg-red-500/10 rounded-full blur-2xl -mr-10 -mt-10 pointer-events-none" />
           
           <div className="flex flex-col items-center gap-4 relative z-10">
-            <div className="w-20 h-20 rounded-full bg-rose-50 dark:bg-rose-950/20 flex items-center justify-center mb-2 animate-bounce-slow">
-               <AlertTriangle className="w-10 h-10 text-rose-500" />
+            <div className="w-16 h-16 rounded-full bg-red-50 dark:bg-red-900/20 text-red-600 flex items-center justify-center mb-2 animate-bounce-slow">
+               <AlertTriangle size={32} />
             </div>
-
-            <DialogTitle className="text-xl font-bold text-slate-800 dark:text-white">
-              Bahaya: Reset Database
-            </DialogTitle>
+            <DialogTitle className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight">Format Sistem</DialogTitle>
             
-            <div className="space-y-4">
-              <p className="text-slate-500 dark:text-slate-400 text-[11px] font-bold leading-relaxed px-4">
-                Tindakan ini akan <span className="text-rose-600 underline">MENGHAPUS PERMANEN</span> seluruh data:
-                <br/>
-                <span className="text-[9px] text-slate-400 font-normal">
-                  Siswa, Bank Soal, Pertanyaan, Ruang Ujian, Riwayat Jawaban, Kelas, dan Mata Pelajaran.
-                </span>
-                <br/><br/>
-                Hanya akun <span className="text-slate-800 dark:text-slate-200">Admin</span> Anda yang akan dipertahankan.
-              </p>
-
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold text-slate-400 text-center block italic">Ketik "RESET" untuk konfirmasi</label>
-                <Input 
-                   value={resetInput}
-                   onChange={(e) => setResetInput(e.target.value.toUpperCase())}
-                   placeholder="Ketik 'RESET' di sini..."
-                   className="text-center font-bold text-rose-600 rounded-xl border-rose-100 dark:border-rose-900/30 focus:border-rose-500 focus:ring-rose-500"
-                />
+            {isBackupLoading ? (
+              <div className="w-full pt-2">
+                <div className="h-2 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden mb-2">
+                   <div className="h-full bg-red-600 transition-all duration-300" style={{ width: `${importProgress}%` }}></div>
+                </div>
+                <p className="text-[10px] font-bold text-red-500">{importProgress}% • {importStatus}</p>
               </div>
-
-              <div className="grid grid-cols-2 gap-3 w-full">
-                <Button variant="outline" onClick={() => { setIsResetConfirmOpen(false); setResetInput(""); }} className="rounded-xl h-11 font-bold text-xs">Batalkan</Button>
-                <Button 
-                   onClick={handleResetDB} 
-                   disabled={resetInput !== "RESET" || isBackupLoading}
-                   className="bg-rose-600 hover:bg-rose-700 text-white rounded-xl h-11 font-bold text-xs shadow-lg shadow-rose-200 disabled:opacity-30 disabled:grayscale"
-                >
-                  Ya, Hapus Semua
-                </Button>
-              </div>
-            </div>
+            ) : (
+              <>
+                <p className="text-[11px] text-slate-600 dark:text-slate-400 font-medium">Tindakan fatal: <b>Seluruh records</b> (siswa, ujian, nilai) akan dihapus, menyisakan akun login Anda.</p>
+                <div className="w-full text-left mt-2">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest pl-1 mb-1 block">Ketik "RESET" di bawah</label>
+                  <Input 
+                     value={resetInput} onChange={(e) => setResetInput(e.target.value.toUpperCase())}
+                     className="text-center font-bold text-red-600 h-11 rounded-xl bg-slate-50 dark:bg-slate-950 border-red-200 dark:border-red-900 focus:border-red-500 focus:ring-red-500"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3 w-full mt-2">
+                  <Button variant="outline" onClick={() => { setIsResetConfirmOpen(false); setResetInput(""); }} className="rounded-xl h-11 text-xs font-bold">Urungkan</Button>
+                  <Button onClick={handleResetDB} disabled={resetInput !== "RESET"} className="bg-red-600 hover:bg-red-700 text-white rounded-xl h-11 text-xs font-bold shadow-md">Hapus</Button>
+                </div>
+              </>
+            )}
           </div>
         </DialogContent>
       </Dialog>
-
-      <input
-        type="file"
-        id="logoInput"
-        accept="image/*"
-        className="hidden"
-        onChange={handleLogoChange}
-      />
     </div>
   );
 };

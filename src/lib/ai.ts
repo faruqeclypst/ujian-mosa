@@ -25,6 +25,26 @@ const robustJSONParse = (text: string): any => {
     clean = clean.substring(firstBrace, lastBrace + 1);
   }
 
+  // 1.5. Amankan perintah LaTeX yang bertabrakan dengan JSON control characters (r, n, t, f, b, u)
+  // Misalnya \rightarrow dianggap sebagai Carriage Return (\r) + ightarrow
+  const latexProblemCommands = [
+    // r
+    'rightarrow', 'Rightarrow', 'rho', 'right', 'rangle', 'rm', 
+    // t
+    'text', 'tan', 'theta', 'times', 'tau', 'triangle', 'to', 'top', 
+    // n
+    'neq', 'nu', 'nabla', 'nleq', 'ngeq', 'notin', 'ni', 
+    // f
+    'frac', 'forall', 
+    // b
+    'beta', 'bar', 'bf', 'bigcup', 'bigcap', 'bot', 'bullet', 'bmod', 'bra', 'bigcirc',
+    // u
+    'uparrow', 'Uparrow', 'updownarrow', 'Updownarrow', 'underbar', 'underbrace', 'uplus'
+  ];
+  
+  const latexRegex = new RegExp(`(?<!\\\\)\\\\(${latexProblemCommands.join('|')})`, 'g');
+  clean = clean.replace(latexRegex, "\\\\$1");
+
   try {
     // Jalur cepat: Jika AI memberikan JSON murni (seperti Groq json_object)
     return JSON.parse(clean);
@@ -54,15 +74,17 @@ const robustJSONParse = (text: string): any => {
 };
 
 export const AI_MODELS = [
-  // --- GROQ CLOUD (Official Production Models) ---
-  { id: "llama-3.3-70b-versatile", name: "Llama 3.3 70B (Versatile Expert)", speed: "High Performance", status: "production", provider: "groq" },
-  { id: "mixtral-8x7b-32768", name: "Mixtral 8x7B (Large Context)", speed: "Fast", status: "production", provider: "groq" },
-  { id: "llama-3.1-8b-instant", name: "Llama 3.1 8B (Instant)", speed: "Blink Speed", status: "production", provider: "groq" },
-  { id: "gemma2-9b-it", name: "Google Gemma 2 9B", speed: "Smart", status: "production", provider: "groq" },
-  
-  // --- GROQ CLOUD (Preview Models) ---
+  // --- GROQ CLOUD (High Speed) ---
+  { id: "llama-3.3-70b-versatile", name: "Llama 3.3 70B (Greatest)", speed: "High Performance", status: "production", provider: "groq" },
+  { id: "deepseek-r1-distill-llama-70b", name: "DeepSeek R1 Llama 70B (Reasoning)", speed: "Powerful", status: "production", provider: "groq" },
+  { id: "mixtral-8x7b-32768", name: "Mixtral 8x7B (Balanced)", speed: "Fast", status: "production", provider: "groq" },
+  { id: "mixtral-8x7b-32768", name: "Mixtral 8x7B", speed: "Fast", status: "production", provider: "groq" },
+  { id: "llama-3.1-70b-versatile", name: "Llama 3.1 70B", speed: "Balanced", status: "production", provider: "groq" },
+  { id: "gemma2-9b-it", name: "Gemma 2 9B", speed: "Fast", status: "production", provider: "groq" },
   { id: "llama-3.2-1b-preview", name: "Llama 3.2 1B (Micro Fast)", speed: "Hyper Fast", status: "preview", provider: "groq" },
   { id: "llama-3.2-3b-preview", name: "Llama 3.2 3B (Compact)", speed: "Efficient", status: "preview", provider: "groq" },
+  { id: "llama-3.2-11b-vision-preview", name: "Llama 3.2 11B (Vision)", speed: "Fast", status: "preview", provider: "groq" },
+  { id: "llama-3.2-90b-vision-preview", name: "Llama 3.2 90B (Vision)", speed: "Powerful", status: "preview", provider: "groq" },
 
   // --- OLLAMA CLOUD (Verified from api/tags) ---
   { id: "mistral-large-3:675b", name: "Mistral Large 3 (675B Monster)", speed: "Colossal", status: "production", provider: "ollama" },
@@ -78,6 +100,85 @@ export const AI_MODELS = [
   { id: "ministral-3:14b", name: "Ministral 3 14B", speed: "Efficient", status: "production", provider: "ollama" },
   { id: "gemini-3-flash-preview", name: "Gemini 3 Flash (Preview)", speed: "Hyper Speed", status: "preview", provider: "ollama" },
   { id: "gemma3:4b", name: "Gemma 3 4B (Small)", speed: "Eco-Friendly", status: "production", provider: "ollama" },
+  
+  // --- GOOGLE AI STUDIO (Gemini) ---
+  { id: "gemini-2.0-pro-exp-02-05", name: "Gemini 2.0 Pro (Experimental)", speed: "Ultimate Brain", status: "preview", provider: "google" },
+  { id: "gemini-2.0-flash", name: "Gemini 2.0 Flash (Next-Gen)", speed: "Hyper Fast", status: "production", provider: "google" },
+  { id: "gemini-2.0-flash-lite-preview-02-05", name: "Gemini 2.0 Flash Lite (Preview)", speed: "Instant", status: "preview", provider: "google" },
+  { id: "gemini-1.5-pro", name: "Gemini 1.5 Pro (Powerful)", speed: "Balanced", status: "production", provider: "google" },
+  { id: "gemini-1.5-flash", name: "Gemini 1.5 Flash (Fast)", speed: "Instant", status: "production", provider: "google" },
+  { id: "gemini-1.5-flash-8b", name: "Gemini 1.5 Flash 8B", speed: "Hyper Fast", status: "production", provider: "google" },
+  
+  // --- CLOUDFLARE WORKERS AI (Requires Account ID) ---
+  // Sumber: https://developers.cloudflare.com/workers-ai/models/ (Text Generation only, non-deprecated)
+  // --- 🔥 Model Flagship & Terbaru ---
+  { id: "@cf/moonshotai/kimi-k2.5", name: "Kimi K2.5 (256k ctx)", speed: "Powerful", status: "production", provider: "cloudflare" },
+  { id: "@cf/zai-org/glm-4.7-flash", name: "GLM-4.7 Flash", speed: "Fast", status: "production", provider: "cloudflare" },
+  { id: "@cf/openai/gpt-oss-120b", name: "GPT OSS 120B (Reasoning)", speed: "Heavyweight", status: "production", provider: "cloudflare" },
+  { id: "@cf/openai/gpt-oss-20b", name: "GPT OSS 20B", speed: "Balanced", status: "production", provider: "cloudflare" },
+  { id: "@cf/meta/llama-4-scout-17b-16e-instruct", name: "Llama 4 Scout 17B (Vision)", speed: "Balanced", status: "production", provider: "cloudflare" },
+  { id: "@cf/google/gemma-4-26b-a4b-it", name: "Gemma 4 26B (Vision)", speed: "Balanced", status: "production", provider: "cloudflare" },
+  { id: "@cf/nvidia/nemotron-3-120b-a12b", name: "Nemotron 3 120B (MoE)", speed: "Heavyweight", status: "production", provider: "cloudflare" },
+  { id: "@cf/ibm/granite-4.0-h-micro", name: "Granite 4.0 Micro (Function)", speed: "Fast", status: "production", provider: "cloudflare" },
+  { id: "@cf/aisingapore/gemma-sea-lion-v4-27b-it", name: "SEA-LION 27B (SE Asian)", speed: "Balanced", status: "production", provider: "cloudflare" },
+  // --- Qwen Series ---
+  { id: "@cf/qwen/qwq-32b", name: "QwQ 32B (Reasoning)", speed: "Heavyweight", status: "production", provider: "cloudflare" },
+  { id: "@cf/qwen/qwen3-30b-a3b-fp8", name: "Qwen3 30B MoE (FP8)", speed: "Powerful", status: "production", provider: "cloudflare" },
+  { id: "@cf/qwen/qwen2.5-coder-32b-instruct", name: "Qwen 2.5 Coder 32B", speed: "Balanced", status: "production", provider: "cloudflare" },
+  // --- Mistral Series ---
+  { id: "@cf/mistralai/mistral-small-3.1-24b-instruct", name: "Mistral Small 3.1 24B", speed: "Balanced", status: "production", provider: "cloudflare" },
+  { id: "@cf/mistralai/mistral-7b-instruct-v0.2", name: "Mistral 7B v0.2", speed: "Fast", status: "production", provider: "cloudflare" },
+  { id: "@cf/mistralai/mistral-7b-instruct-v0.1", name: "Mistral 7B v0.1", speed: "Fast", status: "production", provider: "cloudflare" },
+  // --- DeepSeek Series ---
+  { id: "@cf/deepseek-ai/deepseek-r1-distill-qwen-32b", name: "DeepSeek R1 32B (Reasoning)", speed: "Powerful", status: "production", provider: "cloudflare" },
+  // --- Google Gemma Series ---
+  { id: "@cf/google/gemma-3-12b-it", name: "Gemma 3 12B", speed: "Balanced", status: "production", provider: "cloudflare" },
+  { id: "@cf/google/gemma-7b-it", name: "Gemma 7B", speed: "Fast", status: "production", provider: "cloudflare" },
+  // --- Meta Llama 3.x Series ---
+  { id: "@cf/meta/llama-3.3-70b-instruct-fp8-fast", name: "Llama 3.3 70B FP8 (Fast)", speed: "Fast", status: "production", provider: "cloudflare" },
+  { id: "@cf/meta/llama-3.2-3b-instruct", name: "Llama 3.2 3B", speed: "Instant", status: "production", provider: "cloudflare" },
+  { id: "@cf/meta/llama-3.2-1b-instruct", name: "Llama 3.2 1B (Ultra Tiny)", speed: "Instant", status: "production", provider: "cloudflare" },
+  { id: "@cf/meta/llama-3.1-70b-instruct", name: "Llama 3.1 70B", speed: "Balanced", status: "production", provider: "cloudflare" },
+  { id: "@cf/meta/llama-3.1-8b-instruct", name: "Llama 3.1 8B", speed: "Fast", status: "production", provider: "cloudflare" },
+  { id: "@cf/meta/llama-3.1-8b-instruct-fast", name: "Llama 3.1 8B (Fast)", speed: "Hyper Fast", status: "production", provider: "cloudflare" },
+  { id: "@cf/meta/llama-3.1-8b-instruct-awq", name: "Llama 3.1 8B AWQ", speed: "Hyper Fast", status: "production", provider: "cloudflare" },
+  { id: "@cf/meta/llama-3.1-8b-instruct-fp8", name: "Llama 3.1 8B FP8", speed: "Hyper Fast", status: "production", provider: "cloudflare" },
+  { id: "@cf/meta/llama-3-8b-instruct", name: "Llama 3 8B Instruct", speed: "Fast", status: "production", provider: "cloudflare" },
+  { id: "@cf/meta/llama-3-8b-instruct-awq", name: "Llama 3 8B AWQ", speed: "Fast", status: "production", provider: "cloudflare" },
+  { id: "@cf/meta/meta-llama-3-8b-instruct", name: "Meta Llama 3 8B", speed: "Fast", status: "production", provider: "cloudflare" },
+  // --- Nous Research ---
+  { id: "@hf/nousresearch/hermes-2-pro-mistral-7b", name: "Hermes 2 Pro Mistral 7B", speed: "Fast", status: "production", provider: "cloudflare" },
+  // --- IBM ---
+  { id: "@cf/defog/sqlcoder-7b-2", name: "SQLCoder 7B (SQL)", speed: "Fast", status: "production", provider: "cloudflare" },
+  
+  // --- OPENROUTER (Experimental & Flagship) ---
+  { id: "meta-llama/llama-4-scout-17b-16e-instruct", name: "Llama 4 Scout 17B (Next-Gen)", speed: "Instant", status: "preview", provider: "openrouter" },
+  { id: "qwen/qwen3-32b", name: "Qwen 3 32B (Latest)", speed: "Powerful", status: "preview", provider: "openrouter" },
+  { id: "openai/gpt-oss-120b", name: "GPT-OSS 120B (OpenAI Architecture)", speed: "Colossal", status: "preview", provider: "openrouter" },
+  { id: "openai/gpt-oss-20b", name: "GPT-OSS 20B", speed: "Fast", status: "preview", provider: "openrouter" },
+  { id: "google/gemini-flash-1.5", name: "Gemini 1.5 Flash", speed: "Fast", status: "production", provider: "openrouter" },
+  { id: "deepseek/deepseek-r1:free", name: "DeepSeek R1 (Free)", speed: "Powerful", status: "production", provider: "openrouter" },
+
+  // --- GROQ EXPERIMENTAL ---
+  { id: "groq/compound", name: "Groq Compound (Research)", speed: "Fast", status: "preview", provider: "groq" },
+  { id: "groq/compound-mini", name: "Groq Compound Mini", speed: "Hyper Fast", status: "preview", provider: "groq" },
+  
+  // --- TOGETHER AI (Fallbacks) ---
+  { id: "meta-llama/Llama-3-70b-chat-hf", name: "Llama 3 70B", speed: "Fast", status: "production", provider: "together" },
+  { id: "meta-llama/Llama-3-8b-chat-hf", name: "Llama 3 8B", speed: "Instant", status: "production", provider: "together" },
+  
+  // --- GITHUB MODELS (Requires Azure/GitHub Token) ---
+  { id: "gpt-4o", name: "GPT-4o (GitHub)", speed: "Ultimate", status: "production", provider: "github" },
+  { id: "gpt-4o-mini", name: "GPT-4o mini (Fast)", speed: "Fast", status: "production", provider: "github" },
+  { id: "meta-llama-3.1-405b-instruct", name: "Llama 3.1 405B (Extreme)", speed: "Heavyweight", status: "production", provider: "github" },
+  { id: "meta-llama-3.1-70b-instruct", name: "Llama 3.1 70B", speed: "Powerful", status: "production", provider: "github" },
+  { id: "meta-llama-3.1-8b-instruct", name: "Llama 3.1 8B", speed: "Fast", status: "production", provider: "github" },
+  { id: "phi-3-medium-128k-instruct", name: "Phi-3 Medium", speed: "Balanced", status: "production", provider: "github" },
+  { id: "phi-3-mini-128k-instruct", name: "Phi-3 Mini", speed: "Fast", status: "production", provider: "github" },
+  { id: "phi-3-small-128k-instruct", name: "Phi-3 Small", speed: "Fast", status: "production", provider: "github" },
+  
+  // --- HUGGING FACE (Fallbacks) ---
+  { id: "meta-llama/Meta-Llama-3-8B-Instruct", name: "Llama 3 8B Instruct", speed: "Fast", status: "production", provider: "huggingface" },
 ];
 
 /**
@@ -94,38 +195,77 @@ const getAIConfig = async () => {
   const settings = await pb.collection("settings").getFullList({ limit: 1 });
   const config = settings[0];
 
-  // 1. PRIORITAS UTAMA UNTUK ADMIN: Selalu gunakan key dari Pengaturan Global (Settings)
-  // Ini agar Admin tidak bingung saat mengganti provider di halaman Settings
+  // 🎯 Resolusi Paksa (Force Resolution):
+  let rawModel = AI_MODELS[0].id;
+  let rawProvider = "groq";
+  
   if (userRole === "admin") {
-    const isOllama = config?.ai_provider === "ollama";
-    const apiKey = isOllama ? (config?.ai_gateway_key || config?.groq_api_key) : config?.groq_api_key;
-    
-    if (!apiKey) throw new Error("API Key belum diatur di Pengaturan Aplikasi.");
-    
-    return {
-      apiKey,
-      isOllama,
-      model: config?.ai_model || AI_MODELS[0].id,
-      baseUrl: isOllama ? (pb.baseUrl + "/api/ai-proxy") : "https://api.groq.com/openai/v1",
-      provider: config?.ai_provider || "groq"
-    };
+    rawModel = config?.ai_model || AI_MODELS[0].id;
+    rawProvider = config?.ai_provider || "groq";
+  } else {
+    rawModel = (user as any)?.ai_model || config?.ai_model || AI_MODELS[0].id;
+    rawProvider = (user as any)?.ai_provider || config?.ai_provider || "groq";
   }
 
-  // 2. UNTUK GURU: Gunakan API Key pribadi dari Profile
-  if (userApiKey && userApiKey.trim() !== "") {
-    const userProvider = (user as any)?.ai_provider || config?.ai_provider || "groq";
-    const isOllama = userProvider === "ollama";
-    return {
-      apiKey: userApiKey,
-      isOllama,
-      model: (user as any)?.ai_model || config?.ai_model || AI_MODELS[0].id,
-      baseUrl: isOllama ? (pb.baseUrl + "/api/ai-proxy") : "https://api.groq.com/openai/v1",
-      provider: userProvider
-    };
+  const isCustom = rawProvider === "custom";
+  const actualModelDef = AI_MODELS.find((m) => m.id === rawModel);
+  
+  // Jika provider adalah custom, abaikan pencarian presetas. Jika tidak, validasi model terdaftar.
+  const finalModel = isCustom ? rawModel : (actualModelDef ? actualModelDef.id : AI_MODELS[0].id);
+  const finalProvider = isCustom ? "custom" : (actualModelDef ? actualModelDef.provider : "groq");
+  const isOllama = finalProvider === "ollama";
+
+  let apiKey = "";
+
+  const resolveBaseUrl = (provider: string, gatewayUrl: string) => {
+    switch (provider) {
+       case "google": return "https://generativelanguage.googleapis.com/v1beta/openai";
+       case "openrouter": return "https://openrouter.ai/api/v1";
+       case "together": return "https://api.together.xyz/v1";
+       case "huggingface": return "https://api-inference.huggingface.co/v1";
+       case "fireworks": return "https://api.fireworks.ai/inference/v1";
+       case "github": return "https://models.inference.ai.azure.com";
+       case "cloudflare": 
+          // 🚀 CLOUDFLARE FIX: Gunakan endpoint v1 yang lebih stabil
+          return gatewayUrl ? `https://api.cloudflare.com/client/v4/accounts/${gatewayUrl}/ai/v1` : "";
+       case "custom": return gatewayUrl;
+       case "ollama": return pb.baseUrl + "/api/ai-proxy";
+       case "groq": return "https://api.groq.com/openai/v1";
+       default: return "https://api.groq.com/openai/v1";
+    }
+  };
+
+  // Helper untuk membersihkan & menggabungkan URL agar tidak double /chat/completions
+  const cleanUrl = (base: string) => {
+    if (!base) return "";
+    let url = base.trim();
+    if (url.endsWith("/")) url = url.slice(0, -1);
+    if (url.includes("/chat/completions")) return url;
+    return `${url}/chat/completions`;
+  };
+
+  const gatewayUrl = (config?.ai_gateway_url && config.ai_gateway_url.trim() !== "") ? config.ai_gateway_url : "";
+  let baseUrl = resolveBaseUrl(finalProvider, gatewayUrl);
+  const finalFullUrl = cleanUrl(baseUrl);
+
+  // 🎯 UNIFORM PROXY LOGIC:
+  // Semua provider (kecuali Groq) dilewatkan melalui proxy untuk menghindari CORS.
+  const useProxy = finalProvider !== "groq";
+
+  if (userRole === "admin") {
+    apiKey = finalProvider === "groq" ? config?.groq_api_key : config?.ai_gateway_key;
+    if (!apiKey || apiKey.trim() === "") throw new Error(`API Key untuk Provider ${finalProvider.toUpperCase()} belum diatur.`);
+  } else {
+    apiKey = userApiKey;
   }
 
-  // 3. Jika Guru belum mengatur API Key, tampilkan pesan error edukatif
-  throw new Error("Bapak/Ibu Guru wajib mengatur API Key AI sendiri di menu 'Profil' untuk menggunakan fitur ini.");
+  return {
+    apiKey,
+    useProxy,
+    model: finalModel,
+    baseUrl: finalFullUrl, // Kirim URL yang sudah lengkap & bersih
+    provider: finalProvider
+  };
 };
 
 
@@ -141,8 +281,8 @@ export const generateQuestionsAI = async (
   focus: string = "umum"
 ): Promise<AIGeneratedQuestion[]> => {
   try {
-    const { apiKey, isOllama, model, baseUrl } = await getAIConfig();
-    console.log(`🚀 [AI ENGINE] Menggunakan Model: ${model} via ${isOllama ? 'OLLAMA PROXY' : 'GROQ DIRECT'}`);
+    const { apiKey, useProxy, model, baseUrl, provider } = await getAIConfig();
+    console.log(`🚀 [AI ENGINE] Menggunakan Model: ${model} via ${useProxy ? 'SECURE PROXY' : 'DIRECT'}`);
 
     const lengthMap: Record<string, string> = {
       pendek: "sekitar 250-300 kata, lugas & informatif",
@@ -177,29 +317,36 @@ Hanya berikan teks HTML tersebut tanpa salam pembuka/penutup.`;
 
       // 🚀 FETCH PROXY OR DIRECT
       let responseWacana;
-      if (isOllama) {
-        responseWacana = await fetch(baseUrl, {
+      const { apiKey, useProxy, model, baseUrl } = await getAIConfig();
+      
+      // Tentukan max_tokens untuk wacana berdasarkan panjang yang diminta
+      const wacanaTokens = { pendek: 600, sedang: 1000, panjang: 1600 }[passageLength] || 1000;
+
+      if (useProxy) {
+        responseWacana = await fetch(pb.baseUrl + "/api/ai-proxy", {
           method: "POST",
           headers: { "Content-Type": "application/json", "X-Token": pb.authStore.token },
           body: JSON.stringify({
-            baseUrl: "https://ollama.com",
+            baseUrl: baseUrl,
             apiKey: apiKey,
             body: { 
                model, 
                messages: [{ role: "user", content: wacanaPrompt }],
                stream: false,
-               options: { temperature: 0.7 }
+               max_tokens: wacanaTokens,
+               temperature: 0.7
             }
           })
         });
       } else {
-        responseWacana = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        responseWacana = await fetch(baseUrl, {
           method: "POST",
           headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
           body: JSON.stringify({
             model,
             messages: [{ role: "user", content: wacanaPrompt }],
-            temperature: 0.7
+            temperature: 0.7,
+            max_tokens: wacanaTokens
           })
         });
       }
@@ -208,20 +355,21 @@ Hanya berikan teks HTML tersebut tanpa salam pembuka/penutup.`;
       if (!responseWacana.ok) throw new Error("Gagal membuat teks wacana.");
       const dataWacana = await responseWacana.json();
       
-      // Ollama format returns message object, OpenAI returns choices[0].message
-      wacanaResult = isOllama ? dataWacana.message.content : dataWacana.choices[0].message.content;
+      // ✅ Always check both Ollama (message.content) AND OpenAI/Cloudflare (choices[0].message.content)
+      wacanaResult = dataWacana?.message?.content || dataWacana?.choices?.[0]?.message?.content || "";
     }
 
     // 🎯 STEP 2: GENERATE QUESTIONS
     const systemPrompt = `Anda adalah Ahli Evaluasi Pendidikan & Spesialis Kurikulum.
 Tugas: Buat ${count} soal ${typeDesc} untuk jenjang ${level} - ${subject}.
-Kesulitan: ${difficulty}, Fokus: ${focus.toUpperCase()}.
-
-PEDOMAN FORMAT:
+Kesulitan: ${difficulty}, PEDOMAN FORMAT:
 1. GUNAKAN TEKS POLOS: Utamakan teks biasa tanpa tag HTML (seperti <em>, <p>, atau <strong>) agar editor tetap bersih.
-2. EKSAKTA (Matematika/Sains): Gunakan $ ... $ untuk rumus inline dan $$ ... $$ untuk rumus display. JANGAN gunakan LaTeX jika materi tidak relevan.
+2. EKSAKTA (Matematika/Sains): Gunakan LaTeX HANYA dengan pembungkus $ ... $ tunggal agar rumus menyatu dengan teks (JANGAN gunakan $$ atau \displaystyle sebagai teks polos).
+   - Agar simbol besar (integral/pecahan) terlihat bagus dalam teks, gunakan: $\\displaystyle ...$
+   - PENTING (JSON ESCAPE): Di dalam JSON, setiap backslash (\) harus ditulis GANDA (\\). Jadi tulis: "$\\displaystyle \\frac{a}{b}$" (BUKAN \displaystyle).
+   - DILARANG KERAS menggunakan $$ ... $$ karena akan memutus baris (terpisah).
 3. JANGAN gunakan markdown seperti ** atau __.
-4. JSON ESCAPING: Setiap garis miring ("\\") dalam LaTeX WAJIB di-escape ganda ("\\\\") di dalam JSON.
+4. JSON ESCAPING: Setiap garis miring ("\\" tunggal) dalam LaTeX WAJIB di-escape ganda ("\\\\") di dalam JSON.
 
 STRUKTUR JSON (WAJIB):
 {
@@ -235,41 +383,57 @@ STRUKTUR JSON (WAJIB):
 }
 Hanya berikan JSON murni tanpa penjelasan.`;
 
-    const mathHint = (subject.toLowerCase().includes('matematika') || subject.toLowerCase().includes('ipa') || subject.toLowerCase().includes('fisika') || subject.toLowerCase().includes('kimia') || subject.toLowerCase().includes('ekonomi')) 
-      ? "\nGunakan pembungkus LaTeX $ ... $ untuk rumus/simbol matematika." 
+    const mathHint = (subject.toLowerCase().includes('matematika') || subject.toLowerCase().includes('ipa') || subject.toLowerCase().includes('fisika') || subject.toLowerCase().includes('kimia') || subject.toLowerCase().includes('ekonomi') || subject.toLowerCase().includes('informatika') || subject.toLowerCase().includes('it')) 
+      ? "\nGunakan $ ... $ untuk SEMUA rumus agar tidak terpisah dari teks. Untuk integral/fraksi yang bagus, gunakan $\\displaystyle ...$. WAJIB gunakan \\\\ (double backslash) di JSON." 
       : "";
 
     const programmingHint = (subject.toLowerCase().includes('pemrograman') || subject.toLowerCase().includes('it') || subject.toLowerCase().includes('informatika') || subject.toLowerCase().includes('coding'))
       ? `\nKONTEN PEMROGRAMAN: Sangat disarankan untuk menyertakan potongan kode (code snippets) di dalam teks pertanyaan maupun pilihan jawaban. Gunakan tag <pre class="ql-syntax" data-language="NAMA_BAHASA">...</pre> untuk setiap potongan kode program. GANTI NAMA_BAHASA dengan bahasa yang sesuai (misal: javascript, python, cpp, html, css). DILARANG MENGGUNAKAN "auto".`
       : "";
 
-    const arabicHint = (subject.toLowerCase().includes('agama') || subject.toLowerCase().includes('arab') || subject.toLowerCase().includes('islam') || subject.toLowerCase().includes('quran'))
-      ? `\nKONTEN ARAB/AGAMA: WAJIB menyertakan potongan ayat Al-Qur'an atau Hadits dalam teks Arab asli (ber-harakat lengkap). DILARANG KERAS menggunakan tanda kutip jenis apapun (" ' « ») di sekitar ayat. Biarkan ayat bersih.`
+    const isReligiousTopic = (
+      subject.toLowerCase().includes('agama') || 
+      subject.toLowerCase().includes('arab') || 
+      subject.toLowerCase().includes('islam') || 
+      subject.toLowerCase().includes('quran') ||
+      topic.toLowerCase().includes('surah') ||
+      topic.toLowerCase().includes('ayat') ||
+      topic.toLowerCase().includes('hadist')
+    );
+
+    const arabicHint = isReligiousTopic
+      ? `\nKONTEN ARAB/AGAMA: WAJIB menyertakan potongan (snippet) ayat Al-Qur'an atau Hadits dalam TEKS ARAB ASLI (ber-harakat lengkap) sebagai bagian dari soal atau stimulus. DILARANG KERAS menggunakan tanda kutip jenis apapun di sekitar ayat. Tampilkan teks Arab tersebut dengan jelas.`
       : "";
 
     const userPrompt = isLiteracy 
       ? `INI ADALAH WACANA STIMULUS:\n${wacanaResult}\n\nBerdasarkan wacana di atas, buatkan ${count} soal ${typeDesc}.${mathHint}${programmingHint}${arabicHint}`
       : `Buat soal ${typeDesc} untuk jenjang ${level} - ${subject} tentang topik: "${topic}".${mathHint}${programmingHint}${arabicHint}`;
 
+    // Kalkulasi max_tokens: ~1200 token per soal (model reasoning butuh lebih banyak)
+    // Kimi K2.5, DeepSeek R1, QwQ perlu ruang untuk "berpikir" sebelum menjawab
+    const questionTokens = Math.max(count * 1200, 2000);
+
     let responseQuestions;
-    if (isOllama) {
-      responseQuestions = await fetch(baseUrl, {
+    if (useProxy) {
+      responseQuestions = await fetch(pb.baseUrl + "/api/ai-proxy", {
         method: "POST",
         headers: { "Content-Type": "application/json", "X-Token": pb.authStore.token },
         body: JSON.stringify({
-          baseUrl: "https://ollama.com",
+          baseUrl: baseUrl,
           apiKey: apiKey,
           body: {
             model,
             messages: [
               { role: "system", content: systemPrompt },
               { role: "user", content: userPrompt }
-            ]
+            ],
+            max_tokens: questionTokens,
+            temperature: 0.8
           }
         })
       });
     } else {
-      responseQuestions = await fetch(`${baseUrl}/chat/completions`, {
+      responseQuestions = await fetch(baseUrl, {
         method: "POST",
         headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -279,18 +443,29 @@ Hanya berikan JSON murni tanpa penjelasan.`;
             { role: "user", content: userPrompt }
           ],
           temperature: 0.8,
+          max_tokens: questionTokens,
           response_format: { type: "json_object" }
         })
       });
     }
 
     if (responseQuestions.status === 429) throw new Error("AI_RATE_LIMIT");
-    if (!responseQuestions.ok) throw new Error("Gagal membuat butir soal.");
+    if (!responseQuestions.ok) {
+      const errData = await responseQuestions.json().catch(() => ({}));
+      throw new Error(errData?.error?.message || errData?.error || `HTTP ${responseQuestions.status}`);
+    }
     
     const dataQs = await responseQuestions.json();
-    const contentQs = isOllama ? (dataQs?.message?.content || "") : (dataQs?.choices?.[0]?.message?.content || "");
+    // ✅ Always check both Ollama (message.content) AND OpenAI/Cloudflare (choices[0].message.content)
+    const contentQs = dataQs?.message?.content || dataQs?.choices?.[0]?.message?.content || "";
     
-    if (!contentQs) throw new Error("AI tidak memberikan respon teks yang valid.");
+    console.log("[AI DEBUG] dataQs keys:", Object.keys(dataQs || {}));
+    console.log("[AI DEBUG] contentQs length:", contentQs?.length, "| preview:", contentQs?.slice(0, 100));
+    
+    if (!contentQs) {
+      console.error("[AI DEBUG] Full dataQs:", JSON.stringify(dataQs).slice(0, 500));
+      throw new Error(`AI tidak memberikan respon teks yang valid. (model: ${model})`);
+    }
 
     const parsed = robustJSONParse(contentQs);
     const questionsRaw = parsed.questions || parsed.data || parsed.soal || (Array.isArray(parsed) ? parsed : []);
@@ -321,7 +496,7 @@ export const generateSingleQuestionAI = async (
   existingWacana: string = ""
 ): Promise<AIGeneratedQuestion> => {
   try {
-    const { apiKey, isOllama, model, baseUrl } = await getAIConfig();
+    const { apiKey, useProxy, model, baseUrl } = await getAIConfig();
     const cleanModel = model.replace("openclaw/", "");
 
     const typeDesc = {
@@ -337,8 +512,10 @@ Tugas: Buat TEPAT SATU butir soal ${typeDesc} untuk jenjang ${level} - ${subject
 Kesulitan: ${difficulty}, Fokus: ${focus.toUpperCase()}.
 
 PEDOMAN FORMAT:
-1. GUNAKAN TEKS POLOS: Utamakan teks biasa tanpa tag HTML (seperti <em> atau <strong>) agar editor tetap bersih.
-2. EKSAKTA: Gunakan $ ... $ untuk rumus matematika. JANGAN gunakan jika tidak relevan.
+1. GUNAKAN TEKS POLOS: Utamakan teks biasa tanpa tag HTML agar editor tetap bersih.
+2. EKSAKTA: Gunakan LaTeX HANYA dengan pembungkus $ ... $ tunggal agar menyatu dengan kalimat (JANGAN gunakan $$).
+   - Simbol bertingkat (integral/pecahan): Gunakan $\\displaystyle ...$ (WAJIB double backslash di dalam JSON agar tidak error).
+   - Contoh: "Berapakah hasil dari $\\displaystyle \\int_0^1 x^2 \\,dx$ ?"
 3. JANGAN gunakan markdown (**).
 
 STRUKTUR JSON:
@@ -353,8 +530,18 @@ Hanya berikan JSON murni.`;
       ? `\nKONTEN PEMROGRAMAN: Sangat disarankan untuk menyertakan potongan kode (code snippets) di dalam teks pertanyaan maupun pilihan jawaban. Gunakan tag <pre class="ql-syntax" data-language="NAMA_BAHASA">...</pre> untuk setiap potongan kode program. GANTI NAMA_BAHASA dengan bahasa yang sesuai (misal: javascript, python, cpp, html, css). DILARANG MENGGUNAKAN "auto".`
       : "";
 
-    const arabicHint = (subject.toLowerCase().includes('agama') || subject.toLowerCase().includes('arab') || subject.toLowerCase().includes('islam') || subject.toLowerCase().includes('quran'))
-      ? `\nKONTEN ARAB/AGAMA: WAJIB menyertakan potongan ayat Al-Qur'an atau Hadits dalam teks Arab asli (ber-harakat lengkap). DILARANG KERAS menggunakan tanda kutip jenis apapun (" ' « ») di sekitar ayat. Biarkan ayat bersih.`
+    const isReligiousTopic = (
+      subject.toLowerCase().includes('agama') || 
+      subject.toLowerCase().includes('arab') || 
+      subject.toLowerCase().includes('islam') || 
+      subject.toLowerCase().includes('quran') ||
+      topic.toLowerCase().includes('surah') ||
+      topic.toLowerCase().includes('ayat') ||
+      topic.toLowerCase().includes('hadist')
+    );
+
+    const arabicHint = isReligiousTopic
+      ? `\nKONTEN ARAB/AGAMA: WAJIB menyertakan potongan (snippet) ayat Al-Qur'an atau Hadits dalam TEKS ARAB ASLI (ber-harakat lengkap) sebagai bagian dari soal. DILARANG KERAS menggunakan tanda kutip di sekitar ayat. Tampilkan teks Arab tersebut dengan jelas.`
       : "";
 
     const userPrompt = existingWacana 
@@ -362,12 +549,12 @@ Hanya berikan JSON murni.`;
       : `Buat TEPAT SATU soal ${typeDesc} tentang materi/topik: "${topic}". JANGAN menggunakan placeholder.${programmingHint}${arabicHint}`;
 
     let response;
-    if (isOllama) {
-        response = await fetch(baseUrl, {
+    if (useProxy) {
+        response = await fetch(pb.baseUrl + "/api/ai-proxy", {
             method: "POST",
             headers: { "Content-Type": "application/json", "X-Token": pb.authStore.token },
             body: JSON.stringify({
-                baseUrl: "https://ollama.com",
+                baseUrl: baseUrl,
                 apiKey: apiKey,
                 body: { 
                     model, 
@@ -380,7 +567,7 @@ Hanya berikan JSON murni.`;
             })
         });
     } else {
-        response = await fetch(`${baseUrl}/chat/completions`, {
+        response = await fetch(baseUrl, {
             method: "POST",
             headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -398,7 +585,7 @@ Hanya berikan JSON murni.`;
     if (response.status === 429) throw new Error("AI_RATE_LIMIT");
     if (!response.ok) throw new Error("Gagal regenerasi soal.");
     const data = await response.json();
-    const content = isOllama ? data.message.content : data.choices[0].message.content;
+    const content = useProxy ? (data?.message?.content || data?.choices?.[0]?.message?.content || "") : (data?.choices?.[0]?.message?.content || "");
     
     const result = robustJSONParse(content);
     
@@ -422,7 +609,7 @@ export const getTopicSuggestionsAI = async (
   isLiteracy: boolean = false
 ): Promise<string[]> => {
   try {
-    const { apiKey, isOllama, model, baseUrl } = await getAIConfig();
+    const { apiKey, useProxy, model, baseUrl } = await getAIConfig();
     console.log(`💡 [AI TOPIC] Menyarankan topik menggunakan: ${model}`);
 
     const literasiNote = isLiteracy ? "(UTAMAKAN topik yang kaya teks bacaan/fenomena karena Mode Literasi AKTIF)" : "";
@@ -432,12 +619,12 @@ Pastikan materi tersebut sesuai dengan tingkat kognitif jenjang ${level}.
 Balas hanya dengan JSON format: { "topics": ["Topik A", "Topik B", ...] }`;
 
     let response;
-    if (isOllama) {
-      response = await fetch(baseUrl, {
+    if (useProxy) {
+      response = await fetch(pb.baseUrl + "/api/ai-proxy", {
         method: "POST",
         headers: { "Content-Type": "application/json", "X-Token": pb.authStore.token },
         body: JSON.stringify({
-          baseUrl: "https://ollama.com",
+          baseUrl: baseUrl,
           apiKey: apiKey,
           body: {
             model: model,
@@ -447,7 +634,7 @@ Balas hanya dengan JSON format: { "topics": ["Topik A", "Topik B", ...] }`;
         })
       });
     } else {
-      response = await fetch(`${baseUrl}/chat/completions`, {
+      response = await fetch(baseUrl, {
         method: "POST",
         headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -464,7 +651,7 @@ Balas hanya dengan JSON format: { "topics": ["Topik A", "Topik B", ...] }`;
     if (!response.ok) return [];
     
     const data = await response.json();
-    const content = isOllama ? (data?.message?.content || "") : (data?.choices?.[0]?.message?.content || "");
+    const content = useProxy ? (data?.message?.content || data?.choices?.[0]?.message?.content || "") : (data?.choices?.[0]?.message?.content || "");
     
     if (!content) return [];
     
@@ -491,7 +678,7 @@ export const parseQuestionsAI = async (
   level: string = "Umum"
 ): Promise<AIGeneratedQuestion[]> => {
   try {
-    const { apiKey, isOllama, model, baseUrl } = await getAIConfig();
+    const { apiKey, useProxy, model, baseUrl } = await getAIConfig();
 
     const systemPrompt = `Anda adalah Ahli Digitalisasi Dokumen Pendidikan.
 Tugas: Ekstrak semua soal dari teks mentah (hasil copy-paste PDF/Word) menjadi JSON valid.
@@ -521,12 +708,12 @@ Aturan Ketat: Gunakan HTML untuk formatting (<strong> JANGAN **), pastikan JSON 
     const userPrompt = `DOKUMEN MENTAH (${subject} - ${level}):\n\n${rawText}\n\nSilakan ekstrak soal-soal di atas.`;
 
     let response;
-    if (isOllama) {
-      response = await fetch(baseUrl, {
+    if (useProxy) {
+      response = await fetch(pb.baseUrl + "/api/ai-proxy", {
         method: "POST",
         headers: { "Content-Type": "application/json", "X-Token": pb.authStore.token },
         body: JSON.stringify({
-          baseUrl: "https://ollama.com",
+          baseUrl: baseUrl,
           apiKey: apiKey,
           body: {
             model,
@@ -538,7 +725,7 @@ Aturan Ketat: Gunakan HTML untuk formatting (<strong> JANGAN **), pastikan JSON 
         })
       });
     } else {
-      response = await fetch(`${baseUrl}/chat/completions`, {
+      response = await fetch(baseUrl, {
         method: "POST",
         headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -560,7 +747,7 @@ Aturan Ketat: Gunakan HTML untuk formatting (<strong> JANGAN **), pastikan JSON 
     }
     
     const data = await response.json();
-    let content = isOllama ? data.message.content : data.choices[0].message.content;
+    let content = useProxy ? (data?.message?.content || data?.choices?.[0]?.message?.content || "") : (data?.choices?.[0]?.message?.content || "");
     content = content.replace(/```json|```/g, "").trim();
     
     // 🛠️ Robust JSON Parsing & Mapping
@@ -628,15 +815,44 @@ export const testAIConnection = async (apiKey: string, modelId: string, customUr
   try {
     if (!apiKey) throw new Error("API Key Kosong");
     
-    const isOllama = provider === "ollama";
+    const actualModelDef = AI_MODELS.find(m => m.id === modelId) || AI_MODELS[0];
+    const finalProvider = provider || actualModelDef.provider;
+    const useProxy = finalProvider !== "groq";
     
+    const resolveBaseUrl = (p: string, url: string) => {
+      switch (p) {
+         case "google": return "https://generativelanguage.googleapis.com/v1beta/openai";
+         case "openrouter": return "https://openrouter.ai/api/v1";
+         case "together": return "https://api.together.xyz/v1";
+         case "huggingface": return "https://api-inference.huggingface.co/v1";
+         case "fireworks": return "https://api.fireworks.ai/inference/v1";
+         case "github": return "https://models.inference.ai.azure.com";
+         case "cloudflare": return url ? `https://api.cloudflare.com/client/v4/accounts/${url}/ai/v1` : "";
+         case "custom": return url;
+         case "ollama": return pb.baseUrl + "/api/ai-proxy";
+         case "groq": return "https://api.groq.com/openai/v1";
+         default: return "https://api.groq.com/openai/v1";
+      }
+    };
+
+    const cleanUrl = (base: string) => {
+      if (!base) return "";
+      let url = base.trim();
+      if (url.endsWith("/")) url = url.slice(0, -1);
+      if (url.includes("/chat/completions")) return url;
+      return `${url}/chat/completions`;
+    };
+
+    const baseUrl = cleanUrl(resolveBaseUrl(finalProvider, customUrl || ""));
+    if (!baseUrl) throw new Error("Base URL / Account ID belum lengkap.");
+
     let response;
-    if (isOllama) {
+    if (useProxy) {
       response = await fetch(pb.baseUrl + "/api/ai-proxy", {
         method: "POST",
         headers: { "Content-Type": "application/json", "X-Token": pb.authStore.token },
         body: JSON.stringify({
-          baseUrl: "https://ollama.com",
+          baseUrl: baseUrl,
           apiKey: apiKey,
           body: { 
             model: modelId, 
@@ -647,7 +863,7 @@ export const testAIConnection = async (apiKey: string, modelId: string, customUr
         })
       });
     } else {
-      response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      response = await fetch(baseUrl, {
         method: "POST",
         headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -662,8 +878,15 @@ export const testAIConnection = async (apiKey: string, modelId: string, customUr
       return { success: true, message: "Koneksi Berhasil!" };
     }
     
-    const err = await response.json();
-    return { success: false, message: err.error?.message || err.error || "Gagal menghubungi AI" };
+    let errorMessage = "Gagal menghubungi AI";
+    try {
+      const err = await response.json();
+      errorMessage = err.error?.message || err.error || err.message || JSON.stringify(err);
+    } catch (e) {
+      errorMessage = `Server Error: ${response.status} ${response.statusText}`;
+    }
+    
+    return { success: false, message: errorMessage };
   } catch (error: any) {
     return { success: false, message: error.message || "Gagal menghubungi server AI." };
   }

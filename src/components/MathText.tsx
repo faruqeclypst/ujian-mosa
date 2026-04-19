@@ -87,11 +87,6 @@ export const MathText: React.FC<MathTextProps> = ({ content, className = "" }) =
         }
       }
 
-      // Extract language if specified
-      let language = 'javascript';
-      const langMatch = match[0].match(/data-language="([^"]*)"/);
-      if (langMatch) language = langMatch[1];
-
       // Clean HTML entities inside code block
       const code = match[1]
         .replace(/&lt;/g, '<')
@@ -99,6 +94,23 @@ export const MathText: React.FC<MathTextProps> = ({ content, className = "" }) =
         .replace(/&amp;/g, '&')
         .replace(/&quot;/g, '"')
         .replace(/&#39;/g, "'");
+
+      // Extract language if specified or auto-detect based on simple heuristics
+      let language = '';
+      const langMatch = match[0].match(/data-language="([^"]*)"/);
+      
+      if (langMatch && langMatch[1] && langMatch[1] !== 'auto' && langMatch[1] !== 'undefined') {
+        language = langMatch[1];
+      } else {
+        // Simple heuristics detection
+        if (/<\?php/i.test(code)) language = 'php';
+        else if (/\b(cout|cin|#include\s*<[a-z.]+>|std::)\b/.test(code)) language = 'cpp';
+        else if (/\b(public\s+class|System\.out\.println)\b/.test(code)) language = 'java';
+        else if (/\b(def\s+\w+\(|import\s+[a-z_]+|print\(|from\s+[a-z_]+\s+import)\b/.test(code) && !code.includes('{')) language = 'python';
+        else if (/<\/?html|<\/?head|<\/?body|<\/?div|<\/?span|<\/?p|</i.test(code) && !code.includes('<?')) language = 'html';
+        else if (/\b(SELECT|INSERT|UPDATE|DELETE|CREATE TABLE)\b/i.test(code)) language = 'sql';
+        else language = 'javascript'; // Default fallback
+      }
 
       parts.push({ 
         type: 'code', 
@@ -124,7 +136,15 @@ export const MathText: React.FC<MathTextProps> = ({ content, className = "" }) =
 
   const processHtml = (html: string) => {
     // 1. Math Detection (Fixed with word boundaries \b to avoid conflicts like 'Datang' -> 'tan')
-    let processed = html.replace(/\(\s*((?:[^\n()]|\((?:[^\n()]|\((?:[^\n()]|\([^\n()]*\))*\))*\))*?(\\|[\\^_]|\b(sum|sqrt|sin|cos|tan|cot|sec|csc|lim|log|ln|pi|alpha|beta|gamma|theta|sigma|infty|frac|left|right)\b)(?:[^\n()]|\((?:[^\n()]|\((?:[^\n()]|\([^\n()]*\))*\))*\))*?)\)/g, '\\( $1 \\)');
+    const mathRegex = /\(\s*((?:[^\n()]|\((?:[^\n()]|\((?:[^\n()]|\([^\n()]*\))*\))*\))*?(\\|[\\^_]|\b(sum|sqrt|sin|cos|tan|cot|sec|csc|lim|log|ln|pi|alpha|beta|gamma|theta|sigma|infty|frac|left|right)\b)(?:[^\n()]|\((?:[^\n()]|\((?:[^\n()]|\([^\n()]*\))*\))*\))*?)\)/g;
+    
+    let processed = html.replace(mathRegex, (match, p1) => {
+      // Avoid nesting if content is already wrapped in math delimiters
+      if (p1.includes('$') || p1.includes('\\(') || p1.includes('\\[')) {
+        return match;
+      }
+      return `\\( ${p1} \\)`;
+    });
     
     // 2. Arabic Detection & Styling (Premium Quranic Look)
     // Updated regex to include surrounding common punctuation like quotes (", «), dots, or colons

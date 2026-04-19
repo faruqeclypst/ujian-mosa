@@ -3,10 +3,12 @@ import { useNavigate } from "react-router-dom";
 import {
   Plus, Check, X, Edit, Power, PowerOff,
   School, Clock, Users, RefreshCw,
-  Search, Trash2, Monitor, Zap, Server, ChevronDown
+  Search, Trash2, Monitor, Zap, Server, ChevronDown,
+  Building2, Globe
 } from "lucide-react";
 import { masterPb } from "../../lib/pocketbase";
 import SuperAdminLayout from "../../components/layout/SuperAdminLayout";
+import { cn } from "../../lib/utils";
 
 interface SchoolRecord {
   id: string;
@@ -31,6 +33,13 @@ interface SchoolRequest {
   status: "pending" | "approved" | "rejected";
   created: string;
 }
+
+const PLAN_CONFIG: Record<string, { label: string; color: string }> = {
+  free: { label: "Free", color: "bg-slate-100 text-slate-600 border-slate-200" },
+  basic: { label: "Basic", color: "bg-blue-50 text-blue-700 border-blue-200" },
+  pro: { label: "Pro", color: "bg-amber-50 text-amber-700 border-amber-200" },
+  ultimate: { label: "Ultimate", color: "bg-purple-50 text-purple-700 border-purple-200" },
+};
 
 const SuperAdminDashboard = () => {
   const navigate = useNavigate();
@@ -70,7 +79,7 @@ const SuperAdminDashboard = () => {
     try {
       await masterPb.collection("schools").update(school.id, { is_active: !school.is_active });
       loadData();
-    } catch (err) {
+    } catch {
       alert("Gagal mengubah status sekolah.");
     }
   };
@@ -80,7 +89,7 @@ const SuperAdminDashboard = () => {
     try {
       await masterPb.collection("schools").delete(school.id);
       loadData();
-    } catch (err) {
+    } catch {
       alert("Gagal menghapus sekolah.");
     }
   };
@@ -96,7 +105,7 @@ const SuperAdminDashboard = () => {
         created: new Date().toISOString()
       });
       setShowAddModal(true);
-    } catch (err) {
+    } catch {
       alert("Gagal menyetujui pendaftaran.");
     }
   };
@@ -106,7 +115,7 @@ const SuperAdminDashboard = () => {
     try {
       await masterPb.collection("school_requests").update(req.id, { status: "rejected" });
       loadData();
-    } catch (err) {
+    } catch {
       alert("Gagal menolak pendaftaran.");
     }
   };
@@ -119,251 +128,421 @@ const SuperAdminDashboard = () => {
   const pendingCount = requests.filter(r => r.status === "pending").length;
   const activeCount = schools.filter(s => s.is_active).length;
 
+  const stats = [
+    { label: "Instansi Aktif", value: activeCount, icon: Zap, color: "text-amber-600", bg: "bg-amber-50", border: "border-amber-200" },
+    { label: "Total Sekolah", value: schools.length, icon: School, color: "text-blue-600", bg: "bg-blue-50", border: "border-blue-200" },
+    { label: "Menunggu", value: pendingCount, icon: Clock, color: "text-orange-600", bg: "bg-orange-50", border: "border-orange-200" },
+    { label: "Total Pendaftar", value: requests.length, icon: Users, color: "text-emerald-600", bg: "bg-emerald-50", border: "border-emerald-200" },
+  ];
+
   return (
     <SuperAdminLayout>
       {/* Page Header */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
-        <div>
-          <h2 className="text-3xl font-extrabold tracking-tight text-slate-900 mb-1">
-            Dashboard Utama
-          </h2>
-          <p className="text-slate-500 font-medium text-sm">Monitoring dan manajemen infrastruktur tenant E-Ujian.</p>
-        </div>
-        <div className="flex items-center gap-4">
-          <div className="bg-slate-100/80 border border-slate-200 rounded-xl p-1 flex shadow-sm">
-            <button
-              onClick={() => setTab("schools")}
-              className={`px-6 py-2 rounded-lg text-sm font-bold transition-all ${tab === "schools" ? "bg-white text-blue-700 shadow border-slate-200" : "text-slate-500 hover:text-slate-700"
-                }`}
-            >
-              Instansi Aktif
-            </button>
-            <button
-              onClick={() => setTab("requests")}
-              className={`px-6 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${tab === "requests" ? "bg-white text-blue-700 shadow border-slate-200" : "text-slate-500 hover:text-slate-700"
-                }`}
-            >
-              Pendaftaran {pendingCount > 0 && <span className="flex w-2 h-2 bg-red-500 rounded-full" />}
-            </button>
-          </div>
-          <button
-            onClick={() => { setEditSchool(null); setShowAddModal(true); }}
-            className="bg-blue-600 text-white px-5 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 hover:bg-blue-700 transition-all shadow-sm active:scale-95"
-          >
-            <Plus size={18} /> Tambah Sekolah
-          </button>
-        </div>
+      <div className="mb-6">
+        <h2 className="text-xl font-bold text-slate-900">Dashboard Institusi</h2>
+        <p className="text-slate-500 text-sm mt-0.5">Manajemen dan monitoring seluruh tenant E-Ujian.</p>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
-        {[
-          { label: "Instansi Aktif", value: activeCount, icon: Zap, color: "bg-amber-100 text-amber-600 border-amber-200" },
-          { label: "Total Sekolah", value: schools.length, icon: School, color: "bg-blue-100 text-blue-600 border-blue-200" },
-          { label: "Menunggu Persetujuan", value: pendingCount, icon: Clock, color: "bg-indigo-100 text-indigo-600 border-indigo-200" },
-          { label: "Total Pendaftar", value: requests.length, icon: Users, color: "bg-emerald-100 text-emerald-600 border-emerald-200" },
-        ].map((stat, i) => (
-          <div key={i} className="bg-white border border-slate-200 p-6 rounded-2xl shadow-sm hover:shadow-md transition-shadow">
-            <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-4 ${stat.color} border`}>
-              <stat.icon size={24} />
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
+        {stats.map((stat, i) => (
+          <div key={i} className={cn(
+            "bg-white border rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow",
+            stat.border
+          )}>
+            <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center mb-3", stat.bg)}>
+              <stat.icon size={16} className={stat.color} />
             </div>
-            <p className="text-slate-500 font-semibold text-xs uppercase tracking-wider mb-1">{stat.label}</p>
-            <h3 className="text-3xl font-black text-slate-900">{stat.value}</h3>
+            <p className="text-2xl font-bold text-slate-900">{loading ? "–" : stat.value}</p>
+            <p className="text-xs text-slate-500 font-medium mt-0.5">{stat.label}</p>
           </div>
         ))}
       </div>
 
-      {/* Main Table Interface */}
-      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
-        <div className="p-6 border-b border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-50/50">
-          <div className="flex items-center gap-3">
-            <h3 className="text-lg font-bold text-slate-900">{tab === "schools" ? "Daftar Sekolah Tersedia" : "Pendaftaran Masuk"}</h3>
-            <button
-              onClick={loadData}
-              className={`p-1.5 rounded-lg border border-slate-300 hover:bg-slate-100 transition-all bg-white shadow-sm ${loading ? "animate-spin" : ""}`}
-            >
-              <RefreshCw size={14} className="text-slate-600" />
-            </button>
-          </div>
-
-          <div className="relative group w-full max-w-sm">
-            <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
-            <input
-              type="text"
-              placeholder="Cari nama sekolah atau subdomain..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-white border border-slate-300 rounded-xl pl-10 pr-4 py-2.5 text-sm font-medium focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all placeholder:text-slate-400 shadow-sm"
-            />
-          </div>
+      {/* Tab + Action bar */}
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-4">
+        <div className="flex items-center bg-slate-100 rounded-xl p-1 gap-1 w-fit">
+          <button
+            onClick={() => setTab("schools")}
+            className={cn(
+              "px-4 py-2 rounded-lg text-sm font-semibold transition-all",
+              tab === "schools"
+                ? "bg-white text-blue-700 shadow-sm"
+                : "text-slate-500 hover:text-slate-700"
+            )}
+          >
+            <span className="flex items-center gap-2">
+              <Building2 size={14} />
+              Instansi
+              <span className={cn(
+                "text-[10px] font-bold px-1.5 py-0.5 rounded-full",
+                tab === "schools" ? "bg-blue-100 text-blue-700" : "bg-slate-200 text-slate-600"
+              )}>
+                {schools.length}
+              </span>
+            </span>
+          </button>
+          <button
+            onClick={() => setTab("requests")}
+            className={cn(
+              "px-4 py-2 rounded-lg text-sm font-semibold transition-all",
+              tab === "requests"
+                ? "bg-white text-blue-700 shadow-sm"
+                : "text-slate-500 hover:text-slate-700"
+            )}
+          >
+            <span className="flex items-center gap-2">
+              <Clock size={14} />
+              Pendaftaran
+              {pendingCount > 0 && (
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-red-100 text-red-600">
+                  {pendingCount}
+                </span>
+              )}
+            </span>
+          </button>
         </div>
 
-        <div className="overflow-x-auto">
-          {tab === "schools" ? (
-            <table className="w-full text-left">
-              <thead>
-                <tr className="bg-slate-50 text-slate-500 text-xs font-bold uppercase tracking-wider border-b border-slate-200">
-                  <th className="px-6 py-4">Identitas Sekolah</th>
-                  <th className="px-6 py-4">Alamat Sistem</th>
-                  <th className="px-6 py-4">Kuota & Paket</th>
-                  <th className="px-6 py-4">Status</th>
-                  <th className="px-6 py-4 text-right">Aksi</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {loading ? (
-                  <tr><td colSpan={5} className="px-6 py-16 text-center"><div className="flex items-center justify-center gap-2 text-slate-500 font-semibold"><RefreshCw size={18} className="animate-spin" /> Memuat data...</div></td></tr>
-                ) : filteredSchools.length === 0 ? (
-                  <tr><td colSpan={5} className="px-6 py-16 text-center text-slate-500 font-semibold">Tidak ada data sekolah yang ditemukan.</td></tr>
-                ) : filteredSchools.map(school => (
-                  <tr key={school.id} className="hover:bg-slate-50/80 transition-colors group">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center font-black text-blue-600 text-xl border border-blue-100">
-                          {school.name[0]}
-                        </div>
-                        <div>
-                          <p className="font-bold text-slate-900 text-sm mb-0.5">{school.name}</p>
-                          <p className="text-slate-500 text-xs font-medium">{school.contact_email || "-"}</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="space-y-1.5">
-                        <div className="flex items-center gap-2 text-xs font-mono text-slate-700 bg-slate-100 px-2.5 py-1 rounded-md border border-slate-200 w-fit">
-                          <Monitor size={14} className="text-slate-500" />
-                          {school.slug}.alfaruqasri.my.id
-                        </div>
-                        <a
-                          href={`${school.pb_url}${school.pb_url.endsWith("/") ? "" : "/"}_/`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-1.5 text-[10px] text-blue-600 hover:text-blue-700 hover:underline font-semibold ml-1"
-                        >
-                          <Server size={12} />
-                          Backend/Database
-                        </a>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="space-y-2 max-w-[140px]">
-                        <div className="flex justify-between items-center">
-                          <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md ${school.plan === 'pro' ? 'bg-amber-100 text-amber-700 border border-amber-200' : 'bg-slate-100 text-slate-600 border border-slate-200'
-                            }`}>{school.plan || 'Free'}</span>
-                          <span className="text-[10px] font-bold text-slate-500">{school.student_quota || 100} Siswa</span>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${school.is_active
-                          ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                          : "bg-slate-100 text-slate-600 border border-slate-200"
-                        }`}>
-                        <span className={`w-1.5 h-1.5 rounded-full ${school.is_active ? "bg-emerald-500" : "bg-slate-400"}`} />
-                        {school.is_active ? "Aktif" : "Nonaktif"}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button
-                          onClick={() => { setEditSchool(school); setShowAddModal(true); }}
-                          className="p-2 bg-white border border-slate-200 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all shadow-sm"
-                          title="Edit Sekolah"
-                        >
-                          <Edit size={16} />
-                        </button>
-                        <button
-                          onClick={() => toggleActive(school)}
-                          className={`p-2 bg-white border border-slate-200 rounded-lg transition-all shadow-sm ${school.is_active
-                              ? "text-slate-600 hover:text-amber-600 hover:bg-amber-50"
-                              : "text-slate-600 hover:text-emerald-600 hover:bg-emerald-50"
-                            }`}
-                          title={school.is_active ? "Nonaktifkan" : "Aktifkan"}
-                        >
-                          {school.is_active ? <PowerOff size={16} /> : <Power size={16} />}
-                        </button>
-                        <button
-                          onClick={() => deleteSchool(school)}
-                          className="p-2 bg-white border border-slate-200 text-slate-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all shadow-sm"
-                          title="Hapus Permanen"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          ) : (
-            <table className="w-full text-left">
-              <thead>
-                <tr className="bg-slate-50 text-slate-500 text-xs font-bold uppercase tracking-wider border-b border-slate-200">
-                  <th className="px-6 py-4">Nama Sekolah</th>
-                  <th className="px-6 py-4">Usulan Domain</th>
-                  <th className="px-6 py-4">Kontak</th>
-                  <th className="px-6 py-4">Status</th>
-                  <th className="px-6 py-4 text-right">Aksi</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {requests.length === 0 ? (
-                  <tr><td colSpan={5} className="px-6 py-16 text-center text-slate-500 font-semibold">Belum ada pendaftaran baru.</td></tr>
-                ) : requests.map(req => (
-                  <tr key={req.id} className="hover:bg-slate-50/80 transition-colors group">
-                    <td className="px-6 py-4">
-                      <p className="font-bold text-slate-900 text-sm mb-0.5">{req.school_name}</p>
-                      <p className="text-slate-500 text-xs font-medium">{new Date(req.created).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
-                    </td>
-                    <td className="px-6 py-4">
-                      <code className="text-xs font-mono px-2.5 py-1 bg-amber-50 text-amber-700 border border-amber-200 rounded-md">
-                        {req.slug_request}.alfaruqasri.my.id
-                      </code>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="space-y-1">
-                        <p className="text-xs text-slate-700 font-semibold">{req.contact_email}</p>
-                        <p className="text-[10px] text-slate-500 font-medium">{req.contact_phone || "-"}</p>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5 border ${req.status === "pending" ? "bg-amber-50 text-amber-600 border-amber-200"
-                          : req.status === "approved" ? "bg-emerald-50 text-emerald-600 border-emerald-200"
-                            : "bg-red-50 text-red-600 border-red-200"
-                        }`}>
-                        <span className={`w-1.5 h-1.5 rounded-full ${req.status === 'pending' ? 'bg-amber-500' : req.status === 'approved' ? 'bg-emerald-500' : 'bg-red-500'}`} />
-                        {req.status === "pending" ? "Menunggu" : req.status === "approved" ? "Disetujui" : "Ditolak"}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      {req.status === "pending" ? (
-                        <div className="flex items-center justify-end gap-2">
-                          <button
-                            onClick={() => approveRequest(req)}
-                            className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition-all shadow-sm flex items-center gap-1"
-                          >
-                            <Check size={14} /> Buat
-                          </button>
-                          <button
-                            onClick={() => rejectRequest(req)}
-                            className="px-3 py-1.5 bg-white border border-slate-300 text-slate-600 hover:text-red-600 hover:bg-red-50 hover:border-red-200 rounded-lg transition-all shadow-sm flex items-center gap-1"
-                          >
-                            <X size={14} /> Tolak
-                          </button>
-                        </div>
-                      ) : (
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-2">Selesai</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+        <div className="flex items-center gap-2 sm:ml-auto">
+          {/* Search */}
+          <div className="relative flex-1 sm:flex-none sm:w-56">
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Cari sekolah..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="w-full h-9 bg-white border border-slate-200 rounded-xl pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 shadow-sm"
+            />
+          </div>
+
+          {/* Refresh */}
+          <button
+            onClick={loadData}
+            className={cn(
+              "h-9 w-9 flex items-center justify-center bg-white border border-slate-200 rounded-xl hover:bg-slate-50 shadow-sm transition-all",
+              loading && "opacity-60 pointer-events-none"
+            )}
+          >
+            <RefreshCw size={15} className={cn("text-slate-600", loading && "animate-spin")} />
+          </button>
+
+          {/* Add */}
+          <button
+            onClick={() => { setEditSchool(null); setShowAddModal(true); }}
+            className="h-9 px-4 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl flex items-center gap-2 shadow-sm transition-all active:scale-95 whitespace-nowrap"
+          >
+            <Plus size={15} />
+            <span className="hidden sm:inline">Tambah</span>
+          </button>
         </div>
       </div>
 
-      {/* Deployment Modal */}
+      {/* Table */}
+      <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+        {tab === "schools" ? (
+          <>
+            {/* Desktop Table */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-200">
+                    <th className="px-5 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Sekolah</th>
+                    <th className="px-5 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Alamat Sistem</th>
+                    <th className="px-5 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Paket</th>
+                    <th className="px-5 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Status</th>
+                    <th className="px-5 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider text-right">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {loading ? (
+                    <tr><td colSpan={5} className="px-5 py-12 text-center">
+                      <div className="flex items-center justify-center gap-2 text-slate-400 text-sm">
+                        <RefreshCw size={16} className="animate-spin" /> Memuat data...
+                      </div>
+                    </td></tr>
+                  ) : filteredSchools.length === 0 ? (
+                    <tr><td colSpan={5} className="px-5 py-12 text-center text-slate-400 text-sm font-medium">
+                      Tidak ada data sekolah ditemukan.
+                    </td></tr>
+                  ) : filteredSchools.map(school => (
+                    <tr key={school.id} className="hover:bg-slate-50/70 transition-colors group">
+                      <td className="px-5 py-3.5">
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center font-bold text-blue-600 text-sm flex-shrink-0">
+                            {school.name[0]}
+                          </div>
+                          <div>
+                            <p className="font-semibold text-slate-900 text-sm">{school.name}</p>
+                            <p className="text-xs text-slate-400">{school.contact_email || "–"}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-1.5 text-xs font-mono bg-slate-100 text-slate-700 px-2 py-1 rounded-md w-fit border border-slate-200">
+                            <Monitor size={11} className="text-slate-500" />
+                            {school.slug}.alfaruqasri.my.id
+                          </div>
+                          <a
+                            href={`${school.pb_url}${school.pb_url.endsWith("/") ? "" : "/"}_/`}
+                            target="_blank" rel="noopener noreferrer"
+                            className="flex items-center gap-1 text-[10px] text-blue-500 hover:text-blue-700 hover:underline font-semibold"
+                          >
+                            <Server size={10} /> Backend DB
+                          </a>
+                        </div>
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <div className="space-y-1">
+                          <span className={cn(
+                            "inline-block text-[10px] font-bold uppercase px-2 py-0.5 rounded-md border",
+                            PLAN_CONFIG[school.plan || "free"]?.color
+                          )}>
+                            {PLAN_CONFIG[school.plan || "free"]?.label}
+                          </span>
+                          <p className="text-[10px] text-slate-500 font-medium">{school.student_quota || 100} Siswa</p>
+                        </div>
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <div className={cn(
+                          "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border",
+                          school.is_active
+                            ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                            : "bg-slate-100 text-slate-500 border-slate-200"
+                        )}>
+                          <span className={cn("w-1.5 h-1.5 rounded-full", school.is_active ? "bg-emerald-500" : "bg-slate-400")} />
+                          {school.is_active ? "Aktif" : "Nonaktif"}
+                        </div>
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <div className="flex items-center justify-end gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            onClick={() => { setEditSchool(school); setShowAddModal(true); }}
+                            className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-500 hover:text-blue-600 hover:bg-blue-50 hover:border-blue-200 transition-all"
+                            title="Edit"
+                          >
+                            <Edit size={14} />
+                          </button>
+                          <button
+                            onClick={() => toggleActive(school)}
+                            className={cn(
+                              "p-1.5 rounded-lg border border-slate-200 bg-white transition-all",
+                              school.is_active
+                                ? "text-slate-500 hover:text-amber-600 hover:bg-amber-50 hover:border-amber-200"
+                                : "text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 hover:border-emerald-200"
+                            )}
+                            title={school.is_active ? "Nonaktifkan" : "Aktifkan"}
+                          >
+                            {school.is_active ? <PowerOff size={14} /> : <Power size={14} />}
+                          </button>
+                          <button
+                            onClick={() => deleteSchool(school)}
+                            className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-500 hover:text-red-600 hover:bg-red-50 hover:border-red-200 transition-all"
+                            title="Hapus"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile Cards */}
+            <div className="md:hidden divide-y divide-slate-100">
+              {loading ? (
+                <div className="py-12 text-center text-slate-400 text-sm flex items-center justify-center gap-2">
+                  <RefreshCw size={16} className="animate-spin" /> Memuat...
+                </div>
+              ) : filteredSchools.length === 0 ? (
+                <div className="py-12 text-center text-slate-400 text-sm">Tidak ada data ditemukan.</div>
+              ) : filteredSchools.map(school => (
+                <div key={school.id} className="p-4 space-y-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-9 h-9 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center font-bold text-blue-600 text-sm flex-shrink-0">
+                        {school.name[0]}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-semibold text-slate-900 text-sm truncate">{school.name}</p>
+                        <p className="text-xs text-slate-400 truncate">{school.contact_email || "–"}</p>
+                      </div>
+                    </div>
+                    <div className={cn(
+                      "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border flex-shrink-0",
+                      school.is_active ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-slate-100 text-slate-500 border-slate-200"
+                    )}>
+                      <span className={cn("w-1.5 h-1.5 rounded-full", school.is_active ? "bg-emerald-500" : "bg-slate-400")} />
+                      {school.is_active ? "Aktif" : "Nonaktif"}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <span className={cn("text-[10px] font-bold uppercase px-2 py-0.5 rounded border", PLAN_CONFIG[school.plan || "free"]?.color)}>
+                      {PLAN_CONFIG[school.plan || "free"]?.label}
+                    </span>
+                    <span className="text-[10px] text-slate-500">{school.student_quota || 100} Siswa</span>
+                  </div>
+
+                  <div className="text-xs font-mono bg-slate-100 text-slate-600 px-2 py-1.5 rounded-lg flex items-center gap-1.5">
+                    <Globe size={11} />
+                    {school.slug}.alfaruqasri.my.id
+                  </div>
+
+                  <div className="flex items-center gap-2 pt-1">
+                    <button
+                      onClick={() => { setEditSchool(school); setShowAddModal(true); }}
+                      className="flex-1 h-8 text-xs font-semibold border border-slate-200 bg-white text-slate-700 rounded-lg flex items-center justify-center gap-1 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 transition-all"
+                    >
+                      <Edit size={13} /> Edit
+                    </button>
+                    <button
+                      onClick={() => toggleActive(school)}
+                      className={cn(
+                        "flex-1 h-8 text-xs font-semibold border bg-white rounded-lg flex items-center justify-center gap-1 transition-all",
+                        school.is_active
+                          ? "border-amber-200 text-amber-600 hover:bg-amber-50"
+                          : "border-emerald-200 text-emerald-600 hover:bg-emerald-50"
+                      )}
+                    >
+                      {school.is_active ? <><PowerOff size={13} /> Nonaktif</> : <><Power size={13} /> Aktifkan</>}
+                    </button>
+                    <button
+                      onClick={() => deleteSchool(school)}
+                      className="h-8 w-8 border border-red-200 bg-white text-red-500 rounded-lg flex items-center justify-center hover:bg-red-50 transition-all flex-shrink-0"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        ) : (
+          <>
+            {/* Requests Desktop */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-200">
+                    <th className="px-5 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Nama Sekolah</th>
+                    <th className="px-5 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Domain</th>
+                    <th className="px-5 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Kontak</th>
+                    <th className="px-5 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Status</th>
+                    <th className="px-5 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider text-right">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {requests.length === 0 ? (
+                    <tr><td colSpan={5} className="px-5 py-12 text-center text-slate-400 text-sm">Belum ada pendaftaran.</td></tr>
+                  ) : requests.map(req => (
+                    <tr key={req.id} className="hover:bg-slate-50/70 transition-colors">
+                      <td className="px-5 py-3.5">
+                        <p className="font-semibold text-slate-900 text-sm">{req.school_name}</p>
+                        <p className="text-xs text-slate-400">{new Date(req.created).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}</p>
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <code className="text-xs font-mono px-2 py-1 bg-amber-50 text-amber-700 border border-amber-200 rounded-md">
+                          {req.slug_request}.alfaruqasri.my.id
+                        </code>
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <p className="text-sm text-slate-800 font-medium">{req.contact_email}</p>
+                        <p className="text-xs text-slate-400">{req.contact_phone || "–"}</p>
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <span className={cn(
+                          "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide border",
+                          req.status === "pending" ? "bg-amber-50 text-amber-700 border-amber-200"
+                            : req.status === "approved" ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                              : "bg-red-50 text-red-600 border-red-200"
+                        )}>
+                          <span className={cn("w-1.5 h-1.5 rounded-full",
+                            req.status === "pending" ? "bg-amber-500" : req.status === "approved" ? "bg-emerald-500" : "bg-red-500"
+                          )} />
+                          {req.status === "pending" ? "Menunggu" : req.status === "approved" ? "Disetujui" : "Ditolak"}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3.5 text-right">
+                        {req.status === "pending" ? (
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              onClick={() => approveRequest(req)}
+                              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition-all flex items-center gap-1"
+                            >
+                              <Check size={13} /> Buat
+                            </button>
+                            <button
+                              onClick={() => rejectRequest(req)}
+                              className="px-3 py-1.5 border border-slate-200 bg-white text-slate-600 hover:text-red-600 hover:bg-red-50 hover:border-red-200 text-xs font-semibold rounded-lg transition-all flex items-center gap-1"
+                            >
+                              <X size={13} /> Tolak
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Selesai</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Requests Mobile */}
+            <div className="md:hidden divide-y divide-slate-100">
+              {requests.length === 0 ? (
+                <div className="py-12 text-center text-slate-400 text-sm">Belum ada pendaftaran.</div>
+              ) : requests.map(req => (
+                <div key={req.id} className="p-4 space-y-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <p className="font-semibold text-slate-900 text-sm">{req.school_name}</p>
+                      <p className="text-xs text-slate-400">{new Date(req.created).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}</p>
+                    </div>
+                    <span className={cn(
+                      "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border flex-shrink-0",
+                      req.status === "pending" ? "bg-amber-50 text-amber-700 border-amber-200"
+                        : req.status === "approved" ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                          : "bg-red-50 text-red-600 border-red-200"
+                    )}>
+                      {req.status === "pending" ? "Menunggu" : req.status === "approved" ? "Disetujui" : "Ditolak"}
+                    </span>
+                  </div>
+                  <code className="text-xs font-mono px-2 py-1 bg-amber-50 text-amber-700 border border-amber-200 rounded-md block">
+                    {req.slug_request}.alfaruqasri.my.id
+                  </code>
+                  <p className="text-xs text-slate-600">{req.contact_email}</p>
+                  {req.status === "pending" && (
+                    <div className="flex gap-2">
+                      <button onClick={() => approveRequest(req)} className="flex-1 h-8 bg-emerald-600 text-white text-xs font-bold rounded-lg flex items-center justify-center gap-1">
+                        <Check size={13} /> Buat Institusi
+                      </button>
+                      <button onClick={() => rejectRequest(req)} className="h-8 px-3 border border-slate-200 text-slate-600 text-xs font-semibold rounded-lg hover:text-red-600 transition-colors">
+                        Tolak
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Footer */}
+      <div className="mt-4 flex items-center justify-between text-xs text-slate-400">
+        <span>
+          {tab === "schools"
+            ? `${filteredSchools.length} dari ${schools.length} sekolah`
+            : `${requests.length} pendaftaran`}
+        </span>
+      </div>
+
+      {/* Modal */}
       {showAddModal && (
         <AddEditSchoolModal
           school={editSchool}
@@ -376,7 +555,7 @@ const SuperAdminDashboard = () => {
 };
 
 // ============================================================
-// Enhanced Deployment Modal
+// Add/Edit Modal
 // ============================================================
 const AddEditSchoolModal = ({
   school,
@@ -402,18 +581,15 @@ const AddEditSchoolModal = ({
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
-
     if (name === "plan") {
       let autoQuota = form.student_quota;
       if (value === "free") autoQuota = 50;
       else if (value === "basic") autoQuota = 250;
       else if (value === "pro") autoQuota = 500;
       else if (value === "ultimate") autoQuota = 1000;
-
       setForm(prev => ({ ...prev, plan: value, student_quota: autoQuota }));
       return;
     }
-
     setForm(prev => ({
       ...prev,
       [name]: type === "checkbox" ? (e.target as HTMLInputElement).checked
@@ -427,17 +603,11 @@ const AddEditSchoolModal = ({
     e.preventDefault();
     setError("");
     if (!form.name || !form.slug) {
-      setError("Nama institusi dan sub domain wajib diisi.");
+      setError("Nama institusi dan subdomain wajib diisi.");
       return;
     }
-
     const autoPbUrl = `https://${form.slug}.alfaruqasri.my.id`;
-    const finalForm = {
-      ...form,
-      pb_url: autoPbUrl,
-      student_quota: Number(form.student_quota) || 0
-    };
-
+    const finalForm = { ...form, pb_url: autoPbUrl, student_quota: Number(form.student_quota) || 0 };
     setLoading(true);
     try {
       if (isEdit) {
@@ -454,127 +624,103 @@ const AddEditSchoolModal = ({
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200" onClick={onClose}>
+    <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-sm" onClick={onClose}>
       <div
-        className="bg-white border border-slate-200 rounded-3xl shadow-2xl w-full max-w-xl p-8 animate-in zoom-in-95 duration-200"
+        className="bg-white w-full sm:max-w-lg rounded-t-2xl sm:rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto"
         onClick={e => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between mb-8 border-b border-slate-100 pb-4">
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 sticky top-0 bg-white z-10">
           <div>
-            <h2 className="text-xl font-bold text-slate-900">{isEdit ? "Edit Konfigurasi Institusi" : "Buat Institusi Baru"}</h2>
-            <p className="text-slate-500 text-xs font-medium mt-1">Sistem akan secara otomatis menyiapkan environment</p>
+            <h2 className="text-base font-bold text-slate-900">{isEdit ? "Edit Institusi" : "Buat Institusi Baru"}</h2>
+            <p className="text-xs text-slate-500 mt-0.5">Konfigurasi lingkungan tenant secara otomatis</p>
           </div>
-          <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-all">
-            <X size={20} />
+          <button onClick={onClose} className="p-2 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-all">
+            <X size={18} />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-5">
+        {/* Body */}
+        <form onSubmit={handleSubmit} className="p-5 space-y-4">
           {error && (
-            <div className="bg-red-50 border border-red-200 text-red-600 text-xs px-4 py-3 rounded-xl font-medium flex items-center gap-2">
-              <div className="w-1.5 h-1.5 bg-red-500 rounded-full flex-shrink-0" />
+            <div className="bg-red-50 border border-red-200 text-red-600 text-sm px-4 py-3 rounded-xl flex items-center gap-2 font-medium">
+              <div className="w-1.5 h-1.5 rounded-full bg-red-500 flex-shrink-0" />
               {error}
             </div>
           )}
 
-          <div className="grid grid-cols-1 gap-5">
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1.5">Nama Institusi <span className="text-blue-600">*</span></label>
+            <input
+              type="text" name="name" value={form.name} onChange={handleChange}
+              placeholder="cth. SMP Negeri 1 Jakarta" required
+              className="w-full h-10 border border-slate-200 rounded-xl px-3.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 shadow-sm bg-white"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1.5">Nama Institusi</label>
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5">Subdomain <span className="text-blue-600">*</span></label>
               <input
-                type="text"
-                name="name"
-                value={form.name}
-                onChange={handleChange}
-                placeholder="cth. SMP Negeri 1 Jakarta"
-                className="w-full bg-white border border-slate-300 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl px-4 py-3 text-slate-900 text-sm font-medium outline-none transition-all shadow-sm"
+                type="text" name="slug" value={form.slug} onChange={handleChange}
+                disabled={isEdit} placeholder="smpn1"
+                className={cn(
+                  "w-full h-10 border border-slate-200 rounded-xl px-3.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 shadow-sm bg-white",
+                  isEdit && "opacity-60 cursor-not-allowed bg-slate-50"
+                )}
               />
+              <p className="text-[10px] text-slate-400 mt-1 font-mono truncate">
+                {form.slug || "..."}.alfaruqasri.my.id
+              </p>
+              {isEdit && <p className="text-[10px] text-red-500 font-semibold">Tidak bisa diubah</p>}
             </div>
-
-            <div className="grid grid-cols-2 gap-5">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">Subdomain URL</label>
-                <input
-                  type="text"
-                  name="slug"
-                  value={form.slug}
-                  onChange={handleChange}
-                  disabled={isEdit}
-                  placeholder="smpn1"
-                  className={`w-full bg-white border border-slate-300 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl px-4 py-3 text-slate-900 text-sm font-medium outline-none transition-all shadow-sm ${isEdit ? "opacity-60 cursor-not-allowed bg-slate-50" : ""}`}
-                />
-                <p className="text-[11px] font-medium text-slate-500 mt-1.5 break-all">
-                  {form.slug || '...'}.alfaruqasri.my.id
-                  {isEdit && <span className="block mt-1 text-red-500 font-bold italic">Subdomain tidak dapat diubah setelah instalasi.</span>}
-                </p>
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">Email Administrator</label>
-                <input
-                  type="email"
-                  name="contact_email"
-                  value={form.contact_email}
-                  onChange={handleChange}
-                  placeholder="admin@sekolah.sch.id"
-                  className="w-full bg-white border border-slate-300 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl px-4 py-3 text-slate-900 text-sm font-medium outline-none transition-all shadow-sm"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-5">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">Pilihan Paket</label>
-                <div className="relative">
-                  <select
-                    name="plan"
-                    value={form.plan}
-                    onChange={handleChange}
-                    className="w-full bg-white border border-slate-300 rounded-xl px-4 py-3 text-slate-900 text-sm font-medium outline-none focus:ring-4 focus:ring-blue-500/10 transition-all appearance-none shadow-sm cursor-pointer"
-                  >
-                    <option value="free">Free (50 Siswa)</option>
-                    <option value="basic">Basic (250 Siswa)</option>
-                    <option value="pro">Pro (500 Siswa)</option>
-                    <option value="ultimate" disabled>Ultimate (1000 Siswa) - Segera</option>
-                  </select>
-                  <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
-                    <ChevronDown size={16} />
-                  </div>
-                </div>
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">Maksimal Kuota Siswa</label>
-                <input
-                  type="number"
-                  name="student_quota"
-                  value={form.student_quota}
-                  onChange={handleChange}
-                  className="w-full bg-white border border-slate-300 rounded-xl px-4 py-3 text-slate-900 text-sm font-medium outline-none focus:ring-4 focus:ring-blue-500/10 transition-all shadow-sm"
-                />
-              </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5">Email Admin</label>
+              <input
+                type="email" name="contact_email" value={form.contact_email} onChange={handleChange}
+                placeholder="admin@sekolah.sch.id"
+                className="w-full h-10 border border-slate-200 rounded-xl px-3.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 shadow-sm bg-white"
+              />
             </div>
           </div>
 
-          <div className="pt-4 mt-4 border-t border-slate-100 flex gap-3">
-            <button
-              type="button"
-              disabled={loading}
-              onClick={onClose}
-              className="flex-1 bg-white border border-slate-300 text-slate-700 rounded-xl py-3.5 text-sm font-bold hover:bg-slate-50 transition-all"
-            >
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5">Paket</label>
+              <div className="relative">
+                <select
+                  name="plan" value={form.plan} onChange={handleChange}
+                  className="w-full h-10 border border-slate-200 rounded-xl px-3.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 appearance-none bg-white cursor-pointer"
+                >
+                  <option value="free">Free (50 Siswa)</option>
+                  <option value="basic">Basic (250 Siswa)</option>
+                  <option value="pro">Pro (500 Siswa)</option>
+                  <option value="ultimate" disabled>Ultimate (1000) - Segera</option>
+                </select>
+                <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5">Kuota Siswa</label>
+              <input
+                type="number" name="student_quota" value={form.student_quota} onChange={handleChange}
+                className="w-full h-10 border border-slate-200 rounded-xl px-3.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 shadow-sm bg-white"
+              />
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="flex gap-3 pt-2">
+            <button type="button" onClick={onClose} disabled={loading}
+              className="flex-1 h-10 border border-slate-200 text-slate-700 rounded-xl text-sm font-semibold hover:bg-slate-50 transition-all">
               Batal
             </button>
-            <button
-              type="submit"
-              disabled={loading}
-              className="flex-[2] bg-blue-600 text-white rounded-xl py-3.5 text-sm font-bold hover:bg-blue-700 shadow-sm shadow-blue-500/20 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-            >
+            <button type="submit" disabled={loading}
+              className="flex-[2] h-10 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition-all disabled:opacity-50 flex items-center justify-center gap-2">
               {loading ? (
-                <>
-                  <RefreshCw size={16} className="animate-spin" /> Sedang Memproses...
-                </>
+                <><RefreshCw size={14} className="animate-spin" /> Memproses...</>
               ) : (
-                <>
-                  <Check size={18} /> {isEdit ? "Simpan Perubahan" : "Eksekusi & Buat Tenant"}
-                </>
+                <><Check size={15} /> {isEdit ? "Simpan" : "Buat Tenant"}</>
               )}
             </button>
           </div>

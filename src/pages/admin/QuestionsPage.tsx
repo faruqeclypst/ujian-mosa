@@ -293,8 +293,8 @@ const QuestionsPage = () => {
   const [isDeleting, setIsDeleting] = useState(false);
 
   const [isGalleryOpen, setIsGalleryOpen] = useState(false);
-  const [galleryImages, setGalleryImages] = useState<string[]>([]);
-  const [galleryTarget, setGalleryTarget] = useState<{ type: "cover" | "choice" | "batch"; letter?: string; index?: number } | null>(null);
+  const [galleryGroups, setGalleryGroups] = useState<{ title: string; images: string[] }[]>([]);
+  const [galleryTarget, setGalleryTarget] = useState<{ type: "cover" | "choice" | "batch" | "quill"; letter?: string; index?: number; quillInstance?: any; quillIndex?: number } | null>(null);
 
   // 🤖 AI Import State
   const [isAIImportOpen, setIsAIImportOpen] = useState(false);
@@ -306,17 +306,111 @@ const QuestionsPage = () => {
   const [isLiterasiGuideOpen, setIsLiterasiGuideOpen] = useState(false);
   const [isMathGuideOpen, setIsMathGuideOpen] = useState(false);
 
-  const loadGalleryImages = () => {
-    const images = new Set<string>();
+  const loadGalleryImages = async () => {
+    const userGroups: Record<string, Set<string>> = {
+      "Gambar Admin / Sistem": new Set(),
+      "Soal Saya Saat Ini": new Set(),
+    };
+
+    try {
+      if (pb) {
+        // Fetch exams di try-catch terpisah agar tidak membatalkan fetch soal jika teacher tidak punya akses
+        const examToTeacher: Record<string, string> = {};
+        try {
+          const examsData = await pb.collection("exams").getFullList();
+          examsData.forEach(ex => {
+              examToTeacher[ex.id] = ex.teacherId || ex.teacherid;
+          });
+        } catch (e) {
+          console.warn("Gagal fetch exams list (mungkin karena pembatasan hak akses). Mapping uploader akan terbatas.");
+        }
+
+        // Fetch questions dengan getList yang lebih stabil untuk menggunakan limit (HAPUS image != "" karena error PB 400 Bad Request)
+        const pRes = await pb.collection("questions").getList(1, 100, {
+          filter: 'imageUrl != ""',
+          sort: '-created'
+        });
+        const qRecords = pRes.items || [];
+
+        const extractHtmlImages = (html: string, uploadName: string) => {
+          if (!html || !html.includes("<img")) return;
+          try {
+            const doc = new DOMParser().parseFromString(html, "text/html");
+            doc.querySelectorAll("img").forEach(img => {
+              const src = img.getAttribute("src");
+              if (src && !src.startsWith("data:")) userGroups[uploadName].add(src);
+            });
+          } catch(e) {}
+        };
+
+        qRecords.forEach((q: any) => {
+          let uploaderName = "Gambar Admin / Sistem";
+          
+          if (q.examId) {
+             const tId = examToTeacher[q.examId];
+             if (tId === teacherId && tId) {
+                 uploaderName = "Arsip Soal Saya";
+             } else if (tId) {
+                 // Cari dari list teachers
+                 const foundTeacher = teachers.find((t: any) => t.id === tId);
+                 if (foundTeacher) {
+                    uploaderName = `Dari: ${foundTeacher.name}`;
+                 }
+             }
+          }
+
+          if (!userGroups[uploaderName]) userGroups[uploaderName] = new Set();
+          if (q.imageUrl) userGroups[uploaderName].add(q.imageUrl);
+          extractHtmlImages(q.text, uploaderName);
+
+          if (q.options) {
+            Object.values(q.options).forEach((c: any) => {
+              if (c.imageUrl) userGroups[uploaderName].add(c.imageUrl);
+              extractHtmlImages(c.text, uploaderName);
+            });
+          }
+          if (q.choices) {
+            Object.values(q.choices).forEach((c: any) => {
+              if (c.imageUrl) userGroups[uploaderName].add(c.imageUrl);
+              extractHtmlImages(c.text, uploaderName);
+            });
+          }
+        });
+      }
+    } catch (e) {
+      console.warn("Gagal mengambil galeri server:", e);
+    }
+
+    // Tambahkan juga dari state lokal (soal ujian yang sedang di-edit)
+    const extractHtmlImagesLocal = (html: string, uploadName: string) => {
+      if (!html || !html.includes("<img")) return;
+      try {
+        const doc = new DOMParser().parseFromString(html, "text/html");
+        doc.querySelectorAll("img").forEach(img => {
+          const src = img.getAttribute("src");
+          if (src && !src.startsWith("data:")) userGroups[uploadName].add(src);
+        });
+      } catch(e) {}
+    };
+
     questions.forEach((q) => {
-      if (q.imageUrl) images.add(q.imageUrl);
+      let uploaderName = "Soal Saya Saat Ini";
+      if (!userGroups[uploaderName]) userGroups[uploaderName] = new Set();
+      if (q.imageUrl) userGroups[uploaderName].add(q.imageUrl);
+      extractHtmlImagesLocal(q.text, uploaderName);
       if (q.choices) {
         Object.values(q.choices).forEach((c) => {
-          if (c.imageUrl) images.add(c.imageUrl);
+          if (c.imageUrl) userGroups[uploaderName].add(c.imageUrl);
+          extractHtmlImagesLocal(c.text || "", uploaderName);
         });
       }
     });
-    setGalleryImages(Array.from(images));
+
+    const arr: { title: string; images: string[] }[] = Object.keys(userGroups)
+        .map(key => ({ title: key, images: Array.from(userGroups[key]) }))
+        .filter(g => g.images.length > 0);
+
+    setGalleryGroups(arr);
   };
 
   const handlePickGallery = (url: string) => {
@@ -334,6 +428,21 @@ const QuestionsPage = () => {
     } else if (galleryTarget.type === "batch" && galleryTarget.index !== undefined) {
       updateBatchItem(galleryTarget.index, "imageUrl", url);
       updateBatchItem(galleryTarget.index, "imageFile", null); // Reset file jika ada
+    } else if (galleryTarget.type === "quill" && galleryTarget.quillInstance) {
+      const q = galleryTarget.quillInstance;
+      const targetIndex = galleryTarget.quillIndex !== undefined ? galleryTarget.quillIndex : (q.getSelection()?.index || 0);
+      q.insertEmbed(targetIndex, "image", url);
+      setTimeout(() => {
+        const imgs = q.root.querySelectorAll('img');
+        imgs.forEach((img: any) => {
+          if (img.getAttribute('src') === url) {
+             img.setAttribute('width', '350');
+             img.style.display = 'block';
+             img.style.margin = '10px auto';
+          }
+        });
+      }, 10);
+      q.setSelection(targetIndex + 1);
     }
 
     setIsGalleryOpen(false);
@@ -358,21 +467,43 @@ const QuestionsPage = () => {
     if (file.size > 200 * 1024) {
       fileToUpload = await compressImage(file);
     }
+    const finalSize = formatSize(fileToUpload.size);
 
     if (!galleryTarget) return;
 
     if (galleryTarget.type === "cover") {
-      setQuestionFile(fileToUpload);
       setFormValues((prev) => ({ ...prev, imageUrl: "" }));
-      setCoverSizeInfo(file.size > 200 * 1024 ? `${origSize} ➔ ${formatSize(fileToUpload.size)}` : `${origSize} (Hemat)`);
+      setQuestionFile(fileToUpload);
+      setCoverSizeInfo(`${origSize} -> ${finalSize}`);
     } else if (galleryTarget.type === "choice" && galleryTarget.letter) {
       const letter = galleryTarget.letter;
       setChoiceFiles((prev) => ({ ...prev, [letter]: fileToUpload }));
       handleChoiceChange(letter, "imageUrl", "");
-      setChoicesSizeInfo((prev) => ({ ...prev, [letter]: file.size > 100 * 1024 ? `${origSize} ➔ ${formatSize(fileToUpload.size)}` : `${origSize} (Hemat)` }));
+      setChoicesSizeInfo((prev) => ({ ...prev, [letter]: `${origSize} -> ${finalSize}` }));
     } else if (galleryTarget.type === "batch" && galleryTarget.index !== undefined) {
       updateBatchItem(galleryTarget.index, "imageFile", fileToUpload);
-      updateBatchItem(galleryTarget.index, "imageUrl", "");
+      updateBatchItem(galleryTarget.index, "imageUrl", ""); 
+    } else if (galleryTarget.type === "quill" && galleryTarget.quillInstance) {
+       const reader = new FileReader();
+       reader.readAsDataURL(fileToUpload);
+       reader.onload = () => {
+         const base64 = reader.result as string;
+         const q = galleryTarget.quillInstance;
+         const targetIndex = galleryTarget.quillIndex !== undefined ? galleryTarget.quillIndex : (q.getSelection()?.index || 0);
+         q.insertEmbed(targetIndex, "image", base64);
+         
+         setTimeout(() => {
+           const imgs = q.root.querySelectorAll('img');
+           imgs.forEach((img: any) => {
+             if (img.getAttribute('src') === base64) {
+               img.setAttribute('width', '350');
+               img.style.display = 'block';
+               img.style.margin = '10px auto';
+             }
+           });
+         }, 10);
+         q.setSelection(targetIndex + 1);
+       };
     }
 
     setIsPickerOpen(false);
@@ -971,46 +1102,13 @@ const QuestionsPage = () => {
 
   const imageHandler = useCallback(function (this: any) {
     const quill = this.quill; // <--- Instance editor yang sedang diklik toolbar-nya
-    const input = document.createElement("input");
-    input.setAttribute("type", "file");
-    input.setAttribute("accept", "image/*");
-    input.click();
-
-    input.onchange = async () => {
-      const file = input.files?.[0];
-      if (file) {
-        try {
-          let fileToUpload = file;
-          if (file.size > 200 * 1024) { // Compress jika > 200KB
-            fileToUpload = await compressImage(file);
-          }
-          const reader = new FileReader();
-          reader.readAsDataURL(fileToUpload);
-          reader.onload = () => {
-            const base64 = reader.result as string;
-            if (quill) {
-              const range = quill.getSelection() || { index: 0 };
-              quill.insertEmbed(range.index, "image", base64);
-              
-              // ⚡ Set default size to 'Medium' (350px) & Center alignment
-              setTimeout(() => {
-                const img = quill.root.querySelector(`img[src="${base64}"]`);
-                if (img) {
-                  img.setAttribute('width', '350');
-                  img.style.display = 'block';
-                  img.style.margin = '10px auto';
-                }
-              }, 1);
-              
-              quill.setSelection(range.index + 1);
-            }
-          };
-        } catch (e) {
-          alert("Gagal mengunggah gambar ke editor.");
-        }
-      }
-    };
-  }, [examId]);
+    
+    // Alih-alih pakai native browser <input>, kita pakai Custom Gallery UI kita
+    const range = quill.getSelection();
+    const cursorIndex = range ? range.index : quill.getLength();
+    setGalleryTarget({ type: "quill", quillInstance: quill, quillIndex: cursorIndex });
+    setIsPickerOpen(true);
+  }, []);
 
   const quillModules = useMemo(() => ({
     toolbar: {
@@ -3721,28 +3819,36 @@ const QuestionsPage = () => {
         showCancel={confirmModal.showCancel}
       />
       <Dialog open={isGalleryOpen} onOpenChange={setIsGalleryOpen}>
-        <DialogContent className="max-w-3xl bg-card max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Galeri Media Ujian</DialogTitle>
+        <DialogContent className="max-w-4xl bg-card max-h-[80vh] overflow-hidden flex flex-col p-0">
+          <DialogHeader className="p-6 border-b border-slate-100 dark:border-slate-800">
+            <DialogTitle>Galeri Media Bersama</DialogTitle>
+            <p className="text-xs text-slate-500">Pilih gambar yang pernah diunggah oleh Anda atau rekan guru lainnya.</p>
           </DialogHeader>
-          <div className="pt-2">
-            {galleryImages.length === 0 ? (
-              <div className="text-center p-8 text-slate-400 text-sm">Belum ada gambar yang bisa digunakan di ujian ini.</div>
+          <div className="flex-1 overflow-y-auto p-6 space-y-8 scrollbar-thin">
+            {galleryGroups.length === 0 ? (
+              <div className="text-center p-12 text-slate-400 text-sm">Belum ada gambar yang bisa digunakan di server ini.</div>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {galleryImages.map((src, idx) => (
-                  <div
-                    key={idx}
-                    onClick={() => handlePickGallery(src)}
-                    className="group relative border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden cursor-pointer hover:border-blue-500 dark:hover:border-blue-400 transition-all bg-slate-50 dark:bg-slate-900 flex items-center justify-center p-2 h-28"
-                  >
-                    <img src={src} alt="Media" className="max-h-full max-w-full object-contain transition-transform group-hover:scale-105" />
-                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all">
-                      <span className="text-white text-xs font-semibold bg-blue-600 px-2 py-1 rounded-md">Gunakan</span>
-                    </div>
+              galleryGroups.map((group, gIdx) => (
+                <div key={gIdx} className="space-y-3">
+                  <h3 className="text-xs font-black uppercase text-indigo-500 tracking-widest pl-2 border-l-2 border-indigo-500 flex items-center gap-2">
+                    {group.title} <span className="text-slate-400 font-medium ml-1">({group.images.length} gambar)</span>
+                  </h3>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-3">
+                    {group.images.map((src, idx) => (
+                      <div
+                        key={idx}
+                        onClick={() => handlePickGallery(src)}
+                        className="group relative border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden cursor-pointer hover:border-indigo-500 dark:hover:border-indigo-400 transition-all bg-slate-50 dark:bg-slate-900 flex items-center justify-center p-2 h-24 shadow-sm"
+                      >
+                        <img src={src} alt="Media" className="max-h-full max-w-full object-contain transition-transform group-hover:scale-110" />
+                        <div className="absolute inset-0 bg-indigo-900/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all">
+                          <span className="text-white text-[10px] font-bold bg-indigo-600 px-3 py-1.5 rounded-lg shadow-sm tracking-widest uppercase">Pilih</span>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
+                </div>
+              ))
             )}
           </div>
         </DialogContent>

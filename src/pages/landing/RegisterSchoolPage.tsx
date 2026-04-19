@@ -1,20 +1,22 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { 
-  GraduationCap, 
-  ArrowLeft, 
-  CheckCircle, 
-  Send, 
-  Mail, 
-  Phone, 
-  MapPin, 
+import {
+  GraduationCap,
+  ArrowLeft,
+  CheckCircle,
+  Send,
+  Mail,
+  Phone,
+  MapPin,
   Hash,
   ShieldCheck,
   Zap,
   Globe,
-  AlertTriangle
+  AlertTriangle,
+  Building2,
 } from "lucide-react";
 import { masterPb } from "../../lib/pocketbase";
+import { cn } from "../../lib/utils";
 
 const RegisterSchoolPage = () => {
   const navigate = useNavigate();
@@ -43,7 +45,6 @@ const RegisterSchoolPage = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-
     if (!form.school_name || !form.slug_request || !form.contact_email) {
       setError("Nama sekolah, subdomain, dan email wajib diisi.");
       return;
@@ -52,13 +53,9 @@ const RegisterSchoolPage = () => {
       setError("Subdomain minimal 3 karakter.");
       return;
     }
-
     setLoading(true);
     try {
-      await masterPb.collection("school_requests").create({
-        ...form,
-        status: "pending",
-      });
+      await masterPb.collection("school_requests").create({ ...form, status: "pending" });
       setStep("success");
     } catch (err: any) {
       if (err.message?.includes("slug_request")) {
@@ -71,276 +68,286 @@ const RegisterSchoolPage = () => {
     }
   };
 
+  // SUCCESS STATE
   if (step === "success") {
     return (
-      <div className="min-h-screen bg-[#f8fafc] flex items-center justify-center p-6 font-sans relative overflow-hidden">
-        {/* Decorative background elements */}
-        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-100 rounded-full blur-[120px] opacity-50 animate-blob" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-emerald-100 rounded-full blur-[120px] opacity-50 animate-blob animation-delay-2000" />
-
-        <div className="max-w-xl w-full relative z-10">
-          <div className="bg-white/80 backdrop-blur-xl border border-white p-8 md:p-12 rounded-[3rem] shadow-[0_32px_64px_-16px_rgba(0,0,0,0.08)] text-center">
-            <div className="w-24 h-24 bg-emerald-500 rounded-[2.5rem] flex items-center justify-center mx-auto mb-8 shadow-[0_20px_40px_-10px_rgba(16,185,129,0.3)] animate-in zoom-in duration-500">
-              <CheckCircle size={48} className="text-white" />
-            </div>
-            
-            <h1 className="text-4xl font-display font-extrabold text-slate-900 mb-4 tracking-tight">
-              Pendaftaran Berhasil!
-            </h1>
-            
-            <p className="text-lg text-slate-600 mb-8 leading-relaxed">
-              Terima kasih telah mempercayai kami. Tim teknis <span className="font-bold text-slate-900">E-Ujian</span> akan segera memvalidasi pengajuan <span className="text-blue-600 font-bold">{form.school_name}</span>.
-            </p>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-              <div className="bg-white border border-slate-100 rounded-2xl p-5 text-left shadow-sm">
-                <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-2">Subdomain</p>
-                <div className="flex items-center gap-2 text-blue-600 font-mono font-bold text-sm">
-                  <Globe size={14} />
-                  {form.slug_request}.alfaruqasri.my.id
-                </div>
-              </div>
-              <div className="bg-white border border-slate-100 rounded-2xl p-5 text-left shadow-sm">
-                <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-2">Konfirmasi Email</p>
-                <div className="flex items-center gap-2 text-emerald-600 font-bold text-sm">
-                  <Mail size={14} />
-                  {form.contact_email}
-                </div>
-              </div>
-            </div>
-
-            <p className="text-sm text-slate-500 mb-10 font-medium italic">
-              * Estimasi aktivasi sistem adalah 1x24 jam kerja.
-            </p>
-
-            <button
-              onClick={() => navigate("/")}
-              className="w-full h-14 bg-slate-900 hover:bg-black text-white font-bold rounded-2xl transition-all flex items-center justify-center gap-2 shadow-xl hover:shadow-2xl hover:-translate-y-1 active:translate-y-0"
-            >
-              <ArrowLeft size={20} /> Kembali ke Beranda
-            </button>
+      <div className="min-h-screen bg-white flex items-center justify-center p-4 font-sans">
+        <div className="w-full max-w-md text-center">
+          {/* Icon */}
+          <div className="w-20 h-20 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-xl shadow-emerald-600/30">
+            <CheckCircle size={40} className="text-white" />
           </div>
+
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 mb-3">Pendaftaran Berhasil!</h1>
+          <p className="text-slate-500 text-base mb-8 leading-relaxed max-w-sm mx-auto">
+            Terima kasih! Tim <span className="font-bold text-slate-900">E-Ujian</span> akan segera memvalidasi pengajuan{" "}
+            <span className="text-blue-600 font-bold">{form.school_name}</span>.
+          </p>
+
+          <div className="grid grid-cols-2 gap-3 mb-6">
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-left">
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1.5">Subdomain</p>
+              <div className="flex items-center gap-1.5 text-blue-600 font-mono font-bold text-xs">
+                <Globe size={12} />
+                {form.slug_request}.alfaruqasri.my.id
+              </div>
+            </div>
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-left">
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1.5">Email Konfirmasi</p>
+              <div className="flex items-center gap-1.5 text-emerald-600 font-bold text-xs truncate">
+                <Mail size={12} className="flex-shrink-0" />
+                <span className="truncate">{form.contact_email}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mb-8">
+            <p className="text-amber-700 text-xs font-medium text-center">
+              ⏱ Estimasi aktivasi sistem: <strong>1×24 jam kerja</strong>
+            </p>
+          </div>
+
+          <button
+            onClick={() => navigate("/")}
+            className="w-full h-12 bg-slate-900 hover:bg-black text-white font-bold rounded-xl transition-all flex items-center justify-center gap-2 shadow-sm active:scale-95 text-sm"
+          >
+            <ArrowLeft size={18} />
+            Kembali ke Beranda
+          </button>
         </div>
       </div>
     );
   }
 
+  // FORM STATE
   return (
-    <div className="min-h-screen bg-[#f8fafc] flex flex-col items-center justify-center p-6 md:p-12 font-sans relative overflow-hidden">
-      {/* Dynamic Animated Background Blobs */}
-      <div className="absolute top-[-10%] right-[-10%] w-[50%] h-[50%] bg-blue-100/60 rounded-full blur-[120px] animate-blob" />
-      <div className="absolute bottom-[-10%] left-[-10%] w-[50%] h-[50%] bg-indigo-100/60 rounded-full blur-[120px] animate-blob animation-delay-2000" />
-      <div className="absolute top-[20%] left-[10%] w-[30%] h-[30%] bg-emerald-50/60 rounded-full blur-[100px] animate-blob animation-delay-4000" />
-
-      <div className="max-w-6xl w-full grid grid-cols-1 lg:grid-cols-12 gap-12 items-start relative z-10">
-        
-        {/* Left Column: Information & Branding */}
-        <div className="lg:col-span-5 lg:sticky lg:top-12">
-          <div className="flex items-center gap-4 mb-10 group cursor-pointer" onClick={() => navigate("/")}>
-            <div className="w-14 h-14 bg-blue-600 rounded-2xl flex items-center justify-center shadow-[0_20px_40px_-10px_rgba(37,99,235,0.3)] transition-transform group-hover:scale-110 duration-500">
-              <GraduationCap size={32} className="text-white" />
-            </div>
-            <div>
-              <h2 className="font-display font-extrabold text-2xl text-slate-900 leading-none">E-Ujian</h2>
-              <p className="text-blue-600 font-bold text-sm tracking-widest uppercase">Platform SaaS</p>
-            </div>
-          </div>
-
-          <h1 className="text-4xl md:text-5xl lg:text-6xl font-display font-extrabold text-slate-900 mb-6 leading-[1.1] tracking-tight">
-            Mulai Transformasi <span className="text-blue-600 italic">Digital</span> Sekolah Anda
-          </h1>
-          
-          <p className="text-lg text-slate-600 mb-10 leading-relaxed max-w-md">
-            Hanya butuh beberapa langkah untuk memiliki platform ujian online profesional yang mandiri, aman, dan canggih.
-          </p>
-
-          <div className="space-y-6">
-            {[
-              { icon: ShieldCheck, title: "Infrastruktur Terisolasi", desc: "Data sekolah Anda aman dalam server yang terpisah (multi-tenant)." },
-              { icon: Zap, title: "Aktivasi Super Cepat", desc: "Sistem siap digunakan dalam kurang dari 24 jam setelah pengajuan." },
-              { icon: Globe, title: "Subdomain Kustom", desc: "Gunakan nama sekolah Anda sebagai identitas digital resmi." }
-            ].map((item, i) => (
-              <div key={i} className="flex gap-4 items-start">
-                <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center shrink-0 shadow-sm border border-slate-100">
-                  <item.icon size={22} className="text-blue-600" />
-                </div>
-                <div>
-                  <h4 className="font-bold text-slate-900 mb-1">{item.title}</h4>
-                  <p className="text-sm text-slate-500 leading-relaxed">{item.desc}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-
+    <div className="min-h-screen bg-slate-50 font-sans">
+      {/* Top bar */}
+      <div className="sticky top-0 z-10 bg-white border-b border-slate-200 shadow-sm">
+        <div className="max-w-6xl mx-auto px-4 h-14 flex items-center gap-3">
           <button
             onClick={() => navigate("/")}
-            className="mt-12 group flex items-center gap-2 text-slate-400 hover:text-slate-900 font-bold transition-all text-sm"
+            className="p-2 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition-colors"
           >
-            <ArrowLeft size={18} className="group-hover:-translate-x-1 transition-transform" />
-            Kembali ke Beranda
+            <ArrowLeft size={18} />
           </button>
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 bg-blue-600 rounded-lg flex items-center justify-center">
+              <GraduationCap size={15} className="text-white" />
+            </div>
+            <span className="font-bold text-slate-900 text-sm">E-Ujian</span>
+          </div>
+          <span className="text-slate-300 text-sm">/</span>
+          <span className="text-slate-600 text-sm font-medium">Daftar Sekolah</span>
         </div>
+      </div>
 
-        {/* Right Column: The Form Card */}
-        <div className="lg:col-span-7">
-          <div className="bg-white/70 backdrop-blur-xl border border-white p-8 md:p-10 rounded-[3rem] shadow-[0_32px_64px_-16px_rgba(0,0,0,0.06)] ring-1 ring-slate-200/50">
-            <div className="mb-8">
-              <h3 className="text-2xl font-display font-extrabold text-slate-900 mb-2">Formulir Pendaftaran</h3>
-              <p className="text-slate-500 font-medium">Lengkapi data berikut dengan benar.</p>
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-start">
+
+          {/* Left: Info column */}
+          <div className="lg:col-span-4 lg:sticky lg:top-20">
+            <div className="mb-6">
+              <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 mb-3 leading-tight">
+                Mulai Transformasi{" "}
+                <span className="text-blue-600">Digital</span>{" "}
+                Sekolah Anda
+              </h1>
+              <p className="text-slate-500 text-sm leading-relaxed">
+                Hanya butuh beberapa langkah untuk memiliki platform ujian online profesional yang mandiri dan aman.
+              </p>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-6">
-              {error && (
-                <div className="bg-red-50/80 backdrop-blur-sm border border-red-100 text-red-600 text-sm p-4 rounded-2xl font-semibold flex items-center gap-3 animate-in fade-in slide-in-from-top-2">
-                  <AlertTriangle size={18} />
-                  {error}
-                </div>
-              )}
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Nama Sekolah */}
-                <div className="space-y-2">
-                  <label className="text-sm font-bold text-slate-700 ml-1">Nama Sekolah <span className="text-blue-600">*</span></label>
-                  <div className="relative group">
-                    <GraduationCap size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-600 transition-colors" />
-                    <input
-                      type="text"
-                      name="school_name"
-                      value={form.school_name}
-                      onChange={handleChange}
-                      placeholder="SMPN 1 Kota Contoh"
-                      required
-                      className="w-full h-14 bg-white/50 border border-slate-200 focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-2xl pl-12 pr-4 text-slate-900 placeholder:text-slate-300 text-sm outline-none transition-all font-semibold shadow-sm"
-                    />
+            <div className="space-y-4">
+              {[
+                { icon: ShieldCheck, title: "Infrastruktur Terisolasi", desc: "Data sekolah aman dalam server yang terpisah (multi-tenant).", color: "text-blue-600 bg-blue-50 border-blue-100" },
+                { icon: Zap, title: "Aktivasi Super Cepat", desc: "Sistem siap dalam kurang dari 24 jam setelah pengajuan.", color: "text-amber-600 bg-amber-50 border-amber-100" },
+                { icon: Globe, title: "Subdomain Kustom", desc: "Nama sekolah sebagai identitas digital resmi.", color: "text-emerald-600 bg-emerald-50 border-emerald-100" },
+              ].map((item, i) => (
+                <div key={i} className="flex gap-3 items-start">
+                  <div className={cn("w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 border", item.color)}>
+                    <item.icon size={17} />
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-slate-900 text-sm mb-0.5">{item.title}</h4>
+                    <p className="text-xs text-slate-500 leading-relaxed">{item.desc}</p>
                   </div>
                 </div>
+              ))}
+            </div>
 
-                {/* Subdomain */}
-                <div className="space-y-2">
-                  <label className="text-sm font-bold text-slate-700 ml-1">Subdomain <span className="text-blue-600">*</span></label>
-                  <div className="relative group">
-                    <Hash size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-600 transition-colors" />
-                    <input
-                      type="text"
-                      name="slug_request"
-                      value={form.slug_request}
-                      onChange={handleChange}
-                      placeholder="smpn1-kota"
-                      required
-                      className="w-full h-14 bg-white/50 border border-slate-200 focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-2xl pl-12 pr-4 text-slate-900 placeholder:text-slate-300 text-sm outline-none transition-all font-semibold shadow-sm"
-                    />
-                  </div>
+            {/* Stats */}
+            <div className="mt-8 grid grid-cols-2 gap-3">
+              {[
+                { value: "50+", label: "Sekolah Terdaftar" },
+                { value: "<24 Jam", label: "Waktu Aktivasi" },
+              ].map((stat, i) => (
+                <div key={i} className="bg-white border border-slate-200 rounded-xl p-4 text-center shadow-sm">
+                  <p className="text-xl font-bold text-blue-600">{stat.value}</p>
+                  <p className="text-[10px] text-slate-500 font-medium mt-0.5">{stat.label}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Right: Form */}
+          <div className="lg:col-span-8">
+            <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+              {/* Form header */}
+              <div className="px-5 sm:px-6 py-5 border-b border-slate-100 bg-slate-50 flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-blue-100 flex items-center justify-center">
+                  <Building2 size={18} className="text-blue-600" />
+                </div>
+                <div>
+                  <h2 className="font-bold text-slate-900 text-base">Formulir Pendaftaran</h2>
+                  <p className="text-xs text-slate-400">Lengkapi data berikut dengan benar.</p>
                 </div>
               </div>
 
-              {/* Subdomain Preview - Re-styled to look like a premium browser bar */}
-              <div className="space-y-3">
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Pratinjau Alamat Web</label>
-                <div className="bg-slate-900 rounded-2xl p-4 shadow-inner relative overflow-hidden group">
-                  <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
-                    <Globe size={60} className="text-white" />
+              <form onSubmit={handleSubmit} className="p-5 sm:p-6 space-y-5">
+                {/* Error */}
+                {error && (
+                  <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-xl flex items-center gap-2 font-medium">
+                    <AlertTriangle size={16} className="flex-shrink-0" />
+                    {error}
                   </div>
-                  
-                  <div className="flex items-center gap-3 relative z-10">
-                    <div className="flex gap-1.5 shrink-0">
-                      <div className="w-2.5 h-2.5 rounded-full bg-red-400/80" />
-                      <div className="w-2.5 h-2.5 rounded-full bg-amber-400/80" />
-                      <div className="w-2.5 h-2.5 rounded-full bg-emerald-400/80" />
+                )}
+
+                {/* Row 1: Nama + Slug */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                      Nama Sekolah <span className="text-blue-600">*</span>
+                    </label>
+                    <div className="relative">
+                      <GraduationCap size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input
+                        type="text" name="school_name" value={form.school_name}
+                        onChange={handleChange} placeholder="SMPN 1 Kota Contoh" required
+                        className="w-full h-11 border border-slate-200 rounded-xl pl-10 pr-4 text-sm text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 shadow-sm transition-all"
+                      />
                     </div>
-                    
-                    <div className="flex-1 bg-white/10 backdrop-blur-md rounded-lg h-9 flex items-center px-4 gap-2 border border-white/10">
-                      <ShieldCheck size={14} className="text-emerald-400 shrink-0" />
-                      <div className="flex items-center text-sm font-mono overflow-hidden">
-                        <span className="text-white/40">https://</span>
-                        <span className="text-emerald-400 font-bold tracking-tight">{form.slug_request || "nama-sekolah"}</span>
-                        <span className="text-white/60">.alfaruqasri.my.id</span>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                      Subdomain <span className="text-blue-600">*</span>
+                    </label>
+                    <div className="relative">
+                      <Hash size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input
+                        type="text" name="slug_request" value={form.slug_request}
+                        onChange={handleChange} placeholder="smpn1-kota" required
+                        className="w-full h-11 border border-slate-200 rounded-xl pl-10 pr-4 text-sm text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 shadow-sm transition-all"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* URL Preview */}
+                <div className="bg-slate-900 rounded-xl p-4 relative overflow-hidden group">
+                  <div className="absolute top-3 right-3 opacity-5 group-hover:opacity-10 transition-opacity">
+                    <Globe size={64} className="text-white" />
+                  </div>
+                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3">Pratinjau Alamat Web</p>
+                  <div className="flex items-center gap-3">
+                    <div className="flex gap-1.5">
+                      <div className="w-2 h-2 rounded-full bg-red-400/70" />
+                      <div className="w-2 h-2 rounded-full bg-amber-400/70" />
+                      <div className="w-2 h-2 rounded-full bg-emerald-400/70" />
+                    </div>
+                    <div className="flex-1 bg-white/10 rounded-lg h-8 flex items-center px-3 gap-2 border border-white/10">
+                      <ShieldCheck size={12} className="text-emerald-400 flex-shrink-0" />
+                      <div className="flex items-center text-xs font-mono overflow-hidden min-w-0">
+                        <span className="text-white/30">https://</span>
+                        <span className="text-emerald-400 font-bold">{form.slug_request || "nama-sekolah"}</span>
+                        <span className="text-white/50">.alfaruqasri.my.id</span>
                       </div>
                     </div>
                   </div>
+                  <p className="text-[10px] text-red-400/70 font-medium mt-3 flex items-center gap-1.5">
+                    <AlertTriangle size={10} />
+                    Domain tidak dapat diubah setelah sistem diaktifkan.
+                  </p>
+                </div>
 
-                  <div className="mt-4 flex items-center gap-2 px-1 text-[11px]">
-                    <div className="px-2 py-0.5 bg-red-500/10 border border-red-500/20 text-red-400 rounded-md font-bold flex items-center gap-1.5 uppercase letter-spacing-wide">
-                      <AlertTriangle size={12} />
-                      Aturan Permanen
+                {/* Row 2: Email + Phone */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                      Email Kontak <span className="text-blue-600">*</span>
+                    </label>
+                    <div className="relative">
+                      <Mail size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input
+                        type="email" name="contact_email" value={form.contact_email}
+                        onChange={handleChange} placeholder="admin@sekolah.sch.id" required
+                        className="w-full h-11 border border-slate-200 rounded-xl pl-10 pr-4 text-sm text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 shadow-sm transition-all"
+                      />
                     </div>
-                    <p className="text-white/40 font-medium">Domain tidak dapat diubah setelah sistem diaktifkan.</p>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                      No. WhatsApp / HP
+                    </label>
+                    <div className="relative">
+                      <Phone size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input
+                        type="tel" name="contact_phone" value={form.contact_phone}
+                        onChange={handleChange} placeholder="08xxxxxxxxxx"
+                        className="w-full h-11 border border-slate-200 rounded-xl pl-10 pr-4 text-sm text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 shadow-sm transition-all"
+                      />
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Email */}
-                <div className="space-y-2">
-                  <label className="text-sm font-bold text-slate-700 ml-1">Email Kontak <span className="text-blue-600">*</span></label>
-                  <div className="relative group">
-                    <Mail size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-600 transition-colors" />
-                    <input
-                      type="email"
-                      name="contact_email"
-                      value={form.contact_email}
+                {/* Address */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                    Alamat Lengkap Sekolah
+                  </label>
+                  <div className="relative">
+                    <MapPin size={16} className="absolute left-3.5 top-3.5 text-slate-400" />
+                    <textarea
+                      name="address" value={form.address}
                       onChange={handleChange}
-                      placeholder="admin@sekolah.sch.id"
-                      required
-                      className="w-full h-14 bg-white/50 border border-slate-200 focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-2xl pl-12 pr-4 text-slate-900 placeholder:text-slate-300 text-sm outline-none transition-all font-semibold shadow-sm"
+                      placeholder="Masukkan alamat lengkap sekolah..."
+                      rows={3}
+                      className="w-full border border-slate-200 rounded-xl pl-10 pr-4 py-3 text-sm text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 shadow-sm transition-all resize-none"
                     />
                   </div>
                 </div>
 
-                {/* WhatsApp */}
-                <div className="space-y-2">
-                  <label className="text-sm font-bold text-slate-700 ml-1">No. WhatsApp / HP</label>
-                  <div className="relative group">
-                    <Phone size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-600 transition-colors" />
-                    <input
-                      type="tel"
-                      name="contact_phone"
-                      value={form.contact_phone}
-                      onChange={handleChange}
-                      placeholder="08xxxxxxxxxx"
-                      className="w-full h-14 bg-white/50 border border-slate-200 focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-2xl pl-12 pr-4 text-slate-900 placeholder:text-slate-300 text-sm outline-none transition-all font-semibold shadow-sm"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Address */}
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-slate-700 ml-1">Alamat Lengkap Sekolah</label>
-                <div className="relative group">
-                  <MapPin size={18} className="absolute left-4 top-4 text-slate-400 group-focus-within:text-blue-600 transition-colors" />
-                  <textarea
-                    name="address"
-                    value={form.address}
-                    onChange={handleChange}
-                    placeholder="Masukkan alamat lengkap sekolah Anda..."
-                    rows={3}
-                    className="w-full bg-white/50 border border-slate-200 focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-2xl pl-12 pr-4 py-4 text-slate-900 placeholder:text-slate-300 text-sm outline-none transition-all font-semibold shadow-sm resize-none"
-                  />
-                </div>
-              </div>
-
-              <div className="pt-4">
+                {/* Submit */}
                 <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full h-16 bg-blue-600 hover:bg-blue-700 text-white font-extrabold rounded-2xl transition-all hover:scale-[1.01] active:translate-y-1 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-3 shadow-[0_20px_40px_-10px_rgba(37,99,235,0.4)] text-lg relative overflow-hidden group"
+                  type="submit" disabled={loading}
+                  className={cn(
+                    "w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl",
+                    "flex items-center justify-center gap-2.5 transition-all text-sm",
+                    "shadow-md shadow-blue-600/25 hover:shadow-lg hover:shadow-blue-600/30",
+                    "disabled:opacity-60 disabled:cursor-not-allowed active:scale-[0.99]",
+                    "relative overflow-hidden group"
+                  )}
                 >
-                  <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/10 to-white/0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
+                  <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/10 to-white/0 -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
                   {loading ? (
-                    <div className="w-6 h-6 border-3 border-white/30 border-t-white rounded-full animate-spin" />
+                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                   ) : (
                     <>
-                      <span>Kirim Pengajuan</span>
-                      <Send size={20} className="group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
+                      <Send size={16} className="group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+                      Kirim Pengajuan Pendaftaran
                     </>
                   )}
                 </button>
-              </div>
 
-              <p className="text-center text-slate-400 text-xs font-medium max-w-xs mx-auto leading-relaxed">
-                Dengan mendaftar, Anda menyetujui <span className="text-blue-500 cursor-pointer hover:underline">Ketentuan Layanan</span> dan <span className="text-blue-500 cursor-pointer hover:underline">Kebijakan Privasi</span> E-Ujian.
-              </p>
-            </form>
+                <p className="text-center text-slate-400 text-xs font-medium">
+                  Dengan mendaftar, Anda menyetujui{" "}
+                  <span className="text-blue-500 cursor-pointer hover:underline">Ketentuan Layanan</span>{" "}
+                  dan{" "}
+                  <span className="text-blue-500 cursor-pointer hover:underline">Kebijakan Privasi</span>{" "}
+                  E-Ujian.
+                </p>
+              </form>
+            </div>
           </div>
         </div>
       </div>
