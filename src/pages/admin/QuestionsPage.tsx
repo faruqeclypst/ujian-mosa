@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Plus, Edit, Trash, Check, Copy, Image, ChevronDown, FileText, Download, Eye, FolderOpen, Sparkles, Wand2, RefreshCw, BookOpen, Loader2, FileSpreadsheet, Search, X, Bookmark, Forward, CheckCircle2, Menu, Maximize2, HelpCircle } from "lucide-react";
+import { ArrowLeft, Plus, Edit, Trash, Check, Copy, Image, ChevronDown, FileText, Download, Eye, FolderOpen, Sparkles, Wand2, RefreshCw, BookOpen, Loader2, FileSpreadsheet, Search, X, Bookmark, Forward, CheckCircle2, Menu, Maximize2, HelpCircle, FileJson } from "lucide-react";
 import { MathText } from "../../components/MathText";
 import { SmartImage } from "../../components/ui/smart-image";
 import { generateQuestionsAI, generateSingleQuestionAI, getTopicSuggestionsAI, parseQuestionsAI, AI_MODELS } from "../../lib/ai";
@@ -9,7 +9,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Progress } from "../../components/ui/progress";
 import { DeleteConfirmationDialog } from "../../components/ui/delete-confirmation-dialog";
 import { ConfirmationDialog } from "../../components/ui/confirmation-dialog";
-import pb from "../../lib/pocketbase";
 import { Input } from "../../components/ui/input";
 import { Separator } from "../../components/ui/separator";
 import FormField from "../../components/forms/FormField";
@@ -162,7 +161,7 @@ const QuestionsPage = () => {
   }, [examId, navigate]);
 
   const { user, role, teacherId } = useAuth();
-  const { school } = useTenant();
+  const { school, pb, terminology } = useTenant();
   const { addToast } = useToast();
   const { subjects, teachers, teacherFullAccess } = useExamData();
 
@@ -182,6 +181,7 @@ const QuestionsPage = () => {
 
   useEffect(() => {
     const fetchSettings = async () => {
+      if (!pb) return;
       try {
         const records = await pb.collection("settings").getFullList({ limit: 1 });
         if (records.length > 0) {
@@ -570,7 +570,9 @@ const QuestionsPage = () => {
       if (aiLevel && aiSubject && aiSubject.length > 2) {
         setIsFetchingSuggestions(true);
         try {
+          if (!pb) return;
           const suggestions = await getTopicSuggestionsAI(
+            pb,
             aiLevel, 
             aiSubject, 
             aiDifficulty, 
@@ -620,9 +622,11 @@ const QuestionsPage = () => {
   };
 
   const handleAIGenerateDirect = async () => {
+    if (!pb) return;
     setIsAIGeneratingDirect(true);
     try {
       const generated = await generateQuestionsAI(
+        pb,
         aiTopic || (exam?.subject + " " + (exam?.name?.split(' ')[0] || "")) || "Umum", 
         aiCount, 
         aiLevel, 
@@ -681,10 +685,12 @@ const QuestionsPage = () => {
 
 
   const handleAIRegenerateSingle = async (index: number) => {
+    if (!pb) return;
     setIsRegeneratingIndex(index);
     try {
       const q = batchQuestions[index];
       const regenerated = await generateSingleQuestionAI(
+        pb,
         aiTopic || (exam?.subject + " " + (exam?.name?.split(' ')[0] || "")) || "Umum",
         q.type || aiType,
         aiLevel,
@@ -738,10 +744,10 @@ const QuestionsPage = () => {
   };
 
   const handleAIParse = async () => {
-    if (!importText.trim()) return;
+    if (!importText.trim() || !pb) return;
     setIsParsing(true);
     try {
-      const results = await parseQuestionsAI(importText, exam?.name || "", exam?.level || "");
+      const results = await parseQuestionsAI(pb, importText, exam?.name || "", exam?.level || "");
       setParsedResults(results);
       addToast({
         title: "Ekstraksi Berhasil",
@@ -813,7 +819,7 @@ const QuestionsPage = () => {
   };
 
   const handleSaveAIImport = async () => {
-    if (parsedResults.length === 0) return;
+    if (parsedResults.length === 0 || !pb) return;
     setIsParsing(true);
     try {
       const typeMap: Record<string, string> = {
@@ -878,7 +884,7 @@ const QuestionsPage = () => {
   };
 
   const handleAIGenerate = async () => {
-    if (!aiTopic.trim()) {
+    if (!aiTopic.trim() || !pb) {
       showAlert("Gagal", "Topik soal tidak boleh kosong.", "danger");
       return;
     }
@@ -886,6 +892,7 @@ const QuestionsPage = () => {
     setIsAIGenerating(true);
     try {
       const generated = await generateQuestionsAI(
+        pb,
         aiTopic, 
         aiCount, 
         aiLevel, 
@@ -992,6 +999,7 @@ const QuestionsPage = () => {
   };
 
   const handleSaveBatch = async () => {
+    if (!pb) return;
     let validQuestions = batchQuestions.filter(q => q.text.trim() !== "");
     if (validQuestions.length === 0) {
       showAlert("Gagal", "Tidak ada soal yang diisi teks pertanyaannya.", "danger");
@@ -1167,7 +1175,7 @@ const QuestionsPage = () => {
 
   // 🔄 Load Questions dari PocketBase
   const loadQuestions = useCallback(async () => {
-    if (!examId) return;
+    if (!examId || !pb) return;
     try {
       const loaded = await pb.collection('questions').getFullList({
         filter: `examId = "${examId}"`,
@@ -1278,6 +1286,7 @@ const QuestionsPage = () => {
     if (!examId) return;
 
     const init = async () => {
+      if (!pb) return;
       try {
         // 1. Load Exam Info dari PocketBase
         const examData = await pb.collection('exams').getOne(examId);
@@ -1295,13 +1304,13 @@ const QuestionsPage = () => {
         await loadQuestions();
 
         // 3. Subscribe Realtime
-        const unsubscribe = await pb.collection('questions').subscribe("*", (e) => {
+        const unsubscribe = await pb!.collection('questions').subscribe("*", (e) => {
           loadQuestions();
         });
 
         return () => {
-          if (pb.authStore.isValid) {
-            pb.collection('questions').unsubscribe("*");
+          if (pb!.authStore.isValid) {
+            pb!.collection('questions').unsubscribe("*");
           }
         };
 
@@ -1440,6 +1449,7 @@ const QuestionsPage = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!pb) return;
 
     // 1. Validasi Teks Pertanyaan
     const isQuestionEmpty = !formValues.text || formValues.text.replace(/<[^>]*>/g, '').trim() === "";
@@ -1697,7 +1707,7 @@ const QuestionsPage = () => {
   };
 
   const handleConfirmDelete = async () => {
-    if (!questionToDelete) return;
+    if (!questionToDelete || !pb) return;
     setIsDeleting(true);
     try {
       // 🗑️ Hapus gambar di R2 (Non-blocking: jika gagal tetap hapus record DB)
@@ -1719,6 +1729,7 @@ const QuestionsPage = () => {
   };
 
   const handleConfirmDeleteAll = async () => {
+    if (!pb) return;
     setDeleteAllDialogOpen(false); // Close confirmation immediately
     setIsDeleting(true);
     setImportProgress(0);
@@ -1793,6 +1804,7 @@ const QuestionsPage = () => {
   };
 
   const handleConfirmBulkDelete = async () => {
+    if (!pb) return;
     setBulkDeleteDialogOpen(false); // Close confirmation immediately
     setIsBulkDeleting(true);
     setImportProgress(0);
@@ -1830,7 +1842,7 @@ const QuestionsPage = () => {
       const chunkSize = 10;
       for (let i = 0; i < selectedQuestions.length; i += chunkSize) {
         const chunk = selectedQuestions.slice(i, i + chunkSize);
-        await Promise.all(chunk.map(q => pb.collection('questions').delete(q.id)));
+        await Promise.all(chunk.map(q => pb!.collection('questions').delete(q.id)));
         
         const currentProcessed = Math.min(i + chunkSize, selectedQuestions.length);
         const progress = Math.round((currentProcessed / selectedQuestions.length) * 100);
@@ -1978,6 +1990,7 @@ const QuestionsPage = () => {
   ], [questions, selectedIds]);
 
   const handleImportWord = async (file: File) => {
+    if (!pb) return;
     setIsImporting(true);
     setImportProgress(0);
     setBatchProgress({
@@ -2056,7 +2069,7 @@ const QuestionsPage = () => {
           };
 
           try {
-            await pb.collection('questions').create(payload);
+            await pb!.collection('questions').create(payload);
             importedCount++;
           } catch (createErr) {
             console.error("Gagal membuat soal Word pada index:", actualIndex, createErr);
@@ -2087,6 +2100,7 @@ const QuestionsPage = () => {
   };
 
   const handleImportExcel = async (file: File) => {
+    if (!pb) return;
     setIsImporting(true);
     setBatchProgress({
       isOpen: true,
@@ -2126,7 +2140,7 @@ const QuestionsPage = () => {
           };
 
           try {
-            await pb.collection('questions').create(payload);
+            await pb!.collection('questions').create(payload);
             importedCount++;
           } catch (createErr) {
             console.error("Gagal membuat soal pada index:", actualIndex, createErr);
@@ -2335,15 +2349,15 @@ const QuestionsPage = () => {
         <div class="kop">
           <p style="font-size: 14pt; font-weight: bold;">NASKAH SOAL UJIAN</p>
           <p style="font-size: 12pt;">${exam?.title || "UJIAN CBT"}</p>
-          <p style="font-size: 10pt; font-weight: normal;">Mata Pelajaran: ${exam?.subject || "-"} | Guru: ${exam?.teacherName || "-"}</p>
+          <p style="font-size: 10pt; font-weight: normal;">Mata Pelajaran: ${exam?.subject || "-"} | ${terminology.teacher}: ${exam?.teacherName || "-"}</p>
         </div>
         <table border="0" cellpadding="0" cellspacing="0" style="width:100%; font-size: 10pt; margin-bottom: 15pt; border: none; border-collapse: collapse;">
           <tr>
             <td width="15%" style="border:none; padding: 2px;">No. Peserta</td><td width="2%" style="border:none;">:</td><td width="33%" style="border:none; border-bottom: 0.5pt solid #000;"></td>
-            <td width="15%" style="border:none; padding: 2px;">Kelas</td><td width="2%" style="border:none;">:</td><td style="border:none;">${exam?.level || "-"}</td>
+            <td width="15%" style="border:none; padding: 2px;">${terminology.class}</td><td width="2%" style="border:none;">:</td><td style="border:none;">${exam?.level || "-"}</td>
           </tr>
           <tr>
-            <td style="border:none; padding: 2px;">Nama Siswa</td><td>:</td><td style="border:none; border-bottom: 0.5pt solid #000;"></td>
+            <td style="border:none; padding: 2px;">Nama ${terminology.student}</td><td>:</td><td style="border:none; border-bottom: 0.5pt solid #000;"></td>
             <td style="padding: 2px;">Hari/Tgl</td><td>:</td><td>..........................</td>
           </tr>
         </table>
@@ -2415,6 +2429,41 @@ const QuestionsPage = () => {
 
     setBatchProgress(prev => ({ ...prev, isOpen: false }));
     addToast({ title: "Export Sukses", description: "Format sudah diperbaiki & Gambar diproses.", type: "success" });
+  };
+
+  const handleExportToJson = () => {
+    if (questions.length === 0) return;
+    
+    // Create a clean version of questions for export
+    const exportData = questions.map(q => ({
+      text: q.text,
+      type: q.type,
+      imageUrl: q.imageUrl,
+      groupId: q.groupId,
+      groupText: q.groupText,
+      choices: q.choices,
+      pairs: q.pairs,
+      answerKey: q.answerKey,
+      items: q.items,
+      order: q.order
+    }));
+
+    const dataStr = JSON.stringify(exportData, null, 2);
+    const blob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    
+    const dateStr = new Date().toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-');
+    const fileName = `BANK_SOAL_${exam?.subject || "Ujian"}_${dateStr}.json`;
+    
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    
+    addToast({ title: "Export Sukses", description: "File JSON berhasil diunduh.", type: "success" });
   };
 
   const copyToClipboard = (text: string, id?: string) => {
@@ -2553,6 +2602,21 @@ const QuestionsPage = () => {
                                 <div className="flex flex-col min-w-0">
                                   <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight tracking-tight">Export ke Word</span>
                                   <span className="text-[10px] text-slate-400 mt-1">Simpan naskah & kunci</span>
+                                </div>
+                              </DropdownMenuItem>
+                            )}
+
+                            {questions.length > 0 && (
+                              <DropdownMenuItem 
+                                onClick={handleExportToJson} 
+                                className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 focus:bg-slate-50 dark:focus:bg-slate-900 transition-colors group"
+                              >
+                                <div className="h-10 w-10 shrink-0 rounded-lg bg-orange-50 dark:bg-orange-900/30 text-orange-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                  <FileJson className="h-5 w-5" />
+                                </div>
+                                <div className="flex flex-col min-w-0">
+                                  <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight tracking-tight">Export ke JSON</span>
+                                  <span className="text-[10px] text-slate-400 mt-1">Format data mentah</span>
                                 </div>
                               </DropdownMenuItem>
                             )}

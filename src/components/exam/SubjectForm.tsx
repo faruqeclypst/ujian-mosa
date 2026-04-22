@@ -6,12 +6,15 @@ import * as z from "zod";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import FormField from "../forms/FormField";
+import { useTenant } from "../../context/TenantContext";
 
-const subjectSchema = z.object({
-  name: z.string().min(1, "Nama mata pelajaran wajib diisi"),
+const createSubjectSchema = (subjectTerm: string) => z.object({
+  name: z.string().min(1, `Nama ${subjectTerm} wajib diisi`),
 });
 
-export type SubjectFormValues = z.infer<typeof subjectSchema>;
+export type SubjectFormValues = {
+  name: string;
+};
 
 interface SubjectFormProps {
   defaultValues?: Partial<SubjectFormValues>;
@@ -21,6 +24,9 @@ interface SubjectFormProps {
 }
 
 const SubjectForm = ({ defaultValues, onSubmit, submitLabel = "Simpan", onCancel }: SubjectFormProps) => {
+  const { terminology } = useTenant();
+  const subjectSchema = createSubjectSchema(terminology.subject);
+
   const {
     register,
     handleSubmit,
@@ -49,7 +55,7 @@ const SubjectForm = ({ defaultValues, onSubmit, submitLabel = "Simpan", onCancel
 
   return (
     <form onSubmit={handleSubmit(submitHandler)} className="space-y-4">
-      <FormField id="name" label="Mata Pelajaran" error={errors.name}>
+      <FormField id="name" label={terminology.subject} error={errors.name}>
         <Input id="name" placeholder="Contoh: Matematika, Bahasa Inggris" {...register("name")} />
       </FormField>
       

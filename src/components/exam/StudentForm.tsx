@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -9,14 +9,14 @@ import FormField from "../forms/FormField";
 import { Select } from "../ui/select";
 import type { ClassData } from "../../types/exam";
 
-const studentSchema = z.object({
-  nisn: z.string().min(5, "NISN minimal 5 karakter"),
-  name: z.string().min(1, "Nama Siswa wajib diisi"),
-  gender: z.enum(["L", "P"], { required_error: "Gender wajib dipilih" }),
-  classId: z.string().min(1, "Kelas wajib dipilih"),
-});
+import { useTenant } from "../../context/TenantContext";
 
-export type StudentFormValues = z.infer<typeof studentSchema>;
+export type StudentFormValues = {
+  nisn: string;
+  name: string;
+  gender: "L" | "P";
+  classId: string;
+};
 
 interface StudentFormProps {
   classes: ClassData[];
@@ -33,6 +33,14 @@ const StudentForm = ({
   submitLabel = "Simpan",
   onCancel
 }: StudentFormProps) => {
+  const { terminology } = useTenant();
+  
+  const studentSchema = useMemo(() => z.object({
+    nisn: z.string().min(3, `${terminology.id} minimal 3 karakter`),
+    name: z.string().min(1, `Nama ${terminology.student} wajib diisi`),
+    gender: z.enum(["L", "P"], { required_error: "Gender wajib dipilih" }),
+    classId: z.string().min(1, `${terminology.class} wajib dipilih`),
+  }), [terminology]);
   const {
     register,
     handleSubmit,
@@ -81,12 +89,12 @@ const StudentForm = ({
 
   return (
     <form onSubmit={handleSubmit(submitHandler)} className="space-y-4">
-      <FormField id="nisn" label="NISN" error={errors.nisn}>
-        <Input id="nisn" placeholder="Masukkan NISN" {...register("nisn")} />
+      <FormField id="nisn" label={terminology.id} error={errors.nisn}>
+        <Input id="nisn" placeholder={`Masukkan ${terminology.id}`} {...register("nisn")} />
       </FormField>
 
-      <FormField id="name" label="Nama Siswa" error={errors.name}>
-        <Input id="name" placeholder="Masukkan Nama Siswa" {...register("name")} />
+      <FormField id="name" label={`Nama ${terminology.student}`} error={errors.name}>
+        <Input id="name" placeholder={`Masukkan Nama ${terminology.student}`} {...register("name")} />
       </FormField>
 
       <FormField id="gender" label="Gender" error={errors.gender}>
@@ -121,13 +129,13 @@ const StudentForm = ({
       </FormField>
 
 
-      <FormField id="classId" label="Kelas" error={errors.classId}>
+      <FormField id="classId" label={terminology.class} error={errors.classId}>
         <Select 
           id="classId"
           {...register("classId")}
           disabled={sortedClasses.length === 0}
         >
-          <option value="">Pilih Kelas</option>
+          <option value="">Pilih {terminology.class}</option>
           {sortedClasses.map((cls) => (
             <option key={cls.id} value={cls.id}>
               {cls.name}
@@ -136,7 +144,7 @@ const StudentForm = ({
         </Select>
         {sortedClasses.length === 0 && (
           <p className="text-[10px] text-rose-500 mt-1 font-medium italic">
-            * Data kelas tidak ditemukan. Mohon daftarkan kelas terlebih dahulu.
+            * Data {terminology.class.toLowerCase()} tidak ditemukan. Mohon daftarkan {terminology.class.toLowerCase()} terlebih dahulu.
           </p>
         )}
       </FormField>

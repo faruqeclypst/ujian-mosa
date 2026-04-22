@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -8,14 +8,7 @@ import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import FormField from "../forms/FormField";
 
-const teacherSchema = z.object({
-  name: z.string().min(1, "Nama guru wajib diisi"),
-  code: z.string().optional(),
-  username: z.string().min(3, "Username minimal 3 karakter untuk login"),
-  subjects: z.array(z.string()).min(1, "Pilih minimal 1 mata pelajaran"),
-});
-
-export type TeacherFormValues = z.infer<typeof teacherSchema>;
+import { useTenant } from "../../context/TenantContext";
 
 export interface TeacherSubmitPayload {
   name: string;
@@ -33,6 +26,16 @@ interface TeacherFormProps {
 
 const TeacherForm = ({ defaultValues, onSubmit, submitLabel = "Simpan", onCancel }: TeacherFormProps) => {
   const { subjects } = useExamData();
+  const { terminology } = useTenant();
+
+  const teacherSchema = useMemo(() => z.object({
+    name: z.string().min(1, `Nama ${terminology.teacher.toLowerCase()} wajib diisi`),
+    code: z.string().optional(),
+    username: z.string().min(3, "Username minimal 3 karakter untuk login"),
+    subjects: z.array(z.string()).min(1, `Pilih minimal 1 ${terminology.subject.toLowerCase()}`),
+  }), [terminology]);
+
+  type TeacherFormValues = z.infer<typeof teacherSchema>;
   
   const {
     register,
@@ -76,23 +79,23 @@ const TeacherForm = ({ defaultValues, onSubmit, submitLabel = "Simpan", onCancel
 
   return (
     <form onSubmit={handleSubmit(submitHandler)} className="space-y-4">
-      <FormField id="name" label="Nama Guru" error={errors.name}>
-        <Input id="name" placeholder="Masukkan nama guru" {...register("name")} />
+      <FormField id="name" label={`Nama ${terminology.teacher}`} error={errors.name}>
+        <Input id="name" placeholder={`Masukkan nama ${terminology.teacher.toLowerCase()}`} {...register("name")} />
       </FormField>
 
-      <FormField id="code" label="Kode Guru (Opsional)" error={errors.code}>
+      <FormField id="code" label={`Kode ${terminology.teacher} (Opsional)`} error={errors.code}>
         <Input id="code" placeholder="Contoh: AA, BB, dll." {...register("code")} />
       </FormField>
 
       <FormField id="username" label="Username Login" error={errors.username}>
-        <Input id="username" placeholder="Masukkan username untuk login guru" {...register("username")} />
-        <p className="text-[10px] text-slate-400 mt-1">* Guru akan login menggunakan username ini dan password default 12345678</p>
+        <Input id="username" placeholder={`Masukkan username untuk login ${terminology.teacher.toLowerCase()}`} {...register("username")} />
+        <p className="text-[10px] text-slate-400 mt-1">* {terminology.teacher} akan login menggunakan username ini dan password default 12345678</p>
       </FormField>
       
-      <FormField id="subjects" label="Mata Pelajaran (Bisa pilih lebih dari satu)" error={errors.subjects as any}>
+      <FormField id="subjects" label={`${terminology.subject} (Bisa pilih lebih dari satu)`} error={errors.subjects as any}>
         {subjects.length === 0 ? (
           <div className="p-3 bg-slate-50 border border-dashed rounded text-sm text-slate-500 text-center">
-            Belum ada data Mapel. Silakan tambah di menu <strong>Data Mapel</strong>.
+            Belum ada data {terminology.subject}. Silakan tambah di menu <strong>Data {terminology.subject}</strong>.
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto p-2 border rounded bg-slate-50 dark:bg-slate-800/50">

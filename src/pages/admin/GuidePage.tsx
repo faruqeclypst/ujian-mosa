@@ -1,13 +1,13 @@
 import React, { useState } from "react";
-import { 
-  BookOpen, 
-  ClipboardList, 
-  LayoutTemplate, 
-  Settings, 
-  ShieldAlert, 
-  Users, 
+import {
+  BookOpen,
+  ClipboardList,
+  LayoutTemplate,
+  Settings,
+  ShieldAlert,
+  Users,
   User,
-  GraduationCap, 
+  GraduationCap,
   Award,
   AlertCircle,
   Download,
@@ -24,11 +24,13 @@ import {
   Menu,
   X
 } from "lucide-react";
+import { useTenant } from "../../context/TenantContext";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
 import { cn } from "../../lib/utils";
 
 const GuidePage = () => {
+  const { school, terminology } = useTenant();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [activeSection, setActiveSection] = useState("pendahuluan");
 
@@ -58,7 +60,7 @@ const GuidePage = () => {
         {/* Background blobs for header */}
         <div className="absolute -top-16 -right-16 w-32 h-32 bg-blue-500/10 dark:bg-blue-500/20 rounded-full blur-3xl" />
         <div className="absolute -bottom-16 -left-16 w-32 h-32 bg-indigo-500/10 dark:bg-indigo-500/20 rounded-full blur-3xl" />
-        
+
         <div className="flex items-center gap-4 relative z-10">
           <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/20 flex-shrink-0">
             <BookOpen size={24} className="text-white" />
@@ -68,13 +70,13 @@ const GuidePage = () => {
               Panduan Sistem
             </h1>
             <p className="text-xs sm:text-sm font-medium text-slate-500 dark:text-slate-400 mt-1">
-              Dokumentasi operasional terpadu E-Ujian.
+              Dokumentasi operasional terpadu EXAM AA.
             </p>
           </div>
         </div>
 
         {/* Mobile Navigation Toggle */}
-        <button 
+        <button
           className="lg:hidden relative z-10 flex items-center justify-between px-4 py-2.5 bg-slate-100 dark:bg-slate-800 rounded-xl text-sm font-semibold text-slate-700 dark:text-slate-300 transition-all active:scale-95"
           onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
         >
@@ -101,13 +103,13 @@ const GuidePage = () => {
             <CardContent className="p-3">
               <nav className="flex flex-col gap-1">
                 {NAV_ITEMS.map((item) => (
-                  <button 
+                  <button
                     key={item.id}
                     onClick={() => handleNavClick(item.id)}
                     className={cn(
                       "w-full text-left flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-semibold transition-all group",
-                      activeSection === item.id 
-                        ? "bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400" 
+                      activeSection === item.id
+                        ? "bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400"
                         : "text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-200"
                     )}
                   >
@@ -123,21 +125,21 @@ const GuidePage = () => {
           </Card>
 
           <div className="hidden lg:block p-5 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 text-white shadow-md relative overflow-hidden group">
-             <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                <AlertCircle size={64} className="rotate-12" />
-             </div>
-             <h4 className="font-bold text-sm mb-2 flex items-center gap-2">
-                <AlertCircle size={16} className="text-blue-200" /> Bantuan Teknis
-             </h4>
-             <p className="text-[11px] text-blue-100/90 leading-relaxed relative z-10 font-medium">
-                Jika mengalami kendala operasional, hubungi administrator atau tim IT Sekolah.
-             </p>
+            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+              <AlertCircle size={64} className="rotate-12" />
+            </div>
+            <h4 className="font-bold text-sm mb-2 flex items-center gap-2">
+              <AlertCircle size={16} className="text-blue-200" /> Bantuan Teknis
+            </h4>
+            <p className="text-[11px] text-blue-100/90 leading-relaxed relative z-10 font-medium">
+              Jika mengalami kendala operasional, hubungi administrator atau tim IT {terminology.school}.
+            </p>
           </div>
         </div>
 
         {/* ── Content Section ── */}
         <div className="lg:col-span-3 space-y-12 lg:space-y-16">
-          
+
           {/* Pendahuluan */}
           <section id="pendahuluan" className="scroll-mt-32 space-y-5">
             <div className="flex items-center gap-3">
@@ -147,7 +149,7 @@ const GuidePage = () => {
               <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">1. Pendahuluan</h2>
             </div>
             <p className="text-sm sm:text-base text-slate-600 dark:text-slate-400 leading-relaxed font-medium">
-              E-Ujian adalah platform Computer Based Test (CBT) generasi terbaru yang dirancang untuk stabilitas dan keamanan tinggi. Sistem ini menyediakan alur kerja yang intuitif untuk Guru dan Administrator dalam mengelola evaluasi belajar mandiri.
+              EXAM AA adalah platform Computer Based Test (CBT) generasi terbaru yang dirancang untuk stabilitas dan keamanan tinggi. Sistem ini menyediakan alur kerja yang intuitif untuk {terminology.teacher} dan Administrator dalam mengelola evaluasi belajar mandiri.
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
               <div className="p-5 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm group hover:border-indigo-200 dark:hover:border-indigo-800/50 transition-all">
@@ -158,11 +160,11 @@ const GuidePage = () => {
                 <ul className="text-xs space-y-2.5 text-slate-500 dark:text-slate-400">
                   <li className="flex items-start gap-2.5">
                     <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 mt-1.5 shrink-0" />
-                    <span>Manajemen Data Master (Siswa, Kelas, Guru)</span>
+                    <span>Manajemen Data Master ({terminology.student}, Kelas, {terminology.teacher})</span>
                   </li>
                   <li className="flex items-start gap-2.5">
                     <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 mt-1.5 shrink-0" />
-                    <span>Konfigurasi identitas sekolah & logo</span>
+                    <span>Konfigurasi identitas {terminology.school.toLowerCase()} & logo</span>
                   </li>
                   <li className="flex items-start gap-2.5">
                     <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 mt-1.5 shrink-0" />
@@ -171,11 +173,12 @@ const GuidePage = () => {
                 </ul>
               </div>
               <div className="p-5 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm group hover:border-emerald-200 dark:hover:border-emerald-800/50 transition-all">
-                <div className="w-10 h-10 bg-emerald-50 dark:bg-emerald-900/20 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                  <Users size={20} className="text-emerald-600 dark:text-emerald-400" />
-                </div>
-                <h4 className="font-bold text-sm text-slate-900 dark:text-white mb-3">Guru Mata Pelajaran</h4>
+                <h4 className="font-bold text-sm text-slate-900 dark:text-white mb-3">{terminology.teacher}</h4>
                 <ul className="text-xs space-y-2.5 text-slate-500 dark:text-slate-400">
+                  <li className="flex items-start gap-2.5">
+                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 mt-1.5 shrink-0" />
+                    <span>{terminology.teacher} {terminology.subject}</span>
+                  </li>
                   <li className="flex items-start gap-2.5">
                     <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 mt-1.5 shrink-0" />
                     <span>Pembuatan Bank Soal secara mandiri</span>
@@ -186,7 +189,7 @@ const GuidePage = () => {
                   </li>
                   <li className="flex items-start gap-2.5">
                     <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 mt-1.5 shrink-0" />
-                    <span>Monitoring Siswa secara real-time</span>
+                    <span>Monitoring {terminology.student} secara real-time</span>
                   </li>
                 </ul>
               </div>
@@ -218,7 +221,7 @@ const GuidePage = () => {
                     </div>
                   </div>
                 ))}
-                
+
                 {/* Info Literasi Alert style */}
                 <div className="p-5 bg-blue-50/50 dark:bg-blue-900/10">
                   <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
@@ -240,7 +243,7 @@ const GuidePage = () => {
               </div>
               <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">3. Operasional Ruang Ujian</h2>
             </div>
-            
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Card className="rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900">
                 <CardHeader className="p-5 pb-3">
@@ -298,7 +301,7 @@ const GuidePage = () => {
               </div>
               <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">4. Sistem Anti-Cheat</h2>
             </div>
-            
+
             <div className="grid grid-cols-1 gap-4">
               <div className="p-5 sm:p-6 bg-white dark:bg-slate-900 border border-red-100 dark:border-red-900/30 rounded-2xl shadow-sm relative overflow-hidden flex flex-col sm:flex-row gap-5 items-start">
                 <div className="absolute top-0 right-0 w-32 h-32 bg-red-500/5 rounded-full blur-2xl -mr-10 -mt-10 pointer-events-none" />
@@ -308,11 +311,11 @@ const GuidePage = () => {
                 <div className="relative z-10">
                   <h4 className="text-sm font-bold text-slate-900 dark:text-white mb-2">Deteksi Pindah Tab (Lock System)</h4>
                   <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed font-medium">
-                    E-Ujian memantau status fokus browser siswa secara ketat. Jika siswa terdeteksi beralih ke aplikasi lain atau membuka tab baru, sistem akan mencatat sebagai pelanggaran. Melebihi batas pelanggaran akan menyebabkan <span className="font-bold text-red-600 dark:text-red-400 uppercase">ujian terkunci otomatis</span>.
+                    EXAM AA memantau status fokus browser {terminology.student.toLowerCase()} secara ketat. Jika {terminology.student.toLowerCase()} terdeteksi beralih ke aplikasi lain atau membuka tab baru, sistem akan mencatat sebagai pelanggaran. Melebihi batas pelanggaran akan menyebabkan <span className="font-bold text-red-600 dark:text-red-400 uppercase">ujian terkunci otomatis</span>.
                   </p>
                 </div>
               </div>
-              
+
               <div className="p-5 sm:p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm flex flex-col sm:flex-row gap-5 items-start">
                 <div className="w-12 h-12 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 flex items-center justify-center shrink-0 border border-slate-100 dark:border-slate-700">
                   <Key size={24} />
@@ -320,7 +323,7 @@ const GuidePage = () => {
                 <div>
                   <h4 className="text-sm font-bold text-slate-900 dark:text-white mb-2">Membuka Kunci & Selesaikan Paksa</h4>
                   <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed font-medium">
-                    Gunakan dashboard Pengawasan Ruang (Menu Monitoring) untuk membuka kunci siswa yang ter-lock atau mengatur ulang (reset) login siswa. Guru juga dapat menggunakan <span className="font-semibold italic">Selesaikan Paksa</span> bila sesi waktu ujian dirasa telah paripurna namun siswa lupa klik tombol Selesai.
+                    Gunakan dashboard Pengawasan Ruang (Menu Monitoring) untuk membuka kunci {terminology.student.toLowerCase()} yang ter-lock atau mengatur ulang (reset) login {terminology.student.toLowerCase()}. {terminology.teacher} juga dapat menggunakan <span className="font-semibold italic">Selesaikan Paksa</span> bila sesi waktu ujian dirasa telah paripurna namun {terminology.student.toLowerCase()} lupa klik tombol Selesai.
                   </p>
                 </div>
               </div>
@@ -335,13 +338,13 @@ const GuidePage = () => {
               </div>
               <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">5. Manajemen Data Master</h2>
             </div>
-            
+
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
               <div className="space-y-3">
                 {[
-                  { icon: GraduationCap, label: "Database Peserta Didik", count: "Tabel Siswa" },
-                  { icon: Users, label: "Database Tenaga Pendidik", count: "Tabel Guru" },
-                  { icon: Award, label: "Database Mata Pelajaran", count: "Tabel Mapel" },
+                  { icon: GraduationCap, label: `Database ${terminology.student}`, count: `Tabel ${terminology.student}` },
+                  { icon: Users, label: `Database ${terminology.teacher}`, count: `Tabel ${terminology.teacher}` },
+                  { icon: Award, label: `Database ${terminology.subject}`, count: `Tabel ${terminology.subject}` },
                 ].map((item, idx) => (
                   <div key={idx} className="flex items-center justify-between p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
                     <div className="flex items-center gap-4">
@@ -373,7 +376,7 @@ const GuidePage = () => {
                     </li>
                     <li className="flex gap-3 items-start">
                       <span className="font-black text-slate-400">3</span>
-                      Validasi kode unik (NISN, NIP) jangan sampai berubah format scientific (contoh 1.2E+). Pastikan format kolom teks.
+                      Validasi kode unik ({terminology.id}, NIP) jangan sampai berubah format scientific (contoh 1.2E+). Pastikan format kolom teks.
                     </li>
                     <li className="flex gap-3 items-start">
                       <span className="font-black text-slate-400">4</span>
@@ -393,7 +396,7 @@ const GuidePage = () => {
               </div>
               <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">6. Konfigurasi Lingkungan</h2>
             </div>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm space-y-6">
                 <div className="flex gap-4">
@@ -401,11 +404,11 @@ const GuidePage = () => {
                     <ImageIcon size={20} />
                   </div>
                   <div>
-                    <h4 className="text-sm font-bold text-slate-900 dark:text-white mb-1.5">Identitas Visual Sekolah</h4>
-                    <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed font-medium">Unggah logo dan nama institusi Anda dari panel Pengaturan. Ini akan dipakai untuk tampilan antarmuka murid serta laporan PDF.</p>
+                    <h4 className="text-sm font-bold text-slate-900 dark:text-white mb-1.5">Identitas Visual {terminology.school}</h4>
+                    <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed font-medium">Unggah logo dan nama institusi Anda dari panel Pengaturan. Ini akan dipakai untuk tampilan antarmuka {terminology.student.toLowerCase()} serta laporan PDF.</p>
                   </div>
                 </div>
-                
+
                 <div className="flex gap-4 border-t border-slate-100 dark:border-slate-800 pt-5">
                   <div className="w-10 h-10 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 rounded-xl flex items-center justify-center shrink-0">
                     <Cpu size={20} />
@@ -439,73 +442,73 @@ const GuidePage = () => {
           {/* Pengembang */}
           <section id="pengembang" className="scroll-mt-32 pt-6">
             <Card className="rounded-[2.5rem] border-0 bg-gradient-to-br from-slate-100 via-blue-50 to-indigo-50 dark:from-slate-950 dark:via-indigo-950/30 dark:to-slate-950 shadow-none overflow-hidden relative">
-               <div className="pointer-events-none absolute inset-0 rounded-[2.5rem] ring-1 ring-inset ring-slate-200/50 dark:ring-white/5" />
-               <div className="absolute top-0 right-0 w-96 h-96 bg-blue-500/10 rounded-full blur-[80px] -mr-48 -mt-48 transition-opacity duration-1000" />
-               <div className="absolute bottom-0 left-0 w-96 h-96 bg-indigo-500/10 rounded-full blur-[80px] -ml-48 -mb-48 transition-opacity duration-1000" />
+              <div className="pointer-events-none absolute inset-0 rounded-[2.5rem] ring-1 ring-inset ring-slate-200/50 dark:ring-white/5" />
+              <div className="absolute top-0 right-0 w-96 h-96 bg-blue-500/10 rounded-full blur-[80px] -mr-48 -mt-48 transition-opacity duration-1000" />
+              <div className="absolute bottom-0 left-0 w-96 h-96 bg-indigo-500/10 rounded-full blur-[80px] -ml-48 -mb-48 transition-opacity duration-1000" />
 
-               <CardContent className="p-8 sm:p-12 relative z-10 flex flex-col md:flex-row items-center gap-8 md:gap-12">
-                  {/* Foto Profil */}
-                  <div className="flex flex-col items-center gap-4 flex-shrink-0">
-                     <div className="w-36 h-48 sm:w-40 sm:h-56 rounded-3xl border-4 border-white/60 dark:border-white/10 overflow-hidden shadow-xl bg-white/20 dark:bg-slate-800">
-                        <img 
-                          src="https://www.sman-modalbangsa.sch.id/wp-content/uploads/2021/09/alfaruqasri-300x400.jpeg" 
-                          alt="Alfaruq Asri" 
-                          className="w-full h-full object-cover object-[center_15%]"
-                        />
-                     </div>
-                     <Badge className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60 font-black uppercase tracking-widest text-[9px] px-3">
-                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-2 animate-pulse" />
-                       Lead Developer
-                     </Badge>
+              <CardContent className="p-8 sm:p-12 relative z-10 flex flex-col md:flex-row items-center gap-8 md:gap-12">
+                {/* Foto Profil */}
+                <div className="flex flex-col items-center gap-4 flex-shrink-0">
+                  <div className="w-36 h-48 sm:w-40 sm:h-56 rounded-3xl border-4 border-white/60 dark:border-white/10 overflow-hidden shadow-xl bg-white/20 dark:bg-slate-800">
+                    <img
+                      src="https://www.sman-modalbangsa.sch.id/wp-content/uploads/2021/09/alfaruqasri-300x400.jpeg"
+                      alt="Alfaruq Asri"
+                      className="w-full h-full object-cover object-[center_15%]"
+                    />
                   </div>
+                  <Badge className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60 font-black uppercase tracking-widest text-[9px] px-3">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-2 animate-pulse" />
+                    Lead Developer
+                  </Badge>
+                </div>
 
-                  {/* Biodata */}
-                  <div className="text-center md:text-left space-y-5">
-                    <div>
-                      <h3 className="text-2xl sm:text-3xl font-black text-slate-800 dark:text-white tracking-tight mb-3">
-                        Alfaruq Asri, S.Pd., Gr.
-                      </h3>
-                      <div className="flex flex-wrap items-center justify-center md:justify-start gap-2">
-                         {["Informatics Engineer", "Tim IT Sekolah", "SMA Negeri Modal Bangsa Aceh"].map((bLabel, idx) => (
-                           <Badge key={idx} variant="secondary" className="bg-white/60 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 pointer-events-none text-[10px] uppercase font-bold tracking-wider">{bLabel}</Badge>
-                         ))}
-                      </div>
-                    </div>
-
-                    <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed font-medium max-w-2xl">
-                      "Platform E-Ujian ini adalah karya dedikasi untuk simplifikasi digitalisasi madrasah dan sekolahan. Dibangun dengan PocketBase mutakhir dan React demi stabilitas tinggi."
-                    </p>
-
-                    <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 pt-2">
-                       <a 
-                         href="https://www.alfaruqasri.my.id/" 
-                         target="_blank" 
-                         rel="noopener noreferrer"
-                         className="inline-flex items-center gap-2 px-5 py-2.5 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl transition-all shadow-sm"
-                       >
-                         <Globe size={16} className="text-blue-600 dark:text-blue-400" /> Web Portofolio
-                       </a>
-                       <a 
-                         href="https://wa.me/6285359907696" 
-                         target="_blank" 
-                         rel="noopener noreferrer"
-                         className="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-50 dark:bg-emerald-900/20 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 text-xs font-bold text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/50 rounded-xl transition-all shadow-sm"
-                       >
-                         <MessageCircle size={16} className="fill-current text-opacity-80" /> Hubungi via WhatsApp
-                       </a>
+                {/* Biodata */}
+                <div className="text-center md:text-left space-y-5">
+                  <div>
+                    <h3 className="text-2xl sm:text-3xl font-black text-slate-800 dark:text-white tracking-tight mb-3">
+                      Alfaruq Asri, S.Pd., Gr.
+                    </h3>
+                    <div className="flex flex-wrap items-center justify-center md:justify-start gap-2">
+                      {["Informatics Engineer", `Tim IT ${terminology.school}`, school?.name || "Institusi Pendidikan"].map((bLabel, idx) => (
+                        <Badge key={idx} variant="secondary" className="bg-white/60 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 pointer-events-none text-[10px] uppercase font-bold tracking-wider">{bLabel}</Badge>
+                      ))}
                     </div>
                   </div>
-               </CardContent>
+
+                  <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed font-medium max-w-2xl">
+                    "Platform EXAM AA ini adalah karya dedikasi untuk simplifikasi digitalisasi {terminology.school.toLowerCase()} dan institusi pendidikan. Dibangun dengan PocketBase mutakhir dan React demi stabilitas tinggi."
+                  </p>
+
+                  <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 pt-2">
+                    <a
+                      href="https://www.alfaruqasri.my.id/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 px-5 py-2.5 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl transition-all shadow-sm"
+                    >
+                      <Globe size={16} className="text-blue-600 dark:text-blue-400" /> Web Portofolio
+                    </a>
+                    <a
+                      href="https://wa.me/6285359907696"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-50 dark:bg-emerald-900/20 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 text-xs font-bold text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/50 rounded-xl transition-all shadow-sm"
+                    >
+                      <MessageCircle size={16} className="fill-current text-opacity-80" /> Hubungi via WhatsApp
+                    </a>
+                  </div>
+                </div>
+              </CardContent>
             </Card>
           </section>
 
           <div className="flex flex-col items-center justify-center pt-8 border-t border-slate-200 dark:border-slate-800 text-center gap-4">
-             <Badge className="bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 hover:bg-slate-200 border-0 font-black uppercase tracking-[0.2em] px-4 py-1.5 text-[9px]">
-               E-Ujian Platform • Build 2026
-             </Badge>
-             <p className="text-[10px] font-semibold text-slate-400 dark:text-slate-600">
-               © {new Date().getFullYear()} Hak Cipta Dilindungi Undang-Undang.
-             </p>
+            <Badge className="bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 hover:bg-slate-200 border-0 font-black uppercase tracking-[0.2em] px-4 py-1.5 text-[9px]">
+              EXAM AA Platform • Build 2026
+            </Badge>
+            <p className="text-[10px] font-semibold text-slate-400 dark:text-slate-600">
+              © {new Date().getFullYear()} Hak Cipta Dilindungi Undang-Undang.
+            </p>
           </div>
 
         </div>

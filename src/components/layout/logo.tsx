@@ -3,7 +3,7 @@ import { useTenant } from "../../context/TenantContext";
 
 const Logo = () => {
   const { pb, school } = useTenant();
-  const [profile, setProfile] = useState({ name: "E-Ujian", logoUrl: "" });
+  const [profile, setProfile] = useState({ name: "EXAM AA", logoUrl: "" });
   const [logoError, setLogoError] = useState(false);
 
   useEffect(() => {
@@ -26,7 +26,7 @@ const Logo = () => {
           }
 
           setProfile({
-            name: data.name || "E-Ujian",
+            name: data.name || "EXAM AA",
             logoUrl: logoUrl
           });
           setLogoError(false);
@@ -48,7 +48,7 @@ const Logo = () => {
         }
 
         setProfile({
-          name: e.record.name || "E-Ujian",
+          name: e.record.name || "EXAM AA",
           logoUrl: logoUrl
         });
         setLogoError(false);
@@ -61,14 +61,15 @@ const Logo = () => {
   }, [pb]);
 
   return (
-    <div className="flex items-center gap-3 sm:gap-4">
-      <div className="relative flex-shrink-0">
-        <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl flex items-center justify-center overflow-hidden">
+    <div className="flex items-center gap-3.5 group cursor-default min-w-0 w-full overflow-hidden">
+      {/* Logo Container with Premium Styling */}
+      <div className="relative shrink-0">
+        <div className="h-11 w-11 sm:h-[48px] sm:w-[48px] transition-all duration-300 group-hover:scale-110 flex items-center justify-center">
           {profile.logoUrl && !logoError ? (
             <img
               src={profile.logoUrl}
               alt="Logo"
-              className="h-full w-full object-contain"
+              className="h-full w-full object-contain drop-shadow-sm"
               onError={() => setLogoError(true)}
             />
           ) : (
@@ -79,18 +80,25 @@ const Logo = () => {
             />
           )}
         </div>
-        <div className="absolute -bottom-1 -right-1 h-3 w-3 sm:h-4 sm:w-4 bg-green-500 rounded-full border-2 border-white dark:border-gray-800 shadow-sm"></div>
+        {/* Refined Online Badge */}
+        <div className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 bg-emerald-500 rounded-full border-[2.5px] border-white dark:border-[#0B1120] shadow-sm animate-pulse-slow"></div>
       </div>
-      <div className="flex flex-col justify-center min-w-0 flex-1">
-        <div className="flex items-center gap-2 flex-wrap">
-          <h1 className="text-base sm:text-lg font-bold text-foreground leading-none">E-Ujian</h1>
-          <div className="px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-xs font-medium rounded shrink-0">
+
+      {/* Brand Text Identity */}
+      <div className="flex flex-col min-w-0 justify-center flex-1">
+        <div className="flex items-center gap-1.5 mb-0.5">
+          <span className="text-[13px] font-black text-slate-800 dark:text-white tracking-widest uppercase opacity-90 shrink-0">
+            EXAM AA
+          </span>
+          <span className="text-[9px] px-1.5 py-0.5 bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 font-black rounded-md border border-blue-100/50 dark:border-blue-500/20 shrink-0">
             v3.1
-          </div>
+          </span>
         </div>
-        <p className="text-[10px] text-muted-foreground leading-tight mt-0.5 sm:mt-1 font-medium truncate">
-          {profile.name}
-        </p>
+        <div className="min-w-0 pr-1">
+          <p className="text-[11px] sm:text-[12px] font-bold text-slate-500 dark:text-slate-400 leading-tight line-clamp-2 tracking-tight">
+            {profile.name}
+          </p>
+        </div>
       </div>
     </div>
   );

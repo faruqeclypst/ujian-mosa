@@ -22,6 +22,7 @@ import {
   DropdownMenuLabel
 } from "../components/ui/dropdown-menu";
 import { useExamData } from "../context/ExamDataContext";
+import { useTenant } from "../context/TenantContext";
 import { Button } from "../components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "../components/ui/dialog";
 import { Progress } from "../components/ui/progress";
@@ -36,6 +37,7 @@ import type { ClassData } from "../types/exam";
 
 const ClassesPage = () => {
   const { classes, loading, createClass, updateClass, deleteClass } = useExamData();
+  const { terminology } = useTenant();
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [dialogMode, setDialogMode] = useState<"create" | "edit">("create");
@@ -111,8 +113,8 @@ const ClassesPage = () => {
       }
       closeDialog();
     } catch (error) {
-      console.error("Gagal menyimpan data kelas", error);
-      showAlert("Gagal", "Gagal menyimpan data kelas.", "danger");
+      console.error(`Gagal menyimpan data ${terminology.class.toLowerCase()}`, error);
+      showAlert("Gagal", `Gagal menyimpan data ${terminology.class.toLowerCase()}.`, "danger");
     }
   };
 
@@ -122,8 +124,8 @@ const ClassesPage = () => {
     try {
       await deleteClass(classToDelete.id);
     } catch (error) {
-      console.error("Gagal menghapus kelas", error);
-      showAlert("Gagal", "Gagal menghapus data kelas.", "danger");
+      console.error(`Gagal menghapus ${terminology.class.toLowerCase()}`, error);
+      showAlert("Gagal", `Gagal menghapus data ${terminology.class.toLowerCase()}.`, "danger");
     } finally {
       setIsDeleting(false);
       setDeleteDialogOpen(false);
@@ -139,23 +141,23 @@ const ClassesPage = () => {
       for (const row of parsed) {
         await createClass({ name: row.name });
       }
-      showAlert("Import Berhasil", `${parsed.length} kelas berhasil diimport.`, "success");
+      showAlert("Import Berhasil", `${parsed.length} ${terminology.class.toLowerCase()} berhasil diimport.`, "success");
     } catch (err: any) {
-      showAlert("Gagal Import", err.message || "Gagal mengimport data kelas.", "danger");
+      showAlert("Gagal Import", err.message || `Gagal mengimport data ${terminology.class.toLowerCase()}.`, "danger");
     } finally {
       setIsImporting(false);
     }
   };
 
   const handleExportClasses = () => {
-    exportClassToExcel({ classes, filename: "data-kelas.xlsx" });
+    exportClassToExcel({ classes, filename: `data-${terminology.class.toLowerCase()}.xlsx` });
   };
 
   const handleBatchDelete = async () => {
     if (selectedIds.length === 0) return;
     showAlert(
-      "Hapus Kelas Massal",
-      `Apakah Anda yakin ingin menghapus ${selectedIds.length} kelas terpilih?`,
+      `Hapus ${terminology.class} Massal`,
+      `Apakah Anda yakin ingin menghapus ${selectedIds.length} ${terminology.class.toLowerCase()} terpilih?`,
       "danger",
       async () => {
         setBatchProgress({
@@ -163,7 +165,7 @@ const ClassesPage = () => {
           total: selectedIds.length,
           current: 0,
           message: "Menyiapkan penghapusan...",
-          title: "Hapus Kelas Massal"
+          title: `Hapus ${terminology.class} Massal`
         });
         
         try {
@@ -176,13 +178,13 @@ const ClassesPage = () => {
             setBatchProgress(prev => ({
               ...prev,
               current: currentProcessed,
-              message: `Menghapus data kelas (${currentProcessed}/${selectedIds.length})`
+              message: `Menghapus data ${terminology.class.toLowerCase()} (${currentProcessed}/${selectedIds.length})`
             }));
           }
           setSelectedIds([]);
         } catch (error) {
-          console.error("Gagal menghapus kelas massal", error);
-          showAlert("Gagal", "Gagal menghapus kelas massal.", "danger");
+          console.error(`Gagal menghapus ${terminology.class.toLowerCase()} massal`, error);
+          showAlert("Gagal", `Gagal menghapus ${terminology.class.toLowerCase()} massal.`, "danger");
         } finally {
           setBatchProgress(prev => ({ ...prev, isOpen: false }));
         }
@@ -202,9 +204,9 @@ const ClassesPage = () => {
         <div>
           <h2 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
             <LayoutGrid className="h-5 w-5 text-indigo-500" />
-            Daftar Kelas
+            Daftar {terminology.class}
           </h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Kelola daftar kelas untuk pengelompokan student.</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Kelola daftar {terminology.class.toLowerCase()} untuk pengelompokan {terminology.student.toLowerCase()}.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           {loading ? (
@@ -235,7 +237,7 @@ const ClassesPage = () => {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56 p-2 rounded-2xl shadow-2xl border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 z-[100]">
-              <DropdownMenuLabel className="text-[10px] font-bold uppercase tracking-widest text-slate-400 px-3 py-2 text-left">Kelola Kelas</DropdownMenuLabel>
+              <DropdownMenuLabel className="text-[10px] font-bold uppercase tracking-widest text-slate-400 px-3 py-2 text-left">Kelola {terminology.class}</DropdownMenuLabel>
               <DropdownMenuItem 
                 className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 focus:bg-slate-50 dark:focus:bg-slate-900 transition-colors group"
                 onClick={() => {
@@ -250,7 +252,7 @@ const ClassesPage = () => {
                   <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">
                     {isImporting ? "Mengimport..." : "Import dari Excel"}
                   </span>
-                  <span className="text-[10px] text-slate-400 mt-1">Unggah file data kelas</span>
+                  <span className="text-[10px] text-slate-400 mt-1">Unggah file data {terminology.class.toLowerCase()}</span>
                 </div>
                 <input
                   id="class-import-input"
@@ -273,7 +275,7 @@ const ClassesPage = () => {
                 </div>
                 <div className="flex flex-col min-w-0">
                   <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">Export ke Excel</span>
-                  <span className="text-[10px] text-slate-400 mt-1">Unduh daftar kelas</span>
+                  <span className="text-[10px] text-slate-400 mt-1">Unduh daftar {terminology.class.toLowerCase()}</span>
                 </div>
               </DropdownMenuItem>
               <DropdownMenuSeparator className="my-1 border-slate-100 dark:border-slate-800" />
@@ -286,7 +288,7 @@ const ClassesPage = () => {
                 </div>
                 <div className="flex flex-col min-w-0">
                   <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">Unduh Template</span>
-                  <span className="text-[10px] text-slate-400 mt-1">Format file import Excel</span>
+                  <span className="text-[10px] text-slate-400 mt-1">Format file import Excel {terminology.class.toLowerCase()}</span>
                 </div>
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -296,12 +298,12 @@ const ClassesPage = () => {
             <DialogTrigger asChild>
               <Button onClick={() => { setSelectedClass(null); setIsDialogOpen(true); }} size="sm" className="rounded-2xl bg-blue-50 hover:bg-blue-100 border border-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 dark:border-blue-800/40 text-blue-700 font-bold shadow-sm h-9 px-4">
                 <Plus className="mr-1 h-3.5 w-3.5" />
-                Tambah Kelas
+                Tambah {terminology.class}
               </Button>
             </DialogTrigger>
             <DialogContent className="max-w-md bg-card">
               <DialogHeader>
-                <DialogTitle className="text-base font-bold text-slate-800 dark:text-white">{dialogMode === "edit" ? "Edit Data Kelas" : "Tambah Data Kelas"}</DialogTitle>
+                <DialogTitle className="text-base font-bold text-slate-800 dark:text-white">{dialogMode === "edit" ? `Edit Data ${terminology.class}` : `Tambah Data ${terminology.class}`}</DialogTitle>
               </DialogHeader>
               <ClassForm
                 defaultValues={defaultValues}
@@ -321,7 +323,7 @@ const ClassesPage = () => {
       {loading ? (
         <Card>
           <CardHeader className="p-4">
-            <CardTitle className="text-base font-semibold text-slate-800 dark:text-white">Daftar Kelas</CardTitle>
+            <CardTitle className="text-base font-semibold text-slate-800 dark:text-white">Daftar {terminology.class}</CardTitle>
           </CardHeader>
           <CardContent>
              <div className="rounded-xl border border-slate-200/60 dark:border-slate-800 overflow-hidden">
@@ -329,7 +331,7 @@ const ClassesPage = () => {
                   <TableHeader className="bg-slate-50/50 dark:bg-slate-900/50">
                     <TableRow>
                       <TableHead className="w-16 text-center">No</TableHead>
-                      <TableHead>Nama Kelas</TableHead>
+                      <TableHead>Nama {terminology.class}</TableHead>
                       <TableHead className="text-right">Aksi</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -365,9 +367,9 @@ const ClassesPage = () => {
         isOpen={deleteDialogOpen}
         onClose={() => setDeleteDialogOpen(false)}
         onConfirm={handleConfirmDelete}
-        title="Hapus Kelas"
-        description="Apakah Anda yakin ingin menghapus data kelas ini?"
-        itemName={`Kelas ${classToDelete?.name || ""}`}
+        title={`Hapus ${terminology.class}`}
+        description={`Apakah Anda yakin ingin menghapus data ${terminology.class.toLowerCase()} ini?`}
+        itemName={`${terminology.class} ${classToDelete?.name || ""}`}
         isLoading={isDeleting}
       />
 

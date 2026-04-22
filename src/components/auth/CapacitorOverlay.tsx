@@ -11,29 +11,54 @@ const CapacitorOverlay = () => {
   const [password, setPassword] = useState("");
 
   useEffect(() => {
-    if (Capacitor.isNativePlatform()) {
+    // Only show on Android native platform
+    if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android') {
       setIsCapacitor(true);
     }
+
+    // Listen for hardware back button to show exit dialog
+    const backListener = App.addListener('backButton', ({ canGoBack }) => {
+      // If we're on a deep route, we might want to let it go back, 
+      // but for Exambro, we usually want to block exit.
+      setDialogType("exit");
+      setPassword("");
+    });
+
+    return () => {
+      backListener.then(l => l.remove());
+    };
   }, []);
 
-  if (!isCapacitor) return null;
+  const isExcludedRoute = window.location.pathname.startsWith('/admin') ||
+    window.location.pathname.startsWith('/superadmin');
+
+  if (!isCapacitor || isExcludedRoute) return null;
 
   const handleRefresh = () => {
     window.location.reload();
   };
 
   const handleExitApp = async () => {
-    if (password === "quit") {
-      setDialogType("none");
+    const cleanPass = password.trim().toLowerCase();
+    if (cleanPass === "quit") {
+      // Keep dialog visible while exiting to prevent double-input confusion
       try {
         if (Capacitor.isNativePlatform()) {
+          // Try custom plugin first (for specialized locker apps)
           // @ts-ignore
-          await (Capacitor.Plugins.CheatAlert as any).exitApp();
+          const cheatAlert = Capacitor.Plugins.CheatAlert;
+          if (cheatAlert && (cheatAlert as any).exitApp) {
+            await (cheatAlert as any).exitApp();
+          } 
+          
+          // Guaranteed fallback for standard Capacitor apps
+          await App.exitApp();
         } else {
+          setDialogType("none");
           window.close();
         }
       } catch (e) {
-        console.error("Exit failed", e);
+        console.error("Exit system failed, forcing fallback:", e);
         App.exitApp();
       }
     } else {
@@ -44,83 +69,118 @@ const CapacitorOverlay = () => {
 
   return (
     <>
-      <motion.div
+      {/* Draggable Menu Toggle */}
+      <motion.div 
         drag
-        dragConstraints={{ left: -window.innerWidth + 100, right: 0, top: -window.innerHeight + 100, bottom: 100 }}
-        dragElastic={0}
         dragMomentum={false}
-        className="fixed bottom-48 right-4 z-[9999] flex flex-col items-end gap-2 select-none"
-        style={{ touchAction: "none" }}
+        dragElastic={0.1}
+        initial={{ x: 0, y: 0 }}
+        className="fixed bottom-24 right-5 flex flex-col items-center gap-2.5 z-[9990] pointer-events-auto select-none print:hidden touch-none"
       >
         <AnimatePresence>
           {showMenu && (
-            <div 
-              className="bg-white dark:bg-slate-900 p-2 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col gap-2 mb-2"
+            <motion.div
+              initial={{ opacity: 0, y: 10, scale: 0.8 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 10, scale: 0.8 }}
+              className="flex flex-col gap-2.5 mb-1"
             >
-              <button
-                onClick={handleRefresh}
-                className="w-10 h-10 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-xl flex items-center justify-center hover:bg-blue-100 transition-colors"
+              {/* Refresh Button */}
+              <motion.button
+                whileTap={{ scale: 0.9 }}
+                onClick={() => { handleRefresh(); setShowMenu(false); }}
+                className="w-10 h-10 flex items-center justify-center rounded-full bg-emerald-500 text-white shadow-xl border border-emerald-400 hover:bg-emerald-600 transition-colors"
                 title="Refresh"
               >
                 <RefreshCw size={18} />
-              </button>
-              <button
-                onClick={() => { setDialogType("exit"); setShowMenu(false); }}
-                className="w-10 h-10 bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 rounded-xl flex items-center justify-center hover:bg-rose-100 transition-colors"
-                title="Keluar Aplikasi"
+              </motion.button>
+
+              {/* Exit Button */}
+              <motion.button
+                whileTap={{ scale: 0.9 }}
+                onClick={() => { setDialogType("exit"); setPassword(""); setShowMenu(false); }}
+                className="w-10 h-10 flex items-center justify-center rounded-full bg-rose-500 text-white shadow-xl border border-rose-400 hover:bg-rose-600 transition-colors"
+                title="Exit"
               >
                 <LogOut size={18} />
-              </button>
-            </div>
+              </motion.button>
+            </motion.div>
           )}
         </AnimatePresence>
 
-        <button
+        {/* Main Toggle Button */}
+        <motion.button
+          whileTap={{ scale: 0.9 }}
           onClick={() => setShowMenu(!showMenu)}
-          className="w-12 h-12 bg-slate-900/60 dark:bg-slate-800/60 backdrop-blur-md text-white rounded-full flex items-center justify-center shadow-xl active:scale-90 transition-all border border-white/20 ring-1 ring-black/10"
+          className={`w-12 h-12 flex items-center justify-center rounded-full shadow-2xl transition-all duration-300 border ${
+            showMenu 
+              ? "bg-slate-900 border-slate-700 text-white rotate-45" 
+              : "bg-emerald-500 border-emerald-400 text-white"
+          }`}
         >
-          {showMenu ? <X size={22} className="opacity-80" /> : <MoreHorizontal size={28} className="opacity-90" />}
-        </button>
+          {showMenu ? <X size={20} /> : <MoreHorizontal size={20} />}
+        </motion.button>
       </motion.div>
 
       <AnimatePresence>
         {dialogType !== "none" && (
-          <div className="fixed inset-0 z-[10000] flex items-center justify-center p-6 bg-slate-950/80 backdrop-blur-sm">
-            <motion.div 
+          <div className="fixed inset-0 z-[10000] flex items-center justify-center p-6 bg-slate-950/60 backdrop-blur-sm">
+            <motion.div
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.9 }}
-              className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl border border-slate-100 dark:border-slate-800"
+              className="bg-white dark:bg-slate-900 w-full max-w-[320px] rounded-[2rem] p-6 shadow-2xl border border-white/5"
             >
-              <div className="w-16 h-16 bg-blue-50 dark:bg-blue-900/20 rounded-3xl flex items-center justify-center mb-6 mx-auto">
-                {dialogType === "refresh" ? <RefreshCw className="text-blue-600" /> : <ShieldAlert className="text-rose-600" />}
+              <div className="w-14 h-14 bg-slate-100 dark:bg-slate-800 rounded-2xl flex items-center justify-center mb-5 mx-auto">
+                {dialogType === "refresh" ? (
+                  <RefreshCw className="text-blue-500 w-6 h-6" />
+                ) : (
+                  <ShieldAlert className="text-rose-500 w-6 h-6" />
+                )}
               </div>
-              <h3 className="text-xl font-black text-center mb-2 dark:text-white uppercase tracking-tight">
+
+              <h3 className="text-lg font-bold text-center mb-2 dark:text-white">
                 {dialogType === "refresh" ? "Muat Ulang?" : "Keluar Sesi?"}
               </h3>
-              <p className="text-center text-slate-500 text-sm mb-8 font-medium">
-                {dialogType === "refresh" ? "Seluruh progres jawaban yang belum tersimpan mungkin akan hilang." : "Hanya pengawas yang diizinkan untuk menutup aplikasi ujian ini."}
+
+              <p className="text-center text-slate-500 dark:text-slate-400 text-xs mb-6 leading-relaxed">
+                {dialogType === "refresh"
+                  ? "Seluruh progres jawaban yang belum tersimpan mungkin akan hilang."
+                  : "Hanya pengawas yang diizinkan untuk menutup aplikasi ujian ini."}
               </p>
+
               {dialogType === "exit" && (
-                <input 
-                  type="password"
-                  placeholder="Password Pengawas"
-                  autoFocus
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full mb-6 p-4 rounded-2xl bg-slate-100 dark:bg-slate-800 border-none text-center font-bold tracking-widest outline-none focus:ring-2 focus:ring-rose-500/20"
-                />
+                <div className="mb-6">
+                  <input
+                    type="password"
+                    placeholder="PIN PENGAWAS"
+                    autoFocus
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full py-4 px-4 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-center font-bold tracking-[0.3em] outline-none transition-all placeholder:tracking-normal placeholder:font-medium text-sm"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        handleExitApp();
+                      }
+                    }}
+                  />
+                </div>
               )}
+
               <div className="flex flex-col gap-3">
-                <button 
+                <motion.button
+                  whileTap={{ scale: 0.98 }}
                   onClick={dialogType === "refresh" ? handleRefresh : handleExitApp}
-                  className={`w-full py-4 rounded-2xl font-black text-white uppercase tracking-widest text-xs ${dialogType === "refresh" ? "bg-blue-600" : "bg-rose-600"}`}
+                  className={`w-full py-3.5 rounded-xl font-bold text-white text-sm shadow-lg ${dialogType === "refresh"
+                      ? "bg-blue-600 shadow-blue-500/20"
+                      : "bg-rose-600 shadow-rose-500/20"
+                    }`}
                 >
                   Ya, Lanjutkan
-                </button>
-                <button 
+                </motion.button>
+                <button
                   onClick={() => { setDialogType("none"); setPassword(""); }}
-                  className="w-full py-4 text-slate-400 font-bold uppercase tracking-widest text-[10px]"
+                  className="w-full py-2 text-slate-400 hover:text-slate-500 dark:hover:text-slate-300 font-bold text-xs transition-colors"
                 >
                   Batal / Kembali
                 </button>

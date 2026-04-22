@@ -5,7 +5,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { motion } from "framer-motion";
 import { Link, useNavigate } from "react-router-dom";
-import pb from "../lib/pocketbase";
+import { useTenant } from "../context/TenantContext";
 import { testAIConnection, AI_MODELS } from "../lib/ai";
 
 import FormField from "../components/forms/FormField";
@@ -27,6 +27,7 @@ const profileSchema = z.object({
 type ProfileFormValues = z.infer<typeof profileSchema>;
 
 const ProfilePage = () => {
+  const { pb, terminology } = useTenant();
   const { user } = useAuth();
   const navigate = useNavigate();
   const { addToast } = useToast();
@@ -59,6 +60,7 @@ const ProfilePage = () => {
 
     setFormError(null);
     setIsUpdating(true);
+    if (!pb) return;
 
     try {
       await pb.collection("users").update(user.id, {
@@ -91,6 +93,7 @@ const ProfilePage = () => {
     setTestResult(null);
 
     try {
+      if (!pb) return;
       const settings = await pb.collection("settings").getFullList({ limit: 1 });
       const config = settings[0];
 
@@ -99,7 +102,7 @@ const ProfilePage = () => {
       const modelId = watch("ai_model") || config?.ai_model || AI_MODELS[0].id;
       const customUrl = config?.ai_gateway_url || "https://ollama.com";
 
-      const res = await testAIConnection(aiKey, modelId, customUrl, provider);
+      const res = await testAIConnection(pb, aiKey, modelId, customUrl, provider);
       setTestResult(res);
 
       if (res.success) {
@@ -279,7 +282,7 @@ const ProfilePage = () => {
                     </Button>
                   </div>
                   <p className="text-[10px] text-gray-500 mt-1">
-                    Bagi Guru, wajib mengisi API Key sendiri untuk menggunakan fitur AI.
+                    Bagi {terminology.teacher}, wajib mengisi API Key sendiri untuk menggunakan fitur AI.
                   </p>
                   {testResult && (
                     <p className={`text-[10px] mt-1 font-bold ${testResult.success ? 'text-emerald-600' : 'text-rose-600'}`}>

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   GraduationCap, Monitor, BarChart3, Shield, Users, Zap,
-  ArrowRight, CheckCircle, Building2, Menu, X, Globe, Star
+  ArrowRight, CheckCircle, Building2, Menu, X, Globe, Star, Wand2, MessageCircle, Phone
 } from "lucide-react";
 import { cn } from "../../lib/utils";
 
@@ -14,7 +14,7 @@ const LandingPage = () => {
     { icon: Monitor, title: "Ujian CBT Stabil", desc: "Sistem ujian online yang dioptimasi agar lancar diakses ratusan siswa serentak tanpa server down.", color: "text-blue-600 bg-blue-50 border-blue-100" },
     { icon: BarChart3, title: "Nilai & Analisis Otomatis", desc: "Hasil ujian langsung dihitung otomatis. Tersedia analitik butir soal untuk evaluasi guru.", color: "text-violet-600 bg-violet-50 border-violet-100" },
     { icon: Shield, title: "Cegah Menyontek", desc: "Fitur wajib fullscreen, pencegahan buka tab lain, dan kunci ujian otomatis jika melanggar.", color: "text-emerald-600 bg-emerald-50 border-emerald-100" },
-    { icon: Users, title: "Kelola Kelas & Guru", desc: "Satu dashboard untuk atur jadwal, mata pelajaran, guru pengawas, hingga ribuan siswa.", color: "text-amber-600 bg-amber-50 border-amber-100" },
+    { icon: Wand2, title: "AI Question Generator", desc: "Buat soal berkualitas dalam hitungan detik dengan bantuan AI. Hemat waktu persiapan ujian hingga 90%.", color: "text-amber-600 bg-amber-50 border-amber-100" },
     { icon: Zap, title: "Zero Maintenance", desc: "Sekolah tidak perlu sewa server atau urus teknis. Semuanya sudah kami kelola sepenuhnya.", color: "text-rose-600 bg-rose-50 border-rose-100" },
     { icon: Building2, title: "Identitas Sekolah", desc: "Siswa mengakses link ujian khusus dengan logo dan nama sekolah Anda sendiri.", color: "text-cyan-600 bg-cyan-50 border-cyan-100" },
   ];
@@ -22,55 +22,73 @@ const LandingPage = () => {
   const plans = [
     {
       name: "Paket Berkembang",
-      price: "Rp 299",
-      period: "ribu / bulan",
-      desc: "Pilihan utama sekolah aktif",
+      price: "225.000",
+      oldPrice: "315.000",
+      period: "/ bulan",
+      desc: "Ideal untuk sekolah/kampus kecil",
       quota: "Maks. 250 Siswa",
-      features: ["Pelaksanaan ujian CBT", "Import soal via Ms. Word", "Analisa kompetensi siswa", "Bantuan teknis via WA"],
+      features: [
+        "Ujian CBT (8 Tipe Soal)",
+        "Import Word, Excel & AI",
+        "Anti-Contek & Lock Browser",
+        "Monitoring Real-time",
+        "Bantuan Teknis via WA"
+      ],
       cta: "Daftar Sekarang",
       highlight: false,
       comingSoon: false,
     },
     {
       name: "Paket Lanjutan",
-      price: "Rp 499",
-      period: "ribu / bulan",
-      desc: "Untuk institusi skala menengah",
+      price: "450.000",
+      oldPrice: "675.000",
+      period: "/ bulan",
+      desc: "Untuk institusi menengah",
       quota: "Maks. 500 Siswa",
-      features: ["Semua di Paket Berkembang", "Server kapasitas tinggi", "Integrasi rapor digital", "Pendampingan via Zoom"],
+      features: [
+        "Semua di Paket Berkembang",
+        "Kapasitas Server Medium",
+        "Analisis Hasil & Ekspor Excel",
+        "Custom Subdomain Sekolah",
+        "Pelatihan Guru via Zoom"
+      ],
       cta: "Daftar Sekarang",
       highlight: true,
       comingSoon: false,
     },
     {
       name: "Paket Premium",
-      price: "Segera",
-      period: "Hadir",
+      price: "700.000",
+      oldPrice: "1.000.000",
+      period: "/ bulan",
       desc: "Untuk entitas skala besar",
       quota: "Maks. 1000 Siswa",
-      features: ["Semua di Paket Lanjutan", "Domain sekolah.sch.id", "Server dedicated", "Bank Soal Terpusat"],
-      cta: "Nantikan Segera",
+      features: [
+        "Semua di Paket Lanjutan",
+        "Server Dedicated (High Performance)",
+        "Custom Domain (segera)",
+        "Bank Soal Terpusat (Global)",
+        "Support Prioritas 24/7"
+      ],
+      cta: "Daftar Sekarang",
       highlight: false,
-      comingSoon: true,
+      comingSoon: false,
     },
   ];
 
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans overflow-x-hidden selection:bg-blue-100 selection:text-blue-900">
 
-      {/* Subtle grid background */}
-      <div className="fixed inset-0 pointer-events-none bg-[linear-gradient(to_right,#f1f5f9_1px,transparent_1px),linear-gradient(to_bottom,#f1f5f9_1px,transparent_1px)] bg-[size:32px_32px] z-0" />
-
       {/* Navbar */}
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-xl border-b border-slate-200/80 shadow-sm">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+      <nav className="fixed top-0 left-0 right-0 z-[100] bg-white/80 backdrop-blur-md border-b border-slate-100">
+        <div className="max-w-[1440px] mx-auto px-8 sm:px-12 lg:px-20 h-16 sm:h-20 flex items-center justify-between">
           {/* Logo */}
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center shadow-sm">
               <GraduationCap size={18} className="text-white" />
             </div>
-            <span className="font-bold text-slate-900">E-Ujian</span>
-            <span className="hidden sm:inline text-[10px] font-bold bg-blue-50 text-blue-600 border border-blue-200 px-2 py-0.5 rounded-full uppercase tracking-wider">SaaS</span>
+            <span className="font-bold text-slate-900">EXAM AA</span>
+            <span className="hidden sm:inline text-[10px] font-bold bg-blue-50 text-blue-600 border border-blue-200 px-2 py-0.5 rounded-full uppercase tracking-wider">Ujian Anti Ribet</span>
           </div>
 
           {/* Desktop nav */}
@@ -88,14 +106,8 @@ const LandingPage = () => {
               Harga
             </button>
             <button
-              onClick={() => navigate("/superadmin/login")}
-              className="text-sm font-medium text-slate-500 hover:text-slate-900 transition-colors px-3 py-2 rounded-lg hover:bg-slate-100"
-            >
-              Admin
-            </button>
-            <button
               onClick={() => navigate("/daftar")}
-              className="text-sm font-semibold bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-all shadow-sm hover:shadow-md active:scale-95"
+              className="text-sm font-semibold bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-all shadow-sm hover:shadow-md active:scale-95 ml-2"
             >
               Mulai Gratis
             </button>
@@ -125,12 +137,7 @@ const LandingPage = () => {
             >
               Paket Harga
             </button>
-            <button
-              onClick={() => navigate("/superadmin/login")}
-              className="w-full text-left text-sm font-medium text-slate-500 px-3 py-2.5 rounded-lg hover:bg-slate-100 transition-colors"
-            >
-              Super Admin
-            </button>
+
             <button
               onClick={() => navigate("/daftar")}
               className="w-full text-sm font-semibold bg-blue-600 text-white px-4 py-3 rounded-xl transition-all"
@@ -142,30 +149,33 @@ const LandingPage = () => {
       </nav>
 
       {/* Hero */}
-      <section className="relative min-h-screen flex items-center justify-center pt-16 px-4 sm:px-6 z-10">
-        {/* Blue glow */}
-        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[400px] bg-blue-600/5 blur-[120px] rounded-full pointer-events-none" />
+      <section className="relative min-h-screen flex items-center justify-center pt-20 px-6 sm:px-10 lg:px-16 z-10 overflow-hidden">
+        {/* Subtle grid background - Only in Hero */}
+        <div className="absolute inset-0 pointer-events-none bg-[linear-gradient(to_right,#f1f5f9_1px,transparent_1px),linear-gradient(to_bottom,#f1f5f9_1px,transparent_1px)] bg-[size:32px_32px] z-0" />
 
-        <div className="relative max-w-4xl mx-auto text-center py-16 sm:py-24">
+        {/* Blue glow */}
+        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[500px] bg-blue-600/5 blur-[100px] rounded-full pointer-events-none" />
+
+        <div className="relative max-w-7xl mx-auto text-center py-20">
           {/* Badge */}
           <div className="inline-flex items-center gap-2 bg-white border border-slate-200 shadow-sm rounded-full px-4 py-1.5 mb-8 hover:border-blue-300 transition-colors cursor-default">
             <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-slate-600 text-sm font-medium">Platform CBT untuk Sekolah Indonesia</span>
+            <span className="text-slate-600 text-sm font-medium">Platform CBT Anti Curang</span>
           </div>
 
-          <h1 className="text-3xl sm:text-5xl md:text-6xl font-extrabold leading-tight tracking-tight mb-6 text-slate-900">
-            Ujian Online Profesional{" "}
-            <span className="relative inline-block">
+          <h1 className="text-3xl sm:text-5xl md:text-6xl lg:text-7xl font-black leading-[1.1] tracking-tight mb-6 text-slate-900">
+            Ujian Online Profesional <br />
+            <span className="relative inline-block mt-2">
               <span className="text-blue-600">Tanpa Ribet</span>
-              <svg className="absolute -bottom-1 left-0 w-full" viewBox="0 0 200 8" fill="none">
-                <path d="M2 6C40 2 80 2 100 4C120 6 160 4 198 2" stroke="#3B82F6" strokeWidth="2.5" strokeLinecap="round" opacity="0.4" />
+              <svg className="absolute -bottom-2 left-0 w-full" viewBox="0 0 200 8" fill="none">
+                <path d="M2 6C40 2 80 2 100 4C120 6 160 4 198 2" stroke="#3B82F6" strokeWidth="3" strokeLinecap="round" opacity="0.4" />
               </svg>
             </span>{" "}
             Urus Server
           </h1>
 
-          <p className="text-base sm:text-lg text-slate-500 max-w-2xl mx-auto mb-10 leading-relaxed font-medium">
-            E-Ujian membantu sekolah mengadakan CBT, PTS, dan PAT dengan lancar. Tidak ada lagi kendala teknis atau aplikasi down saat ujian berlangsung.
+          <p className="text-base sm:text-lg md:text-xl text-slate-500 max-w-3xl mx-auto mb-10 leading-relaxed font-medium">
+            EXAM AA membantu sekolah / universitas (umum) mengadakan pelaksanaan ujian online dengan lancar. Tidak ada lagi kendala teknis atau aplikasi down saat ujian berlangsung.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
@@ -173,7 +183,7 @@ const LandingPage = () => {
               onClick={() => navigate("/daftar")}
               className="group flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold h-12 sm:h-14 px-6 sm:px-8 rounded-xl transition-all hover:shadow-lg hover:shadow-blue-600/25 text-sm sm:text-base active:scale-95"
             >
-              Daftarkan Sekolah Gratis
+              Daftar Gratis Sekarang
               <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
             </button>
             <button
@@ -194,10 +204,10 @@ const LandingPage = () => {
                 <div className="w-2.5 h-2.5 rounded-full bg-emerald-400/70" />
               </div>
             </div>
-            <div className="bg-slate-50 border border-slate-100 rounded-lg px-3 py-2 text-sm font-mono text-slate-500 flex items-center gap-2">
-              <Globe size={12} className="text-slate-400 flex-shrink-0" />
+            <div className="bg-slate-50 border border-slate-100 rounded-lg px-3 py-2 text-sm font-mono text-slate-500 flex items-center">
+              <Globe size={12} className="text-slate-400 flex-shrink-0 mr-2" />
               <span className="text-slate-900 font-bold">sekolahanda</span>
-              <span>.alfaruqasri.my.id</span>
+              <span className="text-slate-500">.alfaruqasri.my.id</span>
             </div>
           </div>
 
@@ -214,13 +224,13 @@ const LandingPage = () => {
       </section>
 
       {/* Features */}
-      <section id="features" className="py-16 sm:py-24 px-4 sm:px-6 relative z-10 border-t border-slate-100 bg-slate-50">
-        <div className="max-w-6xl mx-auto">
+      <section id="features" className="py-24 sm:py-32 px-6 sm:px-10 lg:px-16 relative z-10 border-t border-slate-100 bg-white">
+        <div className="max-w-7xl mx-auto">
           <div className="text-center mb-12">
             <div className="inline-flex items-center gap-2 bg-blue-50 border border-blue-200 text-blue-700 text-xs font-bold px-3 py-1.5 rounded-full mb-4 uppercase tracking-wider">
               <Star size={12} /> Fitur Unggulan
             </div>
-            <h2 className="text-2xl sm:text-3xl font-extrabold mb-4 text-slate-900">Kenapa E-Ujian Cocok untuk Sekolah Anda?</h2>
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black mb-6 text-slate-900 leading-tight">Kenapa EXAM AA Cocok untuk Sekolah Anda?</h2>
             <p className="text-slate-500 text-base max-w-2xl mx-auto font-medium">
               Dirancang berdasarkan masukan ratusan guru. Siapapun bisa menggunakannya dengan mudah.
             </p>
@@ -244,20 +254,20 @@ const LandingPage = () => {
       </section>
 
       {/* Trust Section */}
-      <section className="py-16 sm:py-24 px-4 sm:px-6 relative z-10 bg-white border-t border-slate-100">
-        <div className="max-w-6xl mx-auto flex flex-col lg:flex-row items-center gap-12 lg:gap-16">
-          <div className="flex-1 max-w-xl">
+      <section className="py-24 sm:py-32 px-6 sm:px-10 lg:px-16 relative z-10 bg-white border-t border-slate-100 overflow-hidden">
+        <div className="max-w-7xl mx-auto flex flex-col lg:flex-row items-center gap-16 lg:gap-24">
+          <div className="flex-1 max-w-2xl">
             <div className="inline-flex items-center gap-2 bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold px-3 py-1.5 rounded-full mb-6 uppercase tracking-wider">
               <CheckCircle size={12} /> Terpercaya
             </div>
-            <h3 className="text-2xl sm:text-3xl font-extrabold mb-4 text-slate-900">Memudahkan Guru, Melancarkan Nilai Siswa</h3>
+            <h3 className="text-3xl sm:text-4xl lg:text-5xl font-black mb-6 text-slate-900 leading-tight">Memudahkan Guru, Melancarkan Nilai Siswa</h3>
             <p className="text-slate-500 text-base mb-8 leading-relaxed font-medium">
               Dari penyusunan naskah ujian, pelaksanaan di lab atau kelas, hingga mencetak hasil evaluasi yang siap ditarik ke laporan rapor.
             </p>
             <ul className="space-y-4">
               {[
                 "Kehandalan server dimonitor tim teknis 24/7",
-                "Privasi dan keamanan bank soal sekolah terjamin",
+                "Privasi dan keamanan bank soal terjamin",
                 "Navigasi minimalis dan ramah pengguna",
               ].map((item, i) => (
                 <li key={i} className="flex items-center gap-3 text-slate-700 font-medium text-sm">
@@ -272,52 +282,33 @@ const LandingPage = () => {
               onClick={() => navigate("/daftar")}
               className="mt-8 inline-flex items-center gap-2 text-blue-600 hover:text-blue-700 font-bold text-sm hover:underline underline-offset-4"
             >
-              Mulai Daftarkan Sekolah <ArrowRight size={16} />
+              Mulai Daftarkan Sekarang <ArrowRight size={16} />
             </button>
           </div>
-          <div className="flex-1 w-full max-w-lg">
-            <div className="bg-gradient-to-br from-slate-50 to-slate-100 border border-slate-200 rounded-2xl p-6 shadow-inner space-y-3">
-              {/* Mock dashboard preview */}
-              <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
-                <div className="flex items-center gap-2 mb-3">
-                  <div className="w-6 h-6 rounded-md bg-blue-100 flex items-center justify-center">
-                    <Monitor size={13} className="text-blue-600" />
-                  </div>
-                  <span className="text-xs font-bold text-slate-700">Ujian Aktif</span>
-                  <span className="ml-auto text-[10px] font-bold bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full">LIVE</span>
-                </div>
-                <div className="space-y-2">
-                  {["Matematika Kelas 10A", "Bahasa Indonesia Kelas 11B"].map((name, j) => (
-                    <div key={j} className="flex items-center justify-between">
-                      <span className="text-xs text-slate-600 font-medium">{name}</span>
-                      <div className="h-1.5 w-24 bg-slate-100 rounded-full overflow-hidden">
-                        <div className="h-full bg-blue-500 rounded-full" style={{ width: `${j === 0 ? 78 : 56}%` }} />
-                      </div>
-                    </div>
-                  ))}
-                </div>
+          <div className="flex-1 w-full max-w-2xl relative group">
+            {/* Decorative elements behind image */}
+            <div className="absolute -inset-1 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-[2rem] blur opacity-20 group-hover:opacity-30 transition duration-1000 group-hover:duration-200"></div>
+
+            <div className="relative bg-white border border-slate-200 rounded-[2rem] p-2 shadow-2xl overflow-hidden">
+              <img
+                src="https://cdn.alfaruqasri.my.id/schools/modalbangsa/identity/2026-04-21T08-17-30-489Z-screenshot-1514-.png"
+                alt="EXAM AA Dashboard Preview"
+                className="w-full h-auto rounded-[1.8rem] shadow-sm transform group-hover:scale-[1.01] transition-transform duration-500"
+              />
+
+              {/* Label Overlay */}
+              <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-white/90 backdrop-blur-md border border-slate-200/50 px-4 py-2 rounded-2xl shadow-xl flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-800">Preview Dashboard EXAM AA</span>
               </div>
-              <div className="grid grid-cols-3 gap-3">
-                {[
-                  { label: "Siswa", value: "142", color: "text-blue-600" },
-                  { label: "Selesai", value: "89", color: "text-emerald-600" },
-                  { label: "Peringatan", value: "3", color: "text-amber-600" },
-                ].map((stat, k) => (
-                  <div key={k} className="bg-white rounded-xl border border-slate-200 p-3 text-center shadow-sm">
-                    <p className={cn("text-xl font-bold", stat.color)}>{stat.value}</p>
-                    <p className="text-[10px] text-slate-400 font-semibold">{stat.label}</p>
-                  </div>
-                ))}
-              </div>
-              <p className="text-center text-xs text-slate-400 font-medium pt-1">✨ Preview Dashboard E-Ujian</p>
             </div>
           </div>
         </div>
       </section>
 
       {/* Pricing */}
-      <section id="pricing" className="py-16 sm:py-24 px-4 sm:px-6 relative z-10 bg-slate-50 border-t border-slate-100">
-        <div className="max-w-5xl mx-auto">
+      <section id="pricing" className="py-24 sm:py-32 px-6 sm:px-10 lg:px-16 relative z-10 bg-white border-t border-slate-100">
+        <div className="max-w-7xl mx-auto">
           <div className="text-center mb-12">
             <div className="inline-flex items-center gap-2 bg-blue-50 border border-blue-200 text-blue-700 text-xs font-bold px-3 py-1.5 rounded-full mb-4 uppercase tracking-wider">
               💰 Harga
@@ -351,11 +342,24 @@ const LandingPage = () => {
                 <h3 className={cn("font-bold text-lg mb-1", plan.highlight ? "text-white" : "text-slate-900")}>{plan.name}</h3>
                 <p className={cn("text-sm mb-5", plan.highlight ? "text-blue-100" : "text-slate-500")}>{plan.desc}</p>
 
-                <div className="flex items-baseline gap-1.5 mb-2">
-                  <span className={cn("text-3xl sm:text-4xl font-black", plan.comingSoon ? "text-slate-400" : plan.highlight ? "text-white" : "text-slate-900")}>
-                    {plan.price}
-                  </span>
-                  <span className={cn("text-sm font-semibold", plan.highlight ? "text-blue-200" : "text-slate-400")}>{plan.period}</span>
+                <div className="flex flex-col mb-5">
+                  {plan.oldPrice && (
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className={cn("text-lg font-bold line-through decoration-rose-500 decoration-2", plan.highlight ? "text-blue-200/80" : "text-slate-400")}>
+                        Rp {plan.oldPrice}
+                      </span>
+                      <span className="text-[10px] font-black px-2 py-0.5 rounded-md bg-rose-500 text-white shadow-sm uppercase tracking-wider">
+                        Diskon
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex items-baseline gap-1.5">
+                    <span className={cn("text-xs font-bold mr-1", plan.highlight ? "text-blue-200" : "text-slate-500")}>Rp</span>
+                    <span className={cn("text-3xl sm:text-4xl font-black", plan.comingSoon ? "text-slate-400" : plan.highlight ? "text-white" : "text-slate-900")}>
+                      {plan.price}
+                    </span>
+                    <span className={cn("text-xs font-semibold", plan.highlight ? "text-blue-200" : "text-slate-400")}>{plan.period}</span>
+                  </div>
                 </div>
 
                 <div className={cn(
@@ -377,7 +381,7 @@ const LandingPage = () => {
                 </ul>
 
                 <button
-                  onClick={() => { if (!plan.comingSoon) navigate("/daftar"); }}
+                  onClick={() => { if (!plan.comingSoon) navigate("/daftar", { state: { selectedPlan: plan.name } }); }}
                   disabled={plan.comingSoon}
                   className={cn(
                     "w-full h-11 rounded-xl font-bold text-sm transition-all",
@@ -407,13 +411,13 @@ const LandingPage = () => {
                 Siap Beralih ke Ujian Online yang Tenang?
               </h2>
               <p className="text-blue-100 text-base mb-8 max-w-lg mx-auto font-medium">
-                Kami memandu admin sekolah hingga seluruh sistem berjalan mandiri. Bebas konsultasi awal gratis.
+                Kami akan memandu admin sekolah / kampus hingga seluruh sistem berjalan mandiri. Bebas konsultasi awal gratis.
               </p>
               <button
                 onClick={() => navigate("/daftar")}
                 className="inline-flex items-center gap-3 bg-white text-blue-700 hover:bg-blue-50 font-bold h-12 sm:h-14 px-8 sm:px-10 rounded-xl transition-all hover:scale-105 active:scale-95 shadow-xl text-sm sm:text-base"
               >
-                Buat Akun Sekolah Sekarang
+                Daftar Sekarang
                 <ArrowRight size={18} />
               </button>
             </div>
@@ -422,22 +426,47 @@ const LandingPage = () => {
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-slate-200 py-8 px-4 sm:px-6 bg-slate-50 relative z-10">
-        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+      <footer className="border-t border-slate-200 py-12 px-6 sm:px-10 lg:px-16 bg-white relative z-10">
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-8">
           <div className="flex items-center gap-2">
             <div className="w-7 h-7 bg-blue-100 rounded-lg flex items-center justify-center">
               <GraduationCap size={15} className="text-blue-600" />
             </div>
-            <span className="font-bold text-slate-800 text-sm">E-Ujian SaaS</span>
+            <span className="font-bold text-slate-800 text-sm">EXAM AA</span>
           </div>
-          <div className="flex gap-5 text-sm text-slate-500">
+          <div className="flex gap-4 sm:gap-5 text-sm text-slate-500">
             <button onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} className="hover:text-blue-600 transition-colors">Beranda</button>
             <button onClick={() => document.getElementById("features")?.scrollIntoView({ behavior: "smooth" })} className="hover:text-blue-600 transition-colors">Fitur</button>
-            <button onClick={() => document.getElementById("pricing")?.scrollIntoView({ behavior: "smooth" })} className="hover:text-blue-600 transition-colors">Harga</button>
+            <button onClick={() => document.getElementById("pricing")?.scrollIntoView({ behavior: "smooth" })} className="hover:text-blue-600 transition-colors text-nowrap">Harga</button>
+            <a href="https://wa.me/6285359907696" target="_blank" rel="noopener noreferrer" className="hover:text-emerald-600 transition-colors flex items-center gap-1 text-nowrap">
+              <MessageCircle size={14} /> Hubungi CS
+            </a>
           </div>
-          <p className="text-sm text-slate-400">© {new Date().getFullYear()} E-Ujian · Edukasi Indonesia</p>
+          <p className="text-sm text-slate-400">© {new Date().getFullYear()} EXAM AA · By Alfaruq Asri</p>
         </div>
       </footer>
+
+      {/* Floating WA */}
+      <a
+        href="https://wa.me/6285359907696?text=Halo%20Admin%20EXAM%20AA,%20saya%20ingin%20tanya%20seputar%20platform%20ujian..."
+        target="_blank"
+        rel="noopener noreferrer"
+        className="fixed bottom-6 right-6 z-[999] flex items-center group"
+      >
+        <div className="mr-3 bg-white border border-slate-200 py-2 px-4 rounded-xl shadow-lg text-slate-700 text-xs font-bold opacity-0 group-hover:opacity-100 transition-all duration-300 translate-x-4 group-hover:translate-x-0 pointer-events-none whitespace-nowrap">
+          Tanya Admin (WhatsApp)
+        </div>
+        <div className="w-12 h-12 bg-emerald-500 hover:bg-emerald-600 text-white rounded-full shadow-xl shadow-emerald-500/25 flex items-center justify-center transition-all hover:scale-110 active:scale-95 relative">
+          <div className="absolute inset-0 rounded-full bg-emerald-400 animate-ping opacity-20" />
+          <svg
+            viewBox="0 0 24 24"
+            className="w-6 h-6 fill-current relative z-10"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z" />
+          </svg>
+        </div>
+      </a>
     </div>
   );
 };

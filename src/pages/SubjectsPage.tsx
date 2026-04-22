@@ -22,6 +22,7 @@ import {
   DropdownMenuLabel
 } from "../components/ui/dropdown-menu";
 import { useExamData } from "../context/ExamDataContext";
+import { useTenant } from "../context/TenantContext";
 import { Button } from "../components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "../components/ui/dialog";
 import { Progress } from "../components/ui/progress";
@@ -36,6 +37,7 @@ import type { SubjectData } from "../types/exam";
 
 const SubjectsPage = () => {
   const { subjects, loading, createSubject, updateSubject, deleteSubject } = useExamData();
+  const { terminology } = useTenant();
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [dialogMode, setDialogMode] = useState<"create" | "edit">("create");
@@ -111,8 +113,8 @@ const SubjectsPage = () => {
       }
       closeDialog();
     } catch (error) {
-      console.error("Gagal menyimpan data mata pelajaran", error);
-      showAlert("Gagal", "Gagal menyimpan data mata pelajaran.", "danger");
+      console.error(`Gagal menyimpan data ${terminology.subject.toLowerCase()}`, error);
+      showAlert("Gagal", `Gagal menyimpan data ${terminology.subject.toLowerCase()}.`, "danger");
     }
   };
 
@@ -122,8 +124,8 @@ const SubjectsPage = () => {
     try {
       await deleteSubject(subjectToDelete.id);
     } catch (error) {
-      console.error("Gagal menghapus mata pelajaran", error);
-      showAlert("Gagal", "Gagal menghapus mata pelajaran.", "danger");
+      console.error(`Gagal menghapus ${terminology.subject.toLowerCase()}`, error);
+      showAlert("Gagal", `Gagal menghapus ${terminology.subject.toLowerCase()}.`, "danger");
     } finally {
       setIsDeleting(false);
       setDeleteDialogOpen(false);
@@ -142,7 +144,7 @@ const SubjectsPage = () => {
         total: parsed.length,
         current: 0,
         message: "Memulai import data...",
-        title: "Import Mata Pelajaran"
+        title: `Import ${terminology.subject}`
       });
 
       let importedCount = 0;
@@ -166,9 +168,9 @@ const SubjectsPage = () => {
         }));
       }
 
-      showAlert("Import Berhasil", `${importedCount} mata pelajaran berhasil diimport.`, "success");
+      showAlert("Import Berhasil", `${importedCount} ${terminology.subject.toLowerCase()} berhasil diimport.`, "success");
     } catch (err: any) {
-      showAlert("Gagal Import", err.message || "Gagal mengimport mata pelajaran.", "danger");
+      showAlert("Gagal Import", err.message || `Gagal mengimport ${terminology.subject.toLowerCase()}.`, "danger");
     } finally {
       setIsImporting(false);
       setBatchProgress(prev => ({ ...prev, isOpen: false }));
@@ -182,8 +184,8 @@ const SubjectsPage = () => {
   const handleBatchDelete = async () => {
     if (selectedIds.length === 0) return;
     showAlert(
-      "Hapus Mapel Massal",
-      `Apakah Anda yakin ingin menghapus ${selectedIds.length} mata pelajaran terpilih?`,
+      `Hapus ${terminology.subject} Massal`,
+      `Apakah Anda yakin ingin menghapus ${selectedIds.length} ${terminology.subject.toLowerCase()} terpilih?`,
       "danger",
       async () => {
         setBatchProgress({
@@ -191,7 +193,7 @@ const SubjectsPage = () => {
           total: selectedIds.length,
           current: 0,
           message: "Menyiapkan penghapusan...",
-          title: "Hapus Mapel Massal"
+          title: `Hapus ${terminology.subject} Massal`
         });
         
         try {
@@ -204,13 +206,13 @@ const SubjectsPage = () => {
             setBatchProgress(prev => ({
               ...prev,
               current: currentProcessed,
-              message: `Menghapus data mapel (${currentProcessed}/${selectedIds.length})`
+              message: `Menghapus data ${terminology.subject.toLowerCase()} (${currentProcessed}/${selectedIds.length})`
             }));
           }
           setSelectedIds([]);
         } catch (error) {
-          console.error("Gagal menghapus mapel massal", error);
-          showAlert("Gagal", "Gagal menghapus mata pelajaran massal.", "danger");
+          console.error(`Gagal menghapus ${terminology.subject.toLowerCase()} massal`, error);
+          showAlert("Gagal", `Gagal menghapus ${terminology.subject.toLowerCase()} massal.`, "danger");
         } finally {
           setBatchProgress(prev => ({ ...prev, isOpen: false }));
         }
@@ -230,9 +232,9 @@ const SubjectsPage = () => {
         <div>
           <h2 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
             <BookOpen className="h-5 w-5 text-indigo-500" />
-            Data Mata Pelajaran
+            Data {terminology.subject}
           </h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Kelola daftar mata pelajaran untuk jadwal ujian.</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Kelola daftar {terminology.subject.toLowerCase()} untuk jadwal ujian.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           {loading ? (
@@ -263,7 +265,7 @@ const SubjectsPage = () => {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56 p-2 rounded-2xl shadow-2xl border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 z-[100]">
-              <DropdownMenuLabel className="text-[10px] font-bold uppercase tracking-widest text-slate-400 px-3 py-2 text-left">Kelola Mapel</DropdownMenuLabel>
+              <DropdownMenuLabel className="text-[10px] font-bold uppercase tracking-widest text-slate-400 px-3 py-2 text-left">Kelola {terminology.subject}</DropdownMenuLabel>
               <DropdownMenuItem 
                 className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 focus:bg-slate-50 dark:focus:bg-slate-900 transition-colors group"
                 onClick={() => {
@@ -276,9 +278,9 @@ const SubjectsPage = () => {
                 </div>
                 <div className="flex flex-col min-w-0">
                   <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">
-                    {isImporting ? "Mengimport..." : "Import dari Excel"}
+                    {isImporting ? "Mengimport..." : `Import dari Excel`}
                   </span>
-                  <span className="text-[10px] text-slate-400 mt-1">Unggah file mata pelajaran</span>
+                  <span className="text-[10px] text-slate-400 mt-1">Unggah file {terminology.subject.toLowerCase()}</span>
                 </div>
                 <input
                   id="subject-import-input"
@@ -301,7 +303,7 @@ const SubjectsPage = () => {
                 </div>
                 <div className="flex flex-col min-w-0">
                   <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">Export ke Excel</span>
-                  <span className="text-[10px] text-slate-400 mt-1">Unduh daftar mapel</span>
+                  <span className="text-[10px] text-slate-400 mt-1">Unduh daftar {terminology.subject.toLowerCase()}</span>
                 </div>
               </DropdownMenuItem>
               <DropdownMenuSeparator className="my-1 border-slate-100 dark:border-slate-800" />
@@ -314,22 +316,22 @@ const SubjectsPage = () => {
                 </div>
                 <div className="flex flex-col min-w-0">
                   <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">Unduh Template</span>
-                  <span className="text-[10px] text-slate-400 mt-1">Format file import Excel</span>
+                  <span className="text-[10px] text-slate-400 mt-1">Format file import Excel {terminology.subject.toLowerCase()}</span>
                 </div>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-
+ 
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
               <Button onClick={() => { setSelectedSubject(null); setIsDialogOpen(true); }} size="sm" className="rounded-2xl bg-blue-50 hover:bg-blue-100 border border-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 dark:border-blue-800/40 text-blue-700 font-bold shadow-sm h-9 px-4">
                 <Plus className="mr-1 h-3.5 w-3.5" />
-                Tambah Mapel
+                Tambah {terminology.subject}
               </Button>
             </DialogTrigger>
             <DialogContent className="max-w-md bg-card">
               <DialogHeader>
-                <DialogTitle className="text-base font-bold text-slate-800 dark:text-white">{dialogMode === "edit" ? "Edit Data Mapel" : "Tambah Data Mapel"}</DialogTitle>
+                <DialogTitle className="text-base font-bold text-slate-800 dark:text-white">{dialogMode === "edit" ? `Edit Data ${terminology.subject}` : `Tambah Data ${terminology.subject}`}</DialogTitle>
               </DialogHeader>
               <SubjectForm
                 defaultValues={defaultValues}
@@ -349,7 +351,7 @@ const SubjectsPage = () => {
       {loading ? (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base font-semibold text-slate-800 dark:text-white">Daftar Mata Pelajaran</CardTitle>
+            <CardTitle className="text-base font-semibold text-slate-800 dark:text-white">Daftar {terminology.subject}</CardTitle>
           </CardHeader>
           <CardContent>
              <div className="rounded-xl border border-slate-200/60 dark:border-slate-800 overflow-hidden">
@@ -357,7 +359,7 @@ const SubjectsPage = () => {
                   <TableHeader className="bg-slate-50/50 dark:bg-slate-900/50">
                     <TableRow>
                       <TableHead className="w-16 text-center">No</TableHead>
-                      <TableHead>Mata Pelajaran</TableHead>
+                      <TableHead>{terminology.subject}</TableHead>
                       <TableHead className="text-right">Aksi</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -393,9 +395,9 @@ const SubjectsPage = () => {
         isOpen={deleteDialogOpen}
         onClose={() => setDeleteDialogOpen(false)}
         onConfirm={handleConfirmDelete}
-        title="Hapus Mapel"
-        description="Apakah Anda yakin ingin menghapus data mata pelajaran ini?"
-        itemName={`Mapel ${subjectToDelete?.name || ""}`}
+        title={`Hapus ${terminology.subject}`}
+        description={`Apakah Anda yakin ingin menghapus data ${terminology.subject.toLowerCase()} ini?`}
+        itemName={`${terminology.subject} ${subjectToDelete?.name || ""}`}
         isLoading={isDeleting}
       />
 

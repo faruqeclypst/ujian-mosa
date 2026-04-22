@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import {
   GraduationCap,
   ArrowLeft,
@@ -14,11 +14,13 @@ import {
   Globe,
   AlertTriangle,
   Building2,
+  Sparkles,
 } from "lucide-react";
 import { masterPb } from "../../lib/pocketbase";
 import { cn } from "../../lib/utils";
 
 const RegisterSchoolPage = () => {
+  const location = useLocation();
   const navigate = useNavigate();
   const [step, setStep] = useState<"form" | "success">("form");
   const [loading, setLoading] = useState(false);
@@ -30,7 +32,15 @@ const RegisterSchoolPage = () => {
     contact_email: "",
     contact_phone: "",
     address: "",
+    type: "school" as "school" | "campus",
+    plan: "Paket Berkembang",
   });
+
+  useEffect(() => {
+    if (location.state?.selectedPlan) {
+      setForm(prev => ({ ...prev, plan: location.state.selectedPlan }));
+    }
+  }, [location.state]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -46,7 +56,7 @@ const RegisterSchoolPage = () => {
     e.preventDefault();
     setError("");
     if (!form.school_name || !form.slug_request || !form.contact_email) {
-      setError("Nama sekolah, subdomain, dan email wajib diisi.");
+      setError("Nama institusi, subdomain, dan email wajib diisi.");
       return;
     }
     if (form.slug_request.length < 3) {
@@ -80,7 +90,7 @@ const RegisterSchoolPage = () => {
 
           <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 mb-3">Pendaftaran Berhasil!</h1>
           <p className="text-slate-500 text-base mb-8 leading-relaxed max-w-sm mx-auto">
-            Terima kasih! Tim <span className="font-bold text-slate-900">E-Ujian</span> akan segera memvalidasi pengajuan{" "}
+            Terima kasih! Tim <span className="font-bold text-slate-900">EXAM AA</span> akan segera memvalidasi pengajuan{" "}
             <span className="text-blue-600 font-bold">{form.school_name}</span>.
           </p>
 
@@ -135,10 +145,10 @@ const RegisterSchoolPage = () => {
             <div className="w-7 h-7 bg-blue-600 rounded-lg flex items-center justify-center">
               <GraduationCap size={15} className="text-white" />
             </div>
-            <span className="font-bold text-slate-900 text-sm">E-Ujian</span>
+            <span className="font-bold text-slate-900 text-sm">EXAM AA</span>
           </div>
           <span className="text-slate-300 text-sm">/</span>
-          <span className="text-slate-600 text-sm font-medium">Daftar Sekolah</span>
+          <span className="text-slate-600 text-sm font-medium">Daftar Institusi</span>
         </div>
       </div>
 
@@ -151,7 +161,7 @@ const RegisterSchoolPage = () => {
               <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 mb-3 leading-tight">
                 Mulai Transformasi{" "}
                 <span className="text-blue-600">Digital</span>{" "}
-                Sekolah Anda
+                {form.type === 'school' ? 'Sekolah' : 'Universitas'} Anda
               </h1>
               <p className="text-slate-500 text-sm leading-relaxed">
                 Hanya butuh beberapa langkah untuk memiliki platform ujian online profesional yang mandiri dan aman.
@@ -162,7 +172,7 @@ const RegisterSchoolPage = () => {
               {[
                 { icon: ShieldCheck, title: "Infrastruktur Terisolasi", desc: "Data sekolah aman dalam server yang terpisah (multi-tenant).", color: "text-blue-600 bg-blue-50 border-blue-100" },
                 { icon: Zap, title: "Aktivasi Super Cepat", desc: "Sistem siap dalam kurang dari 24 jam setelah pengajuan.", color: "text-amber-600 bg-amber-50 border-amber-100" },
-                { icon: Globe, title: "Subdomain Kustom", desc: "Nama sekolah sebagai identitas digital resmi.", color: "text-emerald-600 bg-emerald-50 border-emerald-100" },
+                { icon: Globe, title: "Subdomain Kustom", desc: "Nama institusi sebagai identitas digital resmi.", color: "text-emerald-600 bg-emerald-50 border-emerald-100" },
               ].map((item, i) => (
                 <div key={i} className="flex gap-3 items-start">
                   <div className={cn("w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 border", item.color)}>
@@ -179,7 +189,7 @@ const RegisterSchoolPage = () => {
             {/* Stats */}
             <div className="mt-8 grid grid-cols-2 gap-3">
               {[
-                { value: "50+", label: "Sekolah Terdaftar" },
+                { value: "50+", label: "Institusi Terdaftar" },
                 { value: "<24 Jam", label: "Waktu Aktivasi" },
               ].map((stat, i) => (
                 <div key={i} className="bg-white border border-slate-200 rounded-xl p-4 text-center shadow-sm">
@@ -213,17 +223,99 @@ const RegisterSchoolPage = () => {
                   </div>
                 )}
 
+                {/* Package Selection */}
+                <div className="space-y-3">
+                  <label className="block text-xs font-semibold text-slate-700">
+                    Pilih Paket Layanan <span className="text-blue-600">*</span>
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {[
+                      { name: "Paket Berkembang", quota: "250 Siswa", icon: Zap, color: "blue" },
+                      { name: "Paket Lanjutan", quota: "500 Siswa", icon: ShieldCheck, color: "amber" },
+                      { name: "Paket Premium", quota: "1000 Siswa", icon: Sparkles, color: "purple" },
+                    ].map((p) => (
+                      <button
+                        key={p.name}
+                        type="button"
+                        onClick={() => setForm(prev => ({ ...prev, plan: p.name }))}
+                        className={cn(
+                          "flex items-center gap-3 p-3 rounded-xl border transition-all text-left",
+                          form.plan === p.name
+                            ? `bg-${p.color}-50 border-${p.color}-500/50 text-${p.color}-700 ring-2 ring-${p.color}-500/10 shadow-sm`
+                            : "bg-white border-slate-200 text-slate-500 hover:border-slate-300"
+                        )}
+                      >
+                        <div className={cn(
+                          "w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0",
+                          form.plan === p.name ? `bg-${p.color}-600 text-white` : "bg-slate-100 text-slate-400"
+                        )}>
+                          {p.name === "Paket Berkembang" ? <Zap size={14} /> :
+                            p.name === "Paket Lanjutan" ? <ShieldCheck size={14} /> :
+                              <Sparkles size={14} />}
+                        </div>
+                        <div className="flex flex-col min-w-0">
+                          <span className="text-xs font-bold leading-tight truncate">{p.name}</span>
+                          <span className="text-[10px] opacity-60 font-medium">{p.quota}</span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Institutional Type Selection */}
+                <div className="space-y-3">
+                  <label className="block text-xs font-semibold text-slate-700">
+                    Tipe Institusi <span className="text-blue-600">*</span>
+                  </label>
+                  <div className="grid grid-cols-2 gap-4">
+                    <button
+                      type="button"
+                      onClick={() => setForm(prev => ({ ...prev, type: 'school' }))}
+                      className={cn(
+                        "flex flex-col items-center gap-3 p-4 rounded-2xl border transition-all relative overflow-hidden group",
+                        form.type === 'school'
+                          ? "bg-blue-50 border-blue-500/50 text-blue-600 shadow-md ring-2 ring-blue-500/10"
+                          : "bg-white border-slate-200 text-slate-400 hover:border-slate-300"
+                      )}
+                    >
+                      {form.type === 'school' && <div className="absolute top-2 right-2 w-2 h-2 bg-blue-500 rounded-full animate-pulse" />}
+                      <GraduationCap size={28} className={cn("transition-transform", form.type === 'school' && "scale-110")} />
+                      <div className="text-center">
+                        <p className="text-[10px] font-black uppercase tracking-[0.2em]">Sekolah</p>
+                        <p className="text-[9px] font-medium opacity-60">Guru & Siswa</p>
+                      </div>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setForm(prev => ({ ...prev, type: 'campus' }))}
+                      className={cn(
+                        "flex flex-col items-center gap-3 p-4 rounded-2xl border transition-all relative overflow-hidden group",
+                        form.type === 'campus'
+                          ? "bg-indigo-50 border-indigo-500/50 text-indigo-600 shadow-md ring-2 ring-indigo-500/10"
+                          : "bg-white border-slate-200 text-slate-400 hover:border-slate-300"
+                      )}
+                    >
+                      {form.type === 'campus' && <div className="absolute top-2 right-2 w-2 h-2 bg-indigo-500 rounded-full animate-pulse" />}
+                      <Building2 size={28} className={cn("transition-transform", form.type === 'campus' && "scale-110")} />
+                      <div className="text-center">
+                        <p className="text-[10px] font-black uppercase tracking-[0.2em]">Universitas</p>
+                        <p className="text-[9px] font-medium opacity-60">Dosen & Mahasiswa</p>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+
                 {/* Row 1: Nama + Slug */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                      Nama Sekolah <span className="text-blue-600">*</span>
+                      Nama {form.type === 'school' ? 'Sekolah' : 'Universitas'} <span className="text-blue-600">*</span>
                     </label>
                     <div className="relative">
                       <GraduationCap size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                       <input
                         type="text" name="school_name" value={form.school_name}
-                        onChange={handleChange} placeholder="SMPN 1 Kota Contoh" required
+                        onChange={handleChange} placeholder={form.type === 'school' ? "SMPN 1 Kota Contoh" : "Universitas Contoh Indonesia"} required
                         className="w-full h-11 border border-slate-200 rounded-xl pl-10 pr-4 text-sm text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 shadow-sm transition-all"
                       />
                     </div>
@@ -259,7 +351,7 @@ const RegisterSchoolPage = () => {
                       <ShieldCheck size={12} className="text-emerald-400 flex-shrink-0" />
                       <div className="flex items-center text-xs font-mono overflow-hidden min-w-0">
                         <span className="text-white/30">https://</span>
-                        <span className="text-emerald-400 font-bold">{form.slug_request || "nama-sekolah"}</span>
+                        <span className="text-emerald-400 font-bold">{form.slug_request || "subdomain"}</span>
                         <span className="text-white/50">.alfaruqasri.my.id</span>
                       </div>
                     </div>
@@ -303,14 +395,14 @@ const RegisterSchoolPage = () => {
                 {/* Address */}
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                    Alamat Lengkap Sekolah
+                    Alamat Lengkap {form.type === 'school' ? 'Sekolah' : 'Universitas'}
                   </label>
                   <div className="relative">
                     <MapPin size={16} className="absolute left-3.5 top-3.5 text-slate-400" />
                     <textarea
                       name="address" value={form.address}
                       onChange={handleChange}
-                      placeholder="Masukkan alamat lengkap sekolah..."
+                      placeholder={`Masukkan alamat lengkap ${form.type === 'school' ? 'sekolah' : 'universitas'}...`}
                       rows={3}
                       className="w-full border border-slate-200 rounded-xl pl-10 pr-4 py-3 text-sm text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 shadow-sm transition-all resize-none"
                     />
@@ -344,7 +436,7 @@ const RegisterSchoolPage = () => {
                   <span className="text-blue-500 cursor-pointer hover:underline">Ketentuan Layanan</span>{" "}
                   dan{" "}
                   <span className="text-blue-500 cursor-pointer hover:underline">Kebijakan Privasi</span>{" "}
-                  E-Ujian.
+                  EXAM AA.
                 </p>
               </form>
             </div>

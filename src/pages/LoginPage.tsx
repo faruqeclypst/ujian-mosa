@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
+import { Capacitor } from "@capacitor/core";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Lock, User, Eye, EyeOff, Sparkles, Shield } from "lucide-react";
+import { Lock, User, Eye, EyeOff, Sparkles, Shield, School } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { motion } from "framer-motion";
@@ -23,7 +24,7 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 
 const LoginPage = () => {
   const { signInWithUsername, user, changePassword } = useAuth();
-  const { pb: tenantPb } = useTenant();
+  const { pb: tenantPb, setManualSchool } = useTenant();
   const pb = tenantPb;
   const [formError, setFormError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
@@ -52,8 +53,8 @@ const LoginPage = () => {
 
         if (records.length > 0) {
           const data = records[0];
-          setSchoolName(data.name || "E-Ujian CBT");
-          
+          setSchoolName(data.name || "EXAM AA CBT");
+
           let logoUrl = data.logoUrl || data.logo || "";
           if (logoUrl && !logoUrl.startsWith('http') && !logoUrl.startsWith('data:')) {
             logoUrl = pb.files.getUrl(data, logoUrl);
@@ -94,6 +95,20 @@ const LoginPage = () => {
 
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-gradient-to-br from-blue-50 via-blue-100 to-blue-200 dark:from-gray-900 dark:via-blue-900/20 dark:to-blue-800/20">
+      {/* Floating Change School Button (Android Only) */}
+      {Capacitor.getPlatform() === 'android' && (
+        <div className="absolute top-6 left-6 z-50">
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => setManualSchool(null)}
+            className="flex items-center gap-2 px-4 py-2 bg-white/80 backdrop-blur-md border border-slate-200 rounded-full text-sm font-semibold text-slate-600 hover:text-blue-600 hover:border-blue-200 transition-all shadow-sm dark:bg-slate-800/80 dark:border-slate-700 dark:text-slate-300"
+          >
+            <School size={16} />
+            <span>Ganti Sekolah</span>
+          </motion.button>
+        </div>
+      )}
       {/* Theme Toggle - Fixed Position */}
       <div className="absolute top-4 right-4 z-50">
         <ThemeToggle />
@@ -196,7 +211,7 @@ const LoginPage = () => {
                     <div className="h-24 w-24 md:h-32 md:w-32 flex items-center justify-center p-1">
                       <img
                         src={schoolLogo}
-                        alt="Logo Sekolah" 
+                        alt="Logo Sekolah"
                         className="h-full w-full object-contain filter drop-shadow-md"
                         onError={() => setLogoError(true)}
                       />
@@ -205,7 +220,7 @@ const LoginPage = () => {
                     <div className="h-20 w-20 md:h-24 md:w-24 flex items-center justify-center p-1">
                       <img
                         src="/logo-default.png"
-                        alt="Logo Default" 
+                        alt="Logo Default"
                         className="h-full w-full object-contain"
                       />
                     </div>
@@ -355,13 +370,13 @@ const LoginPage = () => {
             </p>
           </DialogHeader>
 
-          <form 
+          <form
             onSubmit={async (e) => {
               e.preventDefault();
               setChangePassError("");
               if (newPassword.length < 6) return setChangePassError("Password baru minimal 6 karakter!");
               if (newPassword !== confirmPassword) return setChangePassError("Konfirmasi password tidak cocok!");
-              
+
               setIsChangingPass(true);
               try {
                 await changePassword(newPassword);
@@ -370,7 +385,7 @@ const LoginPage = () => {
               } finally {
                 setIsChangingPass(false);
               }
-            }} 
+            }}
             className="space-y-6"
           >
             {changePassError && (

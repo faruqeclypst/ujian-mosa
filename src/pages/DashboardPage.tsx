@@ -23,7 +23,7 @@ import { cn } from "../lib/utils";
 
 const DashboardPage = () => {
   const { teachers, classes, subjects, students, loading: contextLoading } = useExamData();
-  const { pb: tenantPb, school } = useTenant();
+  const { pb: tenantPb, school, terminology } = useTenant();
   const pb = tenantPb!;
 
   const planName = school?.plan ? school.plan.charAt(0).toUpperCase() + school.plan.slice(1) : "Free";
@@ -114,7 +114,7 @@ const DashboardPage = () => {
           if (a.status === "LOCKED" || (a.cheatCount || 0) > 0) {
             const room = roomsData.find((r) => r.id === a.examRoomId);
             violations.push({
-              name: std?.name || "Siswa",
+              name: std?.name || terminology.student,
               className: cls?.name || "-",
               cheatCount: a.cheatCount || 0,
               cheatLimit: room?.cheat_limit || 0,
@@ -124,7 +124,7 @@ const DashboardPage = () => {
 
           if (["finished", "submitted", "graded"].includes(a.status)) {
             finished.push({
-              name: std?.name || "Siswa",
+              name: std?.name || terminology.student,
               className: cls?.name || "-",
               score: a.score || 0,
               examTitle: exm?.title || "Ujian",
@@ -209,7 +209,7 @@ const DashboardPage = () => {
     { id: "performa" as const, label: "Performa" },
     { id: "pelanggaran" as const, label: "Pelanggaran" },
     { id: "selesai" as const, label: "Terbaru" },
-    { id: "mapel" as const, label: "Mapel" },
+    { id: "mapel" as const, label: terminology.subject },
   ];
 
   return (
@@ -233,7 +233,7 @@ const DashboardPage = () => {
           <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-3 py-1.5 rounded-full">
             <span className="font-bold text-blue-600">{planName}</span>
             <span className="w-px h-3 bg-slate-300" />
-            {quota.toLocaleString("id-ID")} Siswa
+            {quota.toLocaleString("id-ID")} {terminology.student}
           </div>
           <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/30 px-3 py-1.5 rounded-full">
             <span className="relative flex h-2 w-2">
@@ -267,7 +267,7 @@ const DashboardPage = () => {
                 {ongoingStudents}
               </p>
               <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest mt-1.5">
-                Siswa Sedang Ujian
+                {terminology.student} Sedang Ujian
               </p>
             </div>
 
@@ -421,7 +421,7 @@ const DashboardPage = () => {
                     </p>
                     {logActivity.recentFinished.length === 0 ? (
                       <div className="py-12 text-center text-slate-400 text-xs font-medium">
-                        Belum ada siswa yang selesai.
+                        Belum ada {terminology.student.toLowerCase()} yang selesai.
                       </div>
                     ) : (
                       logActivity.recentFinished.slice(0, 6).map((s: any, i: number) => (
@@ -605,10 +605,10 @@ const DashboardPage = () => {
             Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-16 rounded-xl" />)
           ) : (
             [
-              { label: "Tenaga Pendidik", value: totalTeachers, icon: Users, color: "text-blue-600", bg: "bg-blue-50 dark:bg-blue-900/20", border: "border-blue-100 dark:border-blue-800/30" },
-              { label: "Rombongan Belajar", value: totalClasses, icon: LayoutTemplate, color: "text-purple-600", bg: "bg-purple-50 dark:bg-purple-900/20", border: "border-purple-100 dark:border-purple-800/30" },
-              { label: "Mata Pelajaran", value: totalSubjects, icon: BookOpen, color: "text-amber-600", bg: "bg-amber-50 dark:bg-amber-900/20", border: "border-amber-100 dark:border-amber-800/30" },
-              { label: "Peserta Didik", value: totalStudents, icon: GraduationCap, color: "text-emerald-600", bg: "bg-emerald-50 dark:bg-emerald-900/20", border: "border-emerald-100 dark:border-emerald-800/30" },
+              { label: terminology.teacher, value: totalTeachers, icon: Users, color: "text-blue-600", bg: "bg-blue-50 dark:bg-blue-900/20", border: "border-blue-100 dark:border-blue-800/30" },
+              { label: terminology.class, value: totalClasses, icon: LayoutTemplate, color: "text-purple-600", bg: "bg-purple-50 dark:bg-purple-900/20", border: "border-purple-100 dark:border-purple-800/30" },
+              { label: terminology.subject, value: totalSubjects, icon: BookOpen, color: "text-amber-600", bg: "bg-amber-50 dark:bg-amber-900/20", border: "border-amber-100 dark:border-amber-800/30" },
+              { label: terminology.student, value: totalStudents, icon: GraduationCap, color: "text-emerald-600", bg: "bg-emerald-50 dark:bg-emerald-900/20", border: "border-emerald-100 dark:border-emerald-800/30" },
             ].map((item, idx) => (
               <div key={idx} className={cn("flex items-center gap-3 p-3.5 rounded-xl border group hover:shadow-sm transition-all", item.bg, item.border)}>
                 <div className={cn("w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform bg-white/60 dark:bg-slate-900/40", item.color)}>

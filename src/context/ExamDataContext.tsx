@@ -14,6 +14,9 @@ interface ExamDataContextType {
   classes: ClassData[];
   subjects: SubjectData[];
   students: StudentData[];
+  examsCount: number;
+  questionsCount: number;
+  roomsCount: number;
   loading: boolean;
 
   // Teachers
@@ -53,6 +56,9 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
   const [classes, setClasses] = useState<ClassData[]>([]);
   const [subjects, setSubjects] = useState<SubjectData[]>([]);
   const [students, setStudents] = useState<StudentData[]>([]);
+  const [examsCount, setExamsCount] = useState(0);
+  const [questionsCount, setQuestionsCount] = useState(0);
+  const [roomsCount, setRoomsCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
   const [universalToken, setUniversalToken] = useState("");
@@ -105,11 +111,14 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
       pb.autoCancellation(false);
 
       // Ambil data awal untuk semua
-      const [tData, cData, sMapel, stData] = await Promise.all([
+      const [tData, cData, sMapel, stData, eCount, qCount, rCount] = await Promise.all([
         pb.collection("teachers").getFullList({ sort: '-created' }),
         pb.collection("classes").getFullList({ sort: '-created' }),
         pb.collection("subjects").getFullList({ sort: '-created' }),
         pb.collection("students").getFullList({ sort: '-created' }),
+        pb.collection("exams").getList(1, 1).then(res => res.totalItems).catch(() => 0),
+        pb.collection("questions").getList(1, 1).then(res => res.totalItems).catch(() => 0),
+        pb.collection("exam_rooms").getList(1, 1).then(res => res.totalItems).catch(() => 0),
       ]);
 
       setTeachers(tData.map(i => ({ ...i, id: i.id } as any)));
@@ -125,6 +134,9 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
           hasChangedPassword: i.hasChangedPassword || false
         } as any;
       }));
+      setExamsCount(eCount);
+      setQuestionsCount(qCount);
+      setRoomsCount(rCount);
 
     } finally {
       setLoading(false);
@@ -410,7 +422,14 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
   return (
     <ExamDataContext.Provider
       value={{
-        teachers, classes, subjects, students, loading,
+        teachers,
+        classes,
+        subjects,
+        students,
+        examsCount,
+        questionsCount,
+        roomsCount,
+        loading,
         createTeacher, updateTeacher, deleteTeacher,
         createClass, updateClass, deleteClass,
         createSubject, updateSubject, deleteSubject,

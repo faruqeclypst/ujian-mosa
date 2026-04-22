@@ -51,7 +51,7 @@ export interface ExamRoomData {
 
 const ExamRoomsPage = () => {
   const navigate = useNavigate();
-  const { pb } = useTenant();
+  const { pb, terminology } = useTenant();
   const { user, role, teacherId } = useAuth();
   const { addToast } = useToast();
   const [rooms, setRooms] = useState<ExamRoomData[]>([]);
@@ -224,7 +224,7 @@ const ExamRoomsPage = () => {
                </div>
                {liveBreakdown[room.id] > 0 && (
                  <div className="text-emerald-600 font-black animate-pulse opacity-80">
-                   {liveBreakdown[room.id]} SISWA SEDANG MENGERJAKAN
+                   {liveBreakdown[room.id]} {terminology.student.toUpperCase()} SEDANG MENGERJAKAN
                  </div>
                )}
             </div>
@@ -234,7 +234,7 @@ const ExamRoomsPage = () => {
     },
     {
       key: "className",
-      label: "Kelas",
+      label: terminology.class,
       className: "w-24",
       render: (v: string, room: ExamRoomData) => (
         <div className="flex flex-wrap gap-1">
@@ -352,7 +352,7 @@ const ExamRoomsPage = () => {
           const subjectObj = subjects.find(s => s.id === (examObj?.subjectId || (examObj as any)?.subjectid));
           const teacherObj = masterTeachers.find(t => t.id === eTeacherId);
 
-          let className = "Semua Kelas";
+          let className = `Semua ${terminology.class}`;
           // ... (logika penentuan nama kelas tetap sama)
           if (!room.allClasses) {
             const clsData = room.classId || (room as any).classid || (room as any).classIds || (room as any).classids || "";
@@ -464,8 +464,8 @@ const ExamRoomsPage = () => {
       isOpen: true,
       title: isCurrentlyActive ? "Nonaktifkan Ruangan" : "Aktifkan Ruangan",
       description: isCurrentlyActive 
-        ? `Apakah Anda yakin ingin menonaktifkan "${room.room_name}"? Siswa tidak akan bisa masuk atau lanjut mengerjakan.` 
-        : `Aktifkan "${room.room_name}" sekarang agar siswa bisa mulai mengerjakan?`,
+        ? `Apakah Anda yakin ingin menonaktifkan "${room.room_name}"? ${terminology.student} tidak akan bisa masuk atau lanjut mengerjakan.` 
+        : `Aktifkan "${room.room_name}" sekarang agar ${terminology.student.toLowerCase()} bisa mulai mengerjakan?`,
       type: isCurrentlyActive ? "warning" : "info",
       confirmLabel: isCurrentlyActive ? "Nonaktifkan" : "Aktifkan",
       onConfirm: async () => {
@@ -602,7 +602,7 @@ const ExamRoomsPage = () => {
             <ClipboardList className="h-5 w-5 text-blue-500" />
             Ruang Ujian
           </h2>
-          <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Aktifkan dan kelola sesi ujian untuk Siswa.</div>
+          <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Aktifkan dan kelola sesi ujian untuk ${terminology.student.toLowerCase()}.</div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {isLoading ? (
@@ -662,7 +662,7 @@ const ExamRoomsPage = () => {
             <Users className="h-5 w-5" />
           </div>
           <div>
-            <p className="text-xs text-slate-500 dark:text-slate-400">Siswa Aktif</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">{terminology.student} Aktif</p>
             <div className="text-lg font-bold text-slate-800 dark:text-slate-100 mt-0.5 leading-none">
               {isLoading ? <Skeleton className="h-5 w-8" /> : totalOngoing}
             </div>
@@ -724,7 +724,7 @@ const ExamRoomsPage = () => {
                      <TableHead className="w-16 text-center">No</TableHead>
                      <TableHead>Status</TableHead>
                      <TableHead>Ruangan / Bank Soal</TableHead>
-                     <TableHead>Kelas</TableHead>
+                     <TableHead>{terminology.class}</TableHead>
                      <TableHead className="text-right">Aksi</TableHead>
                    </TableRow>
                  </TableHeader>
@@ -867,7 +867,7 @@ const ExamRoomsPage = () => {
                 onChange={(e) => setFormValues({ ...formValues, room_name: e.target.value })}
                 required
               />
-              <p className="text-[10px] text-slate-400 mt-1">Nama ini yang akan ditampilkan di layar dashboard dashboard Siswa Anda.</p>
+              <p className="text-[10px] text-slate-400 mt-1">Nama ini yang akan ditampilkan di layar dashboard dashboard {terminology.student} Anda.</p>
             </FormField>
 
             <FormField id="examId" label="Pilih Bank Soal" error={undefined}>
@@ -961,13 +961,13 @@ const ExamRoomsPage = () => {
               </div>
               <FormField id="submit_window" label="Kumpul Dibuka (Sisa Menit)" error={undefined}>
                 <Input type="number" placeholder="Contoh: 10 (Tombol kumpul aktif 10 menit sebelum berakhir)" value={formValues.submit_window || ""} onChange={(e) => setFormValues({ ...formValues, submit_window: Number(e.target.value) })} />
-                <p className="text-slate-400 text-xs mt-1">biarkan kosong agar Siswa dapat mengumpulkan selama ujian berjalan</p>
+                <p className="text-slate-400 text-xs mt-1">biarkan kosong agar {terminology.student.toLowerCase()} dapat mengumpulkan selama ujian berjalan</p>
               </FormField>
 
               <div className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-900/40 rounded-xl border border-slate-100 dark:border-slate-800/60 mt-2">
                 <div className="space-y-0.5 pr-2">
                   <label className="text-sm font-semibold text-slate-700 dark:text-slate-200">Menampilkan Hasil Ujian</label>
-                  <p className="text-[10px] text-slate-400 leading-tight">Siswa dapat melihat skor, jumlah benar & salah setelah selesai mengumpulkan.</p>
+                  <p className="text-[10px] text-slate-400 leading-tight">{terminology.student} dapat melihat skor, jumlah benar & salah setelah selesai mengumpulkan.</p>
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer">
                   <input
@@ -993,7 +993,7 @@ const ExamRoomsPage = () => {
         onClose={() => setDeleteDialogOpen(false)}
         onConfirm={handleConfirmDelete}
         title="Hapus Ruang Ujian"
-        description="Apakah Anda yakin ingin menghapus ruang ujian ini? Data pengerjaan Siswa akan hilang."
+        description={`Apakah Anda yakin ingin menghapus ruang ujian ini? Data pengerjaan ${terminology.student} akan hilang.`}
         itemName="Ruang ujian ini"
         isLoading={isDeleting}
       />

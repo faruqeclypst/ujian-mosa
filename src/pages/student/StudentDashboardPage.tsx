@@ -3,11 +3,11 @@ import { useNavigate } from "react-router-dom";
 import { useStudentAuth } from "../../context/StudentAuthContext";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
-import pb from "../../lib/pocketbase";
+import { useTenant } from "../../context/TenantContext";
 import {
   Calendar, Clock, ChevronRight, User, AlertCircle,
   Award, LogOut as LogoutIcon, Sun, Moon, Monitor, KeyRound, ClipboardCheck, Sparkles,
-  Lock
+  Lock, RefreshCcw, LogOut
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../../components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuLabel } from "../../components/ui/dropdown-menu";
@@ -30,6 +30,7 @@ const getExamTypeColorClass = (type: string) => {
 
 const StudentDashboardPage = () => {
   const navigate = useNavigate();
+  const { pb, terminology } = useTenant();
   const { student, logoutStudent } = useStudentAuth();
   const [attempts, setAttempts] = useState<any[]>([]);
   const [hasInterests, setHasInterests] = useState(false);
@@ -59,7 +60,7 @@ const StudentDashboardPage = () => {
   const [isChangingPass, setIsChangingPass] = useState(false);
   const { changePassword } = useStudentAuth();
 
-  // ✨ TYPING EFFECT UNTUK NAMA SISWA
+  // ✨ TYPING EFFECT UNTUK NAMA ${terminology.student.toUpperCase()}
   useEffect(() => {
     if (!student?.name) return;
     let i = 0;
@@ -73,10 +74,10 @@ const StudentDashboardPage = () => {
   }, [student?.name]);
 
   const handleManualSync = async () => {
-    if (!student || isSyncingData || !navigator.onLine) return;
+    if (!student || isSyncingData || !navigator.onLine || !pb) return;
     setIsSyncingData(true);
     try {
-      await syncPendingData(student.id);
+      await syncPendingData(pb, student.id);
       setHasPendingSync(false);
     } catch (e) {
       setHasPendingSync(true);
@@ -85,7 +86,7 @@ const StudentDashboardPage = () => {
     }
   };
 
-  // 🔄 BACKGROUND AUTO-SYNC (TANPA DISADARI SISWA)
+  // 🔄 BACKGROUND AUTO-SYNC (TANPA DISADARI ${terminology.student.toUpperCase()})
   useEffect(() => {
     if (!student) return;
 
@@ -107,6 +108,7 @@ const StudentDashboardPage = () => {
   }, [student, isSyncingData]);
 
   const fetchData = async (isSilent = false) => {
+    if (!pb) return;
     try {
       // Only show full loading on initial mount
       if (loading && !isSilent) setLoading(true);
@@ -197,6 +199,7 @@ const StudentDashboardPage = () => {
   useEffect(() => {
     if (!student) return;
     fetchData();
+    if (!pb) return;
 
     // Subscribe to room changes (Global)
     const unsubR = pb.collection("exam_rooms").subscribe("*", (e) => {
@@ -219,15 +222,15 @@ const StudentDashboardPage = () => {
   }, [student?.id]);
 
   useEffect(() => {
-    if (student?.id && navigator.onLine) {
-      syncPendingData(student.id).then((synced) => {
+    if (student?.id && pb && navigator.onLine) {
+      syncPendingData(pb, student.id).then((synced) => {
         if (synced && synced.length > 0) fetchData(true);
       });
     }
   }, [student?.id]);
 
   const handleValidateToken = async () => {
-    if (!selectedRoom || !student) return;
+    if (!selectedRoom || !student || !pb) return;
     setTokenError("");
     setIsValidating(true);
     try {
@@ -332,7 +335,7 @@ const StudentDashboardPage = () => {
             <div className="text-right min-w-0 hidden sm:block">
               <p className="text-sm font-black text-slate-800 dark:text-slate-200 leading-snug uppercase">{student?.name?.split(" ")[0]}</p>
               <div className="inline-block px-2 py-0.5 bg-emerald-50 dark:bg-emerald-950/40 rounded-md text-[9px] font-black text-emerald-600 dark:text-emerald-400 mt-2 leading-none uppercase tracking-widest border border-emerald-100/50 dark:border-emerald-800/50 shadow-sm">
-                Class {student?.className}
+                {terminology.class} {student?.className}
               </div>
             </div>
 
@@ -350,7 +353,7 @@ const StudentDashboardPage = () => {
               <DropdownMenuContent align="end" className="w-64 p-2 rounded-2xl border-slate-100 dark:border-slate-800 shadow-2xl">
                 <DropdownMenuLabel className="px-3 py-2 flex flex-col gap-0.5">
                   <span className="text-xs font-black text-slate-800 dark:text-white uppercase truncate">{student?.name}</span>
-                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">SISWA • {student?.className} • NISN {student?.nisn}</span>
+                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{terminology.student.toUpperCase()} • {student?.className} • {terminology.id} {student?.nisn}</span>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator className="my-2 bg-slate-50 dark:bg-slate-800" />
                 <div className="px-3 py-2 flex flex-col gap-2">
@@ -401,7 +404,7 @@ const StudentDashboardPage = () => {
               
               <div className="relative z-10 space-y-6">
                 <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/10 backdrop-blur-md rounded-full text-[10px] font-black text-slate-200 uppercase tracking-widest border border-white/5">
-                  Verified Student Account
+                  Verified {terminology.student} Account
                 </div>
                 
                 {/* 👻 GHOST WRAPPER FOR STABILITY */}
@@ -454,7 +457,7 @@ const StudentDashboardPage = () => {
               <div className="absolute top-0 right-0 w-1/2 h-full bg-emerald-500/50 skew-x-[-20deg] translate-x-1/2" />
               <div className="relative z-10 text-center space-y-3">
                 <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/10 backdrop-blur-md rounded-full text-[8px] font-black text-slate-200 uppercase tracking-widest border border-white/5 mx-auto">
-                  Verified Student Account
+                  Verified {terminology.student} Account
                 </div>
                 <h2 className="text-xl font-black text-white tracking-tight leading-tight uppercase">
                   Halo, {student?.name?.split(" ")[0]}
@@ -739,7 +742,7 @@ const StudentDashboardPage = () => {
                     <User className="h-7 w-7 text-emerald-600" />
                   </div>
                   <div>
-                    <p className="text-[10px] font-black text-emerald-600/60 dark:text-emerald-400/60 uppercase tracking-widest leading-none">Status Siswa</p>
+                    <p className="text-[10px] font-black text-emerald-600/60 dark:text-emerald-400/60 uppercase tracking-widest leading-none">Status {terminology.student}</p>
                     <h4 className="text-base font-black text-slate-800 dark:text-white mt-1 leading-tight">{student?.name}</h4>
                   </div>
                 </div>
@@ -749,7 +752,7 @@ const StudentDashboardPage = () => {
                     <span className="text-slate-700 dark:text-slate-200 uppercase">{student?.className}</span>
                   </div>
                   <div className="flex justify-between items-center text-[10px] font-bold">
-                    <span className="text-emerald-600/70 dark:text-emerald-400/70 uppercase">Username / NISN</span>
+                    <span className="text-emerald-600/70 dark:text-emerald-400/70 uppercase">Username / {terminology.id}</span>
                     <span className="text-slate-700 dark:text-slate-200">{student?.nisn}</span>
                   </div>
                 </div>

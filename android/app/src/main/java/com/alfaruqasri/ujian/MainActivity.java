@@ -66,20 +66,46 @@ public class MainActivity extends BridgeActivity {
         @com.getcapacitor.PluginMethod
         public void exitApp(com.getcapacitor.PluginCall call) {
             isExiting = true;
-            try {
-                handler.removeCallbacksAndMessages(null);
-                alarmHandler.removeCallbacksAndMessages(null);
-                isAlarmPlaying = false;
-                stopRingtone();
-                if (blockingLayout != null) {
-                    blockingLayout.setVisibility(android.view.View.GONE);
+            getActivity().runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        // 1. Matikan semua loop pengetesan agar tidak bentrok
+                        handler.removeCallbacksAndMessages(null);
+                        alarmHandler.removeCallbacksAndMessages(null);
+                        isAlarmPlaying = false;
+                        stopRingtone();
+                        
+                        if (blockingLayout != null) {
+                            blockingLayout.setVisibility(android.view.View.GONE);
+                        }
+
+                        // 2. Lepas kunci layar
+                        try {
+                            stopLockTask();
+                        } catch (Exception e) {}
+
+                        // 3. TUTUP PAKSA
+                        if (android.os.Build.VERSION.SDK_INT >= 21) {
+                            finishAndRemoveTask();
+                        } else {
+                            finish();
+                        }
+                        
+                        // Pintu keluar cadangan (Force Kill setelah 500ms jika masih hidup)
+                        new android.os.Handler().postDelayed(new Runnable() {
+                            @Override
+                            public void run() {
+                                System.exit(0);
+                            }
+                        }, 500);
+
+                        call.resolve();
+                    } catch (Exception e) {
+                        call.reject(e.getMessage());
+                    }
                 }
-                stopLockTask();
-                finish();
-                call.resolve();
-            } catch (Exception e) {
-                call.reject(e.getMessage());
-            }
+            });
         }
     }
 

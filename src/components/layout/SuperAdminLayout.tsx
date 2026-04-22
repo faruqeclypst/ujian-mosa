@@ -19,7 +19,7 @@ interface SuperAdminLayoutProps {
 }
 
 const navItems = [
-  { label: "Dashboard", sublabel: "Institusi Aktif", icon: LayoutDashboard, path: "/superadmin" },
+  { label: "Dashboard", sublabel: "Seluruh Tenant", icon: LayoutDashboard, path: "/superadmin" },
   { label: "Infrastruktur", sublabel: "Status & Latensi", icon: Database, path: "/superadmin/infra" },
   { label: "Statistik", sublabel: "Analitik Server", icon: Globe, path: "/superadmin/analytics" },
   { label: "Pengaturan", sublabel: "Akun & Keamanan", icon: Settings, path: "/superadmin/settings" },
@@ -85,7 +85,7 @@ const SuperAdminLayout: React.FC<SuperAdminLayoutProps> = ({ children }) => {
                 <ShieldCheck size={18} className="text-white" />
               </div>
               <div>
-                <h1 className="font-bold text-sm text-slate-900 leading-none">E-Ujian</h1>
+                <h1 className="font-bold text-sm text-slate-900 leading-none">EXAM AA</h1>
                 <p className="text-[10px] font-semibold text-blue-600 tracking-widest uppercase mt-0.5">Super Admin</p>
               </div>
             </div>
@@ -170,7 +170,7 @@ const SuperAdminLayout: React.FC<SuperAdminLayoutProps> = ({ children }) => {
             </button>
 
             <div className="flex items-center gap-2 min-w-0">
-              <span className="text-slate-400 text-sm hidden sm:block">E-Ujian</span>
+              <span className="text-slate-400 text-sm hidden sm:block">EXAM AA</span>
               <ChevronRight size={14} className="text-slate-300 hidden sm:block" />
               <span className="font-semibold text-slate-800 text-sm truncate">
                 {currentPage?.label || "Super Admin"}

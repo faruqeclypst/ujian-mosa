@@ -37,7 +37,7 @@ import type { Teacher } from "../types/exam";
 
 const TeachersPage = () => {
   const { teachers, loading, createTeacher, updateTeacher, deleteTeacher, resetUserPassword } = useExamData();
-  const { pb } = useTenant();
+  const { pb, terminology } = useTenant();
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [dialogMode, setDialogMode] = useState<"create" | "edit">("create");
@@ -113,8 +113,8 @@ const TeachersPage = () => {
       }
       closeDialog();
     } catch (error) {
-      console.error("Gagal menyimpan data guru", error);
-      showAlert("Gagal", "Gagal menyimpan data guru.", "danger");
+      console.error(`Gagal menyimpan data ${terminology.teacher.toLowerCase()}`, error);
+      showAlert("Gagal", `Gagal menyimpan data ${terminology.teacher.toLowerCase()}.`, "danger");
     }
   };
 
@@ -124,8 +124,8 @@ const TeachersPage = () => {
     try {
       await deleteTeacher(teacherToDelete.id);
     } catch (error) {
-      console.error("Gagal menghapus guru", error);
-      showAlert("Gagal", "Gagal menghapus data guru.", "danger");
+      console.error(`Gagal menghapus ${terminology.teacher.toLowerCase()}`, error);
+      showAlert("Gagal", `Gagal menghapus data ${terminology.teacher.toLowerCase()}.`, "danger");
     } finally {
       setIsDeleting(false);
       setDeleteDialogOpen(false);
@@ -138,8 +138,8 @@ const TeachersPage = () => {
     if (!teacher) return;
 
     showAlert(
-      "Reset Password Guru",
-      `Apakah Anda yakin ingin mereset password untuk guru ${teacher.name}? Password akan dikembalikan ke default "12345678".`,
+      `Reset Password ${terminology.teacher}`,
+      `Apakah Anda yakin ingin mereset password untuk ${terminology.teacher.toLowerCase()} ${teacher.name}? Password akan dikembalikan ke default "12345678".`,
       "warning",
       async () => {
         if (!pb) return;
@@ -154,7 +154,7 @@ const TeachersPage = () => {
 
           if (userRec) {
             await resetUserPassword(userRec.id);
-            showAlert("Berhasil", `Password guru ${teacher.name} berhasil direset menjadi 12345678.`, "success");
+            showAlert("Berhasil", `Password ${terminology.teacher.toLowerCase()} ${teacher.name} berhasil direset menjadi 12345678.`, "success");
           } else {
             // Re-create user account if missing (e.g. after data restore)
             const defaultPass = "12345678";
@@ -170,11 +170,11 @@ const TeachersPage = () => {
               hasChangedPassword: false,
             });
             
-            showAlert("Berhasil Dipulihkan", `Akun login guru ${teacher.name} yang sempat hilang telah dibuat kembali dengan password default 12345678.`, "success");
+            showAlert("Berhasil Dipulihkan", `Akun login ${terminology.teacher.toLowerCase()} ${teacher.name} yang sempat hilang telah dibuat kembali dengan password default 12345678.`, "success");
           }
         } catch (error: any) {
           console.error("Gagal reset password", error);
-          const errorMsg = error.data?.message || error.message || "Gagal mereset password guru.";
+          const errorMsg = error.data?.message || error.message || `Gagal mereset password ${terminology.teacher.toLowerCase()}.`;
           showAlert("Gagal", errorMsg, "danger");
         }
       },
@@ -185,8 +185,8 @@ const TeachersPage = () => {
 
   const handleSyncAllUsers = async () => {
     showAlert(
-      "Sinkronkan Semua Akun Guru",
-      "Sistem akan memeriksa semua guru dan membuatkan akun login (users) bagi guru yang belum memilikinya. Username akan diambil dari kode guru/nama, dan password default adalah 12345678.",
+      "Sinkronkan Semua Akun ${terminology.teacher}",
+      `Sistem akan memeriksa semua ${terminology.teacher.toLowerCase()} dan membuatkan akun login (users) bagi ${terminology.teacher.toLowerCase()} yang belum memilikinya. Username akan diambil dari kode ${terminology.teacher.toLowerCase()}/nama, dan password default adalah 12345678.`,
       "info",
       async () => {
         setBatchProgress({
@@ -194,7 +194,7 @@ const TeachersPage = () => {
           total: teachers.length,
           current: 0,
           message: "Memulai sinkronisasi...",
-          title: "Sinkronisasi Akun Guru"
+          title: `Sinkronisasi Akun ${terminology.teacher}`
         });
 
         let createdCount = 0;
@@ -225,7 +225,7 @@ const TeachersPage = () => {
               }
             }
           }
-          showAlert("Selesai", `${createdCount} akun guru baru berhasil dibuat/dipulihkan.`, "success");
+          showAlert("Selesai", `${createdCount} akun ${terminology.teacher.toLowerCase()} baru berhasil dibuat/dipulihkan.`, "success");
         } catch (err: any) {
           console.error("Sync all err", err);
           showAlert("Gagal", "Terjadi kesalahan saat sinkronisasi massal.", "danger");
@@ -251,23 +251,23 @@ const TeachersPage = () => {
           subjects: row.subjects,
         });
       }
-      showAlert("Import Berhasil", `${parsed.length} guru berhasil diimport.`, "success");
+      showAlert("Import Berhasil", `${parsed.length} ${terminology.teacher.toLowerCase()} berhasil diimport.`, "success");
     } catch (err: any) {
-      showAlert("Gagal Import", err.message || "Gagal mengimport data guru.", "danger");
+      showAlert("Gagal Import", err.message || `Gagal mengimport data ${terminology.teacher.toLowerCase()}.`, "danger");
     } finally {
       setIsImporting(false);
     }
   };
 
   const handleExportTeachers = () => {
-    exportTeacherToExcel({ teachers, filename: "data-guru.xlsx" });
+    exportTeacherToExcel({ teachers, filename: `data-${terminology.teacher.toLowerCase()}.xlsx` });
   };
 
   const handleBatchDelete = async () => {
     if (selectedIds.length === 0) return;
     showAlert(
-      "Hapus Guru Massal",
-      `Apakah Anda yakin ingin menghapus ${selectedIds.length} guru terpilih?`,
+      `Hapus ${terminology.teacher} Massal`,
+      `Apakah Anda yakin ingin menghapus ${selectedIds.length} ${terminology.teacher.toLowerCase()} terpilih?`,
       "danger",
       async () => {
         setBatchProgress({
@@ -275,7 +275,7 @@ const TeachersPage = () => {
           total: selectedIds.length,
           current: 0,
           message: "Menyiapkan penghapusan...",
-          title: "Hapus Guru Massal"
+          title: `Hapus ${terminology.teacher} Massal`
         });
         
         try {
@@ -288,13 +288,13 @@ const TeachersPage = () => {
             setBatchProgress(prev => ({
               ...prev,
               current: currentProcessed,
-              message: `Menghapus data guru (${currentProcessed}/${selectedIds.length})`
+              message: `Menghapus data ${terminology.teacher.toLowerCase()} (${currentProcessed}/${selectedIds.length})`
             }));
           }
           setSelectedIds([]);
         } catch (error) {
-          console.error("Gagal menghapus guru massal", error);
-          showAlert("Gagal", "Gagal menghapus data guru massal.", "danger");
+          console.error(`Gagal menghapus ${terminology.teacher.toLowerCase()} massal`, error);
+          showAlert("Gagal", `Gagal menghapus data ${terminology.teacher.toLowerCase()} massal.`, "danger");
         } finally {
           setBatchProgress(prev => ({ ...prev, isOpen: false }));
         }
@@ -334,9 +334,9 @@ const TeachersPage = () => {
         <div>
           <h2 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
             <Users className="h-5 w-5 text-emerald-500" />
-            Data Guru
+            Data {terminology.teacher}
           </h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Kelola daftar guru dan mata pelajaran pengampu.</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Kelola daftar {terminology.teacher.toLowerCase()} dan {terminology.subject.toLowerCase()} pengampu.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           {loading ? (
@@ -367,7 +367,7 @@ const TeachersPage = () => {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56 p-2 rounded-2xl shadow-2xl border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 z-[100]">
-              <DropdownMenuLabel className="text-[10px] font-bold uppercase tracking-widest text-slate-400 px-3 py-2 text-left">Kelola Guru</DropdownMenuLabel>
+              <DropdownMenuLabel className="text-[10px] font-bold uppercase tracking-widest text-slate-400 px-3 py-2 text-left">Kelola {terminology.teacher}</DropdownMenuLabel>
               <div 
                 className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors group"
                 onClick={() => {
@@ -382,7 +382,7 @@ const TeachersPage = () => {
                   <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">
                     {isImporting ? "Mengimport..." : "Import dari Excel"}
                   </span>
-                  <span className="text-[10px] text-slate-400 mt-1">Unggah file data guru</span>
+                  <span className="text-[10px] text-slate-400 mt-1">Unggah file data {terminology.teacher.toLowerCase()}</span>
                 </div>
               </div>
               <DropdownMenuItem 
@@ -394,7 +394,7 @@ const TeachersPage = () => {
                 </div>
                 <div className="flex flex-col min-w-0">
                   <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">Export ke Excel</span>
-                  <span className="text-[10px] text-slate-400 mt-1">Unduh daftar guru</span>
+                  <span className="text-[10px] text-slate-400 mt-1">Unduh daftar {terminology.teacher.toLowerCase()}</span>
                 </div>
               </DropdownMenuItem>
               <DropdownMenuSeparator className="my-1 border-slate-100 dark:border-slate-800" />
@@ -407,7 +407,7 @@ const TeachersPage = () => {
                 </div>
                 <div className="flex flex-col min-w-0">
                   <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">Unduh Template</span>
-                  <span className="text-[10px] text-slate-400 mt-1">Format file import Excel</span>
+                  <span className="text-[10px] text-slate-400 mt-1">Format file import Excel {terminology.teacher.toLowerCase()}</span>
                 </div>
               </DropdownMenuItem>
               <DropdownMenuSeparator className="my-1 border-slate-100 dark:border-slate-800" />
@@ -430,12 +430,12 @@ const TeachersPage = () => {
             <DialogTrigger asChild>
               <Button onClick={() => { setSelectedTeacher(null); setIsDialogOpen(true); }} size="sm" className="rounded-2xl bg-blue-50 hover:bg-blue-100 border border-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 dark:border-blue-800/40 text-blue-700 font-bold shadow-sm h-9 px-4">
                 <Plus className="mr-1 h-3.5 w-3.5" />
-                Tambah Guru
+                Tambah {terminology.teacher}
               </Button>
             </DialogTrigger>
             <DialogContent className="max-w-md bg-card">
               <DialogHeader>
-                <DialogTitle className="text-base font-bold text-slate-800 dark:text-white">{dialogMode === "edit" ? "Edit Data Guru" : "Tambah Data Guru"}</DialogTitle>
+                <DialogTitle className="text-base font-bold text-slate-800 dark:text-white">{dialogMode === "edit" ? `Edit Data ${terminology.teacher}` : `Tambah Data ${terminology.teacher}`}</DialogTitle>
               </DialogHeader>
               <TeacherForm
                 defaultValues={defaultValues}
@@ -455,7 +455,7 @@ const TeachersPage = () => {
       {loading ? (
         <Card>
           <CardHeader className="p-4">
-            <CardTitle className="text-base font-semibold text-slate-800 dark:text-white">Daftar Guru</CardTitle>
+            <CardTitle className="text-base font-semibold text-slate-800 dark:text-white">Daftar {terminology.teacher}</CardTitle>
           </CardHeader>
           <CardContent>
              <div className="rounded-xl border border-slate-200/60 dark:border-slate-800 overflow-hidden">
@@ -463,8 +463,8 @@ const TeachersPage = () => {
                   <TableHeader className="bg-slate-50/50 dark:bg-slate-900/50">
                     <TableRow>
                       <TableHead className="w-16 text-center">No</TableHead>
-                      <TableHead>Nama Guru</TableHead>
-                      <TableHead>Mapel Utama</TableHead>
+                      <TableHead>Nama {terminology.teacher}</TableHead>
+                      <TableHead>{terminology.subject} Utama</TableHead>
                       <TableHead className="text-right">Aksi</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -502,9 +502,9 @@ const TeachersPage = () => {
         isOpen={deleteDialogOpen}
         onClose={() => setDeleteDialogOpen(false)}
         onConfirm={handleConfirmDelete}
-        title="Hapus Guru"
-        description="Apakah Anda yakin ingin menghapus data guru ini? Data jadwal yang sudah dibuat menggunakan guru ini mungkin akan kehilangan referensi."
-        itemName={`Guru ${teacherToDelete?.name || ""}`}
+        title={`Hapus ${terminology.teacher}`}
+        description={`Apakah Anda yakin ingin menghapus data ${terminology.teacher.toLowerCase()} ini? Data jadwal yang sudah dibuat menggunakan ${terminology.teacher.toLowerCase()} ini mungkin akan kehilangan referensi.`}
+        itemName={`${terminology.teacher} ${teacherToDelete?.name || ""}`}
         isLoading={isDeleting}
       />
 

@@ -1,6 +1,6 @@
-import pb from "./pocketbase";
+import PocketBase from "pocketbase";
 
-export async function syncPendingData(studentId: string) {
+export async function syncPendingData(pb: PocketBase, studentId: string) {
   if (!navigator.onLine || !studentId) return;
 
   const syncedRoomIds: string[] = [];

@@ -7,7 +7,7 @@ const CheatAlert = registerPlugin<any>("CheatAlert");
 import { MathText } from "../../components/MathText";
 import { SmartImage } from "../../components/ui/smart-image";
 import { useStudentAuth } from "../../context/StudentAuthContext";
-import pb from "../../lib/pocketbase";
+import { useTenant } from "../../context/TenantContext";
 import { Button } from "../../components/ui/button";
 import { Skeleton } from "../../components/ui/skeleton";
 import { ThemeToggle } from "../../components/ui/theme-toggle";
@@ -121,6 +121,7 @@ const formatStudentName = (name?: string) => {
 const CBTPage = () => {
   const { roomId: paramRoomId } = useParams<{ roomId: string }>();
   const navigate = useNavigate();
+  const { pb, terminology } = useTenant();
   const { student, logoutStudent } = useStudentAuth();
   const { theme, setTheme } = useTheme();
 
@@ -273,6 +274,7 @@ const CBTPage = () => {
     }
 
     const startTime = Date.now();
+    if (!pb) return null;
     try {
       const res = await pb.collection("attempts").update(attId, data);
       localStorage.removeItem(`pending_sync_${student?.id}_${roomId}`);
@@ -291,7 +293,7 @@ const CBTPage = () => {
   const syncAllLocalData = useCallback(async () => {
     if (!isOnline || !student?.id) return;
     try {
-      await syncPendingData(student.id);
+      await syncPendingData(pb!, student.id);
       setSyncError(false);
     } catch (e) {
       setSyncError(true);
@@ -367,7 +369,7 @@ const CBTPage = () => {
   };
 
   const loadExamData = useCallback(async () => {
-    if (!student || !roomId) return;
+    if (!student || !roomId || !pb) return;
     try {
       setLoading(true);
       const rData = await pb.collection("exam_rooms").getOne(roomId, { expand: "examId,examId.subjectId,examId.teacherId" });
@@ -511,12 +513,12 @@ const CBTPage = () => {
   useEffect(() => { loadExamData(); }, [loadExamData]);
 
   useEffect(() => {
-    if (!roomData?.examId || !roomId || !attempt?.id) return;
+    if (!roomData?.examId || !roomId || !attempt?.id || !pb) return;
     const rId = roomId;
     const sId = student?.id || "";
 
     // 1. Subscribe ke Room saja (Questions tidak perlu disubscribe during exam)
-    const unsubRoom = pb.collection("exam_rooms").subscribe(rId, (e) => {
+    const unsubRoom = pb!.collection("exam_rooms").subscribe(rId, (e) => {
       if (e.action === "update") {
         setRoomData((prev: any) => ({ ...prev, ...e.record }));
         const isOff = e.record.isDisabled === true || e.record.status === "archive";
@@ -525,7 +527,7 @@ const CBTPage = () => {
     });
 
     // 2. Subscribe ke Attempt
-    const unsubAttempt = pb.collection("attempts").subscribe(attempt.id, (e) => {
+    const unsubAttempt = pb!.collection("attempts").subscribe(attempt.id, (e) => {
       if (e.action === "delete") {
         sessionStorage.removeItem("activeCBTRoomId");
         setIsResetModalOpen(true);
@@ -1005,7 +1007,7 @@ const CBTPage = () => {
               <DropdownMenuContent align="end" className="w-64 p-2 rounded-2xl border-slate-100 dark:border-slate-800 shadow-2xl z-[100]">
                 <DropdownMenuLabel className="px-3 py-2 flex flex-col gap-0.5">
                   <span className="text-xs font-black text-slate-800 dark:text-white uppercase truncate">{student?.name}</span>
-                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">SISWA • {student?.className} • NISN {student?.nisn}</span>
+                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{terminology.student.toUpperCase()} • {student?.className} • {terminology.id} {student?.nisn}</span>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator className="my-2 bg-slate-50 dark:bg-slate-800" />
                 <div className="px-3 py-2 flex flex-col gap-2">

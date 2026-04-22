@@ -4,6 +4,7 @@ import { DataTable } from "../ui/data-table";
 import { Button } from "../ui/button";
 import type { SubjectData } from "../../types/exam";
 import { Edit, Trash, BookOpen } from "lucide-react";
+import { useTenant } from "../../context/TenantContext";
 
 interface SubjectTableProps {
   subjects: SubjectData[];
@@ -20,6 +21,7 @@ const SubjectTable = ({
   onEdit, 
   onDelete 
 }: SubjectTableProps) => {
+  const { terminology } = useTenant();
   const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(null);
 
   const handleSelectAll = (checked: boolean) => {
@@ -84,7 +86,7 @@ const SubjectTable = ({
     },
     { 
       key: "name", 
-      label: "Mata Pelajaran", 
+      label: terminology.subject, 
       sortable: true,
       render: (name: string) => (
         <span className="font-bold text-slate-700 dark:text-slate-200">{name}</span>
@@ -97,14 +99,14 @@ const SubjectTable = ({
       <button 
         className="p-1.5 bg-sky-50 text-sky-600 hover:bg-sky-100 rounded-lg dark:bg-sky-900/10 dark:text-sky-400 border border-sky-100 dark:border-sky-800/40"
         onClick={() => onEdit(subject)}
-        title="Edit Mapel"
+        title={`Edit ${terminology.subject}`}
       >
         <Edit className="h-4 w-4" />
       </button>
       <button 
         className="p-1.5 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-lg dark:bg-rose-900/10 dark:text-rose-400 border border-rose-100 dark:border-rose-800/40"
         onClick={() => onDelete(subject)}
-        title="Hapus Mapel"
+        title={`Hapus ${terminology.subject}`}
       >
         <Trash className="h-4 w-4" />
       </button>
@@ -114,15 +116,15 @@ const SubjectTable = ({
   return (
     <Card>
       <CardHeader className="p-4">
-        <CardTitle className="text-base font-semibold text-slate-800 dark:text-white">Daftar Mata Pelajaran</CardTitle>
+        <CardTitle className="text-base font-semibold text-slate-800 dark:text-white">Daftar {terminology.subject}</CardTitle>
       </CardHeader>
       <CardContent>
         <DataTable
           data={subjects}
           columns={columns}
-          searchPlaceholder="Cari mapel..."
+          searchPlaceholder={`Cari ${terminology.subject}...`}
           actions={renderActions}
-          emptyMessage="Belum ada data mata pelajaran."
+          emptyMessage={`Belum ada data ${terminology.subject}.`}
         />
       </CardContent>
     </Card>

@@ -52,7 +52,7 @@ export const StudentAuthProvider = ({ children }: { children: ReactNode }) => {
           name: model.name || "-",
           classId: model.classId || model.classid || (model as any).class_id || (model as any).class || "",
           className: (model as any).className || (model as any).class_name || "-",
-          hasChangedPassword: model.hasChangedPassword || false
+          hasChangedPassword: model.hasChangedPassword !== false && model.hasChangedPassword !== "false" && model.hasChangedPassword !== "0" && model.hasChangedPassword !== 0
         });
 
         try {
@@ -138,7 +138,7 @@ export const StudentAuthProvider = ({ children }: { children: ReactNode }) => {
         name: model.name,
         classId: classId,
         className: classObj?.name || model.className || model.class_name || "-",
-        hasChangedPassword: model.hasChangedPassword,
+        hasChangedPassword: model.hasChangedPassword !== false && model.hasChangedPassword !== "false" && model.hasChangedPassword !== "0" && model.hasChangedPassword !== 0,
       });
     } catch (err: any) {
       if (err.status === 400 || err.status === 404) {
@@ -228,7 +228,7 @@ export const StudentAuthProvider = ({ children }: { children: ReactNode }) => {
         if (handleSessionConflict(serverSid, localSid)) setIsKicked(true);
 
         // 2. Check for Admin Reset (Kicked)
-        if (e.record.hasChangedPassword === false) {
+        if (e.record.hasChangedPassword === false || e.record.hasChangedPassword === "false" || e.record.hasChangedPassword === "0" || e.record.hasChangedPassword === 0) {
           logoutStudent();
         } else {
           // Sync data if changed (prevent UI from lagging)

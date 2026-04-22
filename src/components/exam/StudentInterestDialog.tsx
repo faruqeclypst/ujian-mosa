@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { JURUSAN_DATA } from "../../lib/riasec";
-import pb from "../../lib/pocketbase";
+import { useTenant } from "../../context/TenantContext";
 import { Button } from "../ui/button";
 
 interface StudentInterestDialogProps {
@@ -28,12 +28,14 @@ interface StudentInterestDialogProps {
 }
 
 const StudentInterestDialog = ({ isOpen, onClose, studentId, studentName }: StudentInterestDialogProps) => {
+  const { pb } = useTenant();
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<any>(null);
 
   useEffect(() => {
     if (isOpen && studentId) {
       const fetchData = async () => {
+        if (!pb) return;
         setLoading(true);
         try {
           const record = await pb.collection("student_interests").getFirstListItem(`studentId="${studentId}"`, {

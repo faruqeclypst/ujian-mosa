@@ -26,7 +26,7 @@ const NotFoundPage = () => {
             404
           </h1>
           <div className="absolute inset-0 flex items-center justify-center">
-             <span className="text-6xl md:text-8xl font-black text-slate-900 dark:text-white tracking-tighter drop-shadow-2xl">UPS!</span>
+            <span className="text-6xl md:text-8xl font-black text-slate-900 dark:text-white tracking-tighter drop-shadow-2xl">UPS!</span>
           </div>
         </motion.div>
 
@@ -40,7 +40,7 @@ const NotFoundPage = () => {
           <div className="mb-8 inline-flex p-5 rounded-[2rem] bg-white dark:bg-slate-800 shadow-2xl shadow-blue-500/10 border border-blue-50 dark:border-blue-900/30 text-blue-600 dark:text-blue-400">
             <Home size={40} className="animate-bounce" />
           </div>
-          
+
           <h2 className="text-3xl md:text-5xl font-black text-slate-900 dark:text-white mb-4 tracking-tighter uppercase">
             Halaman Tidak Ditemukan
           </h2>
@@ -58,7 +58,7 @@ const NotFoundPage = () => {
                 Ke Beranda
               </Link>
             </Button>
-            
+
             <Button
               variant="outline"
               onClick={() => window.history.back()}
@@ -71,7 +71,7 @@ const NotFoundPage = () => {
         </motion.div>
 
         {/* Subtle Footer */}
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.8 }}
@@ -79,7 +79,7 @@ const NotFoundPage = () => {
         >
           <div className="h-1 w-12 bg-gradient-to-r from-transparent via-slate-300 dark:via-slate-700 to-transparent rounded-full" />
           <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.4em]">
-            Portal E-Ujian &copy; {new Date().getFullYear()}
+            Portal EXAM AA &copy; {new Date().getFullYear()}
           </p>
         </motion.div>
       </div>

@@ -27,40 +27,7 @@ import { useTenant } from "../../context/TenantContext";
 import { useExamData } from "../../context/ExamDataContext";
 import { Skeleton } from "../ui/skeleton";
 
-const navigation = [
-  { to: "/admin", label: "Dashboard", icon: Home, badge: null },
-  { 
-    label: "Ujian", 
-    icon: ClipboardList, 
-    badge: null,
-    children: [
-      { to: "/admin/bank-soal", label: "Bank Soal", icon: BookOpen },
-      { to: "/admin/ruang-ujian", label: "Ruang Ujian", icon: ClipboardList }
-    ]
-  },
-  { 
-    label: "Master Data", 
-    icon: LayoutTemplate, 
-    badge: null,
-    children: [
-      { to: "/admin/classes", label: "Data Kelas", icon: LayoutTemplate },
-      { to: "/admin/subjects", label: "Data Mapel", icon: LayoutTemplate },
-      { to: "/admin/teachers", label: "Data Guru", icon: Users },
-      { to: "/admin/student", label: "Data Siswa", icon: GraduationCap },
-      { to: "/admin/alumni", label: "Data Alumni", icon: Award }
-    ]
-  },
-  { 
-    label: "Sistem", 
-    icon: Settings, 
-    badge: null,
-    children: [
-      { to: "/admin/kelola-akun", label: "Kelola Akun", icon: ShieldAlert },
-      { to: "/admin/pengaturan", label: "Pengaturan", icon: Settings }
-    ]
-  },
-  { to: "/admin/panduan", label: "Panduan", icon: HelpCircle, badge: null }
-];
+
 
 const SidebarSkeleton = ({ isCollapsed }: { isCollapsed: boolean }) => {
   return (
@@ -102,8 +69,43 @@ const SidebarSkeleton = ({ isCollapsed }: { isCollapsed: boolean }) => {
 const Sidebar = () => {
   const { role, loading } = useAuth();
   const { isCollapsed, isMobileOpen, toggleCollapsed, closeMobile } = useSidebar();
-  const { school } = useTenant();
-  const { students } = useExamData();
+  const { terminology } = useTenant();
+  const examData = useExamData();
+
+  const navigation = React.useMemo(() => [
+    { to: "/admin", label: "Dashboard", icon: Home, badge: null },
+    { 
+      label: "Ujian", 
+      icon: ClipboardList, 
+      badge: null,
+      children: [
+        { to: "/admin/bank-soal", label: "Bank Soal", icon: BookOpen },
+        { to: "/admin/ruang-ujian", label: "Ruang Ujian", icon: ClipboardList }
+      ]
+    },
+    { 
+      label: "Master Data", 
+      icon: LayoutTemplate, 
+      badge: null,
+      children: [
+        { to: "/admin/classes", label: `Data ${terminology.class}`, icon: LayoutTemplate },
+        { to: "/admin/subjects", label: `Data ${terminology.subject}`, icon: LayoutTemplate },
+        { to: "/admin/teachers", label: `Data ${terminology.teacher}`, icon: Users },
+        { to: "/admin/student", label: `Data ${terminology.student}`, icon: GraduationCap },
+        { to: "/admin/alumni", label: "Data Alumni", icon: Award }
+      ]
+    },
+    { 
+      label: "Sistem", 
+      icon: Settings, 
+      badge: null,
+      children: [
+        { to: "/admin/kelola-akun", label: "Kelola Akun", icon: ShieldAlert },
+        { to: "/admin/pengaturan", label: "Pengaturan", icon: Settings }
+      ]
+    },
+    { to: "/admin/panduan", label: "Panduan", icon: HelpCircle, badge: null }
+  ], [terminology]);
   
   const [expandedMenus, setExpandedMenus] = React.useState<Record<string, boolean>>(() => 
     navigation.reduce((acc, item) => {
@@ -126,13 +128,13 @@ const Sidebar = () => {
         if (item.label === "Master Data") {
           return {
             ...item,
-            children: item.children?.filter(child => child.label === "Data Siswa")
+            children: item.children?.filter(child => child.label === `Data ${terminology.student}`)
           };
         }
         return item;
       })
       .filter(item => item.label !== "Master Data" || (item.children && item.children.length > 0));
-  }, [role]);
+  }, [role, navigation, terminology]);
 
   if (loading) return <SidebarSkeleton isCollapsed={isCollapsed} />;
 
@@ -149,7 +151,7 @@ const Sidebar = () => {
       {/* Desktop Sidebar */}
       <aside className={cn(
         "hidden lg:flex h-full flex-col bg-white dark:bg-[#0B1120] border-r border-slate-200 dark:border-slate-800/80 transition-all duration-300 ease-in-out z-20 shadow-sm",
-        isCollapsed ? "w-[72px]" : "w-64 md:w-72"
+        isCollapsed ? "w-[72px]" : "w-[290px] md:w-[310px] lg:w-[320px]"
       )}>
         {/* Header with logo and collapse toggle */}
         <div className={cn(
@@ -262,23 +264,41 @@ const Sidebar = () => {
 
                   {isMenuExpanded && (
                     <div className="space-y-1 py-1 animate-in slide-in-from-top-1 duration-200 relative before:absolute before:left-[21px] before:top-0 before:bottom-0 before:w-px before:bg-slate-200 dark:before:bg-slate-800">
-                      {item.children!.map(child => (
-                        <NavLink key={child.to} to={child.to} onClick={closeMobile} end>
-                          {({ isActive }) => (
-                            <div className={cn(
-                              "group relative flex items-center gap-3 rounded-lg px-3 py-2.5 ml-[36px] mr-1 text-[13px] font-semibold transition-all duration-200",
-                              isActive
-                                ? "bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400 relative"
-                                : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100/50 dark:hover:bg-slate-800/50"
-                            )}>
-                              {isActive && (
-                                <div className="absolute -left-[15px] top-1/2 -translate-y-1/2 w-[3px] h-4 bg-blue-600 rounded-full" />
-                              )}
-                              <span className="truncate">{child.label}</span>
-                            </div>
-                          )}
-                        </NavLink>
-                      ))}
+                      {item.children!.map(child => {
+                        const getCount = (label: string) => {
+                          if (label === `Data ${terminology.teacher}`) return examData.teachers.length;
+                          if (label === `Data ${terminology.class}`) return examData.classes.length;
+                          if (label === `Data ${terminology.subject}`) return examData.subjects.length;
+                          if (label === `Data ${terminology.student}`) return examData.students.length;
+                          if (label === "Bank Soal") return examData.examsCount;
+                          if (label === "Ruang Ujian") return examData.roomsCount;
+                          return null;
+                        };
+                        const count = getCount(child.label);
+
+                        return (
+                          <NavLink key={child.to} to={child.to} onClick={closeMobile} end>
+                            {({ isActive }) => (
+                              <div className={cn(
+                                "group relative flex items-center gap-3 rounded-lg px-3 py-2.5 ml-[36px] mr-1 text-[13px] font-semibold transition-all duration-200",
+                                isActive
+                                  ? "bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400 relative"
+                                  : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100/50 dark:hover:bg-slate-800/50"
+                              )}>
+                                {isActive && (
+                                  <div className="absolute -left-[15px] top-1/2 -translate-y-1/2 w-[3px] h-4 bg-blue-600 rounded-full" />
+                                )}
+                                <span className="truncate flex-1">{child.label}</span>
+                                {count !== null && !isCollapsed && (
+                                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 group-hover:bg-blue-100 group-hover:text-blue-600 transition-colors">
+                                    {count}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </NavLink>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
@@ -296,7 +316,22 @@ const Sidebar = () => {
                   )}>
                     <item.icon className={cn("h-[18px] w-[18px] transition-transform", isActive ? "text-blue-600 dark:text-blue-400" : "text-slate-400 dark:text-slate-500 group-hover:text-slate-600 dark:group-hover:text-slate-400")} />
                     <div className="flex flex-1 items-center justify-between min-w-0">
-                      <span className="truncate">{item.label}</span>
+                      <span className="truncate flex-1">{item.label}</span>
+                      {(() => {
+                        const getCount = (label: string) => {
+                          switch(label) {
+                            case "Bank Soal": return examData.examsCount;
+                            case "Ruang Ujian": return examData.roomsCount;
+                            default: return null;
+                          }
+                        };
+                        const count = getCount(item.label);
+                        return count !== null && !isCollapsed && (
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 group-hover:bg-blue-100 group-hover:text-blue-600 transition-colors">
+                            {count}
+                          </span>
+                        );
+                      })()}
                     </div>
                     {isActive && (
                       <div className="absolute left-0 top-1.5 bottom-1.5 w-[3px] bg-blue-600 rounded-r-full" />
@@ -311,7 +346,7 @@ const Sidebar = () => {
 
       {/* Mobile/Tablet Sidebar */}
       {isMobileOpen && (
-        <aside className="fixed left-0 top-0 z-50 flex h-screen w-64 sm:w-[280px] flex-col bg-white dark:bg-[#0B1120] border-r border-slate-200 dark:border-slate-800/80 shadow-2xl lg:hidden">
+        <aside className="fixed left-0 top-0 z-50 flex h-screen w-[290px] sm:w-[310px] flex-col bg-white dark:bg-[#0B1120] border-r border-slate-200 dark:border-slate-800/80 shadow-2xl lg:hidden">
           {/* Header with logo and close toggle */}
           <div className="flex h-[72px] items-center justify-between px-4 sm:px-5 relative bg-white dark:bg-[#0B1120]">
             <div className="flex items-center min-w-0 flex-1">

@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================================
-# E-Ujian SaaS VPS Setup Script (Caddy Version)
+# EXAM AA SaaS VPS Setup Script (Caddy Version)
 # Ubuntu 24.04 LTS
 # Jalankan sebagai root: bash setup.sh
 # ============================================================
@@ -38,7 +38,7 @@ FRONTEND_PORT=3000
 # ============================================================
 echo ""
 echo "=========================================="
-echo "   E-Ujian SaaS VPS Setup (Caddy)"
+echo "   EXAM AA SaaS VPS Setup (Caddy)"
 echo "   IP: $(curl -s ifconfig.me)"
 echo "=========================================="
 echo ""
@@ -54,6 +54,19 @@ apt-get install -y -qq curl wget unzip ufw debian-keyring debian-archive-keyring
 curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
 curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | tee /etc/apt/sources.list.d/caddy-stable.list
 apt-get update && apt-get install caddy -y
+
+# Kernel Tuning for High Load
+info "Tuning kernel for high load..."
+cat > /etc/sysctl.d/99-exam-aa.conf << EOF
+fs.file-max = 2097152
+net.core.somaxconn = 65535
+net.core.netdev_max_backlog = 65535
+net.ipv4.tcp_max_syn_backlog = 65535
+net.ipv4.tcp_fin_timeout = 15
+net.ipv4.tcp_tw_reuse = 1
+net.ipv4.ip_local_port_range = 1024 65535
+EOF
+sysctl --system
 
 # Hapus Nginx jika terpasang
 systemctl stop nginx 2>/dev/null || true
@@ -158,6 +171,7 @@ Type=simple
 Restart=always
 RestartSec=5
 User=root
+LimitNOFILE=65535
 WorkingDirectory=$TARGET_DIR
 ExecStart=$TARGET_DIR/pocketbase serve --http="127.0.0.1:${PORT}" --dir=$TARGET_DIR/pb_data --hooksDir=$TARGET_DIR/pb_hooks
 
@@ -219,6 +233,7 @@ Type=simple
 Restart=always
 RestartSec=5
 User=root
+LimitNOFILE=65535
 WorkingDirectory=/opt/pocketbase/master
 ExecStart=/opt/pocketbase/master/pocketbase serve --http="127.0.0.1:${MASTER_PORT}" --dir=/opt/pocketbase/master/pb_data --hooksDir=/opt/pocketbase/master/pb_hooks
 
@@ -233,6 +248,10 @@ systemctl enable pb-master && systemctl restart pb-master
 cat > /etc/caddy/Caddyfile << EOF
 {
     email ${EMAIL}
+    # Performance Tuning
+    servers {
+        max_header_size 16kb
+    }
 }
 
 import /etc/caddy/conf.d/*.caddy

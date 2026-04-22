@@ -12,14 +12,13 @@ import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { cn } from "../../lib/utils";
-import pb from "../../lib/pocketbase";
 import ChangePasswordModal from "../auth/ChangePasswordModal";
 import AISettingsModal from "../auth/AISettingsModal";
 
 const TopNavigation = () => {
   const { user, signOut, usernameFromEmail } = useAuth();
   const { setMobileOpen } = useSidebar();
-  const { school } = useTenant();
+  const { school, pb, terminology } = useTenant();
   const { theme, setTheme } = useTheme();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
@@ -92,6 +91,7 @@ const TopNavigation = () => {
 
     const fetchInitialData = async () => {
       try {
+        if (!pb) return;
         // Fetch Exam Rooms for names mapping
         const rooms = await pb.collection('exam_rooms').getFullList();
         if (!isMounted) return;
@@ -119,6 +119,7 @@ const TopNavigation = () => {
 
     fetchInitialData();
 
+    if (!pb) return;
     // Subscribe to Exam Rooms
     const unsubRooms = pb.collection('exam_rooms').subscribe("*", (e) => {
       if (!isMounted) return;
@@ -173,6 +174,7 @@ const TopNavigation = () => {
   }, []);
 
   const handleUnlockStudent = async (attId: string) => {
+    if (!pb) return;
     try {
       await pb.collection('attempts').update(attId, {
         status: "ongoing",
@@ -246,7 +248,7 @@ const TopNavigation = () => {
               <div className="p-4 border-b flex items-center justify-between bg-slate-50/50 dark:bg-slate-900/40">
                 <div className="flex items-center gap-2">
                   <ShieldAlert className="h-4 w-4 text-red-500" />
-                  <h3 className="font-bold text-sm">Siswa Terkunci</h3>
+                  <h3 className="font-bold text-sm">{terminology.student} Terkunci</h3>
                 </div>
                 <span className="text-[10px] bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-400 px-2 py-0.5 rounded-full font-bold">
                   {lockedAttempts.length} Aktif
@@ -258,7 +260,7 @@ const TopNavigation = () => {
                     <div className="w-12 h-12 bg-slate-50 dark:bg-slate-800 rounded-full flex items-center justify-center">
                       <Bell className="h-6 w-6 text-slate-300" />
                     </div>
-                    <p className="text-xs text-slate-400 font-medium tracking-tight">Tidak ada Siswa yang terkunci saat ini.</p>
+                    <p className="text-xs text-slate-400 font-medium tracking-tight">Tidak ada {terminology.student} yang terkunci saat ini.</p>
                   </div>
                 ) : (
                   <div className="divide-y dark:divide-slate-800">
@@ -273,7 +275,7 @@ const TopNavigation = () => {
                             </div>
                             <div className="flex-1 min-w-0">
                                <p className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">
-                                 {a.expand?.studentId?.name || students.find(s => s.id === a.studentId)?.name || "Siswa Tidak Dikenal"}
+                                 {a.expand?.studentId?.name || students.find(s => s.id === a.studentId)?.name || `${terminology.student} Tidak Dikenal`}
                                </p>
                                <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5">
                                  <span className="text-[10px] font-medium text-slate-500">
@@ -308,7 +310,7 @@ const TopNavigation = () => {
               </div>
               {lockedAttempts.length > 0 && (
                 <div className="p-2 border-t bg-slate-50/50 dark:bg-slate-900/40">
-                  <p className="text-[9px] text-center text-slate-400 font-medium">Klik buka kunci untuk mengembalikan status Siswa menjadi aktif.</p>
+                  <p className="text-[9px] text-center text-slate-400 font-medium font-bold">Klik buka kunci untuk mengembalikan status {terminology.student} menjadi aktif.</p>
                 </div>
               )}
             </div>
@@ -335,7 +337,7 @@ const TopNavigation = () => {
             onClick={() => setIsDropdownOpen(!isDropdownOpen)}
           >
             <Avatar className="h-9 w-9 sm:h-10 sm:w-10">
-              <AvatarImage src={(user as any)?.avatar ? pb.getFileUrl(user as any, (user as any).avatar) : undefined} alt={displayName} />
+              <AvatarImage src={(user as any)?.avatar && pb ? pb.getFileUrl(user as any, (user as any).avatar) : undefined} alt={displayName} />
               <AvatarFallback className="bg-gradient-to-br from-blue-500 to-blue-600 text-white text-xs sm:text-sm">
                 {initials}
               </AvatarFallback>
@@ -348,7 +350,7 @@ const TopNavigation = () => {
               {/* Header Profile Info */}
               <div className="flex items-center justify-start gap-3 p-4 bg-slate-50/50 dark:bg-transparent">
                 <Avatar className="h-10 w-10 ring-2 ring-white dark:ring-slate-800 shadow-sm">
-                  <AvatarImage src={(user as any)?.avatar ? pb.getFileUrl(user as any, (user as any).avatar) : undefined} alt={displayName} />
+                  <AvatarImage src={(user as any)?.avatar && pb ? pb.getFileUrl(user as any, (user as any).avatar) : undefined} alt={displayName} />
                   <AvatarFallback className="bg-gradient-to-br from-blue-500 to-blue-600 text-white font-bold">
                     {initials}
                   </AvatarFallback>
@@ -371,7 +373,7 @@ const TopNavigation = () => {
                       {school?.plan ? school.plan.charAt(0).toUpperCase() + school.plan.slice(1) : "Free"} Plan
                     </span>
                     <span className="text-[10px] font-bold text-amber-800 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/60 px-2 py-0.5 rounded leading-none">
-                      {students.length}/{school?.student_quota || 50} Siswa
+                      {students.length}/{school?.student_quota || 50} {terminology.student}
                     </span>
                   </div>
                   <div className="pt-2.5 mt-0.5 border-t border-amber-100 dark:border-amber-900/30 flex flex-col gap-1 text-[10px] text-amber-900/70 dark:text-amber-500/80 font-medium">

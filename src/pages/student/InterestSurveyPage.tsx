@@ -1,11 +1,11 @@
 import { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { 
-  ChevronRight, 
-  ChevronLeft, 
-  RotateCcw, 
-  CheckCircle2, 
-  Sparkles, 
+import {
+  ChevronRight,
+  ChevronLeft,
+  RotateCcw,
+  CheckCircle2,
+  Sparkles,
   Library,
   Atom,
   Palette,
@@ -26,22 +26,23 @@ import { Progress } from "../../components/ui/progress";
 
 import { QUESTIONS, MI_QUESTIONS, JURUSAN_DATA } from "../../lib/riasec";
 
-import pb from "../../lib/pocketbase";
+import { useTenant } from "../../context/TenantContext";
 import { useStudentAuth } from "../../context/StudentAuthContext";
 
 const InterestSurveyPage = () => {
+  const { pb, terminology } = useTenant();
   const { student } = useStudentAuth();
   const ALL_QUESTIONS = useMemo(() => [...QUESTIONS, ...MI_QUESTIONS], []);
-  
+
   const [currentStep, setCurrentStep] = useState(0);
   const [answers, setAnswers] = useState<Record<number, number>>({});
   const [showResult, setShowResult] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
-  
-  const [finalResult, setFinalResult] = useState<{ 
-    top: string, 
+
+  const [finalResult, setFinalResult] = useState<{
+    top: string,
     scores: Record<string, number>,
     hollandCode: string,
     miScores: Record<string, number>,
@@ -50,7 +51,7 @@ const InterestSurveyPage = () => {
 
   useEffect(() => {
     const checkExistingResult = async () => {
-      if (!student) return;
+      if (!student || !pb) return;
       try {
         const record = await pb.collection("student_interests").getFirstListItem(`studentId="${student.id}"`, {
           sort: "-updated",
@@ -59,10 +60,10 @@ const InterestSurveyPage = () => {
           // Re-calculate top types if missing (for legacy records)
           const scores = record.scores || {};
           const miScores = record.miScores || { LIN: 0, LOG: 0, SPA: 0, KIN: 0, MUS: 0, "INT-R": 0, "INT-A": 0, NAT: 0 };
-          
+
           const sortedRIASEC = Object.entries(scores).sort(([, a], [, b]) => (b as number) - (a as number)).slice(0, 3);
           const derivedHollandCode = sortedRIASEC.map(([type]) => type).join("");
-          
+
           const sortedMI = Object.entries(miScores).sort(([, a], [, b]) => (b as number) - (a as number)).slice(0, 3).map(([type]) => type);
 
           setFinalResult({
@@ -92,7 +93,7 @@ const InterestSurveyPage = () => {
   };
 
   const autoSaveResult = async (res: any, currentAnswers: any) => {
-    if (!student) return;
+    if (!student || !pb) return;
     setIsSaving(true);
     try {
       let existingId = null;
@@ -126,7 +127,7 @@ const InterestSurveyPage = () => {
       const fieldErrors = err.response?.data?.data;
       const errorMsg = err.response?.data?.message || err.message;
       const errorDetail = fieldErrors ? JSON.stringify(fieldErrors, null, 2) : (err.response?.data ? JSON.stringify(err.response.data, null, 2) : err.message);
-      
+
       alert(`Gagal sinkronisasi ke database!\n\nStatus: ${err.status}\nMessage: ${errorMsg}\n\nDetail Field: ${errorDetail}\n\nSaran: Coba Logout dan Login kembali untuk memperbarui sesi.`);
     } finally {
       setIsSaving(false);
@@ -140,12 +141,12 @@ const InterestSurveyPage = () => {
     const qId = ALL_QUESTIONS[currentStep].id;
     const newAnswers = { ...answers, [qId]: value };
     setAnswers(newAnswers);
-    
+
     if (currentStep < ALL_QUESTIONS.length - 1) {
       setTimeout(() => {
         setCurrentStep(prev => prev + 1);
         setIsProcessing(false);
-      }, 50); 
+      }, 50);
     } else {
       const riasecScores: Record<string, number> = { R: 0, I: 0, A: 0, S: 0, E: 0, C: 0 };
       const miScores: Record<string, number> = { LIN: 0, LOG: 0, SPA: 0, KIN: 0, MUS: 0, "INT-R": 0, "INT-A": 0, NAT: 0 };
@@ -187,7 +188,7 @@ const InterestSurveyPage = () => {
   if (showResult && finalResult) {
     const resultContent = JURUSAN_DATA[finalResult.top];
     if (!resultContent) return <div className="min-h-screen flex items-center justify-center">Loading Content...</div>;
-    
+
     const miLabels: Record<string, string> = {
       LIN: "Linguistik", LOG: "Logis-Matematis", SPA: "Visual-Spasial",
       KIN: "Kinestetik", MUS: "Musikal", "INT-R": "Interpersonal",
@@ -199,82 +200,81 @@ const InterestSurveyPage = () => {
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="w-full h-full min-h-screen">
           <Card className={`border-none shadow-none min-h-screen rounded-none bg-gradient-to-br ${resultContent.bgGradient} text-white relative flex flex-col`}>
             <div className="absolute top-0 right-0 p-12 opacity-5 hidden lg:block"><GraduationCap size={400} /></div>
-            
+
             <CardContent className="p-6 sm:p-12 relative z-10 flex-1 flex flex-col max-w-7xl mx-auto w-full">
-               <div className="flex flex-col items-center text-center mb-6 shrink-0">
-                 <motion.div initial={{ y: -20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="h-12 w-12 bg-white/20 rounded-xl flex items-center justify-center mb-3 backdrop-blur-md border border-white/30">
-                   <Sparkles className="h-6 w-6 text-yellow-300 animate-pulse" />
-                 </motion.div>
-                 <h1 className="text-2xl sm:text-4xl font-black mb-1 leading-none tracking-tighter uppercase">Analisis RIASEC + MI Selesai!</h1>
-                 <p className="text-white/80 font-bold tracking-[0.3em] uppercase text-[10px] mt-2 border-b border-white/20 pb-2">Laporan Hasil: {student?.name || 'Siswa E-Ujian'}</p>
-                 <div className="flex flex-wrap justify-center items-center gap-3 mt-4">
-                    <div className="flex items-center gap-2 bg-white/10 px-4 py-1.5 rounded-full border border-white/20">
-                       <p className="text-white/70 text-[10px] font-bold uppercase tracking-[0.2em]">Holland Code:</p>
-                       <span className="text-sm font-black tracking-widest text-white">{finalResult.hollandCode}</span>
-                    </div>
-                    <div className="flex items-center gap-2 bg-white/10 px-4 py-1.5 rounded-full border border-white/20">
-                       <p className="text-white/70 text-[10px] font-bold uppercase tracking-[0.2em]">Kecerdasan Utama:</p>
-                       <span className="text-sm font-black tracking-widest text-white capitalize">{miLabels[finalResult.topMI[0]]}</span>
-                    </div>
-                 </div>
-               </div>
+              <div className="flex flex-col items-center text-center mb-6 shrink-0">
+                <motion.div initial={{ y: -20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="h-12 w-12 bg-white/20 rounded-xl flex items-center justify-center mb-3 backdrop-blur-md border border-white/30">
+                  <Sparkles className="h-6 w-6 text-yellow-300 animate-pulse" />
+                </motion.div>
+                <h1 className="text-2xl sm:text-4xl font-black mb-1 leading-none tracking-tighter uppercase">Analisis RIASEC + MI Selesai!</h1>
+                <p className="text-white/80 font-bold tracking-[0.3em] uppercase text-[10px] mt-2 border-b border-white/20 pb-2">Laporan Hasil: {student?.name || `${terminology.student} EXAM AA`}</p>
+                <div className="flex flex-wrap justify-center items-center gap-3 mt-4">
+                  <div className="flex items-center gap-2 bg-white/10 px-4 py-1.5 rounded-full border border-white/20">
+                    <p className="text-white/70 text-[10px] font-bold uppercase tracking-[0.2em]">Holland Code:</p>
+                    <span className="text-sm font-black tracking-widest text-white">{finalResult.hollandCode}</span>
+                  </div>
+                  <div className="flex items-center gap-2 bg-white/10 px-4 py-1.5 rounded-full border border-white/20">
+                    <p className="text-white/70 text-[10px] font-bold uppercase tracking-[0.2em]">Kecerdasan Utama:</p>
+                    <span className="text-sm font-black tracking-widest text-white capitalize">{miLabels[finalResult.topMI[0]]}</span>
+                  </div>
+                </div>
+              </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-10 items-start flex-1 overflow-y-auto pb-6 custom-scrollbar">
                 <div className="space-y-6 flex flex-col h-full">
                   <motion.div initial={{ x: -30, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ delay: 0.2 }} className="p-7 bg-white/10 rounded-[2.5rem] border border-white/20 backdrop-blur-xl shadow-2xl">
                     <div className="flex items-center gap-5 mb-5">
-                       <div className="bg-white p-4 rounded-2xl text-slate-900 shadow-xl scale-110">
-                          <resultContent.icon className={`h-7 w-7 text-emerald-600`} />
-                       </div>
-                       <h2 className="text-2xl sm:text-3xl font-black text-left leading-tight tracking-tight text-white">{resultContent.title}</h2>
+                      <div className="bg-white p-4 rounded-2xl text-slate-900 shadow-xl scale-110">
+                        <resultContent.icon className={`h-7 w-7 text-emerald-600`} />
+                      </div>
+                      <h2 className="text-2xl sm:text-3xl font-black text-left leading-tight tracking-tight text-white">{resultContent.title}</h2>
                     </div>
                     <p className="text-base leading-relaxed text-white font-medium italic border-l-4 border-white/40 pl-5">"{resultContent.desc}"</p>
                   </motion.div>
 
                   <div className="p-7 bg-white text-slate-900 rounded-[2.5rem] shadow-2xl space-y-6">
                     <div className="flex justify-between items-center">
-                       <h3 className="text-xs font-black uppercase tracking-[0.2em] text-emerald-600 flex items-center gap-2"><Lightbulb className="h-5 w-5" /> 8 Spektrum Kecerdasan:</h3>
-                       <span className="text-[10px] font-bold text-slate-400">Total Potensi Kognitif</span>
+                      <h3 className="text-xs font-black uppercase tracking-[0.2em] text-emerald-600 flex items-center gap-2"><Lightbulb className="h-5 w-5" /> 8 Spektrum Kecerdasan:</h3>
+                      <span className="text-[10px] font-bold text-slate-400">Total Potensi Kognitif</span>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-4 gap-x-6">
-                       {Object.values(finalResult.miScores).every(v => v === 0) ? (
-                         <div className="col-span-full py-10 flex flex-col items-center justify-center text-center space-y-3 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-                           <BrainCircuit className="h-10 w-10 text-slate-300" />
-                           <div className="space-y-1 px-6">
-                             <p className="text-xs font-black text-slate-500 uppercase tracking-tight">Data Lama Terdeteksi</p>
-                             <p className="text-[10px] text-slate-400 leading-tight">Profil Kecerdasan Majemuk belum tersedia untuk rekam medis ini. Silakan tekan <b>Ulangi Analisis</b> untuk mendapatkan hasil terbaru.</p>
-                           </div>
-                         </div>
-                       ) : (
-                         Object.entries(finalResult.miScores).sort(([,a],[,b])=>b-a).map(([mi, score], idx) => (
-                           <div key={mi} className="space-y-1.5 group">
-                              <div className="flex justify-between text-[10px] font-black uppercase tracking-tight">
-                                 <span className={idx < 3 ? "text-slate-900" : "text-slate-400"}>
-                                   {idx < 3 && <Sparkles className="inline-block h-3 w-3 mr-1 text-emerald-500" />}
-                                   {miLabels[mi]}
-                                 </span>
-                                 <span className={idx < 3 ? "text-emerald-600" : "text-slate-400"}>{score} Pts</span>
-                              </div>
-                              <div className="h-2.5 w-full bg-slate-100 rounded-full overflow-hidden">
-                                 <motion.div 
-                                   initial={{ width: 0 }} 
-                                   animate={{ width: `${(score / 12) * 100}%` }} 
-                                   className={`h-full rounded-full transition-all ${
-                                     idx === 0 ? "bg-emerald-600 shadow-[0_0_10px_rgba(16,185,129,0.3)]" : 
-                                     idx < 3 ? "bg-emerald-400" : "bg-slate-300"
-                                   }`} 
-                                 />
-                              </div>
-                           </div>
-                         ))
-                       )}
+                      {Object.values(finalResult.miScores).every(v => v === 0) ? (
+                        <div className="col-span-full py-10 flex flex-col items-center justify-center text-center space-y-3 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                          <BrainCircuit className="h-10 w-10 text-slate-300" />
+                          <div className="space-y-1 px-6">
+                            <p className="text-xs font-black text-slate-500 uppercase tracking-tight">Data Lama Terdeteksi</p>
+                            <p className="text-[10px] text-slate-400 leading-tight">Profil Kecerdasan Majemuk belum tersedia untuk rekam medis ini. Silakan tekan <b>Ulangi Analisis</b> untuk mendapatkan hasil terbaru.</p>
+                          </div>
+                        </div>
+                      ) : (
+                        Object.entries(finalResult.miScores).sort(([, a], [, b]) => b - a).map(([mi, score], idx) => (
+                          <div key={mi} className="space-y-1.5 group">
+                            <div className="flex justify-between text-[10px] font-black uppercase tracking-tight">
+                              <span className={idx < 3 ? "text-slate-900" : "text-slate-400"}>
+                                {idx < 3 && <Sparkles className="inline-block h-3 w-3 mr-1 text-emerald-500" />}
+                                {miLabels[mi]}
+                              </span>
+                              <span className={idx < 3 ? "text-emerald-600" : "text-slate-400"}>{score} Pts</span>
+                            </div>
+                            <div className="h-2.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                              <motion.div
+                                initial={{ width: 0 }}
+                                animate={{ width: `${(score / 12) * 100}%` }}
+                                className={`h-full rounded-full transition-all ${idx === 0 ? "bg-emerald-600 shadow-[0_0_10px_rgba(16,185,129,0.3)]" :
+                                    idx < 3 ? "bg-emerald-400" : "bg-slate-300"
+                                  }`}
+                              />
+                            </div>
+                          </div>
+                        ))
+                      )}
                     </div>
                     <div className="bg-emerald-50 p-4 rounded-2xl border border-emerald-100 flex gap-4 items-start">
-                       <BrainCircuit className="h-10 w-10 text-emerald-600 shrink-0" />
-                       <p className="text-[11px] font-medium text-emerald-800 leading-relaxed">
-                         Kamu memiliki keunggulan tajam di bidang <strong>{miLabels[finalResult.topMI[0]]}</strong>. 
-                         Kekuatan ini sangat mendukung caramu memproses informasi dan menyelesaikan masalah di bidang {resultContent.title}.
-                       </p>
+                      <BrainCircuit className="h-10 w-10 text-emerald-600 shrink-0" />
+                      <p className="text-[11px] font-medium text-emerald-800 leading-relaxed">
+                        Kamu memiliki keunggulan tajam di bidang <strong>{miLabels[finalResult.topMI[0]]}</strong>.
+                        Kekuatan ini sangat mendukung caramu memproses informasi dan menyelesaikan masalah di bidang {resultContent.title}.
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -324,16 +324,16 @@ const InterestSurveyPage = () => {
                   </motion.div>
 
                   <div className="flex flex-wrap gap-4 mt-auto pt-6">
-                    <Button 
-                      onClick={resetSurvey} 
-                      variant="outline" 
+                    <Button
+                      onClick={resetSurvey}
+                      variant="outline"
                       className="flex-1 rounded-2xl h-14 border-white/30 bg-white/10 text-white hover:bg-white hover:text-slate-900 font-black uppercase tracking-widest text-sm"
                     >
-                      <RotateCcw className="mr-2 h-5 w-5" /> 
+                      <RotateCcw className="mr-2 h-5 w-5" />
                       Ulangi Analisis
                     </Button>
-                    <Button 
-                      onClick={() => window.location.href = "/"} 
+                    <Button
+                      onClick={() => window.location.href = "/"}
                       className="flex-2 w-full lg:w-auto px-10 rounded-2xl h-14 bg-white text-slate-900 hover:bg-slate-100 font-black uppercase tracking-widest shadow-2xl text-sm"
                     >
                       Kembali ke Dashboard
@@ -357,9 +357,9 @@ const InterestSurveyPage = () => {
 
       <div className="max-w-4xl w-full space-y-8 relative z-10">
         <div className="text-center space-y-3">
-           <div className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 rounded-full text-xs font-black tracking-widest uppercase border border-emerald-100 dark:border-emerald-900/30">Instrumen RIASEC + MI</div>
-           <h1 className="text-4xl sm:text-5xl font-black text-slate-800 dark:text-white tracking-tighter leading-none">Pilih Masa Depanmu</h1>
-           <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">Temukan potensi terbaik dalam diri Anda secara otomatis.</p>
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 rounded-full text-xs font-black tracking-widest uppercase border border-emerald-100 dark:border-emerald-900/30">Instrumen RIASEC + MI</div>
+          <h1 className="text-4xl sm:text-5xl font-black text-slate-800 dark:text-white tracking-tighter leading-none">Pilih Masa Depanmu</h1>
+          <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">Temukan potensi terbaik dalam diri Anda secara otomatis.</p>
         </div>
 
         {!showResult && currentQuestion && (
@@ -367,14 +367,14 @@ const InterestSurveyPage = () => {
             <div className="absolute top-0 left-0 w-full h-2 bg-slate-100 dark:bg-slate-800">
               <motion.div initial={false} animate={{ width: `${progress}%` }} className="h-full bg-gradient-to-r from-emerald-500 to-teal-500" />
             </div>
-            
+
             <CardContent className="p-8 sm:p-12">
               <AnimatePresence mode="wait">
                 <motion.div key={currentStep} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-8">
                   <div className="flex justify-between items-center">
                     <div className="flex flex-col gap-1">
-                       <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.25em]">{currentStep < QUESTIONS.length ? "Orientasi Kerja" : "Potensi Otak"}</span>
-                       <span className="text-xs font-black text-slate-800 dark:text-slate-200">Soal {currentStep + 1} / {ALL_QUESTIONS.length}</span>
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.25em]">{currentStep < QUESTIONS.length ? "Orientasi Kerja" : "Potensi Otak"}</span>
+                      <span className="text-xs font-black text-slate-800 dark:text-slate-200">Soal {currentStep + 1} / {ALL_QUESTIONS.length}</span>
                     </div>
                     <span className="text-sm font-black text-emerald-600">{Math.round(progress)}%</span>
                   </div>
@@ -388,7 +388,7 @@ const InterestSurveyPage = () => {
                   </div>
 
                   <div className="pt-8 flex justify-between items-center border-t border-slate-100 dark:border-slate-800/60 font-medium text-slate-400">
-                     <button disabled={currentStep === 0} onClick={() => setCurrentStep(prev => prev - 1)} className="flex items-center gap-2 hover:text-emerald-600 transition-colors disabled:opacity-30"><ChevronLeft className="h-4 w-4" /> Sebelumnya</button>
+                    <button disabled={currentStep === 0} onClick={() => setCurrentStep(prev => prev - 1)} className="flex items-center gap-2 hover:text-emerald-600 transition-colors disabled:opacity-30"><ChevronLeft className="h-4 w-4" /> Sebelumnya</button>
                   </div>
                 </motion.div>
               </AnimatePresence>

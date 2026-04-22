@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Capacitor } from "@capacitor/core";
 import { useStudentAuth } from "../../context/StudentAuthContext";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
@@ -9,8 +10,8 @@ import { useTenant } from "../../context/TenantContext";
 import { User, Lock, GraduationCap, School, Eye, EyeOff } from "lucide-react";
 
 const StudentLoginPage = () => {
-  const { loginStudent, student, changePassword } = useStudentAuth();
-  const { pb, school } = useTenant();
+  const { student, loginStudent, changePassword } = useStudentAuth();
+  const { pb, school, setManualSchool, terminology } = useTenant();
 
   const [nisn, setNisn] = useState("");
   const [password, setPassword] = useState("");
@@ -42,7 +43,7 @@ const StudentLoginPage = () => {
 
         if (records.length > 0) {
           const data = records[0];
-          setSchoolName(data.name || "E-Ujian CBT");
+          setSchoolName(data.name || "EXAM AA CBT");
 
           let logoUrl = data.logoUrl || data.logo || "";
           if (logoUrl && !logoUrl.startsWith('http') && !logoUrl.startsWith('data:')) {
@@ -53,7 +54,7 @@ const StudentLoginPage = () => {
           setLogoError(false);
         }
       } catch (err) {
-        console.error("Gagal memuat logo siswa (Cek API Rules koleksi settings di PocketBase):", err);
+        console.error(`Gagal memuat logo ${terminology.student.toLowerCase()} (Cek API Rules koleksi settings di PocketBase):`, err);
         setLogoError(true);
       } finally {
         setLogoLoading(false);
@@ -71,7 +72,7 @@ const StudentLoginPage = () => {
     try {
       await loginStudent(nisn, password);
     } catch (err: any) {
-      setError(err.message || "Gagal login. Periksa kembali NISN dan password Anda.");
+      setError(err.message || `Gagal login. Periksa kembali ${terminology.id} dan password Anda.`);
     } finally {
       setLoading(false);
     }
@@ -105,6 +106,19 @@ const StudentLoginPage = () => {
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-[#f8fafc] overflow-hidden relative font-sans leading-relaxed">
+      {/* Floating Change School Button (Android Only) */}
+      {Capacitor.getPlatform() === 'android' && (
+        <div className="absolute top-6 left-6 z-50">
+          <button
+            onClick={() => setManualSchool(null)}
+            className="flex items-center gap-2 px-4 py-2 bg-white/80 backdrop-blur-md border border-slate-200 rounded-full text-sm font-semibold text-slate-600 hover:text-emerald-600 hover:border-emerald-200 transition-all shadow-sm"
+          >
+            <School size={16} />
+            <span>Ganti Unit</span>
+          </button>
+        </div>
+      )}
+
       {/* Dynamic Animated Background */}
       <div className="absolute inset-0 z-0">
         <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-emerald-400/20 rounded-full blur-[120px] animate-pulse"></div>
@@ -128,7 +142,7 @@ const StudentLoginPage = () => {
                 <div className="relative w-32 h-32 md:w-44 md:h-44 flex items-center justify-center overflow-hidden">
                   <img
                     src={schoolLogo}
-                    alt="Logo Sekolah"
+                    alt={`Logo ${terminology.school}`}
                     className="w-full h-full object-contain filter drop-shadow-md"
                     onError={() => setLogoError(true)}
                   />
@@ -148,7 +162,7 @@ const StudentLoginPage = () => {
 
         <div className="text-center mb-8">
           <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight mb-2">
-            Portal Ujian Siswa
+            Portal Ujian {terminology.student}
           </h1>
           <div className="flex items-center justify-center gap-2">
             <GraduationCap size={18} className="text-emerald-600" />
@@ -170,12 +184,12 @@ const StudentLoginPage = () => {
 
               <div className="space-y-2">
                 <label className="text-sm font-semibold text-slate-700 ml-1 flex items-center gap-2">
-                  <User size={14} className="text-slate-400" /> NISN / Username
+                  <User size={14} className="text-slate-400" /> {terminology.id} / Username
                 </label>
                 <Input
                   value={nisn}
                   onChange={(e) => setNisn(e.target.value)}
-                  placeholder="Masukkan nomor induk siswa"
+                  placeholder={`Masukkan nomor induk ${terminology.student.toLowerCase()}`}
                   className="bg-white/50 border-slate-200/60 text-slate-800 placeholder:text-slate-400 focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 rounded-[20px] h-14 px-5 text-base transition-all duration-300"
                   disabled={loading}
                 />
@@ -223,7 +237,7 @@ const StudentLoginPage = () => {
         </Card>
 
         <div className="mt-8 flex flex-col items-center gap-1 text-slate-400 text-sm font-medium">
-          <p>© {new Date().getFullYear()} CBT {schoolName}. All rights reserved.</p>
+          <p>© {new Date().getFullYear()} CBT {schoolName}.</p>
         </div>
       </div>
 

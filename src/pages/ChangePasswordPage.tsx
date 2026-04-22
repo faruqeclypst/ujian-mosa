@@ -5,7 +5,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { motion } from "framer-motion";
 import { Link, useNavigate } from "react-router-dom";
-import pb from "../lib/pocketbase";
+import { useTenant } from "../context/TenantContext";
 
 import FormField from "../components/forms/FormField";
 import { Button } from "../components/ui/button";
@@ -26,6 +26,7 @@ const changePasswordSchema = z.object({
 type ChangePasswordFormValues = z.infer<typeof changePasswordSchema>;
 
 const ChangePasswordPage = () => {
+  const { pb } = useTenant();
   const { user } = useAuth();
   const navigate = useNavigate();
   const { addToast } = useToast();
@@ -54,11 +55,13 @@ const ChangePasswordPage = () => {
     }
 
     setFormError(null);
+    if (!pb) return;
     try {
       await pb.collection("users").update(user.id, {
         oldPassword: values.currentPassword,
         password: values.newPassword,
         passwordConfirm: values.confirmPassword,
+        hasChangedPassword: true,
       });
 
       addToast({

@@ -1,4 +1,5 @@
-import pb from "./pocketbase";
+import PocketBase from "pocketbase";
+import globalPb from "./pocketbase";
 
 export interface AIGeneratedQuestion {
   text: string;
@@ -187,7 +188,7 @@ export const AI_MODELS = [
  * 1. API Key milik User sendiri (jika ada di Profile)
  * 2. API Key Admin (hanya jika User adalah Admin)
  */
-const getAIConfig = async () => {
+const getAIConfig = async (pb: PocketBase) => {
   const user = pb.authStore.model;
   const userApiKey = (user as any)?.ai_api_key;
   const userRole = (user as any)?.role || "teacher";
@@ -270,6 +271,7 @@ const getAIConfig = async () => {
 
 
 export const generateQuestionsAI = async (
+  pb: PocketBase,
   topic: string, 
   count: number = 5, 
   level: string = "Umum", 
@@ -281,7 +283,7 @@ export const generateQuestionsAI = async (
   focus: string = "umum"
 ): Promise<AIGeneratedQuestion[]> => {
   try {
-    const { apiKey, useProxy, model, baseUrl, provider } = await getAIConfig();
+    const { apiKey, useProxy, model, baseUrl, provider } = await getAIConfig(pb);
     console.log(`🚀 [AI ENGINE] Menggunakan Model: ${model} via ${useProxy ? 'SECURE PROXY' : 'DIRECT'}`);
 
     const lengthMap: Record<string, string> = {
@@ -317,7 +319,7 @@ Hanya berikan teks HTML tersebut tanpa salam pembuka/penutup.`;
 
       // 🚀 FETCH PROXY OR DIRECT
       let responseWacana;
-      const { apiKey, useProxy, model, baseUrl } = await getAIConfig();
+      const { apiKey, useProxy, model, baseUrl } = await getAIConfig(pb);
       
       // Tentukan max_tokens untuk wacana berdasarkan panjang yang diminta
       const wacanaTokens = { pendek: 600, sedang: 1000, panjang: 1600 }[passageLength] || 1000;
@@ -487,6 +489,7 @@ Hanya berikan JSON murni tanpa penjelasan.`;
 };
 
 export const generateSingleQuestionAI = async (
+  pb: PocketBase,
   topic: string,
   type: string = "pilihan_ganda",
   level: string = "Umum",
@@ -496,7 +499,7 @@ export const generateSingleQuestionAI = async (
   existingWacana: string = ""
 ): Promise<AIGeneratedQuestion> => {
   try {
-    const { apiKey, useProxy, model, baseUrl } = await getAIConfig();
+    const { apiKey, useProxy, model, baseUrl } = await getAIConfig(pb);
     const cleanModel = model.replace("openclaw/", "");
 
     const typeDesc = {
@@ -601,6 +604,7 @@ Hanya berikan JSON murni.`;
 };
 
 export const getTopicSuggestionsAI = async (
+  pb: PocketBase,
   level: string,
   subject: string,
   difficulty: string = "sedang",
@@ -609,7 +613,7 @@ export const getTopicSuggestionsAI = async (
   isLiteracy: boolean = false
 ): Promise<string[]> => {
   try {
-    const { apiKey, useProxy, model, baseUrl } = await getAIConfig();
+    const { apiKey, useProxy, model, baseUrl } = await getAIConfig(pb);
     console.log(`💡 [AI TOPIC] Menyarankan topik menggunakan: ${model}`);
 
     const literasiNote = isLiteracy ? "(UTAMAKAN topik yang kaya teks bacaan/fenomena karena Mode Literasi AKTIF)" : "";
@@ -673,12 +677,13 @@ Balas hanya dengan JSON format: { "topics": ["Topik A", "Topik B", ...] }`;
 };
 
 export const parseQuestionsAI = async (
+  pb: PocketBase,
   rawText: string,
   subject: string = "",
   level: string = "Umum"
 ): Promise<AIGeneratedQuestion[]> => {
   try {
-    const { apiKey, useProxy, model, baseUrl } = await getAIConfig();
+    const { apiKey, useProxy, model, baseUrl } = await getAIConfig(pb);
 
     const systemPrompt = `Anda adalah Ahli Digitalisasi Dokumen Pendidikan.
 Tugas: Ekstrak semua soal dari teks mentah (hasil copy-paste PDF/Word) menjadi JSON valid.
@@ -797,7 +802,7 @@ Aturan Ketat: Gunakan HTML untuk formatting (<strong> JANGAN **), pastikan JSON 
       const jsonMatch = content.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
       if (jsonMatch) {
          // Recursive call dengan string yang sudah dibersihkan
-         const retryData = await parseQuestionsAI(jsonMatch[0], subject, level);
+         const retryData = await parseQuestionsAI(pb, jsonMatch[0], subject, level);
          return retryData;
       }
       throw new Error("Gagal mengolah format data dari AI.");
@@ -811,7 +816,7 @@ Aturan Ketat: Gunakan HTML untuk formatting (<strong> JANGAN **), pastikan JSON 
   }
 };
 
-export const testAIConnection = async (apiKey: string, modelId: string, customUrl?: string, provider: string = "groq"): Promise<{ success: boolean; message: string }> => {
+export const testAIConnection = async (pb: PocketBase, apiKey: string, modelId: string, customUrl?: string, provider: string = "groq"): Promise<{ success: boolean; message: string }> => {
   try {
     if (!apiKey) throw new Error("API Key Kosong");
     

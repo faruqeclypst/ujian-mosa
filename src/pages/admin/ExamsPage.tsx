@@ -46,7 +46,7 @@ export const getExamTypeColorClass = (type: string) => {
 
 const ExamsPage = () => {
   const navigate = useNavigate();
-  const { pb } = useTenant();
+  const { pb, terminology } = useTenant();
   const { user, role, teacherId } = useAuth();
   const { addToast } = useToast();
   const { subjects, teachers, teacherFullAccess, loading: dataLoading } = useExamData();
@@ -74,7 +74,7 @@ const ExamsPage = () => {
     },
     {
       key: "title",
-      label: "Judul Bank Soal",
+      label: `Judul Bank Soal`,
       sortable: true,
       render: (v: string, item: any) => (
         <div className="flex flex-col min-w-0">
@@ -91,7 +91,7 @@ const ExamsPage = () => {
     },
     {
       key: "subjectName",
-      label: "Mata Pelajaran",
+      label: terminology.subject,
       sortable: true,
       render: (name: string) => (
         <span className="text-sm font-semibold text-slate-600 dark:text-slate-300">{name}</span>
@@ -99,7 +99,7 @@ const ExamsPage = () => {
     },
     {
       key: "teacherName",
-      label: "Guru Pengampu",
+      label: `${terminology.teacher} Pengampu`,
       sortable: true,
       render: (name: string, exam: any) => {
         const teacher = teachers.find((t: any) => t.id === exam.teacherId);
@@ -246,7 +246,7 @@ const ExamsPage = () => {
             teacherId: tId,
             examType: type,
             subjectName: subjectObj ? subjectObj.name : "Mapel Tidak Ditemukan",
-            teacherName: teacherObj ? teacherObj.name : "Guru Tidak Ditemukan",
+            teacherName: teacherObj ? teacherObj.name : `${terminology.teacher} Tidak Ditemukan`,
           };
         });
 
@@ -403,7 +403,7 @@ const ExamsPage = () => {
                       <TableHead className="w-16 text-center">No</TableHead>
                       <TableHead>Judul Ujian</TableHead>
                       <TableHead>Mata Pelajaran</TableHead>
-                      <TableHead>Guru Pengampu</TableHead>
+                      <TableHead>{terminology.teacher} Pengampu</TableHead>
                       <TableHead className="text-right">Aksi</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -480,7 +480,7 @@ const ExamsPage = () => {
                       <button 
                         className="p-1.5 bg-sky-50 text-sky-600 hover:bg-sky-100 rounded-lg dark:bg-sky-900/10 dark:text-sky-400 border border-sky-100 dark:border-sky-800/40" 
                         onClick={() => handleEditClick(exam)}
-                        title="Edit Ujian"
+                        title="Edit Data"
                       >
                         <Edit className="h-4 w-4" />
                       </button>
@@ -506,10 +506,10 @@ const ExamsPage = () => {
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="max-w-md bg-card">
           <DialogHeader>
-            <DialogTitle>{dialogMode === "edit" ? "Edit Ujian" : "Tambah Ujian"}</DialogTitle>
+            <DialogTitle>{dialogMode === "edit" ? "Edit Data" : "Tambah Data"}</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <FormField id="title" label="Judul Ujian" error={undefined}>
+            <FormField id="title" label="Judul" error={undefined}>
               <Input value={formValues.title} onChange={(e) => setFormValues({ ...formValues, title: e.target.value })} required />
             </FormField>
 
@@ -529,7 +529,7 @@ const ExamsPage = () => {
               </select>
             </FormField>
 
-            <FormField id="subjectId" label="Mata Pelajaran" error={undefined}>
+            <FormField id="subjectId" label={terminology.subject} error={undefined}>
               <select 
                 value={formValues.subjectId} 
                 onChange={(e) => setFormValues({ ...formValues, subjectId: e.target.value })} 
@@ -542,14 +542,14 @@ const ExamsPage = () => {
             </FormField>
 
             {role === "admin" && (
-              <FormField id="teacherId" label="Guru Pengampu" error={undefined}>
+              <FormField id="teacherId" label={`${terminology.teacher} Pengampu`} error={undefined}>
                 <select 
                   value={formValues.teacherId} 
                   onChange={(e) => setFormValues({ ...formValues, teacherId: e.target.value })} 
                   required
                   className="w-full rounded-md border border-slate-200 dark:border-slate-800 bg-card text-sm p-2"
                 >
-                  <option value="">-- Pilih Guru --</option>
+                  <option value="">-- Pilih {terminology.teacher} --</option>
                   {teachers.map((t: any) => <option key={t.id} value={t.id}>{t.name}</option>)}
                 </select>
               </FormField>
@@ -564,8 +564,8 @@ const ExamsPage = () => {
         isOpen={deleteDialogOpen}
         onClose={() => setDeleteDialogOpen(false)}
         onConfirm={handleConfirmDelete}
-        title="Hapus Ujian"
-        description="Apakah Anda yakin ingin menghapus ujian ini? Seluruh soal di dalamnya juga akan hilang."
+        title="Hapus Data"
+        description="Apakah Anda yakin ingin menghapus data ini? Seluruh soal di dalamnya juga akan hilang."
         itemName={examToDelete?.title || ""}
         isLoading={isDeleting}
       />

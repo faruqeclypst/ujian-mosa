@@ -60,7 +60,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             role: model.role || "teacher",
             teacherId: model.teacherId,
             avatar: model.avatar ? pb.files.getUrl(model, model.avatar) : "",
-            hasChangedPassword: model.hasChangedPassword || false,
+            // Force change ONLY if explicitly set to false. If missing (undefined/null), assume true for compatibility.
+            hasChangedPassword: model.hasChangedPassword !== false && model.hasChangedPassword !== "false" && model.hasChangedPassword !== "0" && model.hasChangedPassword !== 0,
             ai_api_key: model.ai_api_key || "",
             ai_provider: model.ai_provider || "groq",
             ai_model: model.ai_model || "",
@@ -138,8 +139,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const unsubscribe = pb.collection("users").subscribe(user.id, (e) => {
       if (e.action === "update") {
-        // Kick if password reset by SuperAdmin
-        if (e.record.hasChangedPassword === false) {
+        // Kick only if explicitly set to false (Reset by Admin)
+        if (e.record.hasChangedPassword === false || e.record.hasChangedPassword === "false" || e.record.hasChangedPassword === "0" || e.record.hasChangedPassword === 0) {
+           console.log("Password reset detected via real-time sync. Logging out...");
            signOut();
         }
       }

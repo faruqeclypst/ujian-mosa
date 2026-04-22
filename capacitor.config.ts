@@ -2,11 +2,11 @@ import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'com.alfaruqasri.ujian',
-  appName: 'E-Ujian AA',
+  appName: 'EXAM AA',
   webDir: 'dist',
   server: {
     androidScheme: 'https',
-    url: 'https://exam.sman-modalbangsa.sch.id/',
+    // url: 'https://exam.sman-modalbangsa.sch.id/',
     cleartext: true
   },
   android: {

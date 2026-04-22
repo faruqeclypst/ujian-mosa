@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # ==========================================================================
-# E-UJIAN SCHOOL SETUP AUTOMATION
-# Dasar script dari E-Ujian Master Handbook
+# EXAM AA SCHOOL SETUP AUTOMATION
+# Dasar script dari EXAM AA Master Handbook
 # ==========================================================================
 
 # Pastikan dijalankan sebagai root atau dengan sudo

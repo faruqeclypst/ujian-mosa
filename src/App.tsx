@@ -47,6 +47,7 @@ import RegisterSchoolPage from "./pages/landing/RegisterSchoolPage";
 import SchoolNotFoundPage from "./pages/landing/SchoolNotFoundPage";
 import SuperAdminLoginPage from "./pages/superadmin/SuperAdminLoginPage";
 import SuperAdminDashboard from "./pages/superadmin/SuperAdminDashboard";
+import SelectSchoolPage from "./pages/landing/SelectSchoolPage";
 
 import { ExamDataProvider } from "./context/ExamDataContext";
 import CapacitorOverlay from "./components/auth/CapacitorOverlay";
@@ -79,7 +80,7 @@ const SchoolAppContent = () => {
 
   useEffect(() => {
     if (school) {
-      document.title = `E-Ujian - ${school.name}`;
+      document.title = `EXAM AA - ${school.name}`;
     }
     if (Capacitor.isNativePlatform()) {
       SplashScreen.hide().catch(err => console.warn("Splash hide error:", err));
@@ -94,7 +95,6 @@ const SchoolAppContent = () => {
 
   return (
     <>
-      <CapacitorOverlay />
       {isGlobalLoading && !isAdminRoute ? (
         <LoadingScreen />
       ) : (
@@ -187,9 +187,9 @@ import SuperAdminSettingsPage from "./pages/superadmin/SuperAdminSettingsPage";
 
 const LandingContent = () => {
   useEffect(() => {
-    document.title = "E-Ujian — Platform CBT Online untuk Sekolah";
+    document.title = "EXAM AA — Platform CBT Online untuk Sekolah";
     if (Capacitor.isNativePlatform()) {
-      SplashScreen.hide().catch(() => {});
+      SplashScreen.hide().catch(() => { });
     }
   }, []);
 
@@ -203,6 +203,9 @@ const LandingContent = () => {
         <Route path="/superadmin/analytics" element={<SuperAdminAnalyticsPage />} />
         <Route path="/superadmin/settings" element={<SuperAdminSettingsPage />} />
         <Route path="/superadmin/login" element={<SuperAdminLoginPage />} />
+        <Route path="/pilih-sekolah" element={<SelectSchoolPage />} />
+        <Route path="/pilih sekolah" element={<SelectSchoolPage />} />
+        <Route path="/pilihsekolah" element={<SelectSchoolPage />} />
         <Route path="*" element={<LandingPage />} />
       </Routes>
     </Suspense>
@@ -214,10 +217,22 @@ const LandingContent = () => {
 // ============================================================
 const AppRouter = () => {
   const { isLandingDomain, loading } = useTenant();
+  const location = useLocation();
 
   if (loading) return <LoadingScreen />;
 
   if (isLandingDomain) {
+    // Jika di mobile app, paksa ke halaman pilih sekolah (simulation mode untuk localhost tetap tersedia via /pilih-sekolah)
+    const isAppMode = Capacitor.isNativePlatform();
+    const isSpecialRoute = location.pathname.startsWith('/superadmin') || location.pathname === '/daftar';
+
+    if (isAppMode && location.pathname !== '/pilih-sekolah' && !isSpecialRoute) {
+      return (
+        <Routes>
+          <Route path="*" element={<SelectSchoolPage />} />
+        </Routes>
+      );
+    }
     return <LandingContent />;
   }
 
@@ -237,6 +252,7 @@ const App = () => {
           <TenantProvider>
             <AuthProvider>
               <AppRouter />
+              <CapacitorOverlay />
             </AuthProvider>
           </TenantProvider>
         </SidebarProvider>

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useTenant } from "../context/TenantContext";
-import { uploadInventoryImage } from "../lib/storage"; 
+import { masterPb } from "../lib/pocketbase";
+import { uploadInventoryImage } from "../lib/storage";
 import { AI_MODELS, testAIConnection } from "../lib/ai";
 import { Skeleton } from "../components/ui/skeleton";
 import { ThemeToggle } from "../components/ui/theme-toggle";
@@ -12,15 +13,15 @@ import { useToast } from "../components/ui/toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "../components/ui/dialog";
 import { Badge } from "../components/ui/badge";
 import { cn } from "../lib/utils";
-import { 
-  Upload, 
-  Save, 
-  Building, 
-  FolderOpen, 
-  Image as ImageIcon, 
-  Database, 
-  Download, 
-  FileJson, 
+import {
+  Upload,
+  Save,
+  Building,
+  FolderOpen,
+  Image as ImageIcon,
+  Database,
+  Download,
+  FileJson,
   AlertTriangle,
   RefreshCw,
   CheckCircle2,
@@ -47,8 +48,8 @@ const COLLECTIONS = [
 ];
 
 const SettingsPage = () => {
-  const { pb, school } = useTenant();
-  
+  const { pb, school, terminology } = useTenant();
+
   const [settingsId, setSettingsId] = useState<string | null>(null);
   const [schoolName, setSchoolName] = useState("");
   const [schoolLogo, setSchoolLogo] = useState("");
@@ -59,7 +60,7 @@ const SettingsPage = () => {
   const [aiGatewayKey, setAiGatewayKey] = useState("");
   const [aiModel, setAiModel] = useState(AI_MODELS[0].id);
   const [aiProvider, setAiProvider] = useState("groq");
-  
+
   const [remoteModels, setRemoteModels] = useState<any[]>([]);
   const [isLoadingModels, setIsLoadingModels] = useState(false);
   const [isExambroEnabled, setIsExambroEnabled] = useState(false);
@@ -72,7 +73,7 @@ const SettingsPage = () => {
 
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [isGalleryOpen, setIsGalleryOpen] = useState(false);
-  const [galleryGroups, setGalleryGroups] = useState<{title: string; images: string[]}[]>([]);
+  const [galleryGroups, setGalleryGroups] = useState<{ title: string; images: string[] }[]>([]);
 
   // 📝 Backup States
   const [isBackupLoading, setIsBackupLoading] = useState(false);
@@ -117,7 +118,7 @@ const SettingsPage = () => {
       if (records.length > 0) {
         const data = records[0];
         setSettingsId(data.id);
-        setSchoolName(data.name || "E-Ujian");
+        setSchoolName(data.name || "EXAM AA");
         setGroqApiKey(data.groq_api_key || "");
         setAiGatewayUrl(data.ai_gateway_url || "");
         setAiGatewayKey(data.ai_gateway_key || "");
@@ -125,7 +126,7 @@ const SettingsPage = () => {
         setAiProvider(data.ai_provider || "groq");
         setIsExambroEnabled(data.is_exambro_enabled ?? false);
         setTeacherFullAccess(data.teacher_full_access || false);
-        
+
         const logoUrl = data.logoUrl || data.logo || "";
         setSchoolLogo(logoUrl);
         setLogoPreview(logoUrl);
@@ -133,7 +134,7 @@ const SettingsPage = () => {
         if (data.allowed_types) setAllowedTypes(data.allowed_types);
         else if (data.allowed_question_types) setAllowedTypes(data.allowed_question_types);
       } else {
-        setSchoolName("E-Ujian");
+        setSchoolName("EXAM AA");
       }
     } catch (e) {
       console.error("Settings fetch err", e);
@@ -151,7 +152,7 @@ const SettingsPage = () => {
     setIsTestingAI(true);
     setTestResult(null);
     try {
-      const res = await testAIConnection(targetKey, aiModel, aiGatewayUrl || "https://ollama.com", aiProvider);
+      const res = await testAIConnection(pb!, targetKey, aiModel, aiGatewayUrl || "https://ollama.com", aiProvider);
       setTestResult(res);
       if (res.success) {
         addToast({ title: "Berhasil!", description: "Koneksi AI berjalan lancar.", type: "success" });
@@ -177,16 +178,16 @@ const SettingsPage = () => {
 
       try {
         const [examsData, teachersData] = await Promise.all([
-            pb.collection("exams").getFullList(),
-            pb.collection("teachers").getFullList()
+          pb.collection("exams").getFullList(),
+          pb.collection("teachers").getFullList()
         ]);
 
         examsData.forEach(ex => {
-            examToTeacher[ex.id] = ex.teacherId || ex.teacherid;
+          examToTeacher[ex.id] = ex.teacherId || ex.teacherid;
         });
 
         teachersData.forEach((t: any) => {
-            teacherMap[t.id] = t.name;
+          teacherMap[t.id] = t.name;
         });
       } catch (e) {
         console.warn("Gagal mengambil mapping guru untuk galeri.");
@@ -206,16 +207,16 @@ const SettingsPage = () => {
             const src = img.getAttribute("src");
             if (src && !src.startsWith("data:")) userGroups[uploadName].add(src);
           });
-        } catch(e) {}
+        } catch (e) { }
       };
 
       qRecords.forEach((q: any) => {
         let uploaderName = "Gambar Admin / Sistem";
         if (q.examId) {
-            const tId = examToTeacher[q.examId];
-            if (tId && teacherMap[tId]) {
-                uploaderName = `Dari: ${teacherMap[tId]}`;
-            }
+          const tId = examToTeacher[q.examId];
+          if (tId && teacherMap[tId]) {
+            uploaderName = `Dari: ${teacherMap[tId]}`;
+          }
         }
         if (!userGroups[uploaderName]) userGroups[uploaderName] = new Set();
         if (q.imageUrl) userGroups[uploaderName].add(q.imageUrl);
@@ -237,16 +238,16 @@ const SettingsPage = () => {
     } catch (e) { console.error("Gallery err", e); }
 
     const arr: { title: string; images: string[] }[] = Object.keys(userGroups)
-        .map(key => ({ title: key, images: Array.from(userGroups[key]) }))
-        .filter(g => g.images.length > 0);
+      .map(key => ({ title: key, images: Array.from(userGroups[key]) }))
+      .filter(g => g.images.length > 0);
 
     setGalleryGroups(arr);
   };
 
   const handlePickGallery = (url: string) => {
     setLogoPreview(url);
-    setSchoolLogo(url); 
-    setLogoFile(null); 
+    setSchoolLogo(url);
+    setLogoFile(null);
     setIsGalleryOpen(false);
   };
 
@@ -267,19 +268,19 @@ const SettingsPage = () => {
     }
 
     if (aiProvider === "custom") {
-       setRemoteModels([]); // allow typing
-       return;
+      setRemoteModels([]); // allow typing
+      return;
     }
 
     // 🚀 ANTI-CORS: Jangan panggil fetch langsung untuk provider yang memblokir Browser (CORS)
     const corsRestricted = ["cloudflare", "google", "huggingface", "github"];
     if (corsRestricted.includes(aiProvider)) {
-       const fallback = AI_MODELS.filter((m: any) => m.provider === aiProvider);
-       setRemoteModels(fallback);
-       if (!fallback.some(m => m.id === aiModel) && fallback.length > 0) {
-          setAiModel(fallback[0].id);
-       }
-       return;
+      const fallback = AI_MODELS.filter((m: any) => m.provider === aiProvider);
+      setRemoteModels(fallback);
+      if (!fallback.some(m => m.id === aiModel) && fallback.length > 0) {
+        setAiModel(fallback[0].id);
+      }
+      return;
     }
 
     const key = aiProvider === "groq" ? groqApiKey : aiGatewayKey;
@@ -292,21 +293,21 @@ const SettingsPage = () => {
       setIsLoadingModels(true);
       try {
         let baseUrl = "";
-        switch(aiProvider) {
-           case "google": baseUrl = "https://generativelanguage.googleapis.com/v1beta/openai"; break;
-           case "openrouter": baseUrl = "https://openrouter.ai/api/v1"; break;
-           case "together": baseUrl = "https://api.together.xyz/v1"; break;
-           case "huggingface": baseUrl = "https://api-inference.huggingface.co/v1"; break;
-           case "fireworks": baseUrl = "https://api.fireworks.ai/inference/v1"; break;
-           case "github": baseUrl = "https://models.inference.ai.azure.com"; break;
-           case "cloudflare": 
-              if (!aiGatewayUrl) { setIsLoadingModels(false); return; }
-              baseUrl = `https://api.cloudflare.com/client/v4/accounts/${aiGatewayUrl}/ai/v1`; 
-              break;
+        switch (aiProvider) {
+          case "google": baseUrl = "https://generativelanguage.googleapis.com/v1beta/openai"; break;
+          case "openrouter": baseUrl = "https://openrouter.ai/api/v1"; break;
+          case "together": baseUrl = "https://api.together.xyz/v1"; break;
+          case "huggingface": baseUrl = "https://api-inference.huggingface.co/v1"; break;
+          case "fireworks": baseUrl = "https://api.fireworks.ai/inference/v1"; break;
+          case "github": baseUrl = "https://models.inference.ai.azure.com"; break;
+          case "cloudflare":
+            if (!aiGatewayUrl) { setIsLoadingModels(false); return; }
+            baseUrl = `https://api.cloudflare.com/client/v4/accounts/${aiGatewayUrl}/ai/v1`;
+            break;
         }
-        
+
         if (!baseUrl) {
-           setIsLoadingModels(false); return;
+          setIsLoadingModels(false); return;
         }
 
         const res = await fetch(`${baseUrl}/models`, {
@@ -314,36 +315,36 @@ const SettingsPage = () => {
             "Authorization": `Bearer ${key}`
           }
         });
-        
+
         if (res.ok) {
-           const data = await res.json();
-           const items = data.data || data.models || data;
-           if (Array.isArray(items)) {
-             const models = items.map((m: any) => ({
-               id: m.id,
-               name: m.name || m.id,
-               speed: "Remote API",
-               provider: aiProvider
-             }));
-             models.sort((a: any, b: any) => a.name.localeCompare(b.name));
-             setRemoteModels(models);
-             
-             if (!models.find((m: any) => m.id === aiModel) && models.length > 0) {
-                setAiModel(models[0].id);
-             }
-           }
+          const data = await res.json();
+          const items = data.data || data.models || data;
+          if (Array.isArray(items)) {
+            const models = items.map((m: any) => ({
+              id: m.id,
+              name: m.name || m.id,
+              speed: "Remote API",
+              provider: aiProvider
+            }));
+            models.sort((a: any, b: any) => a.name.localeCompare(b.name));
+            setRemoteModels(models);
+
+            if (!models.find((m: any) => m.id === aiModel) && models.length > 0) {
+              setAiModel(models[0].id);
+            }
+          }
         } else {
-           // Silent fallback for 401/403/CORS
-           const fallback = AI_MODELS.filter((m: any) => m.provider === aiProvider);
-           if (fallback.length > 0) setRemoteModels(fallback);
+          // Silent fallback for 401/403/CORS
+          const fallback = AI_MODELS.filter((m: any) => m.provider === aiProvider);
+          if (fallback.length > 0) setRemoteModels(fallback);
         }
       } catch (err) {
         // Suppress console error for expected CORS blocks on local dev
         const fallback = AI_MODELS.filter((m: any) => m.provider === aiProvider);
         setRemoteModels(fallback);
-        
+
         if (!fallback.find((m: any) => m.id === aiModel) && fallback.length > 0) {
-           setAiModel(fallback[0].id);
+          setAiModel(fallback[0].id);
         }
       } finally {
         setIsLoadingModels(false);
@@ -395,9 +396,9 @@ const SettingsPage = () => {
       }
 
       const payload: any = {
-        name: schoolName || "E-Ujian",
+        name: schoolName || "EXAM AA",
         logo: finalLogoUrl || "",
-        logoUrl: finalLogoUrl || "", 
+        logoUrl: finalLogoUrl || "",
         allowed_types: allowedTypes || {},
         groq_api_key: groqApiKey || "",
         ai_gateway_url: aiGatewayUrl || "",
@@ -413,7 +414,7 @@ const SettingsPage = () => {
       };
 
       if (!pb) return;
-      
+
       const isCreate = !settingsId;
 
       if (!isCreate) {
@@ -429,6 +430,40 @@ const SettingsPage = () => {
         setSettingsId(created.id);
       }
 
+      // 🔄 SYNC TO MASTER REGISTRY (SaaS SaaS Multi-Tenant Support)
+      const currentSlug = school?.slug || window.location.hostname.split('.')[0];
+      if (currentSlug && currentSlug !== 'localhost' && currentSlug !== 'ujian') {
+        try {
+          console.log("Attempting sync to Master Registry for slug:", currentSlug);
+          const masterRecords = await masterPb.collection("schools").getList(1, 1, {
+            filter: `slug ~ "${currentSlug}"` // Use ~ for flexible matching
+          });
+
+          if (masterRecords.items.length > 0) {
+            const masterId = masterRecords.items[0].id;
+            await masterPb.collection("schools").update(masterId, {
+              name: schoolName,
+              logo_url: finalLogoUrl
+            });
+            console.log("Master Registry synced successfully for ID:", masterId);
+            addToast({
+              title: "Branding Disinkronkan",
+              description: "Logo di halaman pilih sekolah telah diperbarui.",
+              type: "success"
+            });
+          } else {
+            console.warn("School not found in Master Registry for slug:", currentSlug);
+          }
+        } catch (syncErr: any) {
+          console.error("Failed to sync to Master Registry:", syncErr);
+          addToast({
+            title: "Sinkronisasi Superadmin Gagal",
+            description: `Error: ${syncErr.message}. Pastikan API Rules 'schools' sudah benar.`,
+            type: "error"
+          });
+        }
+      }
+
       setSchoolLogo(finalLogoUrl);
       setLogoFile(null);
       addToast({ title: "Berhasil!", description: "Pengaturan berhasil diperbarui.", type: "success" });
@@ -436,10 +471,10 @@ const SettingsPage = () => {
     } catch (err: any) {
       console.error("Save settings err", err);
       if (err?.status === 404) {
-        addToast({ 
-          title: "Akses Ditolak (404)", 
-          description: "Gagal menyimpan. Pastikan API Rules 'Update' & 'Create' koleksi 'settings' diset dengan benar.", 
-          type: "error" 
+        addToast({
+          title: "Akses Ditolak (404)",
+          description: "Gagal menyimpan. Pastikan API Rules 'Update' & 'Create' koleksi 'settings' diset dengan benar.",
+          type: "error"
         });
       } else {
         addToast({ title: "Gagal", description: "Terjadi kesalahan saat menyimpan.", type: "error" });
@@ -462,7 +497,7 @@ const SettingsPage = () => {
     setIsBackupLoading(true);
     try {
       const backupData: Record<string, any[]> = {};
-      
+
       for (const collectionName of COLLECTIONS) {
         try {
           const records = await pb.collection(collectionName).getFullList();
@@ -488,7 +523,7 @@ const SettingsPage = () => {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      
+
       addToast({ title: "Ekspor Berhasil", description: "Data berhasil diunduh.", type: "success" });
     } catch (err: any) {
       addToast({ title: "Gagal Ekspor", description: err.message, type: "error" });
@@ -514,7 +549,7 @@ const SettingsPage = () => {
     try {
       const text = await importFile.text();
       const data = JSON.parse(text);
-      
+
       const totalCollections = Object.keys(data).length;
       let processed = 0;
 
@@ -523,12 +558,12 @@ const SettingsPage = () => {
 
         setImportStatus(`Mengimpor: ${collectionName}...`);
         const records = data[collectionName];
-        
+
         for (const recordData of records) {
-          const { 
-            id, created, updated, 
+          const {
+            id, created, updated,
             collectionId, collectionName: _unusedName, expand,
-            ...cleanData 
+            ...cleanData
           } = recordData;
 
           Object.keys(cleanData).forEach(key => {
@@ -541,7 +576,7 @@ const SettingsPage = () => {
             } catch (e: any) {
               if (e.status === 404) {
                 const createData: any = { id, ...cleanData };
-                
+
                 const isAuthCollection = ["students", "users"].includes(collectionName);
                 if (isAuthCollection) {
                   const defaultPass = "12345678";
@@ -558,7 +593,7 @@ const SettingsPage = () => {
             console.error(`Gagal impor record ${id} di ${collectionName}`);
           }
         }
-        
+
         processed++;
         setImportProgress(Math.round((processed / totalCollections) * 100));
       }
@@ -598,13 +633,13 @@ const SettingsPage = () => {
 
       for (const colName of REVERSE_COLLECTIONS) {
         setImportStatus(`Membersihkan: ${colName}...`);
-        
+
         const records = await pb.collection(colName).getFullList({ fields: 'id' });
-        
+
         for (const r of records) {
           const currentAdminId = pb.authStore.model?.id;
           if (colName === "users" && r.id === currentAdminId) continue;
-          
+
           try {
             await pb.collection(colName).delete(r.id);
           } catch (e) {
@@ -632,11 +667,11 @@ const SettingsPage = () => {
 
   return (
     <div className="space-y-6 pb-20 max-w-6xl mx-auto animate-in fade-in duration-500">
-      
+
       {/* ── Page Header ── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 px-5 py-4 sm:px-6 sm:py-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden">
         <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none" />
-        
+
         <div className="flex items-center gap-4 relative z-10">
           <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center flex-shrink-0 shadow-md shadow-blue-500/20">
             <Settings size={20} className="text-white" />
@@ -653,13 +688,13 @@ const SettingsPage = () => {
 
         <div className="relative z-10 flex shrink-0">
           {loading ? (
-             <Skeleton className="h-10 w-40 rounded-xl" />
+            <Skeleton className="h-10 w-40 rounded-xl" />
           ) : (
-            <Button 
-               form="settings-form"
-               type="submit" 
-               disabled={saving} 
-               className="w-full sm:w-auto rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-sm shadow-blue-500/20 h-10 px-5 transition-all active:scale-95"
+            <Button
+              form="settings-form"
+              type="submit"
+              disabled={saving}
+              className="w-full sm:w-auto rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-sm shadow-blue-500/20 h-10 px-5 transition-all active:scale-95"
             >
               {saving ? (
                 <><RefreshCw className="mr-2 h-4 w-4 animate-spin" /> Menyimpan...</>
@@ -677,12 +712,12 @@ const SettingsPage = () => {
           <Card className="rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900 overflow-hidden">
             <CardHeader className="p-5 border-b border-slate-100 dark:border-slate-800">
               <CardTitle className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 flex items-center gap-2">
-                 <Building size={14} /> Profil Institusi
+                <Building size={14} /> Profil Institusi
               </CardTitle>
             </CardHeader>
             <CardContent className="p-5">
               <form id="settings-form" onSubmit={handleSave} className="space-y-6">
-                
+
                 {/* Logo & Name */}
                 <div className="flex flex-col sm:flex-row gap-5">
                   <div className="w-full sm:w-24 group relative">
@@ -696,17 +731,17 @@ const SettingsPage = () => {
                       <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
                         <Upload size={16} className="text-white" />
                       </div>
-                      <input 
-                        type="file" 
-                        accept="image/*" 
+                      <input
+                        type="file"
+                        accept="image/*"
                         className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                         onChange={handleLogoChange}
                         title="Upload Logo"
                       />
                     </div>
                     {logoPreview && (
-                      <button 
-                        type="button" 
+                      <button
+                        type="button"
                         onClick={handleDeleteLogo}
                         className="text-[10px] text-red-500 hover:text-red-700 font-bold block mt-2 text-center w-24"
                       >
@@ -714,25 +749,25 @@ const SettingsPage = () => {
                       </button>
                     )}
                   </div>
-                  
+
                   <div className="flex-1 space-y-4">
-                    <FormField id="schoolName" label="Nama Sekolah / Institusi Utama" error={undefined}>
+                    <FormField id="schoolName" label={`Nama ${terminology.school} / Institusi Utama`} error={undefined}>
                       <Input
                         value={schoolName}
                         onChange={(e) => setSchoolName(e.target.value)}
-                        placeholder="Contoh: SMA Negeri 1 Banda Aceh"
+                        placeholder={`Contoh: ${terminology.school} Maju Bersama`}
                         className="rounded-xl font-semibold h-11 border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900"
                       />
                     </FormField>
-                    
+
                     <div className="flex items-center gap-2">
-                       <button
-                         type="button"
-                         onClick={() => setIsPickerOpen(true)}
-                         className="px-4 py-2 bg-blue-50 dark:bg-slate-800 text-blue-600 dark:text-slate-200 hover:bg-blue-100 dark:hover:bg-slate-700 border border-transparent dark:border-slate-700 rounded-xl text-xs font-bold transition-colors flex items-center gap-2"
-                       >
-                         <FolderOpen size={14} /> Pilih dari Galeri Server
-                       </button>
+                      <button
+                        type="button"
+                        onClick={() => setIsPickerOpen(true)}
+                        className="px-4 py-2 bg-blue-50 dark:bg-slate-800 text-blue-600 dark:text-slate-200 hover:bg-blue-100 dark:hover:bg-slate-700 border border-transparent dark:border-slate-700 rounded-xl text-xs font-bold transition-colors flex items-center gap-2"
+                      >
+                        <FolderOpen size={14} /> Pilih dari Galeri Server
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -764,8 +799,8 @@ const SettingsPage = () => {
                         <CheckCircle2 size={16} />
                       </div>
                       <div>
-                        <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200 leading-none">Akses Guru Penuh</h4>
-                        <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 leading-tight pr-4">Guru bisa buat ruang dan reset ujian siswa secara mandiri.</p>
+                        <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200 leading-none">Akses {terminology.teacher} Penuh</h4>
+                        <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 leading-tight pr-4">{terminology.teacher} bisa buat ruang dan reset ujian {terminology.student.toLowerCase()} secara mandiri.</p>
                       </div>
                     </div>
                     {loading ? (
@@ -782,97 +817,97 @@ const SettingsPage = () => {
                 {/* ── AI Engine Config ── */}
                 <div className="pt-6 border-t border-slate-100 dark:border-slate-800">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-                     <div className="flex items-center gap-2">
-                       <Cpu size={16} className="text-indigo-500" />
-                       <h4 className="text-sm font-bold text-slate-900 dark:text-white">API Gen-AI Engine</h4>
-                     </div>
-                     <div className="w-full sm:w-64">
-                       <select 
-                         value={aiProvider}
-                         onChange={(e) => {
-                           setAiProvider(e.target.value);
-                           setAiModel("");
-                         }}
-                         className="w-full h-9 px-3 rounded-xl text-xs font-bold bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none cursor-pointer text-slate-800 dark:text-slate-200"
-                       >
-                         <option value="groq">Groq Cloud</option>
-                         <option value="ollama">Ollama (Local / Proxy)</option>
-                         <option value="google">Google AI Studio (Gemini)</option>
-                         <option value="openrouter">OpenRouter</option>
-                         <option value="together">Together AI</option>
-                         <option value="huggingface">Hugging Face (Serverless)</option>
-                         <option value="fireworks">Fireworks AI</option>
-                         <option value="github">GitHub Models</option>
-                         <option value="cloudflare">Cloudflare Workers AI</option>
-                         <option value="custom">Custom Endpoint (Lainnya)</option>
-                       </select>
-                     </div>
+                    <div className="flex items-center gap-2">
+                      <Cpu size={16} className="text-indigo-500" />
+                      <h4 className="text-sm font-bold text-slate-900 dark:text-white">API Gen-AI Engine</h4>
+                    </div>
+                    <div className="w-full sm:w-64">
+                      <select
+                        value={aiProvider}
+                        onChange={(e) => {
+                          setAiProvider(e.target.value);
+                          setAiModel("");
+                        }}
+                        className="w-full h-9 px-3 rounded-xl text-xs font-bold bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none cursor-pointer text-slate-800 dark:text-slate-200"
+                      >
+                        <option value="groq">Groq Cloud</option>
+                        <option value="ollama">Ollama (Local / Proxy)</option>
+                        <option value="google">Google AI Studio (Gemini)</option>
+                        <option value="openrouter">OpenRouter</option>
+                        <option value="together">Together AI</option>
+                        <option value="huggingface">Hugging Face (Serverless)</option>
+                        <option value="fireworks">Fireworks AI</option>
+                        <option value="github">GitHub Models</option>
+                        <option value="cloudflare">Cloudflare Workers AI</option>
+                        <option value="custom">Custom Endpoint (Lainnya)</option>
+                      </select>
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                     {(aiProvider === "custom" || aiProvider === "cloudflare") && (
-                       <div className="sm:col-span-2">
-                         <FormField id="aiGatewayUrl" label={aiProvider === "cloudflare" ? "Cloudflare Account ID" : "Base URL (OpenAI Compatible)"} error={undefined}>
-                            <Input
-                              type="text"
-                              value={aiGatewayUrl}
-                              onChange={(e) => setAiGatewayUrl(e.target.value)}
-                              placeholder={aiProvider === "cloudflare" ? "Masukkan Account ID Cloudflare..." : "Contoh: https://openrouter.ai/api/v1"}
-                              className="rounded-xl h-11 text-xs font-mono bg-white dark:bg-slate-900"
-                            />
-                         </FormField>
-                       </div>
-                     )}
+                    {(aiProvider === "custom" || aiProvider === "cloudflare") && (
+                      <div className="sm:col-span-2">
+                        <FormField id="aiGatewayUrl" label={aiProvider === "cloudflare" ? "Cloudflare Account ID" : "Base URL (OpenAI Compatible)"} error={undefined}>
+                          <Input
+                            type="text"
+                            value={aiGatewayUrl}
+                            onChange={(e) => setAiGatewayUrl(e.target.value)}
+                            placeholder={aiProvider === "cloudflare" ? "Masukkan Account ID Cloudflare..." : "Contoh: https://openrouter.ai/api/v1"}
+                            className="rounded-xl h-11 text-xs font-mono bg-white dark:bg-slate-900"
+                          />
+                        </FormField>
+                      </div>
+                    )}
 
-                     <FormField id="apiKey" label={aiProvider === "groq" ? "Kunci API Groq" : "API Key"} error={undefined}>
-                        <Input
-                          type="password"
-                          value={aiProvider === "groq" ? groqApiKey : aiGatewayKey}
-                          onChange={(e) => aiProvider === "groq" ? setGroqApiKey(e.target.value) : setAiGatewayKey(e.target.value)}
-                          placeholder={aiProvider === "groq" ? "gsk_xxxxxxx" : "API Key..."}
-                          className="rounded-xl h-11 text-xs font-mono"
-                        />
-                     </FormField>
-                     
-                     <FormField id="aiModel" label={isLoadingModels ? "Memuat Model..." : "Model Kecerdasan (LLM)"} error={undefined}>
-                        <div className="relative">
-                          {remoteModels.length > 0 && aiProvider !== "custom" ? (
-                            <select
-                              value={aiModel}
-                              onChange={(e) => setAiModel(e.target.value)}
-                              className="w-full h-11 px-3 rounded-xl text-xs font-bold bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 focus:ring-2 focus:ring-blue-500/20 outline-none appearance-none cursor-pointer"
-                              disabled={isLoadingModels}
-                            >
-                              <optgroup label={`Model ${aiProvider.toUpperCase()}`}>
-                                {remoteModels.map((m: any) => (
-                                  <option key={m.id} value={m.id}>{m.name} {m.speed && `(${m.speed})`}</option>
-                                ))}
-                              </optgroup>
-                            </select>
-                          ) : (
-                             <Input
-                               type="text"
-                               value={aiModel}
-                               onChange={(e) => setAiModel(e.target.value)}
-                               placeholder={isLoadingModels ? "Mencari model..." : aiProvider === "custom" ? "Masukkan ID model..." : "Ketik ID Model secara manual"}
-                               className="rounded-xl h-11 text-xs font-bold"
-                             />
-                          )}
-                        </div>
-                     </FormField>
+                    <FormField id="apiKey" label={aiProvider === "groq" ? "Kunci API Groq" : "API Key"} error={undefined}>
+                      <Input
+                        type="password"
+                        value={aiProvider === "groq" ? groqApiKey : aiGatewayKey}
+                        onChange={(e) => aiProvider === "groq" ? setGroqApiKey(e.target.value) : setAiGatewayKey(e.target.value)}
+                        placeholder={aiProvider === "groq" ? "gsk_xxxxxxx" : "API Key..."}
+                        className="rounded-xl h-11 text-xs font-mono"
+                      />
+                    </FormField>
 
-                     <div className="sm:col-span-2 pt-1 flex justify-end">
-                       <Button 
-                         type="button" onClick={handleTestAI} disabled={isTestingAI || (aiProvider === "groq" ? !groqApiKey : !aiGatewayKey)}
-                         variant="outline"
-                         className="h-9 px-4 rounded-xl text-xs font-bold border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800"
-                       >
-                         {isTestingAI ? <RefreshCw size={14} className="animate-spin mr-2" /> : <RefreshCw size={14} className="mr-2" />}
-                         Pinging Server
-                       </Button>
-                     </div>
+                    <FormField id="aiModel" label={isLoadingModels ? "Memuat Model..." : "Model Kecerdasan (LLM)"} error={undefined}>
+                      <div className="relative">
+                        {remoteModels.length > 0 && aiProvider !== "custom" ? (
+                          <select
+                            value={aiModel}
+                            onChange={(e) => setAiModel(e.target.value)}
+                            className="w-full h-11 px-3 rounded-xl text-xs font-bold bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 focus:ring-2 focus:ring-blue-500/20 outline-none appearance-none cursor-pointer"
+                            disabled={isLoadingModels}
+                          >
+                            <optgroup label={`Model ${aiProvider.toUpperCase()}`}>
+                              {remoteModels.map((m: any) => (
+                                <option key={m.id} value={m.id}>{m.name} {m.speed && `(${m.speed})`}</option>
+                              ))}
+                            </optgroup>
+                          </select>
+                        ) : (
+                          <Input
+                            type="text"
+                            value={aiModel}
+                            onChange={(e) => setAiModel(e.target.value)}
+                            placeholder={isLoadingModels ? "Mencari model..." : aiProvider === "custom" ? "Masukkan ID model..." : "Ketik ID Model secara manual"}
+                            className="rounded-xl h-11 text-xs font-bold"
+                          />
+                        )}
+                      </div>
+                    </FormField>
+
+                    <div className="sm:col-span-2 pt-1 flex justify-end">
+                      <Button
+                        type="button" onClick={handleTestAI} disabled={isTestingAI || (aiProvider === "groq" ? !groqApiKey : !aiGatewayKey)}
+                        variant="outline"
+                        className="h-9 px-4 rounded-xl text-xs font-bold border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800"
+                      >
+                        {isTestingAI ? <RefreshCw size={14} className="animate-spin mr-2" /> : <RefreshCw size={14} className="mr-2" />}
+                        Pinging Server
+                      </Button>
+                    </div>
                   </div>
-                  
+
                   {/* Test Results Message */}
                   {testResult && (
                     <div className={cn("mt-4 p-3 rounded-xl border text-xs font-bold flex items-center gap-2", testResult.success ? "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800" : "bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 border-red-200 dark:border-red-800")}>
@@ -888,26 +923,26 @@ const SettingsPage = () => {
           <Card className="rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900 overflow-hidden">
             <CardHeader className="p-5 border-b border-slate-100 dark:border-slate-800">
               <CardTitle className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 flex items-center gap-2">
-                 <LayoutTemplate size={14} /> Kustomisasi Soal
+                <LayoutTemplate size={14} /> Kustomisasi Soal
               </CardTitle>
             </CardHeader>
             <CardContent className="p-5">
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                 {questionTypes.map((type) => (
                   <div key={type.id} className="flex items-center justify-between p-3 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                      <span className="text-xs font-bold text-slate-700 dark:text-slate-300">{type.label}</span>
-                      {loading ? (
-                        <Skeleton className="h-5 w-9 rounded-full" />
-                      ) : (
-                        <label className="relative inline-flex items-center cursor-pointer">
-                            <input 
-                                type="checkbox" className="sr-only peer" 
-                                checked={allowedTypes[type.id] || false}
-                                onChange={(e) => setAllowedTypes(prev => ({ ...prev, [type.id]: e.target.checked }))}
-                            />
-                            <div className="w-9 h-5 bg-slate-200 dark:bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
-                        </label>
-                      )}
+                    <span className="text-xs font-bold text-slate-700 dark:text-slate-300">{type.label}</span>
+                    {loading ? (
+                      <Skeleton className="h-5 w-9 rounded-full" />
+                    ) : (
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox" className="sr-only peer"
+                          checked={allowedTypes[type.id] || false}
+                          onChange={(e) => setAllowedTypes(prev => ({ ...prev, [type.id]: e.target.checked }))}
+                        />
+                        <div className="w-9 h-5 bg-slate-200 dark:bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                      </label>
+                    )}
                   </div>
                 ))}
               </div>
@@ -919,18 +954,18 @@ const SettingsPage = () => {
         <div className="space-y-6">
           <Card className="rounded-2xl border border-slate-200 dark:border-indigo-500/20 shadow-sm bg-gradient-to-br from-indigo-600 to-blue-700 dark:from-indigo-950/80 dark:to-slate-900 text-white overflow-hidden relative">
             <div className="absolute top-0 right-0 p-4 opacity-10 dark:opacity-5">
-               <Database size={80} />
+              <Database size={80} />
             </div>
             <CardHeader className="p-5 pb-2 relative z-10">
               <CardTitle className="text-sm font-bold flex items-center gap-2 text-indigo-50 dark:text-indigo-200">
-                 <Database size={16} /> Manajemen Database
+                <Database size={16} /> Manajemen Database
               </CardTitle>
             </CardHeader>
             <CardContent className="p-5 relative z-10 space-y-4">
               <p className="text-[11px] font-medium text-indigo-100 dark:text-slate-300 leading-relaxed bg-white/10 dark:bg-slate-800/80 p-3 rounded-xl border border-transparent dark:border-slate-700/50">
                 Amankan data di akhir semester dengan melakukan pencadangan JSON dan hapus riwayat secara total untuk meringankan performa.
               </p>
-              
+
               <div className="flex flex-col gap-2.5">
                 {loading ? (
                   <>
@@ -939,14 +974,14 @@ const SettingsPage = () => {
                   </>
                 ) : (
                   <>
-                    <Button 
+                    <Button
                       onClick={handleExportDB} disabled={isBackupLoading}
                       className="w-full bg-white/10 hover:bg-white/20 dark:bg-indigo-500/20 dark:hover:bg-indigo-500/40 dark:text-indigo-300 text-white font-bold text-xs h-10 rounded-xl transition-all"
                     >
                       {isBackupLoading ? <RefreshCw size={14} className="animate-spin mr-2" /> : <Download size={14} className="mr-2" />}
                       Eksport File Backup (.json)
                     </Button>
-                    <Button 
+                    <Button
                       onClick={() => fileInputRef.current?.click()} disabled={isBackupLoading}
                       className="w-full bg-white text-indigo-600 hover:bg-slate-50 dark:bg-slate-800 dark:text-blue-400 dark:hover:bg-slate-700 dark:hover:text-blue-300 dark:border dark:border-slate-700 font-bold text-xs h-10 rounded-xl shadow-lg dark:shadow-none transition-all"
                     >
@@ -984,7 +1019,7 @@ const SettingsPage = () => {
               </div>
             </CardContent>
           </Card>
-          
+
           {/* ── Active AI Status Card ── */}
           {!loading && (
             <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 overflow-hidden shadow-sm">
@@ -999,11 +1034,11 @@ const SettingsPage = () => {
                   <span className={cn(
                     "text-[10px] font-black px-2.5 py-1 rounded-full",
                     aiProvider === "groq" ? "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400" :
-                    aiProvider === "cloudflare" ? "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400" :
-                    aiProvider === "google" ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" :
-                    aiProvider === "openrouter" ? "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400" :
-                    aiProvider === "ollama" ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" :
-                    "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                      aiProvider === "cloudflare" ? "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400" :
+                        aiProvider === "google" ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" :
+                          aiProvider === "openrouter" ? "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400" :
+                            aiProvider === "ollama" ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" :
+                              "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300"
                   )}>
                     {{
                       groq: "⚡ Groq Cloud",
@@ -1059,10 +1094,10 @@ const SettingsPage = () => {
 
           {/* Info Card */}
           <div className="p-4 rounded-2xl bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 flex gap-3 text-blue-800 dark:text-blue-300">
-             <HelpCircle size={16} className="shrink-0 mt-0.5 opacity-70" />
-             <p className="text-[11px] font-medium leading-relaxed">
-               Gunakan tab 'Panduan' untuk dokumentasi penggunaan lengkap. Segala modifikasi pada panel ini langsung berdampak seluas aplikasi institusi Anda.
-             </p>
+            <HelpCircle size={16} className="shrink-0 mt-0.5 opacity-70" />
+            <p className="text-[11px] font-medium leading-relaxed">
+              Gunakan tab 'Panduan' untuk dokumentasi penggunaan lengkap. Segala modifikasi pada panel ini langsung berdampak seluas aplikasi institusi Anda.
+            </p>
           </div>
         </div>
       </div>
@@ -1078,14 +1113,14 @@ const SettingsPage = () => {
               className="flex flex-col items-center justify-center p-6 bg-slate-50 dark:bg-slate-800 rounded-2xl hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300"
             >
               <Upload size={24} className="mb-3 text-indigo-500" />
-              <span className="text-xs font-bold text-center">Buka Browser<br/>File Sistem</span>
+              <span className="text-xs font-bold text-center">Buka Browser<br />File Sistem</span>
             </button>
             <button
               type="button" onClick={() => { setIsPickerOpen(false); setIsGalleryOpen(true); loadGalleryImages(); }}
               className="flex flex-col items-center justify-center p-6 bg-slate-50 dark:bg-slate-800 rounded-2xl hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300"
             >
               <FolderOpen size={24} className="mb-3 text-blue-500" />
-              <span className="text-xs font-bold text-center">Cloud Galeri<br/>E-Ujian</span>
+              <span className="text-xs font-bold text-center">Cloud Galeri<br />EXAM AA</span>
             </button>
           </div>
         </DialogContent>
@@ -1139,7 +1174,7 @@ const SettingsPage = () => {
             <DialogTitle className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight">
               {isBackupLoading ? "Memulihkan..." : "Impor Backup"}
             </DialogTitle>
-            
+
             {!isBackupLoading ? (
               <>
                 <p className="text-xs text-slate-500 font-medium">Lanjutkan pemulihan dari file <b>{importFile?.name}</b>?</p>
@@ -1155,7 +1190,7 @@ const SettingsPage = () => {
             ) : (
               <div className="w-full pt-2">
                 <div className="h-2 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden mb-2">
-                   <div className="h-full bg-blue-600 transition-all duration-300" style={{ width: `${importProgress}%` }}></div>
+                  <div className="h-full bg-blue-600 transition-all duration-300" style={{ width: `${importProgress}%` }}></div>
                 </div>
                 <p className="text-[10px] font-bold text-slate-500">{importProgress}% • {importStatus}</p>
               </div>
@@ -1168,17 +1203,17 @@ const SettingsPage = () => {
         <DialogContent className="z-[100] max-w-sm rounded-[2rem] p-6 text-center border-0 shadow-2xl bg-white dark:bg-slate-900">
           <DialogDescription className="sr-only">Tindakan berbahaya untuk menghapus seluruh data database.</DialogDescription>
           <div className="absolute top-0 right-0 w-32 h-32 bg-red-500/10 rounded-full blur-2xl -mr-10 -mt-10 pointer-events-none" />
-          
+
           <div className="flex flex-col items-center gap-4 relative z-10">
             <div className="w-16 h-16 rounded-full bg-red-50 dark:bg-red-900/20 text-red-600 flex items-center justify-center mb-2 animate-bounce-slow">
-               <AlertTriangle size={32} />
+              <AlertTriangle size={32} />
             </div>
             <DialogTitle className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight">Format Sistem</DialogTitle>
-            
+
             {isBackupLoading ? (
               <div className="w-full pt-2">
                 <div className="h-2 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden mb-2">
-                   <div className="h-full bg-red-600 transition-all duration-300" style={{ width: `${importProgress}%` }}></div>
+                  <div className="h-full bg-red-600 transition-all duration-300" style={{ width: `${importProgress}%` }}></div>
                 </div>
                 <p className="text-[10px] font-bold text-red-500">{importProgress}% • {importStatus}</p>
               </div>
@@ -1187,9 +1222,9 @@ const SettingsPage = () => {
                 <p className="text-[11px] text-slate-600 dark:text-slate-400 font-medium">Tindakan fatal: <b>Seluruh records</b> (siswa, ujian, nilai) akan dihapus, menyisakan akun login Anda.</p>
                 <div className="w-full text-left mt-2">
                   <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest pl-1 mb-1 block">Ketik "RESET" di bawah</label>
-                  <Input 
-                     value={resetInput} onChange={(e) => setResetInput(e.target.value.toUpperCase())}
-                     className="text-center font-bold text-red-600 h-11 rounded-xl bg-slate-50 dark:bg-slate-950 border-red-200 dark:border-red-900 focus:border-red-500 focus:ring-red-500"
+                  <Input
+                    value={resetInput} onChange={(e) => setResetInput(e.target.value.toUpperCase())}
+                    className="text-center font-bold text-red-600 h-11 rounded-xl bg-slate-50 dark:bg-slate-950 border-red-200 dark:border-red-900 focus:border-red-500 focus:ring-red-500"
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-3 w-full mt-2">

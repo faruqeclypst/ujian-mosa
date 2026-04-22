@@ -32,7 +32,7 @@ jobs:
         run: pnpm run build
         env:
           # VITE_POCKETBASE_URL kini dinamis (otomatis deteksi domain)
-          VITE_APP_NAME: "E-Ujian"
+          VITE_APP_NAME: "EXAM-AA"
           VITE_AUTH_USERNAME_DOMAIN: "https://assets.alfaruqasri.my.id"
           VITE_R2_BUCKET: "piket"
           VITE_R2_ENDPOINT: "https://fbb45dee06536009648061725236f3d9.r2.cloudflarestorage.com"

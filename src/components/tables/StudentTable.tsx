@@ -4,6 +4,7 @@ import { DataTable } from "../ui/data-table";
 import { Button } from "../ui/button";
 import type { StudentData, ClassData } from "../../types/exam";
 import { useAuth } from "../../context/AuthContext";
+import { useTenant } from "../../context/TenantContext";
 import { Edit, Trash, Sparkles, KeyRound } from "lucide-react";
 import { Avatar, AvatarFallback } from "../ui/avatar";
 import { Badge } from "../ui/badge";
@@ -33,8 +34,10 @@ const StudentTable = ({
   onViewInterest,
   filterActions,
   customActions,
-  title = "Daftar Siswa"
+  title
 }: StudentTableProps & { title?: string }) => {
+  const { terminology } = useTenant();
+  const displayTitle = title || `Daftar ${terminology.student}`;
 
   const handleSelectAll = (checked: boolean) => {
     const currentIds = students.map((s) => s.id);
@@ -103,7 +106,7 @@ const StudentTable = ({
     },
     { 
       key: "nisn", 
-      label: "NISN", 
+      label: terminology.id, 
       sortable: true,
       className: "w-[120px] text-left",
       render: (nisn: string) => (
@@ -114,7 +117,7 @@ const StudentTable = ({
     },
     { 
       key: "name", 
-      label: "Nama Siswa", 
+      label: `Nama ${terminology.student}`, 
       sortable: true,
       render: (name: string, student: StudentData) => (
         <div className="flex items-center gap-3">
@@ -148,13 +151,13 @@ const StudentTable = ({
     },
     { 
       key: "classId", 
-      label: "Kelas", 
+      label: terminology.class, 
       sortable: true,
       render: (classId: string) => {
         const cls = classes.find(c => c.id === classId);
         return (
           <Badge variant="secondary" className="bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border-transparent text-[10px] font-bold px-2 py-0.5">
-            {cls?.name || "Tanpa Kelas"}
+            {cls?.name || `Tanpa ${terminology.class}`}
           </Badge>
         );
       }
@@ -180,7 +183,7 @@ const StudentTable = ({
             <button 
               className="p-1.5 bg-sky-50 text-sky-600 hover:bg-sky-100 rounded-lg dark:bg-sky-900/10 dark:text-sky-400 border border-sky-100 dark:border-sky-800/40"
               onClick={() => onEdit(student)}
-              title="Edit Siswa"
+              title={`Edit ${terminology.student}`}
             >
               <Edit className="h-4 w-4" />
             </button>
@@ -188,7 +191,7 @@ const StudentTable = ({
               <button 
                 className="p-1.5 bg-amber-50 text-amber-600 hover:bg-amber-100 rounded-lg dark:bg-amber-900/10 dark:text-amber-400 border border-amber-100 dark:border-amber-800/40"
                 onClick={() => onResetPassword(student)}
-                title="Reset Password ke Default (12345678)"
+                title={`Reset Password ${terminology.student} ke Default (12345678)`}
               >
                 <KeyRound className="h-4 w-4" />
               </button>
@@ -196,7 +199,7 @@ const StudentTable = ({
             <button 
               className="p-1.5 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-lg dark:bg-rose-900/10 dark:text-rose-400 border border-rose-100 dark:border-rose-800/40"
               onClick={() => onDelete(student)}
-              title="Hapus Siswa"
+              title={`Hapus ${terminology.student}`}
             >
               <Trash className="h-4 w-4" />
             </button>
@@ -209,15 +212,15 @@ const StudentTable = ({
   return (
     <Card>
       <CardHeader className="p-4">
-        <CardTitle className="text-base font-semibold text-slate-800 dark:text-slate-100">{title}</CardTitle>
+        <CardTitle className="text-base font-semibold text-slate-800 dark:text-slate-100">{displayTitle}</CardTitle>
       </CardHeader>
       <CardContent>
         <DataTable
           data={students}
           columns={columns}
-          searchPlaceholder="Cari Siswa..."
+          searchPlaceholder={`Cari ${terminology.student}...`}
           actions={renderActions}
-          emptyMessage="Belum ada data Siswa."
+          emptyMessage={`Belum ada data ${terminology.student}.`}
           filterActions={filterActions}
         />
       </CardContent>

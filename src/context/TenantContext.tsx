@@ -12,11 +12,42 @@ import { masterPb, getSchoolPb } from '../lib/pocketbase';
 // ============================================================
 // Types
 // ============================================================
+export type SchoolType = 'school' | 'campus';
+
+export interface Terminology {
+  teacher: string;
+  student: string;
+  class: string;
+  school: string;
+  id: string;
+  subject: string;
+}
+
+export const TERMINOLOGY: Record<SchoolType, Terminology> = {
+  school: {
+    teacher: 'Guru',
+    student: 'Siswa',
+    class: 'Kelas',
+    school: 'Sekolah',
+    id: 'NISN',
+    subject: 'Mata Pelajaran',
+  },
+  campus: {
+    teacher: 'Dosen',
+    student: 'Mahasiswa',
+    class: 'Prodi / Semester',
+    school: 'Kampus',
+    id: 'NIM',
+    subject: 'Mata Kuliah',
+  },
+};
+
 export interface SchoolRecord {
   id: string;
   name: string;
   slug: string;
   pb_url: string;
+  type: SchoolType;
   logo_url?: string;
   primary_color?: string;
   is_active: boolean;
@@ -33,6 +64,8 @@ interface TenantContextValue {
   loading: boolean;
   notFound: boolean;           // true jika slug ada tapi tidak di registry
   inactive: boolean;           // true jika sekolah is_active = false
+  terminology: Terminology;     // Helper untuk label dinamis
+  setManualSchool: (slug: string | null) => void;
 }
 
 const TenantContext = createContext<TenantContextValue | undefined>(undefined);
@@ -82,8 +115,24 @@ export const TenantProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [inactive, setInactive] = useState(false);
+  const [manualSlug, setManualSlug] = useState<string | null>(() => {
+    return typeof window !== 'undefined' ? localStorage.getItem('selected_school_slug') : null;
+  });
 
-  const { slug, isLanding } = useMemo(() => resolveSlugFromUrl(), []);
+  const { slug: urlSlug, isLanding: isUrlLanding } = useMemo(() => resolveSlugFromUrl(), []);
+
+  // Effective slug: URL slug takes priority on web, manual slug for native/override
+  const slug = urlSlug || manualSlug;
+  const isLanding = isUrlLanding && !manualSlug;
+
+  const setManualSchool = (newSlug: string | null) => {
+    if (newSlug) {
+      localStorage.setItem('selected_school_slug', newSlug);
+    } else {
+      localStorage.removeItem('selected_school_slug');
+    }
+    setManualSlug(newSlug);
+  };
 
   useEffect(() => {
     if (isLanding || !slug) {
@@ -121,6 +170,7 @@ export const TenantProvider = ({ children }: { children: ReactNode }) => {
             slug: devSlug,
             pb_url: directPbUrl,
             is_active: true,
+            type: 'school',
           };
           setSchool(devSchool);
           setPb(getSchoolPb(directPbUrl));
@@ -154,7 +204,17 @@ export const TenantProvider = ({ children }: { children: ReactNode }) => {
 
 
   const value = useMemo<TenantContextValue>(
-    () => ({ school, pb, slug, isLandingDomain: isLanding, loading, notFound, inactive }),
+    () => ({ 
+      school, 
+      pb, 
+      slug: slug || null, 
+      isLandingDomain: isLanding, 
+      loading, 
+      notFound, 
+      inactive,
+      terminology: TERMINOLOGY[school?.type || 'school'],
+      setManualSchool
+    }),
     [school, pb, slug, isLanding, loading, notFound, inactive]
   );
 

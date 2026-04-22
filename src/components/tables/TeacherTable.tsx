@@ -6,6 +6,7 @@ import type { Teacher } from "../../types/exam";
 import { Edit, Trash, KeyRound, User } from "lucide-react";
 import { Avatar, AvatarFallback } from "../ui/avatar";
 import { Badge } from "../ui/badge";
+import { useTenant } from "../../context/TenantContext";
 
 interface TeacherTableProps {
   teachers: Teacher[];
@@ -24,6 +25,7 @@ const TeacherTable = ({
   onDelete,
   onResetPassword
 }: TeacherTableProps) => {
+  const { terminology } = useTenant();
   const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(null);
 
   const handleSelectAll = (checked: boolean) => {
@@ -98,7 +100,7 @@ const TeacherTable = ({
     },
     { 
       key: "name", 
-      label: "Nama Guru", 
+      label: `Nama ${terminology.teacher}`, 
       sortable: true,
       render: (name: string, teacher: Teacher) => (
         <div className="flex items-center gap-3">
@@ -116,7 +118,7 @@ const TeacherTable = ({
     },
     { 
       key: "subjects", 
-      label: "Mata Pelajaran", 
+      label: terminology.subject, 
       render: (subjects: string[]) => (
         <div className="flex flex-wrap gap-1.5">
           {(!subjects || subjects.length === 0) ? (
@@ -139,21 +141,21 @@ const TeacherTable = ({
       <button 
         className="p-1.5 bg-sky-50 text-sky-600 hover:bg-sky-100 rounded-lg dark:bg-sky-900/10 dark:text-sky-400 border border-sky-100 dark:border-sky-800/40"
         onClick={() => onEdit(teacher)}
-        title="Edit Guru"
+        title={`Edit ${terminology.teacher}`}
       >
         <Edit className="h-4 w-4" />
       </button>
       <button 
         className="p-1.5 bg-amber-50 text-amber-600 hover:bg-amber-100 rounded-lg dark:bg-amber-900/10 dark:text-amber-400 border border-amber-100 dark:border-amber-800/40"
         onClick={() => onResetPassword(teacher.id)}
-        title="Reset Password Guru"
+        title={`Reset Password ${terminology.teacher}`}
       >
         <KeyRound className="h-4 w-4" />
       </button>
       <button 
         className="p-1.5 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-lg dark:bg-rose-900/10 dark:text-rose-400 border border-rose-100 dark:border-rose-800/40"
         onClick={() => onDelete(teacher)}
-        title="Hapus Guru"
+        title={`Hapus ${terminology.teacher}`}
       >
         <Trash className="h-4 w-4" />
       </button>
@@ -163,15 +165,15 @@ const TeacherTable = ({
   return (
     <Card>
       <CardHeader className="p-4">
-        <CardTitle className="text-base font-semibold text-slate-800 dark:text-white">Daftar Guru</CardTitle>
+        <CardTitle className="text-base font-semibold text-slate-800 dark:text-white">Daftar {terminology.teacher}</CardTitle>
       </CardHeader>
       <CardContent>
         <DataTable
           data={teachers}
           columns={columns}
-          searchPlaceholder="Cari guru..."
+          searchPlaceholder={`Cari ${terminology.teacher.toLowerCase()}...`}
           actions={renderActions}
-          emptyMessage="Belum ada data guru."
+          emptyMessage={`Belum ada data ${terminology.teacher.toLowerCase()}.`}
         />
       </CardContent>
     </Card>

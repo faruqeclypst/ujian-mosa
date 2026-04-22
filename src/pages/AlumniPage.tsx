@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { useTenant } from "../context/TenantContext";
 import { Skeleton } from "../components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
@@ -17,6 +18,7 @@ import type { StudentData } from "../types/exam";
 
 const AlumniPage = () => {
   const { students, classes, loading, deleteStudent, updateStudent, updateStudentClassBatch } = useExamData();
+  const { terminology } = useTenant();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [studentToDelete, setStudentToDelete] = useState<StudentData | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -77,15 +79,15 @@ const AlumniPage = () => {
 
   const handleRestore = async (id: string) => {
     showAlert(
-      "Pulihkan Siswa",
-      "Kembalikan Siswa ini ke status Aktif (Tanpa Kelas)?",
+      `Pulihkan ${terminology.student}`,
+      `Kembalikan ${terminology.student} ini ke status Aktif (Tanpa ${terminology.class})?`,
       "warning",
       async () => {
         try {
           await updateStudent(id, { classId: "" });
         } catch (err) {
           console.error(err);
-          showAlert("Gagal", "Gagal memulihkan Siswa.", "danger");
+          showAlert("Gagal", `Gagal memulihkan ${terminology.student}.`, "danger");
         }
       },
       true,
@@ -101,24 +103,24 @@ const AlumniPage = () => {
       setSelectedIds([]);
       setTargetClassId("");
     } catch (error) {
-      console.error("Gagal memindahkan alumni", error);
-      showAlert("Gagal", "Gagal memindahkan alumni.", "danger");
+      console.error(`Gagal memindahkan ${terminology.student.toLowerCase()}`, error);
+      showAlert("Gagal", `Gagal memindahkan ${terminology.student.toLowerCase()}.`, "danger");
     }
   };
 
   const handleBatchRestore = async () => {
     if (selectedIds.length === 0) return;
     showAlert(
-      "Pulihkan Alumni Massal",
-      `Kembalikan ${selectedIds.length} alumni ini ke status Aktif (Tanpa Kelas)?`,
+      `Pulihkan ${terminology.student} Massal`,
+      `Kembalikan ${selectedIds.length} ${terminology.student.toLowerCase()} ini ke status Aktif (Tanpa ${terminology.class})?`,
       "warning",
       async () => {
         try {
           await updateStudentClassBatch(selectedIds, "");
           setSelectedIds([]);
         } catch (error) {
-          console.error("Gagal memulihkan alumni", error);
-          showAlert("Gagal", "Gagal memulihkan alumni.", "danger");
+          console.error(`Gagal memulihkan ${terminology.student.toLowerCase()}`, error);
+          showAlert("Gagal", `Gagal memulihkan ${terminology.student.toLowerCase()}.`, "danger");
         }
       },
       true,
@@ -134,7 +136,7 @@ const AlumniPage = () => {
             <Users className="h-5 w-5 text-indigo-500" />
             Data Alumni / Lulusan
           </h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Daftar Siswa yang sudah lulus atau menyelesaikan pendidikan.</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Daftar {terminology.student.toLowerCase()} yang sudah lulus atau menyelesaikan pendidikan.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           {loading ? (
@@ -152,21 +154,21 @@ const AlumniPage = () => {
               <DialogTrigger asChild>
                 <Button variant="default" className="bg-orange-600 hover:bg-orange-700 h-9 text-xs">
                   <ArrowLeftRight className="mr-2 h-4 w-4" />
-                  Pindah/Kembalikan ke Kelas ({selectedIds.length})
+                  Pindah/Kembalikan ke {terminology.class} ({selectedIds.length})
                 </Button>
               </DialogTrigger>
               <DialogContent className="max-w-md">
                 <DialogHeader>
-                  <DialogTitle>Kembalikan ke Kelas</DialogTitle>
+                  <DialogTitle>Kembalikan ke {terminology.class}</DialogTitle>
                 </DialogHeader>
                 <p className="text-sm text-muted-foreground">
-                  Pindahkan {selectedIds.length} alumni terpilih ke kelas tujuan.
+                  Pindahkan {selectedIds.length} {terminology.student.toLowerCase()} terpilih ke {terminology.class.toLowerCase()} tujuan.
                 </p>
                 
                 <div className="space-y-4 pt-4">
-                  <FormField id="batch-class" label="Kelas Tujuan">
+                  <FormField id="batch-class" label={`${terminology.class} Tujuan`}>
                     <Select value={targetClassId} onChange={(e) => setTargetClassId(e.target.value)}>
-                      <option value="">Pilih Kelas Tujuan</option>
+                      <option value="">Pilih {terminology.class} Tujuan</option>
                       {sortedClasses.map((cls) => (
                         <option key={cls.id} value={cls.id}>{cls.name}</option>
                       ))}
@@ -189,7 +191,7 @@ const AlumniPage = () => {
               className="hover:bg-green-50 hover:text-green-600 h-9 text-xs border-dashed border-green-200"
               onClick={handleBatchRestore}
             >
-              <Check className="mr-1 w-4 h-4" /> Pulihkan Tanpa Kelas
+              <Check className="mr-1 w-4 h-4" /> Pulihkan Tanpa {terminology.class}
             </Button>
           </div>
         </div>
@@ -209,10 +211,10 @@ const AlumniPage = () => {
                          <div className="h-4 w-4 border border-slate-300 rounded mx-auto" />
                       </TableHead>
                       <TableHead className="w-[60px] text-center">No</TableHead>
-                      <TableHead>NISN</TableHead>
-                      <TableHead>Nama Siswa</TableHead>
+                      <TableHead>{terminology.id}</TableHead>
+                      <TableHead>Nama {terminology.student}</TableHead>
                       <TableHead className="w-[60px] text-center">L/P</TableHead>
-                      <TableHead>Kelas</TableHead>
+                      <TableHead>{terminology.class}</TableHead>
                       <TableHead className="text-right">Aksi</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -252,14 +254,14 @@ const AlumniPage = () => {
               <button 
                 className="p-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-lg dark:bg-emerald-900/10 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-800/40"
                 onClick={() => handleRestore(student.id)}
-                title="Pulihkan Siswa"
+                title={`Pulihkan ${terminology.student}`}
               >
                 <RotateCw className="h-4 w-4" />
               </button>
               <button 
                 className="p-1.5 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-lg dark:bg-rose-900/10 dark:text-rose-400 border border-rose-100 dark:border-rose-800/40"
                 onClick={() => handleDeleteClick(student)}
-                title="Hapus Siswa"
+                title={`Hapus ${terminology.student}`}
               >
                 <Trash className="h-4 w-4" />
               </button>

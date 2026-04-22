@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Activity, Server, Database, Cloud, CheckCircle, RefreshCw, AlertCircle, Wifi } from "lucide-react";
+import { Activity, Server, Database, Cloud, CheckCircle, RefreshCw, AlertCircle, Wifi, PowerOff } from "lucide-react";
 import SuperAdminLayout from "../../components/layout/SuperAdminLayout";
 import { masterPb } from "../../lib/pocketbase";
 import { cn } from "../../lib/utils";
@@ -22,7 +22,7 @@ const SuperAdminInfraPage = () => {
   const fetchAndPingNodes = async () => {
     setLoading(true);
     try {
-      const records = await masterPb.collection("schools").getFullList({ filter: "is_active=true" });
+      const records = await masterPb.collection("schools").getFullList({ sort: "-created" });
       const initialNodes: SchoolNode[] = records.map(r => ({
         id: r.id, name: r.name, slug: r.slug, pb_url: r.pb_url, is_active: r.is_active,
         status: "checking", latency: 0,
@@ -36,6 +36,9 @@ const SuperAdminInfraPage = () => {
       const checkedNodes = await Promise.all(initialNodes.map(async (node) => {
         const start = performance.now();
         try {
+          if (node.is_active === false) {
+            return { ...node, status: "offline" as const, latency: 0 };
+          }
           const res = await fetch(`${node.pb_url}/api/health`, { method: "GET", signal: AbortSignal.timeout(5000) });
           const latency = Math.round(performance.now() - start);
           if (res.ok) {
@@ -164,7 +167,7 @@ const SuperAdminInfraPage = () => {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {nodes.length === 0 && !loading && (
-                <tr><td colSpan={4} className="px-5 py-10 text-center text-slate-400 text-sm">Tidak ada tenant aktif.</td></tr>
+                <tr><td colSpan={4} className="px-5 py-10 text-center text-slate-400 text-sm">Tidak ada tenant terdaftar.</td></tr>
               )}
               {nodes.map(node => (
                 <tr key={node.id} className="hover:bg-slate-50/60 transition-colors">
@@ -204,6 +207,10 @@ const SuperAdminInfraPage = () => {
                       <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 text-slate-500 rounded-full text-[10px] font-bold border border-slate-200">
                         <Wifi size={11} className="opacity-50" /> Menghubungkan
                       </span>
+                    ) : node.is_active === false ? (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 text-slate-400 rounded-full text-[10px] font-bold border border-slate-200">
+                        <PowerOff size={11} /> Sistem Nonaktif
+                      </span>
                     ) : node.status === "offline" ? (
                       <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-red-50 text-red-700 rounded-full text-[10px] font-bold border border-red-200">
                         <AlertCircle size={11} /> Gagal Terhubung
@@ -235,6 +242,10 @@ const SuperAdminInfraPage = () => {
                 {node.status === "checking" ? (
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-100 text-slate-500 rounded-full text-[10px] font-bold border border-slate-200 flex-shrink-0">
                     <RefreshCw size={10} className="animate-spin" /> Cek
+                  </span>
+                ) : node.is_active === false ? (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-100 text-slate-400 rounded-full text-[10px] font-bold border border-slate-200 flex-shrink-0">
+                    <PowerOff size={10} /> Nonaktif
                   </span>
                 ) : node.status === "offline" ? (
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-50 text-red-600 rounded-full text-[10px] font-bold border border-red-200 flex-shrink-0">

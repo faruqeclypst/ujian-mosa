@@ -3,9 +3,16 @@ import type { StudentData, ClassData } from "../types/exam";
 
 export const STUDENT_IMPORT_HEADERS = ["NISN", "Nama Siswa", "Gender (L/P)", "Nama Kelas"] as const;
 
-export function downloadStudentImportTemplate(filename = "Template_Import_Siswa_Master.xlsx") {
+export function downloadStudentImportTemplate(terminology?: any) {
+  const studentLabel = terminology?.student || "Siswa";
+  const idLabel = terminology?.id || "NISN";
+  const classLabel = terminology?.class || "Kelas";
+  const filename = `Template_Import_${studentLabel}_Master.xlsx`;
+
+  const headers = [idLabel, `Nama ${studentLabel}`, "Gender (L/P)", `Nama ${classLabel}`];
+
   const ws = XLSX.utils.aoa_to_sheet([
-    [...STUDENT_IMPORT_HEADERS],
+    [...headers],
     ["1234567890", "Ahmad Fauzi", "L", "X-MIPA-1"],
     ["0987654321", "Siti Aminah", "P", "X-MIPA-1"],
     ["1122334455", "Budi Santoso", "L", "XI-IPS-2"],
@@ -24,27 +31,27 @@ export function downloadStudentImportTemplate(filename = "Template_Import_Siswa_
     }
   };
 
-  for (let c = 0; c < STUDENT_IMPORT_HEADERS.length; c++) {
+  for (let c = 0; c < headers.length; c++) {
     const addr = XLSX.utils.encode_cell({ r: 0, c: c });
     if (ws[addr]) (ws[addr] as any).s = headerStyle;
   }
 
   (ws as any)["!cols"] = [
-    { wch: 20 }, // NISN
+    { wch: 20 }, // ID
     { wch: 30 }, // Nama student
     { wch: 15 }, // Gender
     { wch: 20 }, // Nama Kelas
   ];
 
   const wsNotes = XLSX.utils.aoa_to_sheet([
-    ["PANDUAN PENGISIAN DATA SISWA"],
+    [`PANDUAN PENGISIAN DATA ${studentLabel.toUpperCase()}`],
     [],
-    ["1. NISN", "Wajib diisi. Usahakan format kolom adalah 'Text' agar nol di depan tidak hilang."],
-    ["2. NAMA SISWA", "Wajib diisi sesuai nama lengkap."],
+    [`1. ${idLabel}`, "Wajib diisi. Usahakan format kolom adalah 'Text' agar nol di depan tidak hilang."],
+    [`2. NAMA ${studentLabel.toUpperCase()}`, "Wajib diisi sesuai nama lengkap."],
     ["3. GENDER", "Isi dengan 'L' untuk Laki-laki atau 'P' untuk Perempuan."],
-    ["4. NAMA KELAS", "PENTING: Harus sama persis dengan nama kelas di menu 'Data Kelas'."],
+    [`4. NAMA ${classLabel.toUpperCase()}`, `PENTING: Harus sama persis dengan nama ${classLabel.toLowerCase()} di menu 'Data ${classLabel}' .`],
     [],
-    ["TIPS:", "Jika nama kelas di sistem adalah 'XII-IPA-1', maka di Excel harus 'XII-IPA-1' (boleh pakai spasi/tanpa spasi karena sistem sudah auto-match)."],
+    ["TIPS:", `Jika nama ${classLabel.toLowerCase()} di sistem adalah 'XII-IPA-1', maka di Excel harus 'XII-IPA-1' (boleh pakai spasi/tanpa spasi karena sistem sudah auto-match).`],
   ]);
   (wsNotes as any)["!cols"] = [{ wch: 20 }, { wch: 80 }];
 
@@ -52,7 +59,7 @@ export function downloadStudentImportTemplate(filename = "Template_Import_Siswa_
   (wsNotes["A1"] as any).s = styleNoteHeader;
 
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "DATA_SISWA");
+  XLSX.utils.book_append_sheet(wb, ws, `DATA_${studentLabel.toUpperCase()}`);
   XLSX.utils.book_append_sheet(wb, wsNotes, "PANDUAN_IMPORT");
   XLSX.writeFile(wb, filename);
 }
@@ -74,8 +81,25 @@ export async function parseStudentImportExcel(
   const skipped: { nisn: string; name: string; className: string }[] = [];
 
   for (const row of raw) {
-    const nisn = String(row["NISN"] || "").trim();
-    const name = String(row["Nama Siswa"] || "").trim();
+    // Robust detection for ID column
+    const nisn = String(
+      row["NISN"] || 
+      row["NIM"] || 
+      row["ID"] || 
+      row["Nomor Induk"] ||
+      Object.keys(row).find(k => k.match(/NISN|NIM|ID|Nomor/i)) ? row[Object.keys(row).find(k => k.match(/NISN|NIM|ID|Nomor/i))!] : ""
+    ).trim();
+
+    // Robust detection for Name column
+    const name = String(
+      row["Nama Siswa"] || 
+      row["Nama Mahasiswa"] || 
+      row["Nama"] || 
+      row["Name"] ||
+      row["Full Name"] ||
+      Object.keys(row).find(k => k.match(/Nama|Name/i)) ? row[Object.keys(row).find(k => k.match(/Nama|Name/i))!] : ""
+    ).trim();
+
     // Detect Gender with multiple possible header names
     const genderRaw = (
       row["Gender (L/P)"] || 
@@ -89,10 +113,12 @@ export async function parseStudentImportExcel(
     // Detect Class Name with multiple possible header names
     const className = (
       row["Nama Kelas"] || 
+      row["Nama Program"] || 
       row["Kelas"] || 
+      row["Program"] || 
       row["Class"] || 
       row["Kls"] || 
-      ""
+      Object.keys(row).find(k => k.match(/Kelas|Program|Class/i)) ? row[Object.keys(row).find(k => k.match(/Kelas|Program|Class/i))!] : ""
     ).toString().trim();
 
     if (!nisn && !name) continue;
@@ -124,18 +150,25 @@ export async function parseStudentImportExcel(
 export function exportStudentToExcel(params: { 
   students: StudentData[];
   classes: ClassData[];
-  filename?: string 
+  filename?: string;
+  terminology?: any;
 }) {
-  const filename = params.filename ?? "data-siswa.xlsx";
+  const studentLabel = params.terminology?.student || "Siswa";
+  const idLabel = params.terminology?.id || "NISN";
+  const classLabel = params.terminology?.class || "Kelas";
+  
+  const filename = params.filename ?? `data-${studentLabel.toLowerCase()}.xlsx`;
+  const headers = [idLabel, `Nama ${studentLabel}`, "Gender", `Nama ${classLabel}`];
+
   const ws = XLSX.utils.aoa_to_sheet([
-    [...STUDENT_IMPORT_HEADERS],
+    [...headers],
     ...params.students.map((s) => {
       const cls = params.classes.find(c => c.id === s.classId);
       return [
         s.nisn, 
         s.name, 
         s.gender, 
-        cls ? cls.name : "Tanpa Kelas"
+        cls ? cls.name : `Tanpa ${classLabel}`
       ];
     }),
   ]);
@@ -145,20 +178,21 @@ export function exportStudentToExcel(params: {
     fill: { patternType: "solid", fgColor: { rgb: "16A34A" } },
   };
 
-  for (let c = 0; c < STUDENT_IMPORT_HEADERS.length; c++) {
+  for (let c = 0; c < headers.length; c++) {
     const addr = XLSX.utils.encode_cell({ r: 0, c: c });
     if (ws[addr]) (ws[addr] as any).s = headerStyle;
   }
 
   (ws as any)["!cols"] = [
-    { wch: 15 }, // NISN
+    { wch: 15 }, // ID
     { wch: 25 }, // Nama student
     { wch: 12 }, // Gender
     { wch: 15 }, // Nama Kelas
   ];
 
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "siswa");
+  XLSX.utils.book_append_sheet(wb, ws, studentLabel.toLowerCase());
   XLSX.writeFile(wb, filename);
 }
+
 

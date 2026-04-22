@@ -37,7 +37,7 @@ const AISettingsModal = ({ isOpen, onClose }: AISettingsModalProps) => {
   const { user, refreshUser } = useAuth();
   const { pb } = useTenant();
   const { addToast } = useToast();
-  
+
   const [formError, setFormError] = useState<string | null>(null);
   const [isTestingAI, setIsTestingAI] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
@@ -76,7 +76,7 @@ const AISettingsModal = ({ isOpen, onClose }: AISettingsModalProps) => {
           }
         } else {
           // 👨‍🏫 Guru: Ambil dari Profil Pribadi
-          reset({ 
+          reset({
             ai_api_key: (user as any)?.ai_api_key || "",
             ai_provider: (user as any)?.ai_provider || "groq",
             ai_model: (user as any)?.ai_model || "",
@@ -101,7 +101,7 @@ const AISettingsModal = ({ isOpen, onClose }: AISettingsModalProps) => {
         // 🏛️ Admin: Update Global Settings
         const records = await pb.collection("settings").getFullList({ limit: 1 });
         const config = records[0];
-        
+
         const isOllama = values.ai_provider === 'ollama';
         const payload: any = {
           ai_provider: values.ai_provider,
@@ -117,7 +117,7 @@ const AISettingsModal = ({ isOpen, onClose }: AISettingsModalProps) => {
         if (config) {
           await pb.collection("settings").update(config.id, payload);
         } else {
-          await pb.collection("settings").create({ ...payload, name: "E-Ujian" });
+          await pb.collection("settings").create({ ...payload, name: "EXAM AA" });
         }
 
         addToast({
@@ -140,7 +140,7 @@ const AISettingsModal = ({ isOpen, onClose }: AISettingsModalProps) => {
         });
       }
 
-      await refreshUser(); 
+      await refreshUser();
       onClose();
     } catch (error: any) {
       setFormError(error.message || "Gagal menyimpan konfigurasi AI.");
@@ -163,12 +163,12 @@ const AISettingsModal = ({ isOpen, onClose }: AISettingsModalProps) => {
     try {
       const settings = await pb?.collection("settings").getFullList({ limit: 1 });
       const config = settings?.[0];
-      
+
       const provider = aiProvider || config?.ai_provider || "groq";
       const modelId = aiModel || config?.ai_model || AI_MODELS[0].id;
       const customUrl = config?.ai_gateway_url || "https://ollama.com";
 
-      const res = await testAIConnection(aiKey, modelId, customUrl, provider);
+      const res = await testAIConnection(pb!, aiKey, modelId, customUrl, provider);
       setTestResult(res);
 
       if (res.success) {
@@ -189,7 +189,7 @@ const AISettingsModal = ({ isOpen, onClose }: AISettingsModalProps) => {
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-[450px] p-0 overflow-hidden border-0 bg-white dark:bg-gray-900 shadow-2xl rounded-[2rem]">
         <div className="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-700 z-50" />
-        
+
         <DialogHeader className="pt-8 px-8 pb-4">
           <div className="flex items-center gap-4">
             <div className="p-3 bg-blue-50 dark:bg-blue-900/30 rounded-2xl text-blue-600 dark:text-blue-400">
@@ -200,7 +200,7 @@ const AISettingsModal = ({ isOpen, onClose }: AISettingsModalProps) => {
                 Konfigurasi AI
               </DialogTitle>
               <DialogDescription className="text-gray-500 dark:text-gray-400 font-medium">
-                {user?.role === 'admin' 
+                {user?.role === 'admin'
                   ? "Atur kunci pribadi atau biarkan kosong untuk menggunakan Pengaturan Global."
                   : "Atur mesin kecerdasan buatan untuk akun Anda."}
               </DialogDescription>
@@ -263,25 +263,25 @@ const AISettingsModal = ({ isOpen, onClose }: AISettingsModalProps) => {
 
           <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800/30 space-y-3">
             <p className="text-[11px] text-amber-700 dark:text-amber-400 font-medium leading-relaxed">
-              <strong>Info:</strong> {user?.role === 'admin' 
-                ? "Konfigurasi ini digunakan untuk akun Admin Anda saat menyusun naskah di Bank Soal." 
+              <strong>Info:</strong> {user?.role === 'admin'
+                ? "Konfigurasi ini digunakan untuk akun Admin Anda saat menyusun naskah di Bank Soal."
                 : "Akun Guru wajib memiliki API Key sendiri. Penggunaan fitur AI Lab akan memotong kuota dari Key di atas."}
             </p>
             <div className="pt-2 border-t border-amber-200/50 dark:border-amber-800/50 flex flex-col gap-2">
               <span className="text-[10px] font-black text-amber-800 dark:text-amber-300 uppercase tracking-widest">Dapatkan Key Gratis:</span>
               <div className="flex flex-col gap-1.5">
-                <a 
-                  href="https://console.groq.com/keys" 
-                  target="_blank" 
+                <a
+                  href="https://console.groq.com/keys"
+                  target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center justify-between group hover:bg-white/50 p-1.5 rounded-lg transition-colors border border-transparent hover:border-amber-200"
                 >
                   <span className="text-[10px] font-bold text-indigo-600">🚀 Ambil di Groq Console (Disarankan)</span>
                   <ExternalLink className="w-3 h-3 text-indigo-400" />
                 </a>
-                <a 
-                  href="https://ollama.com/settings/keys" 
-                  target="_blank" 
+                <a
+                  href="https://ollama.com/settings/keys"
+                  target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center justify-between group hover:bg-white/50 p-1.5 rounded-lg transition-colors border border-transparent hover:border-amber-200"
                 >
