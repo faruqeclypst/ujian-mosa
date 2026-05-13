@@ -15,7 +15,8 @@ import {
   Download,
   Upload,
   FileText,
-  Sparkles
+  Sparkles,
+  KeyRound
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -37,7 +38,7 @@ import StudentTable from "../components/tables/StudentTable";
 import { ImportButton } from "../components/ui/import-button";
 import { ExportButton } from "../components/ui/export-button";
 import { ConfirmationDialog } from "../components/ui/confirmation-dialog";
-import { downloadStudentImportTemplate, exportStudentToExcel, parseStudentImportExcel } from "../lib/studentExcel";
+import { downloadStudentImportTemplate, exportStudentToExcel, exportStudentLoginsToExcel, parseStudentImportExcel } from "../lib/studentExcel";
 import FormField from "../components/forms/FormField";
 import { Select } from "../components/ui/select";
 import type { StudentData } from "../types/exam";
@@ -266,6 +267,10 @@ const StudentsPage = () => {
 
   const handleExportStudents = () => {
     exportStudentToExcel({ students, classes, filename: `data-${terminology.student.toLowerCase()}.xlsx`, terminology });
+  };
+
+  const handleExportStudentLogins = () => {
+    exportStudentLoginsToExcel({ students: filteredStudents, classes, filename: `data-login-${terminology.student.toLowerCase()}.xlsx`, terminology });
   };
 
   const defaultValues = useMemo(() =>
@@ -538,6 +543,18 @@ const StudentsPage = () => {
                       <div className="flex flex-col min-w-0">
                         <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">Export ke Excel</span>
                         <span className="text-[10px] text-slate-400 mt-1">Unduh data {terminology.student.toLowerCase()} aktif</span>
+                      </div>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => handleExportStudentLogins()}
+                      className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 focus:bg-slate-50 dark:focus:bg-slate-900 transition-colors group"
+                    >
+                      <div className="h-10 w-10 shrink-0 rounded-lg bg-amber-50 dark:bg-amber-900/30 text-amber-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <KeyRound className="h-5 w-5" />
+                      </div>
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">Export Akun Login</span>
+                        <span className="text-[10px] text-slate-400 mt-1">Unduh username & password {terminology.student.toLowerCase()}</span>
                       </div>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator className="my-1 border-slate-100 dark:border-slate-800" />

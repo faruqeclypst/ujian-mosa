@@ -24,7 +24,7 @@ import {
   ShieldAlert
 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
-import * as XLSX from "xlsx";
+import * as XLSX from "xlsx-js-style";
 import { Button } from "../../components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../../components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../components/ui/table";
@@ -696,11 +696,13 @@ const MonitoringPage = () => {
         border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } }
       },
       correct: {
+        fill: { patternType: "solid", fgColor: { rgb: "DCFCE7" } },
         font: { color: { rgb: "16A34A" }, bold: true },
         alignment: { horizontal: "center", vertical: "center" },
         border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } }
       },
       wrong: {
+        fill: { patternType: "solid", fgColor: { rgb: "FEE2E2" } },
         font: { color: { rgb: "DC2626" }, bold: true },
         alignment: { horizontal: "center", vertical: "center" },
         border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } }

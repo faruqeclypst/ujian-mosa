@@ -1,4 +1,4 @@
-import * as XLSX from "xlsx";
+import * as XLSX from "xlsx-js-style";
 import type { StudentData, ClassData } from "../types/exam";
 
 export const STUDENT_IMPORT_HEADERS = ["NISN", "Nama Siswa", "Gender (L/P)", "Nama Kelas"] as const;
@@ -192,6 +192,97 @@ export function exportStudentToExcel(params: {
 
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, studentLabel.toLowerCase());
+  XLSX.writeFile(wb, filename);
+}
+
+export function exportStudentLoginsToExcel(params: { 
+  students: StudentData[];
+  classes: ClassData[];
+  filename?: string;
+  terminology?: any;
+}) {
+  const studentLabel = params.terminology?.student || "Siswa";
+  const idLabel = params.terminology?.id || "NISN";
+  const classLabel = params.terminology?.class || "Kelas";
+  
+  const filename = params.filename ?? `data-login-${studentLabel.toLowerCase()}.xlsx`;
+  const headers = [idLabel, `Nama ${studentLabel}`, `Nama ${classLabel}`, "Username", "Password"];
+
+  const headerStyle = {
+    font: { bold: true, color: { rgb: "FFFFFF" } },
+    fill: { patternType: "solid", fgColor: { rgb: "D97706" } }, // Amber-600
+  };
+
+  const cols = [
+    { wch: 15 }, // ID
+    { wch: 25 }, // Nama student
+    { wch: 20 }, // Nama Kelas
+    { wch: 20 }, // Username
+    { wch: 15 }, // Password
+  ];
+
+  const wb = XLSX.utils.book_new();
+
+  // Helper to create and append a sheet
+  const createSheet = (data: StudentData[], sheetName: string) => {
+    const wsData = [
+      [...headers],
+      ...data.map((s) => {
+        const cls = params.classes.find(c => c.id === s.classId);
+        return [
+          s.nisn, 
+          s.name, 
+          cls ? cls.name : `Tanpa ${classLabel}`,
+          s.nisn, 
+          "12345678"
+        ];
+      })
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    
+    for (let c = 0; c < headers.length; c++) {
+      const addr = XLSX.utils.encode_cell({ r: 0, c: c });
+      if (ws[addr]) (ws[addr] as any).s = headerStyle;
+    }
+    (ws as any)["!cols"] = cols;
+    
+    // Clean sheet name (max 31 chars, no invalid chars for Excel)
+    let safeName = sheetName.replace(/[\\\/\?\*\[\]\:]/g, "").substring(0, 31) || "Sheet";
+    
+    // Ensure unique sheet name (just in case truncation causes duplicates)
+    let finalName = safeName;
+    let counter = 1;
+    while (wb.SheetNames.includes(finalName)) {
+      finalName = `${safeName.substring(0, 28)}_${counter}`;
+      counter++;
+    }
+
+    XLSX.utils.book_append_sheet(wb, ws, finalName);
+  };
+
+  // 1. Sheet for ALL classes
+  createSheet(params.students, `Semua ${classLabel}`);
+
+  // 2. Sheets for individual classes
+  const classGroups: Record<string, StudentData[]> = {};
+  const noClassKey = `Tanpa ${classLabel}`;
+  
+  params.students.forEach(s => {
+    const cls = params.classes.find(c => c.id === s.classId);
+    const key = cls ? cls.name : noClassKey;
+    if (!classGroups[key]) classGroups[key] = [];
+    classGroups[key].push(s);
+  });
+
+  // Sort class names alphabetically
+  const sortedClassNames = Object.keys(classGroups).sort((a, b) => 
+    a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' })
+  );
+
+  for (const cName of sortedClassNames) {
+    createSheet(classGroups[cName], cName);
+  }
+
   XLSX.writeFile(wb, filename);
 }
 

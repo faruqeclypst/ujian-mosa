@@ -291,6 +291,7 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
     
     // 1. Create Teacher Data Record (including username)
     const teacherRecord = await pb.collection("teachers").create(payload);
+    setTeachers(prev => prev.find(i => i.id === teacherRecord.id) ? prev : [teacherRecord as any, ...prev]);
     
     // 2. Create Auth User Record for the Teacher using the provided username
     try {
@@ -309,7 +310,8 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
   };
   
   const updateTeacher = async (id: string, payload: Partial<TeacherPayload>) => {
-    await pb.collection("teachers").update(id, payload);
+    const record = await pb.collection("teachers").update(id, payload);
+    setTeachers(prev => prev.map(item => item.id === id ? { ...item, ...record } as any : item));
     // Also update name/username in users if changed
     try {
       const userRec = await pb.collection("users").getFirstListItem(`teacherId="${id}"`);
@@ -332,6 +334,7 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
       if (userRec) await pb.collection("users").delete(userRec.id);
     } catch (e) {}
     await pb.collection("teachers").delete(id);
+    setTeachers(prev => prev.filter(item => item.id !== id));
   };
 
   const resetUserPassword = async (userId: string) => {
@@ -345,30 +348,36 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
 
   // --- Class Actions ---
   const createClass = async (payload: ClassPayload) => {
-    await pb.collection("classes").create(payload);
+    const record = await pb.collection("classes").create(payload);
+    setClasses(prev => prev.find(i => i.id === record.id) ? prev : [record as any, ...prev]);
   };
   const updateClass = async (id: string, payload: Partial<ClassPayload>) => {
-    await pb.collection("classes").update(id, payload);
+    const record = await pb.collection("classes").update(id, payload);
+    setClasses(prev => prev.map(item => item.id === id ? { ...item, ...record } as any : item));
   };
   const deleteClass = async (id: string) => {
     await pb.collection("classes").delete(id);
+    setClasses(prev => prev.filter(item => item.id !== id));
   };
 
   // --- Subject Actions ---
   const createSubject = async (payload: SubjectPayload) => {
-    await pb.collection("subjects").create(payload);
+    const record = await pb.collection("subjects").create(payload);
+    setSubjects(prev => prev.find(i => i.id === record.id) ? prev : [record as any, ...prev]);
   };
   const updateSubject = async (id: string, payload: Partial<SubjectPayload>) => {
-    await pb.collection("subjects").update(id, payload);
+    const record = await pb.collection("subjects").update(id, payload);
+    setSubjects(prev => prev.map(item => item.id === id ? { ...item, ...record } as any : item));
   };
   const deleteSubject = async (id: string) => {
     await pb.collection("subjects").delete(id);
+    setSubjects(prev => prev.filter(item => item.id !== id));
   };
 
   // --- Student Actions ---
   const createStudent = async (payload: StudentPayload) => {
     const defaultPass = "12345678";
-    await pb.collection("students").create({
+    const record = await pb.collection("students").create({
       username: payload.nisn,
       password: defaultPass,
       passwordConfirm: defaultPass,
@@ -377,6 +386,11 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
       classId: payload.classId,
       classid: payload.classId, // backup for lowercase field
       hasChangedPassword: false,
+    });
+    setStudents(prev => {
+      if (prev.find(i => i.id === record.id)) return prev;
+      const m = { ...record, id: record.id, nisn: record.username || record.nisn, gender: record.gender || "L", classId: record.classId || record.classid } as any;
+      return [m, ...prev];
     });
   };
   const updateStudent = async (id: string, payload: Partial<StudentPayload>) => {
@@ -388,10 +402,15 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
       updateData.classId = payload.classId;
       updateData.classid = payload.classId;
     }
-    await pb.collection("students").update(id, updateData);
+    const record = await pb.collection("students").update(id, updateData);
+    setStudents(prev => {
+      const m = { ...record, id: record.id, nisn: record.username || record.nisn, gender: record.gender || "L", classId: record.classId || record.classid, hasChangedPassword: record.hasChangedPassword || false } as any;
+      return prev.map(item => item.id === id ? m : item);
+    });
   };
   const deleteStudent = async (id: string) => {
     await pb.collection("students").delete(id);
+    setStudents(prev => prev.filter(item => item.id !== id));
   };
   const resetStudentPassword = async (id: string) => {
     const defaultPass = "12345678";
@@ -410,6 +429,9 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
         classid: newClassId
       })));
     }
+    setStudents(prev => prev.map(student => 
+      studentIds.includes(student.id) ? { ...student, classId: newClassId, classid: newClassId } : student
+    ));
   };
   const deleteStudentsBatch = async (studentIds: string[]) => {
     const chunkSize = 10;
@@ -417,6 +439,7 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
       const chunk = studentIds.slice(i, i + chunkSize);
       await Promise.all(chunk.map(id => pb.collection("students").delete(id)));
     }
+    setStudents(prev => prev.filter(student => !studentIds.includes(student.id)));
   };
 
   return (

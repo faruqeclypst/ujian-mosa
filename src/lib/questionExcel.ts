@@ -1,4 +1,4 @@
-import * as XLSX from "xlsx";
+import * as XLSX from "xlsx-js-style";
 
 export const QUESTION_IMPORT_HEADERS = [
   "Pertanyaan", 
@@ -51,7 +51,10 @@ export function downloadQuestionTemplate(filename = "Template_Soal_Baru.xlsx") {
     }
   };
 
-  // Styling ignored in community version of xlsx, skipping
+  for (let c = 0; c < QUESTION_IMPORT_HEADERS.length; c++) {
+    const addr = XLSX.utils.encode_cell({ r: 0, c: c });
+    if (ws[addr]) (ws[addr] as any).s = headerStyle;
+  }
 
   (ws as any)["!cols"] = [
     { wch: 50 }, // Pertanyaan
