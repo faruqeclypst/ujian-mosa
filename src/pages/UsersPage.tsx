@@ -112,8 +112,8 @@ const UsersPage = () => {
     e.preventDefault();
     setError("");
 
-    if (!formData.email || (dialogMode === "create" && !formData.password) || !formData.name) {
-      setError("Email, Password, dan Nama Lengkap wajib diisi!");
+    if ((dialogMode === "create" && !formData.password) || !formData.name) {
+      setError("Password dan Nama Lengkap wajib diisi!");
       return;
     }
 
@@ -138,12 +138,17 @@ const UsersPage = () => {
         const defaultPass = formData.password || "12345678";
         payload.password = defaultPass;
         payload.passwordConfirm = defaultPass;
-        payload.email = formData.email;
-        payload.emailVisibility = true;
+        if (formData.email) {
+          payload.email = formData.email;
+          payload.emailVisibility = true;
+          const emailPrefix = formData.email.split("@")[0].replace(/[^a-zA-Z0-9]/g, "");
+          payload.username = emailPrefix + Math.floor(Math.random() * 1000);
+        } else {
+          // Generate username from name if email is empty
+          const namePrefix = formData.name.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 10);
+          payload.username = namePrefix + Math.floor(Math.random() * 9999);
+        }
         payload.hasChangedPassword = false;
-
-        const emailPrefix = formData.email.split("@")[0].replace(/[^a-zA-Z0-0]/g, "");
-        payload.username = emailPrefix + Math.floor(Math.random() * 1000);
 
         if (!pb) return;
         await pb.collection("users").create(payload);
@@ -373,13 +378,12 @@ const UsersPage = () => {
               />
             </FormField>
 
-            <FormField id="email" label="Email (Login)" error={undefined}>
+            <FormField id="email" label="Email (Login - Opsional)" error={undefined}>
               <Input
                 type="email"
                 value={formData.email}
                 onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
                 placeholder="user@sekolah.com"
-                required
                 className="h-12 px-4 rounded-2xl"
               />
             </FormField>

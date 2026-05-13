@@ -83,6 +83,7 @@ const ExamRoomsPage = () => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [roomToDelete, setRoomToDelete] = useState<ExamRoomData | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showClassesRoom, setShowClassesRoom] = useState<ExamRoomData | null>(null);
 
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean;
@@ -235,18 +236,40 @@ const ExamRoomsPage = () => {
     {
       key: "className",
       label: terminology.class,
-      className: "w-24",
-      render: (v: string, room: ExamRoomData) => (
-        <div className="flex flex-wrap gap-1">
-          {room.allClasses ? (
-            <Badge variant="outline" className="text-[9px] font-black uppercase bg-blue-50/50 text-blue-600 border-blue-100">Semua</Badge>
-          ) : (
-            (v || "").split(", ").map((cls, idx) => (
-              <Badge key={idx} variant="secondary" className="px-1.5 py-0 rounded text-[9px] font-bold bg-slate-100 text-slate-600 border-transparent">{cls}</Badge>
-            ))
-          )}
-        </div>
-      )
+      className: "w-32",
+      render: (v: string, room: ExamRoomData) => {
+        if (room.allClasses) {
+          return <Badge variant="outline" className="text-[9px] font-black uppercase bg-blue-50/50 text-blue-600 border-blue-100">Semua {terminology.class}</Badge>;
+        }
+
+        const classList = (v || "").split(", ").filter(Boolean);
+        if (classList.length === 0) return <span className="text-slate-400 text-[10px]">N/A</span>;
+
+        if (classList.length <= 2) {
+          return (
+            <div className="flex flex-wrap gap-1">
+              {classList.map((cls, idx) => (
+                <Badge key={idx} variant="secondary" className="px-1.5 py-0 rounded text-[9px] font-bold bg-slate-100 text-slate-600 border-transparent">{cls}</Badge>
+              ))}
+            </div>
+          );
+        }
+
+        return (
+          <button 
+            onClick={() => setShowClassesRoom(room)}
+            className="group flex items-center gap-1.5 px-2 py-1 rounded-lg bg-indigo-50/50 hover:bg-indigo-100 border border-indigo-100/50 transition-all active:scale-95"
+            title="Klik untuk lihat semua kelas"
+          >
+            <Users className="h-3 w-3 text-indigo-500" />
+            <span className="text-[10px] font-bold text-indigo-600 whitespace-nowrap">{classList.length} {terminology.class}</span>
+            <div className="flex -space-x-2 ml-1 opacity-60 group-hover:opacity-100 transition-opacity">
+               <div className="w-4 h-4 rounded-full bg-indigo-200 border border-white flex items-center justify-center text-[8px] text-indigo-700 font-bold">1</div>
+               <div className="w-4 h-4 rounded-full bg-indigo-300 border border-white flex items-center justify-center text-[8px] text-indigo-700 font-bold">2</div>
+            </div>
+          </button>
+        );
+      }
     }
   ], [masterTeachers, liveBreakdown, rooms]);
 
@@ -327,84 +350,75 @@ const ExamRoomsPage = () => {
   }, [pb]);
 
   // Sync Exam Rooms listing
-  useEffect(() => {
-    const fetchRooms = async () => {
-      if (!pb) return;
-      try {
-        const loaded = await pb.collection('exam_rooms').getFullList({ sort: '-created' });
-        console.log("DEBUG: Rooms count loaded:", loaded.length);
-        console.log("DEBUG: Current User TeacherID:", teacherId);
+  const fetchRooms = useCallback(async () => {
+    if (!pb) return;
+    try {
+      const loaded = await pb.collection('exam_rooms').getFullList({ sort: '-created' });
+      
+      const mapped = loaded.map(room => {
+        const sId = room.examId || (room as any).examid || "";
+        const examObj = exams.find(e => e.id === sId);
+        const eTeacherId = examObj?.teacherId || (examObj as any)?.teacherid || "";
         
-        const mapped = loaded.map(room => {
-          const sId = room.examId || (room as any).examid || "";
-          const examObj = exams.find(e => e.id === sId);
-          const eTeacherId = examObj?.teacherId || (examObj as any)?.teacherid || "";
-          
-          if (!examObj) console.warn("DEBUG: Exam object not found for room:", room.id);
-          else console.log(`DEBUG: Room "${room.room_name || room.title}" -> ExamTeacherID: "${eTeacherId}"`);
+        const startTime = room.start_time || (room as any).startTime || "";
+        const endTime = room.end_time || (room as any).endTime || "";
+        const roomName = room.room_name || (room as any).title || room.title || "";
+        const clsId = room.classId || (room as any).classIds || "";
+        const isOff = room.isDisabled !== undefined ? room.isDisabled : (room as any).isActive === false;
 
-          const startTime = room.start_time || (room as any).startTime || "";
-          const endTime = room.end_time || (room as any).endTime || "";
-          const roomName = room.room_name || (room as any).title || room.title || "";
-          const clsId = room.classId || (room as any).classIds || "";
-          const isOff = room.isDisabled !== undefined ? room.isDisabled : (room as any).isActive === false;
+        const subjectObj = subjects.find(s => s.id === (examObj?.subjectId || (examObj as any)?.subjectid));
+        const teacherObj = masterTeachers.find(t => t.id === eTeacherId);
 
-          const subjectObj = subjects.find(s => s.id === (examObj?.subjectId || (examObj as any)?.subjectid));
-          const teacherObj = masterTeachers.find(t => t.id === eTeacherId);
+        let className = `Semua ${terminology.class}`;
+        if (!room.allClasses) {
+          const clsData = room.classId || (room as any).classid || (room as any).classIds || (room as any).classids || "";
+          let classList: string[] = [];
+          if (Array.isArray(clsData)) classList = clsData;
+          else if (typeof clsData === 'string' && clsData.length > 0) classList = clsData.split(",").map(id => id.trim()).filter(id => id && id !== "all");
 
-          let className = `Semua ${terminology.class}`;
-          // ... (logika penentuan nama kelas tetap sama)
-          if (!room.allClasses) {
-            const clsData = room.classId || (room as any).classid || (room as any).classIds || (room as any).classids || "";
-            let classList: string[] = [];
-            if (Array.isArray(clsData)) classList = clsData;
-            else if (typeof clsData === 'string' && clsData.length > 0) classList = clsData.split(",").map(id => id.trim()).filter(id => id && id !== "all");
+          const foundNames = classList.map(id => {
+            const c = (examClasses || []).find(cl => cl.id === id);
+            return c ? c.name : null;
+          }).filter(Boolean);
 
-            const foundNames = classList.map(id => {
-              const c = (examClasses || []).find(cl => cl.id === id);
-              return c ? c.name : null;
-            }).filter(Boolean);
+          if (foundNames.length > 0) className = foundNames.join(", ");
+          else className = classList.length > 0 ? `ID: ${classList[0].substring(0, 5)}...` : "N/A";
+        }
 
-            if (foundNames.length > 0) className = foundNames.join(", ");
-            else className = classList.length > 0 ? `ID: ${classList[0].substring(0, 5)}...` : "N/A";
-          }
+        const { id, ...rest } = room;
+        return {
+          id,
+          ...rest,
+          examId: sId,
+          room_name: roomName,
+          start_time: startTime,
+          end_time: endTime,
+          classId: clsId,
+          isDisabled: isOff,
+          examTitle: examObj?.title || "...",
+          examType: (examObj as any)?.examType || (examObj as any)?.examtype || "UMUM",
+          subjectName: subjectObj?.name || "N/A",
+          teacherName: teacherObj?.name || "N/A",
+          examTeacherId: eTeacherId,
+          className: className,
+          is_exambro: room.is_exambro || (room as any).isExambro || false
+        } as any as ExamRoomData;
+      });
 
-          const { id, ...rest } = room;
-          return {
-            id,
-            ...rest,
-            examId: sId,
-            room_name: roomName,
-            start_time: startTime,
-            end_time: endTime,
-            classId: clsId,
-            isDisabled: isOff,
-            examTitle: examObj?.title || "...",
-            examType: (examObj as any)?.examType || (examObj as any)?.examtype || "UMUM",
-            subjectName: subjectObj?.name || "N/A",
-            teacherName: teacherObj?.name || "N/A",
-            examTeacherId: eTeacherId,
-            className: className,
-            is_exambro: room.is_exambro || (room as any).isExambro || false
-          } as any as ExamRoomData;
-        });
+      setRooms(mapped);
+    } catch (e) {
+      console.error("Error fetching rooms:", e);
+    } finally {
+      setLoading(false);
+    }
+  }, [subjects, masterTeachers, exams, examClasses, pb, terminology.class]);
 
-        setRooms(mapped);
-      } catch (e) {
-        console.error("Error fetching rooms:", e);
-      } finally {
-        setLoading(false);
-      }
-    };
-
+  useEffect(() => {
     fetchRooms();
 
     if (!pb) return;
     const unsubscribe = pb.collection('exam_rooms').subscribe("*", (e) => {
       if (e.action === "create" || e.action === "update") {
-        // Re-fetch rooms to get mapped data correctly (it's hard to map a single record without context of exams/classes)
-        // but it's much better than doing it for every single tiny change in context.
-        // Actually, let's keep fetchRooms for simplicity here as it's less frequent than student updates.
         fetchRooms();
       } else if (e.action === "delete") {
         setRooms(prev => prev.filter(r => r.id !== e.record.id));
@@ -413,8 +427,39 @@ const ExamRoomsPage = () => {
     return () => {
       unsubscribe.then(unsub => unsub());
     };
-  }, [subjects, masterTeachers, exams, examClasses, pb]);
+  }, [pb, fetchRooms]);
 
+
+  const formatLocalDateTime = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+  };
+
+  const calculateEndTime = (start: string, durationMin: number) => {
+    if (!start) return "";
+    const startDate = new Date(start);
+    if (isNaN(startDate.getTime())) return "";
+    const endDate = new Date(startDate.getTime() + durationMin * 60000);
+    return formatLocalDateTime(endDate);
+  };
+
+  const handleStartTimeChange = (val: string) => {
+    const newEndTime = calculateEndTime(val, formValues.duration);
+    setFormValues(prev => ({ ...prev, start_time: val, end_time: newEndTime }));
+  };
+
+  const handleDurationChange = (dur: number) => {
+    const newEndTime = calculateEndTime(formValues.start_time, dur);
+    setFormValues(prev => ({ ...prev, duration: dur, end_time: newEndTime }));
+  };
+
+  const handleSetNow = () => {
+    handleStartTimeChange(formatLocalDateTime(new Date()));
+  };
 
   const handleCreateClick = () => {
     setDialogMode("create");
@@ -575,6 +620,7 @@ const ExamRoomsPage = () => {
         await pb.collection('exam_rooms').create(data);
       }
       setIsDialogOpen(false);
+      await fetchRooms();
       showAlert("Berhasil", "Data berhasil disimpan.", "success");
     } catch (e) {
       console.error("Save error:", e);
@@ -943,17 +989,53 @@ const ExamRoomsPage = () => {
 
             <div className="grid grid-cols-2 gap-3">
               <FormField id="start_time" label="Waktu Mulai" error={undefined}>
-                <Input type="datetime-local" value={formValues.start_time} onChange={(e) => setFormValues({ ...formValues, start_time: e.target.value })} required />
+                <div className="space-y-1.5">
+                  <Input type="datetime-local" value={formValues.start_time} onChange={(e) => handleStartTimeChange(e.target.value)} required />
+                  <div className="flex flex-wrap gap-1">
+                    <button 
+                      type="button" 
+                      onClick={handleSetNow}
+                      className="px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-[9px] font-bold border border-blue-100 dark:border-blue-800 hover:bg-blue-100 transition-colors"
+                    >
+                      Mulai Sekarang
+                    </button>
+                    <button 
+                      type="button" 
+                      onClick={() => {
+                        const now = new Date();
+                        now.setHours(7, 30, 0, 0);
+                        handleStartTimeChange(formatLocalDateTime(now));
+                      }}
+                      className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-[9px] font-bold border border-slate-200 dark:border-slate-700 hover:bg-slate-200 transition-colors"
+                    >
+                      07:30
+                    </button>
+                    <button 
+                      type="button" 
+                      onClick={() => {
+                        const now = new Date();
+                        now.setHours(8, 0, 0, 0);
+                        handleStartTimeChange(formatLocalDateTime(now));
+                      }}
+                      className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-[9px] font-bold border border-slate-200 dark:border-slate-700 hover:bg-slate-200 transition-colors"
+                    >
+                      08:00
+                    </button>
+                  </div>
+                </div>
               </FormField>
               <FormField id="end_time" label="Waktu Berakhir" error={undefined}>
-                <Input type="datetime-local" value={formValues.end_time} onChange={(e) => setFormValues({ ...formValues, end_time: e.target.value })} required />
+                <div className="space-y-1.5">
+                  <Input type="datetime-local" value={formValues.end_time} onChange={(e) => setFormValues({ ...formValues, end_time: e.target.value })} required />
+                  <p className="text-[9px] text-emerald-600 dark:text-emerald-400 font-medium italic">* Otomatis dari Mulai + Durasi</p>
+                </div>
               </FormField>
             </div>
 
             <div className="space-y-4 pt-1 border-t mt-4">
               <div className="grid grid-cols-2 gap-3 mt-2">
                 <FormField id="duration" label="Durasi (Menit)" error={undefined}>
-                  <Input type="number" value={formValues.duration} onChange={(e) => setFormValues({ ...formValues, duration: Number(e.target.value) })} required />
+                  <Input type="number" value={formValues.duration} onChange={(e) => handleDurationChange(Number(e.target.value))} required />
                 </FormField>
                 <FormField id="cheat_limit" label="Batas Cheat" error={undefined}>
                   <Input type="number" value={formValues.cheat_limit} onChange={(e) => setFormValues({ ...formValues, cheat_limit: Number(e.target.value) })} required />
@@ -1010,6 +1092,30 @@ const ExamRoomsPage = () => {
         type={confirmDialog.type}
         confirmLabel={confirmDialog.confirmLabel}
       />
+
+      {/* Modal Daftar Kelas (Jika banyak) */}
+      <Dialog open={!!showClassesRoom} onOpenChange={(open) => !open && setShowClassesRoom(null)}>
+        <DialogContent className="max-w-sm bg-card rounded-3xl overflow-hidden p-0 border-none shadow-2xl">
+          <div className="bg-gradient-to-br from-indigo-600 to-blue-700 p-6 text-white relative">
+            <Users className="h-12 w-12 opacity-10 absolute right-4 top-4" />
+            <h3 className="text-lg font-bold mb-1">Daftar {terminology.class}</h3>
+            <p className="text-indigo-100 text-xs opacity-80">Ruangan: {showClassesRoom?.room_name || showClassesRoom?.examTitle}</p>
+          </div>
+          <div className="p-6 max-h-[60vh] overflow-y-auto bg-white dark:bg-slate-950">
+            <div className="grid grid-cols-2 gap-2">
+              {(showClassesRoom?.className || "").split(", ").map((cls, idx) => (
+                <div key={idx} className="flex items-center gap-2 p-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 shadow-sm transition-all hover:border-indigo-200 dark:hover:border-indigo-900">
+                  <div className="h-2 w-2 rounded-full bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.5)]"></div>
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-200">{cls}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <DialogFooter className="p-4 bg-slate-50 dark:bg-slate-900/50">
+            <Button onClick={() => setShowClassesRoom(null)} className="w-full rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 font-bold">Tutup</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

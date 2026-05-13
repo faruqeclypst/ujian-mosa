@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Plus, Edit, Trash, Check, Copy, Image, ChevronDown, FileText, Download, Eye, FolderOpen, Sparkles, Wand2, RefreshCw, BookOpen, Loader2, FileSpreadsheet, Search, X, Bookmark, Forward, CheckCircle2, Menu, Maximize2, HelpCircle, FileJson } from "lucide-react";
+import { ArrowLeft, Plus, Edit, Trash, Check, Copy, Image, ChevronDown, FileText, Download, Eye, FolderOpen, Sparkles, Wand2, RefreshCw, BookOpen, Loader2, FileSpreadsheet, Search, X, Bookmark, Forward, CheckCircle2, Menu, Maximize2, HelpCircle, FileJson, GripVertical } from "lucide-react";
+import { Reorder } from "framer-motion";
 import { MathText } from "../../components/MathText";
 import { SmartImage } from "../../components/ui/smart-image";
 import { generateQuestionsAI, generateSingleQuestionAI, getTopicSuggestionsAI, parseQuestionsAI, AI_MODELS } from "../../lib/ai";
@@ -151,6 +152,7 @@ const compressImage = (file: File): Promise<File> => {
 
 const QuestionsPage = () => {
   const navigate = useNavigate();
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [examId, setExamId] = useState<string | null>(() => sessionStorage.getItem("activeQuestionsExamId"));
 
   useEffect(() => {
@@ -3205,77 +3207,103 @@ const QuestionsPage = () => {
               {/* RENDER BASED ON TYPE */}
               {(formValues.type === "pilihan_ganda" || formValues.type === "pilihan_ganda_kompleks" || formValues.type === "benar_salah") && (
                 <div className="space-y-3">
-                  {['a', 'b', 'c', 'd', 'e'].map((letter) => {
-                    if (formValues.type === "benar_salah" && (letter !== 'a' && letter !== 'b')) return null;
-                    
-                    return (
-                      <div key={letter} className={`p-3 border rounded-xl space-y-2 transition-all ${formValues.choices[letter].isCorrect ? "bg-green-50/30 border-green-200 dark:bg-green-950/10 dark:border-green-900/40" : "bg-slate-50/50 dark:bg-slate-900/30 border-slate-200 dark:border-slate-800"}`}>
-                        <div className="flex gap-3 items-center">
-                          <div className="font-bold text-sm w-4">{letter.toUpperCase()}.</div>
-                          <div className="bg-card rounded-md border flex-1">
-                            <ReactQuill
-                              key={selectedQuestion ? `edit-${selectedQuestion.id}-${letter}` : `create-${letter}`}
-                              theme="snow"
-                              value={formValues.choices[letter].text}
-                              onChange={(content) => handleChoiceChange(letter, 'text', content)}
-                              placeholder={`Jawaban ${letter.toUpperCase()} ...`}
-                               modules={quillModulesChoice}
-                               formats={quillFormats}
-                              className="[&_.ql-editor]:min-h-[42px] [&_.ql-editor]:py-2 [&_.ql-container]:border-none [&_.ql-toolbar]:border-none [&_.ql-toolbar]:border-b [&_.ql-toolbar]:px-1 [&_.ql-toolbar]:py-0 [&_.ql-formats]:mr-1"
-                            />
-                            {/* Pratinjau Opsi */}
-                            {formValues.choices[letter].text && (
-                              <div className="p-2 bg-slate-50/50 dark:bg-slate-900/40 border-t border-slate-100 dark:border-slate-800 rounded-b-md">
-                                <MathText content={formValues.choices[letter].text} className="text-[11px] font-serif ql-editor !p-0 text-slate-600 dark:text-slate-400" />
-                              </div>
-                            )}
-                          </div>
-                          <div className="flex flex-col gap-1.5 shrink-0">
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              className={`h-8 text-[10px] font-bold px-3 rounded-lg transition-all border flex items-center gap-1.5 focus-visible:ring-emerald-500/30 active:scale-95 ${
-                                formValues.choices[letter].isCorrect 
-                                  ? "bg-emerald-50 text-emerald-600 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800/40 shadow-sm hover:bg-emerald-100/80 hover:text-emerald-700 active:bg-emerald-200" 
-                                  : "bg-slate-50 text-slate-400 border-slate-200 dark:bg-slate-900/40 dark:text-slate-600 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-500 active:bg-slate-200"
-                               }`}
-                              size="sm"
-                              onClick={() => handleChoiceChange(letter, 'isCorrect', !formValues.choices[letter].isCorrect)}
-                            >
-                              {formValues.choices[letter].isCorrect ? (
-                                <>
-                                  <Check className="h-3.5 w-3.5" />
-                                  <span>KUNCI</span>
-                                </>
-                              ) : (
-                                "SET KUNCI"
+                  {Object.keys(formValues.choices)
+                    .filter(k => formValues.type !== "benar_salah" || (k === 'a' || k === 'b'))
+                    .map((letter, index) => {
+                      return (
+                        <div 
+                          key={letter} 
+                          draggable={true}
+                          onDragStart={() => setDraggedIndex(index)}
+                          onDragOver={(e) => e.preventDefault()}
+                          onDrop={() => {
+                            if (draggedIndex === null || draggedIndex === index) return;
+                            
+                            const letters = ['a', 'b', 'c', 'd', 'e'];
+                            const oldLetter = letters[draggedIndex];
+                            const newLetter = letters[index];
+                            
+                            const updatedChoices = { ...formValues.choices };
+                            const temp = updatedChoices[oldLetter];
+                            updatedChoices[oldLetter] = updatedChoices[newLetter];
+                            updatedChoices[newLetter] = temp;
+                            
+                            setFormValues(prev => ({ ...prev, choices: updatedChoices }));
+                            setDraggedIndex(null);
+                          }}
+                          className={`p-3 border rounded-xl space-y-2 transition-all relative group/choice cursor-default ${formValues.choices[letter].isCorrect ? "bg-green-50/30 border-green-200 dark:bg-green-950/10 dark:border-green-900/40" : "bg-slate-50/50 dark:bg-slate-900/30 border-slate-200 dark:border-slate-800"} ${draggedIndex === index ? "opacity-40" : ""}`}
+                        >
+                          <div className="flex gap-3 items-center">
+                            {/* Drag Handle (Visual Only for HTML5) */}
+                            <div className="cursor-move p-1 -ml-1 text-slate-300 hover:text-slate-500 transition-colors">
+                              <GripVertical className="h-4 w-4" />
+                            </div>
+                            
+                            <div className="font-bold text-sm w-4">{letter.toUpperCase()}.</div>
+                            <div className="bg-card rounded-md border flex-1">
+                              <ReactQuill
+                                key={selectedQuestion ? `edit-${selectedQuestion.id}-${letter}` : `create-${letter}`}
+                                theme="snow"
+                                value={formValues.choices[letter].text}
+                                onChange={(content) => handleChoiceChange(letter, 'text', content)}
+                                placeholder={`Jawaban ${letter.toUpperCase()} ...`}
+                                 modules={quillModulesChoice}
+                                 formats={quillFormats}
+                                className="[&_.ql-editor]:min-h-[42px] [&_.ql-editor]:py-2 [&_.ql-container]:border-none [&_.ql-toolbar]:border-none [&_.ql-toolbar]:border-b [&_.ql-toolbar]:px-1 [&_.ql-toolbar]:py-0 [&_.ql-formats]:mr-1"
+                              />
+                              {/* Pratinjau Opsi */}
+                              {formValues.choices[letter].text && (
+                                <div className="p-2 bg-slate-50/50 dark:bg-slate-900/40 border-t border-slate-100 dark:border-slate-800 rounded-b-md">
+                                  <MathText content={formValues.choices[letter].text} className="text-[11px] font-serif ql-editor !p-0 text-slate-600 dark:text-slate-400" />
+                                </div>
                               )}
-                            </Button>
-                            <button
-                              type="button"
-                              className="flex items-center justify-center gap-1 cursor-pointer bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-md h-8 text-[11px] px-2 border border-slate-200 dark:border-slate-800 transition-all font-medium"
-                              onClick={() => {
-                                setGalleryTarget({ type: "choice", letter });
-                                setIsPickerOpen(true);
-                              }}
-                            >
-                              <Image className="w-3.5 h-3.5 text-slate-400" />
-                              <span>{choiceFiles[letter] || formValues.choices[letter].imageUrl ? "Ubah" : "Img"}</span>
-                            </button>
+                            </div>
+                            <div className="flex flex-col gap-1.5 shrink-0">
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                className={`h-8 text-[10px] font-bold px-3 rounded-lg transition-all border flex items-center gap-1.5 focus-visible:ring-emerald-500/30 active:scale-95 ${
+                                  formValues.choices[letter].isCorrect 
+                                    ? "bg-emerald-50 text-emerald-600 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800/40 shadow-sm hover:bg-emerald-100/80 hover:text-emerald-700 active:bg-emerald-200" 
+                                    : "bg-slate-50 text-slate-400 border-slate-200 dark:bg-slate-900/40 dark:text-slate-600 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-500 active:bg-slate-200"
+                                 }`}
+                                size="sm"
+                                onClick={() => handleChoiceChange(letter, 'isCorrect', !formValues.choices[letter].isCorrect)}
+                              >
+                                {formValues.choices[letter].isCorrect ? (
+                                  <>
+                                    <Check className="h-3.5 w-3.5" />
+                                    <span>KUNCI</span>
+                                  </>
+                                ) : (
+                                  "SET KUNCI"
+                                )}
+                              </Button>
+                              <button
+                                type="button"
+                                className="flex items-center justify-center gap-1 cursor-pointer bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-md h-8 text-[11px] px-2 border border-slate-200 dark:border-slate-800 transition-all font-medium"
+                                onClick={() => {
+                                  setGalleryTarget({ type: "choice", letter });
+                                  setIsPickerOpen(true);
+                                }}
+                              >
+                                <Image className="w-3.5 h-3.5 text-slate-400" />
+                                <span>{choiceFiles[letter] || formValues.choices[letter].imageUrl ? "Ubah" : "Img"}</span>
+                              </button>
+                            </div>
                           </div>
+                          {(choiceFiles[letter] || formValues.choices[letter].imageUrl) && (
+                            <div className="pl-14 pt-1 flex items-center gap-2">
+                              <img
+                                src={choiceFiles[letter] ? URL.createObjectURL(choiceFiles[letter]!) : formValues.choices[letter].imageUrl}
+                                alt={`Pratinjau ${letter}`}
+                                className="max-h-16 w-auto rounded-lg border border-slate-200/80 shadow-sm"
+                              />
+                            </div>
+                          )}
                         </div>
-                        {(choiceFiles[letter] || formValues.choices[letter].imageUrl) && (
-                          <div className="pl-7 pt-1 flex items-center gap-2">
-                            <img
-                              src={choiceFiles[letter] ? URL.createObjectURL(choiceFiles[letter]!) : formValues.choices[letter].imageUrl}
-                              alt={`Pratinjau ${letter}`}
-                              className="max-h-16 w-auto rounded-lg border border-slate-200/80 shadow-sm"
-                            />
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
                 </div>
               )}
 
@@ -3285,33 +3313,54 @@ const QuestionsPage = () => {
                     <span className="text-[10px] font-bold text-slate-400 uppercase">Pernyataan (Kiri)</span>
                     <span className="text-[10px] font-bold text-slate-400 uppercase">Pasangan (Kanan)</span>
                   </div>
-                  {formValues.pairs.map((pair, idx) => (
-                    <div key={pair.id} className="flex gap-2 items-center p-2 rounded-xl bg-slate-50 dark:bg-slate-900/30 border border-slate-200 dark:border-slate-800">
-                      <Input
-                        placeholder="Kiri..."
-                        value={pair.left}
-                        onChange={(e) => handlePairChange(pair.id, "left", e.target.value)}
-                        className="h-9 text-xs"
-                      />
-                      <span className="text-slate-300">➔</span>
-                      <Input
-                        placeholder="Kanan..."
-                        value={pair.right}
-                        onChange={(e) => handlePairChange(pair.id, "right", e.target.value)}
-                        className="h-9 text-xs"
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleRemovePair(pair.id)}
-                        className="h-8 w-8 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/20"
-                        disabled={formValues.pairs.length <= 1}
+                  <div className="space-y-3">
+                    {formValues.pairs.map((pair, index) => (
+                      <div 
+                        key={pair.id} 
+                        draggable={true}
+                        onDragStart={() => setDraggedIndex(index)}
+                        onDragOver={(e) => e.preventDefault()}
+                        onDrop={() => {
+                          if (draggedIndex === null || draggedIndex === index) return;
+                          const newPairs = [...formValues.pairs];
+                          const temp = newPairs[draggedIndex];
+                          newPairs[draggedIndex] = newPairs[index];
+                          newPairs[index] = temp;
+                          setFormValues(prev => ({ ...prev, pairs: newPairs }));
+                          setDraggedIndex(null);
+                        }}
+                        onDragEnd={() => setDraggedIndex(null)}
+                        className={`flex gap-2 items-center p-2 rounded-xl bg-slate-50 dark:bg-slate-900/30 border border-slate-200 dark:border-slate-800 transition-opacity ${draggedIndex === index ? "opacity-40" : ""}`}
                       >
-                        <Trash className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))}
+                        <div className="cursor-move p-1 text-slate-300 hover:text-slate-500">
+                          <GripVertical className="h-4 w-4" />
+                        </div>
+                        <Input
+                          placeholder="Kiri..."
+                          value={pair.left}
+                          onChange={(e) => handlePairChange(pair.id, "left", e.target.value)}
+                          className="h-9 text-xs"
+                        />
+                        <span className="text-slate-300">➔</span>
+                        <Input
+                          placeholder="Kanan..."
+                          value={pair.right}
+                          onChange={(e) => handlePairChange(pair.id, "right", e.target.value)}
+                          className="h-9 text-xs"
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleRemovePair(pair.id)}
+                          className="h-8 w-8 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/20"
+                          disabled={formValues.pairs.length <= 1}
+                        >
+                          <Trash className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
                   <Button type="button" variant="outline" size="sm" onClick={handleAddPair} className="w-full text-xs h-8 border-dashed">
                     <Plus className="h-3 w-3 mr-1" /> Tambah Pasangan
                   </Button>
@@ -3342,29 +3391,50 @@ const QuestionsPage = () => {
                   <p className="text-[10px] text-indigo-500 p-2 bg-indigo-50/50 rounded-lg border border-indigo-100">
                     Ketik item di bawah ini dalam <strong>URUTAN YANG BENAR</strong>. Sistem akan mengacak urutannya saat ujian dimulai.
                   </p>
-                  {formValues.items.map((item, idx) => (
-                    <div key={item.id} className="flex gap-2 items-center p-2 rounded-xl bg-slate-50 dark:bg-slate-900/30 border border-slate-200 dark:border-slate-800">
-                      <div className="flex items-center justify-center w-6 h-6 rounded-full bg-indigo-600 text-white font-bold text-[10px]">
-                        {idx + 1}
-                      </div>
-                      <Input
-                        placeholder={`Item ke-${idx + 1}...`}
-                        value={item.text}
-                        onChange={(e) => handleItemChange(item.id, e.target.value)}
-                        className="h-9 text-xs"
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleRemoveItem(item.id)}
-                        className="h-8 w-8 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/20"
-                        disabled={formValues.items.length <= 1}
+                  <div className="space-y-3">
+                    {formValues.items.map((item, index) => (
+                      <div 
+                        key={item.id} 
+                        draggable={true}
+                        onDragStart={() => setDraggedIndex(index)}
+                        onDragOver={(e) => e.preventDefault()}
+                        onDrop={() => {
+                          if (draggedIndex === null || draggedIndex === index) return;
+                          const newItems = [...formValues.items];
+                          const temp = newItems[draggedIndex];
+                          newItems[draggedIndex] = newItems[index];
+                          newItems[index] = temp;
+                          setFormValues(prev => ({ ...prev, items: newItems }));
+                          setDraggedIndex(null);
+                        }}
+                        onDragEnd={() => setDraggedIndex(null)}
+                        className={`flex gap-2 items-center p-2 rounded-xl bg-slate-50 dark:bg-slate-900/30 border border-slate-200 dark:border-slate-800 transition-opacity ${draggedIndex === index ? "opacity-40" : ""}`}
                       >
-                        <Trash className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))}
+                        <div className="cursor-move p-1 text-slate-300 hover:text-slate-500">
+                          <GripVertical className="h-4 w-4" />
+                        </div>
+                        <div className="flex items-center justify-center w-6 h-6 shrink-0 rounded-full bg-indigo-600 text-white font-bold text-[10px]">
+                          {index + 1}
+                        </div>
+                        <Input
+                          placeholder={`Item ke-${index + 1}...`}
+                          value={item.text}
+                          onChange={(e) => handleItemChange(item.id, e.target.value)}
+                          className="h-9 text-xs"
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleRemoveItem(item.id)}
+                          className="h-8 w-8 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/20"
+                          disabled={formValues.items.length <= 1}
+                        >
+                          <Trash className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
                   <Button type="button" variant="outline" size="sm" onClick={handleAddItem} className="w-full text-xs h-8 border-dashed">
                     <Plus className="h-3 w-3 mr-1" /> Tambah Item
                   </Button>

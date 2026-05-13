@@ -138,14 +138,41 @@ const ClassesPage = () => {
     try {
       const parsed = await parseClassImportExcel(file);
       if (parsed.length === 0) return showAlert("File Kosong", "File yang Anda upload kosong atau tidak valid.", "warning");
-      for (const row of parsed) {
-        await createClass({ name: row.name });
+      
+      setBatchProgress({
+        isOpen: true,
+        total: parsed.length,
+        current: 0,
+        message: "Memulai import data...",
+        title: `Import Data ${terminology.class}`
+      });
+
+      const failures: string[] = [];
+      for (let i = 0; i < parsed.length; i++) {
+        try {
+          await createClass({ name: parsed[i].name });
+          setBatchProgress(prev => ({
+            ...prev,
+            current: i + 1,
+            message: `Mengimport ${terminology.class.toLowerCase()} (${i + 1}/${parsed.length})`
+          }));
+        } catch (err: any) {
+          console.error(`Gagal import ${parsed[i].name}:`, err);
+          failures.push(`${parsed[i].name} - ${err.message || "Error"}`);
+        }
       }
-      showAlert("Import Berhasil", `${parsed.length} ${terminology.class.toLowerCase()} berhasil diimport.`, "success");
+
+      let message = `${parsed.length - failures.length} ${terminology.class} berhasil diimport.`;
+      if (failures.length > 0) {
+        message += `\n\n❌ ${failures.length} data gagal:\n- ${failures.slice(0, 5).join("\n- ")}`;
+      }
+      
+      showAlert("Hasil Import", message, failures.length > 0 ? "warning" : "success");
     } catch (err: any) {
       showAlert("Gagal Import", err.message || `Gagal mengimport data ${terminology.class.toLowerCase()}.`, "danger");
     } finally {
       setIsImporting(false);
+      setBatchProgress(prev => ({ ...prev, isOpen: false }));
     }
   };
 
@@ -200,6 +227,17 @@ const ClassesPage = () => {
 
   return (
     <div className="space-y-5">
+      <input
+        id="class-import-input"
+        type="file"
+        accept=".xlsx,.xls"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) handleImportClasses(file);
+          e.target.value = "";
+        }}
+      />
       <div className="relative z-30 flex flex-col gap-3 md:flex-row md:items-center md:justify-between bg-card p-4 rounded-2xl border border-slate-200/60 dark:border-slate-800/40 shadow-sm backdrop-blur-sm">
         <div>
           <h2 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
@@ -254,17 +292,6 @@ const ClassesPage = () => {
                   </span>
                   <span className="text-[10px] text-slate-400 mt-1">Unggah file data {terminology.class.toLowerCase()}</span>
                 </div>
-                <input
-                  id="class-import-input"
-                  type="file"
-                  accept=".xlsx,.xls"
-                  className="hidden"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) handleImportClasses(file);
-                    e.target.value = "";
-                  }}
-                />
               </DropdownMenuItem>
               <DropdownMenuItem 
                 onClick={handleExportClasses} 

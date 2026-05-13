@@ -147,28 +147,27 @@ const SubjectsPage = () => {
         title: `Import ${terminology.subject}`
       });
 
-      let importedCount = 0;
-      const chunkSize = 10;
-      for (let i = 0; i < parsed.length; i += chunkSize) {
-        const chunk = parsed.slice(i, i + chunkSize);
-        await Promise.all(chunk.map(async (row) => {
-          try {
-            await createSubject({ name: row.name });
-            importedCount++;
-          } catch (err) {
-            console.error("Gagal import mapel:", row.name, err);
-          }
-        }));
-        
-        const currentProcessed = Math.min(i + chunkSize, parsed.length);
-        setBatchProgress(prev => ({
-          ...prev,
-          current: currentProcessed,
-          message: `Mengimport data (${currentProcessed}/${parsed.length})`
-        }));
+      const failures: string[] = [];
+      for (let i = 0; i < parsed.length; i++) {
+        try {
+          await createSubject({ name: parsed[i].name });
+          setBatchProgress(prev => ({
+            ...prev,
+            current: i + 1,
+            message: `Mengimport ${terminology.subject.toLowerCase()} (${i + 1}/${parsed.length})`
+          }));
+        } catch (err: any) {
+          console.error(`Gagal import ${parsed[i].name}:`, err);
+          failures.push(`${parsed[i].name} - ${err.message || "Error"}`);
+        }
       }
 
-      showAlert("Import Berhasil", `${importedCount} ${terminology.subject.toLowerCase()} berhasil diimport.`, "success");
+      let message = `${parsed.length - failures.length} ${terminology.subject} berhasil diimport.`;
+      if (failures.length > 0) {
+        message += `\n\n❌ ${failures.length} data gagal:\n- ${failures.slice(0, 5).join("\n- ")}`;
+      }
+      
+      showAlert("Hasil Import", message, failures.length > 0 ? "warning" : "success");
     } catch (err: any) {
       showAlert("Gagal Import", err.message || `Gagal mengimport ${terminology.subject.toLowerCase()}.`, "danger");
     } finally {
@@ -228,6 +227,17 @@ const SubjectsPage = () => {
 
   return (
     <div className="space-y-5">
+      <input
+        id="subject-import-input"
+        type="file"
+        accept=".xlsx,.xls"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) handleImportSubjects(file);
+          e.target.value = "";
+        }}
+      />
       <div className="relative z-30 flex flex-col gap-3 md:flex-row md:items-center md:justify-between bg-card p-4 rounded-2xl border border-slate-200/60 dark:border-slate-800/40 shadow-sm backdrop-blur-sm">
         <div>
           <h2 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
@@ -282,17 +292,6 @@ const SubjectsPage = () => {
                   </span>
                   <span className="text-[10px] text-slate-400 mt-1">Unggah file {terminology.subject.toLowerCase()}</span>
                 </div>
-                <input
-                  id="subject-import-input"
-                  type="file"
-                  accept=".xlsx,.xls"
-                  className="hidden"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) handleImportSubjects(file);
-                    e.target.value = "";
-                  }}
-                />
               </DropdownMenuItem>
               <DropdownMenuItem 
                 onClick={handleExportSubjects} 

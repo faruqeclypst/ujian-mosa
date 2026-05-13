@@ -145,6 +145,7 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     let unsubscribeTeachers: any, unsubscribeClasses: any, unsubscribeSubjects: any, unsubscribeStudents: any;
+    let unsubscribeExams: any, unsubscribeRooms: any, unsubscribeQuestions: any;
 
     const setup = async () => {
       pb.autoCancellation(false);
@@ -189,6 +190,28 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
         }
         if (e.action === "delete") setStudents(prev => prev.filter(item => item.id !== e.record.id));
       });
+
+      // Count Sync Subscriptions
+      unsubscribeExams = await pb.collection("exams").subscribe("*", async (e) => {
+        if (e.action === "create" || e.action === "delete") {
+          const res = await pb.collection("exams").getList(1, 1).catch(() => ({ totalItems: 0 }));
+          setExamsCount(res.totalItems);
+        }
+      });
+
+      unsubscribeRooms = await pb.collection("exam_rooms").subscribe("*", async (e) => {
+        if (e.action === "create" || e.action === "delete") {
+          const res = await pb.collection("exam_rooms").getList(1, 1).catch(() => ({ totalItems: 0 }));
+          setRoomsCount(res.totalItems);
+        }
+      });
+
+      unsubscribeQuestions = await pb.collection("questions").subscribe("*", async (e) => {
+        if (e.action === "create" || e.action === "delete") {
+          const res = await pb.collection("questions").getList(1, 1).catch(() => ({ totalItems: 0 }));
+          setQuestionsCount(res.totalItems);
+        }
+      });
     };
 
     setup();
@@ -197,6 +220,9 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
       if (unsubscribeClasses) unsubscribeClasses();
       if (unsubscribeSubjects) unsubscribeSubjects();
       if (unsubscribeStudents) unsubscribeStudents();
+      if (unsubscribeExams) unsubscribeExams();
+      if (unsubscribeRooms) unsubscribeRooms();
+      if (unsubscribeQuestions) unsubscribeQuestions();
     };
   }, []);
 

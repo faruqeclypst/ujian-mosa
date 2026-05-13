@@ -243,19 +243,62 @@ const TeachersPage = () => {
     try {
       const parsed = await parseTeacherImportExcel(file);
       if (parsed.length === 0) return showAlert("File Kosong", "File yang Anda upload kosong atau tidak valid.", "warning");
-      for (const row of parsed) {
-        await createTeacher({
-          name: row.name,
-          code: row.code,
-          username: row.code || row.name.toLowerCase().replace(/\s+/g, "_") + "_" + Math.floor(Math.random() * 1000),
-          subjects: row.subjects,
-        });
+      
+      setBatchProgress({
+        isOpen: true,
+        total: parsed.length,
+        current: 0,
+        message: "Memulai import data...",
+        title: `Import Data ${terminology.teacher}`
+      });
+
+      const failures: string[] = [];
+      for (let i = 0; i < parsed.length; i++) {
+        const row = parsed[i];
+        try {
+          // Logika Generate: Hapus gelar (setelah koma)
+          const namePart = row.name.split(',')[0].trim();
+          
+          // 1. Generate Username: kecilkan, ganti spasi jadi _
+          const generatedUsername = namePart.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+          
+          // 2. Generate Kode: Ambil inisial (Alfaruq Asri -> AA)
+          const generatedCode = namePart
+            .split(/\s+/)
+            .map(word => word[0])
+            .join('')
+            .toUpperCase()
+            .replace(/[^A-Z]/g, '');
+
+          await createTeacher({
+            name: row.name,
+            code: row.code || generatedCode,
+            username: row.code || generatedUsername || `guru_${Math.floor(Math.random() * 1000)}`,
+            subjects: row.subjects,
+          });
+          
+          setBatchProgress(prev => ({
+            ...prev,
+            current: i + 1,
+            message: `Mengimport ${terminology.teacher.toLowerCase()} (${i + 1}/${parsed.length})`
+          }));
+        } catch (err: any) {
+          console.error(`Gagal import ${row.name}:`, err);
+          failures.push(`${row.name} - ${err.message || "Error"}`);
+        }
       }
-      showAlert("Import Berhasil", `${parsed.length} ${terminology.teacher.toLowerCase()} berhasil diimport.`, "success");
+
+      let message = `${parsed.length - failures.length} ${terminology.teacher} berhasil diimport.`;
+      if (failures.length > 0) {
+        message += `\n\n❌ ${failures.length} data gagal:\n- ${failures.slice(0, 5).join("\n- ")}`;
+      }
+      
+      showAlert("Hasil Import", message, failures.length > 0 ? "warning" : "success");
     } catch (err: any) {
       showAlert("Gagal Import", err.message || `Gagal mengimport data ${terminology.teacher.toLowerCase()}.`, "danger");
     } finally {
       setIsImporting(false);
+      setBatchProgress(prev => ({ ...prev, isOpen: false }));
     }
   };
 
