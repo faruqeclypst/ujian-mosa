@@ -1,0 +1,41 @@
+VITE_APP_NAME=EXAM AA
+VITE_AUTH_USERNAME_DOMAIN=https://assets.alfaruqasri.my.id
+
+# === SaaS Multi-Tenant Config ===
+# Master PocketBase: menyimpan registry sekolah (schools, school_requests, super_admins)
+VITE_MASTER_PB_URL=https://db.alfaruqasri.my.id
+# Domain utama platform SaaS (tanpa subdomain)
+VITE_MAIN_DOMAIN=alfaruqasri.my.id
+# Subdomain khusus untuk landing page & super admin
+VITE_LANDING_SUBDOMAIN=ujian
+# DEV ONLY: isi slug sekolah untuk bypass landing page di localhost
+# Contoh: VITE_DEV_SCHOOL_SLUG=sman-modalbangsa
+# Kosongkan agar localhost tetap tampilkan landing page
+VITE_DEV_SCHOOL_SLUG=modalbangsa
+
+# VITE_POCKETBASE_URL=http://127.0.0.1:8090 offline
+# VITE_POCKETBASE_URL=https://db.alfaruqasri.my.id
+VITE_POCKETBASE_URL=https://modalbangsa.alfaruqasri.my.id
+# IP Online bisa juga URL kayak diatas yang di nginx dari vps ip ke db.alfaruqasri
+
+
+# VITE_R2_SIGNER_URL=https://api.alfaruqasri.my.id/r2/presign
+VITE_R2_SIGNER_URL=http://localhost:5173/r2/presign
+
+# Bypass Exambro Guard (Isi 'true' untuk testing/nonaktifkan pengaman)
+VITE_DISABLE_EXAMBRO_GUARD=false
+VITE_R2_ACCOUNT_ID=fbb45dee06536009648061725236f3d9
+VITE_R2_ACCESS_KEY_ID=e55b9e287ddb52e4a94596ce8011f222
+VITE_R2_SECRET_ACCESS_KEY=15dd3afbca9696723a226718c859132bd8b0864fa186fdddd532518727860400
+VITE_R2_BUCKET=piket
+# VITE_R2_PUBLIC_BASE_URL=https://pub-a1193e163fef41c9afc15d1334b8740b.r2.dev
+VITE_R2_PUBLIC_BASE_URL=https://cdn.alfaruqasri.my.id
+
+# URL backend API (bisa proxy atau langsung)
+VITE_API_URL=http://localhost:5173
+VITE_R2_DEV_INLINE_BASE64=false
+VITE_R2_ENDPOINT=https://fbb45dee06536009648061725236f3d9.r2.cloudflarestorage.com
+
+# Cloudflare Worker URL for R2 operations
+VITE_R2_WORKER_URL=https://r2-delete-worker.faruq-blogger.workers.dev
+

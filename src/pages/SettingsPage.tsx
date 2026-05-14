@@ -732,6 +732,7 @@ const SettingsPage = () => {
                         <Upload size={16} className="text-white" />
                       </div>
                       <input
+                        id="logoInput"
                         type="file"
                         accept="image/*"
                         className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"

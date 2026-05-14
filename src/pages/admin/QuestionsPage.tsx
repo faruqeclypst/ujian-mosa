@@ -153,6 +153,7 @@ const compressImage = (file: File): Promise<File> => {
 const QuestionsPage = () => {
   const navigate = useNavigate();
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [canDrag, setCanDrag] = useState(false);
   const [examId, setExamId] = useState<string | null>(() => sessionStorage.getItem("activeQuestionsExamId"));
 
   useEffect(() => {
@@ -3181,7 +3182,7 @@ const QuestionsPage = () => {
                       return (
                         <div 
                           key={letter} 
-                          draggable={true}
+                          draggable={canDrag}
                           onDragStart={() => setDraggedIndex(index)}
                           onDragOver={(e) => e.preventDefault()}
                           onDrop={() => {
@@ -3199,11 +3200,15 @@ const QuestionsPage = () => {
                             setFormValues(prev => ({ ...prev, choices: updatedChoices }));
                             setDraggedIndex(null);
                           }}
-                          className={`p-3 border rounded-xl space-y-2 transition-all relative group/choice cursor-default ${formValues.choices[letter].isCorrect ? "bg-green-50/30 border-green-200 dark:bg-green-950/10 dark:border-green-900/40" : "bg-slate-50/50 dark:bg-slate-900/30 border-slate-200 dark:border-slate-800"} ${draggedIndex === index ? "opacity-40" : ""}`}
+                          className={`p-3 border rounded-xl space-y-2 transition-all relative group/choice cursor-default ${formValues.choices[letter].isCorrect ? "bg-green-50/30 border-green-200 dark:bg-green-950/10 dark:border-green-900/40" : "bg-slate-50/50 dark:bg-slate-900/30 border-slate-200 dark:border-slate-800"}`}
                         >
                           <div className="flex gap-3 items-center">
                             {/* Drag Handle (Visual Only for HTML5) */}
-                            <div className="cursor-move p-1 -ml-1 text-slate-300 hover:text-slate-500 transition-colors">
+                            <div 
+                              onMouseEnter={() => setCanDrag(true)}
+                              onMouseLeave={() => setCanDrag(false)}
+                              className="cursor-move p-1 -ml-1 text-slate-300 hover:text-slate-500 transition-colors"
+                            >
                               <GripVertical className="h-4 w-4" />
                             </div>
                             
@@ -3230,7 +3235,7 @@ const QuestionsPage = () => {
                               <Button
                                 type="button"
                                 variant="ghost"
-                                className={`h-8 text-[10px] font-bold px-3 rounded-lg transition-all border flex items-center gap-1.5 focus-visible:ring-emerald-500/30 active:scale-95 ${
+                                className={`h-8 text-[10px] font-bold w-24 justify-center rounded-lg transition-all border flex items-center gap-1.5 focus-visible:ring-emerald-500/30 active:scale-95 ${
                                   formValues.choices[letter].isCorrect 
                                     ? "bg-emerald-50 text-emerald-600 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800/40 shadow-sm hover:bg-emerald-100/80 hover:text-emerald-700 active:bg-emerald-200" 
                                     : "bg-slate-50 text-slate-400 border-slate-200 dark:bg-slate-900/40 dark:text-slate-600 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-500 active:bg-slate-200"
@@ -3285,7 +3290,7 @@ const QuestionsPage = () => {
                     {formValues.pairs.map((pair, index) => (
                       <div 
                         key={pair.id} 
-                        draggable={true}
+                        draggable={canDrag}
                         onDragStart={() => setDraggedIndex(index)}
                         onDragOver={(e) => e.preventDefault()}
                         onDrop={() => {
@@ -3297,10 +3302,14 @@ const QuestionsPage = () => {
                           setFormValues(prev => ({ ...prev, pairs: newPairs }));
                           setDraggedIndex(null);
                         }}
-                        onDragEnd={() => setDraggedIndex(null)}
-                        className={`flex gap-2 items-center p-2 rounded-xl bg-slate-50 dark:bg-slate-900/30 border border-slate-200 dark:border-slate-800 transition-opacity ${draggedIndex === index ? "opacity-40" : ""}`}
+                        onDragEnd={() => { setDraggedIndex(null); setCanDrag(false); }}
+                        className={`flex gap-2 items-center p-2 rounded-xl bg-slate-50 dark:bg-slate-900/30 border border-slate-200 dark:border-slate-800 transition-opacity`}
                       >
-                        <div className="cursor-move p-1 text-slate-300 hover:text-slate-500">
+                        <div 
+                          onMouseEnter={() => setCanDrag(true)}
+                          onMouseLeave={() => setCanDrag(false)}
+                          className="cursor-move p-1 text-slate-300 hover:text-slate-500"
+                        >
                           <GripVertical className="h-4 w-4" />
                         </div>
                         <Input
@@ -3363,7 +3372,7 @@ const QuestionsPage = () => {
                     {formValues.items.map((item, index) => (
                       <div 
                         key={item.id} 
-                        draggable={true}
+                        draggable={canDrag}
                         onDragStart={() => setDraggedIndex(index)}
                         onDragOver={(e) => e.preventDefault()}
                         onDrop={() => {
@@ -3375,10 +3384,14 @@ const QuestionsPage = () => {
                           setFormValues(prev => ({ ...prev, items: newItems }));
                           setDraggedIndex(null);
                         }}
-                        onDragEnd={() => setDraggedIndex(null)}
-                        className={`flex gap-2 items-center p-2 rounded-xl bg-slate-50 dark:bg-slate-900/30 border border-slate-200 dark:border-slate-800 transition-opacity ${draggedIndex === index ? "opacity-40" : ""}`}
+                        onDragEnd={() => { setDraggedIndex(null); setCanDrag(false); }}
+                        className={`flex gap-2 items-center p-2 rounded-xl bg-slate-50 dark:bg-slate-900/30 border border-slate-200 dark:border-slate-800 transition-opacity`}
                       >
-                        <div className="cursor-move p-1 text-slate-300 hover:text-slate-500">
+                        <div 
+                          onMouseEnter={() => setCanDrag(true)}
+                          onMouseLeave={() => setCanDrag(false)}
+                          className="cursor-move p-1 text-slate-300 hover:text-slate-500"
+                        >
                           <GripVertical className="h-4 w-4" />
                         </div>
                         <div className="flex items-center justify-center w-6 h-6 shrink-0 rounded-full bg-indigo-600 text-white font-bold text-[10px]">

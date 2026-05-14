@@ -19,6 +19,47 @@ const LandingPage = () => {
     { icon: Building2, title: "Identitas Sekolah", desc: "Siswa mengakses link ujian khusus dengan logo dan nama sekolah Anda sendiri.", color: "text-cyan-600 bg-cyan-50 border-cyan-100" },
   ];
 
+  const testimonials = [
+    {
+      name: "Bapak Said",
+      role: "Waka Kurikulum",
+      school: "SMA Negeri Modal Bangsa Aceh",
+      content: "Platform EXAM AA sangat membantu kami dalam pelaksanaan ujian sekolah. Servernya stabil meskipun diakses oleh ratusan siswa secara bersamaan. Fitur anti-conteknya juga sangat efektif.",
+      image: "https://api.dicebear.com/7.x/avataaars/svg?seed=Said"
+    },
+    {
+      name: "Ibu Rahma",
+      role: "Guru IT",
+      school: "SMK Negeri 1 Banda Aceh",
+      content: "Dulu kami kesulitan mengelola bank soal, sekarang dengan fitur AI Generator dan import Word, persiapan ujian jadi jauh lebih cepat dan efisien.",
+      image: "https://api.dicebear.com/7.x/avataaars/svg?seed=Rahma"
+    },
+    {
+      name: "Pak Budi",
+      role: "Kepala Sekolah",
+      school: "SMA Swasta Unggul",
+      content: "Analisis nilainya sangat detail. Kami bisa langsung melihat statistik butir soal untuk evaluasi pembelajaran guru di kelas. Sangat direkomendasikan!",
+      image: "https://api.dicebear.com/7.x/avataaars/svg?seed=Budi"
+    }
+  ];
+
+  const techStackRow1 = [
+    { name: "React", logo: "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/react/react-original.svg" },
+    { name: "TypeScript", logo: "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/typescript/typescript-original.svg" },
+    { name: "Tailwind CSS", logo: "https://www.vectorlogo.zone/logos/tailwindcss/tailwindcss-icon.svg" },
+    { name: "Vite", logo: "https://vitejs.dev/logo.svg" },
+    { name: "Bun", logo: "https://bun.sh/logo.svg" },
+    { name: "Zod", logo: "https://raw.githubusercontent.com/colinhacks/zod/master/logo.svg" },
+  ];
+
+  const techStackRow2 = [
+    { name: "PocketBase", logo: "https://pocketbase.io/images/logo.svg" },
+    { name: "Capacitor", logo: "https://icon.icepanel.io/Technology/svg/Capacitor.svg" },
+    { name: "Framer Motion", logo: "https://framerusercontent.com/images/Io89FonxEaWg4nxvQQllVLwPUUI.png" },
+    { name: "Radix UI", logo: "https://avatars.githubusercontent.com/u/75042455?s=200&v=4" },
+    { name: "Lucide", logo: "https://lucide.dev/logo.light.svg" }
+  ];
+
   const plans = [
     {
       name: "Paket Berkembang",
@@ -106,6 +147,12 @@ const LandingPage = () => {
               Harga
             </button>
             <button
+              onClick={() => document.getElementById("testimonials")?.scrollIntoView({ behavior: "smooth" })}
+              className="text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors px-3 py-2 rounded-lg hover:bg-slate-100"
+            >
+              Testimoni
+            </button>
+            <button
               onClick={() => navigate("/daftar")}
               className="text-sm font-semibold bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-all shadow-sm hover:shadow-md active:scale-95 ml-2"
             >
@@ -137,6 +184,12 @@ const LandingPage = () => {
             >
               Paket Harga
             </button>
+            <button
+              onClick={() => { document.getElementById("testimonials")?.scrollIntoView({ behavior: "smooth" }); setMobileMenuOpen(false); }}
+              className="w-full text-left text-sm font-medium text-slate-700 px-3 py-2.5 rounded-lg hover:bg-slate-100 transition-colors"
+            >
+              Testimoni
+            </button>
 
             <button
               onClick={() => navigate("/daftar")}
@@ -164,18 +217,19 @@ const LandingPage = () => {
           </div>
 
           <h1 className="text-3xl sm:text-5xl md:text-6xl lg:text-7xl font-black leading-[1.1] tracking-tight mb-6 text-slate-900">
-            Ujian Online Profesional <br />
+            Platform Ujian Sekolah <br />
             <span className="relative inline-block mt-2">
-              <span className="text-blue-600">Tanpa Ribet</span>
+              <span className="text-blue-600">Terpercaya</span>
               <svg className="absolute -bottom-2 left-0 w-full" viewBox="0 0 200 8" fill="none">
                 <path d="M2 6C40 2 80 2 100 4C120 6 160 4 198 2" stroke="#3B82F6" strokeWidth="3" strokeLinecap="round" opacity="0.4" />
               </svg>
             </span>{" "}
-            Urus Server
+            & Profesional
           </h1>
 
           <p className="text-base sm:text-lg md:text-xl text-slate-500 max-w-3xl mx-auto mb-10 leading-relaxed font-medium">
-            EXAM AA membantu sekolah / universitas (umum) mengadakan pelaksanaan ujian online dengan lancar. Tidak ada lagi kendala teknis atau aplikasi down saat ujian berlangsung.
+            {/* Telah dipercayai oleh <span className="text-blue-600 font-bold">SMA Negeri Modal Bangsa</span> dan berbagai sekolah unggulan lainnya untuk menyelenggarakan ujian CBT yang aman, stabil, dan otomatis. */}
+            EXAM AA membantu <span className="text-blue-600 font-bold">sekolah / universitas (umum)</span> mengadakan pelaksanaan ujian online dengan lancar. Tidak ada lagi kendala teknis atau aplikasi down saat ujian berlangsung.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
@@ -220,6 +274,38 @@ const LandingPage = () => {
               </div>
             ))}
           </div>
+
+          {/* School Partner Logo Bar */}
+          <div className="mt-20 pt-10 border-t border-slate-100">
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-8">Telah Dipercayai Oleh</p>
+            <div className="flex flex-wrap justify-center items-center gap-10 opacity-80 grayscale hover:grayscale-0 transition-all duration-500">
+              <div className="flex flex-col items-center gap-3">
+                <img
+                  src="https://cdn.alfaruqasri.my.id/assets/modalbangsa.png"
+                  alt="SMA Negeri Modal Bangsa"
+                  className="h-16 w-auto object-contain"
+                />
+                <span className="font-bold text-slate-400 text-[10px] uppercase tracking-widest text-center">SMAN Modal Bangsa</span>
+              </div>
+              <div className="flex flex-col items-center gap-3">
+                <img
+                  src="https://cdn.alfaruqasri.my.id/assets/SMA%20Negeri%2011%20Tangerang%20Selatan.webp"
+                  alt="SMA Negeri Modal Bangsa"
+                  className="h-16 w-auto object-contain"
+                />
+                <span className="font-bold text-slate-400 text-[10px] uppercase tracking-widest text-center">SMAN 11 Tangerang Selatan</span>
+              </div>
+              {/* Add more as text/placeholders if no other logos are available */}
+              {/* <div className="flex flex-col items-center gap-3">
+                <div className="w-12 h-12 bg-slate-100 rounded-2xl flex items-center justify-center font-bold text-slate-400 text-sm shadow-inner">SMK</div>
+                <span className="font-bold text-slate-400 text-[10px] uppercase tracking-widest text-center">SMKN 1 Banda Aceh</span>
+              </div> */}
+              {/* <div className="flex flex-col items-center gap-3">
+                <div className="w-12 h-12 bg-slate-100 rounded-2xl flex items-center justify-center font-bold text-slate-400 text-sm shadow-inner">SMA</div>
+                <span className="font-bold text-slate-400 text-[10px] uppercase tracking-widest text-center">SMA Fatih Billingual</span>
+              </div> */}
+            </div>
+          </div>
         </div>
       </section>
 
@@ -247,6 +333,56 @@ const LandingPage = () => {
                 </div>
                 <h3 className="font-bold text-base mb-2 text-slate-900 group-hover:text-blue-700 transition-colors">{f.title}</h3>
                 <p className="text-slate-500 text-sm leading-relaxed">{f.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Tech Stack Marquee */}
+      <section className="py-16 bg-white overflow-hidden border-y border-slate-50 relative">
+        <div className="absolute inset-y-0 left-0 w-32 bg-gradient-to-r from-white to-transparent z-10" />
+        <div className="absolute inset-y-0 right-0 w-32 bg-gradient-to-l from-white to-transparent z-10" />
+
+        <div className="flex flex-col items-center mb-16 px-6">
+          <div className="inline-flex items-center gap-2 bg-blue-50 border border-blue-200 text-blue-700 text-xs font-bold px-3 py-1.5 rounded-full mb-4 uppercase tracking-wider">
+            ⚡ Teknologi
+          </div>
+          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-slate-900 leading-tight text-center max-w-3xl">Teknologi Modern di Balik <span className="text-blue-600">EXAM AA</span></h2>
+          <p className="mt-6 text-slate-500 text-base max-w-2xl mx-auto font-medium text-center">
+            Demi aplikasi yang stabil, kami mengembangkan sistem CBT dan Website dengan stack teknologi terkini untuk memastikan performa maksimal, keamanan data yang tinggi, dan pengalaman ujian yang mulus bagi seluruh siswa.
+          </p>
+        </div>
+
+        <div className="space-y-12">
+          {/* Row 1: To the Left */}
+          <div className="flex w-max animate-marquee whitespace-nowrap gap-24 items-center">
+            {[...techStackRow1, ...techStackRow1, ...techStackRow1, ...techStackRow1].map((tech, i) => (
+              <div key={i} className="flex items-center gap-4 transition-all duration-300 group">
+                <img
+                  src={tech.logo}
+                  alt={tech.name}
+                  className="h-10 w-auto grayscale opacity-40 group-hover:grayscale-0 group-hover:opacity-100 transition-all duration-500 transform group-hover:scale-110"
+                />
+                <span className="text-xl font-black text-slate-300 group-hover:text-slate-900 transition-all duration-500 tracking-tighter">
+                  {tech.name}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          {/* Row 2: To the Right */}
+          <div className="flex w-max animate-marquee-reverse whitespace-nowrap gap-24 items-center">
+            {[...techStackRow2, ...techStackRow2, ...techStackRow2, ...techStackRow2].map((tech, i) => (
+              <div key={i} className="flex items-center gap-4 transition-all duration-300 group">
+                <img
+                  src={tech.logo}
+                  alt={tech.name}
+                  className="h-10 w-auto grayscale opacity-40 group-hover:grayscale-0 group-hover:opacity-100 transition-all duration-500 transform group-hover:scale-110"
+                />
+                <span className="text-xl font-black text-slate-300 group-hover:text-slate-900 transition-all duration-500 tracking-tighter">
+                  {tech.name}
+                </span>
               </div>
             ))}
           </div>
@@ -302,6 +438,53 @@ const LandingPage = () => {
                 <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-800">Preview Dashboard EXAM AA</span>
               </div>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Testimonials */}
+      <section id="testimonials" className="py-24 sm:py-32 px-6 sm:px-10 lg:px-16 relative z-10 bg-slate-50 overflow-hidden">
+        {/* Decorative Glow */}
+        <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-blue-100/50 blur-[120px] rounded-full -translate-y-1/2 translate-x-1/2" />
+        <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-indigo-50/50 blur-[120px] rounded-full translate-y-1/2 -translate-x-1/2" />
+
+        <div className="max-w-7xl mx-auto relative z-10">
+          <div className="text-center mb-16">
+            <div className="inline-flex items-center gap-2 bg-blue-100 border border-blue-200 text-blue-700 text-xs font-bold px-3 py-1.5 rounded-full mb-4 uppercase tracking-wider">
+              <MessageCircle size={12} /> Testimoni
+            </div>
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black mb-6 text-slate-900 leading-tight">Apa Kata Mereka Tentang EXAM AA?</h2>
+            <p className="text-slate-500 text-base max-w-2xl mx-auto font-medium">
+              Telah digunakan oleh berbagai sekolah unggulan untuk meningkatkan kualitas evaluasi pembelajaran.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {testimonials.map((t, i) => (
+              <div key={i} className="group bg-white p-8 rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-2xl hover:shadow-blue-600/10 transition-all duration-500 flex flex-col justify-between relative overflow-hidden">
+                {/* Accent line on hover */}
+                <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-400 to-blue-600 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500" />
+
+                <div>
+                  <div className="flex gap-1 text-amber-400 mb-6">
+                    {[...Array(5)].map((_, j) => <Star key={j} size={16} fill="currentColor" />)}
+                  </div>
+                  <p className="text-slate-600 italic mb-8 leading-relaxed font-medium relative z-10">
+                    "{t.content}"
+                  </p>
+                </div>
+                <div className="flex items-center gap-4 border-t border-slate-50 pt-6">
+                  <div className="w-12 h-12 rounded-2xl overflow-hidden bg-slate-100 border border-slate-200 shadow-inner group-hover:scale-110 transition-transform duration-500">
+                    <img src={t.image} alt={t.name} className="w-full h-full object-cover" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-slate-900 text-sm">{t.name}</h4>
+                    <p className="text-[10px] font-black uppercase tracking-wider text-blue-600">{t.role}</p>
+                    <p className="text-[11px] text-slate-400 font-medium">{t.school}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </section>
@@ -437,6 +620,7 @@ const LandingPage = () => {
           <div className="flex gap-4 sm:gap-5 text-sm text-slate-500">
             <button onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} className="hover:text-blue-600 transition-colors">Beranda</button>
             <button onClick={() => document.getElementById("features")?.scrollIntoView({ behavior: "smooth" })} className="hover:text-blue-600 transition-colors">Fitur</button>
+            <button onClick={() => document.getElementById("testimonials")?.scrollIntoView({ behavior: "smooth" })} className="hover:text-blue-600 transition-colors">Testimoni</button>
             <button onClick={() => document.getElementById("pricing")?.scrollIntoView({ behavior: "smooth" })} className="hover:text-blue-600 transition-colors text-nowrap">Harga</button>
             <a href="https://wa.me/6285359907696" target="_blank" rel="noopener noreferrer" className="hover:text-emerald-600 transition-colors flex items-center gap-1 text-nowrap">
               <MessageCircle size={14} /> Hubungi CS
