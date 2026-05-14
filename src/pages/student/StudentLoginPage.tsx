@@ -7,11 +7,13 @@ import FormField from "../../components/forms/FormField";
 import { Card, CardContent } from "../../components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../../components/ui/dialog";
 import { useTenant } from "../../context/TenantContext";
-import { User, Lock, GraduationCap, School, Eye, EyeOff } from "lucide-react";
+import { useTheme } from "../../context/ThemeContext";
+import { User, Lock, GraduationCap, School, Eye, EyeOff, Sun, Moon } from "lucide-react";
 
 const StudentLoginPage = () => {
   const { student, loginStudent, changePassword } = useStudentAuth();
   const { pb, school, setManualSchool, terminology } = useTenant();
+  const { actualTheme, toggleTheme } = useTheme();
 
   const [nisn, setNisn] = useState("");
   const [password, setPassword] = useState("");
@@ -105,7 +107,7 @@ const StudentLoginPage = () => {
   const showChangePassModal = !!(student && !student.hasChangedPassword);
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-[#f8fafc] overflow-hidden relative font-sans leading-relaxed">
+    <div className="flex items-center justify-center min-h-screen bg-[#f8fafc] dark:bg-[#020617] overflow-hidden relative font-sans leading-relaxed transition-colors duration-500">
       {/* Floating Change School Button (Android Only) */}
       {Capacitor.getPlatform() === 'android' && (
         <div className="absolute top-6 left-6 z-50">
@@ -118,6 +120,21 @@ const StudentLoginPage = () => {
           </button>
         </div>
       )}
+      
+      {/* Dark Mode Toggle Button */}
+      <div className="absolute top-6 right-6 z-50">
+        <button
+          onClick={toggleTheme}
+          className="flex items-center justify-center w-11 h-11 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-slate-200 dark:border-slate-800 rounded-full text-slate-600 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400 hover:border-emerald-200 dark:hover:border-emerald-900/50 transition-all shadow-sm group"
+          title={actualTheme === 'dark' ? "Mode Terang" : "Mode Gelap"}
+        >
+          {actualTheme === 'dark' ? (
+            <Sun size={20} className="group-hover:rotate-45 transition-transform duration-300" />
+          ) : (
+            <Moon size={20} className="group-hover:-rotate-12 transition-transform duration-300" />
+          )}
+        </button>
+      </div>
 
       {/* Dynamic Animated Background */}
       <div className="absolute inset-0 z-0">
@@ -126,7 +143,7 @@ const StudentLoginPage = () => {
         <div className="absolute top-[30%] right-[10%] w-[30%] h-[30%] bg-lime-400/10 rounded-full blur-[100px] animate-pulse delay-150"></div>
 
         {/* Subtle Background Accent */}
-        <div className="absolute inset-0 bg-slate-50/50"></div>
+        <div className="absolute inset-0 bg-slate-50/50 dark:bg-slate-950/20"></div>
       </div>
 
       <div className="w-full max-w-lg mx-auto z-10 p-6 flex flex-col items-center">
@@ -161,18 +178,18 @@ const StudentLoginPage = () => {
         </div>
 
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight mb-2">
+          <h1 className="text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight mb-2">
             Portal Ujian {terminology.student}
           </h1>
           <div className="flex items-center justify-center gap-2">
             <GraduationCap size={18} className="text-emerald-600" />
-            <p className="text-slate-500 font-medium text-sm md:text-base">
+            <p className="text-slate-500 dark:text-slate-400 font-medium text-sm md:text-base">
               {schoolName || "SMAN Modal Bangsa Aceh"}
             </p>
           </div>
         </div>
 
-        <Card className="w-full bg-white/70 backdrop-blur-2xl border border-white/60 shadow-[0_20px_50px_rgba(16,185,129,0.07)] rounded-[32px] overflow-hidden">
+        <Card className="w-full bg-white/70 dark:bg-slate-900/60 backdrop-blur-2xl border border-white/60 dark:border-slate-800/60 shadow-[0_20px_50px_rgba(16,185,129,0.07)] dark:shadow-[0_20px_50px_rgba(0,0,0,0.3)] rounded-[32px] overflow-hidden">
           <CardContent className="p-8 md:p-10">
             <form onSubmit={handleLogin} className="space-y-6">
               {error && (
@@ -183,21 +200,21 @@ const StudentLoginPage = () => {
               )}
 
               <div className="space-y-2">
-                <label className="text-sm font-semibold text-slate-700 ml-1 flex items-center gap-2">
-                  <User size={14} className="text-slate-400" /> {terminology.id} / Username
+                <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 ml-1 flex items-center gap-2">
+                  <User size={14} className="text-slate-400 dark:text-slate-500" /> {terminology.id} / Username
                 </label>
                 <Input
                   value={nisn}
                   onChange={(e) => setNisn(e.target.value)}
                   placeholder={`Masukkan nomor induk ${terminology.student.toLowerCase()}`}
-                  className="bg-white/50 border-slate-200/60 text-slate-800 placeholder:text-slate-400 focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 rounded-[20px] h-14 px-5 text-base transition-all duration-300"
+                  className="bg-white/50 dark:bg-slate-950/50 border-slate-200/60 dark:border-slate-800/60 text-slate-800 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 rounded-[20px] h-14 px-5 text-base transition-all duration-300"
                   disabled={loading}
                 />
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-semibold text-slate-700 ml-1 flex items-center gap-2">
-                  <Lock size={14} className="text-slate-400" /> Password
+                <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 ml-1 flex items-center gap-2">
+                  <Lock size={14} className="text-slate-400 dark:text-slate-500" /> Password
                 </label>
                 <div className="relative">
                   <Input
@@ -205,13 +222,13 @@ const StudentLoginPage = () => {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
-                    className="bg-white/50 border-slate-200/60 text-slate-800 placeholder:text-slate-400 focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 rounded-[20px] h-14 px-5 pr-12 text-base transition-all duration-300"
+                    className="bg-white/50 dark:bg-slate-950/50 border-slate-200/60 dark:border-slate-800/60 text-slate-800 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 rounded-[20px] h-14 px-5 pr-12 text-base transition-all duration-300"
                     disabled={loading}
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors focus:outline-none"
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-600 hover:text-slate-600 dark:hover:text-slate-400 transition-colors focus:outline-none"
                   >
                     {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                   </button>
@@ -263,14 +280,14 @@ const StudentLoginPage = () => {
             )}
 
             <div className="space-y-2">
-              <label className="text-sm font-semibold text-slate-700 ml-1">Password Baru</label>
+              <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 ml-1">Password Baru</label>
               <div className="relative">
                 <Input
                   type={showNewPassword ? "text" : "password"}
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   placeholder="Minimal 6 karakter"
-                  className="rounded-2xl h-12 bg-slate-50 border-slate-200 pr-10"
+                  className="rounded-2xl h-12 bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 pr-10 text-slate-900 dark:text-white"
                 />
                 <button
                   type="button"
@@ -283,14 +300,14 @@ const StudentLoginPage = () => {
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-semibold text-slate-700 ml-1">Konfirmasi Password Baru</label>
+              <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 ml-1">Konfirmasi Password Baru</label>
               <div className="relative">
                 <Input
                   type={showNewPassword ? "text" : "password"}
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   placeholder="Ulangi password baru"
-                  className="rounded-2xl h-12 bg-slate-50 border-slate-200 pr-10"
+                  className="rounded-2xl h-12 bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 pr-10 text-slate-900 dark:text-white"
                 />
               </div>
             </div>

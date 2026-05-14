@@ -193,6 +193,7 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
 
       // Count Sync Subscriptions
       unsubscribeExams = await pb.collection("exams").subscribe("*", async (e) => {
+        console.log("🔔 Realtime Exam Event:", e.action);
         if (e.action === "create" || e.action === "delete") {
           const res = await pb.collection("exams").getList(1, 1).catch(() => ({ totalItems: 0 }));
           setExamsCount(res.totalItems);
@@ -200,6 +201,7 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
       });
 
       unsubscribeRooms = await pb.collection("exam_rooms").subscribe("*", async (e) => {
+        console.log("🔔 Realtime Room Event:", e.action);
         if (e.action === "create" || e.action === "delete") {
           const res = await pb.collection("exam_rooms").getList(1, 1).catch(() => ({ totalItems: 0 }));
           setRoomsCount(res.totalItems);
@@ -207,6 +209,7 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
       });
 
       unsubscribeQuestions = await pb.collection("questions").subscribe("*", async (e) => {
+        console.log("🔔 Realtime Question Event:", e.action);
         if (e.action === "create" || e.action === "delete") {
           const res = await pb.collection("questions").getList(1, 1).catch(() => ({ totalItems: 0 }));
           setQuestionsCount(res.totalItems);
@@ -224,7 +227,7 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
       if (unsubscribeRooms) unsubscribeRooms();
       if (unsubscribeQuestions) unsubscribeQuestions();
     };
-  }, []);
+  }, [pb, initAll]);
 
   // --- Universal Token & Settings Sync ---
   useEffect(() => {

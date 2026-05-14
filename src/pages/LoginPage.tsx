@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Capacitor } from "@capacitor/core";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Lock, User, Eye, EyeOff, Sparkles, Shield, School } from "lucide-react";
+import { Lock, User, Eye, EyeOff, Sparkles, Shield, School, Sun, Moon } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { motion } from "framer-motion";
@@ -11,9 +11,9 @@ import { Button } from "../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../components/ui/dialog";
 import { Input } from "../components/ui/input";
-import { ThemeToggle } from "../components/ui/theme-toggle";
 import { useAuth } from "../context/AuthContext";
 import { useTenant } from "../context/TenantContext";
+import { useTheme } from "../context/ThemeContext";
 
 const loginSchema = z.object({
   username: z.string().min(3, "Username minimal 3 karakter"),
@@ -25,6 +25,7 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 const LoginPage = () => {
   const { signInWithUsername, user, changePassword } = useAuth();
   const { pb: tenantPb, setManualSchool } = useTenant();
+  const { actualTheme, toggleTheme } = useTheme();
   const pb = tenantPb;
   const [formError, setFormError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
@@ -110,8 +111,18 @@ const LoginPage = () => {
         </div>
       )}
       {/* Theme Toggle - Fixed Position */}
-      <div className="absolute top-4 right-4 z-50">
-        <ThemeToggle />
+      <div className="absolute top-6 right-6 z-50">
+        <button
+          onClick={toggleTheme}
+          className="flex items-center justify-center w-11 h-11 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-slate-200 dark:border-slate-800 rounded-full text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-200 dark:hover:border-blue-900/50 transition-all shadow-sm group"
+          title={actualTheme === 'dark' ? "Mode Terang" : "Mode Gelap"}
+        >
+          {actualTheme === 'dark' ? (
+            <Sun size={20} className="group-hover:rotate-45 transition-transform duration-300" />
+          ) : (
+            <Moon size={20} className="group-hover:-rotate-12 transition-transform duration-300" />
+          )}
+        </button>
       </div>
       {/* Animated Background Elements */}
       <div className="absolute inset-0 overflow-hidden">

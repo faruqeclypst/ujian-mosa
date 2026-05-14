@@ -1,12 +1,12 @@
 import * as XLSX from "xlsx-js-style";
 
-export const TEACHER_IMPORT_HEADERS = ["Nama Guru", "Kode Guru", "Mapel Utama (Pisahkan dengan koma)"] as const;
+export const TEACHER_IMPORT_HEADERS = ["Nama Guru", "Kode Guru", "Username Login", "Mapel Utama (Pisahkan dengan koma)"] as const;
 
 export function downloadTeacherImportTemplate(filename = "template-import-guru.xlsx") {
   const ws = XLSX.utils.aoa_to_sheet([
     [...TEACHER_IMPORT_HEADERS],
-    ["Pak Toni Syafi'i", "TS", "Informatika, Matematika"],
-    ["Bu Siti Aminah", "SA", "Bahasa Indonesia"],
+    ["Pak Toni Syafi'i", "TS", "tonisyafii", "Informatika, Matematika"],
+    ["Bu Siti Aminah", "SA", "sitiaminah", "Bahasa Indonesia"],
   ]);
   
   const headerStyle = {
@@ -20,7 +20,7 @@ export function downloadTeacherImportTemplate(filename = "template-import-guru.x
     if (ws[addr]) (ws[addr] as any).s = headerStyle;
   }
 
-  (ws as any)["!cols"] = [{ wch: 25 }, { wch: 12 }, { wch: 40 }];
+  (ws as any)["!cols"] = [{ wch: 25 }, { wch: 12 }, { wch: 18 }, { wch: 40 }];
 
   const wsNotes = XLSX.utils.aoa_to_sheet([
     ["Keterangan Import Guru"],
@@ -28,6 +28,7 @@ export function downloadTeacherImportTemplate(filename = "template-import-guru.x
     ["Aturan:"],
     ["- Nama Guru wajib diisi."],
     ["- Kode Guru: opsional (misal: TS, SA)."],
+    ["- Username Login: opsional (jika kosong akan dibuat otomatis dari nama)."],
     ["- Mapel Utama: pisahkan dengan koma jika lebih dr satu (misal: Matematika, IPA)."],
   ]);
   (wsNotes as any)["!cols"] = [{ wch: 80 }];
@@ -49,6 +50,7 @@ export async function parseTeacherImportExcel(file: File): Promise<{ name: strin
     .map((row) => ({
       name: String(row["Nama Guru"] || "").trim(),
       code: String(row["Kode Guru"] || "").trim() || undefined,
+      username: String(row["Username Login"] || "").trim() || undefined,
       subjects: String(row["Mapel Utama (Pisahkan dengan koma)"] || "")
         .split(",")
         .map((s) => s.trim())
@@ -57,11 +59,11 @@ export async function parseTeacherImportExcel(file: File): Promise<{ name: strin
     .filter((v) => v.name.length > 0);
 }
 
-export function exportTeacherToExcel(params: { teachers: Array<{ name: string; code?: string; subjects?: string[] }>; filename?: string }) {
+export function exportTeacherToExcel(params: { teachers: Array<{ name: string; code?: string; username?: string; subjects?: string[] }>; filename?: string }) {
   const filename = params.filename ?? "data-guru.xlsx";
   const ws = XLSX.utils.aoa_to_sheet([
     [...TEACHER_IMPORT_HEADERS],
-    ...params.teachers.map((t) => [t.name, t.code || "", (t.subjects || []).join(", ")]),
+    ...params.teachers.map((t) => [t.name, t.code || "", t.username || "", (t.subjects || []).join(", ")]),
   ]);
 
   const headerStyle = {
@@ -73,7 +75,7 @@ export function exportTeacherToExcel(params: { teachers: Array<{ name: string; c
     if (ws[addr]) (ws[addr] as any).s = headerStyle;
   }
 
-  (ws as any)["!cols"] = [{ wch: 25 }, { wch: 12 }, { wch: 40 }];
+  (ws as any)["!cols"] = [{ wch: 25 }, { wch: 12 }, { wch: 18 }, { wch: 40 }];
 
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Teacher");

@@ -22,7 +22,10 @@ import {
   Image as ImageIcon,
   ChevronRight,
   Menu,
-  X
+  X,
+  FileSpreadsheet,
+  FileText,
+  Sparkles
 } from "lucide-react";
 import { useTenant } from "../../context/TenantContext";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
@@ -197,42 +200,132 @@ const GuidePage = () => {
           </section>
 
           {/* Bank Soal */}
-          <section id="bank-soal" className="scroll-mt-32 space-y-5">
+          <section id="bank-soal" className="scroll-mt-32 space-y-8">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-indigo-100 dark:bg-indigo-900/30 rounded-xl flex items-center justify-center flex-shrink-0">
                 <BookOpen size={20} className="text-indigo-600 dark:text-indigo-400" />
               </div>
-              <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">2. Manajemen Bank Soal</h2>
+              <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">2. Panduan Detail Bank Soal</h2>
             </div>
-            <Card className="rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900 overflow-hidden">
-              <div className="divide-y divide-slate-100 dark:divide-slate-800 flex flex-col">
+
+            <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed font-medium">
+              Ikuti langkah-langkah di bawah ini untuk mengelola pertanyaan ujian dari nol hingga siap digunakan di Ruang Ujian.
+            </p>
+
+            {/* A. Pembuatan Paket */}
+            <div className="space-y-4">
+              <h3 className="text-base font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                <Badge className="bg-indigo-600 text-white border-0">A</Badge> Membuat Paket Soal Baru
+              </h3>
+              <div className="grid grid-cols-1 gap-3 pl-2 sm:pl-9 border-l-2 border-slate-100 dark:border-slate-800">
                 {[
-                  { char: "A", title: "Pembuatan Paket", desc: "Buat paket soal melalui tombol Tambah Paket Soal. Isi nama paket dan atur ketersediaan akses tingkat kelas." },
-                  { char: "B", title: "Input Pertanyaan", desc: "Berbagai tipe tersedia (Pilihan Ganda, Essay, Menjodohkan). Editor Teks Kaya mendukung gambar dan format penuh." },
-                  { char: "C", title: "Generate via AI", desc: "Buat soal dalam detik menggunakan integrasi Kecerdasan Buatan. Cukup ketik topik kompetensi dasar." }
-                ].map((step) => (
-                  <div key={step.char} className="p-5 flex items-start sm:items-center gap-4 hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
-                    <div className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-900/30 flex items-center justify-center shrink-0 border border-indigo-100 dark:border-indigo-800/40">
-                      <span className="font-bold text-indigo-600 dark:text-indigo-400 text-sm">{step.char}</span>
-                    </div>
-                    <div>
-                      <h4 className="font-bold text-sm text-slate-900 dark:text-white mb-1.5">{step.title}</h4>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed font-medium">{step.desc}</p>
-                    </div>
+                  "Klik menu Bank Soal di sidebar kiri.",
+                  "Klik tombol biru bertuliskan + Tambah Paket Soal di pojok kanan atas.",
+                  "Isi Nama Paket (Contoh: Informatika XI-34 AA).",
+                  "Pilih Jenjang Kelas (Contoh: Kelas X). Paket ini hanya bisa diakses oleh kelas yang Anda centang.",
+                  "Klik Simpan. Paket akan muncul di daftar tabel."
+                ].map((txt, i) => (
+                  <div key={i} className="flex gap-3 text-xs font-medium text-slate-600 dark:text-slate-400">
+                    <span className="text-indigo-500 font-bold">{i + 1}.</span>
+                    <span>{txt}</span>
                   </div>
                 ))}
+              </div>
+            </div>
 
-                {/* Info Literasi Alert style */}
-                <div className="p-5 bg-blue-50/50 dark:bg-blue-900/10">
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-                    <Badge className="bg-blue-600 text-white border-0 px-2.5 py-0.5 text-[10px] uppercase font-black uppercase shrink-0">Wacana / Literasi</Badge>
-                    <p className="text-[11px] font-semibold text-blue-800 dark:text-blue-300">
-                      Gunakan <span className="font-black bg-blue-100 dark:bg-blue-800/50 px-1 rounded mx-0.5">ID Grup</span> yang identik untuk mengelompokkan soal ke dalam satu wacana. Teks bacaan wacana cukup diisi pada butir soal pertama.
-                    </p>
+            {/* B. Input Soal Manual */}
+            <div className="space-y-4">
+              <h3 className="text-base font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                <Badge className="bg-emerald-600 text-white border-0">B</Badge> Mengisi Soal Secara Manual
+              </h3>
+              <div className="grid grid-cols-1 gap-3 pl-2 sm:pl-9 border-l-2 border-slate-100 dark:border-slate-800">
+                {[
+                  "Cari paket soal yang baru dibuat, klik tombol biru ikon Mata (Lihat Soal).",
+                  "Klik tombol + Tambah Soal untuk membuka Editor.",
+                  "Tipe Soal: Secara default adalah Pilihan Ganda. Anda bisa menggantinya ke Isian, Essay, atau Menjodohkan.",
+                  "Teks Soal: Ketik pertanyaan Anda. Gunakan ikon Gambar untuk upload foto, Untuk rumus Matematika, Fisika, Kimia langsung Copy Paste (hapus tanda / dan lainnya jika ada!).",
+                  "Opsi Jawaban: Isi pilihan A sampai E. Pastikan mencentang bulatan hijau di samping opsi yang benar.",
+                  "Literasi (Opsional): Jika soal berbasis wacana panjang, aktifkan tombol Literasi, buat Kode Grup (misal: TEKS-1), dan isi teks bacaannya.",
+                  "Klik Simpan Soal. Soal akan masuk ke dalam daftar."
+                ].map((txt, i) => (
+                  <div key={i} className="flex gap-3 text-xs font-medium text-slate-600 dark:text-slate-400">
+                    <span className="text-emerald-500 font-bold">{i + 1}.</span>
+                    <span>{txt}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* C. Fitur AI (Koneksi & Magic) */}
+            <div className="space-y-4">
+              <h3 className="text-base font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                <Badge className="bg-orange-600 text-white border-0">C</Badge> Menggunakan Fitur AI (Otomatis)
+              </h3>
+              <Card className="rounded-2xl border border-orange-100 dark:border-orange-900/30 bg-orange-50/20 dark:bg-orange-950/5 overflow-hidden ml-0 sm:ml-9">
+                <div className="p-5 space-y-6">
+                  <div>
+                    <h4 className="text-xs font-black uppercase tracking-widest text-orange-700 dark:text-orange-400 mb-3 flex items-center gap-2">
+                      <Settings size={14} /> Tahap 1: Koneksi AI
+                    </h4>
+                    <div className="grid grid-cols-1 gap-2.5">
+                      <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed italic border-l-2 border-orange-200 dark:border-orange-800 pl-3">
+                        Klik menu <b>Pengaturan</b> &rarr; Pilih tab <b>Koneksi AI</b> &rarr; Pilih Provider (misal: <b>Groq</b>) &rarr; Masukkan <b>API Key</b> &rarr; Klik <b>Simpan</b>.
+                      </p>
+                    </div>
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-black uppercase tracking-widest text-orange-700 dark:text-orange-400 mb-3 flex items-center gap-2">
+                      <Sparkles size={14} /> Tahap 2: Magic AI (Buat Soal)
+                    </h4>
+                    <div className="grid grid-cols-1 gap-2.5">
+                      {[
+                        "Di halaman daftar soal, klik tombol ungu Magic AI.",
+                        "Ketik topik soal yang diinginkan (Contoh: Ekosistem Laut dan Rantai Makanan).",
+                        "Pilih jumlah soal dan tingkat kesulitan.",
+                        "Klik Generate. Tunggu AI memproses hingga muncul daftar soal hasil buatan AI.",
+                        "Klik Simpan Hasil AI. Semua soal otomatis masuk ke bank soal Anda."
+                      ].map((txt, i) => (
+                        <div key={i} className="flex gap-3 text-[11px] font-medium text-slate-600 dark:text-slate-400">
+                          <span className="text-orange-500 font-bold">{i + 1}.</span>
+                          <span>{txt}</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
+              </Card>
+            </div>
+
+            {/* D. Batch Import */}
+            <div className="space-y-4">
+              <h3 className="text-base font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                <Badge className="bg-blue-600 text-white border-0">D</Badge> Import dari Excel & Word
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 ml-0 sm:ml-9">
+                <div className="p-5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm">
+                  <h4 className="text-xs font-bold text-slate-900 dark:text-white mb-3 flex items-center gap-2">
+                    <FileSpreadsheet size={16} className="text-emerald-600" /> Lewat Excel (Teks)
+                  </h4>
+                  <ul className="text-[10px] space-y-2 text-slate-500 dark:text-slate-400">
+                    <li>1. Klik <b>Download Template</b> di menu Import.</li>
+                    <li>2. Isi soal dan kunci sesuai kolom yang ada.</li>
+                    <li>3. Klik <b>Import Excel</b> dan pilih file Anda.</li>
+                    <li>4. Tinjau hasil di layar, lalu klik <b>Simpan</b>.</li>
+                  </ul>
+                </div>
+                <div className="p-5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm">
+                  <h4 className="text-xs font-bold text-slate-900 dark:text-white mb-3 flex items-center gap-2">
+                    <FileText size={16} className="text-blue-600" /> Lewat Word (Bergambar)
+                  </h4>
+                  <ul className="text-[10px] space-y-2 text-slate-500 dark:text-slate-400">
+                    <li>1. Masukkan soal ke dalam tabel (sesuai template Word).</li>
+                    <li>2. Gambar diletakkan langsung di dalam sel tabel.</li>
+                    <li>3. Klik <b>Import Word</b> di aplikasi.</li>
+                    <li>4. Sistem otomatis mengekstrak teks dan gambar Anda.</li>
+                  </ul>
+                </div>
               </div>
-            </Card>
+            </div>
           </section>
 
           {/* Ruang Ujian */}

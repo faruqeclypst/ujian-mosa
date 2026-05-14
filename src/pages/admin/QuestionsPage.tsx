@@ -16,7 +16,7 @@ import FormField from "../../components/forms/FormField";
 import { uploadInventoryImage, deleteImageFromStorage, deleteImagesFromStorage } from "../../lib/storage";
 import { ImportButton } from "../../components/ui/import-button";
 import { parseQuestionsFromWord } from "../../lib/questionWordParser";
-import { parseQuestionsSimple } from "../../lib/questionSimpleParser";
+
 import { downloadQuestionTemplate, parseQuestionImportExcel } from "../../lib/questionExcel";
 import mammoth from "mammoth";
 import ReactQuill, { Quill } from "react-quill";
@@ -300,8 +300,6 @@ const QuestionsPage = () => {
 
   // 🤖 AI Import State
   const [isAIImportOpen, setIsAIImportOpen] = useState(false);
-  const [isQuickPasteOpen, setIsQuickPasteOpen] = useState(false);
-  const [quickPasteText, setQuickPasteText] = useState("");
   const [importText, setImportText] = useState("");
   const [isParsing, setIsParsing] = useState(false);
   const [parsedResults, setParsedResults] = useState<any[]>([]);
@@ -703,12 +701,23 @@ const QuestionsPage = () => {
       );
 
       const choicesBatch: Record<string, { text: string }> = {};
-      let correctKey = "a";
+      let correctKey = (regenerated.answerKey || "a").toLowerCase();
+      
       if (regenerated.choices) {
-        Object.keys(regenerated.choices).forEach(key => {
-          choicesBatch[key] = { text: regenerated.choices![key].text };
-          if (regenerated.choices![key].isCorrect) correctKey = key;
-        });
+        if (Array.isArray(regenerated.choices)) {
+          regenerated.choices.forEach((c: any, i: number) => {
+            const key = String.fromCharCode(97 + i);
+            choicesBatch[key] = { text: typeof c === 'object' ? (c.text || String(c)) : String(c) };
+            if (typeof c === 'object' && c.isCorrect) correctKey = key;
+          });
+        } else {
+          Object.keys(regenerated.choices).forEach(key => {
+            const lowerKey = key.toLowerCase();
+            const val = (regenerated.choices as any)[key];
+            choicesBatch[lowerKey] = { text: typeof val === 'object' ? (val.text || String(val)) : String(val) };
+            if (typeof val === 'object' && val.isCorrect) correctKey = lowerKey;
+          });
+        }
       }
 
       const updatedRow = {
@@ -767,58 +776,7 @@ const QuestionsPage = () => {
     }
   };
 
-  const handleQuickPasteParse = () => {
-    if (!quickPasteText.trim()) return;
-    
-    try {
-      const results = parseQuestionsSimple(quickPasteText);
-      if (results.length === 0) {
-        addToast({
-          title: "Format Tidak Dikenali",
-          description: "Pastikan format soal sudah benar (Nomor soal, Opsi A-E, dan Jawaban).",
-          type: "error"
-        });
-        return;
-      }
 
-      // Convert to batch review format
-      const questionsForReview = results.map(q => {
-        const choicesBatch: Record<string, { text: string }> = {};
-        Object.keys(q.choices).forEach(key => {
-          choicesBatch[key] = { text: q.choices[key].text };
-        });
-
-        return {
-          text: q.text,
-          type: "pilihan_ganda",
-          choices: choicesBatch,
-          correctKey: q.answerKey || "a",
-          answerKey: "",
-          groupId: "",
-          groupText: "",
-          isFromPaste: true
-        };
-      });
-
-      setBatchQuestions(questionsForReview);
-      setIsQuickPasteOpen(false);
-      setQuickPasteText("");
-      setIsBatchModalOpen(true);
-      
-      addToast({
-        type: "success",
-        title: "Berhasil Memproses",
-        description: `${results.length} soal telah siap ditinjau.`,
-        duration: 3000
-      });
-    } catch (err: any) {
-      addToast({
-        type: "error",
-        title: "Gagal Memproses",
-        description: "Terjadi kesalahan saat memproses teks.",
-      });
-    }
-  };
 
   const handleSaveAIImport = async () => {
     if (parsedResults.length === 0 || !pb) return;
@@ -913,13 +871,23 @@ const QuestionsPage = () => {
       // 🪄 NEW SYSTEM: Populate Batch Modal for Review instead of saving directly
       const questionsForReview = generated.map(q => {
         const choicesBatch: Record<string, { text: string }> = {};
-        let correctKey = "a";
+        let correctKey = (q.answerKey || "a").toLowerCase();
         
         if (q.choices) {
-          Object.keys(q.choices).forEach(key => {
-            choicesBatch[key] = { text: q.choices![key].text };
-            if (q.choices![key].isCorrect) correctKey = key;
-          });
+          if (Array.isArray(q.choices)) {
+            q.choices.forEach((c: any, i: number) => {
+              const key = String.fromCharCode(97 + i);
+              choicesBatch[key] = { text: typeof c === 'object' ? (c.text || String(c)) : String(c) };
+              if (typeof c === 'object' && c.isCorrect) correctKey = key;
+            });
+          } else {
+            Object.keys(q.choices).forEach(key => {
+              const lowerKey = key.toLowerCase();
+              const val = (q.choices as any)[key];
+              choicesBatch[lowerKey] = { text: typeof val === 'object' ? (val.text || String(val)) : String(val) };
+              if (typeof val === 'object' && val.isCorrect) correctKey = lowerKey;
+            });
+          }
         }
 
         return {
@@ -1449,7 +1417,7 @@ const QuestionsPage = () => {
     }));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: any, stayOpen: boolean = false) => {
     e.preventDefault();
     if (!pb) return;
 
@@ -1646,11 +1614,34 @@ const QuestionsPage = () => {
 
       if (dialogMode === "edit" && selectedQuestion) {
         await pb.collection('questions').update(selectedQuestion.id, payload);
+        setIsDialogOpen(false);
+        showAlert("Berhasil", "Soal berhasil diperbarui.", "success");
       } else {
         await pb.collection('questions').create(payload);
+        showAlert("Berhasil", "Soal berhasil ditambahkan.", "success");
+        if (stayOpen) {
+          // Reset form fields to add another question but keep type and literasi settings
+          setFormValues(prev => ({
+            ...prev,
+            text: "",
+            imageUrl: "",
+            choices: {
+              a: { text: "", isCorrect: false },
+              b: { text: "", isCorrect: false },
+              c: { text: "", isCorrect: false },
+              d: { text: "", isCorrect: false },
+              e: { text: "", isCorrect: false },
+            },
+            pairs: [{ id: "1", left: "", right: "" }],
+            answerKey: "",
+            items: [{ id: "1", text: "" }]
+          }));
+          setQuestionFile(null);
+          setChoiceFiles({});
+        } else {
+          setIsDialogOpen(false);
+        }
       }
-      setIsDialogOpen(false);
-      showAlert("Berhasil", "Soal berhasil disimpan.", "success");
     } catch (error) {
       showAlert("Gagal", "Gagal menyimpan soal ke PocketBase.", "danger");
     }
@@ -2813,31 +2804,8 @@ const QuestionsPage = () => {
                             </div>
                           </DropdownMenuItem>
 
-                          <DropdownMenuItem 
-                            onClick={handleBatchCreateClick}
-                            className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 focus:bg-slate-50 dark:focus:bg-slate-900 transition-colors group"
-                          >
-                            <div className="h-10 w-10 shrink-0 rounded-lg bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 flex items-center justify-center group-hover:scale-110 transition-transform">
-                              <Plus className="h-5 w-5" />
-                            </div>
-                            <div className="flex flex-col min-w-0 text-left">
-                              <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">Tambah Batch</span>
-                              <span className="text-[10px] text-slate-400 mt-1">Tambah banyak soal sekaligus</span>
-                            </div>
-                          </DropdownMenuItem>
 
-                          <DropdownMenuItem 
-                            onClick={() => setIsQuickPasteOpen(true)}
-                            className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 focus:bg-slate-50 dark:focus:bg-slate-900 transition-colors group"
-                          >
-                            <div className="h-10 w-10 shrink-0 rounded-lg bg-orange-50 dark:bg-orange-900/30 text-orange-600 flex items-center justify-center group-hover:scale-110 transition-transform">
-                              <Sparkles className="h-5 w-5" />
-                            </div>
-                            <div className="flex flex-col min-w-0 text-left">
-                              <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">Paste dari Teks</span>
-                              <span className="text-[10px] text-slate-400 mt-1">Copas soal dari web/dokumen</span>
-                            </div>
-                          </DropdownMenuItem>
+
 
                           <DropdownMenuSeparator className="my-1 border-slate-100 dark:border-slate-800" />
                           
@@ -3002,7 +2970,7 @@ const QuestionsPage = () => {
             <DialogTitle>{dialogMode === "edit" ? "Edit Soal" : "Tambah Soal"}</DialogTitle>
           </DialogHeader>
 
-          <form onSubmit={handleSubmit} className="space-y-4 pt-2">
+          <form onSubmit={(e) => handleSubmit(e, false)} className="space-y-4 pt-2">
             <div className="flex items-center justify-between mb-1">
               <label className="text-xs font-semibold text-slate-500">Pertanyaan Utama</label>
               <button 
@@ -3442,8 +3410,22 @@ const QuestionsPage = () => {
               )}
             </div>
 
-            <DialogFooter className="pt-2">
-              <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl h-11 shadow-lg shadow-blue-500/20">{dialogMode === "edit" ? "Perbarui" : "Simpan"}</Button>
+            <DialogFooter className="pt-2 flex flex-col sm:flex-row gap-3">
+              {dialogMode === "create" && (
+                <Button 
+                  type="button" 
+                  onClick={(e) => handleSubmit(e, true)} 
+                  className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-2xl h-11 shadow-lg shadow-emerald-500/20"
+                >
+                  <Plus className="mr-2 h-4 w-4" /> Simpan & Tambah Lagi
+                </Button>
+              )}
+              <Button 
+                type="submit" 
+                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl h-11 shadow-lg shadow-blue-500/20"
+              >
+                {dialogMode === "edit" ? "Perbarui" : "Simpan & Tutup"}
+              </Button>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -3883,7 +3865,7 @@ const QuestionsPage = () => {
               <Button type="button" variant="outline" size="sm" onClick={handleAddBatchRow} className="rounded-xl flex items-center gap-1 text-slate-600 dark:text-slate-400 text-xs h-9">
                 <Plus className="h-3.5 w-3.5" /> Tambah Manual
               </Button>
-              {role === "admin" && batchQuestions.some(q => q.isFromAI) && (
+              {(role === "admin" || (role === "teacher" && user?.ai_api_key)) && batchQuestions.some(q => q.isFromAI) && (
                 <>
                   <Button 
                     type="button" 
@@ -4030,63 +4012,7 @@ const QuestionsPage = () => {
         className="hidden"
         onChange={handleGlobalFileSelect}
       />
-      {/* 📋 QUICK PASTE DIALOG */}
-      <Dialog open={isQuickPasteOpen} onOpenChange={setIsQuickPasteOpen}>
-        <DialogContent className="max-w-2xl bg-card border-none shadow-2xl p-0 overflow-hidden rounded-3xl">
-          <div className="bg-orange-600 p-6 text-white flex items-center gap-4">
-             <div className="bg-white/20 p-3 rounded-2xl">
-               <Sparkles className="h-6 w-6 text-white" />
-             </div>
-             <div>
-               <DialogTitle className="text-xl font-black uppercase tracking-tight text-white">Quick Paste Import</DialogTitle>
-               <DialogDescription className="text-orange-100 text-xs font-bold uppercase tracking-wider">Tempel teks soal dari dokumen atau website Anda</DialogDescription>
-             </div>
-          </div>
-          
-          <div className="p-6 space-y-5 bg-white dark:bg-slate-900">
-            <div className="bg-orange-50 dark:bg-orange-900/10 border border-orange-100 dark:border-orange-800/40 p-4 rounded-2xl space-y-1.5">
-               <p className="text-xs font-bold text-orange-700 dark:text-orange-300 flex items-center gap-1.5 uppercase tracking-widest">
-                 <Check className="h-3.5 w-3.5" /> Panduan Format:
-               </p>
-               <p className="text-[10px] text-orange-600 dark:text-orange-400 font-medium leading-relaxed italic">
-                 Pastikan soal memiliki nomor (1.), pilihan (A. B. C. D. E. atau A) B) C)), dan baris penutup kunci jawaban (misal: "Jawaban: A").
-               </p>
-            </div>
 
-            <div className="relative group bg-slate-50 dark:bg-slate-800 rounded-[2rem] border-2 border-slate-100 dark:border-slate-800 overflow-hidden focus-within:ring-4 focus-within:ring-orange-500/10 focus-within:border-orange-500 transition-all">
-              <ReactQuill
-                theme="snow"
-                value={quickPasteText}
-                onChange={setQuickPasteText}
-                placeholder={"Contoh:\n1. Siapa penemu lampu pijar?\nA. Thomas Alva Edison\nB. Isaac Newton\n...\nJawaban: A"}
-                 modules={quillModulesChoice}
-                 formats={quillFormats}
-                className="quill-paste-area [&_.ql-editor]:min-h-[320px] [&_.ql-editor]:max-h-[500px] [&_.ql-editor]:overflow-y-auto [&_.ql-container]:border-none [&_.ql-toolbar]:border-none [&_.ql-toolbar]:border-b [&_.ql-toolbar]:bg-orange-50/50 dark:[&_.ql-toolbar]:bg-slate-700/50"
-              />
-              {!quickPasteText.replace(/<[^>]*>/g, '').trim() && (
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-40 mt-10">
-                   <div className="text-center">
-                     <FileText className="h-10 w-10 text-slate-300 mx-auto mb-2" />
-                     <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Siap Menerima Teks Soal</p>
-                   </div>
-                </div>
-              )}
-            </div>
-
-            <DialogFooter className="pt-2">
-              <Button variant="ghost" onClick={() => setIsQuickPasteOpen(false)} className="rounded-xl font-bold uppercase text-xs h-12">Batal</Button>
-              <Button 
-                onClick={handleQuickPasteParse} 
-                disabled={!quickPasteText.trim()}
-                className="flex-1 bg-orange-600 hover:bg-orange-700 text-white rounded-2xl h-12 font-black uppercase text-xs tracking-widest shadow-lg shadow-orange-200 dark:shadow-none transition-all active:scale-95"
-              >
-                <Sparkles className="mr-2 h-4 w-4" />
-                Proses & Tinjau Sekarang
-              </Button>
-            </DialogFooter>
-          </div>
-        </DialogContent>
-      </Dialog>
 
       {/* 🪄 MODAL GENERASI AI */}
       <Dialog open={isAIModalOpen} onOpenChange={setIsAIModalOpen}>
