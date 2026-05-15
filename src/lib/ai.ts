@@ -76,16 +76,13 @@ const robustJSONParse = (text: string): any => {
 
 export const AI_MODELS = [
   // --- GROQ CLOUD (High Speed) ---
-  { id: "llama-3.3-70b-versatile", name: "Llama 3.3 70B (Greatest)", speed: "High Performance", status: "production", provider: "groq" },
+  { id: "openai/gpt-oss-120b", name: "GPT-OSS 120B (Latest Reasoning)", speed: "Powerful", status: "production", provider: "groq" },
+  { id: "openai/gpt-oss-20b", name: "GPT-OSS 20B (Fast Reasoning)", speed: "Fast", status: "production", provider: "groq" },
+  { id: "meta-llama/llama-4-maverick-17b-128e-instruct", name: "Llama 4 Maverick 17B", speed: "High Performance", status: "production", provider: "groq" },
+  { id: "meta-llama/llama-4-scout-17b-16e-instruct", name: "Llama 4 Scout 17B", speed: "Fast", status: "production", provider: "groq" },
+  { id: "llama-3.3-70b-versatile", name: "Llama 3.3 70B", speed: "High Performance", status: "production", provider: "groq" },
   { id: "deepseek-r1-distill-llama-70b", name: "DeepSeek R1 Llama 70B (Reasoning)", speed: "Powerful", status: "production", provider: "groq" },
-  { id: "mixtral-8x7b-32768", name: "Mixtral 8x7B (Balanced)", speed: "Fast", status: "production", provider: "groq" },
-  { id: "mixtral-8x7b-32768", name: "Mixtral 8x7B", speed: "Fast", status: "production", provider: "groq" },
-  { id: "llama-3.1-70b-versatile", name: "Llama 3.1 70B", speed: "Balanced", status: "production", provider: "groq" },
   { id: "gemma2-9b-it", name: "Gemma 2 9B", speed: "Fast", status: "production", provider: "groq" },
-  { id: "llama-3.2-1b-preview", name: "Llama 3.2 1B (Micro Fast)", speed: "Hyper Fast", status: "preview", provider: "groq" },
-  { id: "llama-3.2-3b-preview", name: "Llama 3.2 3B (Compact)", speed: "Efficient", status: "preview", provider: "groq" },
-  { id: "llama-3.2-11b-vision-preview", name: "Llama 3.2 11B (Vision)", speed: "Fast", status: "preview", provider: "groq" },
-  { id: "llama-3.2-90b-vision-preview", name: "Llama 3.2 90B (Vision)", speed: "Powerful", status: "preview", provider: "groq" },
 
   // --- OLLAMA CLOUD (Verified from api/tags) ---
   { id: "mistral-large-3:675b", name: "Mistral Large 3 (675B Monster)", speed: "Colossal", status: "production", provider: "ollama" },
@@ -308,6 +305,11 @@ export const generateQuestionsAI = async (
 Tugas: Buat teks bacaan berkualitas tinggi bertema "${topic}" untuk jenjang ${level} - ${subject}.
 Target: Panjang ${lengthMap[passageLength]}, Kesulitan ${difficulty}.
 
+PENTING (KUALITAS & GAYA PENULISAN WACANA ANTI-MONOTON):
+- JANGAN sekadar membuat rangkuman materi atau definisi ensiklopedis yang membosankan (misal: menjelaskan pengertian satu per satu).
+- Sajikan wacana dalam bentuk artikel analitis, studi kasus dunia nyata, permasalahan/dilema di lapangan, laporan investigasi, atau cerita kontekstual yang memicu pemikiran kritis (HOTS).
+- Masukkan dinamika, perbandingan, atau tantangan nyata terkait topik agar teks kaya akan bahan kajian dan menarik bagi siswa.
+
 FORMAT HTML WAJIB (DILARANG KERAS MENGGUNAKAN MARKDOWN SEPERTI **):
 - <h2 style="text-align:center; color:#1e3a8a; margin-bottom:32px; font-weight:900;">[JUDUL]</h2>
 - WAJIB gunakan beberapa blok <p> untuk setiap paragraf baru (JANGAN DISATUKAN).
@@ -370,19 +372,36 @@ Kesulitan: ${difficulty}, PEDOMAN FORMAT:
    - Agar simbol besar (integral/pecahan) terlihat bagus dalam teks, gunakan: $\\displaystyle ...$
    - PENTING (JSON ESCAPE): Di dalam JSON, setiap backslash (\) harus ditulis GANDA (\\). Jadi tulis: "$\\displaystyle \\frac{a}{b}$" (BUKAN \displaystyle).
    - DILARANG KERAS menggunakan $$ ... $$ karena akan memutus baris (terpisah).
-3. JANGAN gunakan markdown seperti ** atau __.
-4. JSON ESCAPING: Setiap garis miring ("\\" tunggal) dalam LaTeX WAJIB di-escape ganda ("\\\\") di dalam JSON.
+3. ATURAN KEBERAGAMAN SOAL & KREATIVITAS (WAJIB ANTI-MONOTON):
+   - DILARANG KERAS menggunakan pola kalimat tanya yang seragam atau berulang di setiap soal (misalnya memulai setiap soal dengan "Apa yang dimaksud...", "Jelaskan kelebihan dan kekurangan...", atau "Sebutkan...").
+   - SETIAP BUTIR SOAL WAJIB MEMILIKI SUDUT PANDANG, KONTEKS, & POLA STEM YANG BERBEDA:
+     * Soal 1: Analisis kasus/skenario masalah dunia nyata tertentu (contoh: "Sebuah instansi X mengalami kendala... Berdasarkan kasus tersebut, solusi apa yang paling tepat...").
+     * Soal 2: Evaluasi perbandingan/kelebihan-kekurangan dalam situasi spesifik (contoh: "Bandingkan efisiensi dan performa antara metode A dan B jika diterapkan pada kondisi Y...").
+     * Soal 3: Memprediksi dampak/konsekuensi dari sebuah perubahan (contoh: "Jika terjadi kegagalan pada komponen utama di tengah jam operasional, apa implikasi logis yang akan terjadi...").
+     * Soal 4: Sintesis/Penyelesaian masalah (Problem Solving) dengan batasan/kendala tertentu (contoh: "Dengan anggaran terbatas dan kebutuhan skalabilitas tinggi, rancangan manakah yang paling memenuhi kriteria...").
+     * Soal 5: Pemahaman konsep tingkat tinggi melalui analogi, fenomena, atau inferensi data (contoh: "Berdasarkan karakteristik sistem pada wacana/materi, kesimpulan mana yang paling akurat...").
+   - OPSI JAWABAN (A, B, C, D, E): Untuk Pilihan Ganda, WAJIB menyediakan 5 pilihan jawaban (A, B, C, D, E). Opsi WAJIB beragam, logis, dan berfungsi sebagai pengecoh (distractor) yang cerdas. JANGAN membuat pola kalimat opsi yang persis sama strukturnya antar soal.
+   - Distribusi Kognitif: Pastikan ada variasi level kognitif dari C3 (Aplikasi), C4 (Analisis), C5 (Evaluasi), hingga C6 (Mencipta/Solusi).
+4. JANGAN gunakan markdown seperti ** atau __.
+5. JSON ESCAPING: Setiap garis miring ("\\" tunggal) dalam LaTeX WAJIB di-escape ganda ("\\\\") di dalam JSON.
 
 STRUKTUR JSON (WAJIB):
 {
   "questions": [
     {
-      "text": "Teks pertanyaan (Gunakan $ untuk rumus)",
-      "choices": { "a": { "text": "...", "isCorrect": true }, ... },
-      "answerKey": "Kunci jawaban"
+      "text": "Teks pertanyaan (HOTS)",
+      "choices": { 
+        "a": { "text": "...", "isCorrect": false }, 
+        "b": { "text": "...", "isCorrect": false },
+        "c": { "text": "...", "isCorrect": true },
+        "d": { "text": "...", "isCorrect": false },
+        "e": { "text": "...", "isCorrect": false }
+      },
+      "answerKey": "c"
     }
   ]
 }
+PENTING: Pastikan kunci jawaban terdistribusi secara acak (tidak selalu A atau B).
 Hanya berikan JSON murni tanpa penjelasan.`;
 
     const mathHint = (subject.toLowerCase().includes('matematika') || subject.toLowerCase().includes('ipa') || subject.toLowerCase().includes('fisika') || subject.toLowerCase().includes('kimia') || subject.toLowerCase().includes('ekonomi') || subject.toLowerCase().includes('informatika') || subject.toLowerCase().includes('it')) 
@@ -408,8 +427,27 @@ Hanya berikan JSON murni tanpa penjelasan.`;
       : "";
 
     const userPrompt = isLiteracy 
-      ? `INI ADALAH WACANA STIMULUS:\n${wacanaResult}\n\nBerdasarkan wacana di atas, buatkan ${count} soal ${typeDesc}.${mathHint}${programmingHint}${arabicHint}`
-      : `Buat soal ${typeDesc} untuk jenjang ${level} - ${subject} tentang topik: "${topic}".${mathHint}${programmingHint}${arabicHint}`;
+      ? `INI ADALAH WACANA STIMULUS:\n${wacanaResult}\n\nBerdasarkan wacana di atas, buatkan ${count} soal ${typeDesc}. 
+      PENTING (WAJIB BERAGAM & HOTS):
+      1. DILARANG KERAS membuat soal dengan pola kalimat yang sama/monoton (misal: jangan mengulang pertanyaan "Apa yang dimaksud..." atau "Jelaskan kelebihan...").
+      2. Buat ${count} soal dengan variasi tipe pertanyaan berikut:
+         - Soal Pemecahan Masalah (Problem Solving) berdasarkan situasi dalam teks.
+         - Soal Analisis Sebab-Akibat atau implikasi dari peristiwa/data dalam teks.
+         - Soal Evaluasi Kritis terhadap argumen atau keputusan yang ada di wacana.
+         - Soal Prediksi atau Proyeksi skenario masa depan jika kondisi dalam teks diubah.
+         - Soal Inferensi atau penarikan kesimpulan logis dari data/fakta yang tersirat.
+      3. DILARANG KERAS membuat soal yang jawabannya sekadar menyalin (copy-paste) kalimat langsung dari teks.
+      4. Pastikan kelima opsi jawaban (A, B, C, D, E) pada setiap soal ditulis dengan kalimat yang variatif, mengecoh dengan cerdas, dan tidak mengulang pola yang sama.${mathHint}${programmingHint}${arabicHint}`
+      : `Buat ${count} soal ${typeDesc} untuk jenjang ${level} - ${subject} tentang topik: "${topic}". 
+      PENTING (WAJIB BERAGAM & HOTS):
+      1. DILARANG KERAS menggunakan pola kalimat tanya yang seragam/monoton (misal: jangan semua soal bertanya "Apa yang dimaksud..." atau "Jelaskan kelebihan...").
+      2. Setiap butir soal WAJIB menggunakan pendekatan dan sudut pandang yang berbeda:
+         - Gunakan studi kasus nyata atau skenario simulasi di tempat kerja/kehidupan sehari-hari.
+         - Gunakan analisis perbandingan dua konsep atau metode.
+         - Gunakan pertanyaan pemecahan masalah (problem solving) dengan kendala/batasan tertentu.
+         - Gunakan analisis sebab-akibat dari suatu fenomena/kendala teknis.
+         - Gunakan evaluasi kritis terhadap suatu rancangan atau keputusan.
+      3. Pastikan kelima opsi jawaban (A, B, C, D, E) pada setiap soal variatif, mengecoh dengan cerdas, dan tidak mengulang pola kalimat yang sama.${mathHint}${programmingHint}${arabicHint}`;
 
     // Kalkulasi max_tokens: ~1200 token per soal (model reasoning butuh lebih banyak)
     // Kimi K2.5, DeepSeek R1, QwQ perlu ruang untuk "berpikir" sebelum menjawab
@@ -519,15 +557,26 @@ PEDOMAN FORMAT:
 2. EKSAKTA: Gunakan LaTeX HANYA dengan pembungkus $ ... $ tunggal agar menyatu dengan kalimat (JANGAN gunakan $$).
    - Simbol bertingkat (integral/pecahan): Gunakan $\\displaystyle ...$ (WAJIB double backslash di dalam JSON agar tidak error).
    - Contoh: "Berapakah hasil dari $\\displaystyle \\int_0^1 x^2 \\,dx$ ?"
-3. JANGAN gunakan markdown (**).
+3. VARIASI STEM & HOTS (WAJIB ANTI-MONOTON): 
+   - DILARANG KERAS menggunakan pertanyaan definisi standar atau hafalan mati (seperti "Apa yang dimaksud dengan...", "Sebutkan pengertian...").
+   - WAJIB menggunakan konteks masalah nyata, studi kasus, skenario simulasi, atau analisis data/fenomena.
+   - Target Kognitif: ${difficulty === 'mudah' ? 'C2-C3 (Pemahaman/Aplikasi)' : (difficulty === 'sedang' ? 'C4-C5 (Analisis/Evaluasi)' : 'C5-C6 (Evaluasi/Kreasi/Problem Solving)')}.
+   - Opsi jawaban (A, B, C, D, E) wajib variatif, logis, dan tidak menggunakan pola kalimat yang persis sama.
+4. JANGAN gunakan markdown (**).
 
 STRUKTUR JSON:
 {
   "text": "Teks pertanyaan",
-  "choices": { "a": { "text": "...", "isCorrect": true }, ... },
-  "answerKey": "Kunci jawaban"
+  "choices": { 
+    "a": { "text": "...", "isCorrect": false }, 
+    "b": { "text": "...", "isCorrect": false },
+    "c": { "text": "...", "isCorrect": true },
+    "d": { "text": "...", "isCorrect": false },
+    "e": { "text": "...", "isCorrect": false }
+  },
+  "answerKey": "c"
 }
-Hanya berikan JSON murni.`;
+Hanya berikan JSON murni. JANGAN selalu menjadikan A sebagai kunci jawaban.`;
 
     const programmingHint = (subject.toLowerCase().includes('pemrograman') || subject.toLowerCase().includes('it') || subject.toLowerCase().includes('informatika') || subject.toLowerCase().includes('coding'))
       ? `\nKONTEN PEMROGRAMAN: Sangat disarankan untuk menyertakan potongan kode (code snippets) di dalam teks pertanyaan maupun pilihan jawaban. Gunakan tag <pre class="ql-syntax" data-language="NAMA_BAHASA">...</pre> untuk setiap potongan kode program. GANTI NAMA_BAHASA dengan bahasa yang sesuai (misal: javascript, python, cpp, html, css). DILARANG MENGGUNAKAN "auto".`
@@ -548,8 +597,8 @@ Hanya berikan JSON murni.`;
       : "";
 
     const userPrompt = existingWacana 
-      ? `INI ADALAH WACANA STIMULUS:\n${existingWacana}\n\nBerdasarkan wacana di atas, BUAT TEPAT SATU soal ${typeDesc}. JANGAN menggunakan placeholder.${programmingHint}${arabicHint}`
-      : `Buat TEPAT SATU soal ${typeDesc} tentang materi/topik: "${topic}". JANGAN menggunakan placeholder.${programmingHint}${arabicHint}`;
+      ? `INI ADALAH WACANA STIMULUS:\n${existingWacana}\n\nBerdasarkan wacana di atas, BUAT TEPAT SATU soal ${typeDesc} yang baru dan BERBEDA dari soal sebelumnya. Gunakan pendekatan HOTS (analisis implikasi, evaluasi argumen, atau pemecahan masalah). DILARANG KERAS menanyakan definisi ("Apa yang dimaksud..."). JANGAN menggunakan placeholder.${programmingHint}${arabicHint}`
+      : `Buat TEPAT SATU soal ${typeDesc} tentang materi/topik: "${topic}". Gunakan skenario studi kasus nyata atau pemecahan masalah (HOTS). DILARANG KERAS menanyakan definisi sederhana ("Apa yang dimaksud..."). JANGAN menggunakan placeholder.${programmingHint}${arabicHint}`;
 
     let response;
     if (useProxy) {
@@ -685,32 +734,59 @@ export const parseQuestionsAI = async (
   try {
     const { apiKey, useProxy, model, baseUrl } = await getAIConfig(pb);
 
-    const systemPrompt = `Anda adalah Ahli Digitalisasi Dokumen Pendidikan.
+    const systemPrompt = `Anda adalah Ahli Digitalisasi Dokumen Pendidikan & Spesialis Evaluasi STEM/Literasi.
 Tugas: Ekstrak semua soal dari teks mentah (hasil copy-paste PDF/Word) menjadi JSON valid.
 
 KETENTUAN EKSTRAKSI:
-1. Identifikasi Teks Stimulus/Wacana (SHARED): Gunakan field 'groupText' dan 'groupId' HANYA JIKA satu teks panjang digunakan untuk beberapa soal sekaligus (misal: "Bacaan untuk nomor 1-3").
-2. Soal Mandiri (STANDALONE): Jika soal tidak memiliki teks bacaan bersama, pastikan 'groupText' dan 'groupId' adalah string KOSONG (""). Jangan memasukkan stimulus ke dalam 'groupText' jika itu hanya berlaku untuk satu soal tersebut saja.
-3. Identifikasi Soal & Opsi: Pisahkan pertanyaan dengan pilihan jawaban (a, b, c, d, e).
-4. Identifikasi Kunci Jawaban: Deteksi kunci jawaban dari tanda (bold, bintang, dll). Jika tidak ada, biarkan isCorrect: false.
-5. Tipe Soal: Default adalah 'pilihan_ganda'.
+1. IDENTIFIKASI LITERASI/STIMULUS: 
+   - Jika ada teks bacaan panjang, cerita, atau stimulus yang digunakan untuk beberapa soal, letakkan di field 'groupText'.
+   - Berikan 'groupId' yang unik (misal: "LIT-001") untuk soal-soal yang menggunakan stimulus tersebut.
+   - Jika stimulus hanya untuk 1 soal, letakkan langsung di field 'text' soal tersebut saja.
+2. EKSAKTA (Matematika/Sains): Gunakan LaTeX HANYA dengan pembungkus $ ... $ tunggal agar rumus menyatu dengan teks (JANGAN gunakan $$ atau \\displaystyle sebagai teks polos).
+   - Simbol bertingkat (integral/pecahan): Gunakan $\\displaystyle ...$ (WAJIB double backslash di dalam JSON agar tidak error).
+3. IDENTIFIKASI SOAL & OPSI: Pisahkan pertanyaan dengan pilihan jawaban (a, b, c, d, e).
+4. IDENTIFIKASI KUNCI JAWABAN: Deteksi kunci jawaban dari tanda (bold, bintang (*), atau huruf yang dilingkari). 
+5. TIPE SOAL: Gunakan 'pilihan_ganda' (default), 'pilihan_ganda_kompleks', 'benar_salah', 'isian_singkat', atau 'uraian'.
+6. JANGAN gunakan markdown seperti ** atau __. Gunakan tag HTML <strong> jika perlu penekanan.
 
 STRUKTUR JSON (WAJIB):
 {
   "questions": [
     {
-      "text": "Pertanyaan (HTML)",
+      "text": "Pertanyaan (HTML, gunakan $ untuk rumus)",
       "type": "pilihan_ganda",
-      "groupId": "",
-      "groupText": "",
-      "choices": { "a": { "text": "...", "isCorrect": true }, ... }
+      "groupId": "ID_GRUP_JIKA_ADA",
+      "groupText": "TEKS_WACANA_JIKA_ADA",
+      "choices": { 
+        "a": { "text": "...", "isCorrect": false }, 
+        "b": { "text": "...", "isCorrect": true },
+        ... 
+      },
+      "answerKey": "b"
     }
   ]
 }
 
-Aturan Ketat: Gunakan HTML untuk formatting (<strong> JANGAN **), pastikan JSON valid dan utuh.`;
+Aturan Ketat: Pastikan JSON valid. Setiap garis miring ("\\" tunggal) dalam LaTeX WAJIB di-escape ganda ("\\\\") di dalam JSON.`;
 
-    const userPrompt = `DOKUMEN MENTAH (${subject} - ${level}):\n\n${rawText}\n\nSilakan ekstrak soal-soal di atas.`;
+    const mathHint = (subject.toLowerCase().includes('matematika') || subject.toLowerCase().includes('ipa') || subject.toLowerCase().includes('fisika') || subject.toLowerCase().includes('kimia')) 
+      ? "\nKONTEN STEM: Deteksi semua rumus dan ubah ke format LaTeX $ ... $. Pastikan penulisan pecahan menggunakan $\\displaystyle \\frac{a}{b}$." 
+      : "";
+
+    const programmingHint = (subject.toLowerCase().includes('pemrograman') || subject.toLowerCase().includes('it') || subject.toLowerCase().includes('informatika'))
+      ? `\nKONTEN PEMROGRAMAN: Gunakan tag <pre class="ql-syntax" data-language="NAMA_BAHASA">...</pre> untuk potongan kode program.`
+      : "";
+
+    const arabicHint = (subject.toLowerCase().includes('agama') || subject.toLowerCase().includes('arab') || subject.toLowerCase().includes('islam'))
+      ? `\nKONTEN ARAB: Pastikan teks Arab/Ayat tetap dalam format teks Arab asli dengan harakat.`
+      : "";
+
+    const userPrompt = `INPUT DOKUMEN (${subject} - ${level}):\n\n${rawText}\n\n
+    TUGAS: Ekstrak soal-soal dari dokumen di atas. 
+    PENTING: 
+    - JANGAN memaksa membuat soal Literasi/Stimulus jika soal asli bersifat mandiri. 
+    - Jika ada instruksi khusus dalam teks (misal: "Ubah ke HOTS"), ikuti instruksi tersebut. 
+    - Pastikan kunci jawaban terdeteksi akurat.${mathHint}${programmingHint}${arabicHint}`;
 
     let response;
     if (useProxy) {
@@ -725,7 +801,8 @@ Aturan Ketat: Gunakan HTML untuk formatting (<strong> JANGAN **), pastikan JSON 
             messages: [
               { role: "system", content: systemPrompt },
               { role: "user", content: userPrompt }
-            ]
+            ],
+            temperature: 0.1 // Sangat rendah agar ekstraksi presisi
           }
         })
       });
@@ -739,7 +816,7 @@ Aturan Ketat: Gunakan HTML untuk formatting (<strong> JANGAN **), pastikan JSON 
             { role: "system", content: systemPrompt },
             { role: "user", content: userPrompt }
           ],
-          temperature: 0.3, // Low temperature for extraction accuracy
+          temperature: 0.1, 
           response_format: { type: "json_object" }
         })
       });
@@ -894,5 +971,144 @@ export const testAIConnection = async (pb: PocketBase, apiKey: string, modelId: 
     return { success: false, message: errorMessage };
   } catch (error: any) {
     return { success: false, message: error.message || "Gagal menghubungi server AI." };
+  }
+};
+
+/**
+ * 📚 Generate Questions from Raw Material Text
+ * Transforms raw reading material/text into structured questions.
+ */
+export const generateFromMaterialAI = async (
+  pb: PocketBase,
+  material: string,
+  count: number = 5,
+  difficulty: string = "sedang",
+  subject: string = "Umum",
+  level: string = "Umum",
+  type: string = "pilihan_ganda"
+): Promise<AIGeneratedQuestion[]> => {
+  try {
+    const { apiKey, useProxy, model, baseUrl } = await getAIConfig(pb);
+
+    const typeMap: Record<string, string> = {
+      pilihan_ganda: "Pilihan Ganda (1 jawaban benar)",
+      pilihan_ganda_kompleks: "Pilihan Ganda Kompleks (lebih dari 1 jawaban benar)",
+      isian_singkat: "Isian Singkat",
+      uraian: "Uraian / Essay",
+      benar_salah: "Benar atau Salah",
+      menjodohkan: "Menjodohkan (Matching)",
+    };
+
+    const typeDesc = typeMap[type] || "Pilihan Ganda";
+
+    const systemPrompt = `Anda adalah Spesialis Kurikulum & Evaluasi Pendidikan.
+Tugas: Buat ${count} soal ${typeDesc} berdasarkan MATERI BACAAN yang diberikan.
+Jenjang: ${level}, Mata Pelajaran: ${subject}, Kesulitan: ${difficulty}.
+
+KETENTUAN:
+1. AKURASI: Soal WAJIB berdasarkan fakta/informasi yang ada di dalam materi yang diberikan.
+2. HOTS & VARIASI (WAJIB ANTI-MONOTON): 
+   - WAJIB menggunakan standar HOTS (Analisis, Evaluasi, Kreasi) dan bervariasi.
+   - DILARANG KERAS menggunakan pola kalimat tanya yang seragam atau berulang (misal: "Apa yang dimaksud...", "Jelaskan kelebihan...").
+   - SETIAP SOAL WAJIB MENGGUNAKAN SUDUT PANDANG, KONTEKS, & POLA STEM YANG BERBEDA:
+     * Gunakan skenario kasus atau simulasi masalah nyata yang relevan dengan materi.
+     * Gunakan pertanyaan yang menuntut analisis perbandingan atau hubungan sebab-akibat.
+     * Gunakan pertanyaan evaluasi terhadap efektivitas suatu metode/keputusan dalam materi.
+     * Gunakan pertanyaan prediksi/implikasi jika suatu kondisi dalam materi mengalami perubahan.
+   - LITERASI PANJANG: Jika diminta soal literasi, buatkan teks wacana/stimulus yang mendalam, analitis, berupa studi kasus/problematika nyata (minimal 2-3 paragraf) agar tidak sekadar berupa definisi ensiklopedis.
+   - OPSI JAWABAN: Untuk Pilihan Ganda, WAJIB menyediakan 5 pilihan jawaban (A, B, C, D, E) yang variatif, logis, dan tidak berpola sama antar soal.
+3. FORMAT: Gunakan LaTeX $ ... $ untuk rumus jika ada. Gunakan HTML <strong> untuk penekanan.
+4. JSON ESCAPING: Setiap garis miring ("\\" tunggal) dalam LaTeX WAJIB di-escape ganda ("\\\\") di dalam JSON.
+
+STRUKTUR JSON (WAJIB):
+{
+  "questions": [
+    {
+      "text": "Pertanyaan (HOTS)",
+      "type": "${type}",
+      "choices": { 
+        "a": { "text": "...", "isCorrect": false }, 
+        "b": { "text": "...", "isCorrect": false },
+        "c": { "text": "...", "isCorrect": false },
+        "d": { "text": "...", "isCorrect": false },
+        "e": { "text": "...", "isCorrect": true }
+      },
+      "answerKey": "e",
+      "groupText": "POTONGAN MATERI YANG RELEVAN"
+    }
+  ]
+}
+Hanya berikan JSON murni.`;
+
+    const mathHint = (subject.toLowerCase().includes('matematika') || subject.toLowerCase().includes('ipa') || subject.toLowerCase().includes('fisika') || subject.toLowerCase().includes('kimia') || subject.toLowerCase().includes('ekonomi') || subject.toLowerCase().includes('informatika') || subject.toLowerCase().includes('it')) 
+      ? "\nGunakan $ ... $ untuk SEMUA rumus agar tidak terpisah dari teks. Untuk integral/fraksi yang bagus, gunakan $\\displaystyle ...$. WAJIB gunakan \\\\ (double backslash) di JSON." 
+      : "";
+
+    const programmingHint = (subject.toLowerCase().includes('pemrograman') || subject.toLowerCase().includes('it') || subject.toLowerCase().includes('informatika') || subject.toLowerCase().includes('coding'))
+      ? `\nKONTEN PEMROGRAMAN: Gunakan tag <pre class="ql-syntax" data-language="NAMA_BAHASA">...</pre> untuk setiap potongan kode program.`
+      : "";
+
+    const arabicHint = (subject.toLowerCase().includes('agama') || subject.toLowerCase().includes('arab') || subject.toLowerCase().includes('islam'))
+      ? `\nKONTEN ARAB: Pastikan teks Arab/Ayat tetap dalam format teks Arab asli dengan harakat.`
+      : "";
+
+    const userPrompt = `INPUT PENGGUNA (Materi/Instruksi):\n\n${material}\n\n
+    TUGAS:
+    1. Jika teks berisi instruksi spesifik (misal: "Buatkan soal literasi...", "Buat 10 soal..."), ikuti instruksi tersebut sebagai prioritas utama.
+    2. Jika teks hanya berisi materi, buatkan ${count} soal ${typeDesc} dengan tingkat kesulitan ${difficulty}.
+    3. PENTING (WAJIB BERAGAM & ANTI-MONOTON): DILARANG KERAS membuat soal dengan pola kalimat yang seragam (misal: jangan semua soal bertanya "Apa yang dimaksud..." atau "Jelaskan kelebihan..."). Buat variasi skenario, studi kasus, analisis dampak, dan pemecahan masalah nyata pada setiap butir soal.
+    4. Literasi/Stimulus hanya dibuat JIKA diminta secara spesifik atau jika materi sangat panjang dan cocok untuk wacana. Jika dibuatkan wacana, pastikan wacananya berbentuk artikel analitis atau studi kasus yang menarik, bukan sekadar rangkuman definisi.
+    5. Pastikan kelima opsi jawaban (A, B, C, D, E) pada setiap soal ditulis secara variatif dan tidak mengulang pola yang sama.${mathHint}${programmingHint}${arabicHint}`;
+
+    let response;
+    if (useProxy) {
+      response = await fetch(pb.baseUrl + "/api/ai-proxy", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Token": pb.authStore.token },
+        body: JSON.stringify({
+          baseUrl: baseUrl,
+          apiKey: apiKey,
+          body: {
+            model,
+            messages: [
+              { role: "system", content: systemPrompt },
+              { role: "user", content: userPrompt }
+            ],
+            temperature: 0.7,
+            max_tokens: count * 1500
+          }
+        })
+      });
+    } else {
+      response = await fetch(baseUrl, {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model,
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt }
+          ],
+          temperature: 0.7,
+          max_tokens: count * 1500,
+          response_format: { type: "json_object" }
+        })
+      });
+    }
+
+    if (!response.ok) {
+      const errData = await response.json();
+      if (errData.error?.message?.includes("rate limit")) throw new Error("AI_RATE_LIMIT");
+      throw new Error(errData.error?.message || "AI Error");
+    }
+
+    const data = await response.json();
+    const content = data.choices?.[0]?.message?.content || data.message?.content || "";
+    const parsed = robustJSONParse(content);
+    
+    return parsed.questions || [];
+  } catch (err: any) {
+    console.error("Generate from Material Error:", err);
+    throw err;
   }
 };

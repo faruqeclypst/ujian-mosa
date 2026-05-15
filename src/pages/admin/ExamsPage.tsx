@@ -63,7 +63,38 @@ const ExamsPage = () => {
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [examToDelete, setExamToDelete] = useState<ExamData | null>(null);
+  const [questionCounts, setQuestionCounts] = useState<Record<string, number>>({});
   const [isDeleting, setIsDeleting] = useState(false);
+
+  const fetchQuestionCounts = useCallback(async () => {
+    if (!pb) return;
+    try {
+      // Kita hanya butuh examId untuk menghitung jumlah soal per exam
+      const questions = await pb.collection('questions').getFullList({
+        fields: 'examId',
+        requestKey: 'question_counts_fetch' // Prevent cancellation issues
+      });
+      
+      const counts: Record<string, number> = {};
+      questions.forEach((q: any) => {
+        const eId = q.examId || q.examid;
+        if (eId) {
+          counts[eId] = (counts[eId] || 0) + 1;
+        }
+      });
+      setQuestionCounts(counts);
+    } catch (e) {
+      console.warn("Gagal load data jumlah soal:", e);
+    }
+  }, [pb]);
+
+  useEffect(() => {
+    fetchQuestionCounts();
+    pb?.collection('questions').subscribe("*", fetchQuestionCounts);
+    return () => {
+      pb?.collection('questions').unsubscribe("*");
+    };
+  }, [pb, fetchQuestionCounts]);
 
   const columns = useMemo(() => [
     {
@@ -107,12 +138,11 @@ const ExamsPage = () => {
           <div className="flex items-center gap-2">
             <Avatar className="h-7 w-7 border border-slate-200 dark:border-slate-800">
               <AvatarFallback className="bg-gradient-to-br from-indigo-500 to-blue-600 text-white text-[10px] font-bold">
-              {(name || "U").split(" ").map(n => n[0]).join("").substring(0, 2).toUpperCase()}
+                {teacher?.code || (name || "U").split(" ").map(n => n[0]).join("").substring(0, 2).toUpperCase()}
               </AvatarFallback>
             </Avatar>
             <div className="flex flex-col">
                <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">{name}</span>
-               <span className="text-[10px] text-slate-400 font-medium">{teacher?.code || "No Code"}</span>
             </div>
           </div>
         );
@@ -447,14 +477,15 @@ const ExamsPage = () => {
               actions={(exam: any) => (
                 <div className="flex justify-end gap-1.5 items-center whitespace-nowrap">
                   <button 
-                    className="p-1.5 bg-purple-50 text-purple-700 hover:bg-purple-100 rounded-lg dark:bg-purple-900/10 dark:text-purple-400 border border-purple-100 dark:border-purple-800/40" 
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 bg-purple-50 text-purple-700 hover:bg-purple-100 rounded-lg dark:bg-purple-900/20 dark:text-purple-400 border border-purple-100 dark:border-purple-800/40 transition-all hover:shadow-sm" 
                     onClick={() => {
                       sessionStorage.setItem("activeQuestionsExamId", exam.id);
                       navigate(`/admin/bank-soal/questions`);
                     }}
                     title="Kelola Soal"
                   >
-                    <BookOpen className="h-4 w-4" />
+                    <span className="text-xs font-black">{questionCounts[exam.id] || 0}</span>
+                    <BookOpen className="h-3.5 w-3.5" />
                   </button>
                   
                   {isOwner(exam) && (

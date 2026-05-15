@@ -4,7 +4,7 @@ import { ArrowLeft, Plus, Edit, Trash, Check, Copy, Image, ChevronDown, FileText
 import { Reorder } from "framer-motion";
 import { MathText } from "../../components/MathText";
 import { SmartImage } from "../../components/ui/smart-image";
-import { generateQuestionsAI, generateSingleQuestionAI, getTopicSuggestionsAI, parseQuestionsAI, AI_MODELS } from "../../lib/ai";
+import { generateQuestionsAI, generateSingleQuestionAI, getTopicSuggestionsAI, parseQuestionsAI, generateFromMaterialAI, AI_MODELS } from "../../lib/ai";
 import { Button } from "../../components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "../../components/ui/dialog";
 import { Progress } from "../../components/ui/progress";
@@ -16,6 +16,7 @@ import FormField from "../../components/forms/FormField";
 import { uploadInventoryImage, deleteImageFromStorage, deleteImagesFromStorage } from "../../lib/storage";
 import { ImportButton } from "../../components/ui/import-button";
 import { parseQuestionsFromWord } from "../../lib/questionWordParser";
+import { Select } from "../../components/ui/select";
 
 import { downloadQuestionTemplate, parseQuestionImportExcel } from "../../lib/questionExcel";
 import mammoth from "mammoth";
@@ -302,6 +303,9 @@ const QuestionsPage = () => {
   // 🤖 AI Import State
   const [isAIImportOpen, setIsAIImportOpen] = useState(false);
   const [importText, setImportText] = useState("");
+  const [importMode, setImportMode] = useState<'extract' | 'generate'>('extract');
+  const [importCount, setImportCount] = useState(5);
+  const [importType, setImportType] = useState('pilihan_ganda');
   const [isParsing, setIsParsing] = useState(false);
   const [parsedResults, setParsedResults] = useState<any[]>([]);
   const [isLiterasiGuideOpen, setIsLiterasiGuideOpen] = useState(false);
@@ -641,7 +645,7 @@ const QuestionsPage = () => {
       
       const questionsForReview = generated.map(q => {
         const choicesBatch: Record<string, { text: string }> = {};
-        let correctKey = "a";
+        let correctKey = (q.answerKey || "").toLowerCase();
         if (q.choices) {
           Object.keys(q.choices).forEach(key => {
             choicesBatch[key] = { text: q.choices![key].text };
@@ -702,7 +706,7 @@ const QuestionsPage = () => {
       );
 
       const choicesBatch: Record<string, { text: string }> = {};
-      let correctKey = (regenerated.answerKey || "a").toLowerCase();
+      let correctKey = (regenerated.answerKey || "").toLowerCase();
       
       if (regenerated.choices) {
         if (Array.isArray(regenerated.choices)) {
@@ -759,10 +763,23 @@ const QuestionsPage = () => {
     if (!importText.trim() || !pb) return;
     setIsParsing(true);
     try {
-      const results = await parseQuestionsAI(pb, importText, exam?.name || "", exam?.level || "");
+      let results = [];
+      if (importMode === 'extract') {
+        results = await parseQuestionsAI(pb, importText, exam?.name || "", exam?.level || "");
+      } else {
+        results = await generateFromMaterialAI(
+          pb, 
+          importText, 
+          importCount, 
+          aiDifficulty, 
+          exam?.subject || "", 
+          exam?.level || "", 
+          importType
+        );
+      }
       setParsedResults(results);
       addToast({
-        title: "Ekstraksi Berhasil",
+        title: importMode === 'extract' ? "Ekstraksi Berhasil" : "Generasi Berhasil",
         description: `Ditemukan ${results.length} soal. Silakan tinjau sebelum menyimpan.`,
         type: "success"
       });
@@ -804,12 +821,27 @@ const QuestionsPage = () => {
 
       let count = 0;
       for (const q of parsedResults) {
+        const type = q.type || "pilihan_ganda";
+        const field = typeMap[type] || "multiple_choice";
+        
+        // Handle Options mapping for different types
+        let options = q.choices || {};
+        if (type === "menjodohkan") options = { pairs: q.pairs || [] };
+        if (type === "urutkan" || type === "drag_drop") options = { items: q.items || [] };
+
+        // Determine correct answer
+        let correctAnswer = q.correctAnswer || q.answerKey || "";
+        if (!correctAnswer && q.choices) {
+          const correctKeys = Object.keys(q.choices).filter(k => q.choices[k].isCorrect);
+          correctAnswer = correctKeys.join(",");
+        }
+
         await pb.collection("questions").create({
           examId,
           text: q.text || "Pertanyaan Tanpa Judul",
-          field: typeMap[q.type || "pilihan_ganda"] || "multiple_choice",
-          options: q.choices || {},
-          answerKey: q.answerKey || "",
+          field: field,
+          options: options,
+          correctAnswer: correctAnswer,
           groupId: q.groupId || "",
           groupText: q.groupText || "",
           order: (questions.length || 0) + count + 1
@@ -872,7 +904,7 @@ const QuestionsPage = () => {
       // 🪄 NEW SYSTEM: Populate Batch Modal for Review instead of saving directly
       const questionsForReview = generated.map(q => {
         const choicesBatch: Record<string, { text: string }> = {};
-        let correctKey = (q.answerKey || "a").toLowerCase();
+        let correctKey = (q.answerKey || "").toLowerCase();
         
         if (q.choices) {
           if (Array.isArray(q.choices)) {
@@ -979,8 +1011,9 @@ const QuestionsPage = () => {
 
     // Validate all must have key
     const hasEmptyKeys = validQuestions.some(q => {
+      if (!q.correctKey) return true;
       const correctChoice = q.choices[q.correctKey];
-      return !correctChoice.text || correctChoice.text.trim() === "";
+      return !correctChoice || !correctChoice.text || correctChoice.text.trim() === "";
     });
 
     if (hasEmptyKeys) {
@@ -4262,7 +4295,55 @@ const QuestionsPage = () => {
 
           <div className="flex-1 overflow-y-auto p-6 pt-2 space-y-6 scrollbar-thin">
             {parsedResults.length === 0 ? (
-              <div className="space-y-5 animate-in fade-in duration-500">
+              <div className="space-y-6 animate-in fade-in duration-500">
+                {/* 🏷️ Mode Selection */}
+                <div className="flex p-1 bg-slate-100 dark:bg-slate-800/50 rounded-xl w-fit">
+                  <button
+                    onClick={() => setImportMode('extract')}
+                    className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${
+                      importMode === 'extract' 
+                      ? "bg-white dark:bg-slate-700 text-emerald-600 shadow-sm" 
+                      : "text-slate-500 hover:text-slate-700"
+                    }`}
+                  >
+                    Ekstraksi Soal (Detect)
+                  </button>
+                  <button
+                    onClick={() => setImportMode('generate')}
+                    className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${
+                      importMode === 'generate' 
+                      ? "bg-white dark:bg-slate-700 text-blue-600 shadow-sm" 
+                      : "text-slate-500 hover:text-slate-700"
+                    }`}
+                  >
+                    Buat dari Materi (Gen)
+                  </button>
+                </div>
+
+                {importMode === 'generate' && (
+                  <div className="grid grid-cols-2 gap-4 animate-in slide-in-from-top-2 duration-300">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black uppercase text-slate-400">Jumlah Soal</label>
+                      <Select value={importCount.toString()} onChange={(e) => setImportCount(parseInt(e.target.value))}>
+                        {[2, 5, 10, 15, 20].map(n => (
+                          <option key={n} value={n.toString()}>{n} Soal</option>
+                        ))}
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black uppercase text-slate-400">Tipe Soal</label>
+                      <Select value={importType} onChange={(e) => setImportType(e.target.value)}>
+                        <option value="pilihan_ganda">Pilihan Ganda</option>
+                        <option value="pilihan_ganda_kompleks">Ganda Kompleks</option>
+                        <option value="benar_salah">Benar / Salah</option>
+                        <option value="menjodohkan">Menjodohkan</option>
+                        <option value="isian_singkat">Isian Singkat</option>
+                        <option value="uraian">Uraian / Essay</option>
+                      </Select>
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex items-center gap-3">
                    <div className="relative flex-1">
                       <label className="flex items-center justify-center gap-2 w-full p-4 border-2 border-dashed border-emerald-200 dark:border-emerald-800/40 rounded-2xl bg-emerald-50/30 dark:bg-emerald-950/10 cursor-pointer hover:bg-emerald-50 dark:hover:bg-emerald-950/20 transition-all group">
@@ -4273,7 +4354,7 @@ const QuestionsPage = () => {
                    </div>
                    <div className="text-slate-400 text-xs font-bold">ATAU</div>
                    <div className="flex-1 text-[10px] text-slate-500 font-medium italic">
-                     Tempel teks secara manual di kotak bawah ini
+                     {importMode === 'extract' ? "Tempel soal-soal mentah di bawah ini" : "Tempel materi bacaan/artikel di bawah ini"}
                    </div>
                 </div>
 
@@ -4288,17 +4369,44 @@ const QuestionsPage = () => {
                     <div>
                       <p className="text-sm font-bold text-blue-800 dark:text-blue-300">Cara Menggunakan:</p>
                       <ul className="text-[11px] text-blue-600/80 dark:text-blue-400/80 mt-1.5 space-y-1.5 list-none">
-                        <li className="flex items-start gap-2">
-                          <span className="w-4 h-4 rounded-full bg-blue-100 dark:bg-blue-800 text-[10px] flex items-center justify-center font-bold shrink-0 mt-0.5">1</span>
-                          <span>Buka PDF Anda, tekan <strong>Ctrl + A</strong> (Seleksi) lalu <strong>Ctrl + C</strong> (Salin).</span>
-                        </li>
-                        <li className="flex items-start gap-2">
-                          <span className="w-4 h-4 rounded-full bg-blue-100 dark:bg-blue-800 text-[10px] flex items-center justify-center font-bold shrink-0 mt-0.5">2</span>
-                          <span>Tempelkan di kotak di bawah ini. AI akan mendeteksi soal & kunci jawaban.</span>
-                        </li>
+                        {importMode === 'extract' ? (
+                          <>
+                            <li className="flex items-start gap-2">
+                              <span className="w-4 h-4 rounded-full bg-blue-100 dark:bg-blue-800 text-[10px] flex items-center justify-center font-bold shrink-0 mt-0.5">1</span>
+                              <span>Salin seluruh naskah soal dari Word/PDF (Ctrl+A {'->'} Ctrl+C).</span>
+                            </li>
+                            <li className="flex items-start gap-2">
+                              <span className="w-4 h-4 rounded-full bg-blue-100 dark:bg-blue-800 text-[10px] flex items-center justify-center font-bold shrink-0 mt-0.5">2</span>
+                              <span>Tempel di kotak bawah. AI akan mendeteksi puluhan soal sekaligus secara otomatis.</span>
+                            </li>
+                            <li className="flex items-start gap-2">
+                              <span className="w-4 h-4 rounded-full bg-blue-100 dark:bg-blue-800 text-[10px] flex items-center justify-center font-bold shrink-0 mt-0.5">3</span>
+                              <span>Tinjau hasil deteksi, lalu klik "Simpan" untuk memasukkannya ke sistem.</span>
+                            </li>
+                          </>
+                        ) : (
+                          <>
+                            <li className="flex items-start gap-2">
+                              <span className="w-4 h-4 rounded-full bg-blue-100 dark:bg-blue-800 text-[10px] flex items-center justify-center font-bold shrink-0 mt-0.5">1</span>
+                              <span>Tempelkan materi pelajaran, artikel, atau bacaan apa saja.</span>
+                            </li>
+                            <li className="flex items-start gap-2">
+                              <span className="w-4 h-4 rounded-full bg-blue-100 dark:bg-blue-800 text-[10px] flex items-center justify-center font-bold shrink-0 mt-0.5">2</span>
+                              <span>Tentukan jumlah soal, lalu klik tombol "Buat Soal" di bawah.</span>
+                            </li>
+                            <li className="flex items-start gap-2">
+                              <span className="w-4 h-4 rounded-full bg-blue-100 dark:bg-blue-800 text-[10px] flex items-center justify-center font-bold shrink-0 mt-0.5">3</span>
+                              <span>Soal-soal baru akan muncul dan siap disimpan ke bank soal.</span>
+                            </li>
+                          </>
+                        )}
                         <li className="flex items-start gap-2">
                           <span className="w-4 h-4 rounded-full bg-blue-100 dark:bg-blue-800 text-[10px] flex items-center justify-center font-bold shrink-0 mt-0.5">3</span>
                           <span>Teks wacana/stimulus pembuka akan otomatis dipisahkan (Mode Literasi).</span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <span className="w-4 h-4 rounded-full bg-blue-100 dark:bg-blue-800 text-[10px] flex items-center justify-center font-bold shrink-0 mt-0.5">4</span>
+                          <span>Mendukung rumus Matematika (LaTeX), potongan kode program, soal Isian & Uraian.</span>
                         </li>
                       </ul>
                     </div>
@@ -4307,7 +4415,7 @@ const QuestionsPage = () => {
                 <div className="relative group">
                   <textarea
                     className="w-full h-[400px] p-6 bg-slate-50/50 dark:bg-slate-900/40 border-2 border-slate-100 dark:border-slate-800 rounded-[2.5rem] text-xs font-mono focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 outline-none transition-all resize-none shadow-inner"
-                    placeholder="Contoh: (1) PG : Siapakah proklamator Indonesia? a. Soeharto b. Soekarno* c. Habibie..."
+                    placeholder="Contoh: Buatkan 5 soal literasi tentang ekosistem laut... atau tempelkan naskah soal Anda di sini."
                     value={importText}
                     onChange={(e) => setImportText(e.target.value)}
                   />
@@ -4315,7 +4423,7 @@ const QuestionsPage = () => {
                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-30">
                       <div className="text-center">
                         <BookOpen className="w-12 h-12 text-slate-300 mx-auto mb-2" />
-                        <p className="text-xs font-bold text-slate-400">Siap Menerima Teks Dokumen</p>
+                        <p className="text-xs font-bold text-slate-400">Isi perintah anda / masukkan materi / soal yang sudah jadi untuk dimasukkan ke aplikasi secara cepat</p>
                       </div>
                     </div>
                   )}
@@ -4372,17 +4480,21 @@ const QuestionsPage = () => {
               <Button
                 onClick={handleAIParse}
                 disabled={isParsing || !importText.trim()}
-                className="w-full h-14 bg-emerald-600 hover:bg-emerald-700 text-white rounded-[1.5rem] font-black uppercase text-xs tracking-widest shadow-xl shadow-emerald-200/50 dark:shadow-none transition-all active:scale-95"
+                className={`w-full h-14 rounded-[1.5rem] font-black uppercase text-xs tracking-widest shadow-xl transition-all active:scale-95 ${
+                  importMode === 'extract'
+                  ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-200/50"
+                  : "bg-blue-600 hover:bg-blue-700 text-white shadow-blue-200/50"
+                }`}
               >
                 {isParsing ? (
                   <>
                     <RefreshCw className="mr-2 h-5 w-5 animate-spin" />
-                    Sedang Memilah Dokumen...
+                    {importMode === 'extract' ? "Sedang Memilah Dokumen..." : "Membangun Soal dari Materi..."}
                   </>
                 ) : (
                   <>
                     <Sparkles className="mr-2 h-5 w-5" />
-                    Analisis Dokumen Sekarang
+                    {importMode === 'extract' ? "Analisis Dokumen Sekarang" : "Buat Soal dari Materi Sekarang"}
                   </>
                 )}
               </Button>

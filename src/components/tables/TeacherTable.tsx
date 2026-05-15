@@ -106,7 +106,7 @@ const TeacherTable = ({
         <div className="flex items-center gap-3">
           <Avatar className="h-9 w-9 border-2 border-white dark:border-slate-800 shadow-sm">
             <AvatarFallback className="bg-gradient-to-br from-indigo-500 to-blue-600 text-white text-[10px] font-bold">
-              {(name || "U").split(" ").map(n => n[0]).join("").substring(0, 2).toUpperCase()}
+              {teacher.code || (name || "U").split(" ").map(n => n[0]).join("").substring(0, 2).toUpperCase()}
             </AvatarFallback>
           </Avatar>
           <div className="flex flex-col">

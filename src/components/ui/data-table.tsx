@@ -333,7 +333,8 @@ export function DataTable<T>({
                 </TableCell>
               </TableRow>
             ) : (
-              currentData.map((item, index) => (
+              <>
+              {currentData.map((item, index) => (
                 <TableRow
                   key={index}
                   className={cn(onRowClick && "cursor-pointer")}
@@ -361,7 +362,13 @@ export function DataTable<T>({
                     </TableCell>
                   )}
                 </TableRow>
-              ))
+              ))}
+              {currentData.length < state.pageSize && Array.from({ length: state.pageSize - currentData.length }).map((_, i) => (
+                <TableRow key={`empty-${i}`}>
+                  <TableCell colSpan={columns.filter(col => state.visibleColumns.has(col.key.toString())).length + (actions ? 1 : 0)} className="h-[49px]">&nbsp;</TableCell>
+                </TableRow>
+              ))}
+              </>
             )}
           </TableBody>
         </Table>

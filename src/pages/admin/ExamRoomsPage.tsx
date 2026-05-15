@@ -64,6 +64,9 @@ const ExamRoomsPage = () => {
   const [dialogMode, setDialogMode] = useState<"create" | "edit">("create");
   const [selectedRoom, setSelectedRoom] = useState<ExamRoomData | null>(null);
 
+  const [examSearch, setExamSearch] = useState("");
+  const [lastSelectedClassIndex, setLastSelectedClassIndex] = useState<number | null>(null);
+
   const [formValues, setFormValues] = useState({
     room_name: "",
     examId: "",
@@ -163,10 +166,25 @@ const ExamRoomsPage = () => {
             <span className="font-bold text-slate-800 dark:text-white text-sm tracking-tight">{v || "Tanpa Nama"}</span>
             {room.is_exambro && <ShieldAlert className="h-3 w-3 text-orange-500" />}
           </div>
-          <div className="flex items-center gap-2 whitespace-nowrap overflow-hidden">
-             <span className="text-[10px] font-bold text-slate-600 dark:text-slate-400 leading-none">{room.teacherName}</span>
-             <span className="text-slate-300 dark:text-slate-700">|</span>
-             <span className="text-[10px] font-bold text-slate-400 truncate" title={room.examTitle}>{room.examTitle}</span>
+          <div className="flex flex-col gap-0.5 min-w-0">
+            <div className="flex items-center gap-2 whitespace-nowrap overflow-hidden">
+               <span className="text-[10px] font-bold text-slate-600 dark:text-slate-400 leading-none">{room.teacherName}</span>
+               <span className="text-slate-300 dark:text-slate-700">|</span>
+               <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 truncate">
+                 {room.subjectName || "N/A"}
+               </span>
+            </div>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleQuestionsClick(room);
+              }}
+              className="text-[10px] font-black text-slate-500 hover:text-blue-600 hover:underline dark:text-slate-400 dark:hover:text-blue-400 truncate text-left"
+              title="Buka bank soal"
+            >
+              Bank Soal: {room.examTitle || "Tanpa Nama"}
+            </button>
           </div>
         </div>
       )
@@ -236,7 +254,7 @@ const ExamRoomsPage = () => {
     {
       key: "className",
       label: terminology.class,
-      className: "w-32",
+      className: "w-40",
       render: (v: string, room: ExamRoomData) => {
         if (room.allClasses) {
           return <Badge variant="outline" className="text-[9px] font-black uppercase bg-blue-50/50 text-blue-600 border-blue-100">Semua {terminology.class}</Badge>;
@@ -256,18 +274,23 @@ const ExamRoomsPage = () => {
         }
 
         return (
-          <button 
-            onClick={() => setShowClassesRoom(room)}
-            className="group flex items-center gap-1.5 px-2 py-1 rounded-lg bg-indigo-50/50 hover:bg-indigo-100 border border-indigo-100/50 transition-all active:scale-95"
-            title="Klik untuk lihat semua kelas"
-          >
-            <Users className="h-3 w-3 text-indigo-500" />
-            <span className="text-[10px] font-bold text-indigo-600 whitespace-nowrap">{classList.length} {terminology.class}</span>
-            <div className="flex -space-x-2 ml-1 opacity-60 group-hover:opacity-100 transition-opacity">
-               <div className="w-4 h-4 rounded-full bg-indigo-200 border border-white flex items-center justify-center text-[8px] text-indigo-700 font-bold">1</div>
-               <div className="w-4 h-4 rounded-full bg-indigo-300 border border-white flex items-center justify-center text-[8px] text-indigo-700 font-bold">2</div>
+          <div className="relative group">
+            <button 
+              onClick={() => setShowClassesRoom(room)}
+              className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-indigo-50/50 hover:bg-indigo-100 border border-indigo-100/50 transition-all active:scale-95"
+            >
+              <Users className="h-3 w-3 text-indigo-500" />
+              <span className="text-[10px] font-bold text-indigo-600 whitespace-nowrap">{classList.length} {terminology.class}</span>
+            </button>
+            {/* Hover tooltip - desktop only */}
+            <div className="hidden group-hover:block absolute z-50 top-full left-0 mt-1 p-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl w-max max-w-xs">
+              <div className="grid grid-cols-3 gap-1">
+                {classList.map((cls, idx) => (
+                  <span key={idx} className="px-2 py-0.5 rounded-full text-[10px] font-bold text-center bg-indigo-50 text-indigo-700 border border-indigo-100 dark:bg-indigo-950/30 dark:text-indigo-300 dark:border-indigo-800">{cls}</span>
+                ))}
+              </div>
             </div>
-          </button>
+          </div>
         );
       }
     }
@@ -462,11 +485,13 @@ const ExamRoomsPage = () => {
   };
 
   const handleCreateClick = () => {
+    setExamSearch("");
+    setLastSelectedClassIndex(null);
     setDialogMode("create");
     setSelectedRoom(null);
     setFormValues({
       room_name: "",
-      examId: exams[0]?.id || "",
+      examId: "",
       classId: "all",
       allClasses: true,
       token: "",
@@ -483,6 +508,8 @@ const ExamRoomsPage = () => {
   };
 
   const handleEditClick = (room: ExamRoomData) => {
+    setExamSearch("");
+    setLastSelectedClassIndex(null);
     setDialogMode("edit");
     setSelectedRoom(room);
     setFormValues({
@@ -585,6 +612,11 @@ const ExamRoomsPage = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      if (!formValues.examId) {
+        showAlert("Gagal", "Pilih bank soal terlebih dahulu.", "danger");
+        return;
+      }
+
       const finalClassIds = formValues.allClasses
         ? (examClasses || []).map(c => c.id)
         : formValues.classId.split(",").filter(Boolean);
@@ -628,6 +660,12 @@ const ExamRoomsPage = () => {
     }
   };
 
+  const handleQuestionsClick = (room: ExamRoomData) => {
+    if (!room.examId) return;
+    sessionStorage.setItem("activeQuestionsExamId", room.examId);
+    navigate(`/admin/bank-soal/questions`);
+  };
+
   const handleMonitorClick = (room: ExamRoomData) => {
     sessionStorage.setItem("activeMonitoringRoomId", room.id);
     navigate(`/admin/monitoring`);
@@ -638,6 +676,54 @@ const ExamRoomsPage = () => {
     (Date.now() >= new Date(selectedRoom.start_time).getTime() && Date.now() <= new Date(selectedRoom.end_time).getTime())
   ) : false;
   const isEditRestricted = dialogMode === "edit" && isRoomActive;
+  const filteredExams = useMemo(() => {
+    const q = examSearch.trim().toLowerCase();
+    return exams
+      .filter((e) => role === "admin" || e.teacherId === teacherId || e.id === formValues.examId)
+      .filter((e) => {
+        if (!q) return true;
+        const subjectName = subjects.find((s: any) => s.id === (e.subjectId || e.subjectid))?.name || "";
+        const teacherName = masterTeachers.find((t: any) => t.id === (e.teacherId || e.teacherid))?.name || "";
+        return [e.title, subjectName, teacherName].some((v) => String(v || "").toLowerCase().includes(q));
+      });
+  }, [examSearch, exams, role, teacherId, subjects, masterTeachers, formValues.examId]);
+
+  const visibleExamOptions = useMemo(() => {
+    const selected = exams.find((e) => e.id === formValues.examId);
+    const list = [...filteredExams];
+    if (selected && !list.some((e) => e.id === selected.id)) list.unshift(selected);
+    // Move selected to top
+    if (selected) {
+      const idx = list.findIndex((e) => e.id === selected.id);
+      if (idx > 0) {
+        list.splice(idx, 1);
+        list.unshift(selected);
+      }
+    }
+    return list;
+  }, [filteredExams, exams, formValues.examId]);
+
+  const sortedClasses = useMemo(() => [...examClasses].sort((a: any, b: any) => String(a.name || "").localeCompare(String(b.name || ""), undefined, { numeric: true })), [examClasses]);
+
+  const handleClassToggle = (classId: string, checked: boolean, shiftKey: boolean) => {
+    const idx = sortedClasses.findIndex((c: any) => c.id === classId);
+    let current = formValues.classId ? formValues.classId.split(",").filter(Boolean) : [];
+
+    if (shiftKey && lastSelectedClassIndex !== null && idx !== -1) {
+      const [start, end] = [lastSelectedClassIndex, idx].sort((a, b) => a - b);
+      const rangeIds = sortedClasses.slice(start, end + 1).map((c: any) => c.id);
+      current = checked
+        ? Array.from(new Set([...current, ...rangeIds]))
+        : current.filter((id) => !rangeIds.includes(id));
+    } else if (checked) {
+      current = Array.from(new Set([...current, classId]));
+    } else {
+      current = current.filter((id) => id !== classId);
+    }
+
+    setLastSelectedClassIndex(idx === -1 ? null : idx);
+    setFormValues({ ...formValues, classId: current.join(",") });
+  };
 
   return (
     <div className="space-y-6">
@@ -894,9 +980,10 @@ const ExamRoomsPage = () => {
 
       {/* Dialog Create/Edit */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-md bg-card">
-          <DialogHeader>
-            <DialogTitle>{dialogMode === "edit" ? "Edit Ruang Ujian" : "Buka Ruang Ujian"}</DialogTitle>
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto bg-card p-0 rounded-2xl border-slate-200/70 dark:border-slate-800 shadow-2xl">
+          <DialogHeader className="px-4 py-3 bg-gradient-to-br from-blue-600 to-indigo-700 text-white rounded-t-2xl">
+            <DialogTitle className="text-lg font-black tracking-tight">{dialogMode === "edit" ? "Edit Ruang Ujian" : "Buka Ruang Ujian"}</DialogTitle>
+            <p className="text-xs text-blue-100 font-medium mt-1">Atur bank soal, kelas, waktu, dan keamanan ruang ujian.</p>
             {isEditRestricted && (
               <div className="bg-amber-50 border border-amber-200 text-amber-700 p-2.5 rounded-xl text-[10px] mt-2 font-medium flex items-start gap-2 animate-pulse-slow dark:bg-amber-950/20 dark:border-amber-900/40 dark:text-amber-400">
                 <Lock className="h-3.5 w-3.5 shrink-0 mt-0.5" />
@@ -905,88 +992,86 @@ const ExamRoomsPage = () => {
             )}
           </DialogHeader>
 
-          <form onSubmit={handleSubmit} className="space-y-4 pt-2">
-            <FormField id="room_name" label="Nama Ruang Ujian" error={undefined}>
-              <Input
-                placeholder="Contoh: Tryout UTBK - Gelombang 1"
-                value={formValues.room_name}
-                onChange={(e) => setFormValues({ ...formValues, room_name: e.target.value })}
-                required
-              />
-              <p className="text-[10px] text-slate-400 mt-1">Nama ini yang akan ditampilkan di layar dashboard dashboard {terminology.student} Anda.</p>
-            </FormField>
-
-            <FormField id="examId" label="Pilih Bank Soal" error={undefined}>
-              <select
-                value={formValues.examId}
-                onChange={(e) => setFormValues({ ...formValues, examId: e.target.value })}
-                required
-                disabled={isEditRestricted}
-                className={`w-full rounded-md border border-slate-200 dark:border-slate-800 bg-card text-sm p-2 ${isEditRestricted ? "opacity-60 cursor-not-allowed" : ""}`}
-              >
-                <option value="">-- Pilih Bank Soal --</option>
-                {exams
-                  .filter((e) => role === "admin" || e.teacherId === teacherId)
-                  .map((e) => (
-                    <option key={e.id} value={e.id}>{e.title}</option>
-                  ))}
-              </select>
-              {formValues.examId && exams.find(e => e.id === formValues.examId) && (
-                <div className="mt-2 text-xs text-slate-500 bg-slate-50 dark:bg-slate-800/50 p-2.5 rounded-lg border border-slate-100 dark:border-slate-800 flex flex-col gap-1">
-                  <div><span className="font-semibold text-slate-700 dark:text-slate-300">Jenis:</span> {exams.find(e => e.id === formValues.examId)?.examType || "Latihan Biasa"}</div>
-                  <div><span className="font-semibold text-slate-700 dark:text-slate-300">Mapel:</span> {subjects.find(m => m.id === exams.find(e => e.id === formValues.examId)?.subjectId)?.name || "-"}</div>
-                  <div><span className="font-semibold text-slate-700 dark:text-slate-300">Guru:</span> {masterTeachers.find(t => t.id === exams.find(e => e.id === formValues.examId)?.teacherId)?.name || "-"}</div>
+          <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-3 p-4">
+            {/* Row 1: Nama Ruang + Search - full width */}
+            <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-3">
+              <FormField id="exam_search" label="Cari Bank Soal" error={undefined}>
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                  <Input
+                    placeholder="Guru / bank soal / mapel"
+                    value={examSearch}
+                    onChange={(e) => setExamSearch(e.target.value)}
+                    disabled={isEditRestricted}
+                    className="h-9 pl-8"
+                  />
                 </div>
-              )}
-            </FormField>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-700 dark:text-slate-200">Pilih Kelas</label>
-              <div className="flex gap-2 mb-2">
-                <button
-                  type="button"
-                  onClick={() => setFormValues({ ...formValues, allClasses: true, classId: "" })}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${formValues.allClasses ? "bg-blue-50 text-blue-700 border border-blue-100 dark:bg-blue-900/40 dark:text-blue-400 dark:border-blue-800/40" : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300"}`}
-                >
-                  Semua Kelas
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setFormValues({ ...formValues, allClasses: false })}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${!formValues.allClasses ? "bg-blue-50 text-blue-700 border border-blue-100 dark:bg-blue-900/40 dark:text-blue-400 dark:border-blue-800/40" : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300"}`}
-                >
-                  Pilih Parsial (Multiple)
-                </button>
-              </div>
-
-              {!formValues.allClasses && (
-                <div className="grid grid-cols-2 gap-2 border border-slate-200 dark:border-slate-800 rounded-xl p-2 max-h-40 overflow-y-auto bg-card">
-                  {examClasses.map((c) => {
-                    const isChecked = formValues.classId ? formValues.classId.split(",").includes(c.id) : false;
-                    return (
-                      <label key={c.id} className={`flex items-center gap-2 text-xs p-1 hover:bg-slate-50 dark:hover:bg-slate-800 rounded cursor-pointer text-slate-700 dark:text-slate-200`}>
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={(e) => {
-                            let current = formValues.classId ? formValues.classId.split(",") : [];
-                            if (e.target.checked) {
-                              current.push(c.id);
-                            } else {
-                              current = current.filter(id => id !== c.id);
-                            }
-                            current = current.filter(Boolean);
-                            setFormValues({ ...formValues, classId: current.join(",") });
-                          }}
-                        />
-                        <span className="truncate">{c.name}</span>
-                      </label>
-                    )
-                  })}
-                </div>
-              )}
+              </FormField>
+              <FormField id="room_name" label="Nama Ruang" error={undefined}>
+                <Input
+                  placeholder="Contoh: Gelombang 1"
+                  value={formValues.room_name}
+                  onChange={(e) => setFormValues({ ...formValues, room_name: e.target.value })}
+                  required
+                  className="h-9"
+                />
+              </FormField>
             </div>
 
+            {/* Col 1: Bank Soal */}
+            <div className="rounded-2xl border border-slate-200/70 dark:border-slate-800 bg-gradient-to-br from-blue-50/70 to-white dark:from-blue-950/20 dark:to-slate-950/70 p-3 space-y-2 shadow-sm">
+              <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                <BookOpen className="h-3.5 w-3.5 text-blue-500" />
+                Pilih Bank Soal
+              </div>
+              <input type="hidden" value={formValues.examId} />
+              <div className={`space-y-1.5 max-h-[260px] overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] ${isEditRestricted ? "opacity-60 pointer-events-none" : ""}`}>
+                {filteredExams.length === 0 && (
+                  <div className="rounded-xl border border-dashed border-slate-200 dark:border-slate-800 p-3 text-center text-xs text-slate-400 font-semibold">
+                    Tidak ditemukan
+                  </div>
+                )}
+                {visibleExamOptions.map((e) => {
+                  const subjectName = subjects.find((m: any) => m.id === (e.subjectId || e.subjectid))?.name || "-";
+                  const teacherName = masterTeachers.find((t: any) => t.id === (e.teacherId || e.teacherid))?.name || "-";
+                  const selected = formValues.examId === e.id;
+                  return (
+                    <button
+                      key={e.id}
+                      type="button"
+                      onClick={() => setFormValues({ ...formValues, examId: e.id })}
+                      className={cn(
+                        "w-full text-left rounded-xl border p-2 transition-all active:scale-[0.99]",
+                        selected
+                          ? "border-blue-300 bg-blue-50 ring-2 ring-blue-500/10 dark:border-blue-800 dark:bg-blue-950/30"
+                          : "border-slate-200 bg-white hover:border-blue-200 hover:bg-blue-50/40 dark:border-slate-800 dark:bg-slate-950/50 dark:hover:border-blue-900"
+                      )}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          {selected && <div className="h-4 w-4 rounded-full bg-blue-600 flex items-center justify-center shrink-0"><svg className="h-2.5 w-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg></div>}
+                          <span className="font-black text-xs text-slate-800 dark:text-slate-100 truncate">{e.title}</span>
+                        </div>
+                        <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 shrink-0">{e.examType || "Latihan"}</span>
+                      </div>
+                      <div className="mt-0.5 flex items-center gap-2 text-[10px] text-slate-500 dark:text-slate-400">
+                        <span className="truncate">{subjectName}</span>
+                        <span>•</span>
+                        <span className="truncate">{teacherName}</span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="text-[10px] text-slate-400">{filteredExams.length} bank soal</p>
+            </div>
+
+            {/* Col 2: Jadwal & Aturan */}
+            <div className="rounded-2xl border border-slate-200/70 dark:border-slate-800 bg-gradient-to-br from-emerald-50/70 to-white dark:from-emerald-950/20 dark:to-slate-950/70 p-3 space-y-3 shadow-sm">
+              <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                <Clock className="h-3.5 w-3.5 text-emerald-500" />
+                Jadwal & Aturan Ujian
+              </div>
             <div className="grid grid-cols-2 gap-3">
               <FormField id="start_time" label="Waktu Mulai" error={undefined}>
                 <div className="space-y-1.5">
@@ -1032,19 +1117,17 @@ const ExamRoomsPage = () => {
               </FormField>
             </div>
 
-            <div className="space-y-4 pt-1 border-t mt-4">
-              <div className="grid grid-cols-2 gap-3 mt-2">
+              <div className="grid grid-cols-3 gap-2 pt-2 border-t border-emerald-100 dark:border-emerald-900/30">
                 <FormField id="duration" label="Durasi (Menit)" error={undefined}>
                   <Input type="number" value={formValues.duration} onChange={(e) => handleDurationChange(Number(e.target.value))} required />
                 </FormField>
                 <FormField id="cheat_limit" label="Batas Cheat" error={undefined}>
                   <Input type="number" value={formValues.cheat_limit} onChange={(e) => setFormValues({ ...formValues, cheat_limit: Number(e.target.value) })} required />
                 </FormField>
+                <FormField id="submit_window" label="Kumpul Dibuka" error={undefined}>
+                  <Input type="number" placeholder="Sisa menit" value={formValues.submit_window || ""} onChange={(e) => setFormValues({ ...formValues, submit_window: Number(e.target.value) })} />
+                </FormField>
               </div>
-              <FormField id="submit_window" label="Kumpul Dibuka (Sisa Menit)" error={undefined}>
-                <Input type="number" placeholder="Contoh: 10 (Tombol kumpul aktif 10 menit sebelum berakhir)" value={formValues.submit_window || ""} onChange={(e) => setFormValues({ ...formValues, submit_window: Number(e.target.value) })} />
-                <p className="text-slate-400 text-xs mt-1">biarkan kosong agar {terminology.student.toLowerCase()} dapat mengumpulkan selama ujian berjalan</p>
-              </FormField>
 
               <div className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-900/40 rounded-xl border border-slate-100 dark:border-slate-800/60 mt-2">
                 <div className="space-y-0.5 pr-2">
@@ -1063,8 +1146,60 @@ const ExamRoomsPage = () => {
               </div>
             </div>
 
-            <DialogFooter className="pt-2">
-              <Button type="submit" className="w-full bg-blue-50 hover:bg-blue-100 border border-blue-100 dark:bg-blue-900/40 dark:text-blue-400 dark:hover:bg-blue-900/60 dark:border-blue-800/40 text-blue-700">{dialogMode === "edit" ? "Perbarui" : "Simpan"}</Button>
+            {/* Full width: Target Kelas */}
+            <div className="md:col-span-2 rounded-2xl border border-slate-200/70 dark:border-slate-800 bg-gradient-to-br from-indigo-50/70 to-white dark:from-indigo-950/20 dark:to-slate-950/70 p-3 space-y-2 shadow-sm">
+              <div className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-slate-400">
+                <Users className="h-4 w-4 text-indigo-500" />
+                Target Kelas
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setFormValues({ ...formValues, allClasses: true, classId: "" })}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${formValues.allClasses ? "bg-blue-50 text-blue-700 border border-blue-100 dark:bg-blue-900/40 dark:text-blue-400 dark:border-blue-800/40" : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300"}`}
+                    >
+                      Semua Kelas
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFormValues({ ...formValues, allClasses: false })}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${!formValues.allClasses ? "bg-blue-50 text-blue-700 border border-blue-100 dark:bg-blue-900/40 dark:text-blue-400 dark:border-blue-800/40" : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300"}`}
+                    >
+                      Pilih Parsial
+                    </button>
+                  </div>
+                  <span className="text-[10px] font-bold text-slate-400">Shift + klik untuk rentang</span>
+                </div>
+
+                {!formValues.allClasses && (
+                  <div className="flex flex-wrap gap-1.5 border border-slate-200 dark:border-slate-800 rounded-xl p-3 bg-card">
+                    {[...examClasses].sort((a: any, b: any) => String(a.name || "").localeCompare(String(b.name || ""), undefined, { numeric: true })).map((c: any) => {
+                      const isChecked = formValues.classId ? formValues.classId.split(",").includes(c.id) : false;
+                      return (
+                        <button
+                          key={c.id}
+                          type="button"
+                          onClick={(e) => handleClassToggle(c.id, !isChecked, e.shiftKey)}
+                          className={cn(
+                            "px-2.5 py-1 rounded-full text-[11px] font-bold border transition-all active:scale-95 select-none",
+                            isChecked
+                              ? "bg-indigo-100 text-indigo-700 border-indigo-300 shadow-sm dark:bg-indigo-900/40 dark:text-indigo-300 dark:border-indigo-700"
+                              : "bg-white text-slate-500 border-slate-200 hover:border-indigo-200 hover:bg-indigo-50/50 dark:bg-slate-900 dark:text-slate-400 dark:border-slate-700 dark:hover:border-indigo-800"
+                          )}
+                        >
+                          {c.name}
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <DialogFooter className="md:col-span-2 sticky bottom-0 -mx-4 -mb-4 px-4 py-3 bg-white/90 dark:bg-slate-950/90 backdrop-blur border-t border-slate-200/70 dark:border-slate-800">
+              <Button type="submit" className="w-full h-10 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black shadow-lg shadow-blue-600/20">{dialogMode === "edit" ? "Perbarui" : "Simpan"}</Button>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -1102,9 +1237,9 @@ const ExamRoomsPage = () => {
             <p className="text-indigo-100 text-xs opacity-80">Ruangan: {showClassesRoom?.room_name || showClassesRoom?.examTitle}</p>
           </div>
           <div className="p-6 max-h-[60vh] overflow-y-auto bg-white dark:bg-slate-950">
-            <div className="grid grid-cols-2 gap-2">
+            <div className="flex flex-wrap gap-2">
               {(showClassesRoom?.className || "").split(", ").map((cls, idx) => (
-                <div key={idx} className="flex items-center gap-2 p-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 shadow-sm transition-all hover:border-indigo-200 dark:hover:border-indigo-900">
+                <div key={idx} className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 shadow-sm">
                   <div className="h-2 w-2 rounded-full bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.5)]"></div>
                   <span className="text-xs font-bold text-slate-700 dark:text-slate-200">{cls}</span>
                 </div>

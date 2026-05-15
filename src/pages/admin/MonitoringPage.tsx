@@ -331,6 +331,8 @@ const MonitoringPage = () => {
         const sId = roomRecord.examId || (roomRecord as any).examid || "";
         const roomName = roomRecord.room_name || (roomRecord as any).title || roomRecord.title || "Tanpa Nama";
         const isOff = roomRecord.isDisabled !== undefined ? roomRecord.isDisabled : (roomRecord as any).isActive === false;
+        const subjectObj = subjects.find((s: any) => s.id === (examObj?.subjectId || (examObj as any)?.subjectid));
+        const teacherObj = masterTeachers.find((t: any) => t.id === (examObj?.teacherId || (examObj as any)?.teacherid));
 
         // Robust mapping for Class IDs
         const isAllClasses = roomRecord.allClasses || (roomRecord as any).all_classes || false;
@@ -352,6 +354,8 @@ const MonitoringPage = () => {
           examTitle: examObj?.title || "...",
           examTeacherId: examObj?.teacherId,
           examType: (examObj as any)?.examType || (examObj as any)?.examtype || "UMUM",
+          subjectName: subjectObj?.name || "N/A",
+          teacherName: teacherObj?.name || "N/A",
           isDisabled: isOff,
           allClasses: isAllClasses,
           classId: classList.length > 0 ? classList : (roomRecord.classId || [])
@@ -420,7 +424,7 @@ const MonitoringPage = () => {
       setIsMonitorRefreshing(false);
       setLoading(false);
     }
-  }, [roomId, monitorRoom, monitorQuestions.length]);
+  }, [roomId, monitorRoom, monitorQuestions.length, pb, subjects, masterTeachers]);
 
   // Initial Fetch
   useEffect(() => {
@@ -867,9 +871,14 @@ const MonitoringPage = () => {
                 )}
               </div>
               <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
-                <div className="flex items-center gap-1.5">
-                  <BookOpen className="h-3.5 w-3.5 text-blue-500" />
-                  <span className="font-medium truncate max-w-[200px] md:max-w-md">{isLoading ? <Skeleton className="h-3 w-32" /> : monitorRoom?.examTitle}</span>
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <BookOpen className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                  <span className="font-medium truncate max-w-[140px] md:max-w-xs">{isLoading ? <Skeleton className="h-3 w-32" /> : monitorRoom?.subjectName}</span>
+                </div>
+                <span className="text-slate-300 dark:text-slate-700">|</span>
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                  <span className="font-bold truncate max-w-[180px] md:max-w-md">{isLoading ? <Skeleton className="h-3 w-36" /> : `Bank Soal: ${monitorRoom?.examTitle || "Tanpa Nama"}`}</span>
                 </div>
                 <span className="text-slate-300 dark:text-slate-700">|</span>
                 <div className="flex flex-wrap gap-1">
