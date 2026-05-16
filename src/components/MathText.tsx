@@ -68,6 +68,75 @@ export const MathText: React.FC<MathTextProps> = ({ content, className = "" }) =
   const parsedContent = useMemo(() => {
     if (!content) return [];
     
+    // 🔧 Pre-process: wrap bare LaTeX commands (not inside $...$) with $ delimiters
+    let processedContent = content;
+    
+    // Step 1: Find all existing $...$ spans and mark them
+    const dollarSpans: Array<[number, number]> = [];
+    const dollarRegex = /\$[^$]+\$/g;
+    let dm;
+    while ((dm = dollarRegex.exec(processedContent)) !== null) {
+      dollarSpans.push([dm.index, dm.index + dm[0].length]);
+    }
+    
+    const isInsideDollar = (idx: number) => dollarSpans.some(([s, e]) => idx >= s && idx < e);
+    
+    // Step 2: Find bare LaTeX expressions and wrap them
+    // Match \displaystyle, \frac, \int, \sum, \sqrt, \lim, \prod, \left, \right etc. 
+    // followed by math content until we hit a sentence boundary or HTML tag
+    const latexStartRegex = /\\(displaystyle|frac|int|sum|sqrt|lim|prod|bigcup|bigcap|left|infty|alpha|beta|gamma|theta|sigma|pi|Delta|Omega|partial|nabla|vec|hat|bar|dot|ddot|overline|underline|overbrace|underbrace)\b/g;
+    
+    let result = '';
+    let lastIdx = 0;
+    let lm;
+    
+    // Reset regex
+    latexStartRegex.lastIndex = 0;
+    
+    while ((lm = latexStartRegex.exec(processedContent)) !== null) {
+      if (isInsideDollar(lm.index)) continue;
+      // Also skip if inside HTML tags
+      const before = processedContent.substring(Math.max(0, lm.index - 50), lm.index);
+      if (before.match(/<[^>]*$/)) continue; // inside an HTML tag
+      
+      // Find the end of this math expression
+      // It ends at: HTML tag, period followed by space+uppercase, newline, or end of string
+      let endIdx = lm.index;
+      let depth = 0;
+      let i = lm.index;
+      while (i < processedContent.length) {
+        const ch = processedContent[i];
+        if (ch === '<') break; // HTML tag
+        if (ch === '\n') break;
+        if (ch === '{') depth++;
+        if (ch === '}') depth--;
+        if (ch === '$') break; // hitting another dollar
+        // End at period/comma followed by space and non-math char (but not inside braces)
+        if (depth <= 0 && (ch === '.' || ch === '?') && i + 1 < processedContent.length) {
+          const next = processedContent[i + 1];
+          if (next === ' ' || next === '<' || next === '\n') { endIdx = i; break; }
+        }
+        endIdx = i + 1;
+        i++;
+      }
+      if (endIdx <= lm.index) continue;
+      
+      const mathExpr = processedContent.substring(lm.index, endIdx).trim();
+      if (!mathExpr || mathExpr.length < 3) continue;
+      
+      // Add content before this match
+      result += processedContent.substring(lastIdx, lm.index);
+      // Wrap in $...$
+      result += `$${mathExpr}$`;
+      lastIdx = endIdx;
+      
+      // Update dollar spans for subsequent checks
+      dollarSpans.push([result.length - mathExpr.length - 2, result.length]);
+    }
+    
+    result += processedContent.substring(lastIdx);
+    processedContent = result || processedContent;
+
     const parts: Array<{ type: 'html' | 'code'; value: string; language?: string }> = [];
     // Regex matches <pre class="ql-syntax" ...>content</pre>
     const regex = /<pre[^>]*class="[^"]*ql-syntax[^"]*"[^>]*>(.*?)<\/pre>/gs;
@@ -75,10 +144,10 @@ export const MathText: React.FC<MathTextProps> = ({ content, className = "" }) =
     let lastIndex = 0;
     let match;
 
-    while ((match = regex.exec(content)) !== null) {
+    while ((match = regex.exec(processedContent)) !== null) {
       // Add HTML before the code block
       if (match.index > lastIndex) {
-        let htmlVal = content.substring(lastIndex, match.index);
+        let htmlVal = processedContent.substring(lastIndex, match.index);
         // Clean trailing empty paragraphs before code block
         htmlVal = htmlVal.replace(/(<p><br><\/p>\s*)+$/i, '');
         // Only push if not completely empty after trim
@@ -105,10 +174,11 @@ export const MathText: React.FC<MathTextProps> = ({ content, className = "" }) =
         // Simple heuristics detection
         if (/<\?php/i.test(code)) language = 'php';
         else if (/\b(cout|cin|#include\s*<[a-z.]+>|std::)\b/.test(code)) language = 'cpp';
-        else if (/\b(public\s+class|System\.out\.println)\b/.test(code)) language = 'java';
-        else if (/\b(def\s+\w+\(|import\s+[a-z_]+|print\(|from\s+[a-z_]+\s+import)\b/.test(code) && !code.includes('{')) language = 'python';
+        else if (/\b(public\s+class|System\.out\.println|public\s+static\s+void)\b/.test(code)) language = 'java';
+        else if (/\b(def\s+\w+\(|import\s+[a-z_]+|print\s*\(|from\s+[a-z_]+\s+import|elif\b|input\s*\(|len\s*\(|range\s*\(|self\.|__init__|lambda\s|True|False|None)\b/.test(code) && !code.includes('{')) language = 'python';
         else if (/<\/?html|<\/?head|<\/?body|<\/?div|<\/?span|<\/?p|</i.test(code) && !code.includes('<?')) language = 'html';
         else if (/\b(SELECT|INSERT|UPDATE|DELETE|CREATE TABLE)\b/i.test(code)) language = 'sql';
+        else if (/\b(func\s+\w+|fmt\.|package\s+main)\b/.test(code)) language = 'go';
         else language = 'javascript'; // Default fallback
       }
 
@@ -122,8 +192,8 @@ export const MathText: React.FC<MathTextProps> = ({ content, className = "" }) =
     }
 
     // Add remaining HTML
-    if (lastIndex < content.length) {
-      let htmlVal = content.substring(lastIndex);
+    if (lastIndex < processedContent.length) {
+      let htmlVal = processedContent.substring(lastIndex);
       // Clean leading empty paragraphs after code block
       htmlVal = htmlVal.replace(/^(<p><br><\/p>\s*)+/i, '');
       if (htmlVal.trim() || htmlVal.includes('<img')) {
@@ -147,23 +217,49 @@ export const MathText: React.FC<MathTextProps> = ({ content, className = "" }) =
     });
     
     // 2. Arabic Detection & Styling (Premium Quranic Look)
-    // Updated regex to include surrounding common punctuation like quotes (", «), dots, or colons
-    const arabicRegex = /((?:["'«:(]\s*)?[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF\u0660-\u0669]+(?:\s+[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF\u0660-\u0669]+)*(?:\s*["'»):.])?)/g;
+    // Skip if content already has dir="rtl" (AI already formatted it)
+    if (processed.includes('dir="rtl"')) {
+      // Just ensure proper styling on existing RTL elements
+      processed = processed.replace(
+        /<p\s+dir="rtl"([^>]*)>/g, 
+        `<p dir="rtl" style="font-family:'Amiri','Noto Sans Arabic',serif;font-size:145%;line-height:2.4;text-align:right;direction:rtl;unicode-bidi:isolate;padding:12px 0;"$1>`
+      );
+      processed = processed.replace(
+        /<span\s+dir="rtl"([^>]*)>/g,
+        `<span dir="rtl" style="font-family:'Amiri','Noto Sans Arabic',serif;font-size:145%;line-height:2;direction:rtl;unicode-bidi:isolate;"$1>`
+      );
+      return processed;
+    }
+    
+    // Auto-detect Arabic text and style it
+    const arabicRegex = /((?:["'«:(]\s*)?[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF\u0660-\u0669]+(?:[\s\u060C\u061B\u061F\u06D4]+[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF\u0660-\u0669]+)*(?:\s*["'»):.])?)/g;
     
     processed = processed.replace(arabicRegex, (match) => {
       const cleanMatch = match.trim();
       if (cleanMatch.length < 2 && !/[\u0621-\u064A]/.test(cleanMatch)) return match;
       
-      // Jika teks Arab cukup panjang (ayat), buatkan blok khusus rata kanan
-      const isVerse = cleanMatch.length > 15;
+      // Jika teks Arab cukup panjang (ayat/kalimat), buatkan blok khusus rata kanan
+      const isVerse = cleanMatch.length > 20;
+      
+      if (isVerse) {
+        return `<span dir="rtl" class="arabic-text arabic-verse" style="
+          font-family: 'Amiri', 'Noto Sans Arabic', serif; 
+          font-size: 145%; 
+          line-height: 2.4; 
+          display: block; 
+          padding: 12px 0; 
+          text-align: right;
+          direction: rtl;
+          unicode-bidi: isolate;
+        ">${match}</span>`;
+      }
       
       return `<span dir="rtl" class="arabic-text" style="
-        font-family: 'Amiri', serif; 
-        font-size: 145%; 
-        line-height: ${isVerse ? '2.4' : '1.8'}; 
-        display: ${isVerse ? 'block' : 'inline-block'}; 
-        padding: ${isVerse ? '15px 0' : '0 4px'}; 
-        text-align: right;
+        font-family: 'Amiri', 'Noto Sans Arabic', serif; 
+        font-size: 130%; 
+        line-height: 2; 
+        display: inline-block; 
+        padding: 0 4px; 
         direction: rtl;
         unicode-bidi: isolate;
       ">${match}</span>`;

@@ -144,8 +144,8 @@ const SettingsPage = () => {
   };
 
   const handleTestAI = async () => {
-    const targetKey = aiProvider === "groq" ? groqApiKey : aiGatewayKey;
-    if (!targetKey) {
+    const targetKey = aiProvider === "puter" ? "puter-no-key" : (aiProvider === "groq" ? groqApiKey : aiGatewayKey);
+    if (!targetKey && aiProvider !== "puter") {
       addToast({ title: "Gagal", description: "Masukkan API Key terlebih dahulu.", type: "error" });
       return;
     }
@@ -258,7 +258,7 @@ const SettingsPage = () => {
   useEffect(() => {
     if (loading) return;
 
-    if (aiProvider === "groq" || aiProvider === "ollama") {
+    if (aiProvider === "groq" || aiProvider === "ollama" || aiProvider === "puter") {
       const availableModels = AI_MODELS.filter((m: any) => m.provider === aiProvider);
       setRemoteModels(availableModels);
       if (!availableModels.some(m => m.id === aiModel) && availableModels.length > 0) {
@@ -833,6 +833,7 @@ const SettingsPage = () => {
                       >
                         <option value="groq">Groq Cloud</option>
                         <option value="ollama">Ollama (Local / Proxy)</option>
+                        <option value="ollama">Ollama (Local / Proxy)</option>
                         <option value="google">Google AI Studio (Gemini)</option>
                         <option value="openrouter">OpenRouter</option>
                         <option value="together">Together AI</option>
@@ -841,6 +842,7 @@ const SettingsPage = () => {
                         <option value="github">GitHub Models</option>
                         <option value="cloudflare">Cloudflare Workers AI</option>
                         <option value="custom">Custom Endpoint (Lainnya)</option>
+                        <option value="puter">Puter (Gratis, tanpa API Key, limit terbatas)</option>
                       </select>
                     </div>
                   </div>
@@ -881,7 +883,7 @@ const SettingsPage = () => {
                           >
                             <optgroup label={`Model ${aiProvider.toUpperCase()}`}>
                               {remoteModels.map((m: any) => (
-                                <option key={m.id} value={m.id}>{m.name} {m.speed && `(${m.speed})`}</option>
+                                <option key={m.id} value={m.id}>{m.name} {m.speed && `(${m.speed})`}{m.dailyLimit ? ` [${m.dailyLimit}]` : ''}</option>
                               ))}
                             </optgroup>
                           </select>
@@ -899,7 +901,7 @@ const SettingsPage = () => {
 
                     <div className="sm:col-span-2 pt-1 flex justify-end">
                       <Button
-                        type="button" onClick={handleTestAI} disabled={isTestingAI || (aiProvider === "groq" ? !groqApiKey : !aiGatewayKey)}
+                        type="button" onClick={handleTestAI} disabled={isTestingAI || (aiProvider === "puter" ? false : (aiProvider === "groq" ? !groqApiKey : !aiGatewayKey))}
                         variant="outline"
                         className="h-9 px-4 rounded-xl text-xs font-bold border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800"
                       >
@@ -1086,6 +1088,15 @@ const SettingsPage = () => {
                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Kecepatan</span>
                     <span className="text-[10px] font-bold text-slate-600 dark:text-slate-400">
                       {AI_MODELS.find(m => m.id === aiModel)?.speed}
+                    </span>
+                  </div>
+                )}
+                {/* Daily limit info for Groq models */}
+                {(AI_MODELS.find(m => m.id === aiModel) as any)?.dailyLimit && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Kuota Harian</span>
+                    <span className={`text-[10px] font-bold ${(AI_MODELS.find(m => m.id === aiModel) as any)?.dailyLimit?.includes('⚠️') ? 'text-rose-500' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                      {(AI_MODELS.find(m => m.id === aiModel) as any)?.dailyLimit}
                     </span>
                   </div>
                 )}

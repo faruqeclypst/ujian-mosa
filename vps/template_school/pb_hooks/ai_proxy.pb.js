@@ -1,26 +1,23 @@
 routerAdd("POST", "/api/ai-proxy", (c) => {
     try {
-        // 🔥 Use Try/Catch for each header to prevent crash
         try { c.setResponseHeader("Access-Control-Allow-Origin", "*"); } catch (e) { }
         try { c.setResponseHeader("Access-Control-Allow-Methods", "POST, OPTIONS"); } catch (e) { }
         try { c.setResponseHeader("Access-Control-Allow-Headers", "Content-Type, X-Token, Authorization"); } catch (e) { }
 
-        console.log("[PROXY] step 1: getting requestInfo");
         const info = c.requestInfo();
-
-        console.log("[PROXY] step 2: extracting data safely");
-        // Safe extraction from Go map (bracket notation is safe)
         const apiKey = (info.body["apiKey"] || "").toString();
-        const baseUrl = (info.body["baseUrl"] || "https://ollama.com").toString();
+        const baseUrl = (info.body["baseUrl"] || "").toString();
         const bodyData = info.body["body"];
 
-        if (!apiKey || apiKey === "undefined") {
+        if (!apiKey || apiKey === "undefined" || apiKey === "") {
             return c.json(400, { error: "Missing API Key" });
+        }
+        if (!baseUrl || baseUrl === "") {
+            return c.json(400, { error: "Missing Base URL" });
         }
 
         const model = (bodyData["model"] || "").toString();
         const msgs = bodyData["messages"];
-
         const msgArray = [];
         if (msgs) {
             for (let i = 0; i < msgs.length; i++) {
@@ -31,23 +28,35 @@ routerAdd("POST", "/api/ai-proxy", (c) => {
             }
         }
 
-        console.log("[PROXY] forwarding to " + baseUrl + " model " + model);
+        let finalUrl = baseUrl;
+        if (baseUrl.includes("ollama.com") || baseUrl.includes(":11434")) {
+            finalUrl = baseUrl.endsWith("/api/chat") ? baseUrl : baseUrl.replace(/\/$/, "") + "/api/chat";
+        } else if (!baseUrl.includes("/chat/completions") && !baseUrl.includes("/api/chat") && !baseUrl.includes("/v1/engines")) {
+            finalUrl = baseUrl.replace(/\/$/, "") + "/chat/completions";
+        }
+
+        const maxTokens = bodyData["max_tokens"] ? parseInt(bodyData["max_tokens"]) : 4000;
+        const reqBody = {
+            model: model,
+            messages: msgArray,
+            stream: false,
+            max_tokens: maxTokens
+        };
+        if (bodyData["temperature"]) reqBody["temperature"] = bodyData["temperature"];
+
+        console.log("[PROXY] forwarding to " + finalUrl + " model " + model + " max_tokens " + maxTokens);
 
         const res = $http.send({
-            url: baseUrl + "/api/chat",
+            url: finalUrl,
             method: "POST",
             headers: {
                 "Authorization": "Bearer " + apiKey,
                 "Content-Type": "application/json"
             },
-            body: JSON.stringify({
-                model: model,
-                messages: msgArray,
-                stream: false
-            })
+            body: JSON.stringify(reqBody)
         });
 
-        console.log("[PROXY] ollama responded: " + res.statusCode);
+        console.log("[PROXY] responded: " + res.statusCode);
 
         let result = {};
         try {

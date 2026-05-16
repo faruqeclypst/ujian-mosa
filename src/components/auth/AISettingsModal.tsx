@@ -103,12 +103,15 @@ const AISettingsModal = ({ isOpen, onClose }: AISettingsModalProps) => {
         const config = records[0];
 
         const isOllama = values.ai_provider === 'ollama';
+        const isPuter = values.ai_provider === 'puter';
         const payload: any = {
           ai_provider: values.ai_provider,
           ai_model: values.ai_model,
         };
 
-        if (isOllama) {
+        if (isPuter) {
+          // Puter doesn't need API key
+        } else if (isOllama) {
           payload.ai_gateway_key = values.ai_api_key;
         } else {
           payload.groq_api_key = values.ai_api_key;
@@ -246,6 +249,7 @@ const AISettingsModal = ({ isOpen, onClose }: AISettingsModalProps) => {
               >
                 <option value="groq">Groq Cloud (Cepat)</option>
                 <option value="ollama">Ollama (Lokal)</option>
+                <option value="puter">Puter (Gratis, tanpa API Key, limit terbatas)</option>
               </select>
             </FormField>
 
@@ -255,7 +259,7 @@ const AISettingsModal = ({ isOpen, onClose }: AISettingsModalProps) => {
                 className="w-full h-11 rounded-xl border border-gray-200 bg-gray-50 text-sm px-3 dark:border-gray-700 dark:bg-gray-800 outline-none focus:ring-2 focus:ring-blue-500/20"
               >
                 {AI_MODELS.filter(m => m.provider === selectedProvider).map(m => (
-                  <option key={m.id} value={m.id}>{m.name}</option>
+                  <option key={m.id} value={m.id}>{m.name}{(m as any).dailyLimit ? ` — ${(m as any).dailyLimit}` : ''}</option>
                 ))}
               </select>
             </FormField>

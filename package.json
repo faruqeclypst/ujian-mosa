@@ -29,6 +29,7 @@
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.0",
     "framer-motion": "^10.18.0",
+    "jsonrepair": "^3.14.0",
     "katex": "^0.16.45",
     "lucide-react": "^0.370.0",
     "mammoth": "^1.12.0",

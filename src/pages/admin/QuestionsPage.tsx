@@ -550,6 +550,36 @@ const QuestionsPage = () => {
   const [isAIModalOpen, setIsAIModalOpen] = useState(false);
   const [isAIGenerating, setIsAIGenerating] = useState(false);
   const [isAIGeneratingDirect, setIsAIGeneratingDirect] = useState(false);
+  const [aiProgress, setAiProgress] = useState(0);
+  const aiAbortRef = useRef<AbortController | null>(null);
+  const aiProgressRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const startAIProgress = () => {
+    setAiProgress(0);
+    if (aiProgressRef.current) clearInterval(aiProgressRef.current);
+    let progress = 0;
+    aiProgressRef.current = setInterval(() => {
+      // Simulate progress: fast at start, slow near end
+      const increment = progress < 30 ? 3 : progress < 60 ? 2 : progress < 85 ? 0.5 : 0.1;
+      progress = Math.min(progress + increment, 95);
+      setAiProgress(Math.round(progress));
+    }, 300);
+  };
+
+  const stopAIProgress = (success: boolean) => {
+    if (aiProgressRef.current) { clearInterval(aiProgressRef.current); aiProgressRef.current = null; }
+    setAiProgress(success ? 100 : 0);
+    if (success) setTimeout(() => setAiProgress(0), 1000);
+  };
+
+  const cancelAIGeneration = () => {
+    if (aiAbortRef.current) { aiAbortRef.current.abort(); aiAbortRef.current = null; }
+    stopAIProgress(false);
+    setIsAIGenerating(false);
+    setIsAIGeneratingDirect(false);
+    setIsParsing(false);
+    addToast({ title: "Dibatalkan", description: "Generasi AI dibatalkan.", type: "info" });
+  };
   const [isRegeneratingIndex, setIsRegeneratingIndex] = useState<number | null>(null);
   const [aiTopic, setAiTopic] = useState("");
   const [aiCount, setAiCount] = useState(5);
@@ -600,9 +630,9 @@ const QuestionsPage = () => {
       }
     };
 
-    const timer = setTimeout(fetchSuggestions, 800);
+    const timer = setTimeout(fetchSuggestions, 1500);
     return () => clearTimeout(timer);
-  }, [aiLevel, aiSubject, aiDifficulty, aiType, aiFocus, isAiLiteracy]);
+  }, [aiLevel, aiSubject, aiFocus, isAiLiteracy]);
 
 
   const handleRandomFill = () => {
@@ -629,6 +659,8 @@ const QuestionsPage = () => {
   const handleAIGenerateDirect = async () => {
     if (!pb) return;
     setIsAIGeneratingDirect(true);
+    startAIProgress();
+    aiAbortRef.current = new AbortController();
     try {
       const generated = await generateQuestionsAI(
         pb,
@@ -673,17 +705,25 @@ const QuestionsPage = () => {
       });
     } catch (err: any) {
       console.error("AI Direct Generate Error:", err);
-      if (err.message === "AI_RATE_LIMIT") {
-        showAlert("Limit Tercapai", "Server AI sedang sibuk karena terlalu banyak permintaan. Silakan tunggu sekitar 1-2 menit sebelum mencoba lagi.", "danger");
+      if (err.message?.startsWith("AI_RATE_LIMIT")) {
+        const parts = err.message.split("|");
+        if (parts.length >= 5) {
+          const [, limit, used, remaining, requested] = parts;
+          showAlert("Limit Harian Tercapai", `Kuota token harian habis.\n\n• Limit: ${Number(limit).toLocaleString()} token/hari\n• Terpakai: ${Number(used).toLocaleString()} token\n• Sisa: ${Number(remaining).toLocaleString()} token\n• Diminta: ${Number(requested).toLocaleString()} token\n\nSilakan tunggu reset harian atau upgrade plan Groq.`, "danger");
+        } else {
+          showAlert("Limit Tercapai", "Server AI sedang sibuk karena terlalu banyak permintaan. Silakan tunggu sekitar 1-2 menit sebelum mencoba lagi.", "danger");
+        }
       } else {
         addToast({
           type: "error",
           title: "Gagal Generasi",
-          description: err.message || "Gagal meramu paket soal baru.",
+          description: (err.message || "Gagal meramu paket soal baru.") + " Silakan coba ganti model AI di Pengaturan.",
         });
       }
     } finally {
+      stopAIProgress(true);
       setIsAIGeneratingDirect(false);
+      aiAbortRef.current = null;
     }
   };
 
@@ -745,13 +785,19 @@ const QuestionsPage = () => {
       });
     } catch (err: any) {
       console.error("AI Single Regenerate Error:", err);
-      if (err.message === "AI_RATE_LIMIT") {
-        showAlert("Limit Tercapai", "Permintaan terlalu cepat. Silakan tunggu 1 menit agar AI siap kembali.", "danger");
+      if (err.message?.startsWith("AI_RATE_LIMIT")) {
+        const parts = err.message.split("|");
+        if (parts.length >= 5) {
+          const [, limit, used, remaining, requested] = parts;
+          showAlert("Limit Harian Tercapai", `Kuota token harian habis.\n• Limit: ${Number(limit).toLocaleString()} token/hari\n• Terpakai: ${Number(used).toLocaleString()}\n• Sisa: ${Number(remaining).toLocaleString()}\n• Diminta: ${Number(requested).toLocaleString()}\n\nTunggu reset harian atau upgrade plan.`, "danger");
+        } else {
+          showAlert("Limit Tercapai", "Permintaan terlalu cepat. Silakan tunggu 1 menit agar AI siap kembali.", "danger");
+        }
       } else {
         addToast({
           type: "error",
           title: "Gagal Regenerasi",
-          description: err.message || "AI gagal meramu soal baru.",
+          description: (err.message || "AI gagal meramu soal baru.") + " Silakan coba ganti model AI di Pengaturan.",
         });
       }
     } finally {
@@ -762,6 +808,8 @@ const QuestionsPage = () => {
   const handleAIParse = async () => {
     if (!importText.trim() || !pb) return;
     setIsParsing(true);
+    startAIProgress();
+    aiAbortRef.current = new AbortController();
     try {
       let results = [];
       if (importMode === 'extract') {
@@ -786,11 +834,15 @@ const QuestionsPage = () => {
     } catch (err: any) {
       addToast({
         title: "Gagal Menarik Soal",
-        description: err.message === "AI_RATE_LIMIT" ? "Terlalu banyak permintaan. Tunggu 60 detik." : (err.message || "Gagal memproses dokumen."),
+        description: err.message?.startsWith("AI_RATE_LIMIT") 
+          ? "Kuota token harian habis. Tunggu reset atau upgrade plan." 
+          : `${err.message || "Gagal memproses dokumen."} Silakan coba ganti model AI di Pengaturan.`,
         type: "error"
       });
     } finally {
+      stopAIProgress(parsedResults.length > 0);
       setIsParsing(false);
+      aiAbortRef.current = null;
     }
   };
 
@@ -883,6 +935,8 @@ const QuestionsPage = () => {
     }
     
     setIsAIGenerating(true);
+    startAIProgress();
+    aiAbortRef.current = new AbortController();
     try {
       const generated = await generateQuestionsAI(
         pb,
@@ -947,17 +1001,25 @@ const QuestionsPage = () => {
       });
     } catch (err: any) {
       console.error("AI Generate Error:", err);
-      if (err.message === "AI_RATE_LIMIT") {
-        showAlert("Server Sedang Limit", "Terlalu banyak permintaan AI. Silakan jeda sejenak (1 menit) sebelum memulai generasi baru.", "danger");
+      if (err.message?.startsWith("AI_RATE_LIMIT")) {
+        const parts = err.message.split("|");
+        if (parts.length >= 5) {
+          const [, limit, used, remaining, requested] = parts;
+          showAlert("Limit Harian Tercapai", `Kuota token harian habis.\n• Limit: ${Number(limit).toLocaleString()} token/hari\n• Terpakai: ${Number(used).toLocaleString()}\n• Sisa: ${Number(remaining).toLocaleString()}\n• Diminta: ${Number(requested).toLocaleString()}\n\nTunggu reset harian atau upgrade plan.`, "danger");
+        } else {
+          showAlert("Server Sedang Limit", "Terlalu banyak permintaan AI. Silakan jeda sejenak (1 menit) sebelum memulai generasi baru.", "danger");
+        }
       } else {
         addToast({
           type: "error",
           title: "Gagal Generasi AI",
-          description: err.message || "Gagal meramu soal.",
+          description: (err.message || "Gagal meramu soal.") + " Silakan coba ganti model AI di Pengaturan.",
         });
       }
     } finally {
+      stopAIProgress(!isAIGenerating);
       setIsAIGenerating(false);
+      aiAbortRef.current = null;
     }
   };
   const [batchQuestions, setBatchQuestions] = useState<any[]>([
@@ -2711,7 +2773,7 @@ const QuestionsPage = () => {
                           <div className="bg-gradient-to-br from-sky-600 to-indigo-700 p-8 text-white relative">
                             <BookOpen className="h-16 w-16 opacity-10 absolute right-8 top-8" />
                             <h2 className="text-2xl font-bold mb-2">Panduan Soal Literasi</h2>
-                            <p className="text-sky-100 text-sm">Pelajari cara mengelompokkan soal berdasarkan wacana (AKM/Literasi).</p>
+                            <p className="text-sky-100 text-sm">Pelajari cara mengelompokkan soal berdasarkan stimulus (AKM/Literasi).</p>
                           </div>
                           
                           <div className="p-8 space-y-6 max-h-[70vh] overflow-y-auto bg-white dark:bg-slate-950">
@@ -3087,7 +3149,7 @@ const QuestionsPage = () => {
                     className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
                   />
                   <label htmlFor="literasi-active" className="text-sm font-semibold text-blue-700 dark:text-blue-400 cursor-pointer">
-                    Aktifkan Paket Wacana
+                    Aktifkan Paket Stimulus / Literasi
                   </label>
                 </div>
               </FormField>
@@ -3103,7 +3165,7 @@ const QuestionsPage = () => {
                         const val = e.target.value;
                         if (val === "NEW_LITERASI") {
                           setLiterasiMode("create");
-                          setFormValues({ ...formValues, groupId: "", groupText: '<h2 style="text-align:center;">JUDUL WACANA</h2><p><br></p><p>Tuliskan isi wacana di sini...</p>' });
+                          setFormValues({ ...formValues, groupId: "", groupText: '<h2 style="text-align:center;">JUDUL STIMULUS</h2><p><br></p><p>Tuliskan isi stimulus / literasi di sini...</p>' });
                         } else {
                           setLiterasiMode("select");
                           setFormValues({ 
@@ -3126,7 +3188,7 @@ const QuestionsPage = () => {
                     {literasiMode === "select" && formValues.groupId && existingLiteracies[formValues.groupId] && (
                       <div className="mt-2 bg-slate-50 dark:bg-slate-900/40 p-2.5 rounded-lg border border-slate-100 dark:border-slate-800 flex flex-col gap-1">
                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide flex items-center gap-1">
-                          🔒 Wacana Terkunci (Hanya Edit di Soal #1 grup ini)
+                          🔒 Stimulus / Literasi Terkunci (Hanya Edit di Soal #1 grup ini)
                         </span>
                         <MathText 
                           content={existingLiteracies[formValues.groupId]}
@@ -3147,14 +3209,14 @@ const QuestionsPage = () => {
                         />
                       </FormField>
 
-                      <FormField id="groupText" label="Teks Wacana / Cerita Literasi Baru" error={undefined}>
+                      <FormField id="groupText" label="Teks Stimulus / Literasi Baru" error={undefined}>
                         <div className="bg-card rounded-md border flex flex-col mt-1">
                           <ReactQuill
                             key={`group-create`}
                             theme="snow"
                             value={formValues.groupText || ""}
                             onChange={(content) => setFormValues({ ...formValues, groupText: content })}
-                            placeholder="Ketikkan teks wacana literasi di sini..."
+                            placeholder="Ketikkan teks stimulus / literasi di sini..."
                             modules={quillModules}
                             formats={quillFormats}
                             className="[&_.ql-editor]:min-h-[100px] [&_.ql-container]:border-none [&_.ql-toolbar]:border-none [&_.ql-toolbar]:border-b"
@@ -3704,8 +3766,8 @@ const QuestionsPage = () => {
                       <BookOpen className="w-5 h-5" />
                     </div>
                     <div>
-                      <h3 className="text-sm font-black text-blue-900 dark:text-blue-100 uppercase tracking-tight">Wacana Stimulus Literasi</h3>
-                      <p className="text-[10px] text-blue-700/60 dark:text-blue-400/60 font-bold uppercase tracking-widest">Wacana Induk untuk Paket Soal Ini</p>
+                      <h3 className="text-sm font-black text-blue-900 dark:text-blue-100 uppercase tracking-tight">Stimulus / Literasi</h3>
+                      <p className="text-[10px] text-blue-700/60 dark:text-blue-400/60 font-bold uppercase tracking-widest">Stimulus / Literasi Induk untuk Paket Soal Ini</p>
                     </div>
                   </div>
                   <div className="bg-white/80 dark:bg-slate-900/80 px-4 py-1.5 rounded-full border border-blue-100 dark:border-blue-800/40 shadow-sm">
@@ -3718,11 +3780,11 @@ const QuestionsPage = () => {
                     theme="snow"
                     value={batchQuestions[0].groupText}
                     onChange={(content) => {
-                      // Update all questions in batch to share same wacana
+                      // Update all questions in batch to share same stimulus
                       const updatedBatch = batchQuestions.map(bq => ({ ...bq, groupText: content }));
                       setBatchQuestions(updatedBatch);
                     }}
-                    placeholder="Tuliskan wacana literasi di sini..."
+                    placeholder="Tuliskan stimulus / literasi di sini..."
                     className="[&_.ql-editor]:min-h-[250px] [&_.ql-editor_p]:text-indent-[48px] [&_.ql-editor_p]:mb-[1.5rem] [&_.ql-editor_p]:leading-[1.8] [&_.ql-editor_p]:text-justify [&_.ql-container]:border-none [&_.ql-toolbar]:border-none [&_.ql-toolbar]:border-b [&_.ql-toolbar]:bg-slate-50 dark:[&_.ql-toolbar]:bg-slate-800/50"
                   />
                 </div>
@@ -4166,7 +4228,7 @@ const QuestionsPage = () => {
                       onChange={(e) => setAiCount(parseInt(e.target.value) || 1)}
                       className="w-full text-center bg-transparent font-black text-slate-800 dark:text-white outline-none text-xs [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                     />
-                    <button onClick={() => setAiCount(Math.min(20, aiCount + 1))} className="text-slate-400 hover:text-indigo-600 transition-colors font-bold text-lg">+</button>
+                    <button onClick={() => setAiCount(Math.min(10, aiCount + 1))} className="text-slate-400 hover:text-indigo-600 transition-colors font-bold text-lg">+</button>
                  </div>
               </FormField>
             </div>
@@ -4226,7 +4288,7 @@ const QuestionsPage = () => {
 
               {isAiLiteracy && (
                 <div className="pt-3 border-t border-indigo-100 dark:border-indigo-800/40 animate-in slide-in-from-top-2 duration-300">
-                  <FormField id="aiPassageLength" label="Panjang Wacana" error={undefined}>
+                  <FormField id="aiPassageLength" label="Panjang Stimulus" error={undefined}>
                     <div className="grid grid-cols-3 gap-2 mt-1">
                       {['pendek', 'sedang', 'panjang'].map((len) => (
                         <button
@@ -4249,30 +4311,37 @@ const QuestionsPage = () => {
             </div>
 
             <DialogFooter className="flex flex-col gap-2 sm:gap-0 sm:flex-row p-0 pt-2 border-t border-slate-100 dark:border-slate-800">
-               <Button
-                variant="ghost"
-                onClick={() => setIsAIModalOpen(false)}
-                className="rounded-xl font-bold uppercase text-xs"
-               >
-                Batal
-               </Button>
-               <Button
-                onClick={handleAIGenerate}
-                disabled={isAIGenerating || !aiTopic.trim()}
-                className="flex-1 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-200 dark:shadow-none font-bold uppercase text-xs group py-6"
-               >
-                {isAIGenerating ? (
-                  <>
-                    <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                    Menyusun naskah soal...
-                  </>
-                ) : (
-                  <>
+               {(isAIGenerating && aiProgress > 0) ? (
+                 <div className="flex-1 flex flex-col gap-2 p-2">
+                   <div className="flex items-center justify-between">
+                     <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">Generating... {aiProgress}%</span>
+                     <button onClick={cancelAIGeneration} className="px-3 py-1 rounded-lg bg-rose-50 text-rose-600 text-[10px] font-bold border border-rose-200 hover:bg-rose-100 transition-colors">
+                       Batalkan
+                     </button>
+                   </div>
+                   <div className="w-full h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                     <div className="h-full bg-gradient-to-r from-indigo-500 to-blue-500 rounded-full transition-all duration-300 ease-out" style={{ width: `${aiProgress}%` }} />
+                   </div>
+                 </div>
+               ) : (
+                 <>
+                   <Button
+                    variant="ghost"
+                    onClick={() => setIsAIModalOpen(false)}
+                    className="rounded-xl font-bold uppercase text-xs"
+                   >
+                    Batal
+                   </Button>
+                   <Button
+                    onClick={handleAIGenerate}
+                    disabled={isAIGenerating || !aiTopic.trim()}
+                    className="flex-1 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-200 dark:shadow-none font-bold uppercase text-xs group py-6"
+                   >
                     <Sparkles className="mr-2 h-4 w-4 group-hover:rotate-12 transition-transform" />
                     Mulai Generasi
-                  </>
-                )}
-               </Button>
+                   </Button>
+                 </>
+               )}
             </DialogFooter>
           </div>
         </DialogContent>
@@ -4325,7 +4394,7 @@ const QuestionsPage = () => {
                     <div className="space-y-2">
                       <label className="text-[10px] font-black uppercase text-slate-400">Jumlah Soal</label>
                       <Select value={importCount.toString()} onChange={(e) => setImportCount(parseInt(e.target.value))}>
-                        {[2, 5, 10, 15, 20].map(n => (
+                        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => (
                           <option key={n} value={n.toString()}>{n} Soal</option>
                         ))}
                       </Select>
@@ -4402,7 +4471,7 @@ const QuestionsPage = () => {
                         )}
                         <li className="flex items-start gap-2">
                           <span className="w-4 h-4 rounded-full bg-blue-100 dark:bg-blue-800 text-[10px] flex items-center justify-center font-bold shrink-0 mt-0.5">3</span>
-                          <span>Teks wacana/stimulus pembuka akan otomatis dipisahkan (Mode Literasi).</span>
+                          <span>Teks stimulus / literasi pembuka akan otomatis dipisahkan (Mode Literasi).</span>
                         </li>
                         <li className="flex items-start gap-2">
                           <span className="w-4 h-4 rounded-full bg-blue-100 dark:bg-blue-800 text-[10px] flex items-center justify-center font-bold shrink-0 mt-0.5">4</span>
@@ -4487,10 +4556,19 @@ const QuestionsPage = () => {
                 }`}
               >
                 {isParsing ? (
-                  <>
-                    <RefreshCw className="mr-2 h-5 w-5 animate-spin" />
-                    {importMode === 'extract' ? "Sedang Memilah Dokumen..." : "Membangun Soal dari Materi..."}
-                  </>
+                  <div className="flex flex-col items-center gap-2 w-full py-1">
+                    <div className="flex items-center justify-between w-full px-2">
+                      <span className="text-[10px] font-black uppercase tracking-widest">
+                        {importMode === 'extract' ? "Memilah..." : "Membangun..."} {aiProgress}%
+                      </span>
+                      <button onClick={cancelAIGeneration} className="px-3 py-1 rounded-lg bg-white/20 text-[10px] font-bold border border-white/30 hover:bg-white/30 transition-colors">
+                        Batalkan
+                      </button>
+                    </div>
+                    <div className="w-full h-2 bg-white/20 rounded-full overflow-hidden">
+                      <div className="h-full bg-white rounded-full transition-all duration-300 ease-out" style={{ width: `${aiProgress}%` }} />
+                    </div>
+                  </div>
                 ) : (
                   <>
                     <Sparkles className="mr-2 h-5 w-5" />

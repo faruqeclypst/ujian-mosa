@@ -299,6 +299,7 @@ const ProfilePage = () => {
                     >
                       <option value="groq">Groq Cloud</option>
                       <option value="ollama">Ollama (Lokal)</option>
+                      <option value="puter">Puter (Gratis, tanpa API Key, limit terbatas)</option>
                     </select>
                   </FormField>
                   <FormField id="ai_model" label="Model AI">

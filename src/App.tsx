@@ -165,7 +165,7 @@ const SchoolAppContent = () => {
               <Route path="ruang-ujian" element={<ExamRoomsPage />} />
               <Route path="monitoring" element={<MonitoringPage />} />
               <Route path="panduan" element={<GuidePage />} />
-              <Route path="pengaturan" element={<AdminOnlyRoute><SettingsPage /></AdminOnlyRoute>} />
+              <Route path="pengaturan" element={<SettingsPage />} />
             </Route>
 
             {/* Root redirect */}
