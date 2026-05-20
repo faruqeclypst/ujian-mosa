@@ -43,6 +43,7 @@ import FormField from "../components/forms/FormField";
 import { Select } from "../components/ui/select";
 import type { StudentData } from "../types/exam";
 import StudentInterestDialog from "../components/exam/StudentInterestDialog";
+import StudentScoresDialog from "../components/exam/StudentScoresDialog";
 
 const StudentsPage = () => {
   const { role } = useAuth();
@@ -61,6 +62,9 @@ const StudentsPage = () => {
 
   const [interestDialogOpen, setInterestDialogOpen] = useState(false);
   const [studentForInterest, setStudentForInterest] = useState<StudentData | null>(null);
+
+  const [scoresDialogOpen, setScoresDialogOpen] = useState(false);
+  const [studentForScores, setStudentForScores] = useState<StudentData | null>(null);
 
   const [isBatchOpen, setIsBatchOpen] = useState(false);
   const [targetClassId, setTargetClassId] = useState<string>("");
@@ -119,6 +123,11 @@ const StudentsPage = () => {
   const handleViewInterest = (student: StudentData) => {
     setStudentForInterest(student);
     setInterestDialogOpen(true);
+  };
+
+  const handleViewScores = (student: StudentData) => {
+    setStudentForScores(student);
+    setScoresDialogOpen(true);
   };
 
   const closeDialog = () => {
@@ -656,6 +665,7 @@ const StudentsPage = () => {
           onDelete={handleDeleteClick}
           onResetPassword={role === "admin" ? handleResetPassword : undefined}
           onViewInterest={handleViewInterest}
+          onViewScores={handleViewScores}
           filterActions={
             <div className="flex items-center gap-2">
               <span className="text-xs font-bold text-slate-500 uppercase tracking-wider hidden sm:inline">{terminology.class}:</span>
@@ -784,6 +794,16 @@ const StudentsPage = () => {
         }}
         studentId={studentForInterest?.id || ""}
         studentName={studentForInterest?.name || ""}
+      />
+
+      <StudentScoresDialog
+        isOpen={scoresDialogOpen}
+        onClose={() => {
+          setScoresDialogOpen(false);
+          setStudentForScores(null);
+        }}
+        studentId={studentForScores?.id || ""}
+        studentName={studentForScores?.name || ""}
       />
     </div>
   );

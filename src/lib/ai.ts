@@ -494,7 +494,7 @@ export const generateQuestionsAI = async (
       const wacanaExtraHints = [
         isProgramming ? 'Jika topik membahas kode/algoritma, boleh sertakan potongan kode program dalam tag <pre class="ql-syntax" data-language="BAHASA">...</pre>. Tidak wajib jika tidak relevan.' : "",
         explicitlyWantsArabic ? 'WAJIB sertakan ayat Al-Quran/Hadits yang relevan dalam TEKS ARAB ASLI ber-harakat lengkap di dalam stimulus. Gunakan tag <p dir="rtl" style="text-align:right;font-size:1.3em;line-height:2;margin:12px 0;font-family:Amiri,serif;">AYAT ARAB</p>.' : (isReligiousTopic ? "Jika topik membahas ayat/hadits tertentu, boleh sertakan teks Arab asli ber-harakat dalam tag <p dir=\"rtl\">. Tidak wajib di setiap bacaan." : ""),
-        isExact ? "Jika topik membahas rumus/persamaan, boleh sertakan dalam format LaTeX $...$. Tidak wajib jika konteksnya naratif." : ""
+        isExact ? "Jika topik membahas rumus/persamaan, boleh sertakan dalam format LaTeX standar $...$ untuk inline atau $$...$$ untuk display. Tidak wajib jika konteksnya naratif." : ""
       ].filter(Boolean).join("\n");
 
       const wacanaPrompt = `Buat stimulus literasi bertema "${topic}" untuk ${level} - ${subject}. Panjang WAJIB ${lengthMap[passageLength]}, kesulitan ${difficulty}.
@@ -560,9 +560,12 @@ FORMAT HTML: <h2 style="text-align:center;color:#1e3a8a;margin-bottom:32px;font-
       ? 'WAJIB sertakan potongan ayat Al-Quran/Hadits dalam TEKS ARAB ASLI ber-harakat lengkap di setiap soal. PISAHKAN dari teks Latin — tulis pertanyaan dulu, lalu ayat Arab di baris baru dalam tag: <p dir="rtl" style="text-align:right;font-size:1.3em;line-height:2;margin:12px 0;">AYAT ARAB BER-HARAKAT LENGKAP</p>. JANGAN campur teks Arab dan Latin dalam satu kalimat. JANGAN hanya tulis nama surah tanpa ayat aslinya.'
       : (isReligiousTopic ? 'Jika relevan, sertakan ayat Arab ber-harakat. PISAHKAN dari teks Latin di baris baru dalam tag: <p dir="rtl" style="text-align:right;font-size:1.3em;line-height:2;margin:12px 0;">AYAT</p>. JANGAN campur Arab dan Latin dalam satu kalimat.' : '');
 
+    const isChemistry = (subject.toLowerCase().includes('kimia') || subject.toLowerCase().includes('chemistry') || topic.toLowerCase().includes('kimia') || topic.toLowerCase().includes('reaksi') || topic.toLowerCase().includes('senyawa') || topic.toLowerCase().includes('unsur'));
+
     const formatRules = [
       "Teks polos (tanpa HTML/markdown kecuali tag ayat Arab).",
-      isExact ? "Rumus: gunakan $...$ inline. Pecahan/integral: $\\\\displaystyle ...$. Double backslash di JSON." : "",
+      isExact ? "Rumus: gunakan LaTeX dengan delimiter $...$ (inline) dan $$...$$ (display). WAJIB gunakan NOTASI STANDAR NASIONAL INDONESIA:\n- Logaritma: ${}^a\\log b$ (BUKAN $\\log_a b$). Contoh: ${}^2\\log 8 = 3$\n- Vektor: $\\vec{F}$, $\\vec{v}$\n- SEMUA angka+satuan WAJIB LaTeX: $34\\;\\Omega$, $1000\\text{ kg/m}^3$, $10\\text{ m/s}^2$, $220\\text{ V}$, $9{,}8\\text{ m/s}^2$\n- Simbol: $g$, $v_0$, $F$, $P$, $\\rho$, $R$, $I$, $V$. Satuan: \\Omega, \\text{V}, \\text{A}, \\text{W}, \\text{N}, \\text{Pa}, \\text{J}, ^\\circ\\text{C}\n- Matriks: $$\\begin{pmatrix} a & b \\\\\\\\ c & d \\end{pmatrix}$$. Determinan: $\\begin{vmatrix} a & b \\\\\\\\ c & d \\end{vmatrix}$\n- Sistem persamaan: $$\\begin{cases} x+y=5 \\\\\\\\ x-y=1 \\end{cases}$$\n- Himpunan: $\\{x \\mid x>0\\}$, $A \\cup B$, $A \\cap B$, $A \\subset B$, $\\emptyset$\n- Kombinasi: $\\binom{n}{r}$, $C(n,r)$, $P(n,r)$, $n!$\n- Pecahan: $\\frac{a}{b}$. Display: $$\\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}$$\n- Koma desimal Indonesia: $9{,}8$ (pakai {,})\nPENTING: Di JSON string, backslash ditulis ganda (\\\\). Contoh: \"$\\\\frac{1}{2}$\"." : "",
+      isChemistry ? "Rumus kimia: gunakan $\\ce{...}$ (mhchem). Contoh:\n- Senyawa: $\\ce{H2SO4}$, $\\ce{Ca(OH)2}$, $\\ce{NaHCO3}$\n- Reaksi: $\\ce{2H2 + O2 -> 2H2O}$, $\\ce{CH4 + 2O2 -> CO2 + 2H2O}$\n- Isotop/tabel periodik: $\\ce{^{14}_{6}C}$, $\\ce{^{23}_{11}Na}$, $\\ce{^{56}_{26}Fe}$\n- Ion: $\\ce{Na+}$, $\\ce{Fe^{2+}}$, $\\ce{SO4^{2-}}$, $\\ce{OH-}$\n- Kesetimbangan: $\\ce{N2 + 3H2 <=> 2NH3}$\n- Endapan/gas: $\\ce{BaSO4 v}$ (endapan), $\\ce{CO2 ^}$ (gas)\nDi JSON: \"$\\\\ce{H2SO4}$\"." : "",
       isProgramming ? 'Kode: <pre class="ql-syntax" data-language="python">...</pre> (ganti python dengan bahasa yang sesuai: python, javascript, java, cpp, php, html, sql).' : "",
       arabicInstruction
     ].filter(Boolean).join(" ");
@@ -769,9 +772,12 @@ export const generateSingleQuestionAI = async (
     const isProg = (subject.toLowerCase().includes('pemrograman') || subject.toLowerCase().includes('it') || subject.toLowerCase().includes('informatika') || subject.toLowerCase().includes('coding'));
     const isRelig = (subject.toLowerCase().includes('agama') || subject.toLowerCase().includes('arab') || subject.toLowerCase().includes('islam') || subject.toLowerCase().includes('quran') || topic.toLowerCase().includes('surah') || topic.toLowerCase().includes('ayat') || topic.toLowerCase().includes('hadist'));
 
+    const isChem = (subject.toLowerCase().includes('kimia') || topic.toLowerCase().includes('kimia') || topic.toLowerCase().includes('reaksi'));
+
     const fmtRules = [
       "Teks polos.",
-      isExact ? "Rumus: $...$, pecahan: $\\\\displaystyle ...$." : "",
+      isExact ? "Rumus: LaTeX $...$ (inline), $$...$$ (display). NOTASI STANDAR NASIONAL INDONESIA: Logaritma: ${}^a\\log b$. SEMUA angka+satuan WAJIB LaTeX: $34\\;\\Omega$, $10\\text{ m/s}^2$, $1000\\text{ kg/m}^3$, $220\\text{ V}$. Simbol: $g$, $v_0$, $\\rho$, $R$, $I$. Koma desimal: $9{,}8$. Pecahan: $\\frac{a}{b}$. Di JSON, backslash ditulis ganda (\\\\)." : "",
+      isChem ? "Kimia: $\\ce{...}$ untuk semua rumus kimia. Senyawa: $\\ce{H2SO4}$. Reaksi: $\\ce{2H2 + O2 -> 2H2O}$. Isotop: $\\ce{^{14}_{6}C}$. Ion: $\\ce{Na+}$, $\\ce{Fe^{2+}}$, $\\ce{SO4^{2-}}$. Kesetimbangan: $\\ce{<=>}$. Di JSON: \"$\\\\ce{H2SO4}$\"." : "",
       isProg ? 'Kode: <pre class="ql-syntax" data-language="python">...</pre> (ganti python dengan bahasa yang sesuai: python, javascript, java, cpp, php).' : "",
       isRelig ? 'Ayat Arab: FORMAT WAJIB: 1) Ayat dalam <p dir="rtl" style="text-align:right;font-size:1.3em;line-height:2;margin:12px 0;">AYAT</p> 2) Terjemahan dalam <p style="font-style:italic;margin:8px 0;color:#555;">Terjemahan: "..."</p> 3) Pertanyaan dalam <p style="margin-top:12px;font-weight:600;">...</p>. JANGAN campur Arab dan Latin dalam satu baris.' : ""
     ].filter(Boolean).join(" ");
@@ -958,8 +964,17 @@ KETENTUAN EKSTRAKSI:
    - Jika ada teks bacaan panjang, cerita, atau stimulus yang digunakan untuk beberapa soal, letakkan di field 'groupText'.
    - Berikan 'groupId' yang unik (misal: "LIT-001") untuk soal-soal yang menggunakan stimulus tersebut.
    - Jika stimulus hanya untuk 1 soal, letakkan langsung di field 'text' soal tersebut saja.
-2. EKSAKTA (Matematika/Sains): Gunakan LaTeX HANYA dengan pembungkus $ ... $ tunggal agar rumus menyatu dengan teks (JANGAN gunakan $$ atau \\displaystyle sebagai teks polos).
-   - Simbol bertingkat (integral/pecahan): Gunakan $\\displaystyle ...$ (WAJIB double backslash di dalam JSON agar tidak error).
+2. EKSAKTA (Matematika/Sains): Gunakan LaTeX dengan delimiter $...$ (inline) dan $$...$$ (display/block).
+   WAJIB NOTASI STANDAR NASIONAL INDONESIA:
+   - Logaritma: \${}^a\\log b$ (BUKAN $\\log_a b$). Contoh: \${}^2\\log 8 = 3$
+   - Vektor: $\\vec{F}$, $\\vec{v}$ (pakai \\vec)
+   - SEMUA angka+satuan WAJIB dalam LaTeX: $34\\;\\Omega$, $10\\text{ m/s}^2$, $1000\\text{ kg/m}^3$, $220\\text{ V}$, $5\\text{ N}$
+   - Simbol fisika: $g$, $v_0$, $F$, $P$, $\\rho$, $R$, $I$, $V$
+   - Satuan: \\Omega, \\text{V}, \\text{A}, \\text{W}, \\text{N}, \\text{Pa}, \\text{J}, \\text{Hz}, ^\\circ\\text{C}
+   - Kimia: $\\ce{H2SO4}$, $\\ce{2H2 + O2 -> 2H2O}$ (pakai \\ce dari mhchem)
+   - Koma desimal Indonesia: $9{,}8$ (pakai {,})
+   - Pecahan: $\\frac{a}{b}$. Display: $$\\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}$$
+   - PENTING: Di dalam JSON string, setiap backslash (\\) HARUS ditulis sebagai double backslash (\\\\). Contoh: \"$\\\\frac{1}{2}$\"
 3. IDENTIFIKASI SOAL & OPSI: Pisahkan pertanyaan dengan pilihan jawaban (a, b, c, d, e).
 4. IDENTIFIKASI KUNCI JAWABAN: Deteksi kunci jawaban dari tanda (bold, bintang (*), atau huruf yang dilingkari). 
 5. TIPE SOAL: Gunakan 'pilihan_ganda' (default), 'pilihan_ganda_kompleks', 'benar_salah', 'isian_singkat', atau 'uraian'.
@@ -986,7 +1001,7 @@ STRUKTUR JSON (WAJIB):
 Aturan Ketat: Pastikan JSON valid. Setiap garis miring ("\\" tunggal) dalam LaTeX WAJIB di-escape ganda ("\\\\") di dalam JSON.`;
 
     const mathHint = (subject.toLowerCase().includes('matematika') || subject.toLowerCase().includes('ipa') || subject.toLowerCase().includes('fisika') || subject.toLowerCase().includes('kimia')) 
-      ? "\nKONTEN STEM: Deteksi semua rumus dan ubah ke format LaTeX $ ... $. Pastikan penulisan pecahan menggunakan $\\displaystyle \\frac{a}{b}$." 
+      ? "\nKONTEN STEM: Deteksi semua rumus dan ubah ke LaTeX. WAJIB NOTASI STANDAR NASIONAL INDONESIA: Logaritma: ${}^a\\log b$. SEMUA angka+satuan WAJIB LaTeX: $34\\;\\Omega$, $10\\text{ m/s}^2$, $220\\text{ V}$, $5\\text{ N}$. Simbol: $g$, $v_0$, $\\rho$, $R$. Kimia: $\\ce{H2SO4}$. Koma desimal: $9{,}8$. Inline: $...$, Display: $$...$$. Di JSON, backslash ditulis ganda." 
       : "";
 
     const programmingHint = (subject.toLowerCase().includes('pemrograman') || subject.toLowerCase().includes('it') || subject.toLowerCase().includes('informatika'))
@@ -1295,7 +1310,7 @@ PENTING: Field "text" HANYA berisi pertanyaan. Wacana/stimulus WAJIB di "groupTe
 Hanya berikan JSON murni.`;
 
     const mathHint = (subject.toLowerCase().includes('matematika') || subject.toLowerCase().includes('ipa') || subject.toLowerCase().includes('fisika') || subject.toLowerCase().includes('kimia') || subject.toLowerCase().includes('ekonomi') || subject.toLowerCase().includes('informatika') || subject.toLowerCase().includes('it')) 
-      ? "\nGunakan $ ... $ untuk SEMUA rumus agar tidak terpisah dari teks. Untuk integral/fraksi yang bagus, gunakan $\\displaystyle ...$. WAJIB gunakan \\\\ (double backslash) di JSON." 
+      ? "\nKONTEN STEM: Gunakan $...$ (inline) dan $$...$$ (display). WAJIB NOTASI STANDAR NASIONAL INDONESIA: Logaritma: ${}^a\\log b$. SEMUA angka+satuan WAJIB LaTeX: $34\\;\\Omega$, $10\\text{ m/s}^2$, $220\\text{ V}$. Simbol: $g$, $v_0$, $\\rho$. Kimia: $\\ce{H2SO4}$. Koma desimal: $9{,}8$. Di JSON, backslash ditulis ganda (\\\\)." 
       : "";
 
     const programmingHint = (subject.toLowerCase().includes('pemrograman') || subject.toLowerCase().includes('it') || subject.toLowerCase().includes('informatika') || subject.toLowerCase().includes('coding'))

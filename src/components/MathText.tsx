@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useMemo, useState } from "react";
 import katex from "katex";
 import renderMathInElement from "katex/dist/contrib/auto-render";
 import "katex/dist/katex.min.css";
+import "katex/dist/contrib/mhchem";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus, ghcolors } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { Terminal, Check, Copy } from "lucide-react";
@@ -32,19 +33,27 @@ export const MathText: React.FC<MathTextProps> = ({ content, className = "" }) =
         ],
         throwOnError: false,
         preProcess: (math) => {
-          let processed = math;
-          const fixList = ['int', 'sum', 'sqrt', 'pi', 'alpha', 'beta', 'gamma', 'theta', 'sigma', 'infty', 'lim', 'log', 'ln', 'sin', 'cos', 'tan', 'cot', 'sec', 'csc', 'frac', 'left', 'right'];
+          let processed = math.trim();
+          
+          // Skip processing jika sudah jelas formula valid (ada backslash command)
+          if (processed.match(/\\[a-zA-Z]/)) {
+            return processed;
+          }
+          
+          // Auto-fix: kata-kata math yang lupa backslash (hanya jika BELUM ada backslash di depannya)
+          const fixList = ['int', 'sum', 'sqrt', 'pi', 'alpha', 'beta', 'gamma', 'theta', 'sigma', 'infty', 'lim', 'log', 'ln', 'sin', 'cos', 'tan', 'cot', 'sec', 'csc', 'frac', 'left', 'right', 'vec', 'hat', 'bar', 'dot', 'times', 'div', 'pm', 'mp', 'leq', 'geq', 'neq', 'approx', 'equiv', 'cdot', 'ldots', 'cdots', 'forall', 'exists', 'partial', 'nabla', 'Delta', 'Omega'];
           fixList.forEach(word => {
-            const regex = new RegExp(`(?<!\\\\)\\b${word}(?![a-zA-Z])`, 'g');
-            processed = processed.replace(regex, `\\${word} `);
+            const regex = new RegExp(`(?<!\\\\)\\b${word}\\b`, 'g');
+            processed = processed.replace(regex, `\\${word}`);
           });
-          const hasFormulaCommands = processed.replace(/\\,/g, '').match(/[\\^_]/);
-          if (!hasFormulaCommands && processed.trim().length > 2) {
-              processed = `\\text{${processed}}`;
+          
+          // Jika setelah fix masih tidak ada command math sama sekali, 
+          // dan panjang > 2, dan tidak mengandung operator/angka math, wrap sebagai teks
+          const hasAnyMath = processed.match(/[\\^_{}]/) || processed.match(/[+\-*/=<>]/) || processed.match(/\d/);
+          if (!hasAnyMath && processed.length > 2) {
+            processed = `\\text{${processed}}`;
           }
-          if (!processed.includes('\\displaystyle')) {
-            processed = '\\displaystyle ' + processed;
-          }
+          
           return processed;
         }
       });
@@ -68,74 +77,7 @@ export const MathText: React.FC<MathTextProps> = ({ content, className = "" }) =
   const parsedContent = useMemo(() => {
     if (!content) return [];
     
-    // 🔧 Pre-process: wrap bare LaTeX commands (not inside $...$) with $ delimiters
     let processedContent = content;
-    
-    // Step 1: Find all existing $...$ spans and mark them
-    const dollarSpans: Array<[number, number]> = [];
-    const dollarRegex = /\$[^$]+\$/g;
-    let dm;
-    while ((dm = dollarRegex.exec(processedContent)) !== null) {
-      dollarSpans.push([dm.index, dm.index + dm[0].length]);
-    }
-    
-    const isInsideDollar = (idx: number) => dollarSpans.some(([s, e]) => idx >= s && idx < e);
-    
-    // Step 2: Find bare LaTeX expressions and wrap them
-    // Match \displaystyle, \frac, \int, \sum, \sqrt, \lim, \prod, \left, \right etc. 
-    // followed by math content until we hit a sentence boundary or HTML tag
-    const latexStartRegex = /\\(displaystyle|frac|int|sum|sqrt|lim|prod|bigcup|bigcap|left|infty|alpha|beta|gamma|theta|sigma|pi|Delta|Omega|partial|nabla|vec|hat|bar|dot|ddot|overline|underline|overbrace|underbrace)\b/g;
-    
-    let result = '';
-    let lastIdx = 0;
-    let lm;
-    
-    // Reset regex
-    latexStartRegex.lastIndex = 0;
-    
-    while ((lm = latexStartRegex.exec(processedContent)) !== null) {
-      if (isInsideDollar(lm.index)) continue;
-      // Also skip if inside HTML tags
-      const before = processedContent.substring(Math.max(0, lm.index - 50), lm.index);
-      if (before.match(/<[^>]*$/)) continue; // inside an HTML tag
-      
-      // Find the end of this math expression
-      // It ends at: HTML tag, period followed by space+uppercase, newline, or end of string
-      let endIdx = lm.index;
-      let depth = 0;
-      let i = lm.index;
-      while (i < processedContent.length) {
-        const ch = processedContent[i];
-        if (ch === '<') break; // HTML tag
-        if (ch === '\n') break;
-        if (ch === '{') depth++;
-        if (ch === '}') depth--;
-        if (ch === '$') break; // hitting another dollar
-        // End at period/comma followed by space and non-math char (but not inside braces)
-        if (depth <= 0 && (ch === '.' || ch === '?') && i + 1 < processedContent.length) {
-          const next = processedContent[i + 1];
-          if (next === ' ' || next === '<' || next === '\n') { endIdx = i; break; }
-        }
-        endIdx = i + 1;
-        i++;
-      }
-      if (endIdx <= lm.index) continue;
-      
-      const mathExpr = processedContent.substring(lm.index, endIdx).trim();
-      if (!mathExpr || mathExpr.length < 3) continue;
-      
-      // Add content before this match
-      result += processedContent.substring(lastIdx, lm.index);
-      // Wrap in $...$
-      result += `$${mathExpr}$`;
-      lastIdx = endIdx;
-      
-      // Update dollar spans for subsequent checks
-      dollarSpans.push([result.length - mathExpr.length - 2, result.length]);
-    }
-    
-    result += processedContent.substring(lastIdx);
-    processedContent = result || processedContent;
 
     const parts: Array<{ type: 'html' | 'code'; value: string; language?: string }> = [];
     // Regex matches <pre class="ql-syntax" ...>content</pre>
@@ -205,16 +147,7 @@ export const MathText: React.FC<MathTextProps> = ({ content, className = "" }) =
   }, [content]);
 
   const processHtml = (html: string) => {
-    // 1. Math Detection (Fixed with word boundaries \b to avoid conflicts like 'Datang' -> 'tan')
-    const mathRegex = /\(\s*((?:[^\n()]|\((?:[^\n()]|\((?:[^\n()]|\([^\n()]*\))*\))*\))*?(\\|[\\^_]|\b(sum|sqrt|sin|cos|tan|cot|sec|csc|lim|log|ln|pi|alpha|beta|gamma|theta|sigma|infty|frac|left|right)\b)(?:[^\n()]|\((?:[^\n()]|\((?:[^\n()]|\([^\n()]*\))*\))*\))*?)\)/g;
-    
-    let processed = html.replace(mathRegex, (match, p1) => {
-      // Avoid nesting if content is already wrapped in math delimiters
-      if (p1.includes('$') || p1.includes('\\(') || p1.includes('\\[')) {
-        return match;
-      }
-      return `\\( ${p1} \\)`;
-    });
+    let processed = html;
     
     // 2. Arabic Detection & Styling (Premium Quranic Look)
     // Skip if content already has dir="rtl" (AI already formatted it)

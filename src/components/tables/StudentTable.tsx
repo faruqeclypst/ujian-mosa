@@ -5,7 +5,7 @@ import { Button } from "../ui/button";
 import type { StudentData, ClassData } from "../../types/exam";
 import { useAuth } from "../../context/AuthContext";
 import { useTenant } from "../../context/TenantContext";
-import { Edit, Trash, Sparkles, KeyRound } from "lucide-react";
+import { Edit, Trash, Sparkles, KeyRound, ClipboardList } from "lucide-react";
 import { Avatar, AvatarFallback } from "../ui/avatar";
 import { Badge } from "../ui/badge";
 import { cn } from "../../lib/utils";
@@ -19,6 +19,7 @@ interface StudentTableProps {
   onDelete: (student: StudentData) => void;
   onResetPassword?: (student: StudentData) => void;
   onViewInterest?: (student: StudentData) => void;
+  onViewScores?: (student: StudentData) => void;
   filterActions?: React.ReactNode;
   customActions?: (student: StudentData) => React.ReactNode;
 }
@@ -32,6 +33,7 @@ const StudentTable = ({
   onDelete,
   onResetPassword,
   onViewInterest,
+  onViewScores,
   filterActions,
   customActions,
   title
@@ -169,6 +171,15 @@ const StudentTable = ({
   const renderActions = (student: StudentData) => (
     customActions ? customActions(student) : (
       <div className="flex justify-end gap-2">
+        {onViewScores && (
+          <button 
+            className="p-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 rounded-lg dark:bg-emerald-900/10 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-800/40"
+            onClick={() => onViewScores(student)}
+            title="Lihat Nilai"
+          >
+            <ClipboardList className="h-4 w-4" />
+          </button>
+        )}
         {onViewInterest && (
           <button 
             className="p-1.5 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 rounded-lg dark:bg-indigo-900/10 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-800/40"

@@ -16,6 +16,7 @@ import FormField from "../../components/forms/FormField";
 import { uploadInventoryImage, deleteImageFromStorage, deleteImagesFromStorage } from "../../lib/storage";
 import { ImportButton } from "../../components/ui/import-button";
 import { parseQuestionsFromWord } from "../../lib/questionWordParser";
+import { parseQuestionsFromPdf, parseQuestionsFromText } from "../../lib/questionTextParser";
 import { Select } from "../../components/ui/select";
 
 import { downloadQuestionTemplate, parseQuestionImportExcel } from "../../lib/questionExcel";
@@ -2255,6 +2256,91 @@ const QuestionsPage = () => {
     }
   };
 
+  const handleImportPdfText = async (file: File) => {
+    if (!pb) return;
+    setIsImporting(true);
+    setBatchProgress({
+      isOpen: true,
+      total: 0,
+      current: 0,
+      message: "Menganalisis file...",
+      title: "Import dari PDF/Teks"
+    });
+
+    try {
+      let parsed;
+      if (file.type === "application/pdf" || file.name.endsWith(".pdf")) {
+        parsed = await parseQuestionsFromPdf(file);
+      } else {
+        const text = await file.text();
+        parsed = parseQuestionsFromText(text);
+      }
+
+      if (parsed.length === 0) {
+        setBatchProgress(prev => ({ ...prev, isOpen: false }));
+        return showAlert("Tidak Ditemukan", "Tidak ada soal yang dikenali. Pastikan format soal menggunakan penomoran (1. 2. 3.) dan opsi (A. B. C. D. E.).", "warning");
+      }
+
+      setBatchProgress(prev => ({ ...prev, total: parsed.length, message: "Memulai import..." }));
+
+      let importedCount = 0;
+      const chunkSize = 10;
+      for (let i = 0; i < parsed.length; i += chunkSize) {
+        const chunk = parsed.slice(i, i + chunkSize);
+
+        await Promise.all(chunk.map(async (q, index) => {
+          const actualIndex = i + index;
+          const choices: Record<string, any> = {};
+          Object.entries(q.choices).forEach(([key, val]) => {
+            choices[key.toLowerCase()] = {
+              text: val.text,
+              isCorrect: val.isCorrect || false,
+              imageUrl: ""
+            };
+          });
+
+          const answerKey = Object.entries(choices).find(([_, v]) => v.isCorrect)?.[0] || "";
+
+          const payload = {
+            examId,
+            text: q.text,
+            field: "multiple_choice",
+            type: "pilihan_ganda",
+            options: choices,
+            answerKey: answerKey.toLowerCase(),
+            groupId: q.groupId || "",
+            groupText: q.groupText || "",
+            order: (questions.length || 0) + actualIndex + 1,
+            imageUrl: ""
+          };
+
+          try {
+            await pb!.collection('questions').create(payload);
+            importedCount++;
+          } catch (createErr) {
+            console.error("Gagal membuat soal pada index:", actualIndex, createErr);
+          }
+        }));
+
+        const currentProcessed = Math.min(i + chunkSize, parsed.length);
+        setBatchProgress(prev => ({
+          ...prev,
+          current: currentProcessed,
+          message: `Mengimport soal (${currentProcessed}/${parsed.length})`
+        }));
+      }
+
+      loadQuestions();
+      showAlert("Import Berhasil", `${importedCount} soal berhasil diimport.`, "success");
+    } catch (err: any) {
+      console.error("Import PDF/Text Error:", err);
+      showAlert("Gagal Import", err.message || "Gagal mengimport file.", "danger");
+    } finally {
+      setIsImporting(false);
+      setBatchProgress(prev => ({ ...prev, isOpen: false }));
+    }
+  };
+
   const downloadWordTemplateLiterasi = () => {
     const htmlContent = `
       <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
@@ -2677,6 +2763,19 @@ const QuestionsPage = () => {
                               <div className="flex flex-col min-w-0 text-left">
                                 <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">Import dari Word</span>
                                 <span className="text-[10px] text-slate-400 mt-1">Pilih file .docx standard</span>
+                              </div>
+                            </DropdownMenuItem>
+
+                            <DropdownMenuItem 
+                              className="p-2.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-900 transition-all cursor-pointer group flex items-center gap-3"
+                              onClick={() => document.getElementById("pdftext-import-input")?.click()}
+                            >
+                              <div className="h-10 w-10 shrink-0 rounded-lg bg-rose-50 dark:bg-rose-900/30 text-rose-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                <FileText className="h-5 w-5" />
+                              </div>
+                              <div className="flex flex-col min-w-0 text-left">
+                                <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">Import dari PDF / Teks</span>
+                                <span className="text-[10px] text-slate-400 mt-1">Ekstrak soal otomatis tanpa AI</span>
                               </div>
                             </DropdownMenuItem>
 
@@ -4875,6 +4974,11 @@ const QuestionsPage = () => {
       <input id="word-import-input" type="file" className="hidden" accept=".docx" onChange={(e) => {
         const file = e.target.files?.[0];
         if (file) handleImportWord(file);
+        e.target.value = "";
+      }} />
+      <input id="pdftext-import-input" type="file" className="hidden" accept=".pdf,.txt,.text" onChange={(e) => {
+        const file = e.target.files?.[0];
+        if (file) handleImportPdfText(file);
         e.target.value = "";
       }} />
     </div>

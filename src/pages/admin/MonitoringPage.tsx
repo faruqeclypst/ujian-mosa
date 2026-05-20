@@ -719,8 +719,8 @@ const MonitoringPage = () => {
     };
 
     const COL_WIDTHS = [
-      { wch: 4 }, { wch: 15 }, { wch: 30 }, { wch: 12 }, { wch: 10 },
-      { wch: 10 }, { wch: 6 }, { wch: 6 }, { wch: 6 }, { wch: 8 }
+      { wch: 4 }, { wch: 15 }, { wch: 30 }, { wch: 12 }, { wch: 18 },
+      { wch: 10 }, { wch: 18 }, { wch: 6 }, { wch: 6 }, { wch: 6 }, { wch: 8 }
     ];
     monitorQuestions.forEach(() => COL_WIDTHS.push({ wch: 10 }));
 
@@ -745,7 +745,7 @@ const MonitoringPage = () => {
 
     // Function to build a sheet for a set of students
     const buildSheet = (groupStudents: any[], sheetName: string) => {
-      const headerRow = ["No", terminology.id, "Nama", terminology.class, "Login", "Submit", "Cheat", "B", "S", "Nilai"];
+      const headerRow = ["No", terminology.id, "Nama", terminology.class, "Login", "Durasi", "Submit", "Cheat", "B", "S", "Nilai"];
       monitorQuestions.forEach((_, i) => headerRow.push(`Q${i + 1}`));
 
       const rows: any[][] = [headerRow.map(h => ({ v: h, s: STYLES.header }))];
@@ -761,13 +761,31 @@ const MonitoringPage = () => {
           score = getLiveScore(answers, att?.overrides || {});
         }
 
+        // Calculate duration
+        let durationStr = "-";
+        const loginTime = att?.startedAt || att?.startTime || att?.created;
+        if (loginTime) {
+          const startMs = new Date(loginTime).getTime();
+          const endMs = att?.submitTime ? new Date(att.submitTime).getTime() :
+            (att?.submittedAt ? new Date(att.submittedAt).getTime() :
+            (att?.status === "finished" ? new Date(att.updated || att.created).getTime() : Date.now()));
+          const diffMs = Math.max(0, endMs - startMs);
+          const dHrs = Math.floor(diffMs / (1000 * 60 * 60));
+          const dMins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+          const dSecs = Math.floor((diffMs % (1000 * 60)) / 1000);
+          durationStr = dHrs > 0
+            ? `${dHrs}j ${dMins}m ${dSecs}d`
+            : `${dMins}m ${dSecs}d`;
+        }
+
         const row = [
           { v: idx + 1, s: STYLES.cellCenter },
           { v: std.nisn, s: STYLES.cellCenter },
           { v: std.name, s: STYLES.cell },
           { v: std.className, s: STYLES.cellCenter },
-          { v: att?.startTime ? new Date(att.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "-", s: STYLES.cellCenter },
-          { v: att?.submitTime ? new Date(att.submitTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : (att?.status === "finished" ? "Selesai" : (att ? "Proses" : "-")), s: STYLES.cellCenter },
+          { v: loginTime ? new Date(loginTime).toLocaleString("id-ID", { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' }) : "-", s: STYLES.cellCenter },
+          { v: durationStr, s: STYLES.cellCenter },
+          { v: att?.submitTime ? new Date(att.submitTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : (att?.submittedAt ? new Date(att.submittedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : (att?.status === "finished" ? "Selesai" : (att ? "Proses" : "-"))), s: STYLES.cellCenter },
           { v: att?.cheatCount || 0, s: STYLES.cellCenter },
           { v: att?.correct || 0, s: STYLES.correct },
           { v: monitorQuestions.length - (att?.correct || 0), s: STYLES.wrong },

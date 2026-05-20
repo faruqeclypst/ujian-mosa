@@ -253,10 +253,10 @@ body {
 }
 
 .premium-math .katex-display {
-  margin: 1.25em 0;
+  margin: 0.5em 0;
   overflow-x: auto;
   overflow-y: hidden;
-  padding: 0.5em 0;
+  padding: 0.25em 0;
 }
 
 /* Fix for small symbols in inline mode when using \displaystyle */
