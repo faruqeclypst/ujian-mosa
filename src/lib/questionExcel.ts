@@ -2,6 +2,7 @@ import * as XLSX from "xlsx-js-style";
 
 export const QUESTION_IMPORT_HEADERS = [
   "Pertanyaan", 
+  "Tipe Soal",
   "Opsi A", 
   "Opsi B", 
   "Opsi C", 
@@ -17,6 +18,7 @@ export function downloadQuestionTemplate(filename = "Template_Soal_Baru.xlsx") {
     [...QUESTION_IMPORT_HEADERS],
     [
       "Apa makanan utama gajah?", 
+      "pilihan_ganda",
       "Daging", 
       "Tumbuhan", 
       "Ikan", 
@@ -28,6 +30,7 @@ export function downloadQuestionTemplate(filename = "Template_Soal_Baru.xlsx") {
     ],
     [
       "Di mana habitat asli Gajah Afrika?", 
+      "pilihan_ganda",
       "Hutan", 
       "Gurun", 
       "Laut", 
@@ -37,17 +40,41 @@ export function downloadQuestionTemplate(filename = "Template_Soal_Baru.xlsx") {
       "GAJAH-01",
       ""
     ],
+    [
+      "Gajah adalah hewan karnivora",
+      "benar_salah",
+      "Benar",
+      "Salah",
+      "",
+      "",
+      "",
+      "B",
+      "",
+      ""
+    ],
+    [
+      "Sebutkan 3 ciri-ciri gajah!",
+      "isian_singkat",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "Belalai panjang, telinga lebar, badan besar",
+      "",
+      ""
+    ],
   ]);
   
   const headerStyle = {
     font: { bold: true, color: { rgb: "FFFFFF" } },
     alignment: { horizontal: "center", vertical: "center" },
-    fill: { patternType: "solid", fgColor: { rgb: "059669" } }, // Emerald-600
+    fill: { patternType: "solid", fgColor: { rgb: "059669" } },
     border: {
-        top: { style: "thin", color: { rgb: "000000" } },
-        bottom: { style: "thin", color: { rgb: "000000" } },
-        left: { style: "thin", color: { rgb: "000000" } },
-        right: { style: "thin", color: { rgb: "000000" } }
+      top: { style: "thin", color: { rgb: "000000" } },
+      bottom: { style: "thin", color: { rgb: "000000" } },
+      left: { style: "thin", color: { rgb: "000000" } },
+      right: { style: "thin", color: { rgb: "000000" } }
     }
   };
 
@@ -58,6 +85,7 @@ export function downloadQuestionTemplate(filename = "Template_Soal_Baru.xlsx") {
 
   (ws as any)["!cols"] = [
     { wch: 50 }, // Pertanyaan
+    { wch: 20 }, // Tipe Soal
     { wch: 20 }, // A
     { wch: 20 }, // B
     { wch: 20 }, // C
@@ -72,9 +100,19 @@ export function downloadQuestionTemplate(filename = "Template_Soal_Baru.xlsx") {
     ["PANDUAN PENGISIAN TEMPLATE SOAL"],
     [],
     ["1. Kolom Pertanyaan wajib diisi."],
-    ["2. Kolom Opsi A-E diisi dengan teks jawaban."],
-    ["3. Kolom Kunci Jawaban diisi dengan huruf (A, B, C, D, atau E)."],
-    ["4. Kolom GroupId & Teks Literasi (Opsional):"],
+    ["2. Kolom Tipe Soal (opsional, default: pilihan_ganda):"],
+    ["   - pilihan_ganda: Pilihan ganda biasa (1 jawaban benar)"],
+    ["   - pilihan_ganda_kompleks: Pilihan ganda dengan >1 jawaban benar (kunci: A,C,E)"],
+    ["   - benar_salah: Benar/Salah (isi Opsi A=Benar, Opsi B=Salah)"],
+    ["   - isian_singkat: Isian singkat (kunci jawaban di kolom Kunci Jawaban)"],
+    ["   - uraian: Uraian/Essay (kunci jawaban opsional)"],
+    [],
+    ["3. Kolom Opsi A-E diisi dengan teks jawaban."],
+    ["4. Kolom Kunci Jawaban:"],
+    ["   - Untuk pilihan_ganda: isi huruf (A, B, C, D, atau E)"],
+    ["   - Untuk pilihan_ganda_kompleks: isi huruf dipisah koma (A,C,E)"],
+    ["   - Untuk isian_singkat/uraian: isi teks jawaban"],
+    ["5. Kolom GroupId & Teks Literasi (Opsional):"],
     ["   - Jika beberapa soal memiliki stimulus/wacana yang sama, berikan GroupId yang identik."],
     ["   - Teks Literasi hanya perlu diisi pada soal pertama dalam grup tersebut."],
     [],
@@ -88,6 +126,22 @@ export function downloadQuestionTemplate(filename = "Template_Soal_Baru.xlsx") {
   XLSX.writeFile(wb, filename);
 }
 
+// Type mapping from Indonesian to DB field
+const TYPE_MAP: Record<string, { type: string; field: string }> = {
+  pilihan_ganda: { type: "pilihan_ganda", field: "multiple_choice" },
+  pg: { type: "pilihan_ganda", field: "multiple_choice" },
+  "pilihan ganda": { type: "pilihan_ganda", field: "multiple_choice" },
+  pilihan_ganda_kompleks: { type: "pilihan_ganda_kompleks", field: "complex_choice" },
+  "pg kompleks": { type: "pilihan_ganda_kompleks", field: "complex_choice" },
+  benar_salah: { type: "benar_salah", field: "true_false" },
+  "benar salah": { type: "benar_salah", field: "true_false" },
+  isian_singkat: { type: "isian_singkat", field: "short_answer" },
+  "isian singkat": { type: "isian_singkat", field: "short_answer" },
+  isian: { type: "isian_singkat", field: "short_answer" },
+  uraian: { type: "uraian", field: "essay" },
+  essay: { type: "uraian", field: "essay" },
+};
+
 export async function parseQuestionImportExcel(file: File): Promise<any[]> {
   const buffer = await file.arrayBuffer();
   const wb = XLSX.read(buffer, { type: "array" });
@@ -97,30 +151,60 @@ export async function parseQuestionImportExcel(file: File): Promise<any[]> {
   const raw = XLSX.utils.sheet_to_json<Record<string, any>>(ws, { defval: "" });
   return raw
     .map((row) => {
-      // Robust header matching (trimming keys)
       const cleanRow: Record<string, any> = {};
-      Object.keys(row).forEach(key => {
-        cleanRow[key.trim()] = row[key];
-      });
+      Object.keys(row).forEach(key => { cleanRow[key.trim()] = row[key]; });
 
       const qText = String(cleanRow["Pertanyaan"] || "").trim();
       if (!qText) return null;
 
+      // Resolve question type
+      const rawType = String(cleanRow["Tipe Soal"] || "").trim().toLowerCase();
+      const typeInfo = TYPE_MAP[rawType] || TYPE_MAP["pilihan_ganda"];
+      
+      const rawAnswer = String(cleanRow["Kunci Jawaban"] || "").trim();
+
+      // For isian_singkat / uraian: answer key is the text answer itself
+      if (typeInfo.type === "isian_singkat" || typeInfo.type === "uraian") {
+        return {
+          text: qText,
+          type: typeInfo.type,
+          field: typeInfo.field,
+          choices: {},
+          answerKey: rawAnswer,
+          groupId: String(cleanRow["GroupId (Literasi)"] || "").trim() || undefined,
+          groupText: String(cleanRow["Teks Literasi"] || "").trim() || undefined,
+        };
+      }
+
+      // For pilihan_ganda_kompleks: multiple correct answers (e.g., "A,C,E")
+      const correctLetters = rawAnswer.toUpperCase().split(/[,\s]+/).filter(l => /^[A-E]$/.test(l));
+      
       const choices: Record<string, { text: string; isCorrect: boolean; imageUrl: string }> = {};
       ['A', 'B', 'C', 'D', 'E'].forEach((letter) => {
         const val = String(cleanRow[`Opsi ${letter}`] || "").trim();
-        choices[letter.toLowerCase()] = {
-          text: val,
-          isCorrect: String(cleanRow["Kunci Jawaban"] || "").trim().toUpperCase() === letter,
-          imageUrl: ""
-        };
+        if (val || typeInfo.type === "benar_salah") { // Include even empty for benar_salah
+          choices[letter.toLowerCase()] = {
+            text: val,
+            isCorrect: correctLetters.includes(letter),
+            imageUrl: ""
+          };
+        }
+      });
+
+      // Filter out empty choices (except for benar_salah which needs A and B)
+      const filteredChoices: Record<string, any> = {};
+      Object.entries(choices).forEach(([k, v]) => {
+        if (v.text || typeInfo.type === "benar_salah") {
+          filteredChoices[k] = v;
+        }
       });
 
       return {
         text: qText,
-        type: "pilihan_ganda", // UI type
-        field: "multiple_choice", // DB type
-        choices: choices,
+        type: typeInfo.type,
+        field: typeInfo.field,
+        choices: filteredChoices,
+        answerKey: correctLetters.length > 0 ? correctLetters.join(",").toLowerCase() : undefined,
         groupId: String(cleanRow["GroupId (Literasi)"] || "").trim() || undefined,
         groupText: String(cleanRow["Teks Literasi"] || "").trim() || undefined,
       };

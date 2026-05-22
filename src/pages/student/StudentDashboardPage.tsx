@@ -311,7 +311,7 @@ const StudentDashboardPage = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 font-sans pb-20 sm:pb-0">
-      <header className="sticky top-0 z-50 bg-white/90 dark:bg-slate-900/90 backdrop-blur-3xl border-b border-slate-100 dark:border-slate-800 h-16 sm:h-20 px-3 sm:px-10 flex items-center justify-between shadow-sm">
+      <header className="sticky top-0 z-50 bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 h-16 sm:h-20 px-3 sm:px-10 flex items-center justify-between shadow-sm">
         <div className="flex items-center gap-2 sm:gap-3">
           <div className="p-1 sm:p-2 bg-emerald-50 dark:bg-emerald-950/40 rounded-xl sm:rounded-2xl border border-emerald-100/50 dark:border-emerald-800/50 shadow-sm shrink-0">
             {schoolLogo ? (

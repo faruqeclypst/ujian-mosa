@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Plus, Edit, Trash, Check, Copy, Image, ChevronDown, FileText, Download, Eye, FolderOpen, Sparkles, Wand2, RefreshCw, BookOpen, Loader2, FileSpreadsheet, Search, X, Bookmark, Forward, CheckCircle2, Menu, Maximize2, HelpCircle, FileJson, GripVertical } from "lucide-react";
+import { ArrowLeft, Plus, Edit, Trash, Check, Copy, Image, ChevronDown, FileText, Download, Eye, FolderOpen, Sparkles, Wand2, RefreshCw, BookOpen, Loader2, FileSpreadsheet, Search, X, Bookmark, Forward, CheckCircle2, Menu, Maximize2, HelpCircle, FileJson, GripVertical, ChevronLeft, ChevronRight } from "lucide-react";
 import { Reorder } from "framer-motion";
 import { MathText } from "../../components/MathText";
 import { SmartImage } from "../../components/ui/smart-image";
@@ -236,6 +236,7 @@ const QuestionsPage = () => {
   const [selectedQuestion, setSelectedQuestion] = useState<QuestionData | null>(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [previewQuestion, setPreviewQuestion] = useState<QuestionData | null>(null);
+  const [previewIndex, setPreviewIndex] = useState(0);
 
   const [formValues, setFormValues] = useState<{
     text: string;
@@ -2216,13 +2217,23 @@ const QuestionsPage = () => {
         
         await Promise.all(chunk.map(async (q, index) => {
           const actualIndex = i + index;
+          
+          // Determine correct answer based on question type
+          let answerKey = "";
+          if (q.type === "isian_singkat" || q.type === "uraian") {
+            answerKey = q.answerKey || "";
+          } else {
+            answerKey = Object.entries(q.choices as any).find(([_, v]: any) => v.isCorrect)?.[0] || q.answerKey || "";
+          }
+          
           const payload = {
             examId,
             text: q.text,
             field: q.field || "multiple_choice",
             type: q.type,
             options: q.choices,
-            answerKey: Object.entries(q.choices as any).find(([_, v]: any) => v.isCorrect)?.[0] || "a",
+            correctAnswer: answerKey,
+            answerKey: answerKey,
             groupId: q.groupId || "",
             groupText: q.groupText || "",
             order: (questions.length || 0) + actualIndex + 1,
@@ -3124,6 +3135,8 @@ const QuestionsPage = () => {
                       <button
                         className="p-1.5 bg-sky-50 text-sky-600 hover:bg-sky-100 rounded-xl dark:bg-sky-900/10 dark:text-sky-400 border border-sky-100 dark:border-sky-800/40 transition-all hover:scale-110"
                         onClick={() => {
+                          const idx = questions.findIndex(item => item.id === q.id);
+                          setPreviewIndex(idx >= 0 ? idx : 0);
                           setPreviewQuestion(q);
                           setIsPreviewOpen(true);
                         }}
@@ -3660,11 +3673,35 @@ const QuestionsPage = () => {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <button className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-slate-50 dark:bg-slate-800 text-slate-400 flex items-center justify-center border border-slate-100 dark:border-slate-700 pointer-events-none">
-                      <Bookmark className="w-5 h-5" />
+                    <span className="text-xs text-slate-400 font-medium">{previewIndex + 1}/{questions.length}</span>
+                    <button
+                      onClick={() => {
+                        if (previewIndex > 0) {
+                          const newIdx = previewIndex - 1;
+                          setPreviewIndex(newIdx);
+                          setPreviewQuestion(questions[newIdx]);
+                        }
+                      }}
+                      disabled={previewIndex <= 0}
+                      className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-500 flex items-center justify-center border border-slate-100 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors disabled:opacity-25 disabled:cursor-not-allowed"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
                     </button>
-                    <button onClick={() => setIsPreviewOpen(false)} className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-rose-50 dark:bg-rose-950/30 text-rose-500 flex items-center justify-center border border-rose-100 dark:border-rose-800/40 hover:bg-rose-100 transition-colors">
-                      <X className="w-5 h-5" />
+                    <button
+                      onClick={() => {
+                        if (previewIndex < questions.length - 1) {
+                          const newIdx = previewIndex + 1;
+                          setPreviewIndex(newIdx);
+                          setPreviewQuestion(questions[newIdx]);
+                        }
+                      }}
+                      disabled={previewIndex >= questions.length - 1}
+                      className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-500 flex items-center justify-center border border-slate-100 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors disabled:opacity-25 disabled:cursor-not-allowed"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                    <button onClick={() => setIsPreviewOpen(false)} className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-rose-50 dark:bg-rose-950/30 text-rose-500 flex items-center justify-center border border-rose-100 dark:border-rose-800/40 hover:bg-rose-100 transition-colors">
+                      <X className="w-4 h-4" />
                     </button>
                   </div>
                </div>
@@ -3824,25 +3861,6 @@ const QuestionsPage = () => {
                   </div>
                </div>
 
-               {/* MODAL FOOTER - FIXED BOTTOM */}
-               <div className="flex-shrink-0 bg-slate-50/80 dark:bg-slate-900/80 backdrop-blur-md border-t border-slate-100 dark:border-slate-800 p-6 sm:px-10 flex items-center justify-between z-20">
-                  <div className="flex items-center gap-4">
-                    <div className="flex flex-col">
-                      <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">Tipe Konten</span>
-                      <span className="text-sm font-bold text-slate-700 dark:text-slate-300 capitalize">{previewQuestion.type?.replace("_", " ") || "Pilihan Ganda"}</span>
-                    </div>
-                    <div className="w-px h-8 bg-slate-200 dark:bg-slate-800"></div>
-                    <div className="flex flex-col">
-                      <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">Status Rendering</span>
-                      <span className="text-sm font-bold text-emerald-600 flex items-center gap-1">
-                        <CheckCircle2 className="w-4 h-4" /> KaTeX Active
-                      </span>
-                    </div>
-                  </div>
-                  <Button onClick={() => setIsPreviewOpen(false)} className="rounded-2xl h-12 px-8 bg-slate-900 hover:bg-black text-white font-bold transition-all shadow-xl shadow-slate-200 dark:shadow-none">
-                     Tutup Pratinjau
-                  </Button>
-               </div>
             </>
           )}
         </DialogContent>

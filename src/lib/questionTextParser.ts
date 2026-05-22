@@ -1,12 +1,13 @@
 /**
- * Smart Question Parser (Tanpa AI)
+ * Smart Question Parser (Tanpa AI) - OPTIMIZED
  * 
  * Mengekstrak soal dari teks biasa atau PDF menggunakan heuristic pattern matching.
  * Mendukung format soal Indonesia yang umum:
- * - Nomor soal: "1.", "1)", "(1)"
+ * - Nomor soal: "1.", "1)", "(1)", "Soal 1"
  * - Opsi jawaban: "A.", "a)", "(A)", "A )"
- * - Kunci jawaban: "Kunci: A", "*A.", bold marker, tanda bintang
+ * - Kunci jawaban: "Kunci: A", "*A.", bold marker, tanda bintang, trailing key list
  * - Stimulus/wacana: blok teks sebelum soal atau ditandai header
+ * - Kunci jawaban di akhir dokumen: "1.A 2.B 3.C" atau "1)A 2)B"
  */
 
 export interface ParsedTextQuestion {
@@ -20,7 +21,6 @@ export interface ParsedTextQuestion {
 // ─── PDF Text Extraction ─────────────────────────────────────────────────────
 
 export async function extractTextFromPdf(file: File): Promise<string> {
-  // Lazy-load pdfjs-dist agar tidak membengkakkan bundle utama
   const pdfjsLib = await import("pdfjs-dist");
   pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
     "pdfjs-dist/build/pdf.worker.mjs",
@@ -35,18 +35,16 @@ export async function extractTextFromPdf(file: File): Promise<string> {
     const page = await pdf.getPage(i);
     const content = await page.getTextContent();
     
-    // Group text items by Y position to reconstruct lines
     const itemsByY: Map<number, { x: number; text: string }[]> = new Map();
     
     for (const item of content.items) {
       if (!("str" in item)) continue;
-      const y = Math.round((item as any).transform[5]); // Y position
-      const x = (item as any).transform[4]; // X position
+      const y = Math.round((item as any).transform[5]);
+      const x = (item as any).transform[4];
       if (!itemsByY.has(y)) itemsByY.set(y, []);
       itemsByY.get(y)!.push({ x, text: item.str });
     }
 
-    // Sort by Y descending (PDF coordinates are bottom-up)
     const sortedYs = [...itemsByY.keys()].sort((a, b) => b - a);
     
     for (const y of sortedYs) {
@@ -55,7 +53,6 @@ export async function extractTextFromPdf(file: File): Promise<string> {
       if (lineText) lines.push(lineText);
     }
     
-    // Page separator
     if (i < pdf.numPages) lines.push("");
   }
 
@@ -65,17 +62,39 @@ export async function extractTextFromPdf(file: File): Promise<string> {
 // ─── Smart Text Parser ───────────────────────────────────────────────────────
 
 // Regex patterns
-const QUESTION_NUM_PATTERN = /^[\s]*[\(]?(\d{1,3})[\.\)\s]+(.+)/;
-const QUESTION_NUM_ONLY = /^[\s]*[\(]?(\d{1,3})[\.\)\s]*$/;
+const QUESTION_NUM_PATTERN = /^[\s]*(?:Soal\s+)?[\(]?(\d{1,3})[\.\)\s]+(.+)/i;
+const QUESTION_NUM_ONLY = /^[\s]*(?:Soal\s+)?[\(]?(\d{1,3})[\.\)\s]*$/i;
 const CHOICE_PATTERN = /^[\s]*[\(\[]?([A-Ea-e])[\.\)\]\s]+(.+)/;
 const CHOICE_ONLY = /^[\s]*[\(\[]?([A-Ea-e])[\.\)\]\s]*$/;
 const ANSWER_KEY_PATTERN = /(?:kunci|jawaban|answer|key)[\s]*(?:jawaban)?[\s]*[:\-=]\s*([A-Ea-e])/i;
-const ANSWER_INLINE_PATTERN = /\*\*?([A-Ea-e])\*\*?/; // **A** or *A*
 const STIMULUS_PATTERN = /^[\s]*(LITERASI|STIMULUS|TEKS|WACANA|BACAAN|STIMULI|PARAGRAF|CERITA|TEKS BACAAN)[\s.\-:]*(\d+)?[\s.\-:]*(.*)/i;
 
-// Detect if a line is a section header (not a question)
-const HEADER_PATTERN = /^[\s]*(Nama Guru|Kelas|Mapel|Mata Pelajaran|Nama Sekolah|Waktu|Hari|Tanggal|Petunjuk|PETUNJUK|Pilihlah|Berilah|Kerjakan)[\s]*[:\-!.]/i;
+// Detect trailing answer key list: "1.A 2.B 3.C" or "1)A 2)B 3)C" or "1. A, 2. B, 3. C"
+const ANSWER_LIST_PATTERN = /^[\s]*(?:kunci|jawaban|answer|key)[\s]*(?:jawaban)?[\s]*[:\-=]?\s*/i;
+const ANSWER_ITEM_PATTERN = /(\d{1,3})[\.\)\s]*([A-Ea-e])/g;
+
+// Detect section headers (not questions)
+const HEADER_PATTERN = /^[\s]*(Nama Guru|Kelas|Mapel|Mata Pelajaran|Nama Sekolah|Waktu|Hari|Tanggal|Petunjuk|PETUNJUK|Pilihlah|Berilah|Kerjakan|Pilihan Ganda|PILIHAN GANDA|Soal Pilihan|SOAL PILIHAN)[\s]*[:\-!.]/i;
 const SEPARATOR_PATTERN = /^[\s]*[-=_]{3,}[\s]*$/;
+
+/**
+ * Deteksi apakah sebuah blok teks berisi daftar kunci jawaban
+ * Format: "1.A 2.B 3.C" atau "1)A, 2)B, 3)C" atau per baris "1. A\n2. B"
+ */
+function extractAnswerKeyList(text: string): Map<number, string> | null {
+  const keys = new Map<number, string>();
+  const matches = text.matchAll(ANSWER_ITEM_PATTERN);
+  
+  for (const match of matches) {
+    const num = parseInt(match[1]);
+    const letter = match[2].toLowerCase();
+    keys.set(num, letter);
+  }
+  
+  // Hanya valid jika ada minimal 2 kunci dan berurutan
+  if (keys.size >= 2) return keys;
+  return null;
+}
 
 export function parseQuestionsFromText(rawText: string): ParsedTextQuestion[] {
   const lines = rawText.split(/\r?\n/);
@@ -92,18 +111,45 @@ export function parseQuestionsFromText(rawText: string): ParsedTextQuestion[] {
   let currentGroupText: string | undefined = undefined;
   let collectingStimulus = false;
 
+  // Collect potential answer key sections at the end
+  let trailingAnswerKeys: Map<number, string> | null = null;
+  let answerSectionStartIndex = -1;
+
+  // ─── PRE-SCAN: Detect trailing answer key section ──────────────────────
+  for (let i = lines.length - 1; i >= Math.max(0, lines.length - 50); i--) {
+    const trimmed = lines[i].trim();
+    if (!trimmed) continue;
+    
+    // Check if this line starts an answer key section
+    if (ANSWER_LIST_PATTERN.test(trimmed)) {
+      // Collect all answer items from this line onwards
+      const answerSection = lines.slice(i).join(" ");
+      const keys = extractAnswerKeyList(answerSection);
+      if (keys && keys.size >= 2) {
+        trailingAnswerKeys = keys;
+        answerSectionStartIndex = i;
+        break;
+      }
+    }
+    
+    // Also check if the line itself is just answer items without header
+    const lineKeys = extractAnswerKeyList(trimmed);
+    if (lineKeys && lineKeys.size >= 3) {
+      // Multiple answer items on one line — likely an answer key list
+      const fullSection = lines.slice(i).join(" ");
+      const allKeys = extractAnswerKeyList(fullSection);
+      if (allKeys && allKeys.size >= 3) {
+        trailingAnswerKeys = allKeys;
+        answerSectionStartIndex = i;
+        break;
+      }
+    }
+  }
+
   const pushCurrentQuestion = () => {
     if (currentQuestion && currentQuestion.text?.trim()) {
-      // Apply answer key
       if (currentAnswerKey && currentChoices[currentAnswerKey.toLowerCase()]) {
         currentChoices[currentAnswerKey.toLowerCase()].isCorrect = true;
-      }
-      // If no answer key found, try to detect from markers
-      if (!currentAnswerKey) {
-        const marked = Object.entries(currentChoices).find(([_, v]) => v.isCorrect);
-        if (!marked) {
-          // No answer detected — leave all as false
-        }
       }
       questions.push({
         text: currentQuestion.text.trim(),
@@ -115,29 +161,27 @@ export function parseQuestionsFromText(rawText: string): ParsedTextQuestion[] {
     }
   };
 
-  for (let i = 0; i < lines.length; i++) {
+  // ─── MAIN PARSE LOOP ──────────────────────────────────────────────────
+  const parseEndIndex = answerSectionStartIndex > 0 ? answerSectionStartIndex : lines.length;
+
+  for (let i = 0; i < parseEndIndex; i++) {
     const line = lines[i];
     const trimmed = line.trim();
 
-    // Skip empty lines and separators
     if (!trimmed || SEPARATOR_PATTERN.test(trimmed)) {
-      // If collecting stimulus and hit empty line after content, might end stimulus
       if (collectingStimulus && currentGroupText && currentGroupText.trim().length > 50) {
-        // Long enough stimulus, stop collecting on double empty
-        if (i + 1 < lines.length && !lines[i + 1].trim()) {
+        if (i + 1 < parseEndIndex && !lines[i + 1]?.trim()) {
           collectingStimulus = false;
         }
       }
       continue;
     }
 
-    // Skip headers
     if (HEADER_PATTERN.test(trimmed)) continue;
 
     // ─── Detect Stimulus/Wacana ──────────────────────────────────────────
     const stimulusMatch = trimmed.match(STIMULUS_PATTERN);
     if (stimulusMatch) {
-      // Save previous question first
       pushCurrentQuestion();
       currentQuestion = null;
       currentChoices = {};
@@ -162,21 +206,17 @@ export function parseQuestionsFromText(rawText: string): ParsedTextQuestion[] {
 
     if (questionMatch || questionNumOnly) {
       collectingStimulus = false;
-
-      // Save previous question
       pushCurrentQuestion();
 
-      // Start new question
       const qText = questionMatch ? questionMatch[2].trim() : "";
       currentQuestion = { text: qText, imageUrl: undefined };
       currentChoices = {};
       currentAnswerKey = "";
-      pendingQuestionText = !questionMatch; // If only number, text comes next
+      pendingQuestionText = !questionMatch;
       pendingChoiceLetter = null;
       lastChoiceLetter = null;
 
-      // Check for inline answer key in the question line itself (rare but possible)
-      // e.g., "1. Apa ibu kota Indonesia? (Kunci: A)"
+      // Check for inline answer key
       const inlineAnswer = qText.match(ANSWER_KEY_PATTERN);
       if (inlineAnswer) {
         currentAnswerKey = inlineAnswer[1].toLowerCase();
@@ -192,31 +232,22 @@ export function parseQuestionsFromText(rawText: string): ParsedTextQuestion[] {
     if ((choiceMatch || choiceOnly) && currentQuestion) {
       const letter = (choiceMatch ? choiceMatch[1] : choiceOnly![1]).toLowerCase();
       let choiceText = choiceMatch ? choiceMatch[2].trim() : "";
-
-      // Detect if this choice is marked as correct
       let isCorrect = false;
 
-      // Check for asterisk/bold markers: "*A. jawaban*" or "**jawaban**"
+      // Check for asterisk/bold markers
       if (trimmed.startsWith("*") || trimmed.includes("**")) {
         isCorrect = true;
         choiceText = choiceText.replace(/\*+/g, "").trim();
       }
 
-      // Check for trailing marker like "(benar)" or "(correct)" or "✓"
+      // Check for trailing marker
       if (choiceText.match(/[\s]*[\(✓✔★●]*(benar|correct|betul|✓|✔|★)[\)]*[\s]*$/i)) {
         isCorrect = true;
         choiceText = choiceText.replace(/[\s]*[\(✓✔★●]*(benar|correct|betul|✓|✔|★)[\)]*[\s]*$/i, "").trim();
       }
 
-      currentChoices[letter] = {
-        text: choiceText,
-        imageUrl: undefined,
-        isCorrect,
-      };
-
-      if (isCorrect && !currentAnswerKey) {
-        currentAnswerKey = letter;
-      }
+      currentChoices[letter] = { text: choiceText, imageUrl: undefined, isCorrect };
+      if (isCorrect && !currentAnswerKey) currentAnswerKey = letter;
 
       pendingQuestionText = false;
       pendingChoiceLetter = choiceOnly ? letter : null;
@@ -227,28 +258,37 @@ export function parseQuestionsFromText(rawText: string): ParsedTextQuestion[] {
     // ─── Continuation / Fragment Handling ─────────────────────────────────
     if (currentQuestion) {
       if (pendingQuestionText) {
-        // Text for a question that only had a number
         currentQuestion.text = trimmed;
         pendingQuestionText = false;
       } else if (pendingChoiceLetter && currentChoices[pendingChoiceLetter]) {
-        // Text for a choice that only had a letter
         currentChoices[pendingChoiceLetter].text = trimmed;
         pendingChoiceLetter = null;
       } else if (!lastChoiceLetter) {
-        // Still in question text (before any choice appeared)
         currentQuestion.text += " " + trimmed;
       } else if (lastChoiceLetter && currentChoices[lastChoiceLetter]) {
-        // Continuation of last choice text (multi-line choice)
         currentChoices[lastChoiceLetter].text += " " + trimmed;
       }
     } else if (collectingStimulus) {
-      // Collecting stimulus/wacana text
       currentGroupText = (currentGroupText || "") + " " + trimmed;
     }
   }
 
   // Push last question
   pushCurrentQuestion();
+
+  // ─── POST-PROCESS: Apply trailing answer keys ──────────────────────────
+  if (trailingAnswerKeys && trailingAnswerKeys.size > 0) {
+    questions.forEach((q, index) => {
+      const questionNum = index + 1;
+      const key = trailingAnswerKeys!.get(questionNum);
+      if (key && q.choices[key]) {
+        // Reset all choices first
+        Object.keys(q.choices).forEach(k => { q.choices[k].isCorrect = false; });
+        // Set the correct one
+        q.choices[key].isCorrect = true;
+      }
+    });
+  }
 
   return questions;
 }
