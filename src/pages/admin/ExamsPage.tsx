@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Plus, BookOpen, Trash, Edit, Archive, RotateCw } from "lucide-react";
+import { Plus, BookOpen, Trash, Edit, Archive, RotateCw, Copy } from "lucide-react";
 import { Button } from "../../components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../../components/ui/dialog";
 import { DeleteConfirmationDialog } from "../../components/ui/delete-confirmation-dialog";
@@ -317,6 +317,43 @@ const ExamsPage = () => {
     setIsDialogOpen(true);
   };
 
+  const handleDuplicateExam = (exam: ExamData) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: "Duplikat Bank Soal",
+      description: `Apakah Anda yakin ingin menduplikasi "${exam.title}" beserta semua soalnya?`,
+      type: "info",
+      confirmLabel: "Duplikat",
+      onConfirm: async () => {
+        if (!pb) return;
+        try {
+          const newExam = await pb.collection('exams').create({
+            title: `(Salinan) ${exam.title}`,
+            subjectId: exam.subjectId,
+            teacherId: exam.teacherId,
+            examType: exam.examType || "Latihan",
+          });
+
+          const questions = await pb.collection('questions').getFullList({
+            filter: `examId = "${exam.id}"`
+          });
+
+          for (const q of questions) {
+            const { id, created, updated, collectionId, collectionName, ...rest } = q;
+            await pb.collection('questions').create({
+              ...rest,
+              examId: newExam.id,
+            });
+          }
+
+          addToast({ type: "success", title: "Berhasil", description: `Bank soal berhasil diduplikasi (${questions.length} soal).` });
+        } catch (error) {
+          addToast({ type: "error", title: "Gagal", description: "Gagal menduplikasi bank soal." });
+        }
+      }
+    });
+  };
+
   const handleEditClick = (exam: ExamData) => {
     setDialogMode("edit");
     setSelectedExam(exam);
@@ -486,6 +523,14 @@ const ExamsPage = () => {
                   >
                     <span className="text-xs font-black">{questionCounts[exam.id] || 0}</span>
                     <BookOpen className="h-3.5 w-3.5" />
+                  </button>
+
+                  <button 
+                    className="p-1.5 bg-teal-50 text-teal-600 hover:bg-teal-100 rounded-lg dark:bg-teal-900/10 dark:text-teal-400 border border-teal-100 dark:border-teal-800/40 transition-all hover:shadow-sm" 
+                    onClick={() => handleDuplicateExam(exam)}
+                    title="Duplikat Bank Soal"
+                  >
+                    <Copy className="h-4 w-4" />
                   </button>
                   
                   {isOwner(exam) && (
