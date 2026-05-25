@@ -1,12 +1,82 @@
 import mammoth from "mammoth";
+import JSZip from "jszip";
+import { ommlElementToLatex } from "./ommlToLatex";
 
 export interface ParsedQuestion {
   text: string;
+  type?: "pilihan_ganda" | "isian_singkat" | "uraian";
   imageUrl?: string;
   groupId?: string;
   groupText?: string;
+  answerKey?: string;
   choices: Record<string, { text: string; imageUrl?: string; isCorrect: boolean }>;
 }
+
+/**
+ * Extract equations from .docx and inject LaTeX placeholders into the XML
+ * before mammoth processes it. Returns a map of placeholder → LaTeX.
+ */
+const extractEquationsFromDocx = async (arrayBuffer: ArrayBuffer): Promise<{ modifiedBuffer: ArrayBuffer; equationMap: Map<string, string> }> => {
+  const equationMap = new Map<string, string>();
+
+  try {
+    const zip = await JSZip.loadAsync(arrayBuffer);
+    const docXmlFile = zip.file("word/document.xml");
+    if (!docXmlFile) return { modifiedBuffer: arrayBuffer, equationMap };
+
+    let xmlString = await docXmlFile.async("string");
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(xmlString, "application/xml");
+
+    // Find all m:oMath elements (equations)
+    const allElements = doc.getElementsByTagName("*");
+    let eqIndex = 0;
+    const toReplace: Array<{ element: Element; placeholder: string }> = [];
+
+    for (let i = 0; i < allElements.length; i++) {
+      const el = allElements[i];
+      if (el.localName === "oMath" && el.parentElement?.localName !== "oMath") {
+        const latex = ommlElementToLatex(el);
+        if (latex) {
+          const placeholder = `EQPLACEHOLDER${eqIndex}EQEND`;
+          equationMap.set(placeholder, `$${latex}$`);
+          toReplace.push({ element: el, placeholder });
+          eqIndex++;
+        }
+      }
+    }
+
+    // Replace equation elements with placeholder text in the XML
+    toReplace.forEach(({ element, placeholder }) => {
+      // Create a w:r > w:t element with the placeholder text
+      const ns = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+      const r = doc.createElementNS(ns, "w:r");
+      const t = doc.createElementNS(ns, "w:t");
+      t.setAttribute("xml:space", "preserve");
+      t.textContent = placeholder;
+      r.appendChild(t);
+
+      // Also handle oMathPara wrapper
+      const parent = element.parentElement;
+      if (parent && parent.localName === "oMathPara") {
+        parent.parentNode?.replaceChild(r, parent);
+      } else {
+        element.parentNode?.replaceChild(r, element);
+      }
+    });
+
+    // Serialize back to string
+    const serializer = new XMLSerializer();
+    const modifiedXml = serializer.serializeToString(doc);
+    zip.file("word/document.xml", modifiedXml);
+
+    const modifiedBuffer = await zip.generateAsync({ type: "arraybuffer" });
+    return { modifiedBuffer, equationMap };
+  } catch (e) {
+    console.warn("Equation extraction failed, proceeding without equations:", e);
+    return { modifiedBuffer: arrayBuffer, equationMap };
+  }
+};
 
 /**
  * Parse questions from Word (.docx) file - OPTIMIZED
@@ -18,21 +88,38 @@ export interface ParsedQuestion {
  * - Better table support
  * - Trailing answer key detection ("Kunci: 1.A 2.B 3.C")
  */
-export const parseQuestionsFromWord = async (file: File): Promise<ParsedQuestion[]> => {
+export const parseQuestionsFromWord = async (file: File, options?: { includeEssay?: boolean }): Promise<ParsedQuestion[]> => {
+  const includeEssay = options?.includeEssay ?? true;
   const arrayBuffer = await file.arrayBuffer();
-  const result = await mammoth.convertToHtml({ arrayBuffer });
-  const html = result.value;
+  
+  // Step 1: Extract equations and inject placeholders
+  const { modifiedBuffer, equationMap } = await extractEquationsFromDocx(arrayBuffer);
+  
+  // Step 2: Convert to HTML with mammoth (using modified buffer with placeholders)
+  const result = await mammoth.convertToHtml({ arrayBuffer: modifiedBuffer });
+  let html = result.value;
+
+  // Step 3: Replace placeholders with LaTeX in the HTML
+  equationMap.forEach((latex, placeholder) => {
+    html = html.split(placeholder).join(latex);
+  });
 
   const parser = new DOMParser();
   const doc = parser.parseFromString(html, "text/html");
   
-  // Ambil semua p dan td, tapi saring td yang sudah punya p di dalamnya
-  const paragraphs = Array.from(doc.querySelectorAll("p, td")).filter(el => {
+  // Ambil semua p, li, dan td, tapi saring td yang sudah punya p di dalamnya
+  const paragraphs = Array.from(doc.querySelectorAll("p, li, td")).filter(el => {
     if (el.tagName === 'TD') return el.querySelectorAll('p').length === 0;
+    if (el.tagName === 'LI') return el.querySelectorAll('p').length === 0;
     return true;
   });
 
   const questions: ParsedQuestion[] = [];
+
+  // ─── LITERASI REGISTRY: stores kode → isi literasi ─────────────────────
+  const literasiRegistry = new Map<string, string>();
+  let literasiSetForCurrentBlock = false;
+  let isEssaySection = false; // tracks if we're in "Uraian / Isian Singkat" section
 
   let pendingNumber: string | null = null;
   let pendingLetter: string | null = null;
@@ -147,6 +234,79 @@ export const parseQuestionsFromWord = async (file: File): Promise<ParsedQuestion
 
     // Ignore Headers
     if (textOnly.match(/^(Nama Guru|Kelas|Mapel|Mata Pelajaran|Nama Sekolah|Waktu|Hari|Tanggal|Petunjuk|Pilihlah|Berilah|Kerjakan)\s*[:]/i)) return;
+    if (textOnly.match(/^PENTING:/i)) return;
+
+    // Detect essay section header
+    if (textOnly.match(/^(Uraian|Isian Singkat|Uraian\s*[\/&]\s*Isian Singkat|Essay|Soal Uraian|Soal Isian)/i)) {
+      // Save previous question if any
+      if (currentQuestion && currentQuestion.text) {
+        if (currentAnswerKey && currentChoices[currentAnswerKey.toLowerCase()]) { const alreadyHasCorrect = Object.values(currentChoices).some(c => c.isCorrect); if (!alreadyHasCorrect) { currentChoices[currentAnswerKey.toLowerCase()].isCorrect = true; } }
+        questionCounter++;
+        questions.push({
+          text: currentQuestion.text,
+          imageUrl: currentQuestion.imageUrl,
+          groupId: currentGroupId,
+          groupText: currentGroupText,
+          choices: { ...currentChoices },
+        });
+        currentQuestion = null;
+        currentChoices = {};
+        currentAnswerKey = "";
+      }
+      isEssaySection = true;
+      currentGroupId = undefined;
+      currentGroupText = undefined;
+      return;
+    }
+
+    // If in essay section but includeEssay is false, skip everything
+    if (isEssaySection && !includeEssay) return;
+
+    // In essay section, <li> elements handling:
+    // - If it starts with a number (1. 2. etc) or is a top-level ordered list item → new question
+    // - If currentQuestion exists and this is a bullet/sub-item → append to current question text
+    if (isEssaySection && p.tagName === 'LI') {
+      const isNumberedItem = textOnly.match(/^[\(]?(\d+)[\.\s\)]+(.*)/) || (p.parentElement?.tagName === 'OL');
+      const isBulletSubItem = p.parentElement?.tagName === 'UL' || textOnly.match(/^[•\-\*]/);
+      
+      if (isBulletSubItem && currentQuestion) {
+        // Append bullet point to current question text
+        currentQuestion.text += `<br>• ${textOnly}`;
+        return;
+      }
+      
+      if (isNumberedItem && textOnly && !textOnly.match(/^[A-Ea-e][\.\)\s]/)) {
+        // Save previous question
+        if (currentQuestion && currentQuestion.text) {
+          if (currentAnswerKey && currentChoices[currentAnswerKey.toLowerCase()]) { const alreadyHasCorrect = Object.values(currentChoices).some(c => c.isCorrect); if (!alreadyHasCorrect) { currentChoices[currentAnswerKey.toLowerCase()].isCorrect = true; } }
+          questionCounter++;
+          questions.push({
+            text: currentQuestion.text,
+            imageUrl: currentQuestion.imageUrl,
+            groupId: currentGroupId,
+            groupText: currentGroupText,
+            choices: { ...currentChoices },
+          });
+        }
+        // Start new essay question — strip the number prefix if from <ol>
+        const questionText = p.parentElement?.tagName === 'OL' ? (line || textOnly) : (textOnly.replace(/^[\(]?\d+[\.\s\)]+/, '').trim() || textOnly);
+        currentQuestion = { text: questionText, imageUrl: firstImage || undefined };
+        currentChoices = {};
+        currentAnswerKey = "";
+        currentGroupId = undefined;
+        currentGroupText = undefined;
+        literasiSetForCurrentBlock = false;
+        pendingNumber = null;
+        pendingLetter = null;
+        return;
+      }
+      
+      // Default: append to current question if exists
+      if (currentQuestion) {
+        currentQuestion.text += `<br>${textOnly}`;
+        return;
+      }
+    }
 
     const isImageOnly = !textOnly && images.length > 0;
     if (!textOnly && !isImageOnly) return;
@@ -160,24 +320,175 @@ export const parseQuestionsFromWord = async (file: File): Promise<ParsedQuestion
       if (items.length >= 3 && textOnly.replace(/[\d\.\)\s,A-Ea-e]/g, "").length < 5) return;
     }
 
-    // Detect Literasi / Stimulus Start
-    const literasiMatch = textOnly.match(/^(LITERASI|STIMULUS|TEKS|WACANA|BACAAN|STIMULI)[.\s]*(\d+)?[:\s\-]*(.*)/i);
-    if (literasiMatch) {
-      currentGroupId = `GROUP-${literasiMatch[2] || Math.random().toString(36).substr(2, 5).toUpperCase()}`;
-      currentGroupText = literasiMatch[3] || "";
+    // ─── KODE LITERASI TABLE FORMAT ──────────────────────────────────────
+    // Format tabel:
+    // Baris 1: | Kode Literasi (misal LIT-1) | Isi teks literasi... |
+    // Baris 2: | 1. | Teks pertanyaan |
+    // Baris 3: | A | Pilihan A |
+    // ...
+    // Jika kode sama dengan yang sudah ada di registry, pakai teks yang sudah tersimpan
+    // Jika kode baru + ada isi, simpan ke registry
+    // Tanpa baris kode = soal mandiri
+    
+    // Skip header row "Kode Literasi | Contoh Isi Literasi"
+    if (textOnly.match(/^kode\s*literasi$/i) || textOnly.match(/^(contoh\s*)?isi\s*literasi$/i) || textOnly.match(/^contoh/i)) return;
+
+    // Detect kode literasi row in table
+    // Works with <p> inside <td> (mammoth output) or bare <td>
+    const parentTd = p.tagName === 'TD' ? p : p.closest ? p.closest('td') : null;
+    if (parentTd) {
+      const row = parentTd.closest('tr');
+      if (row) {
+        const cells = Array.from(row.querySelectorAll('td'));
+        if (cells.length >= 2) {
+          const firstCell = cells[0];
+          const secondCell = cells[1];
+          
+          // Only process once per row (when we're in the first cell)
+          if (parentTd === firstCell) {
+            const cellText = (firstCell.textContent?.trim() || "");
+            const secondCellText = (secondCell.textContent?.trim() || "");
+            const secondCellHtml = (secondCell.innerHTML?.trim() || "");
+            
+            // Check if this looks like a literasi code
+            // Can be anything: "LIT-1", "jaringan", "KODE-1", "ekosistem", etc.
+            // Must NOT be: a question number, a choice letter, "Kunci Jawaban", or common headers
+            // Additional: second cell must be either empty (reference) or have substantial text (>20 chars)
+            const isLiterasiKode = cellText &&
+              cellText.length >= 2 &&
+              cellText.length <= 30 &&
+              !cellText.match(/^\d+[\.\)\s]*$/) && // not a question number (1. 2. etc)
+              !cellText.match(/^[A-Ea-e][\.\)\s]*$/) && // not a choice letter
+              !cellText.match(/^kunci/i) && // not answer key
+              !cellText.match(/^(Nama|Kelas|Mapel|Mata|Guru|Waktu|Hari|Tanggal|Petunjuk)/i) && // not header
+              !cellText.match(/^\d+[\.\)]\s+\S/) && // not "1. question text"
+              !cellText.match(/^[A-Ea-e][\.\)]\s+\S/) && // not "A. choice text"
+              (secondCellText.length === 0 || secondCellText.length > 20); // isi must be empty or substantial
+            
+            if (isLiterasiKode) {
+              // Push previous question BEFORE setting new literasi group
+              if (currentQuestion && currentQuestion.text) {
+                if (currentAnswerKey && currentChoices[currentAnswerKey.toLowerCase()]) {
+                  const alreadyHasCorrect = Object.values(currentChoices).some(c => c.isCorrect);
+                  if (!alreadyHasCorrect) { currentChoices[currentAnswerKey.toLowerCase()].isCorrect = true; }
+                }
+                questionCounter++;
+                questions.push({
+                  text: currentQuestion.text,
+                  imageUrl: currentQuestion.imageUrl,
+                  groupId: currentGroupId,
+                  groupText: currentGroupText,
+                  choices: { ...currentChoices },
+                });
+                currentQuestion = null;
+                currentChoices = {};
+                currentAnswerKey = "";
+              }
+
+              const kode = cellText.replace(/\s+/g, '-').toUpperCase();
+              literasiSetForCurrentBlock = true;
+              
+              if (secondCellText && secondCellText.length > 10) {
+                literasiRegistry.set(kode, secondCellHtml || secondCellText);
+                currentGroupId = kode;
+                currentGroupText = literasiRegistry.get(kode)!;
+              } else {
+                if (literasiRegistry.has(kode)) {
+                  currentGroupId = kode;
+                  currentGroupText = literasiRegistry.get(kode)!;
+                } else {
+                  currentGroupId = kode;
+                  currentGroupText = secondCellText || "";
+                }
+              }
+              return;
+            }
+          }
+          
+          // Skip second cell content if first cell is a literasi kode
+          if (parentTd === secondCell) {
+            const firstCellText = (firstCell.textContent?.trim() || "");
+            const isFirstKode = firstCellText &&
+              firstCellText.length >= 2 &&
+              firstCellText.length <= 30 &&
+              !firstCellText.match(/^\d+[\.\)\s]*$/) &&
+              !firstCellText.match(/^[A-Ea-e][\.\)\s]*$/) &&
+              !firstCellText.match(/^kunci/i) &&
+              !firstCellText.match(/^(Nama|Kelas|Mapel|Mata|Guru|Waktu|Hari|Tanggal|Petunjuk)/i) &&
+              !firstCellText.match(/^\d+[\.\)]\s+\S/) &&
+              !firstCellText.match(/^[A-Ea-e][\.\)]\s+\S/);
+            if (isFirstKode) return;
+          }
+        }
+      }
+    }
+
+    // ─── LITERASI / STIMULUS DETECTION ─────────────────────────────────────
+    // Format yang didukung:
+    // - "===LITERASI===" atau "---LITERASI---" atau "[LITERASI]" → mulai blok literasi
+    // - "===AKHIR LITERASI===" atau "---AKHIR LITERASI---" atau "[/LITERASI]" → akhir blok literasi
+    // - "LITERASI 1:", "STIMULUS:", "TEKS BACAAN:", "WACANA:", "BACAAN:" → mulai blok
+    // - Blok literasi otomatis berakhir saat soal pertama dimulai (nomor soal)
+    // - Setelah soal-soal literasi, bisa ada literasi baru atau soal mandiri
+
+    // Detect explicit end of literasi
+    const endLiterasiMatch = textOnly.match(/^(={3,}|—{3,}|-{3,})\s*(AKHIR|END)\s*(LITERASI|STIMULUS|TEKS|WACANA|BACAAN)\s*(={3,}|—{3,}|-{3,})?$/i)
+      || textOnly.match(/^\[\/(LITERASI|STIMULUS|TEKS|WACANA|BACAAN)\]$/i);
+    if (endLiterasiMatch) {
+      // End current literasi group — subsequent questions are standalone
+      currentGroupId = undefined;
+      currentGroupText = undefined;
       return;
+    }
+
+    // Detect start of literasi block
+    const literasiStartSeparator = textOnly.match(/^(={3,}|—{3,}|-{3,})\s*(LITERASI|STIMULUS|TEKS|WACANA|BACAAN|STIMULI)\s*(\d+)?\s*(={3,}|—{3,}|-{3,})?$/i)
+      || textOnly.match(/^\[(LITERASI|STIMULUS|TEKS|WACANA|BACAAN)\s*(\d+)?\]$/i);
+    const literasiStartKeyword = textOnly.match(/^(LITERASI|STIMULUS|TEKS BACAAN|WACANA|BACAAN|STIMULI|PARAGRAF|CERITA|KUTIPAN|PERHATIKAN TEKS)\s*(\d+)?\s*[:\s\-]+(.*)/i);
+
+    if (literasiStartSeparator || literasiStartKeyword) {
+      // Save previous question if any
+      if (currentQuestion && currentQuestion.text) {
+        if (currentAnswerKey && currentChoices[currentAnswerKey.toLowerCase()]) { const alreadyHasCorrect = Object.values(currentChoices).some(c => c.isCorrect); if (!alreadyHasCorrect) { currentChoices[currentAnswerKey.toLowerCase()].isCorrect = true; } }
+        questionCounter++;
+        questions.push({
+          text: currentQuestion.text,
+          imageUrl: currentQuestion.imageUrl,
+          groupId: currentGroupId,
+          groupText: currentGroupText,
+          choices: { ...currentChoices },
+        });
+        currentQuestion = null;
+        currentChoices = {};
+        currentAnswerKey = "";
+      }
+
+      const num = literasiStartSeparator
+        ? (literasiStartSeparator[3] || literasiStartSeparator[2] || "")
+        : (literasiStartKeyword![2] || "");
+      currentGroupId = `GROUP-${num || Math.random().toString(36).substr(2, 6).toUpperCase()}`;
+      currentGroupText = literasiStartKeyword ? (literasiStartKeyword[3] || "") : "";
+      return;
+    }
+
+    // If we're collecting literasi text (no question started yet in this group)
+    if (currentGroupId && currentGroupText !== undefined && !currentQuestion) {
+      const isQuestionStart = textOnly.match(/^[\(]?(\d+)[\.\s\)]+/);
+      if (!isQuestionStart) {
+        // Still part of the stimulus text — preserve HTML formatting
+        currentGroupText += (currentGroupText ? "<br>" : "") + (line || textOnly);
+        return;
+      }
     }
 
     // A. Detect Question Start
     const questionMatch = textOnly.match(/^[\(]?(\d+)[\.\s\)]+(.*)/);
     const isJustNumber = textOnly.match(/^[\(]?(\d+)[\.\s\)]?$/);
 
-    if (questionMatch || isJustNumber) {
+    if ((questionMatch || isJustNumber) && !pendingLetter) {
       // Save previous question
       if (currentQuestion && currentQuestion.text) {
-        if (currentAnswerKey && currentChoices[currentAnswerKey.toLowerCase()]) {
-          currentChoices[currentAnswerKey.toLowerCase()].isCorrect = true;
-        }
+        if (currentAnswerKey && currentChoices[currentAnswerKey.toLowerCase()]) { const alreadyHasCorrect = Object.values(currentChoices).some(c => c.isCorrect); if (!alreadyHasCorrect) { currentChoices[currentAnswerKey.toLowerCase()].isCorrect = true; } }
         questionCounter++;
         questions.push({
           text: currentQuestion.text,
@@ -187,6 +498,14 @@ export const parseQuestionsFromWord = async (file: File): Promise<ParsedQuestion
           choices: { ...currentChoices },
         });
       }
+
+      // If no literasi kode was set before this question, it's standalone
+      if (!literasiSetForCurrentBlock) {
+        currentGroupId = undefined;
+        currentGroupText = undefined;
+      }
+      // Reset flag for next question block
+      literasiSetForCurrentBlock = false;
 
       const text = questionMatch ? questionMatch[2] : "";
       currentQuestion = { text, imageUrl: firstImage || undefined };
@@ -206,16 +525,18 @@ export const parseQuestionsFromWord = async (file: File): Promise<ParsedQuestion
         const letter = choiceMatch ? choiceMatch[1].toLowerCase() : isJustLetter![1].toLowerCase();
         const text = choiceMatch ? choiceMatch[2].trim() : "";
         
-        // Check for correct answer markers (color, bold, underline)
+        // Store choice — don't mark correct yet, wait for explicit "Kunci Jawaban" line
+        // Only use inline markers as fallback if no explicit key is found later
         const isMarkedCorrect = hasCorrectMarker(p, line);
         
         currentChoices[letter] = { 
           text, 
           imageUrl: firstImage || undefined,
-          isCorrect: isMarkedCorrect
+          isCorrect: false // default false, will be set by "Kunci Jawaban" or post-process
         };
         
-        if (isMarkedCorrect) currentAnswerKey = letter;
+        // Track inline marker as potential answer (used only as fallback)
+        if (isMarkedCorrect && !currentAnswerKey) currentAnswerKey = letter;
         
         pendingLetter = choiceMatch ? null : letter;
         pendingNumber = null;
@@ -223,10 +544,15 @@ export const parseQuestionsFromWord = async (file: File): Promise<ParsedQuestion
       }
     }
 
-    // C. Detect Answer Key ("Kunci: A")
+    // C. Detect Answer Key ("Kunci: A") — this is the PRIMARY answer detection
     const answerMatch = textOnly.match(/(Kunci|Answer|Kunci Jawaban|Jawaban)[.\s:]+([A-Ea-e])/i);
     if (answerMatch && currentQuestion) {
       currentAnswerKey = answerMatch[2].toLowerCase();
+      // Immediately mark the correct choice
+      Object.keys(currentChoices).forEach(k => { currentChoices[k].isCorrect = false; });
+      if (currentChoices[currentAnswerKey]) {
+        currentChoices[currentAnswerKey].isCorrect = true;
+      }
       return;
     }
 
@@ -266,7 +592,12 @@ export const parseQuestionsFromWord = async (file: File): Promise<ParsedQuestion
         // Continuation for question text (before choices start)
         if (textOnly || firstImage) {
           if (!currentChoices["a"] && !currentAnswerKey) {
-            if (textOnly) currentQuestion.text += " " + textOnly;
+            // In essay section, preserve HTML formatting (bullets, etc.)
+            if (isEssaySection && line) {
+              currentQuestion.text += "<br>" + line;
+            } else if (textOnly) {
+              currentQuestion.text += " " + textOnly;
+            }
             if (firstImage && !currentQuestion.imageUrl) currentQuestion.imageUrl = firstImage;
           }
         }
@@ -279,9 +610,7 @@ export const parseQuestionsFromWord = async (file: File): Promise<ParsedQuestion
   // Push last question
   const lastQ = currentQuestion as Partial<ParsedQuestion> | null;
   if (lastQ && lastQ.text) {
-    if (currentAnswerKey && currentChoices[currentAnswerKey.toLowerCase()]) {
-      currentChoices[currentAnswerKey.toLowerCase()].isCorrect = true;
-    }
+    if (currentAnswerKey && currentChoices[currentAnswerKey.toLowerCase()]) { const alreadyHasCorrect = Object.values(currentChoices).some(c => c.isCorrect); if (!alreadyHasCorrect) { currentChoices[currentAnswerKey.toLowerCase()].isCorrect = true; } }
     questionCounter++;
     questions.push({
       text: lastQ.text,
@@ -308,5 +637,30 @@ export const parseQuestionsFromWord = async (file: File): Promise<ParsedQuestion
     });
   }
 
-  return questions;
+  // ─── POST-PROCESS: Detect essay questions ──────────────────────────────
+  // Questions without choices (no A-E options) are essay/isian singkat
+  questions.forEach(q => {
+    if (!q.type) {
+      const hasChoices = Object.keys(q.choices).length > 0;
+      if (!hasChoices) {
+        // Short questions (< 50 chars) without sub-points are "isian_singkat"
+        // Longer questions or those with bullet points are "uraian"
+        const isShort = q.text.replace(/<[^>]*>/g, '').length < 80 && !q.text.includes('<li') && !q.text.includes('•');
+        q.type = isShort ? "isian_singkat" : "uraian";
+      } else {
+        q.type = "pilihan_ganda";
+      }
+    }
+  });
+
+  // If includeEssay is false, filter out essay questions
+  const finalQuestions = includeEssay ? questions : questions.filter(q => q.type === "pilihan_ganda");
+
+  // Clean up: trim whitespace from question text
+  finalQuestions.forEach(q => {
+    q.text = (q.text || "").trim();
+    if (q.groupText) q.groupText = q.groupText.trim();
+  });
+
+  return finalQuestions;
 };

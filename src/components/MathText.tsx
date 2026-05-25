@@ -147,6 +147,7 @@ export const MathText: React.FC<MathTextProps> = ({ content, className = "" }) =
   }, [content]);
 
   const processHtml = (html: string) => {
+    if (!html) return "";
     let processed = html;
     
     // 2. Arabic Detection & Styling (Premium Quranic Look)

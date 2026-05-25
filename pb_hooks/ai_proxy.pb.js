@@ -86,3 +86,59 @@ routerAdd("OPTIONS", "/api/ai-proxy", (c) => {
     } catch (e) { }
     return c.noContent(204);
 });
+
+
+// ============================================================
+// AI Proxy - Models List (anti-CORS for /models endpoint)
+// ============================================================
+routerAdd("POST", "/api/ai-proxy-models", (c) => {
+    try {
+        try { c.setResponseHeader("Access-Control-Allow-Origin", "*"); } catch (e) { }
+        try { c.setResponseHeader("Access-Control-Allow-Methods", "POST, OPTIONS"); } catch (e) { }
+        try { c.setResponseHeader("Access-Control-Allow-Headers", "Content-Type, X-Token, Authorization"); } catch (e) { }
+
+        const info = c.requestInfo();
+        const apiKey = (info.body["apiKey"] || "").toString();
+        const baseUrl = (info.body["baseUrl"] || "").toString();
+
+        if (!baseUrl) {
+            return c.json(400, { error: "Missing Base URL" });
+        }
+
+        const headers = { "Content-Type": "application/json" };
+        if (apiKey && apiKey !== "undefined") {
+            headers["Authorization"] = "Bearer " + apiKey;
+        }
+
+        console.log("[PROXY-MODELS] fetching: " + baseUrl);
+
+        const res = $http.send({
+            url: baseUrl,
+            method: "GET",
+            headers: headers
+        });
+
+        console.log("[PROXY-MODELS] responded: " + res.statusCode);
+
+        let result = {};
+        try {
+            result = JSON.parse(res.raw || "{}");
+        } catch (e) {
+            result = { error: "Parse failed", raw: res.raw };
+        }
+
+        return c.json(res.statusCode, result);
+    } catch (e) {
+        console.log("[PROXY-MODELS] CRASH: " + e.message);
+        return c.json(500, { error: e.message });
+    }
+});
+
+routerAdd("OPTIONS", "/api/ai-proxy-models", (c) => {
+    try {
+        c.setResponseHeader("Access-Control-Allow-Origin", "*");
+        c.setResponseHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+        c.setResponseHeader("Access-Control-Allow-Headers", "Content-Type, X-Token, Authorization");
+    } catch (e) { }
+    return c.noContent(204);
+});

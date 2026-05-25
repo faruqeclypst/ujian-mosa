@@ -47,6 +47,7 @@ interface ExamDataContextType {
   universalToken: string;
   timeLeft: string;
   teacherFullAccess: boolean;
+  teacherAIAccess: boolean;
 }
 
 const ExamDataContext = createContext<ExamDataContextType | undefined>(undefined);
@@ -66,6 +67,7 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
   const [timeLeft, setTimeLeft] = useState("--:--");
   const [serverOffset, setServerOffset] = useState(0); 
   const [teacherFullAccess, setTeacherFullAccess] = useState(false);
+  const [teacherAIAccess, setTeacherAIAccess] = useState(false);
   const { role } = useAuth();
   const { pb: tenantPb } = useTenant();
   const pb = tenantPb!;
@@ -253,7 +255,8 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
           setUniversalToken(s.universal_token || "");
           setTokenUpdatedAt(s.universal_token_updated_at || s.updated || "");
           setTeacherFullAccess(s.teacher_full_access ?? s.teacherFullAccess ?? false);
-          console.log("⚙️ Settings loaded:", s.universal_token, "FullAccess:", s.teacher_full_access ?? s.teacherFullAccess);
+          setTeacherAIAccess(s.teacher_ai_access ?? false);
+          console.log("⚙️ Settings loaded:", s.universal_token, "FullAccess:", s.teacher_full_access ?? s.teacherFullAccess, "AIAccess:", s.teacher_ai_access);
         }
       } catch (e) {
         console.error("❌ Error fetching settings/time:", e);
@@ -269,6 +272,7 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
         setUniversalToken(e.record.universal_token || "");
         setTokenUpdatedAt(e.record.universal_token_updated_at || e.record.updated || "");
         setTeacherFullAccess(e.record.teacher_full_access ?? e.record.teacherFullAccess ?? false);
+        setTeacherAIAccess(e.record.teacher_ai_access ?? false);
       } else {
         fetchSettings();
       }
@@ -486,7 +490,7 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
         createClass, updateClass, deleteClass,
         createSubject, updateSubject, deleteSubject,
         createStudent, updateStudent, deleteStudent, resetStudentPassword, resetUserPassword, updateStudentClassBatch, deleteStudentsBatch,
-        universalToken, timeLeft, teacherFullAccess
+        universalToken, timeLeft, teacherFullAccess, teacherAIAccess
       }}
     >
       {children}

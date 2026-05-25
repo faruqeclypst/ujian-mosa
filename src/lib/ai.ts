@@ -342,7 +342,18 @@ const getAIConfig = async (pb: PocketBase): Promise<AIConfig> => {
     apiKey = finalProvider === "groq" ? config?.groq_api_key : config?.ai_gateway_key;
     if (!apiKey?.trim()) throw new Error(`API Key untuk Provider ${finalProvider.toUpperCase()} belum diatur.`);
   } else {
-    apiKey = userApiKey;
+    // Guru: pakai key pribadi, fallback ke key admin jika teacher_ai_access aktif
+    const teacherHasOwnKey = userApiKey && userApiKey.trim();
+    const adminKey = finalProvider === "groq" ? config?.groq_api_key : config?.ai_gateway_key;
+    const isAIAccess = config?.teacher_ai_access ?? false;
+
+    if (teacherHasOwnKey) {
+      apiKey = userApiKey;
+    } else if (isAIAccess && adminKey?.trim()) {
+      apiKey = adminKey;
+    } else {
+      throw new Error("Anda belum memiliki API Key AI. Hubungi Admin untuk mengaktifkan akses AI atau masukkan API Key pribadi di Pengaturan AI.");
+    }
   }
 
   const result: AIConfig = { apiKey, useProxy, model: finalModel, baseUrl, provider: finalProvider };
@@ -376,7 +387,7 @@ const fetchAI = async (opts: AIFetchOptions): Promise<string> => {
   if (maxTokens) body.max_tokens = maxTokens;
   if (jsonMode) {
     // Providers that support response_format
-    const supportsJsonMode = ["groq", "openrouter", "together", "github", "google"].includes(provider);
+    const supportsJsonMode = ["groq", "openrouter", "together", "github", "google", "custom"].includes(provider);
     if (supportsJsonMode) {
       body.response_format = { type: "json_object" };
     }
@@ -423,9 +434,23 @@ const fetchAI = async (opts: AIFetchOptions): Promise<string> => {
   const data = await response.json();
   if (data?.usage?.total_tokens) trackTokenUsage(data.usage.total_tokens, undefined, apiKey);
   
-  // Extract content (supports both OpenAI and Ollama formats)
-  const content = data?.choices?.[0]?.message?.content || data?.message?.content || "";
-  if (!content) throw new Error(`AI tidak memberikan respon teks yang valid. (model: ${model})`);
+  // Extract content (supports OpenAI, Ollama, and various custom formats)
+  const content = 
+    data?.choices?.[0]?.message?.content ||
+    data?.message?.content ||
+    data?.choices?.[0]?.text ||
+    data?.response ||
+    data?.output?.content ||
+    data?.output?.text ||
+    data?.result?.response ||
+    data?.content ||
+    data?.text ||
+    "";
+  
+  if (!content) {
+    console.error("[AI] Empty content from response. Full data:", JSON.stringify(data).substring(0, 500));
+    throw new Error(`AI tidak memberikan respon teks yang valid. (model: ${model})`);
+  }
   
   return content;
 };
@@ -445,10 +470,10 @@ const detectSubjectContext = (subject: string, topic: string = ""): SubjectConte
   const s = subject.toLowerCase();
   const t = topic.toLowerCase();
   return {
-    isExact: /matematika|ipa|fisika|kimia|ekonomi|informatika|\bit\b/.test(s),
+    isExact: /matematika|fisika|kimia/.test(s) || (/ipa/.test(s) && /rumus|hitung|energi|gaya|gerak|listrik|kalor/.test(t)),
     isProgramming: /pemrograman|\bit\b|informatika|coding/.test(s),
     isReligious: /agama|arab|islam|quran/.test(s) || /surah|ayat|hadist|hadits/.test(t),
-    isChemistry: /kimia|chemistry/.test(s) || /kimia|reaksi|senyawa|unsur/.test(t),
+    isChemistry: /kimia|chemistry/.test(s) || /reaksi|senyawa|unsur|mol|larutan/.test(t),
     explicitlyWantsArabic: /ayat|surah|surat|lampirkan|hadits|hadist|al-quran|alquran|bahasa arab|teks arab|pakai arab|translate|terjemah/.test(t)
   };
 };
@@ -457,21 +482,19 @@ const buildFormatRules = (ctx: SubjectContext): string => {
   const rules: string[] = [];
   
   if (ctx.isExact || ctx.isChemistry) {
-    rules.push("ATURAN WAJIB RUMUS & ANGKA:\n" +
-"- SEMUA rumus, angka dengan satuan, simbol fisika/kimia WAJIB ditulis dalam LaTeX.\n" +
+    rules.push("ATURAN RUMUS & SIMBOL MATEMATIKA/FISIKA:\n" +
+"- Gunakan LaTeX HANYA untuk rumus matematika, persamaan, dan simbol ilmiah.\n" +
 "- Inline: $...$. Display/block: $$...$$\n" +
-"- NOTASI STANDAR NASIONAL INDONESIA:\n" +
-"  * Logaritma: ${}^a\\\\log b$ (BUKAN $\\\\log_a b$). Contoh: ${}^2\\\\log 8 = 3$\n" +
-"  * Pangkat: $10^{22}$, $v^2$, $x^3$\n" +
-"  * Vektor: $\\\\vec{F}$, $\\\\vec{v}$\n" +
-"  * Angka+satuan: $5\\\\text{ m/s}$, $10\\\\text{ m/s}^2$, $34\\\\;\\\\Omega$, $220\\\\text{ V}$, $1000\\\\text{ kg/m}^3$\n" +
-"  * Simbol: $g$, $v_0$, $F$, $P$, $\\\\rho$, $R$, $I$, $V$, $T$, $n$\n" +
-"  * Koma desimal Indonesia: $9{,}8$ (pakai {,})\n" +
+"- JANGAN gunakan LaTeX untuk angka biasa tanpa konteks rumus (contoh: \"5 siswa\", \"tahun 2024\", \"nomor 3\" tetap teks biasa).\n" +
+"- GUNAKAN LaTeX untuk: rumus ($v = v_0 + at$), angka+satuan fisika ($10\\\\text{ m/s}^2$), simbol ($\\\\rho$, $\\\\Omega$).\n" +
+"- NOTASI STANDAR:\n" +
+"  * Logaritma: ${}^a\\\\log b$\n" +
 "  * Pecahan: $\\\\frac{a}{b}$\n" +
-"  * Perkalian: $\\\\times$ (BUKAN x biasa)\n" +
-"  * Derajat: $0\\\\,^\\\\circ\\\\text{C}$, $90^\\\\circ$\n" +
-"- DILARANG KERAS menulis angka+satuan sebagai teks biasa. Contoh SALAH: \"10 m/s^2\". Contoh BENAR: \"$10\\\\text{ m/s}^2$\"\n" +
-"- Di dalam JSON string, setiap backslash WAJIB ditulis ganda. Contoh: \"$\\\\\\\\frac{1}{2}$\", \"$\\\\\\\\times$\"");
+"  * Perkalian: $\\\\times$\n" +
+"  * Pangkat: $10^{22}$\n" +
+"  * Koma desimal: $9{,}8$\n" +
+"  * Derajat: $90^\\\\circ$\n" +
+"- Di dalam JSON string, backslash ditulis ganda: \"$\\\\\\\\frac{1}{2}$\"");
   }
   
   if (ctx.isChemistry) {
@@ -494,7 +517,7 @@ const buildFormatRules = (ctx: SubjectContext): string => {
     rules.push(`Jika relevan, sertakan ayat Arab ber-harakat dalam <p dir="rtl" style="text-align:right;font-size:1.3em;line-height:2;margin:12px 0;">AYAT</p>. Pisahkan dari teks Latin.`);
   }
   
-  return rules.length > 0 ? rules.join("\n\n") : "";
+  return rules.length > 0 ? rules.join("\n\n") : "PENTING: Tulis soal dalam teks biasa (plain text/HTML). JANGAN gunakan simbol $ atau LaTeX kecuali mapel Matematika/Fisika/Kimia.";
 };
 
 // Few-shot examples for different subject types
@@ -515,32 +538,130 @@ CONTOH OUTPUT BENAR (Eksakta):
 // ═══════════════════════════════════════════════════════════════════════════════
 // ✅ Post-Generation Validation
 // ═══════════════════════════════════════════════════════════════════════════════
-const validateQuestions = (questions: any[]): AIGeneratedQuestion[] => {
+
+// Strip unwanted LaTeX $ from text when subject is NOT math/physics/chemistry
+const stripUnwantedLatex = (text: string, isExactSubject: boolean): string => {
+  if (!text || isExactSubject) return text;
+  
+  // If the text contains $ signs but subject is not exact, try to clean them
+  if (!text.includes('$')) return text;
+  
+  // Remove simple $number$ patterns (e.g. "$5$" → "5", "$1945$" → "1945")
+  let cleaned = text.replace(/\$(\d[\d.,]*)\$/g, '$1');
+  
+  // Remove $simple text$ that doesn't look like real math (no backslash, no ^, no _, no {})
+  cleaned = cleaned.replace(/\$([^$\\^_{}]+)\$/g, (match, inner) => {
+    // If it's just plain text/numbers without math operators, strip the $
+    if (!/[+\-*/=<>]/.test(inner) || /^\d+$/.test(inner.trim())) {
+      return inner;
+    }
+    return match; // Keep it if it looks like actual math
+  });
+  
+  return cleaned;
+};
+
+const validateQuestions = (questions: any[], isExactSubject: boolean = false, requestedType?: string): AIGeneratedQuestion[] => {
   return questions.filter(q => {
     // Must have text
     if (!q.text?.trim() && !q.question?.trim()) return false;
+    const qType = q.type || requestedType || "pilihan_ganda";
+    
     // For multiple choice: must have at least 2 choices
-    if (q.choices && typeof q.choices === "object") {
+    if ((qType === "pilihan_ganda" || qType === "pilihan_ganda_kompleks" || qType === "benar_salah") && q.choices && typeof q.choices === "object") {
       const keys = Object.keys(q.choices);
       if (keys.length < 2) return false;
       // Ensure answer key exists in choices
       if (q.answerKey && !q.choices[q.answerKey.toLowerCase()]) {
-        // Try to fix: find the correct one
         const correctKey = keys.find(k => q.choices[k]?.isCorrect);
         if (correctKey) q.answerKey = correctKey;
       }
       // Check for duplicate options
       const texts = keys.map(k => q.choices[k]?.text?.toLowerCase?.()?.trim()).filter(Boolean);
       const uniqueTexts = new Set(texts);
-      if (uniqueTexts.size < texts.length * 0.7) return false; // Allow some similarity but not exact dupes
+      if (uniqueTexts.size < texts.length * 0.7) return false;
     }
+    
+    // For menjodohkan: should have pairs (but allow empty for manual editing)
+    if (qType === "menjodohkan") {
+      // Try to extract pairs from choices if pairs is missing (AI sometimes returns wrong format)
+      if ((!q.pairs || !Array.isArray(q.pairs) || q.pairs.length === 0) && q.choices) {
+        // Convert choices to pairs: key=left, text=right
+        const keys = Object.keys(q.choices);
+        if (keys.length >= 2) {
+          q.pairs = keys.map((k, idx) => ({
+            id: String(idx + 1),
+            left: k.toUpperCase() + ". " + (q.choices[k]?.text || ""),
+            right: ""
+          }));
+        }
+      }
+      if (q.pairs && Array.isArray(q.pairs)) {
+        const validPairs = q.pairs.filter((p: any) => p.left?.trim() && p.right?.trim());
+        if (validPairs.length >= 2) {
+          q.pairs = validPairs.map((p: any, idx: number) => ({
+            id: p.id || String(idx + 1),
+            left: p.left.trim(),
+            right: p.right.trim()
+          }));
+        } else if (q.pairs.length >= 2) {
+          // Keep pairs even if some are incomplete (user can edit in batch modal)
+          q.pairs = q.pairs.map((p: any, idx: number) => ({
+            id: p.id || String(idx + 1),
+            left: (p.left || "").trim(),
+            right: (p.right || "").trim()
+          }));
+        } else {
+          q.pairs = [];
+        }
+      } else {
+        q.pairs = [];
+      }
+    }
+    
+    // For urutkan/drag_drop: should have items (but allow empty for manual editing)
+    if (qType === "urutkan" || qType === "drag_drop") {
+      if (q.items && Array.isArray(q.items)) {
+        const validItems = q.items.filter((item: any) => item.text?.trim());
+        if (validItems.length >= 2) {
+          q.items = validItems.map((item: any, idx: number) => ({
+            id: item.id || String(idx + 1),
+            text: item.text.trim(),
+            imageUrl: item.imageUrl || ""
+          }));
+        } else {
+          // Keep items even if incomplete
+          q.items = q.items.map((item: any, idx: number) => ({
+            id: item.id || String(idx + 1),
+            text: (item.text || "").trim(),
+            imageUrl: item.imageUrl || ""
+          }));
+        }
+      } else {
+        q.items = [];
+      }
+    }
+    
+    // For isian_singkat: must have answerKey
+    if (qType === "isian_singkat" && !q.answerKey?.trim() && !q.answer_key?.trim() && !q.answer?.trim()) return false;
+    
     return true;
   }).map(q => ({
-    text: q.text || q.question || "",
-    type: q.type || "pilihan_ganda",
-    choices: q.choices || q.options || {},
-    pairs: q.pairs,
-    items: q.items,
+    text: stripUnwantedLatex(q.text || q.question || "", isExactSubject),
+    type: q.type || requestedType || "pilihan_ganda",
+    choices: (() => {
+      const c = q.choices || q.options || undefined;
+      if (c && !isExactSubject) {
+        const cleaned: any = {};
+        Object.keys(c).forEach(k => {
+          cleaned[k] = { ...c[k], text: stripUnwantedLatex(c[k]?.text || "", isExactSubject) };
+        });
+        return cleaned;
+      }
+      return c;
+    })(),
+    pairs: q.pairs || undefined,
+    items: q.items || undefined,
     answerKey: q.answerKey || q.answer_key || q.answer || "",
     groupId: q.groupId || "",
     groupText: q.groupText || ""
@@ -575,9 +696,12 @@ export const generateQuestionsAI = async (
     const typeDesc: Record<string, string> = {
       pilihan_ganda: "Pilihan Ganda Tunggal (5 opsi A-E, 1 benar)",
       pilihan_ganda_kompleks: "Pilihan Ganda Kompleks (5 opsi, >1 benar)",
-      benar_salah: "Benar/Salah",
-      isian_singkat: "Isian Singkat",
-      uraian: "Uraian HOTS"
+      benar_salah: "Benar/Salah (5 pernyataan, jawab Benar atau Salah)",
+      isian_singkat: "Isian Singkat (jawaban 1-3 kata)",
+      uraian: "Uraian HOTS (jawaban panjang/essay)",
+      menjodohkan: "Menjodohkan/Matching (pasangkan item kiri dengan kanan)",
+      urutkan: "Mengurutkan/Sequencing (susun item dalam urutan benar)",
+      drag_drop: "Drag & Drop (susun/kelompokkan item ke posisi benar)"
     };
     const typeLabel = typeDesc[type] || "Pilihan Ganda";
 
@@ -611,16 +735,48 @@ export const generateQuestionsAI = async (
       };
 
       const fewShotLit = getFewShotExample(ctx);
+      
+      // Build type-specific output format for literacy mode
+      const getLiteracyTypeFormat = (questionType: string): string => {
+        switch (questionType) {
+          case "pilihan_ganda":
+            return `{"groupText":"<HTML stimulus lengkap>","groupId":"LIT-001","questions":[{"text":"pertanyaan","type":"pilihan_ganda","choices":{"a":{"text":"...","isCorrect":false},"b":{"text":"...","isCorrect":true},"c":{"text":"...","isCorrect":false},"d":{"text":"...","isCorrect":false},"e":{"text":"...","isCorrect":false}},"answerKey":"b"}]}`;
+          case "pilihan_ganda_kompleks":
+            return `{"groupText":"<HTML stimulus lengkap>","groupId":"LIT-001","questions":[{"text":"pertanyaan","type":"pilihan_ganda_kompleks","choices":{"a":{"text":"...","isCorrect":true},"b":{"text":"...","isCorrect":false},"c":{"text":"...","isCorrect":true},"d":{"text":"...","isCorrect":false},"e":{"text":"...","isCorrect":false}},"answerKey":"a,c"}]}`;
+          case "benar_salah":
+            return `{"groupText":"<HTML stimulus lengkap>","groupId":"LIT-001","questions":[{"text":"<pernyataan>","type":"benar_salah","choices":{"a":{"text":"Benar","isCorrect":true},"b":{"text":"Salah","isCorrect":false}},"answerKey":"a"}]}`;
+          case "isian_singkat":
+            return `{"groupText":"<HTML stimulus lengkap>","groupId":"LIT-001","questions":[{"text":"pertanyaan","type":"isian_singkat","answerKey":"jawaban singkat"}]}`;
+          case "uraian":
+            return `{"groupText":"<HTML stimulus lengkap>","groupId":"LIT-001","questions":[{"text":"pertanyaan HOTS","type":"uraian","answerKey":"pedoman penilaian"}]}`;
+          case "menjodohkan":
+            return `{"groupText":"<HTML stimulus lengkap>","groupId":"LIT-001","questions":[{"text":"Jodohkan item berikut berdasarkan bacaan:","type":"menjodohkan","pairs":[{"id":"1","left":"...","right":"..."},{"id":"2","left":"...","right":"..."},{"id":"3","left":"...","right":"..."},{"id":"4","left":"...","right":"..."}],"answerKey":"1-1,2-2,3-3,4-4"}]}`;
+          case "urutkan":
+            return `{"groupText":"<HTML stimulus lengkap>","groupId":"LIT-001","questions":[{"text":"Urutkan berdasarkan bacaan:","type":"urutkan","items":[{"id":"1","text":"..."},{"id":"2","text":"..."},{"id":"3","text":"..."},{"id":"4","text":"..."}],"answerKey":"1,2,3,4"}]}`;
+          case "drag_drop":
+            return `{"groupText":"<HTML stimulus lengkap>","groupId":"LIT-001","questions":[{"text":"Susun item berdasarkan bacaan:","type":"drag_drop","items":[{"id":"1","text":"..."},{"id":"2","text":"..."},{"id":"3","text":"..."},{"id":"4","text":"..."}],"answerKey":"1,2,3,4"}]}`;
+          default:
+            return `{"groupText":"<HTML stimulus lengkap>","groupId":"LIT-001","questions":[{"text":"pertanyaan","type":"pilihan_ganda","choices":{"a":{"text":"...","isCorrect":false},"b":{"text":"...","isCorrect":true},"c":{"text":"...","isCorrect":false},"d":{"text":"...","isCorrect":false},"e":{"text":"...","isCorrect":false}},"answerKey":"b"}]}`;
+        }
+      };
+
+      const litTypeFormat = getLiteracyTypeFormat(type);
+      const litTypeInstructions = (type === "pilihan_ganda" || type === "pilihan_ganda_kompleks") 
+        ? "Opsi A-E ringkas & logis. Kunci jawaban acak." 
+        : (type === "menjodohkan" ? "Buat 4-6 pasangan yang logis berdasarkan stimulus." 
+          : (type === "urutkan" || type === "drag_drop") ? "Buat 4-6 item yang harus disusun berdasarkan stimulus." 
+          : "");
+
       const systemPrompt = `Anda adalah Spesialis Evaluasi Pendidikan. Buat stimulus literasi + ${count} soal ${typeLabel} dalam SATU respons.
 Jenjang: ${level}, Mapel: ${subject}, Kesulitan: ${difficulty}, Fokus: ${focus}.
 
 INSTRUKSI:
 1. Buat stimulus/wacana bertema "${topic}" sepanjang ${lengthMap[passageLength] || lengthMap.sedang}. Sajikan sebagai artikel/studi kasus menarik (bukan definisi). Format HTML: <h2 style="text-align:center;color:#1e3a8a;margin-bottom:32px;font-weight:900;">[JUDUL]</h2> lalu <p style="text-indent:30px;margin-bottom:24px;line-height:1.8;text-align:justify;">paragraf</p>.
-2. Buat ${count} soal ${typeLabel} berdasarkan stimulus. Variasi pola: konsep, aplikasi, analisis, evaluasi. Opsi A-E ringkas & logis. Kunci jawaban acak.
+2. Buat ${count} soal ${typeLabel} berdasarkan stimulus. Variasi pola: konsep, aplikasi, analisis, evaluasi. ${litTypeInstructions}
 ${formatRules ? `3. FORMAT KHUSUS:\n${formatRules}` : ""}${fewShotLit ? `\n${fewShotLit}` : ""}
 
 OUTPUT JSON (WAJIB):
-{"groupText":"<HTML stimulus lengkap>","groupId":"LIT-001","questions":[{"text":"pertanyaan","choices":{"a":{"text":"...","isCorrect":false},"b":{"text":"...","isCorrect":true},"c":{"text":"...","isCorrect":false},"d":{"text":"...","isCorrect":false},"e":{"text":"...","isCorrect":false}},"answerKey":"b"}]}
+${litTypeFormat}
 Hanya JSON. Pastikan stimulus SELESAI SEMPURNA (tidak terpotong).`;
 
       const topicLower = topic.toLowerCase();
@@ -641,12 +797,12 @@ Hanya JSON. Pastikan stimulus SELESAI SEMPURNA (tidak terpotong).`;
 
       const parsed = robustJSONParse(content);
       const groupText = parsed.groupText || parsed.stimulus || parsed.wacana || "";
-      const groupId = parsed.groupId || `LIT-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
+      const groupId = `LIT-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substr(2, 4).toUpperCase()}`;
       let questionsRaw = parsed.questions || parsed.data || parsed.soal || (Array.isArray(parsed) ? parsed : []);
       
       if (questionsRaw.length === 0 && parsed.text) questionsRaw = [parsed];
       
-      const validated = validateQuestions(questionsRaw);
+      const validated = validateQuestions(questionsRaw, ctx.isExact || ctx.isChemistry, type);
       if (validated.length === 0) throw new Error("AI tidak menghasilkan soal yang valid.");
       
       return validated.map(q => ({ ...q, groupId, groupText }));
@@ -654,10 +810,44 @@ Hanya JSON. Pastikan stimulus SELESAI SEMPURNA (tidak terpotong).`;
 
     // ═══ STANDARD (Non-Literacy) Generation ═══
     const fewShot = getFewShotExample(ctx);
+    
+    // Build type-specific output format instructions
+    const getTypeOutputFormat = (questionType: string): string => {
+      switch (questionType) {
+        case "pilihan_ganda":
+          return `OUTPUT JSON: {"questions":[{"text":"...","type":"pilihan_ganda","choices":{"a":{"text":"...","isCorrect":false},"b":{"text":"...","isCorrect":false},"c":{"text":"...","isCorrect":true},"d":{"text":"...","isCorrect":false},"e":{"text":"...","isCorrect":false}},"answerKey":"c"}]}`;
+        case "pilihan_ganda_kompleks":
+          return `OUTPUT JSON: {"questions":[{"text":"...","type":"pilihan_ganda_kompleks","choices":{"a":{"text":"...","isCorrect":true},"b":{"text":"...","isCorrect":false},"c":{"text":"...","isCorrect":true},"d":{"text":"...","isCorrect":false},"e":{"text":"...","isCorrect":false}},"answerKey":"a,c"}]}
+CATATAN: Lebih dari 1 jawaban benar (2-3 jawaban benar). answerKey berisi huruf-huruf benar dipisah koma.`;
+        case "benar_salah":
+          return `OUTPUT JSON: {"questions":[{"text":"<p>Pernyataan yang harus dinilai Benar atau Salah</p>","type":"benar_salah","choices":{"a":{"text":"Benar","isCorrect":true},"b":{"text":"Salah","isCorrect":false}},"answerKey":"a"}]}
+CATATAN: Setiap soal adalah PERNYATAAN yang harus dinilai Benar atau Salah. Choices hanya 2: a=Benar, b=Salah. Variasi jawaban benar/salah.`;
+        case "isian_singkat":
+          return `OUTPUT JSON: {"questions":[{"text":"...","type":"isian_singkat","answerKey":"jawaban singkat 1-3 kata"}]}
+CATATAN: Tidak ada choices. answerKey berisi jawaban singkat (1-3 kata). Soal harus punya jawaban pasti dan jelas.`;
+        case "uraian":
+          return `OUTPUT JSON: {"questions":[{"text":"...","type":"uraian","answerKey":"Pedoman penilaian: (1) poin pertama (2) poin kedua (3) poin ketiga"}]}
+CATATAN: Tidak ada choices. answerKey berisi pedoman/rubrik penilaian singkat. Soal bersifat HOTS (analisis, evaluasi, kreasi).`;
+        case "menjodohkan":
+          return `OUTPUT JSON: {"questions":[{"text":"Jodohkan item di kolom kiri dengan pasangannya di kolom kanan.","type":"menjodohkan","pairs":[{"id":"1","left":"Item kiri 1","right":"Pasangan kanan 1"},{"id":"2","left":"Item kiri 2","right":"Pasangan kanan 2"},{"id":"3","left":"Item kiri 3","right":"Pasangan kanan 3"},{"id":"4","left":"Item kiri 4","right":"Pasangan kanan 4"},{"id":"5","left":"Item kiri 5","right":"Pasangan kanan 5"}],"answerKey":"1-1,2-2,3-3,4-4,5-5"}]}
+CATATAN: Setiap soal memiliki 4-6 pasangan (pairs). "left" adalah item/pertanyaan, "right" adalah jawaban/pasangannya. Buat pasangan yang logis dan edukatif.`;
+        case "urutkan":
+          return `OUTPUT JSON: {"questions":[{"text":"Urutkan langkah-langkah berikut dengan benar:","type":"urutkan","items":[{"id":"1","text":"Langkah pertama"},{"id":"2","text":"Langkah kedua"},{"id":"3","text":"Langkah ketiga"},{"id":"4","text":"Langkah keempat"},{"id":"5","text":"Langkah kelima"}],"answerKey":"1,2,3,4,5"}]}
+CATATAN: items berisi 4-6 item yang harus diurutkan. Urutan dalam array "items" adalah URUTAN BENAR. answerKey berisi urutan ID yang benar. Buat soal tentang proses/tahapan/kronologi.`;
+        case "drag_drop":
+          return `OUTPUT JSON: {"questions":[{"text":"Kelompokkan/susun item berikut ke posisi yang benar:","type":"drag_drop","items":[{"id":"1","text":"Item pertama"},{"id":"2","text":"Item kedua"},{"id":"3","text":"Item ketiga"},{"id":"4","text":"Item keempat"},{"id":"5","text":"Item kelima"}],"answerKey":"1,2,3,4,5"}]}
+CATATAN: items berisi 4-6 item yang harus disusun/dikelompokkan. Urutan dalam array "items" adalah URUTAN BENAR. Buat soal tentang klasifikasi/pengelompokan/penyusunan.`;
+        default:
+          return `OUTPUT JSON: {"questions":[{"text":"...","type":"pilihan_ganda","choices":{"a":{"text":"...","isCorrect":false},"b":{"text":"...","isCorrect":false},"c":{"text":"...","isCorrect":true},"d":{"text":"...","isCorrect":false},"e":{"text":"...","isCorrect":false}},"answerKey":"c"}]}`;
+      }
+    };
+
+    const typeOutputFormat = getTypeOutputFormat(type);
+    
     const systemPrompt = `Buat ${count} soal ${typeLabel}, ${level} - ${subject}, kesulitan ${difficulty}, fokus ${focus}.
-Variasi pola: konsep, aplikasi, analisis, evaluasi. Variasi panjang stem. Opsi A-E ringkas & logis. Kunci jawaban acak.
+Variasi pola: konsep, aplikasi, analisis, evaluasi. Variasi panjang stem.${type === "pilihan_ganda" || type === "pilihan_ganda_kompleks" ? " Opsi A-E ringkas & logis. Kunci jawaban acak." : ""}
 ${formatRules ? `\n${formatRules}\n` : ""}${fewShot ? `\n${fewShot}\n` : ""}
-OUTPUT JSON: {"questions":[{"text":"...","choices":{"a":{"text":"...","isCorrect":false},"b":{"text":"...","isCorrect":false},"c":{"text":"...","isCorrect":true},"d":{"text":"...","isCorrect":false},"e":{"text":"...","isCorrect":false}},"answerKey":"c"}]}
+${typeOutputFormat}
 Hanya JSON.`;
 
     const topicLower = topic.toLowerCase();
@@ -681,7 +871,7 @@ Hanya JSON.`;
       questionsRaw = [parsed];
     }
 
-    const validated = validateQuestions(questionsRaw);
+    const validated = validateQuestions(questionsRaw, ctx.isExact || ctx.isChemistry, type);
     if (validated.length === 0) throw new Error("Format soal tidak valid.");
     return validated;
 
@@ -712,15 +902,44 @@ export const generateSingleQuestionAI = async (
     const typeDesc: Record<string, string> = {
       pilihan_ganda: "Pilihan Ganda Tunggal (5 opsi, 1 benar)",
       pilihan_ganda_kompleks: "Pilihan Ganda Kompleks (5 opsi, >1 benar)",
-      benar_salah: "Benar/Salah",
-      isian_singkat: "Isian Singkat",
-      uraian: "Uraian HOTS"
+      benar_salah: "Benar/Salah (pernyataan, jawab Benar atau Salah)",
+      isian_singkat: "Isian Singkat (jawaban 1-3 kata)",
+      uraian: "Uraian HOTS (jawaban essay)",
+      menjodohkan: "Menjodohkan/Matching (4-6 pasangan kiri-kanan)",
+      urutkan: "Mengurutkan/Sequencing (4-6 item disusun urut)",
+      drag_drop: "Drag & Drop (4-6 item disusun/dikelompokkan)"
     };
     const typeLabel = typeDesc[type] || "Pilihan Ganda";
 
+    // Build type-specific JSON format for single question
+    const getSingleTypeFormat = (questionType: string): string => {
+      switch (questionType) {
+        case "pilihan_ganda":
+          return `JSON:{"text":"...","type":"pilihan_ganda","choices":{"a":{"text":"...","isCorrect":false},"b":{"text":"...","isCorrect":false},"c":{"text":"...","isCorrect":true},"d":{"text":"...","isCorrect":false},"e":{"text":"...","isCorrect":false}},"answerKey":"c"}`;
+        case "pilihan_ganda_kompleks":
+          return `JSON:{"text":"...","type":"pilihan_ganda_kompleks","choices":{"a":{"text":"...","isCorrect":true},"b":{"text":"...","isCorrect":false},"c":{"text":"...","isCorrect":true},"d":{"text":"...","isCorrect":false},"e":{"text":"...","isCorrect":false}},"answerKey":"a,c"}`;
+        case "benar_salah":
+          return `JSON:{"text":"<pernyataan>","type":"benar_salah","choices":{"a":{"text":"Benar","isCorrect":true},"b":{"text":"Salah","isCorrect":false}},"answerKey":"a"}`;
+        case "isian_singkat":
+          return `JSON:{"text":"...","type":"isian_singkat","answerKey":"jawaban singkat"}`;
+        case "uraian":
+          return `JSON:{"text":"...","type":"uraian","answerKey":"pedoman penilaian"}`;
+        case "menjodohkan":
+          return `JSON:{"text":"Jodohkan item berikut:","type":"menjodohkan","pairs":[{"id":"1","left":"...","right":"..."},{"id":"2","left":"...","right":"..."},{"id":"3","left":"...","right":"..."},{"id":"4","left":"...","right":"..."}],"answerKey":"1-1,2-2,3-3,4-4"}`;
+        case "urutkan":
+          return `JSON:{"text":"Urutkan berikut:","type":"urutkan","items":[{"id":"1","text":"..."},{"id":"2","text":"..."},{"id":"3","text":"..."},{"id":"4","text":"..."}],"answerKey":"1,2,3,4"}`;
+        case "drag_drop":
+          return `JSON:{"text":"Susun item berikut:","type":"drag_drop","items":[{"id":"1","text":"..."},{"id":"2","text":"..."},{"id":"3","text":"..."},{"id":"4","text":"..."}],"answerKey":"1,2,3,4"}`;
+        default:
+          return `JSON:{"text":"...","type":"pilihan_ganda","choices":{"a":{"text":"...","isCorrect":false},"b":{"text":"...","isCorrect":false},"c":{"text":"...","isCorrect":true},"d":{"text":"...","isCorrect":false},"e":{"text":"...","isCorrect":false}},"answerKey":"c"}`;
+      }
+    };
+
+    const typeFormat = getSingleTypeFormat(type);
+
     const systemPrompt = `Buat 1 soal ${typeLabel}, ${level} - ${subject}, kesulitan ${difficulty}.
-${formatRules ? `FORMAT: ${formatRules}` : ""} Opsi A-E ringkas. Kunci jawaban acak.
-JSON:{"text":"...","choices":{"a":{"text":"...","isCorrect":false},"b":{"text":"...","isCorrect":false},"c":{"text":"...","isCorrect":true},"d":{"text":"...","isCorrect":false},"e":{"text":"...","isCorrect":false}},"answerKey":"c"}
+${formatRules ? `FORMAT: ${formatRules}` : ""}${type === "pilihan_ganda" || type === "pilihan_ganda_kompleks" ? " Opsi A-E ringkas. Kunci jawaban acak." : ""}
+${typeFormat}
 Hanya JSON.`;
 
     const userPrompt = existingWacana 
@@ -735,10 +954,21 @@ Hanya JSON.`;
     });
 
     const result = robustJSONParse(content);
+    const isExact = ctx.isExact || ctx.isChemistry;
     return {
-      text: result.text || result.question || "",
+      text: stripUnwantedLatex(result.text || result.question || "", isExact),
       type: result.type || type,
-      choices: result.choices || {},
+      choices: (() => {
+        const c = result.choices || {};
+        if (!isExact && c && Object.keys(c).length > 0) {
+          const cleaned: any = {};
+          Object.keys(c).forEach(k => {
+            cleaned[k] = { ...c[k], text: stripUnwantedLatex(c[k]?.text || "", isExact) };
+          });
+          return cleaned;
+        }
+        return c;
+      })(),
       pairs: result.pairs,
       items: result.items,
       answerKey: result.answerKey || result.answer_key || "",
@@ -765,12 +995,16 @@ export const getTopicSuggestionsAI = async (
 ): Promise<string[]> => {
   try {
     const literasiNote = isLiteracy ? " (topik kaya teks bacaan)" : "";
-    const systemPrompt = `Berikan 5 topik/materi pelajaran sesuai kurikulum untuk ${level} - ${subject}, kesulitan ${difficulty}, standar ${focus}.${literasiNote}
-Topik berupa NAMA MATERI/BAB (bukan judul soal). Contoh: "Pengenalan Algoritma Dasar", "Operasi Hitung Pecahan".
-JSON: {"topics":["...","..."]}`;
+    const systemPrompt = `Anda adalah ahli kurikulum pendidikan Indonesia. Berikan topik/materi pelajaran sesuai kurikulum. Topik berupa NAMA MATERI/BAB (bukan judul soal). Contoh: "Pengenalan Algoritma Dasar", "Operasi Hitung Pecahan".
+Output JSON: {"topics":["...","..."]}`;
+
+    const userPrompt = `Berikan 5 topik untuk ${level} - ${subject}, kesulitan ${difficulty}, standar ${focus}.${literasiNote}`;
 
     const content = await fetchAI({
-      pb, messages: [{ role: "system", content: systemPrompt }],
+      pb, messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt }
+      ],
       maxTokens: 200, temperature: 0.7
     });
 
@@ -849,7 +1083,7 @@ Pastikan JSON valid. Di JSON, backslash ditulis ganda.`;
     }
 
     if (questionsRaw.length === 0) throw new Error("AI tidak menemukan butir soal dalam teks tersebut.");
-    return validateQuestions(questionsRaw);
+    return validateQuestions(questionsRaw, ctx.isExact || ctx.isChemistry);
   } catch (err: any) {
     if (err.message?.includes("maximum context length")) {
       throw new Error("Teks terlalu panjang. Silakan masukkan beberapa soal saja per sekali proses.");
@@ -958,12 +1192,47 @@ export const generateFromMaterialAI = async (
     const typeMap: Record<string, string> = {
       pilihan_ganda: "Pilihan Ganda (5 opsi, 1 benar)",
       pilihan_ganda_kompleks: "Pilihan Ganda Kompleks (>1 benar)",
-      isian_singkat: "Isian Singkat",
+      isian_singkat: "Isian Singkat (jawaban 1-3 kata)",
       uraian: "Uraian / Essay",
-      benar_salah: "Benar atau Salah",
-      menjodohkan: "Menjodohkan (Matching)",
+      benar_salah: "Benar atau Salah (pernyataan, jawab Benar/Salah)",
+      menjodohkan: "Menjodohkan/Matching (4-6 pasangan kiri-kanan)",
+      urutkan: "Mengurutkan/Sequencing (4-6 item disusun urut)",
+      drag_drop: "Drag & Drop (4-6 item disusun/dikelompokkan)",
     };
     const typeDesc = typeMap[type] || "Pilihan Ganda";
+
+    // Build type-specific output format for material-based generation
+    const getMaterialTypeFormat = (questionType: string): string => {
+      switch (questionType) {
+        case "pilihan_ganda":
+          return `JSON: {"questions":[{"text":"pertanyaan SAJA","type":"pilihan_ganda","choices":{"a":{"text":"...","isCorrect":false},...,"e":{"text":"...","isCorrect":true}},"answerKey":"e","groupId":"","groupText":""}]}`;
+        case "pilihan_ganda_kompleks":
+          return `JSON: {"questions":[{"text":"pertanyaan","type":"pilihan_ganda_kompleks","choices":{"a":{"text":"...","isCorrect":true},"b":{"text":"...","isCorrect":false},"c":{"text":"...","isCorrect":true},"d":{"text":"...","isCorrect":false},"e":{"text":"...","isCorrect":false}},"answerKey":"a,c"}]}
+Lebih dari 1 jawaban benar.`;
+        case "benar_salah":
+          return `JSON: {"questions":[{"text":"<pernyataan>","type":"benar_salah","choices":{"a":{"text":"Benar","isCorrect":true},"b":{"text":"Salah","isCorrect":false}},"answerKey":"a"}]}
+Setiap soal adalah PERNYATAAN. Choices hanya 2: a=Benar, b=Salah.`;
+        case "isian_singkat":
+          return `JSON: {"questions":[{"text":"pertanyaan","type":"isian_singkat","answerKey":"jawaban singkat"}]}
+Tidak ada choices. answerKey berisi jawaban pasti 1-3 kata.`;
+        case "uraian":
+          return `JSON: {"questions":[{"text":"pertanyaan HOTS","type":"uraian","answerKey":"pedoman penilaian"}]}
+Tidak ada choices. answerKey berisi rubrik/pedoman penilaian.`;
+        case "menjodohkan":
+          return `JSON: {"questions":[{"text":"Jodohkan item berikut:","type":"menjodohkan","pairs":[{"id":"1","left":"...","right":"..."},{"id":"2","left":"...","right":"..."},{"id":"3","left":"...","right":"..."},{"id":"4","left":"...","right":"..."}],"answerKey":"1-1,2-2,3-3,4-4"}]}
+Setiap soal memiliki 4-6 pasangan.`;
+        case "urutkan":
+          return `JSON: {"questions":[{"text":"Urutkan berikut:","type":"urutkan","items":[{"id":"1","text":"langkah 1"},{"id":"2","text":"langkah 2"},{"id":"3","text":"langkah 3"},{"id":"4","text":"langkah 4"}],"answerKey":"1,2,3,4"}]}
+Urutan dalam array items adalah URUTAN BENAR. 4-6 item.`;
+        case "drag_drop":
+          return `JSON: {"questions":[{"text":"Susun item berikut:","type":"drag_drop","items":[{"id":"1","text":"item 1"},{"id":"2","text":"item 2"},{"id":"3","text":"item 3"},{"id":"4","text":"item 4"}],"answerKey":"1,2,3,4"}]}
+Urutan dalam array items adalah URUTAN BENAR. 4-6 item.`;
+        default:
+          return `JSON: {"questions":[{"text":"pertanyaan SAJA","type":"pilihan_ganda","choices":{"a":{"text":"...","isCorrect":false},...,"e":{"text":"...","isCorrect":true}},"answerKey":"e"}]}`;
+      }
+    };
+
+    const materialTypeFormat = getMaterialTypeFormat(type);
 
     const systemPrompt = `Anda adalah Spesialis Kurikulum & Evaluasi Pendidikan.
 Tugas: Buat ${count} soal ${typeDesc} berdasarkan MATERI yang diberikan.
@@ -972,11 +1241,11 @@ Jenjang: ${level}, Mapel: ${subject}, Kesulitan: ${difficulty}.
 KETENTUAN:
 1. AKURASI: Soal WAJIB berdasarkan fakta dalam materi.
 2. HOTS & VARIASI: Wajib variasi pola (analisis, evaluasi, kreasi, skenario kasus). DILARANG pola seragam.
-3. OPSI: 5 pilihan (A-E) variatif, logis, diawali huruf kapital.
+${type === "pilihan_ganda" || type === "pilihan_ganda_kompleks" ? "3. OPSI: 5 pilihan (A-E) variatif, logis, diawali huruf kapital." : "3. Pastikan format sesuai tipe soal."}
 4. LITERASI: Jika diminta, masukkan wacana ke "groupText" (BUKAN "text"). Berikan "groupId" sama untuk soal satu wacana.
 ${formatRules ? `\n${formatRules}` : ""}${fewShot ? `\n${fewShot}` : ""}
 
-JSON: {"questions":[{"text":"pertanyaan SAJA","type":"${type}","choices":{"a":{"text":"...","isCorrect":false},...,"e":{"text":"...","isCorrect":true}},"answerKey":"e","groupId":"","groupText":""}]}
+${materialTypeFormat}
 Hanya JSON murni.`;
 
     const userPrompt = `MATERI:\n\n${material}\n\nBuat ${count} soal ${typeDesc}, kesulitan ${difficulty}. WAJIB variasi pola pertanyaan. Jika ada instruksi spesifik dalam materi, ikuti sebagai prioritas.`;
@@ -995,7 +1264,7 @@ Hanya JSON murni.`;
             const parsed = robustJSONParse(content);
             let raw = parsed.questions || parsed.data || parsed.soal || (Array.isArray(parsed) ? parsed : []);
             if (raw.length === 0 && parsed.text) raw = [parsed];
-            return validateQuestions(raw);
+            return validateQuestions(raw, ctx.isExact || ctx.isChemistry, type);
           });
         })
       );
@@ -1019,11 +1288,94 @@ Hanya JSON murni.`;
       questionsRaw = [parsed];
     }
     
-    const validated = validateQuestions(questionsRaw);
+    const validated = validateQuestions(questionsRaw, ctx.isExact || ctx.isChemistry, type);
     if (validated.length === 0) throw new Error("Format soal tidak valid.");
     return validated;
   } catch (err: any) {
     console.error("Generate from Material Error:", err);
     throw err;
+  }
+};
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 🎓 AI Essay/Short Answer Grading
+// ═══════════════════════════════════════════════════════════════════════════════
+export interface AIGradeResult {
+  isCorrect: boolean;
+  score: number; // 0-100
+  feedback: string;
+}
+
+export const gradeEssayWithAI = async (
+  pb: PocketBase,
+  question: string,
+  studentAnswer: string,
+  answerKey: string,
+  type: "isian_singkat" | "uraian" = "uraian"
+): Promise<AIGradeResult> => {
+  try {
+    if (!studentAnswer?.trim()) {
+      return { isCorrect: false, score: 0, feedback: "Siswa tidak menjawab." };
+    }
+
+    const systemPrompt = type === "isian_singkat"
+      ? `Anda adalah penilai ujian isian singkat. Periksa apakah jawaban siswa BENAR atau SALAH.
+ATURAN PENILAIAN:
+- Jawaban BENAR jika secara substansi/makna SAMA dengan kunci jawaban.
+- Toleransi: typo kecil (1-2 huruf), sinonim, singkatan umum, huruf besar/kecil, spasi → tetap BENAR.
+- Jawaban SALAH hanya jika maknanya BERBEDA dari kunci.
+- Jika kunci jawaban kosong/tidak ada, nilai berdasarkan relevansi dengan pertanyaan.
+Balas HANYA dengan JSON: {"isCorrect":true,"score":100,"feedback":"alasan"} atau {"isCorrect":false,"score":0,"feedback":"alasan"}`
+      : `Anda adalah penilai ujian essay profesional. Nilai jawaban siswa berdasarkan pedoman penilaian.
+ATURAN:
+- Jika jawaban menyentuh poin-poin utama dari pedoman → BENAR (score >= 60).
+- Tidak perlu kata-kata persis sama, yang penting substansi/konsep benar.
+- Skor: 0=tidak relevan, 40=kurang, 60=cukup, 80=baik, 100=sempurna.
+- isCorrect = true jika score >= 50.
+Balas HANYA dengan JSON: {"isCorrect":true,"score":80,"feedback":"umpan balik singkat"}`;
+
+    const userPrompt = `PERTANYAAN:\n${question}\n\nKUNCI JAWABAN:\n${answerKey || "(Tidak ada kunci khusus - nilai berdasarkan relevansi)"}\n\nJAWABAN SISWA:\n${studentAnswer}\n\nNilai jawaban di atas. Balas HANYA JSON, tanpa teks lain.`;
+
+    let content: string;
+    try {
+      // Try with JSON mode first
+      content = await fetchAI({
+        pb,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt }
+        ],
+        maxTokens: 200,
+        temperature: 0.2,
+        jsonMode: true
+      });
+    } catch (jsonModeErr: any) {
+      // If JSON mode fails, retry without it
+      if (jsonModeErr.message?.includes("AI_RATE_LIMIT")) throw jsonModeErr;
+      content = await fetchAI({
+        pb,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt }
+        ],
+        maxTokens: 200,
+        temperature: 0.2,
+        jsonMode: false
+      });
+    }
+
+    const parsed = robustJSONParse(content);
+    return {
+      isCorrect: parsed.isCorrect ?? parsed.is_correct ?? (parsed.score >= 50),
+      score: Math.min(100, Math.max(0, parsed.score || 0)),
+      feedback: parsed.feedback || parsed.umpan_balik || ""
+    };
+  } catch (err: any) {
+    console.error("AI Grade Error:", err);
+    if (err.message?.includes("AI_RATE_LIMIT")) {
+      throw new Error("Kuota AI habis. Coba lagi nanti.");
+    }
+    throw new Error("Gagal menilai dengan AI: " + (err.message || ""));
   }
 };

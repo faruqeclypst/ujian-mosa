@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import { registerPlugin } from "@capacitor/core";
 import { useParams, useNavigate } from "react-router-dom";
 import { App } from "@capacitor/app";
@@ -43,7 +43,8 @@ import {
   Check,
   Square,
   Zap,
-  Activity
+  Activity,
+  Lock
 } from "lucide-react";
 import { useNetworkStatus } from "../../lib/network";
 import { syncPendingData } from "../../lib/syncManager";
@@ -153,6 +154,7 @@ const CBTPage = () => {
   const [timeLeft, setTimeLeft] = useState<number>(0);
   const [isExamOver, setIsExamOver] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(!!document.fullscreenElement);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
   const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
@@ -160,6 +162,7 @@ const CBTPage = () => {
   const [isExamBrowser] = useState(() => /exambrowser|exambro/i.test(navigator.userAgent));
 
   const [isNavModalOpen, setIsNavModalOpen] = useState(false);
+  const [isConfirmed, setIsConfirmed] = useState(false);
   const [isCheatWarningOpen, setIsCheatWarningOpen] = useState(false);
   const [isLocked, setIsLocked] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -233,6 +236,8 @@ const CBTPage = () => {
   const [choicesOrder, setChoicesOrder] = useState<Record<string, string[]>>({});
   const [itemsOrder, setItemsOrder] = useState<Record<string, string[]>>({});
   const [matchingOptions, setMatchingOptions] = useState<Record<string, string[]>>({});
+  const [draggingOption, setDraggingOption] = useState<string | null>(null);
+  const [dragOverSlot, setDragOverSlot] = useState<string | null>(null);
   const [flaggedQuestions, setFlaggedQuestions] = useState<Record<string, boolean>>({});
   const [fontSize, setFontSize] = useState(1); // 1.0, 1.1, 1.2, 1.3, 1.4, 1.5
 
@@ -380,23 +385,43 @@ const CBTPage = () => {
 
       const qRecord = await pb.collection("questions").getFullList({ filter: `examId = "${rData.examId}"`, sort: "order,created" });
       const loaded: Question[] = qRecord.map(q => {
-        const tM: any = { "multiple_choice": "pilihan_ganda", "complex_multiple_choice": "pilihan_ganda_kompleks", "short_answer": "isian_singkat", "essay": "uraian", "matching": "menjodohkan", "ordering": "urutkan", "true_false": "benar_salah", "pilihan_ganda": "pilihan_ganda", "pilihan_ganda_kompleks": "pilihan_ganda_kompleks", "isian_singkat": "isian_singkat", "uraian": "uraian", "menjodohkan": "menjodohkan", "urutkan": "urutkan", "benar_salah": "benar_salah" };
+        const tM: any = { "multiple_choice": "pilihan_ganda", "complex_multiple_choice": "pilihan_ganda_kompleks", "complex_choice": "pilihan_ganda_kompleks", "short_answer": "isian_singkat", "essay": "uraian", "matching": "menjodohkan", "ordering": "urutkan", "sequence": "urutkan", "true_false": "benar_salah", "drag_drop": "drag_drop", "pilihan_ganda": "pilihan_ganda", "pilihan_ganda_kompleks": "pilihan_ganda_kompleks", "isian_singkat": "isian_singkat", "uraian": "uraian", "menjodohkan": "menjodohkan", "urutkan": "urutkan", "benar_salah": "benar_salah" };
 
         let qImg = q.imageUrl || "";
         if (qImg && !qImg.startsWith('http') && !qImg.startsWith('data:')) {
           qImg = pb.files.getUrl(q, qImg);
         }
 
-        const choices = { ...(q.options || {}) };
-        if (choices) {
+        // Parse options (might be string from PocketBase)
+        let rawOptions = q.options || {};
+        if (typeof rawOptions === 'string') {
+          try { rawOptions = JSON.parse(rawOptions); } catch (e) { rawOptions = {}; }
+        }
+
+        const mappedType = tM[q.field || q.type] || "pilihan_ganda";
+        
+        // For choice-based types, options IS the choices object {a:{...}, b:{...}}
+        // For menjodohkan, options = {pairs: [...]}
+        // For urutkan/drag_drop, options = {items: [...]}
+        let choices: any = {};
+        let pairs: any = undefined;
+        let items: any = undefined;
+
+        if (mappedType === "menjodohkan") {
+          pairs = rawOptions.pairs || [];
+        } else if (mappedType === "urutkan" || mappedType === "drag_drop") {
+          items = rawOptions.items || [];
+        } else {
+          // Choice-based types: options = {a: {text, isCorrect, imageUrl}, b: {...}, ...}
+          choices = { ...rawOptions };
           Object.keys(choices).forEach(id => {
-            if (choices[id].imageUrl && !choices[id].imageUrl.startsWith('http') && !choices[id].imageUrl.startsWith('data:')) {
+            if (choices[id] && typeof choices[id] === 'object' && choices[id].imageUrl && !choices[id].imageUrl.startsWith('http') && !choices[id].imageUrl.startsWith('data:')) {
               choices[id].imageUrl = pb.files.getUrl(q, choices[id].imageUrl);
             }
           });
         }
 
-        return { id: q.id, type: (tM[q.field || q.type] || "pilihan_ganda"), text: q.text, imageUrl: qImg, groupId: q.groupId, groupText: q.groupText, choices, pairs: q.options?.pairs, items: q.options?.items, answerKey: q.answerKey };
+        return { id: q.id, type: mappedType, text: q.text, imageUrl: qImg, groupId: q.groupId, groupText: q.groupText, choices, pairs, items, answerKey: q.answerKey || q.correctAnswer };
       });
 
       const localAnswers = localStorage.getItem(`offline_answers_${student.id}_${roomId}`);
@@ -485,13 +510,31 @@ const CBTPage = () => {
       let sO = sessionStorage.getItem(`order_${pr}`);
       let order: string[] = [];
       const curIds = loaded.map(q => q.id);
-      if (sO) { try { order = JSON.parse(sO).filter((id: string) => curIds.includes(id)); const n = curIds.filter(id => !order.includes(id)); if (n.length > 0) order = [...order, ...clusterShuffle(n)]; sessionStorage.setItem(`order_${pr}`, JSON.stringify(order)); } catch (e) { } }
+      if (sO) { 
+        try { 
+          order = JSON.parse(sO).filter((id: string) => curIds.includes(id)); 
+          const n = curIds.filter(id => !order.includes(id)); 
+          if (n.length > 0) order = [...order, ...clusterShuffle(n)]; 
+          
+          // Always ensure essay questions are at the end (fix old orders)
+          const objOrder = order.filter(id => { const q = loaded.find(x => x.id === id); const t = q?.type || "pilihan_ganda"; return t !== "isian_singkat" && t !== "uraian"; });
+          const essOrder = order.filter(id => { const q = loaded.find(x => x.id === id); const t = q?.type || "pilihan_ganda"; return t === "isian_singkat" || t === "uraian"; });
+          order = [...objOrder, ...essOrder];
+          
+          sessionStorage.setItem(`order_${pr}`, JSON.stringify(order)); 
+        } catch (e) { } 
+      }
       if (order.length === 0) {
         const pg = curIds.filter(id => { const q = loaded.find(x => x.id === id); return !q?.type || q.type.startsWith("pilihan_ganda"); });
         const es = curIds.filter(id => { const q = loaded.find(x => x.id === id); return q?.type === "isian_singkat" || q?.type === "uraian"; });
         const it = curIds.filter(id => !pg.includes(id) && !es.includes(id));
         order = [...clusterShuffle(pg), ...clusterShuffle(it), ...clusterShuffle(es)];
         sessionStorage.setItem(`order_${pr}`, JSON.stringify(order));
+      } else {
+        // Restore choices/items/matching orders from sessionStorage even when question order already exists
+        const sC = sessionStorage.getItem(`choices_${pr}`); if (sC) try { setChoicesOrder(JSON.parse(sC)); } catch (e) { }
+        const sI = sessionStorage.getItem(`items_${pr}`); if (sI) try { setItemsOrder(JSON.parse(sI)); } catch (e) { }
+        const sM = sessionStorage.getItem(`match_${pr}`); if (sM) try { setMatchingOptions(JSON.parse(sM)); } catch (e) { }
       }
 
       setQuestions(order.map(id => loaded.find(x => x.id === id)).filter(x => !!x) as Question[]);
@@ -507,8 +550,9 @@ const CBTPage = () => {
       const diff = Math.floor((actualEnd.getTime() - Date.now()) / 1000);
       if (diff <= 0) setIsExamOver(true); setTimeLeft(Math.max(0, diff));
       const sFlagStored = sessionStorage.getItem(`flags_${pr}`); if (sFlagStored) try { setFlaggedQuestions(JSON.parse(sFlagStored)); } catch (e) { }
+      const sConfirmed = sessionStorage.getItem(`confirmed_${pr}`); if (sConfirmed === "true") setIsConfirmed(true);
     } catch (e) { console.error(e); } finally { setLoading(false); }
-  }, [student, roomId, navigate]);
+  }, [student, roomId, navigate, refreshTrigger]);
 
   useEffect(() => { loadExamData(); }, [loadExamData]);
 
@@ -709,26 +753,60 @@ const CBTPage = () => {
     setIsSubmitting(true);
     setLoading(true);
     try {
-      let c = 0;
+      let objectiveCorrect = 0;
+      let objectiveTotal = 0;
+      let essayTotal = 0;
       const ovr = attempt.overrides || {};
+      
       questions.forEach((q: any) => {
-        if (ovr[q.id] !== undefined) { if (ovr[q.id] === true) c++; return; }
-        const sa = answers[q.id]; if (!sa) return;
         const t = q.type || "pilihan_ganda";
-        if (t === "pilihan_ganda" || t === "benar_salah") { if (q.choices?.[sa]?.isCorrect === true) c++; }
-        else if (t === "pilihan_ganda_kompleks") { const ck = Object.keys(q.choices).filter(k => q.choices[k].isCorrect).map(k => k.toLowerCase()); const sk = Array.isArray(sa) ? sa.map(k => String(k).toLowerCase()) : []; if (sk.length === ck.length && sk.every(k => ck.includes(k))) c++; }
-        else if (t === "menjodohkan") { let cp = 0; (q.pairs || []).forEach((p: any) => { if (sa[p.id] === p.right) cp++; }); if (q.pairs?.length > 0) c += (cp / q.pairs.length); }
-        else if (t === "isian_singkat") { if (q.answerKey && isFuzzyMatch(sa, q.answerKey)) c++; }
-        else if (t === "urutkan") { const co = (q.items || []).map((it: any) => it.id); if (Array.isArray(sa) && sa.length === co.length && sa.every((v, index) => v === co[index])) c++; }
+        
+        // Isian singkat & uraian → dinilai terpisah (manual/AI)
+        if (t === "isian_singkat" || t === "uraian") {
+          essayTotal++;
+          return;
+        }
+        
+        objectiveTotal++;
+        
+        if (ovr[q.id] !== undefined) { if (ovr[q.id] === true) objectiveCorrect++; return; }
+        const sa = answers[q.id]; if (!sa) return;
+        
+        if (t === "pilihan_ganda" || t === "benar_salah") { if (q.choices?.[sa]?.isCorrect === true) objectiveCorrect++; }
+        else if (t === "pilihan_ganda_kompleks") { const ck = Object.keys(q.choices).filter(k => q.choices[k].isCorrect).map(k => k.toLowerCase()); const sk = Array.isArray(sa) ? sa.map(k => String(k).toLowerCase()) : []; if (sk.length === ck.length && sk.every(k => ck.includes(k))) objectiveCorrect++; }
+        else if (t === "menjodohkan") { let cp = 0; (q.pairs || []).forEach((p: any) => { if (sa[p.id] === p.right) cp++; }); if (q.pairs?.length > 0) objectiveCorrect += (cp / q.pairs.length); }
+        else if (t === "urutkan" || t === "drag_drop") { const co = (q.items || []).map((it: any) => it.id); if (Array.isArray(sa) && sa.length === co.length && sa.every((v, index) => v === co[index])) objectiveCorrect++; }
       });
-      const score = Math.round((c / questions.length) * 100) || 0;
+      
+      // Weighted scoring: 40% objektif, 60% essay (jika ada essay)
+      const totalQuestions = objectiveTotal + essayTotal;
+      
+      let score: number;
+      if (essayTotal === 0) {
+        // Tidak ada essay → penilaian murni objektif (100% objektif)
+        score = objectiveTotal > 0 ? Math.round((objectiveCorrect / objectiveTotal) * 100) : 0;
+      } else {
+        // Ada essay → bobot 40:60
+        const objectiveScore = objectiveTotal > 0 ? (objectiveCorrect / objectiveTotal) * 100 : 0;
+        // Essay belum dinilai saat submit, skor sementara hanya dari objektif (40%)
+        score = Math.round(objectiveScore * 0.4);
+      }
+      
+      const objectiveScore = objectiveTotal > 0 ? Math.round((objectiveCorrect / objectiveTotal) * 100) : 0;
       const st = attempt.startedAt || attempt.startTime || attempt.created || Date.now();
       const usedTime = Math.floor((Date.now() - new Date(st as any).getTime()) / 1000);
 
       await safeUpdateAttempt(attempt.id, {
         score,
-        correct: Math.floor(c),
-        total: questions.length,
+        objectiveScore,
+        objectiveCorrect: Math.floor(objectiveCorrect),
+        objectiveTotal,
+        essayTotal,
+        essayScore: 0,
+        essayGraded: 0,
+        totalQuestions,
+        correct: Math.floor(objectiveCorrect),
+        total: totalQuestions,
         usedTime: Math.max(0, usedTime),
         status: "finished",
         submittedAt: new Date().toISOString()
@@ -882,8 +960,124 @@ const CBTPage = () => {
     return true;
   };
 
+  // Check if all objective questions are answered (gate for essay)
+  const objectiveQuestions = questions.filter(q => { const t = q.type || "pilihan_ganda"; return t !== "isian_singkat" && t !== "uraian"; });
+  const allObjectiveAnswered = objectiveQuestions.every(q => isQuestionAnswered(q.id));
+  const isCurrentEssay = currentQuestion && (currentQuestion.type === "isian_singkat" || currentQuestion.type === "uraian");
+  const isEssayLocked = isCurrentEssay && !allObjectiveAnswered;
+
   const unansweredCount = questions.filter((q) => !isQuestionAnswered(q.id)).length;
   const isAllAnswered = unansweredCount === 0;
+
+  // ═══ Halaman Konfirmasi Sebelum Mulai ═══
+  if (!isConfirmed) {
+    const choiceCount = questions.filter(q => {
+      const t = q.type || "pilihan_ganda";
+      return t !== "isian_singkat" && t !== "uraian";
+    }).length;
+    const essayCount = questions.length - choiceCount;
+    const duration = roomData?.duration || 60;
+    const cheatLimit = roomData?.cheat_limit || 3;
+
+    return (
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-4">
+        <div className="w-full max-w-lg bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl border border-slate-100 dark:border-slate-800 overflow-hidden">
+          {/* Header */}
+          <div className="bg-emerald-600 p-6 sm:p-8 text-center relative overflow-hidden">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.1),transparent)]"></div>
+            <div className="relative z-10">
+              <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <FileText className="w-8 h-8 text-white" />
+              </div>
+              <h1 className="text-xl sm:text-2xl font-black text-white uppercase tracking-tight">{roomData?.examTitle || "Ujian"}</h1>
+              <p className="text-emerald-100 text-xs font-bold mt-1">{roomData?.subject || ""} {roomData?.teacherName ? `• ${roomData.teacherName}` : ""}</p>
+            </div>
+          </div>
+
+          {/* Info Ujian */}
+          <div className="p-6 sm:p-8 space-y-5">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-slate-50 dark:bg-slate-800/50 rounded-2xl p-4 text-center border border-slate-100 dark:border-slate-800">
+                <Clock className="w-5 h-5 text-emerald-600 mx-auto mb-1.5" />
+                <p className="text-lg font-black text-slate-800 dark:text-white">{duration} menit</p>
+                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Durasi</p>
+              </div>
+              <div className="bg-slate-50 dark:bg-slate-800/50 rounded-2xl p-4 text-center border border-slate-100 dark:border-slate-800">
+                <HelpCircle className="w-5 h-5 text-emerald-600 mx-auto mb-1.5" />
+                <p className="text-lg font-black text-slate-800 dark:text-white">{questions.length} soal</p>
+                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Total</p>
+              </div>
+              {essayCount > 0 && (
+                <div className="bg-amber-50 dark:bg-amber-950/20 rounded-2xl p-4 text-center border border-amber-100 dark:border-amber-800/40">
+                  <FileText className="w-5 h-5 text-amber-600 mx-auto mb-1.5" />
+                  <p className="text-lg font-black text-amber-700 dark:text-amber-400">{essayCount}</p>
+                  <p className="text-[9px] font-bold text-amber-500 uppercase tracking-widest">Uraian/Isian</p>
+                </div>
+              )}
+              <div className="bg-red-50 dark:bg-red-950/20 rounded-2xl p-4 text-center border border-red-100 dark:border-red-800/40">
+                <ShieldAlert className="w-5 h-5 text-red-500 mx-auto mb-1.5" />
+                <p className="text-lg font-black text-red-600 dark:text-red-400">{cheatLimit}x</p>
+                <p className="text-[9px] font-bold text-red-400 uppercase tracking-widest">Batas Pelanggaran</p>
+              </div>
+            </div>
+
+            {/* Syarat & Ketentuan */}
+            <div className="bg-slate-50 dark:bg-slate-800/30 rounded-2xl p-5 border border-slate-100 dark:border-slate-800">
+              <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3">Syarat & Ketentuan</h3>
+              <ul className="space-y-2.5 text-xs text-slate-600 dark:text-slate-400 font-medium leading-relaxed">
+                <li className="flex items-start gap-2.5">
+                  <Check className="w-4 h-4 text-emerald-500 flex-shrink-0 mt-0.5" />
+                  <span>Ujian harus dikerjakan dalam <strong>mode layar penuh</strong> (fullscreen).</span>
+                </li>
+                <li className="flex items-start gap-2.5">
+                  <Check className="w-4 h-4 text-emerald-500 flex-shrink-0 mt-0.5" />
+                  <span>Dilarang berpindah aplikasi/tab. Pelanggaran akan tercatat otomatis.</span>
+                </li>
+                <li className="flex items-start gap-2.5">
+                  <Check className="w-4 h-4 text-emerald-500 flex-shrink-0 mt-0.5" />
+                  <span>Jawaban tersimpan otomatis. Jika koneksi terputus, jawaban tetap aman di perangkat.</span>
+                </li>
+                <li className="flex items-start gap-2.5">
+                  <Check className="w-4 h-4 text-emerald-500 flex-shrink-0 mt-0.5" />
+                  <span>Waktu berjalan sejak ujian dimulai dan tidak bisa di-pause.</span>
+                </li>
+                {essayCount > 0 && (
+                  <li className="flex items-start gap-2.5">
+                    <Check className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
+                    <span>Soal uraian/isian muncul setelah soal pilihan selesai dan dinilai terpisah oleh guru.</span>
+                  </li>
+                )}
+                <li className="flex items-start gap-2.5">
+                  <Check className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
+                  <span>Jika melebihi <strong>{cheatLimit}x pelanggaran</strong>, sesi akan <strong>terkunci</strong> dan memerlukan izin pengawas.</span>
+                </li>
+              </ul>
+            </div>
+
+            {/* Tombol Mulai */}
+            <Button
+              onClick={() => {
+                const pr = `${student?.nisn}_${roomId}`;
+                sessionStorage.setItem(`confirmed_${pr}`, "true");
+                setIsConfirmed(true);
+              }}
+              className="w-full h-14 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-lg shadow-emerald-600/20 active:scale-95 transition-all"
+            >
+              <Zap className="w-4 h-4 mr-2" />
+              Saya Mengerti, Mulai Ujian
+            </Button>
+
+            <button
+              onClick={() => navigate("/")}
+              className="w-full text-center text-[11px] font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 uppercase tracking-widest transition-colors py-2"
+            >
+              Kembali ke Dashboard
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-screen h-[100dvh] bg-slate-50 dark:bg-slate-950 flex flex-col overflow-hidden select-none font-sans">
@@ -985,6 +1179,10 @@ const CBTPage = () => {
             <div className="px-2 text-[10px] font-black text-slate-500 uppercase tracking-widest w-[45px] text-center">{Math.round(fontSize * 100)}%</div>
             <button onClick={() => setFontSize(p => Math.min(1.5, p + 0.1))} className="w-8 h-8 flex items-center justify-center rounded-xl bg-white dark:bg-slate-900 text-slate-600 hover:text-emerald-600 transition-colors shadow-sm disabled:opacity-30" disabled={fontSize >= 1.5}><ZoomIn className="w-4 h-4" /></button>
           </div>
+          {/* Refresh Button (PC only) — soft refresh without leaving fullscreen */}
+          <button onClick={() => { setLoading(true); setRefreshTrigger(p => p + 1); }} className="hidden sm:flex w-8 h-8 items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-emerald-600 border border-slate-200 dark:border-slate-700 transition-colors" title="Refresh data">
+            <RefreshCcw className="w-4 h-4" />
+          </button>
 
           <div className="flex items-center gap-x-2 sm:gap-4 ml-1 sm:ml-4 border-l border-slate-100 dark:border-slate-800 pl-2 sm:pl-4">
             {/* Nama & Kelas */}
@@ -1148,7 +1346,7 @@ const CBTPage = () => {
                 )}
               </CardHeader>
               <CardContent className="px-5 sm:px-8 pb-6 sm:pb-8 space-y-3">
-                {(currentQuestion.type === "pilihan_ganda" || currentQuestion.type === "pilihan_ganda_kompleks" || currentQuestion.type === "benar_salah") && (
+                {(currentQuestion.type === "pilihan_ganda" || currentQuestion.type === "pilihan_ganda_kompleks") && (
                   <div className="space-y-2">
                     {(choicesOrder[currentQuestion.id] || Object.keys(currentQuestion.choices || {})).map((choiceId, idx) => {
                       const c = currentQuestion.choices![choiceId]; const isM = currentQuestion.type === "pilihan_ganda_kompleks"; const isS = isM ? (answers[currentQuestion.id] || []).includes(choiceId) : answers[currentQuestion.id] === choiceId;
@@ -1198,26 +1396,76 @@ const CBTPage = () => {
                               style={{ fontSize: `${15 * fontSize}px` }}
                             >{p.left}</div>
                             <div className="flex items-center opacity-20"><ArrowRight className="w-4 h-4" /></div>
-                            <div onClick={() => { const n = { ...sA }; delete n[p.id]; handleAnswerSelect(currentQuestion.id, n); }} className={`flex-1 p-1 rounded-xl border-2 border-dashed flex items-center justify-center min-h-[50px] transition-colors ${v ? "bg-emerald-50/20 dark:bg-emerald-950/20 border-emerald-400/50" : "bg-slate-50/30 dark:bg-slate-900/30 border-slate-200 dark:border-slate-800"}`}>{v ? <div className="w-full h-full flex items-center justify-center bg-emerald-600 text-white rounded-lg p-2 font-serif shadow-sm" style={{ fontSize: `${14 * fontSize}px` }}>{v}</div> : <span className="text-[10px] font-bold text-slate-300 dark:text-slate-600 uppercase">Drop Disini</span>}</div>
+                            <div 
+                              onDragOver={(e) => { e.preventDefault(); setDragOverSlot(p.id); }}
+                              onDragLeave={() => setDragOverSlot(null)}
+                              onDrop={(e) => {
+                                e.preventDefault();
+                                setDragOverSlot(null);
+                                if (draggingOption) {
+                                  handleAnswerSelect(currentQuestion.id, { ...(answers[currentQuestion.id] || {}), [p.id]: draggingOption });
+                                  setDraggingOption(null);
+                                }
+                              }}
+                              onClick={() => { if (v) { const n = { ...sA }; delete n[p.id]; handleAnswerSelect(currentQuestion.id, n); } }}
+                              className={`flex-1 p-1 rounded-xl border-2 border-dashed flex items-center justify-center min-h-[50px] transition-all ${
+                                dragOverSlot === p.id && !v ? "bg-emerald-100/50 dark:bg-emerald-900/30 border-emerald-500 scale-[1.02]" :
+                                v ? "bg-emerald-50/20 dark:bg-emerald-950/20 border-emerald-400/50 cursor-pointer" : 
+                                "bg-slate-50/30 dark:bg-slate-900/30 border-slate-200 dark:border-slate-800"
+                              }`}
+                            >
+                              {v ? <div className="w-full h-full flex items-center justify-center bg-emerald-600 text-white rounded-lg p-2 font-serif shadow-sm" style={{ fontSize: `${14 * fontSize}px` }}>{v}</div> : <span className="text-[10px] font-bold text-slate-300 dark:text-slate-600 uppercase">Drop Disini</span>}
+                            </div>
                           </div>
                         );
                       })}
                     </div>
                     <div className="lg:w-1/3 p-4 bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800 rounded-2xl flex flex-wrap gap-2 content-start min-h-[100px]">
                       {(matchingOptions[currentQuestion.id] || []).filter(o => !Object.values(answers[currentQuestion.id] || {}).includes(o)).map(o => (
-                        <button key={o} onClick={() => { const p = (currentQuestion.pairs || []).find(x => !(answers[currentQuestion.id] || {})[x.id]); if (p) handleAnswerSelect(currentQuestion.id, { ...(answers[currentQuestion.id] || {}), [p.id]: o }); }} className="px-3 py-2 bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-xl font-serif text-emerald-600 dark:text-emerald-400 shadow-sm hover:shadow-md hover:border-emerald-300 transition-all" style={{ fontSize: `${14 * fontSize}px` }}>{o}</button>
+                        <div 
+                          key={o} 
+                          draggable
+                          onDragStart={() => setDraggingOption(o)}
+                          onDragEnd={() => { setDraggingOption(null); setDragOverSlot(null); }}
+                          onClick={() => { const p = (currentQuestion.pairs || []).find(x => !(answers[currentQuestion.id] || {})[x.id]); if (p) handleAnswerSelect(currentQuestion.id, { ...(answers[currentQuestion.id] || {}), [p.id]: o }); }}
+                          className={`px-3 py-2 bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-xl font-serif text-emerald-600 dark:text-emerald-400 shadow-sm hover:shadow-md hover:border-emerald-300 transition-all cursor-grab active:cursor-grabbing select-none ${draggingOption === o ? "opacity-50 scale-95" : ""}`} 
+                          style={{ fontSize: `${14 * fontSize}px` }}
+                        >{o}</div>
                       ))}
                     </div>
                   </div>
                 )}
-                {(currentQuestion.type === "isian_singkat" || currentQuestion.type === "uraian") && <textarea value={answers[currentQuestion.id] || ""} onChange={(e) => handleAnswerSelect(currentQuestion.id, e.target.value)} placeholder="Tuliskan jawaban Anda di sini secara lengkap..." rows={currentQuestion.type === "uraian" ? 10 : 3} className="w-full p-6 sm:p-8 rounded-[30px] border-2 border-slate-100 dark:border-slate-800 bg-[#f8fafc] dark:bg-slate-950 font-bold text-sm sm:text-base resize-none focus:ring-4 focus:ring-emerald-100 focus:border-emerald-500 transition-all outline-none" />}
-                {(currentQuestion.type === "urutkan" || currentQuestion.type === "drag_drop") && (
-                  <Reorder.Group axis="y" values={answers[currentQuestion.id] || itemsOrder[currentQuestion.id] || (currentQuestion.items || []).map(it => it.id)} onReorder={(o: string[]) => handleAnswerSelect(currentQuestion.id, o)} className="space-y-2">
-                    {(answers[currentQuestion.id] || itemsOrder[currentQuestion.id] || (currentQuestion.items || []).map(it => it.id)).map((id: string, i: number) => {
-                      const it = currentQuestion.items?.find(x => x.id === id); return <Reorder.Item key={id} value={id} className="flex items-center gap-4 sm:gap-6 p-4 sm:p-5 bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-2xl shadow-sm cursor-grab active:cursor-grabbing group relative overflow-hidden"><div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-slate-50 dark:bg-slate-800/80 text-slate-500 dark:text-slate-400 flex items-center justify-center font-black text-xs sm:text-sm">{String.fromCharCode(65 + i)}</div><div className="flex-1 font-serif text-slate-800 dark:text-slate-200" style={{ fontSize: `${15 * fontSize}px` }}>{it?.text}</div><div className="p-2 bg-slate-50 dark:bg-slate-900 rounded-lg"><GripVertical className="w-4 h-4 sm:w-5 sm:h-5 text-slate-300" /></div></Reorder.Item>;
+                {(currentQuestion.type === "isian_singkat" || currentQuestion.type === "uraian") && (
+                  isEssayLocked ? (
+                    <div className="flex flex-col items-center justify-center py-12 px-6 text-center bg-amber-50/50 dark:bg-amber-950/20 rounded-[30px] border-2 border-dashed border-amber-200 dark:border-amber-800/40">
+                      <Lock className="w-12 h-12 text-amber-400 mb-4" />
+                      <h3 className="text-lg font-black text-amber-700 dark:text-amber-400 uppercase tracking-tight mb-2">Soal Terkunci</h3>
+                      <p className="text-sm text-amber-600/80 dark:text-amber-400/60 font-medium max-w-sm">
+                        Selesaikan semua soal objektif terlebih dahulu sebelum mengerjakan soal uraian/isian singkat.
+                      </p>
+                      <p className="text-xs text-amber-500 mt-3 font-bold">
+                        Sisa {objectiveQuestions.filter(q => !isQuestionAnswered(q.id)).length} soal objektif belum dijawab
+                      </p>
+                    </div>
+                  ) : (
+                    <textarea value={answers[currentQuestion.id] || ""} onChange={(e) => handleAnswerSelect(currentQuestion.id, e.target.value)} placeholder="Tuliskan jawaban Anda di sini secara lengkap..." rows={currentQuestion.type === "uraian" ? 10 : 3} className="w-full p-6 sm:p-8 rounded-[30px] border-2 border-slate-100 dark:border-slate-800 bg-[#f8fafc] dark:bg-slate-950 font-bold text-sm sm:text-base resize-none focus:ring-4 focus:ring-emerald-100 focus:border-emerald-500 transition-all outline-none" />
+                  )
+                )}
+                {(currentQuestion.type === "urutkan" || currentQuestion.type === "drag_drop") && (() => {
+                  const savedOrder = Array.isArray(answers[currentQuestion.id]) ? answers[currentQuestion.id] : null;
+                  const shuffledOrder = Array.isArray(itemsOrder[currentQuestion.id]) ? itemsOrder[currentQuestion.id] : null;
+                  const defaultOrder = (currentQuestion.items || []).map(it => it.id);
+                  const displayOrder = savedOrder || shuffledOrder || defaultOrder;
+                  const hasBeenTouched = !!savedOrder; // Siswa sudah pernah geser
+                  if (!displayOrder || displayOrder.length === 0) return null;
+                  return (
+                  <Reorder.Group axis="y" values={displayOrder} onReorder={(o: string[]) => handleAnswerSelect(currentQuestion.id, o)} className="space-y-2">
+                    {displayOrder.map((id: string, i: number) => {
+                      const it = currentQuestion.items?.find(x => x.id === id); return <Reorder.Item key={id} value={id} className={`flex items-center gap-4 sm:gap-6 p-4 sm:p-5 border rounded-2xl shadow-sm cursor-grab active:cursor-grabbing group relative overflow-hidden transition-colors ${hasBeenTouched ? "bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/40" : "bg-white dark:bg-slate-800 border-slate-100 dark:border-slate-700"}`}><div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center font-black text-xs sm:text-sm ${hasBeenTouched ? "bg-emerald-600 text-white" : "bg-slate-50 dark:bg-slate-800/80 text-slate-500 dark:text-slate-400"}`}>{String.fromCharCode(65 + i)}</div><div className="flex-1 font-serif text-slate-800 dark:text-slate-200" style={{ fontSize: `${15 * fontSize}px` }}>{it?.text || ""}</div><div className={`p-2 rounded-lg ${hasBeenTouched ? "bg-emerald-100 dark:bg-emerald-900/30" : "bg-slate-50 dark:bg-slate-900"}`}><GripVertical className={`w-4 h-4 sm:w-5 sm:h-5 ${hasBeenTouched ? "text-emerald-400" : "text-slate-300"}`} /></div></Reorder.Item>;
                     })}
                   </Reorder.Group>
-                )}
+                  );
+                })()}
               </CardContent>
             </Card>
           )}
@@ -1234,22 +1482,58 @@ const CBTPage = () => {
           {/* List Nomor Soal (Scrollable) */}
           <div className="flex-1 overflow-y-auto px-5 py-2 custom-scrollbar">
             <div className="grid grid-cols-5 gap-2 content-start">
-              {questions.map((q, i) => (
-                  <button 
-                    key={q.id} 
-                    onClick={() => handleNavClick(i)} 
-                    className={`aspect-square rounded-xl flex items-center justify-center font-black text-xl border-2 transition-all active:scale-[0.85] ${i === currentQuestionIndex
-                      ? "bg-emerald-700 border-emerald-700 text-white shadow-lg shadow-emerald-700/30 ring-2 ring-emerald-500 ring-offset-2 dark:ring-offset-slate-900"
-                      : isQuestionAnswered(q.id)
-                        ? "bg-emerald-500 border-emerald-500 text-white shadow-md shadow-emerald-500/20"
-                        : flaggedQuestions[q.id]
-                          ? "bg-amber-500 border-amber-600 text-white shadow-lg shadow-amber-500/20"
-                          : "bg-slate-50 dark:bg-slate-800/50 border-slate-100 dark:border-slate-800 text-slate-400 dark:text-slate-500"
-                      }`}
-                  >
-                    {i + 1}
-                  </button>
-              ))}
+              {(() => {
+                let separatorShown = false;
+                return questions.map((q, i) => {
+                  const t = q.type || "pilihan_ganda";
+                  const isEssay = t === "isian_singkat" || t === "uraian";
+                  const showSeparator = isEssay && !separatorShown;
+                  if (isEssay) separatorShown = true;
+                  
+                  // Hide essay questions entirely if objectives not done
+                  if (isEssay && !allObjectiveAnswered) {
+                    if (showSeparator) {
+                      return (
+                        <React.Fragment key={q.id}>
+                          <div className="col-span-5 flex items-center gap-2 py-2 my-1">
+                            <div className="flex-1 h-px bg-amber-200 dark:bg-amber-800/40"></div>
+                            <span className="text-[8px] font-black text-amber-600 dark:text-amber-400 uppercase tracking-widest whitespace-nowrap flex items-center gap-1"><Lock className="w-3 h-3" /> Terkunci</span>
+                            <div className="flex-1 h-px bg-amber-200 dark:bg-amber-800/40"></div>
+                          </div>
+                        </React.Fragment>
+                      );
+                    }
+                    return null; // Hide essay buttons
+                  }
+                  
+                  return (
+                    <React.Fragment key={q.id}>
+                      {showSeparator && (
+                        <div className="col-span-5 flex items-center gap-2 py-2 my-1">
+                          <div className="flex-1 h-px bg-amber-200 dark:bg-amber-800/40"></div>
+                          <span className="text-[8px] font-black text-amber-600 dark:text-amber-400 uppercase tracking-widest whitespace-nowrap">Uraian / Isian</span>
+                          <div className="flex-1 h-px bg-amber-200 dark:bg-amber-800/40"></div>
+                        </div>
+                      )}
+                      <button 
+                        onClick={() => handleNavClick(i)} 
+                        className={`aspect-square rounded-xl flex items-center justify-center font-black text-xl border-2 transition-all active:scale-[0.85] ${i === currentQuestionIndex
+                          ? "bg-emerald-700 border-emerald-700 text-white shadow-lg shadow-emerald-700/30 ring-2 ring-emerald-500 ring-offset-2 dark:ring-offset-slate-900"
+                          : isQuestionAnswered(q.id)
+                            ? "bg-emerald-500 border-emerald-500 text-white shadow-md shadow-emerald-500/20"
+                            : flaggedQuestions[q.id]
+                              ? "bg-amber-500 border-amber-600 text-white shadow-lg shadow-amber-500/20"
+                              : isEssay
+                                ? "bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800/40 text-amber-500 dark:text-amber-400"
+                                : "bg-slate-50 dark:bg-slate-800/50 border-slate-100 dark:border-slate-800 text-slate-400 dark:text-slate-500"
+                          }`}
+                      >
+                        {i + 1}
+                      </button>
+                    </React.Fragment>
+                  );
+                });
+              })()}
             </div>
           </div>
 
@@ -1283,26 +1567,60 @@ const CBTPage = () => {
           </div>
 
           <div className="grid grid-cols-5 gap-3 sm:gap-4 overflow-y-auto max-h-[60vh] pr-2">
-            {questions.map((q, i) => {
-              const isQuestionAnswered = (id: string) => {
-                const ans = answers[id];
-                if (ans === undefined || ans === null) return false;
-                if (typeof ans === 'string') return ans.trim().length > 0;
-                if (Array.isArray(ans)) return ans.length > 0;
-                if (typeof ans === 'object') return Object.keys(ans).length > 0;
-                return true;
-              };
-              return (
-                <button key={q.id} onClick={() => { setCurrentQuestionIndex(i); setIsNavModalOpen(false); }} className={`aspect-square rounded-2xl flex items-center justify-center font-black text-xl border-3 transition-all active:scale-90 ${i === currentQuestionIndex
-                  ? "bg-emerald-700 border-emerald-700 text-white shadow-2xl ring-2 ring-emerald-500 ring-offset-2 dark:ring-offset-slate-950"
-                  : isQuestionAnswered(q.id)
-                    ? "bg-emerald-500 border-emerald-500 text-white shadow-md shadow-emerald-500/20"
-                    : flaggedQuestions[q.id]
-                      ? "bg-amber-500 border-amber-600 text-white shadow-xl shadow-amber-500/20"
-                      : "bg-slate-50 dark:bg-slate-900 border-slate-100 dark:border-slate-800 text-slate-400 dark:text-slate-500"
-                  }`}>{i + 1}</button>
-              );
-            })}
+            {(() => {
+              let separatorShown = false;
+              return questions.map((q, i) => {
+                const t = q.type || "pilihan_ganda";
+                const isEssay = t === "isian_singkat" || t === "uraian";
+                const showSeparator = isEssay && !separatorShown;
+                if (isEssay) separatorShown = true;
+                const isQuestionAnswered = (id: string) => {
+                  const ans = answers[id];
+                  if (ans === undefined || ans === null) return false;
+                  if (typeof ans === 'string') return ans.trim().length > 0;
+                  if (Array.isArray(ans)) return ans.length > 0;
+                  if (typeof ans === 'object') return Object.keys(ans).length > 0;
+                  return true;
+                };
+                
+                // Hide essay if objectives not done
+                if (isEssay && !allObjectiveAnswered) {
+                  if (showSeparator) {
+                    return (
+                      <React.Fragment key={q.id}>
+                        <div className="col-span-5 flex items-center gap-2 py-2 my-1">
+                          <div className="flex-1 h-px bg-amber-200 dark:bg-amber-800/40"></div>
+                          <span className="text-[9px] font-black text-amber-600 dark:text-amber-400 uppercase tracking-widest whitespace-nowrap flex items-center gap-1"><Lock className="w-3 h-3" /> Terkunci</span>
+                          <div className="flex-1 h-px bg-amber-200 dark:bg-amber-800/40"></div>
+                        </div>
+                      </React.Fragment>
+                    );
+                  }
+                  return null;
+                }
+                return (
+                  <React.Fragment key={q.id}>
+                    {showSeparator && (
+                      <div className="col-span-5 flex items-center gap-2 py-2 my-1">
+                        <div className="flex-1 h-px bg-amber-200 dark:bg-amber-800/40"></div>
+                        <span className="text-[9px] font-black text-amber-600 dark:text-amber-400 uppercase tracking-widest whitespace-nowrap">Uraian / Isian</span>
+                        <div className="flex-1 h-px bg-amber-200 dark:bg-amber-800/40"></div>
+                      </div>
+                    )}
+                    <button onClick={() => { setCurrentQuestionIndex(i); setIsNavModalOpen(false); }} className={`aspect-square rounded-2xl flex items-center justify-center font-black text-xl border-3 transition-all active:scale-90 ${i === currentQuestionIndex
+                      ? "bg-emerald-700 border-emerald-700 text-white shadow-2xl ring-2 ring-emerald-500 ring-offset-2 dark:ring-offset-slate-950"
+                      : isQuestionAnswered(q.id)
+                        ? "bg-emerald-500 border-emerald-500 text-white shadow-md shadow-emerald-500/20"
+                        : flaggedQuestions[q.id]
+                          ? "bg-amber-500 border-amber-600 text-white shadow-xl shadow-amber-500/20"
+                          : isEssay
+                            ? "bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800/40 text-amber-500 dark:text-amber-400"
+                            : "bg-slate-50 dark:bg-slate-900 border-slate-100 dark:border-slate-800 text-slate-400 dark:text-slate-500"
+                      }`}>{i + 1}</button>
+                  </React.Fragment>
+                );
+              });
+            })()}
           </div>
         </DialogContent>
       </Dialog>

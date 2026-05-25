@@ -168,7 +168,7 @@ const QuestionsPage = () => {
   const { user, role, teacherId } = useAuth();
   const { school, pb, terminology } = useTenant();
   const { addToast } = useToast();
-  const { subjects, teachers, teacherFullAccess } = useExamData();
+  const { subjects, teachers, teacherFullAccess, teacherAIAccess } = useExamData();
 
   // 📝 Manage Allowed Question Types
   const [allowedTypes, setAllowedTypes] = useState<Record<string, boolean>>({
@@ -267,6 +267,8 @@ const QuestionsPage = () => {
 
   const [isLiterasiActive, setIsLiterasiActive] = useState(false);
   const [literasiMode, setLiterasiMode] = useState<"select" | "create">("select");
+  const [isRenamingLiterasi, setIsRenamingLiterasi] = useState(false);
+  const [renameLiterasiValue, setRenameLiterasiValue] = useState("");
 
   const existingLiteracies = useMemo(() => {
     const map: Record<string, string> = {};
@@ -530,6 +532,7 @@ const QuestionsPage = () => {
 
   const [isBatchModalOpen, setIsBatchModalOpen] = useState(false);
   const [isSavingBatch, setIsSavingBatch] = useState(false);
+  const [batchDragState, setBatchDragState] = useState<{ questionIndex: number; itemIndex: number } | null>(null);
   const [confirmModal, setConfirmModal] = useState<any>({ isOpen: false, title: "", description: "", type: "info", confirmLabel: "Ok", onConfirm: () => { } });
 
   const showAlert = (title: string, description: string, type: "success" | "danger" | "warning" | "info" = "info", onConfirm?: () => void, showCancel: boolean = false, confirmLabel: string = "OK") => {
@@ -678,20 +681,30 @@ const QuestionsPage = () => {
       );
       
       const questionsForReview = generated.map(q => {
+        const qType = q.type || aiType;
         const choicesBatch: Record<string, { text: string }> = {};
-        let correctKey = (q.answerKey || "").toLowerCase();
-        if (q.choices) {
+        let correctKey = "";
+        
+        // For choice-based types
+        if (q.choices && (qType === "pilihan_ganda" || qType === "pilihan_ganda_kompleks" || qType === "benar_salah")) {
+          const correctKeys: string[] = [];
           Object.keys(q.choices).forEach(key => {
             choicesBatch[key] = { text: q.choices![key].text };
-            if (q.choices![key].isCorrect) correctKey = key;
+            if (q.choices![key].isCorrect) {
+              correctKeys.push(key);
+            }
           });
+          correctKey = correctKeys.length > 0 ? correctKeys.join(",") : (q.answerKey || "").toLowerCase();
         }
+        
         return {
           text: q.text,
-          type: q.type || aiType,
-          choices: choicesBatch,
+          type: qType,
+          choices: Object.keys(choicesBatch).length > 0 ? choicesBatch : undefined,
           correctKey: correctKey,
           answerKey: q.answerKey || "",
+          pairs: q.pairs || (qType === "menjodohkan" ? [] : undefined),
+          items: q.items || (qType === "urutkan" || qType === "drag_drop" ? [] : undefined),
           groupId: q.groupId || "",
           groupText: q.groupText || "",
           isFromAI: true
@@ -879,27 +892,42 @@ const QuestionsPage = () => {
         const field = typeMap[type] || "multiple_choice";
         
         // Handle Options mapping for different types
-        let options = q.choices || {};
-        if (type === "menjodohkan") options = { pairs: q.pairs || [] };
-        if (type === "urutkan" || type === "drag_drop") options = { items: q.items || [] };
-
-        // Determine correct answer
-        let correctAnswer = q.correctAnswer || q.answerKey || "";
-        if (!correctAnswer && q.choices) {
-          const correctKeys = Object.keys(q.choices).filter(k => q.choices[k].isCorrect);
-          correctAnswer = correctKeys.join(",");
+        let options: any = {};
+        if (type === "pilihan_ganda" || type === "pilihan_ganda_kompleks" || type === "benar_salah") {
+          options = q.choices || {};
+        } else if (type === "menjodohkan") {
+          options = { pairs: q.pairs || [] };
+        } else if (type === "urutkan" || type === "drag_drop") {
+          options = { items: q.items || [] };
         }
 
-        await pb.collection("questions").create({
+        // Determine correct answer
+        let correctAnswer = "";
+        if (type === "pilihan_ganda" || type === "pilihan_ganda_kompleks" || type === "benar_salah") {
+          correctAnswer = q.correctAnswer || q.answerKey || "";
+          if (!correctAnswer && q.choices) {
+            const correctKeys = Object.keys(q.choices).filter(k => q.choices[k].isCorrect);
+            correctAnswer = correctKeys.join(",");
+          }
+        } else if (type === "isian_singkat" || type === "uraian") {
+          correctAnswer = q.answerKey || "";
+        }
+        // menjodohkan/urutkan/drag_drop: correctAnswer stays empty, answer is in options structure
+
+        const createPayload: any = {
           examId,
           text: q.text || "Pertanyaan Tanpa Judul",
           field: field,
           options: options,
           correctAnswer: correctAnswer,
-          groupId: q.groupId || "",
-          groupText: q.groupText || "",
           order: (questions.length || 0) + count + 1
-        });
+        };
+        
+        // Only add optional fields if they have values
+        if (q.groupId) { createPayload.groupId = q.groupId; createPayload.group_id = q.groupId; }
+        if (q.groupText) { createPayload.groupText = q.groupText; createPayload.group_text = q.groupText; }
+
+        await pb.collection("questions").create(createPayload);
         count++;
         const progress = Math.round((count / parsedResults.length) * 100);
         setImportProgress(progress);
@@ -918,9 +946,10 @@ const QuestionsPage = () => {
       setParsedResults([]);
       loadQuestions();
     } catch (err: any) {
+      console.error("Save AI Import Error:", err, err?.data);
       addToast({
         title: "Gagal Menyimpan",
-        description: err.message || "Beberapa soal mungkin gagal diimpor.",
+        description: (err?.data ? JSON.stringify(err.data) : err.message) || "Beberapa soal mungkin gagal diimpor.",
         type: "error"
       });
     } finally {
@@ -1075,8 +1104,20 @@ const QuestionsPage = () => {
 
     // Validate all must have key
     const hasEmptyKeys = validQuestions.some(q => {
+      const qType = q.type || "pilihan_ganda";
+      // Skip key validation for non-choice types
+      if (qType === "menjodohkan") return false; // pairs can be edited in batch modal
+      if (qType === "urutkan" || qType === "drag_drop") return false; // items can be edited in batch modal
+      if (qType === "isian_singkat" || qType === "uraian") return false;
       if (!q.correctKey) return true;
-      const correctChoice = q.choices[q.correctKey];
+      
+      // For pilihan_ganda_kompleks, correctKey is comma-separated
+      if (qType === "pilihan_ganda_kompleks") {
+        const keys = q.correctKey.split(",").map((k: string) => k.trim()).filter(Boolean);
+        return keys.length === 0 || keys.some((k: string) => !q.choices?.[k]?.text?.trim());
+      }
+      
+      const correctChoice = q.choices?.[q.correctKey];
       return !correctChoice || !correctChoice.text || correctChoice.text.trim() === "";
     });
 
@@ -1127,26 +1168,51 @@ const QuestionsPage = () => {
           }
         }
 
-        const choicesToSave: any = {};
-        Object.keys(q.choices).forEach((key) => {
-          choicesToSave[key] = {
-            text: q.choices[key].text,
-            isCorrect: key === q.correctKey
-          };
-        });
+        const qType = q.type || "pilihan_ganda";
+        
+        // Build options based on question type
+        let optionsToSave: any = {};
+        let correctAnswer = q.correctKey || "";
+        
+        if (qType === "pilihan_ganda" || qType === "pilihan_ganda_kompleks" || qType === "benar_salah") {
+          // Choice-based: options = {a: {text, isCorrect}, b: {...}, ...}
+          Object.keys(q.choices || {}).forEach((key) => {
+            const choiceText = q.choices[key]?.text || "";
+            // Skip empty choices (but keep benar_salah choices even if text seems empty)
+            if (!choiceText.trim() && qType !== "benar_salah") return;
+            optionsToSave[key] = {
+              text: choiceText,
+              isCorrect: qType === "pilihan_ganda_kompleks" 
+                ? (q.correctKey || "").split(",").map((k: string) => k.trim()).includes(key)
+                : key === q.correctKey
+            };
+          });
+          correctAnswer = q.correctKey || "";
+        } else if (qType === "menjodohkan") {
+          // Matching: options = { pairs: [{id, left, right}, ...] }
+          optionsToSave = { pairs: q.pairs || [] };
+          correctAnswer = ""; // Answer is embedded in pairs structure
+        } else if (qType === "urutkan" || qType === "drag_drop") {
+          // Sequence/DragDrop: options = { items: [{id, text}, ...] }
+          optionsToSave = { items: q.items || [] };
+          correctAnswer = ""; // Correct order is the items array order
+        } else if (qType === "isian_singkat" || qType === "uraian") {
+          // Essay/Short answer: no options, just answerKey
+          optionsToSave = {};
+          correctAnswer = q.answerKey || "";
+        }
 
         const payload: any = {
           examId,
-          // If from AI, text is already formatted. If manual batch, wrap in <p>.
           text: q.isFromAI ? q.text : `<p>${q.text}</p>`, 
-          field: typeMap[q.type || "pilihan_ganda"] || "multiple_choice", 
-          options: choicesToSave,
-          correctAnswer: q.correctKey,
+          field: typeMap[qType] || "multiple_choice", 
+          options: optionsToSave,
+          correctAnswer: correctAnswer,
           order: currentOrder++,
           groupId: q.groupId || "",
-          group_id: q.groupId || "", // PocketBase alias
+          group_id: q.groupId || "",
           groupText: q.groupText || "",
-          group_text: q.groupText || "" // PocketBase alias
+          group_text: q.groupText || ""
         };
 
         if (imageUrl) {
@@ -1711,7 +1777,25 @@ const QuestionsPage = () => {
       console.log("💾 Menempelkan Payload Soal (Dual Format):", payload);
 
       if (dialogMode === "edit" && selectedQuestion) {
+        // Jika ini soal utama literasi dan groupId/groupText berubah, propagate ke semua soal sepaket
+        const oldGroupId = selectedQuestion.groupId || "";
+        const newGroupId = payload.groupId || "";
+        const newGroupText = payload.groupText || "";
+        const isGroupChanged = oldGroupId && newGroupId && (oldGroupId !== newGroupId || (selectedQuestion.groupText || "") !== newGroupText);
+        
         await pb.collection('questions').update(selectedQuestion.id, payload);
+        
+        if (isGroupChanged) {
+          // Update semua soal lain dalam grup lama
+          const siblingQuestions = questions.filter(q => q.id !== selectedQuestion.id && q.groupId === oldGroupId);
+          for (const sibling of siblingQuestions) {
+            await pb.collection('questions').update(sibling.id, {
+              groupId: newGroupId, group_id: newGroupId,
+              groupText: newGroupText, group_text: newGroupText
+            });
+          }
+        }
+        
         setIsDialogOpen(false);
         showAlert("Berhasil", "Soal berhasil diperbarui.", "success");
       } else {
@@ -1816,6 +1900,55 @@ const QuestionsPage = () => {
     } finally {
       setIsDeleting(false);
       setDeleteDialogOpen(false);
+    }
+  };
+
+  // ═══ Hapus Paket Literasi (hapus groupId & groupText dari semua soal dalam grup) ═══
+  const handleDeleteLiterasi = async (groupId: string) => {
+    if (!pb || !groupId) return;
+    showAlert(
+      "Hapus Paket Literasi",
+      `Yakin ingin menghapus paket literasi "${groupId}"? Semua soal dalam paket ini akan dilepas dari grup (soal TIDAK dihapus, hanya dilepas dari literasi).`,
+      "warning",
+      async () => {
+        try {
+          const groupQuestions = questions.filter(q => q.groupId === groupId);
+          for (const q of groupQuestions) {
+            await pb.collection('questions').update(q.id, {
+              groupId: "", group_id: "", groupText: "", group_text: ""
+            });
+          }
+          addToast({ title: "Berhasil", description: `Paket literasi "${groupId}" berhasil dihapus.`, type: "success" });
+          loadQuestions();
+        } catch (e) {
+          addToast({ title: "Gagal", description: "Gagal menghapus paket literasi.", type: "error" });
+        }
+      },
+      true,
+      "Hapus"
+    );
+  };
+
+  // ═══ Rename Paket Literasi (update groupId di semua soal dalam grup) ═══
+  const handleRenameLiterasi = async (oldGroupId: string, newGroupId: string) => {
+    if (!pb || !oldGroupId || !newGroupId.trim()) return;
+    if (oldGroupId === newGroupId.trim()) {
+      setIsRenamingLiterasi(false);
+      return;
+    }
+    try {
+      const groupQuestions = questions.filter(q => q.groupId === oldGroupId);
+      for (const q of groupQuestions) {
+        await pb.collection('questions').update(q.id, {
+          groupId: newGroupId.trim(), group_id: newGroupId.trim()
+        });
+      }
+      addToast({ title: "Berhasil", description: `Paket literasi diubah dari "${oldGroupId}" → "${newGroupId.trim()}".`, type: "success" });
+      setIsRenamingLiterasi(false);
+      setFormValues(prev => ({ ...prev, groupId: newGroupId.trim() }));
+      loadQuestions();
+    } catch (e) {
+      addToast({ title: "Gagal", description: "Gagal mengubah nama paket literasi.", type: "error" });
     }
   };
 
@@ -2096,13 +2229,48 @@ const QuestionsPage = () => {
       const parsed = await parseQuestionsFromWord(file);
       if (parsed.length === 0) throw new Error("Tidak ada soal yang dikenali dalam file.");
 
-      setBatchProgress(prev => ({ ...prev, total: parsed.length, message: `Menyiapkan import ${parsed.length} soal...` }));
+      // ─── DUPLICATE DETECTION & UNIQUE GROUP ID ─────────────────────────
+      // Fetch existing questions for this exam to check duplicates
+      const existingQuestions = await pb!.collection('questions').getFullList({ filter: `examId = "${examId}"` });
+      const existingTexts = new Set(existingQuestions.map(q => (q.text || "").replace(/<[^>]*>/g, '').trim().toLowerCase().substring(0, 80)));
+      const existingGroupIds = new Set(existingQuestions.map(q => q.groupId || q.group_id || "").filter(Boolean));
+
+      // Filter out duplicates (same question text already exists)
+      const uniqueParsed = parsed.filter(q => {
+        const cleanText = (q.text || "").replace(/<[^>]*>/g, '').trim().toLowerCase().substring(0, 80);
+        return cleanText.length > 0 && !existingTexts.has(cleanText);
+      });
+
+      // Make groupIds unique if they already exist in DB
+      const groupIdRemap = new Map<string, string>();
+      uniqueParsed.forEach(q => {
+        if (q.groupId && !groupIdRemap.has(q.groupId)) {
+          let newId = q.groupId;
+          if (existingGroupIds.has(newId)) {
+            // Add unique suffix
+            const suffix = Math.random().toString(36).substring(2, 6).toUpperCase();
+            newId = `${q.groupId}-${suffix}`;
+          }
+          groupIdRemap.set(q.groupId, newId);
+          existingGroupIds.add(newId); // prevent collision within same import
+        }
+      });
+      // Apply remapped groupIds
+      uniqueParsed.forEach(q => {
+        if (q.groupId && groupIdRemap.has(q.groupId)) {
+          q.groupId = groupIdRemap.get(q.groupId)!;
+        }
+      });
+
+      const skippedCount = parsed.length - uniqueParsed.length;
+
+      setBatchProgress(prev => ({ ...prev, total: uniqueParsed.length, message: `Menyiapkan import ${uniqueParsed.length} soal${skippedCount > 0 ? ` (${skippedCount} duplikat dilewati)` : ''}...` }));
 
       let importedCount = 0;
       const chunkSize = 5;
       
-      for (let i = 0; i < parsed.length; i += chunkSize) {
-        const chunk = parsed.slice(i, i + chunkSize);
+      for (let i = 0; i < uniqueParsed.length; i += chunkSize) {
+        const chunk = uniqueParsed.slice(i, i + chunkSize);
         
         await Promise.all(chunk.map(async (q, index) => {
           const actualIndex = i + index;
@@ -2146,13 +2314,23 @@ const QuestionsPage = () => {
 
           const answerKey = Object.entries(choices).find(([_, v]) => v.isCorrect)?.[0] || "";
 
-          const payload = {
+          // Determine field type based on parsed question type
+          const typeMap: Record<string, string> = {
+            pilihan_ganda: "multiple_choice",
+            isian_singkat: "short_answer",
+            uraian: "essay"
+          };
+          const questionType = q.type || "pilihan_ganda";
+          const fieldType = typeMap[questionType] || "multiple_choice";
+
+          const payload: any = {
             examId,
             text: q.text,
-            field: "multiple_choice",
-            type: "pilihan_ganda",
-            options: choices,
-            answerKey: answerKey.toLowerCase(),
+            field: fieldType,
+            type: questionType,
+            options: questionType === "pilihan_ganda" ? choices : {},
+            correctAnswer: questionType === "pilihan_ganda" ? answerKey.toLowerCase() : (q.answerKey || ""),
+            answerKey: questionType === "pilihan_ganda" ? answerKey.toLowerCase() : (q.answerKey || ""),
             groupId: q.groupId || "",
             groupText: q.groupText || "",
             order: (questions.length || 0) + actualIndex + 1,
@@ -2167,17 +2345,18 @@ const QuestionsPage = () => {
           }
         }));
 
-        const currentProcessed = Math.min(i + chunkSize, parsed.length);
-        const progress = Math.round((currentProcessed / parsed.length) * 100);
+        const currentProcessed = Math.min(i + chunkSize, uniqueParsed.length);
+        const progress = Math.round((currentProcessed / uniqueParsed.length) * 100);
         setImportProgress(progress);
         setBatchProgress(prev => ({
           ...prev,
           current: currentProcessed,
-          message: `Mengimport soal (${currentProcessed}/${parsed.length})`
+          message: `Mengimport soal (${currentProcessed}/${uniqueParsed.length})`
         }));
       }
 
       let message = `${importedCount} soal berhasil diimport.`;
+      if (skippedCount > 0) message += ` ${skippedCount} soal duplikat dilewati.`;
       loadQuestions();
       showAlert("Berhasil", message, "success");
     } catch (err: any) {
@@ -2427,7 +2606,7 @@ const QuestionsPage = () => {
       isOpen: true,
       total: questions.length,
       current: 0,
-      message: "Sync naskah & gambar... (Mohon Tunggu)",
+      message: "Menyiapkan export...",
       title: "Export ke Word"
     });
 
@@ -2442,170 +2621,190 @@ const QuestionsPage = () => {
         .trim();
     };
 
-    const getBase64 = async (url: string): Promise<string> => {
-      if (!url) return "";
-      const r2Domain = "pub-a1193e163fef41c9afc15d1334b8740b.r2.dev";
-      let finalUrl = url;
-      if (url.includes(r2Domain)) {
-        finalUrl = url.replace(/^https?:\/\/pub-a1193e163fef41c9afc15d1334b8740b\.r2\.dev/, "/r2-proxy");
-      } else if (!url.startsWith("http") && !url.startsWith("data:")) {
-        finalUrl = window.location.origin + (url.startsWith("/") ? url : "/" + url);
-      }
-
+    // Convert LaTeX to base64 images (fetched from codecogs in parallel)
+    const latexCache = new Map<string, string>();
+    
+    const fetchLatexImage = async (formula: string, dpi: number): Promise<string> => {
+      const cacheKey = `${dpi}_${formula}`;
+      if (latexCache.has(cacheKey)) return latexCache.get(cacheKey)!;
+      
+      const url = `https://latex.codecogs.com/png.latex?\\dpi{${dpi}}\\bg_white ${encodeURIComponent(formula)}`;
       try {
-        const response = await fetch(finalUrl, { cache: 'no-cache' });
-        if (!response.ok) return "";
-        const blob = await response.blob();
-        return new Promise((resolve) => {
+        const resp = await fetch(url);
+        if (!resp.ok) return "";
+        const blob = await resp.blob();
+        // Get actual image dimensions
+        const imgBitmap = await createImageBitmap(blob);
+        const naturalW = imgBitmap.width;
+        const naturalH = imgBitmap.height;
+        imgBitmap.close();
+        
+        const b64 = await new Promise<string>((resolve) => {
           const reader = new FileReader();
           reader.onloadend = () => resolve(reader.result as string || "");
           reader.readAsDataURL(blob);
         });
-      } catch (e) {
-        return new Promise((resolve) => {
-          const img = new window.Image();
-          img.crossOrigin = "anonymous";
-          img.onload = () => {
-             const canvas = document.createElement("canvas");
-             canvas.width = img.width; canvas.height = img.height;
-             const ctx = canvas.getContext("2d");
-             ctx?.drawImage(img, 0, 0);
-             resolve(canvas.toDataURL("image/jpeg", 0.7));
-          };
-          img.onerror = () => resolve("");
-          img.src = finalUrl;
-          setTimeout(() => resolve(""), 15000); // 15s timeout untuk gambar besar
-        });
-      }
+        // Store with dimensions: b64|width|height
+        const scaleFactor = dpi / 96; // scale down to ~96dpi display size
+        const displayW = Math.round(naturalW / scaleFactor);
+        const displayH = Math.round(naturalH / scaleFactor);
+        latexCache.set(cacheKey, `${b64}|${displayW}|${displayH}`);
+        return `${b64}|${displayW}|${displayH}`;
+      } catch { return ""; }
     };
 
-    const processHtmlLatexAndImages = async (htmlInput: string) => {
-      if (!htmlInput) return "";
-      
-      // 1. Convert LaTeX to online images first
-      let withLatexImages = htmlInput;
-      
-      // Handle display mode $$...$$ or \[...\]
+    // Pre-collect all LaTeX formulas from all questions
+    const allFormulas: Array<{ formula: string; dpi: number }> = [];
+    const extractFormulas = (text: string) => {
+      if (!text) return;
       const displayRegex = /(\$\$|\\\[)([\s\S]*?)(\$\$|\\\])/g;
-      withLatexImages = withLatexImages.replace(displayRegex, (_, _start, formula) => {
-        const cleanFormula = formula.trim().replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
-        return `<div style="text-align:center; margin: 10pt 0;"><img src="https://latex.codecogs.com/png.latex?\\dpi{150}\\bg_white ${encodeURIComponent(cleanFormula)}" alt="math" /></div>`;
-      });
-
-      // Handle inline mode $...$ or \(...\)
-      const inlineRegex = /(\$|\\\()([\s\S]*?)(\$|\\\))/g;
-      withLatexImages = withLatexImages.replace(inlineRegex, (_, _start, formula) => {
-        // Skip if it is actually part of a display math that we already processed (unlikely but safe)
-        const cleanFormula = formula.trim().replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
-        return `<img src="https://latex.codecogs.com/png.latex?\\dpi{120}\\bg_white ${encodeURIComponent(cleanFormula)}" style="vertical-align:middle;" alt="math" />`;
-      });
-      
-      const div = document.createElement('div');
-      div.innerHTML = withLatexImages;
-      
-      // 2. Process all images (including the ones we just added) to Base64
-      const imgs = div.getElementsByTagName('img');
-      for (const imgTag of Array.from(imgs)) {
-        const src = imgTag.getAttribute('src');
-        if (src && !src.startsWith('data:')) {
-          const b64 = await getBase64(src);
-          if (b64) imgTag.setAttribute('src', b64);
-          else imgTag.remove();
-        }
+      let m;
+      while ((m = displayRegex.exec(text)) !== null) {
+        const f = m[2].trim().replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').replace(/…/g, '\\ldots').replace(/\.\.\./g, '\\ldots');
+        if (f.length > 2) allFormulas.push({ formula: f, dpi: 200 });
       }
-      return cleanForWord(div.innerHTML);
+      const inlineRegex = /(?<!\$)\$([^\$\n]+?)\$(?!\$)/g;
+      while ((m = inlineRegex.exec(text)) !== null) {
+        const f = m[1].trim().replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').replace(/…/g, '\\ldots').replace(/\.\.\./g, '\\ldots');
+        if (f.length > 1 && /[\\^_{}]/.test(f)) allFormulas.push({ formula: f, dpi: 200 });
+      }
+      const parenRegex = /\\\(([\s\S]*?)\\\)/g;
+      while ((m = parenRegex.exec(text)) !== null) {
+        const f = m[1].trim().replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').replace(/…/g, '\\ldots').replace(/\.\.\./g, '\\ldots');
+        if (f.length > 1) allFormulas.push({ formula: f, dpi: 200 });
+      }
     };
 
-    let html = `
-      <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
-      <head><meta charset='utf-8'>
-      <style>
-        @page { size: A4; margin: 2cm; }
-        body { font-family: 'Times New Roman', serif; color: #000; font-size: 11pt; }
-        .kop { text-align: center; border-bottom: 2pt solid #000; margin-bottom: 15px; padding-bottom: 5px; }
-        .hanging { padding-left: 25pt; text-indent: -25pt; margin-bottom: 3pt; text-align: left; }
-        .choice { padding-left: 45pt; text-indent: -20pt; margin-bottom: 1pt; text-align: left; }
-        img { display: block; margin: 5pt 0; max-width: 280pt; height: auto; border: none; }
-        .wacana { border: 1pt solid #000; padding: 10pt; margin-bottom: 15pt; background: #f5f5f5; font-style: italic; }
-        .spacer { margin: 0; padding: 0; line-height: 12pt; font-size: 12pt; height: 12pt; }
-        p, div, span { margin: 0; padding: 0; line-height: 1.3; text-align: left; }
-      </style>
-      </head>
-      <body>
-        <div class="kop">
-          <p style="font-size: 14pt; font-weight: bold;">NASKAH SOAL UJIAN</p>
-          <p style="font-size: 12pt;">${exam?.title || "UJIAN CBT"}</p>
-          <p style="font-size: 10pt; font-weight: normal;">Mata Pelajaran: ${exam?.subject || "-"} | ${terminology.teacher}: ${exam?.teacherName || "-"}</p>
-        </div>
-        <table border="0" cellpadding="0" cellspacing="0" style="width:100%; font-size: 10pt; margin-bottom: 15pt; border: none; border-collapse: collapse;">
-          <tr>
-            <td width="15%" style="border:none; padding: 2px;">No. Peserta</td><td width="2%" style="border:none;">:</td><td width="33%" style="border:none; border-bottom: 0.5pt solid #000;"></td>
-            <td width="15%" style="border:none; padding: 2px;">${terminology.class}</td><td width="2%" style="border:none;">:</td><td style="border:none;">${exam?.level || "-"}</td>
-          </tr>
-          <tr>
-            <td style="border:none; padding: 2px;">Nama ${terminology.student}</td><td>:</td><td style="border:none; border-bottom: 0.5pt solid #000;"></td>
-            <td style="padding: 2px;">Hari/Tgl</td><td>:</td><td>..........................</td>
-          </tr>
-        </table>
-    `;
+    // Collect all formulas first
+    for (const q of questions) {
+      extractFormulas(q.text || "");
+      extractFormulas(q.groupText || "");
+      if (q.choices) {
+        Object.values(q.choices).forEach((c: any) => extractFormulas(c.text || ""));
+      }
+    }
+
+    // Fetch all formulas in parallel (batches of 10)
+    if (allFormulas.length > 0) {
+      const uniqueFormulas = [...new Map(allFormulas.map(f => [`${f.dpi}_${f.formula}`, f])).values()];
+      for (let i = 0; i < uniqueFormulas.length; i += 10) {
+        const batch = uniqueFormulas.slice(i, i + 10);
+        setBatchProgress(prev => ({ ...prev, current: Math.min(i + 10, uniqueFormulas.length), total: uniqueFormulas.length, message: `Mengunduh rumus ${Math.min(i + 10, uniqueFormulas.length)}/${uniqueFormulas.length}...` }));
+        await Promise.all(batch.map(f => fetchLatexImage(f.formula, f.dpi)));
+      }
+    }
+
+    // Replace LaTeX in text with base64 images
+    const processLatex = (htmlInput: string) => {
+      if (!htmlInput) return htmlInput;
+      let result = htmlInput;
+      const fixFormula = (f: string) => f.trim().replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').replace(/…/g, '\\ldots').replace(/\.\.\./g, '\\ldots');
+      
+      result = result.replace(/(\$\$|\\\[)([\s\S]*?)(\$\$|\\\])/g, (_, _s, formula) => {
+        const clean = fixFormula(formula);
+        const cached = latexCache.get(`200_${clean}`) || "";
+        if (!cached) return `[${clean}]`;
+        const [b64, w, h] = cached.split('|');
+        return `<br/><img src="${b64}" width="${w}" height="${h}" /><br/>`;
+      });
+      result = result.replace(/(?<!\$)(\$)([^\$\n]+?)(\$)(?!\$)/g, (_, _s, formula) => {
+        const clean = fixFormula(formula);
+        if (!/[\\^_{}]/.test(clean)) return formula; // plain number/text, keep as-is without $
+        const cached = latexCache.get(`200_${clean}`) || "";
+        if (!cached) return clean;
+        const [b64, w, h] = cached.split('|');
+        return ` <img src="${b64}" width="${w}" height="${h}" /> `;
+      });
+      result = result.replace(/(\\\()([\s\S]*?)(\\\))/g, (_, _s, formula) => {
+        const clean = fixFormula(formula);
+        const cached = latexCache.get(`200_${clean}`) || "";
+        if (!cached) return clean;
+        const [b64, w, h] = cached.split('|');
+        return ` <img src="${b64}" width="${w}" height="${h}" /> `;
+      });
+      return result;
+    };
+
+    const dateStr = new Date().toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-');
+
+    let html = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+<head><meta charset='utf-8'>
+<style>
+  @page { size: A4; margin: 2cm; }
+  body { font-family: 'Times New Roman', serif; color: #000; font-size: 11pt; }
+  .kop { text-align: center; border-bottom: 2pt solid #000; margin-bottom: 15px; padding-bottom: 5px; }
+  .hanging { padding-left: 25pt; text-indent: -25pt; margin-bottom: 3pt; text-align: left; }
+  .choice { padding-left: 45pt; text-indent: -20pt; margin-bottom: 1pt; text-align: left; }
+  img { display: block; margin: 5pt 0; max-width: 280pt; height: auto; border: none; }
+  .wacana { border: 1pt solid #000; padding: 10pt; margin-bottom: 15pt; background: #f5f5f5; font-style: italic; }
+  .spacer { margin: 0; padding: 0; line-height: 12pt; font-size: 12pt; height: 12pt; }
+  p, div, span { margin: 0; padding: 0; line-height: 1.3; text-align: left; }
+</style>
+</head>
+<body>
+  <div class="kop">
+    <p style="font-size: 14pt; font-weight: bold;">NASKAH SOAL UJIAN</p>
+    <p style="font-size: 12pt;">${exam?.title || "UJIAN CBT"}</p>
+    <p style="font-size: 10pt; font-weight: normal;">Mata Pelajaran: ${exam?.subject || "-"} | ${terminology.teacher}: ${exam?.teacherName || "-"}</p>
+  </div>
+  <table border="0" cellpadding="0" cellspacing="0" style="width:100%; font-size: 10pt; margin-bottom: 15pt; border: none; border-collapse: collapse;">
+    <tr>
+      <td width="15%" style="border:none; padding: 2px;">No. Peserta</td><td width="2%" style="border:none;">:</td><td width="33%" style="border:none; border-bottom: 0.5pt solid #000;"></td>
+      <td width="15%" style="border:none; padding: 2px;">${terminology.class}</td><td width="2%" style="border:none;">:</td><td style="border:none;">${exam?.level || "-"}</td>
+    </tr>
+    <tr>
+      <td style="border:none; padding: 2px;">Nama ${terminology.student}</td><td>:</td><td style="border:none; border-bottom: 0.5pt solid #000;"></td>
+      <td style="padding: 2px;">Hari/Tgl</td><td>:</td><td>..........................</td>
+    </tr>
+  </table>
+`;
 
     let currentGroupId = "";
     let keys = "";
 
     for (let i = 0; i < questions.length; i++) {
-        const q = questions[i];
+      const q = questions[i];
+      if (i % 5 === 0) {
         setBatchProgress(prev => ({ ...prev, current: i + 1, message: `Memproses soal #${i + 1}...` }));
+      }
 
-        if (q.groupId && q.groupId !== currentGroupId && q.groupText) {
-            const cleanWacana = await processHtmlLatexAndImages(q.groupText || "");
-            html += `<div class="wacana"><b>STIMULUS / BACAAN:</b><br/>${cleanWacana}</div>`;
-            currentGroupId = q.groupId;
+      if (q.groupId && q.groupId !== currentGroupId && q.groupText) {
+        const cleanWacana = cleanForWord(processLatex(q.groupText || ""));
+        html += `<div class="wacana"><b>STIMULUS / BACAAN:</b><br/>${cleanWacana}</div>`;
+        currentGroupId = q.groupId;
+      }
+
+      const processedQText = cleanForWord(processLatex(q.text || ""));
+      html += `<div class="hanging"><b>${i + 1}.</b> <span>${processedQText}</span></div>`;
+
+      if (q.choices) {
+        for (const letter of ['a', 'b', 'c', 'd', 'e']) {
+          const c = (q.choices as any)[letter];
+          if (c && c.text) {
+            const processedCText = cleanForWord(processLatex(c.text || ""));
+            html += `<div class="choice">${letter.toUpperCase()}. <span>${processedCText}</span></div>`;
+          }
         }
-
-        let qImg = "";
-        if (q.imageUrl) {
-          const b64 = await getBase64(q.imageUrl);
-          if (b64) qImg = `<div style="margin: 5pt 0;"><img src="${b64}" /></div>`;
-        }
-
-        const processedQText = await processHtmlLatexAndImages(q.text || "");
-        html += `<div class="hanging"><b>${i + 1}.</b> <span>${processedQText}</span>${qImg}</div>`;
-
-        if (q.choices) {
-            for (const letter of ['a', 'b', 'c', 'd', 'e']) {
-                const c = (q.choices as any)[letter];
-                if (c && c.text) {
-                    let cImg = "";
-                    if (c.imageUrl) {
-                      const cb64 = await getBase64(c.imageUrl);
-                      if (cb64) cImg = `<div style="margin: 3pt 0;"><img src="${cb64}" style="max-width: 150pt;" /></div>`;
-                    }
-                    const processedCText = await processHtmlLatexAndImages(c.text || "");
-                    html += `<div class="choice">${letter.toUpperCase()}. <span>${processedCText}</span>${cImg}</div>`;
-                }
-            }
-            html += `<p class="spacer">&nbsp;</p>`;
-
-            const ans = Object.entries(q.choices).filter(([_, v]) => (v as any).isCorrect).map(([k]) => k.toUpperCase()).join(", ");
-            keys += `<tr><td align="center">${i + 1}</td><td align="center"><b>${ans || "-"}</b></td></tr>`;
-        } else {
-            keys += `<tr><td align="center">${i + 1}</td><td>${q.answerKey || "-"}</td></tr>`;
-            html += `<p class="spacer">&nbsp;</p>`;
-        }
+        html += `<p class="spacer">&nbsp;</p>`;
+        const ans = Object.entries(q.choices).filter(([_, v]) => (v as any).isCorrect).map(([k]) => k.toUpperCase()).join(", ");
+        keys += `<tr><td align="center">${i + 1}</td><td align="center"><b>${ans || "-"}</b></td></tr>`;
+      } else {
+        keys += `<tr><td align="center">${i + 1}</td><td>${q.answerKey || "-"}</td></tr>`;
+        html += `<p class="spacer">&nbsp;</p>`;
+      }
     }
 
     html += `
-      <div style="page-break-before: always;"></div>
-      <p align="center" style="font-weight:bold; font-size:14pt; border-bottom:1pt solid #000;">KUNCI JAWABAN</p>
-      <table border="1" style="width:100%; border-collapse:collapse; margin-top:10px;">
-        <tr style="background:#eee;"><th>No</th><th>Jawaban</th></tr>
-        ${keys}
-      </table>
-    </body></html>`;
+  <div style="page-break-before: always;"></div>
+  <p align="center" style="font-weight:bold; font-size:14pt; border-bottom:1pt solid #000;">KUNCI JAWABAN</p>
+  <table border="1" style="width:100%; border-collapse:collapse; margin-top:10px;">
+    <tr style="background:#eee;"><th>No</th><th>Jawaban</th></tr>
+    ${keys}
+  </table>
+</body></html>`;
 
     const blob = new Blob(['\ufeff', html], { type: 'application/msword' });
     const url = URL.createObjectURL(blob);
-    const dateStr = new Date().toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-');
     const fileName = `${exam?.subject || "Ujian"} - ${exam?.teacherName || "Guru"} - ${dateStr}.doc`;
     
     const link = document.createElement('a');
@@ -2614,7 +2813,7 @@ const QuestionsPage = () => {
     link.click();
 
     setBatchProgress(prev => ({ ...prev, isOpen: false }));
-    addToast({ title: "Export Sukses", description: "Format sudah diperbaiki & Gambar diproses.", type: "success" });
+    addToast({ title: "Export Sukses", description: "Naskah soal berhasil diexport.", type: "success" });
   };
 
   const handleExportToJson = () => {
@@ -2773,7 +2972,7 @@ const QuestionsPage = () => {
                               </div>
                               <div className="flex flex-col min-w-0 text-left">
                                 <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">Import dari Word</span>
-                                <span className="text-[10px] text-slate-400 mt-1">Pilih file .docx standard</span>
+                                <span className="text-[10px] text-slate-400 mt-1">Pilih file .docx / .docm</span>
                               </div>
                             </DropdownMenuItem>
 
@@ -2837,19 +3036,6 @@ const QuestionsPage = () => {
                               </DropdownMenuItem>
 
                               <DropdownMenuItem 
-                                onClick={downloadWordTemplateLiterasi} 
-                                className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 focus:bg-slate-50 dark:focus:bg-slate-900 transition-colors group"
-                              >
-                                <div className="h-10 w-10 shrink-0 rounded-lg bg-orange-50 dark:bg-orange-900/30 text-orange-600 flex items-center justify-center group-hover:scale-110 transition-transform">
-                                  <FileText className="h-5 w-5" />
-                                </div>
-                                <div className="flex flex-col min-w-0">
-                                  <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">Template Word Literasi</span>
-                                  <span className="text-[10px] text-slate-400 mt-1 text-left font-bold text-orange-600 dark:text-orange-400">BARU: Support Grup Soal</span>
-                                </div>
-                              </DropdownMenuItem>
-
-                              <DropdownMenuItem 
                                 onClick={() => window.open("/templates/Template_Soal_Tabel.docx")} 
                                 className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 focus:bg-slate-50 dark:focus:bg-slate-900 transition-colors group"
                               >
@@ -2857,8 +3043,8 @@ const QuestionsPage = () => {
                                   <FileSpreadsheet className="h-5 w-5" />
                                 </div>
                                 <div className="flex flex-col min-w-0">
-                                  <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight tracking-tight">Template Word Tabel</span>
-                                  <span className="text-[10px] text-slate-400 mt-1">Download format tabel standard</span>
+                                  <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight tracking-tight">Template Word</span>
+                                  <span className="text-[10px] text-slate-400 mt-1">Download format Template Word</span>
                                 </div>
                               </DropdownMenuItem>
                             <DropdownMenuItem 
@@ -3015,7 +3201,7 @@ const QuestionsPage = () => {
 
                           <DropdownMenuSeparator className="my-1 border-slate-100 dark:border-slate-800" />
                           
-                          {(role === "admin" || (role === "teacher" && user?.ai_api_key)) && (
+                          {(role === "admin" || (role === "teacher" && (user?.ai_api_key || teacherAIAccess))) && (
                             <>
                               <DropdownMenuLabel className="text-[10px] font-bold uppercase tracking-widest text-slate-400 px-3 py-1.5 text-left">Fitur Cerdas AI</DropdownMenuLabel>
                               <DropdownMenuItem 
@@ -3295,6 +3481,61 @@ const QuestionsPage = () => {
                       ))}
                       <option value="NEW_LITERASI" className="font-bold text-blue-600">+ Buat Literasi Baru</option>
                     </select>
+
+                    {/* Tombol Rename & Hapus Literasi */}
+                    {literasiMode === "select" && formValues.groupId && formValues.groupId !== "NEW_LITERASI" && existingLiteracies[formValues.groupId] && (
+                      <div className="flex items-center gap-1.5 mt-2">
+                        {isRenamingLiterasi ? (
+                          <div className="flex items-center gap-1.5 flex-1">
+                            <Input
+                              value={renameLiterasiValue}
+                              onChange={(e) => setRenameLiterasiValue(e.target.value)}
+                              placeholder="Nama baru..."
+                              className="h-7 text-xs rounded-lg flex-1"
+                              autoFocus
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") handleRenameLiterasi(formValues.groupId || "", renameLiterasiValue);
+                                if (e.key === "Escape") setIsRenamingLiterasi(false);
+                              }}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleRenameLiterasi(formValues.groupId || "", renameLiterasiValue)}
+                              className="h-7 px-2 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 text-[10px] font-bold border border-emerald-200 dark:border-emerald-800/40 transition-colors"
+                            >
+                              <Check size={12} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setIsRenamingLiterasi(false)}
+                              className="h-7 px-2 rounded-lg bg-slate-50 dark:bg-slate-800 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 text-[10px] font-bold border border-slate-200 dark:border-slate-700 transition-colors"
+                            >
+                              <X size={12} />
+                            </button>
+                          </div>
+                        ) : (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setRenameLiterasiValue(formValues.groupId || "");
+                                setIsRenamingLiterasi(true);
+                              }}
+                              className="h-7 px-2.5 rounded-lg bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/40 text-[10px] font-bold flex items-center gap-1 border border-amber-200 dark:border-amber-800/40 transition-colors"
+                            >
+                              <Edit size={11} /> Rename
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteLiterasi(formValues.groupId || "")}
+                              className="h-7 px-2.5 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 text-[10px] font-bold flex items-center gap-1 border border-red-200 dark:border-red-800/40 transition-colors"
+                            >
+                              <Trash size={11} /> Hapus
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    )}
                     
                     {/* 🔒 Pratinjau Terkunci (Read-Only) untuk Pilih Mode */}
                     {literasiMode === "select" && formValues.groupId && existingLiteracies[formValues.groupId] && (
@@ -3916,6 +4157,25 @@ const QuestionsPage = () => {
                       {index + 1}
                     </div>
                     <span className="font-black text-slate-800 dark:text-slate-100 text-[10px] uppercase tracking-widest">Unit Soal</span>
+                    {q.type && q.type !== "pilihan_ganda" && (
+                      <span className={`text-[8px] font-bold px-2 py-0.5 rounded-full border ${
+                        q.type === "pilihan_ganda_kompleks" ? "bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-800/40" :
+                        q.type === "benar_salah" ? "bg-green-50 text-green-600 border-green-200 dark:bg-green-950/30 dark:text-green-400 dark:border-green-800/40" :
+                        q.type === "menjodohkan" ? "bg-purple-50 text-purple-600 border-purple-200 dark:bg-purple-950/30 dark:text-purple-400 dark:border-purple-800/40" :
+                        q.type === "isian_singkat" ? "bg-amber-50 text-amber-600 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-800/40" :
+                        q.type === "uraian" ? "bg-rose-50 text-rose-600 border-rose-200 dark:bg-rose-950/30 dark:text-rose-400 dark:border-rose-800/40" :
+                        q.type === "urutkan" ? "bg-orange-50 text-orange-600 border-orange-200 dark:bg-orange-950/30 dark:text-orange-400 dark:border-orange-800/40" :
+                        "bg-cyan-50 text-cyan-600 border-cyan-200 dark:bg-cyan-950/30 dark:text-cyan-400 dark:border-cyan-800/40"
+                      }`}>
+                        {q.type === "pilihan_ganda_kompleks" ? "PG Kompleks" :
+                         q.type === "benar_salah" ? "Benar/Salah" :
+                         q.type === "menjodohkan" ? "Menjodohkan" :
+                         q.type === "isian_singkat" ? "Isian Singkat" :
+                         q.type === "uraian" ? "Uraian" :
+                         q.type === "urutkan" ? "Urutkan" :
+                         q.type === "drag_drop" ? "Drag & Drop" : q.type}
+                      </span>
+                    )}
                   </div>
                   <div className="flex items-center gap-2">
                     {q.isFromAI && role === "admin" && (
@@ -4016,10 +4276,29 @@ const QuestionsPage = () => {
                       <div className="w-1.5 h-6 bg-emerald-500 rounded-full"></div>
                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Pilihan Jawaban & Kunci</p>
                     </div>
+                    {/* Fallback: if benar_salah has no choices, create default */}
+                    {q.type === "benar_salah" && (!q.choices || (!q.choices.a && !q.choices.b)) && (
+                      <div className="flex flex-col gap-2.5">
+                        {[{letter: "a", text: "Benar"}, {letter: "b", text: "Salah"}].map(({letter, text}) => {
+                          const isCorrect = q.correctKey === letter;
+                          return (
+                            <div key={letter} className={`group relative flex items-center gap-4 p-3 rounded-2xl border transition-all duration-300 ${isCorrect ? "bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-400" : "bg-slate-50 dark:bg-slate-800/30 border-slate-100 dark:border-slate-800"}`}>
+                              <button type="button" onClick={() => updateBatchItem(index, 'correctKey', letter)} className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-sm transition-all shadow-sm ${isCorrect ? "bg-emerald-600 text-white" : "bg-white dark:bg-slate-700 text-slate-400"}`}>{letter.toUpperCase()}</button>
+                              <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">{text}</span>
+                              {isCorrect && <div className="bg-emerald-600 text-white p-1 rounded-lg ml-auto"><Check className="w-3 h-3" /></div>}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                    {/* Normal choices rendering */}
+                    {(q.choices && (q.choices.a || q.choices.b)) && (
                     <div className="flex flex-col gap-2.5">
                       {['a', 'b', 'c', 'd', 'e'].map(letter => {
                         if (!q.choices?.[letter]) return null;
-                        const isCorrect = q.correctKey === letter;
+                        const isCorrect = q.type === "pilihan_ganda_kompleks" 
+                          ? (q.correctKey || "").split(",").map((k: string) => k.trim()).includes(letter)
+                          : q.correctKey === letter;
                         return (
                           <div 
                             key={letter} 
@@ -4031,7 +4310,18 @@ const QuestionsPage = () => {
                           >
                             <button
                               type="button"
-                              onClick={() => updateBatchItem(index, 'correctKey', letter)}
+                              onClick={() => {
+                                if (q.type === "pilihan_ganda_kompleks") {
+                                  // Toggle: add/remove from comma-separated list
+                                  const current = (q.correctKey || "").split(",").map((k: string) => k.trim()).filter(Boolean);
+                                  const idx = current.indexOf(letter);
+                                  if (idx >= 0) current.splice(idx, 1);
+                                  else current.push(letter);
+                                  updateBatchItem(index, 'correctKey', current.join(","));
+                                } else {
+                                  updateBatchItem(index, 'correctKey', letter);
+                                }
+                              }}
                               className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-sm transition-all shadow-sm ${
                                 isCorrect 
                                   ? "bg-emerald-600 text-white shadow-emerald-200" 
@@ -4069,18 +4359,175 @@ const QuestionsPage = () => {
                         );
                       })}
                     </div>
+                    )}
                   </div>
                 )}
 
                 {(q.type === "isian_singkat" || q.type === "uraian") && (
-                  <div className="border-t pt-2">
+                  <div className="space-y-3 pt-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-1.5 h-6 bg-amber-500 rounded-full"></div>
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                        {q.type === "isian_singkat" ? "Kunci Jawaban" : "Pedoman Penilaian"}
+                      </p>
+                    </div>
                     <input
                       type="text"
                       placeholder={q.type === "isian_singkat" ? "Kunci Jawaban Singkat..." : "Pedoman Penilaian..."}
                       value={q.answerKey || ""}
                       onChange={(e) => updateBatchItem(index, 'answerKey', e.target.value)}
-                      className="w-full text-xs p-2 rounded-lg border border-slate-200 bg-blue-50/50 dark:bg-blue-900/10 dark:border-slate-800 focus:ring-1 focus:ring-blue-500 outline-none"
+                      className="w-full text-xs p-2.5 rounded-xl border border-amber-200 dark:border-amber-800/40 bg-amber-50/50 dark:bg-amber-950/20 focus:ring-1 focus:ring-amber-500 outline-none"
                     />
+                  </div>
+                )}
+
+                {q.type === "menjodohkan" && (
+                  <div className="space-y-3 pt-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-1.5 h-6 bg-purple-500 rounded-full"></div>
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Pasangan (Kiri → Kanan)</p>
+                    </div>
+                    {(!q.pairs || q.pairs.length === 0) ? (
+                      <div className="text-center py-4 text-xs text-slate-400 italic">
+                        AI tidak menghasilkan pasangan. Tambahkan manual atau regenerasi.
+                        <Button variant="outline" size="sm" className="mt-2 text-[10px]" onClick={() => {
+                          updateBatchItem(index, 'pairs', [
+                            { id: "1", left: "", right: "" },
+                            { id: "2", left: "", right: "" },
+                            { id: "3", left: "", right: "" },
+                            { id: "4", left: "", right: "" }
+                          ]);
+                        }}>+ Tambah 4 Pasangan</Button>
+                      </div>
+                    ) : (
+                    <div className="space-y-2">
+                      {q.pairs.map((pair: any, pIdx: number) => (
+                        <div 
+                          key={pair.id || pIdx} 
+                          draggable
+                          onDragStart={() => setBatchDragState({ questionIndex: index, itemIndex: pIdx })}
+                          onDragOver={(e) => e.preventDefault()}
+                          onDrop={() => {
+                            if (!batchDragState || batchDragState.questionIndex !== index || batchDragState.itemIndex === pIdx) return;
+                            const newPairs = [...q.pairs];
+                            const temp = newPairs[batchDragState.itemIndex];
+                            newPairs[batchDragState.itemIndex] = newPairs[pIdx];
+                            newPairs[pIdx] = temp;
+                            updateBatchItem(index, 'pairs', newPairs);
+                            setBatchDragState(null);
+                          }}
+                          onDragEnd={() => setBatchDragState(null)}
+                          className={`flex items-center gap-2 p-2 rounded-xl bg-purple-50/50 dark:bg-purple-950/20 border border-purple-100 dark:border-purple-800/40 cursor-grab active:cursor-grabbing transition-opacity ${batchDragState?.questionIndex === index && batchDragState?.itemIndex === pIdx ? "opacity-50" : ""}`}
+                        >
+                          <GripVertical className="w-4 h-4 text-purple-300 flex-shrink-0" />
+                          <span className="w-6 h-6 rounded-lg bg-purple-600 text-white flex items-center justify-center text-[10px] font-black flex-shrink-0">{pIdx + 1}</span>
+                          <input
+                            type="text"
+                            value={pair.left}
+                            onChange={(e) => {
+                              const updatedPairs = [...q.pairs];
+                              updatedPairs[pIdx] = { ...updatedPairs[pIdx], left: e.target.value };
+                              updateBatchItem(index, 'pairs', updatedPairs);
+                            }}
+                            className="flex-1 text-xs p-1.5 rounded-lg border border-purple-200 dark:border-purple-800 bg-white dark:bg-slate-800 focus:ring-1 focus:ring-purple-500 outline-none"
+                            placeholder="Item kiri..."
+                          />
+                          <Forward className="w-4 h-4 text-purple-400 flex-shrink-0" />
+                          <input
+                            type="text"
+                            value={pair.right}
+                            onChange={(e) => {
+                              const updatedPairs = [...q.pairs];
+                              updatedPairs[pIdx] = { ...updatedPairs[pIdx], right: e.target.value };
+                              updateBatchItem(index, 'pairs', updatedPairs);
+                            }}
+                            className="flex-1 text-xs p-1.5 rounded-lg border border-purple-200 dark:border-purple-800 bg-white dark:bg-slate-800 focus:ring-1 focus:ring-purple-500 outline-none"
+                            placeholder="Pasangan kanan..."
+                          />
+                          <button type="button" onClick={() => {
+                            const newPairs = q.pairs.filter((_: any, i: number) => i !== pIdx);
+                            updateBatchItem(index, 'pairs', newPairs);
+                          }} className="text-red-300 hover:text-red-500 transition-colors flex-shrink-0">
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                      <Button variant="ghost" size="sm" className="text-[10px] text-purple-500" onClick={() => {
+                        const newPairs = [...(q.pairs || []), { id: String((q.pairs?.length || 0) + 1), left: "", right: "" }];
+                        updateBatchItem(index, 'pairs', newPairs);
+                      }}>+ Tambah Pasangan</Button>
+                    </div>
+                    )}
+                  </div>
+                )}
+
+                {(q.type === "urutkan" || q.type === "drag_drop") && (
+                  <div className="space-y-3 pt-2">
+                    <div className="flex items-center gap-2">
+                      <div className={`w-1.5 h-6 ${q.type === "urutkan" ? "bg-orange-500" : "bg-cyan-500"} rounded-full`}></div>
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                        {q.type === "urutkan" ? "Urutan Benar (atas → bawah)" : "Item (urutan benar)"}
+                      </p>
+                    </div>
+                    {(!q.items || q.items.length === 0) ? (
+                      <div className="text-center py-4 text-xs text-slate-400 italic">
+                        AI tidak menghasilkan item. Tambahkan manual atau regenerasi.
+                        <Button variant="outline" size="sm" className="mt-2 text-[10px]" onClick={() => {
+                          updateBatchItem(index, 'items', [
+                            { id: "1", text: "" },
+                            { id: "2", text: "" },
+                            { id: "3", text: "" },
+                            { id: "4", text: "" }
+                          ]);
+                        }}>+ Tambah 4 Item</Button>
+                      </div>
+                    ) : (
+                    <div className="space-y-2">
+                      {q.items.map((item: any, iIdx: number) => (
+                        <div 
+                          key={item.id || iIdx} 
+                          draggable
+                          onDragStart={() => setBatchDragState({ questionIndex: index, itemIndex: iIdx })}
+                          onDragOver={(e) => e.preventDefault()}
+                          onDrop={() => {
+                            if (!batchDragState || batchDragState.questionIndex !== index || batchDragState.itemIndex === iIdx) return;
+                            const newItems = [...q.items];
+                            const temp = newItems[batchDragState.itemIndex];
+                            newItems[batchDragState.itemIndex] = newItems[iIdx];
+                            newItems[iIdx] = temp;
+                            updateBatchItem(index, 'items', newItems);
+                            setBatchDragState(null);
+                          }}
+                          onDragEnd={() => setBatchDragState(null)}
+                          className={`flex items-center gap-2 p-2 rounded-xl cursor-grab active:cursor-grabbing transition-opacity ${q.type === "urutkan" ? "bg-orange-50/50 dark:bg-orange-950/20 border border-orange-100 dark:border-orange-800/40" : "bg-cyan-50/50 dark:bg-cyan-950/20 border border-cyan-100 dark:border-cyan-800/40"} ${batchDragState?.questionIndex === index && batchDragState?.itemIndex === iIdx ? "opacity-50" : ""}`}
+                        >
+                          <GripVertical className={`w-4 h-4 flex-shrink-0 ${q.type === "urutkan" ? "text-orange-300" : "text-cyan-300"}`} />
+                          <span className={`w-6 h-6 rounded-lg ${q.type === "urutkan" ? "bg-orange-600" : "bg-cyan-600"} text-white flex items-center justify-center text-[10px] font-black flex-shrink-0`}>{iIdx + 1}</span>
+                          <input
+                            type="text"
+                            value={item.text}
+                            onChange={(e) => {
+                              const updatedItems = [...q.items];
+                              updatedItems[iIdx] = { ...updatedItems[iIdx], text: e.target.value };
+                              updateBatchItem(index, 'items', updatedItems);
+                            }}
+                            className={`flex-1 text-xs p-1.5 rounded-lg border ${q.type === "urutkan" ? "border-orange-200 dark:border-orange-800" : "border-cyan-200 dark:border-cyan-800"} bg-white dark:bg-slate-800 focus:ring-1 ${q.type === "urutkan" ? "focus:ring-orange-500" : "focus:ring-cyan-500"} outline-none`}
+                            placeholder={`Item ${iIdx + 1}...`}
+                          />
+                          <button type="button" onClick={() => {
+                            const newItems = q.items.filter((_: any, i: number) => i !== iIdx);
+                            updateBatchItem(index, 'items', newItems);
+                          }} className="text-red-300 hover:text-red-500 transition-colors flex-shrink-0">
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                      <Button variant="ghost" size="sm" className={`text-[10px] ${q.type === "urutkan" ? "text-orange-500" : "text-cyan-500"}`} onClick={() => {
+                        const newItems = [...(q.items || []), { id: String((q.items?.length || 0) + 1), text: "" }];
+                        updateBatchItem(index, 'items', newItems);
+                      }}>+ Tambah Item</Button>
+                    </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -4090,7 +4537,7 @@ const QuestionsPage = () => {
               <Button type="button" variant="outline" size="sm" onClick={handleAddBatchRow} className="rounded-xl flex items-center gap-1 text-slate-600 dark:text-slate-400 text-xs h-9">
                 <Plus className="h-3.5 w-3.5" /> Tambah Manual
               </Button>
-              {(role === "admin" || (role === "teacher" && user?.ai_api_key)) && batchQuestions.some(q => q.isFromAI) && (
+              {(role === "admin" || (role === "teacher" && (user?.ai_api_key || teacherAIAccess))) && batchQuestions.some(q => q.isFromAI) && (
                 <>
                   <Button 
                     type="button" 
@@ -4331,7 +4778,10 @@ const QuestionsPage = () => {
                   {allowedTypes.pilihan_ganda && <option value="pilihan_ganda">Pilihan Ganda</option>}
                   {allowedTypes.pilihan_ganda_kompleks && <option value="pilihan_ganda_kompleks">PG Kompleks</option>}
                   {allowedTypes.benar_salah && <option value="benar_salah">Benar / Salah</option>}
+                  {allowedTypes.menjodohkan && <option value="menjodohkan">Menjodohkan</option>}
                   {allowedTypes.isian_singkat && <option value="isian_singkat">Isian Singkat</option>}
+                  {allowedTypes.urutkan && <option value="urutkan">Mengurutkan</option>}
+                  {allowedTypes.drag_drop && <option value="drag_drop">Drag & Drop</option>}
                   {allowedTypes.uraian && <option value="uraian">Uraian / Essay</option>}
                 </select>
               </FormField>
@@ -4524,6 +4974,8 @@ const QuestionsPage = () => {
                         <option value="benar_salah">Benar / Salah</option>
                         <option value="menjodohkan">Menjodohkan</option>
                         <option value="isian_singkat">Isian Singkat</option>
+                        <option value="urutkan">Mengurutkan</option>
+                        <option value="drag_drop">Drag & Drop</option>
                         <option value="uraian">Uraian / Essay</option>
                       </Select>
                     </div>
@@ -4535,7 +4987,7 @@ const QuestionsPage = () => {
                       <label className="flex items-center justify-center gap-2 w-full p-4 border-2 border-dashed border-emerald-200 dark:border-emerald-800/40 rounded-2xl bg-emerald-50/30 dark:bg-emerald-950/10 cursor-pointer hover:bg-emerald-50 dark:hover:bg-emerald-950/20 transition-all group">
                         <Plus className="w-5 h-5 text-emerald-600 group-hover:scale-110 transition-transform" />
                         <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400">Pilih File PDF / Word</span>
-                        <input type="file" className="hidden" accept=".pdf,.docx" onChange={handleFileUpload} disabled={isParsing} />
+                        <input type="file" className="hidden" accept=".pdf,.docx,.docm" onChange={handleFileUpload} disabled={isParsing} />
                       </label>
                    </div>
                    <div className="text-slate-400 text-xs font-bold">ATAU</div>
@@ -4641,8 +5093,30 @@ const QuestionsPage = () => {
                              </div>
                            )}
                            <MathText content={q.text} className="text-sm font-bold text-slate-800 dark:text-slate-100 leading-normal" />
+                           {/* Type badge */}
+                           {q.type && q.type !== "pilihan_ganda" && (
+                             <span className={`inline-block text-[9px] font-bold px-2 py-0.5 rounded-full border ${
+                               q.type === "pilihan_ganda_kompleks" ? "bg-blue-50 text-blue-600 border-blue-200" :
+                               q.type === "benar_salah" ? "bg-green-50 text-green-600 border-green-200" :
+                               q.type === "menjodohkan" ? "bg-purple-50 text-purple-600 border-purple-200" :
+                               q.type === "isian_singkat" ? "bg-amber-50 text-amber-600 border-amber-200" :
+                               q.type === "uraian" ? "bg-rose-50 text-rose-600 border-rose-200" :
+                               q.type === "urutkan" ? "bg-orange-50 text-orange-600 border-orange-200" :
+                               "bg-cyan-50 text-cyan-600 border-cyan-200"
+                             }`}>
+                               {q.type === "pilihan_ganda_kompleks" ? "PG Kompleks" :
+                                q.type === "benar_salah" ? "Benar/Salah" :
+                                q.type === "menjodohkan" ? "Menjodohkan" :
+                                q.type === "isian_singkat" ? "Isian Singkat" :
+                                q.type === "uraian" ? "Uraian" :
+                                q.type === "urutkan" ? "Urutkan" :
+                                q.type === "drag_drop" ? "Drag & Drop" : q.type}
+                             </span>
+                           )}
+                           {/* Choices (pilihan ganda, benar/salah) */}
+                           {q.choices && Object.keys(q.choices).length > 0 && (
                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 mt-2">
-                             {q.choices && Object.entries(q.choices).map(([key, val]: [string, any]) => (
+                             {Object.entries(q.choices).map(([key, val]: [string, any]) => (
                                <div key={key} className={`p-2.5 rounded-xl border flex items-center gap-3 transition-all ${val.isCorrect ? 'bg-emerald-50 border-emerald-200 dark:bg-emerald-950/20 dark:border-emerald-800/40 text-emerald-700 dark:text-emerald-400' : 'bg-slate-50/50 dark:bg-slate-800/40 border-slate-100 dark:border-slate-700 text-slate-500 dark:text-slate-400'}`}>
                                  <div className={`w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-black uppercase shrink-0 ${val.isCorrect ? 'bg-emerald-500 text-white shadow-md' : 'bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-800'}`}>
                                    {key}
@@ -4652,6 +5126,38 @@ const QuestionsPage = () => {
                                </div>
                              ))}
                            </div>
+                           )}
+                           {/* Pairs (menjodohkan) */}
+                           {q.pairs && q.pairs.length > 0 && (
+                             <div className="space-y-2 mt-2">
+                               {q.pairs.map((p: any, pIdx: number) => (
+                                 <div key={p.id || pIdx} className="flex items-center gap-2 p-2 rounded-xl bg-purple-50/50 dark:bg-purple-950/20 border border-purple-100 dark:border-purple-800/40">
+                                   <span className="w-5 h-5 rounded bg-purple-600 text-white flex items-center justify-center text-[9px] font-black shrink-0">{pIdx + 1}</span>
+                                   <span className="flex-1 text-[11px] font-semibold text-slate-700 dark:text-slate-300">{p.left}</span>
+                                   <Forward className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                                   <span className="flex-1 text-[11px] font-bold text-purple-600 dark:text-purple-400">{p.right}</span>
+                                 </div>
+                               ))}
+                             </div>
+                           )}
+                           {/* Items (urutkan / drag_drop) */}
+                           {q.items && q.items.length > 0 && (
+                             <div className="space-y-1.5 mt-2">
+                               {q.items.map((item: any, iIdx: number) => (
+                                 <div key={item.id || iIdx} className={`flex items-center gap-2 p-2 rounded-xl ${q.type === "urutkan" ? "bg-orange-50/50 border border-orange-100" : "bg-cyan-50/50 border border-cyan-100"}`}>
+                                   <span className={`w-5 h-5 rounded ${q.type === "urutkan" ? "bg-orange-600" : "bg-cyan-600"} text-white flex items-center justify-center text-[9px] font-black shrink-0`}>{iIdx + 1}</span>
+                                   <span className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">{item.text}</span>
+                                 </div>
+                               ))}
+                             </div>
+                           )}
+                           {/* Answer key (isian singkat / uraian) */}
+                           {(q.type === "isian_singkat" || q.type === "uraian") && q.answerKey && (
+                             <div className="mt-2 p-3 rounded-xl bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/40">
+                               <p className="text-[9px] font-black text-amber-500 uppercase tracking-widest mb-1">{q.type === "isian_singkat" ? "Kunci Jawaban" : "Pedoman Penilaian"}</p>
+                               <p className="text-[11px] font-bold text-amber-700 dark:text-amber-300">{q.answerKey}</p>
+                             </div>
+                           )}
                         </div>
                       </div>
                     </div>
@@ -4989,7 +5495,7 @@ const QuestionsPage = () => {
         if (file) handleImportExcel(file);
         e.target.value = "";
       }} />
-      <input id="word-import-input" type="file" className="hidden" accept=".docx" onChange={(e) => {
+      <input id="word-import-input" type="file" className="hidden" accept=".docx,.docm" onChange={(e) => {
         const file = e.target.files?.[0];
         if (file) handleImportWord(file);
         e.target.value = "";

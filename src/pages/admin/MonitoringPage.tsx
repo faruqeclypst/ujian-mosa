@@ -23,6 +23,7 @@ import {
   Clock,
   ShieldAlert
 } from "lucide-react";
+import { Sparkles } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import * as XLSX from "xlsx-js-style";
 import { Button } from "../../components/ui/button";
@@ -35,6 +36,7 @@ import { useExamData } from "../../context/ExamDataContext";
 import { useAuth } from "../../context/AuthContext";
 import { ConfirmationDialog } from "../../components/ui/confirmation-dialog";
 import { MathText } from "../../components/MathText";
+import { gradeEssayWithAI } from "../../lib/ai";
 
 export interface ExamRoomData {
   id: string;
@@ -143,10 +145,12 @@ const StudentTimer = ({ attempt, room }: { attempt: any, room: any }) => {
 // 🛡️ Fuzzy Match Helper for Short Answers
 const isFuzzyMatch = (studentAns: any, correctKey: string) => {
   if (typeof studentAns !== "string" || !correctKey) return false;
-  const sAns = studentAns.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
-  const cKey = correctKey.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+  const stripHtml = (s: string) => s.replace(/<[^>]*>/g, '');
+  const sAns = stripHtml(studentAns).trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+  const cKey = stripHtml(correctKey).trim().toLowerCase().replace(/[^a-z0-9]/g, "");
   if (sAns === cKey) return true;
   if (!sAns || !cKey) return false;
+  if (sAns.includes(cKey) || cKey.includes(sAns)) return true;
   if (cKey.length < 3) return sAns === cKey;
   const distance = (a: string, b: string) => {
     const matrix = Array(b.length + 1).fill(null).map(() => Array(a.length + 1).fill(null));
@@ -161,7 +165,8 @@ const isFuzzyMatch = (studentAns: any, correctKey: string) => {
     return matrix[b.length][a.length];
   };
   const dist = distance(sAns, cKey);
-  const maxAllowed = cKey.length > 8 ? 2 : (cKey.length >= 4 ? 1 : 0);
+  const maxLen = Math.max(sAns.length, cKey.length);
+  const maxAllowed = maxLen > 10 ? 3 : (maxLen > 6 ? 2 : (maxLen >= 4 ? 1 : 0));
   return dist <= maxAllowed;
 };
 
@@ -210,22 +215,28 @@ const MonitoringPage = () => {
 
   const [searchQuery, setSearchQuery] = useState("");
 
-  // 📝 Real-time Live Score Calculator
+  // 📝 Real-time Live Score Calculator (Weighted: objective + essay)
   const getLiveScore = (sisAnswers: Record<string, any>, attOverrides: Record<string, boolean> = {}) => {
     if (!sisAnswers || monitorQuestions.length === 0) return 0;
 
-    let correctCount = 0;
+    // Fallback: read overrides from answers.__overrides__ if attOverrides is empty
+    const overrides = Object.keys(attOverrides).length > 0 ? attOverrides : ((sisAnswers as any)?.__overrides__ || {});
+
+    let objectiveCorrect = 0;
+    let objectiveTotal = 0;
+    let essayCorrect = 0;
+    let essayTotal = 0;
+
     monitorQuestions.forEach((q: any) => {
+      const type = q.type || "pilihan_ganda";
+      const isEssay = type === "isian_singkat" || type === "uraian";
       let itemCorrect = false;
 
-      // 1. Check for Manual Overrides (if teacher manually marked it)
-      if (attOverrides[q.id] !== undefined) {
-        itemCorrect = attOverrides[q.id];
+      if (overrides[q.id] !== undefined) {
+        itemCorrect = overrides[q.id];
       } else {
         const ansId = sisAnswers[q.id];
         if (ansId !== undefined && ansId !== null) {
-          const type = q.type || "pilihan_ganda";
-
           if (type === "pilihan_ganda" || type === "benar_salah") {
             const ck = Object.keys(q.choices || {}).find(k => k.toLowerCase() === String(ansId).toLowerCase());
             itemCorrect = ck ? q.choices[ck].isCorrect === true : false;
@@ -245,11 +256,24 @@ const MonitoringPage = () => {
         }
       }
 
-      if (itemCorrect) correctCount++;
+      if (isEssay) {
+        essayTotal++;
+        if (itemCorrect) essayCorrect++;
+      } else {
+        objectiveTotal++;
+        if (itemCorrect) objectiveCorrect++;
+      }
     });
 
-    const total = monitorQuestions.length;
-    return total > 0 ? Math.round((correctCount / total) * 100) : 0;
+    // Weighted final score: 40% objektif, 60% essay (jika ada essay)
+    if (essayTotal === 0) {
+      // Tidak ada essay → 100% objektif
+      return objectiveTotal > 0 ? Math.round((objectiveCorrect / objectiveTotal) * 100) : 0;
+    }
+    
+    const objScore = objectiveTotal > 0 ? (objectiveCorrect / objectiveTotal) * 100 : 0;
+    const essScore = essayTotal > 0 ? (essayCorrect / essayTotal) * 100 : 0;
+    return Math.round(objScore * 0.4 + essScore * 0.6);
   };
 
   // 🛡️ Self-Healing Logic: Automatically fix 0 scores for FINISHED attempts
@@ -609,24 +633,33 @@ const MonitoringPage = () => {
       const att = studentAttempts.sort((a, b) => new Date(b.created).getTime() - new Date(a.created).getTime())[0];
       if (!att) return;
 
+      // Read overrides from multiple sources and merge (prevent race condition)
       let currentOverrides: any = {};
       try {
-        if (typeof att.overrides === 'string') currentOverrides = JSON.parse(att.overrides);
-        else if (typeof att.overrides === 'object') currentOverrides = { ...att.overrides };
+        const fromField = typeof att.overrides === 'string' ? JSON.parse(att.overrides) : (att.overrides || {});
+        const fromAnswers = (att.answers as any)?.__overrides__ || {};
+        currentOverrides = { ...fromField, ...fromAnswers }; // Merge both sources
       } catch (e) { currentOverrides = {}; }
 
       const newOverrides = { ...currentOverrides, [qId]: isForcedCorrect };
       const sisAnswers = att.answers || {};
-      let correctCount = 0;
+      
+      // Weighted scoring: separate objective vs essay
+      let objectiveCorrect = 0;
+      let objectiveTotal = 0;
+      let essayCorrect = 0;
+      let essayTotal = 0;
 
       monitorQuestions.forEach((q: any) => {
+        const type = q.type || "pilihan_ganda";
+        const isEssay = type === "isian_singkat" || type === "uraian";
+        
         let itemCorrect = false;
         if (newOverrides[q.id] !== undefined) {
           itemCorrect = newOverrides[q.id];
         } else {
           const ansId = sisAnswers[q.id];
           if (ansId) {
-            const type = q.type || "pilihan_ganda";
             if (type === "pilihan_ganda" || type === "benar_salah") {
               const ck = Object.keys(q.choices || {}).find(k => k.toLowerCase() === String(ansId).toLowerCase());
               itemCorrect = ck ? q.choices[ck].isCorrect === true : false;
@@ -644,19 +677,93 @@ const MonitoringPage = () => {
             }
           }
         }
-        if (itemCorrect) correctCount++;
+        
+        if (isEssay) {
+          essayTotal++;
+          if (itemCorrect) essayCorrect++;
+        } else {
+          objectiveTotal++;
+          if (itemCorrect) objectiveCorrect++;
+        }
       });
 
-      const total = monitorQuestions.length;
-      const score = total > 0 ? Math.round((correctCount / total) * 100) : 0;
+      // Weighted final score: 40% objektif, 60% essay (jika ada essay)
+      let finalScore: number;
+      if (essayTotal === 0) {
+        finalScore = objectiveTotal > 0 ? Math.round((objectiveCorrect / objectiveTotal) * 100) : 0;
+      } else {
+        const objScore = objectiveTotal > 0 ? (objectiveCorrect / objectiveTotal) * 100 : 0;
+        const essScore = essayTotal > 0 ? (essayCorrect / essayTotal) * 100 : 0;
+        finalScore = Math.round(objScore * 0.4 + essScore * 0.6);
+      }
 
       if (!pb) return;
+      // Simpan overrides juga di dalam field answers sebagai backup (key: __overrides__)
+      const updatedAnswers = { ...(att.answers || {}), __overrides__: newOverrides };
       await pb.collection('attempts').update(att.id, {
         overrides: newOverrides,
-        correct: correctCount,
-        score: score
+        answers: updatedAnswers,
+        correct: Math.floor(objectiveCorrect + essayCorrect),
+        objectiveCorrect: Math.floor(objectiveCorrect),
+        objectiveTotal,
+        objectiveScore: objectiveTotal > 0 ? Math.round((objectiveCorrect / objectiveTotal) * 100) : 0,
+        essayCorrect,
+        essayTotal,
+        essayScore: essayTotal > 0 ? Math.round((essayCorrect / essayTotal) * 100) : 0,
+        essayGraded: Object.keys(newOverrides).filter(k => {
+          const q = monitorQuestions.find((x: any) => x.id === k);
+          return q && (q.type === "isian_singkat" || q.type === "uraian");
+        }).length,
+        score: finalScore
       });
+      
+      // Update local state immediately to prevent race condition on next grade
+      setAttempts(prev => prev.map(a => a.id === att.id ? { ...a, overrides: newOverrides, answers: updatedAnswers, score: finalScore } : a));
     } catch (error) { console.error(error); }
+  };
+
+  const [aiGradingId, setAiGradingId] = useState<string | null>(null);
+
+  const handleAIGrade = async (studentId: string, qId: string) => {
+    const q = monitorQuestions.find((x: any) => x.id === qId);
+    if (!q || !pb) return;
+    
+    const studentAttempts = attempts.filter(a => a.studentId === studentId || (a as any).student_id === studentId);
+    const att = studentAttempts.sort((a, b) => new Date(b.created).getTime() - new Date(a.created).getTime())[0];
+    if (!att) return;
+
+    const studentAnswer = att.answers?.[qId];
+    if (!studentAnswer || (typeof studentAnswer === 'string' && !studentAnswer.trim())) {
+      handleManualGrade(studentId, qId, false);
+      return;
+    }
+
+    setAiGradingId(`${studentId}_${qId}`);
+    try {
+      // Better text extraction: preserve meaningful content
+      const questionText = (q.text || "").replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+      const answerKey = q.answerKey || q.correctAnswer || "";
+      
+      const result = await gradeEssayWithAI(
+        pb,
+        questionText,
+        String(studentAnswer).trim(),
+        answerKey,
+        q.type === "isian_singkat" ? "isian_singkat" : "uraian"
+      );
+      
+      await handleManualGrade(studentId, qId, result.isCorrect);
+      
+      showAlert(
+        result.isCorrect ? "✓ Benar" : "✗ Salah",
+        `Skor: ${result.score}/100. ${result.feedback}`,
+        result.isCorrect ? "success" : "warning"
+      );
+    } catch (err: any) {
+      showAlert("Gagal", err.message || "AI tidak bisa menilai.", "danger");
+    } finally {
+      setAiGradingId(null);
+    }
   };
 
   const handleExportExcel = () => {
@@ -1049,6 +1156,9 @@ const MonitoringPage = () => {
               </div>
 
               <div className="pt-2 flex flex-col gap-2.5">
+                <Button onClick={() => { sessionStorage.setItem("activeGradingRoomId", roomId || ""); navigate("/admin/penilaian"); }} variant="secondary" className="w-full rounded-xl bg-indigo-50 hover:bg-indigo-100 border border-indigo-100 dark:bg-indigo-900/20 dark:text-indigo-400 dark:hover:bg-indigo-900/40 dark:border-indigo-800/40 text-indigo-700 font-semibold shadow-sm transition-all h-10">
+                  <BookOpen className="mr-2 h-4 w-4" /> Detail Penilaian
+                </Button>
                 <Button onClick={handleExportExcel} variant="secondary" className="w-full rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 dark:hover:bg-emerald-900/40 dark:border-emerald-800/40 text-emerald-700 font-semibold shadow-sm transition-all h-10">
                   <FileSpreadsheet className="mr-2 h-4 w-4" /> Export Excel
                 </Button>
@@ -1068,6 +1178,25 @@ const MonitoringPage = () => {
         </div>
 
         <div className="lg:col-span-3">
+          {/* Formula Info (jika ada soal essay) */}
+          {monitorQuestions.some((q: any) => q.type === "isian_singkat" || q.type === "uraian") && (
+            <div className="bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-800/40 rounded-2xl p-4 flex items-center gap-4 text-xs">
+              <div className="w-8 h-8 rounded-xl bg-indigo-600 flex items-center justify-center shrink-0">
+                <BookOpen className="w-4 h-4 text-white" />
+              </div>
+              <div className="flex-1">
+                <p className="font-black text-indigo-700 dark:text-indigo-300 text-[10px] uppercase tracking-widest mb-1">Rumus Penilaian (Bobot 40:60)</p>
+                <p className="text-indigo-600/80 dark:text-indigo-400/80 font-medium leading-relaxed">
+                  <span className="font-bold">Nilai Final</span> = (Skor Objektif × <span className="font-black">40%</span>) + (Skor Subjektif × <span className="font-black">60%</span>)
+                  <span className="mx-2 text-indigo-300">•</span>
+                  <span className="text-blue-600 dark:text-blue-400">O:{monitorQuestions.filter((q:any) => q.type !== "isian_singkat" && q.type !== "uraian").length} soal</span>
+                  <span className="mx-1 text-indigo-300">|</span>
+                  <span className="text-purple-600 dark:text-purple-400">S:{monitorQuestions.filter((q:any) => q.type === "isian_singkat" || q.type === "uraian").length} soal</span>
+                </p>
+              </div>
+            </div>
+          )}
+
           <div className="bg-card rounded-3xl border border-slate-200/60 dark:border-slate-800 shadow-sm overflow-hidden min-h-[500px]">
             <div className="overflow-x-auto">
               <Table>
@@ -1184,8 +1313,8 @@ const MonitoringPage = () => {
                           <TableRow className={`hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors h-16 ${isExpanded ? "bg-blue-50/30 dark:bg-blue-900/10" : ""}`}>
                             <TableCell className="text-center text-slate-400 text-[10px] px-1">{startIndex + localIdx + 1}</TableCell>
                             <TableCell>
-                              <div className="flex flex-col">
-                                <span className="font-bold text-slate-800 dark:text-slate-100">{student.name}</span>
+                              <div className="flex flex-col cursor-pointer" onClick={() => navigate(`/admin/penilaian/${student.id}`)}>
+                                <span className="font-bold text-indigo-600 dark:text-indigo-400 hover:underline">{student.name}</span>
                                 <span className="text-[10px] text-slate-500 font-medium">{student.nisn} • {student.className}</span>
                               </div>
                             </TableCell>
@@ -1205,12 +1334,50 @@ const MonitoringPage = () => {
                             <TableCell className="text-center text-[11px] font-bold">
                               {(() => {
                                 if (!attempt) return "-";
-                                const liveScore = getLiveScore(sisAnswers, attempt.overrides || {});
-                                if (attempt.status === "finished") {
-                                  const finalScore = (attempt.score === 0 && liveScore > 0) ? liveScore : (attempt.score || 0);
-                                  return <span className="text-emerald-600">{finalScore}</span>;
-                                }
-                                return <span className="text-indigo-600 animate-pulse-subtle">{liveScore}</span>;
+                                const overrides = attempt.overrides || (sisAnswers as any)?.__overrides__ || {};
+                                const liveScore = getLiveScore(sisAnswers, overrides);
+                                
+                                // Calculate detailed breakdown
+                                let objCorrect = 0, objTotal = 0, essCorrect = 0, essTotal = 0;
+                                monitorQuestions.forEach((q: any) => {
+                                  const type = q.type || "pilihan_ganda";
+                                  const isEssay = type === "isian_singkat" || type === "uraian";
+                                  if (isEssay) { essTotal++; if (overrides[q.id]) essCorrect++; }
+                                  else {
+                                    objTotal++;
+                                    let ic = false;
+                                    if (overrides[q.id] !== undefined) ic = overrides[q.id];
+                                    else {
+                                      const a = sisAnswers[q.id];
+                                      if (a) {
+                                        if (type === "pilihan_ganda" || type === "benar_salah") { const ck = Object.keys(q.choices||{}).find(k=>k.toLowerCase()===String(a).toLowerCase()); ic = ck ? q.choices[ck].isCorrect===true : false; }
+                                        else if (type === "pilihan_ganda_kompleks") { const ck = Object.keys(q.choices||{}).filter(k=>q.choices[k].isCorrect).map(k=>k.toLowerCase()); const sk = Array.isArray(a)?a.map(k=>String(k).toLowerCase()):[]; ic = sk.length===ck.length && sk.every(k=>ck.includes(k)); }
+                                        else if (type === "menjodohkan") { const pairs = q.pairs||[]; ic = pairs.length>0 && pairs.every((p:any)=>a[p.id]===p.right); }
+                                        else if (type === "urutkan" || type === "drag_drop") { const co = (q.items||[]).map((it:any)=>it.id); ic = Array.isArray(a) && a.length===co.length && a.every((v:any,i:number)=>v===co[i]); }
+                                      }
+                                    }
+                                    if (ic) objCorrect++;
+                                  }
+                                });
+                                
+                                const objScore = objTotal > 0 ? Math.round((objCorrect/objTotal)*100) : 0;
+                                const essScore = essTotal > 0 ? Math.round((essCorrect/essTotal)*100) : 0;
+                                const essGraded = Object.keys(overrides).filter(k => { const q = monitorQuestions.find((x:any)=>x.id===k); return q && (q.type==="isian_singkat"||q.type==="uraian"); }).length;
+                                const finalScore = essTotal === 0 ? objScore : Math.round(objScore * 0.4 + essScore * 0.6);
+                                const displayScore = attempt.status === "finished" ? ((attempt.score === 0 && liveScore > 0) ? liveScore : (attempt.score || finalScore)) : finalScore;
+
+                                return (
+                                  <div className="flex flex-col items-center gap-0.5">
+                                    <span className={`text-base font-black ${attempt.status === "finished" ? "text-emerald-600" : "text-indigo-600 animate-pulse"}`}>{displayScore}</span>
+                                    {essTotal > 0 && (
+                                      <div className="flex items-center gap-1 text-[8px]">
+                                        <span className="text-blue-500" title="Objektif">O:{objScore}</span>
+                                        <span className="text-slate-300">|</span>
+                                        <span className={`${essGraded < essTotal ? "text-amber-500" : "text-purple-500"}`} title="Subjektif">S:{essGraded < essTotal ? `${essGraded}/${essTotal}` : essScore}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
                               })()}
                             </TableCell>
                             <TableCell className="text-center px-1">
@@ -1297,21 +1464,47 @@ const MonitoringPage = () => {
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                                   {monitorQuestions.map((q, qIdx) => {
                                     const ans = sisAnswers[q.id];
-                                    const overrides = attempt?.overrides || {};
+                                    const overrides = attempt?.overrides || (sisAnswers as any)?.__overrides__ || {};
                                     const correct = overrides[q.id] !== undefined ? overrides[q.id] : (ans ? (q.type === "isian_singkat" ? isFuzzyMatch(ans, q.answerKey) : q.choices?.[ans]?.isCorrect) : false);
                                     return (
                                       <div key={q.id} className="bg-white dark:bg-slate-800 p-3 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col gap-2">
                                         <div className="flex gap-2">
                                           <span className="text-[10px] font-black text-slate-400 shrink-0">#{qIdx + 1}</span>
-                                          <MathText content={q.text} className="text-[11px] font-medium leading-tight text-slate-700 dark:text-slate-300" />
+                                          <MathText content={q.text} className="text-[11px] font-medium leading-tight text-slate-700 dark:text-slate-300 line-clamp-3" />
                                         </div>
-                                        <div className={`mt-auto p-2 rounded-lg flex items-center justify-between ${correct ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"}`}>
-                                          <span className="text-[10px] font-bold">Jawab: {ans ? String(ans).toUpperCase() : "-"}</span>
+                                        {/* Kunci Jawaban */}
+                                        <div className="px-2 py-1.5 rounded-lg bg-blue-50/50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-800/30">
+                                          <span className="text-[9px] font-black text-blue-500 uppercase tracking-widest">Kunci: </span>
+                                          <span className="text-[10px] font-bold text-blue-700 dark:text-blue-300">
+                                            {(() => {
+                                              const t = q.type || "pilihan_ganda";
+                                              if (t === "pilihan_ganda" || t === "benar_salah") {
+                                                const ck = Object.keys(q.choices || {}).find(k => q.choices[k]?.isCorrect);
+                                                return ck ? `${ck.toUpperCase()}. ${q.choices[ck]?.text || ""}`.substring(0, 40) : (q.answerKey || "-");
+                                              }
+                                              if (t === "pilihan_ganda_kompleks") {
+                                                const cks = Object.keys(q.choices || {}).filter(k => q.choices[k]?.isCorrect);
+                                                return cks.map(k => k.toUpperCase()).join(", ") || "-";
+                                              }
+                                              if (t === "isian_singkat" || t === "uraian") return (q.answerKey || "-").substring(0, 50);
+                                              if (t === "menjodohkan") return `${(q.pairs || []).length} pasangan`;
+                                              if (t === "urutkan" || t === "drag_drop") return (q.items || []).map((it: any) => it.text?.substring(0, 10)).join(" → ");
+                                              return q.answerKey || "-";
+                                            })()}
+                                          </span>
+                                        </div>
+                                        <div className={`mt-auto p-2 rounded-lg flex items-center justify-between ${correct ? "bg-emerald-50 text-emerald-700" : ans ? "bg-rose-50 text-rose-700" : "bg-slate-50 text-slate-500"}`}>
+                                          <span className="text-[10px] font-bold truncate max-w-[60%]">Jawab: {ans ? (typeof ans === 'object' ? JSON.stringify(ans).substring(0, 30) : String(ans).substring(0, 30)) : "-"}</span>
                                           <div className="flex gap-1">
-                                            {(role === "admin" || (role === "teacher" && teacherFullAccess)) && (q.type === "isian_singkat" || q.type === "uraian") && (
+                                            {(role === "admin" || (role === "teacher" && teacherFullAccess)) && (
                                               <>
-                                                <button onClick={() => handleManualGrade(student.id, q.id, true)} className="p-1 hover:bg-white rounded"><CheckCircle2 className="h-3 w-3" /></button>
-                                                <button onClick={() => handleManualGrade(student.id, q.id, false)} className="p-1 hover:bg-white rounded"><X className="h-3 w-3" /></button>
+                                                {(q.type === "isian_singkat" || q.type === "uraian") && (
+                                                  <button onClick={() => handleAIGrade(student.id, q.id)} disabled={aiGradingId === `${student.id}_${q.id}`} className="p-1 hover:bg-indigo-50 rounded text-indigo-500" title="Periksa dengan AI">
+                                                    <Sparkles className={`h-3 w-3 ${aiGradingId === `${student.id}_${q.id}` ? "animate-spin" : ""}`} />
+                                                  </button>
+                                                )}
+                                                <button onClick={() => handleManualGrade(student.id, q.id, true)} className={`p-1 rounded ${overrides[q.id] === true ? "bg-emerald-200 text-emerald-700" : "hover:bg-white text-emerald-500"}`} title="Tandai Benar"><CheckCircle2 className="h-3 w-3" /></button>
+                                                <button onClick={() => handleManualGrade(student.id, q.id, false)} className={`p-1 rounded ${overrides[q.id] === false ? "bg-rose-200 text-rose-700" : "hover:bg-white text-rose-500"}`} title="Tandai Salah"><X className="h-3 w-3" /></button>
                                               </>
                                             )}
                                             <span className="text-[9px] font-black">{correct ? "✓" : "✗"}</span>

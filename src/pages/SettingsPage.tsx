@@ -65,6 +65,7 @@ const SettingsPage = () => {
   const [isLoadingModels, setIsLoadingModels] = useState(false);
   const [isExambroEnabled, setIsExambroEnabled] = useState(false);
   const [teacherFullAccess, setTeacherFullAccess] = useState(false);
+  const [teacherAIAccess, setTeacherAIAccess] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [isTestingAI, setIsTestingAI] = useState(false);
@@ -126,6 +127,7 @@ const SettingsPage = () => {
         setAiProvider(data.ai_provider || "groq");
         setIsExambroEnabled(data.is_exambro_enabled ?? false);
         setTeacherFullAccess(data.teacher_full_access || false);
+        setTeacherAIAccess(data.teacher_ai_access ?? false);
 
         const logoUrl = data.logoUrl || data.logo || "";
         setSchoolLogo(logoUrl);
@@ -268,7 +270,55 @@ const SettingsPage = () => {
     }
 
     if (aiProvider === "custom") {
-      setRemoteModels([]); // allow typing
+      // Jika base URL dan API key sudah diisi, coba load model via PocketBase proxy (anti-CORS)
+      if (aiGatewayUrl && aiGatewayKey) {
+        const fetchCustomModels = async () => {
+          setIsLoadingModels(true);
+          try {
+            let baseUrl = aiGatewayUrl.trim().replace(/\/$/, "");
+            baseUrl = baseUrl.replace(/\/chat\/completions$/, "");
+            const modelsUrl = `${baseUrl}/models`;
+
+            // Gunakan PocketBase proxy untuk menghindari CORS
+            const proxyUrl = pb!.baseUrl + "/api/ai-proxy-models";
+            const res = await fetch(proxyUrl, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ baseUrl: modelsUrl, apiKey: aiGatewayKey })
+            });
+
+            if (res.ok) {
+              const data = await res.json();
+              const items = data.data || data.models || data;
+              if (Array.isArray(items) && items.length > 0) {
+                const models = items.map((m: any) => ({
+                  id: m.id,
+                  name: m.name || m.id,
+                  speed: "Custom",
+                  provider: "custom"
+                }));
+                models.sort((a: any, b: any) => (a.name || "").localeCompare(b.name || ""));
+                setRemoteModels(models);
+                if (!models.find((m: any) => m.id === aiModel) && models.length > 0) {
+                  setAiModel(models[0].id);
+                }
+              } else {
+                setRemoteModels([]);
+              }
+            } else {
+              setRemoteModels([]);
+            }
+          } catch {
+            setRemoteModels([]);
+          } finally {
+            setIsLoadingModels(false);
+          }
+        };
+        const timeout = setTimeout(fetchCustomModels, 800);
+        return () => clearTimeout(timeout);
+      } else {
+        setRemoteModels([]);
+      }
       return;
     }
 
@@ -408,6 +458,7 @@ const SettingsPage = () => {
         aiProvider: aiProvider || "groq",
         is_exambro_enabled: !!isExambroEnabled,
         teacher_full_access: !!teacherFullAccess,
+        teacher_ai_access: !!teacherAIAccess,
         isExambroEnabled: !!isExambroEnabled,
         teacherFullAccess: !!teacherFullAccess,
         aiModel: aiModel || "llama-3.3-70b-versatile"
@@ -813,6 +864,26 @@ const SettingsPage = () => {
                       </label>
                     )}
                   </div>
+
+                  <div className="flex items-center justify-between p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40 hover:border-slate-300 dark:hover:border-slate-700 transition-colors group sm:col-span-2">
+                    <div className="flex items-start gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center shrink-0 text-indigo-600 dark:text-indigo-500">
+                        <Cpu size={16} />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200 leading-none">{terminology.teacher} Pakai AI Sekolah</h4>
+                        <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 leading-tight pr-4">{terminology.teacher} bisa gunakan fitur AI menggunakan API Key sekolah tanpa perlu key sendiri.</p>
+                      </div>
+                    </div>
+                    {loading ? (
+                      <Skeleton className="h-6 w-11 rounded-full shrink-0" />
+                    ) : (
+                      <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                        <input type="checkbox" className="sr-only peer" checked={teacherAIAccess} onChange={(e) => setTeacherAIAccess(e.target.checked)} />
+                        <div className="w-11 h-6 bg-slate-200 dark:bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                      </label>
+                    )}
+                  </div>
                 </div>
 
                 {/* ── AI Engine Config ── */}
@@ -874,7 +945,7 @@ const SettingsPage = () => {
 
                     <FormField id="aiModel" label={isLoadingModels ? "Memuat Model..." : "Model Kecerdasan (LLM)"} error={undefined}>
                       <div className="relative">
-                        {remoteModels.length > 0 && aiProvider !== "custom" ? (
+                        {remoteModels.length > 0 ? (
                           <select
                             value={aiModel}
                             onChange={(e) => setAiModel(e.target.value)}

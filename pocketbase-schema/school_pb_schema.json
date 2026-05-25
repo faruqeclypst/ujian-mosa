@@ -116,7 +116,8 @@
       { "name": "groq_api_key", "type": "text" },
       { "name": "ai_gateway_key", "type": "text" },
       { "name": "ai_gateway_url", "type": "text" },
-      { "name": "teacher_full_access", "type": "bool" }
+      { "name": "teacher_full_access", "type": "bool" },
+      { "name": "teacher_ai_access", "type": "bool" }
     ],
     "listRule": "",
     "viewRule": "",

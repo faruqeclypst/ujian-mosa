@@ -39,6 +39,8 @@ const ExamsPage = lazy(() => import("./pages/admin/ExamsPage"));
 const QuestionsPage = lazy(() => import("./pages/admin/QuestionsPage"));
 const ExamRoomsPage = lazy(() => import("./pages/admin/ExamRoomsPage"));
 const MonitoringPage = lazy(() => import("./pages/admin/MonitoringPage"));
+const GradingPage = lazy(() => import("./pages/admin/GradingPage"));
+const StudentGradingDetailPage = lazy(() => import("./pages/admin/StudentGradingDetailPage"));
 const GuidePage = lazy(() => import("./pages/admin/GuidePage"));
 
 // Landing & SaaS pages
@@ -164,6 +166,8 @@ const SchoolAppContent = () => {
               <Route path="bank-soal/questions" element={<QuestionsPage />} />
               <Route path="ruang-ujian" element={<ExamRoomsPage />} />
               <Route path="monitoring" element={<MonitoringPage />} />
+              <Route path="penilaian" element={<GradingPage />} />
+              <Route path="penilaian/:studentId" element={<StudentGradingDetailPage />} />
               <Route path="panduan" element={<GuidePage />} />
               <Route path="pengaturan" element={<SettingsPage />} />
             </Route>

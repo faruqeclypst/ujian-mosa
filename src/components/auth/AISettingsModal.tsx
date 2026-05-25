@@ -21,7 +21,7 @@ import {
 } from "../ui/dialog";
 
 const aiSettingsSchema = z.object({
-  ai_api_key: z.string().min(1, "API Key wajib diisi untuk menggunakan fitur AI"),
+  ai_api_key: z.string().optional(),
   ai_provider: z.string().min(1, "Provider wajib dipilih"),
   ai_model: z.string().optional(),
 });
@@ -269,7 +269,7 @@ const AISettingsModal = ({ isOpen, onClose }: AISettingsModalProps) => {
             <p className="text-[11px] text-amber-700 dark:text-amber-400 font-medium leading-relaxed">
               <strong>Info:</strong> {user?.role === 'admin'
                 ? "Konfigurasi ini digunakan untuk akun Admin Anda saat menyusun naskah di Bank Soal."
-                : "Akun Guru wajib memiliki API Key sendiri. Penggunaan fitur AI Lab akan memotong kuota dari Key di atas."}
+                : "Jika Admin sudah mengaktifkan 'Akses Guru Penuh', Anda bisa langsung menggunakan AI tanpa API Key pribadi. Key di sini bersifat opsional (override)."}
             </p>
             <div className="pt-2 border-t border-amber-200/50 dark:border-amber-800/50 flex flex-col gap-2">
               <span className="text-[10px] font-black text-amber-800 dark:text-amber-300 uppercase tracking-widest">Dapatkan Key Gratis:</span>

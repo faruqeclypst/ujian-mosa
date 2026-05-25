@@ -672,6 +672,7 @@ const StudentDashboardPage = () => {
                                                 <div className="mt-auto pt-4 border-t border-slate-50 dark:border-slate-800/50">
                                   {isFinished ? (
                                     <div className="flex flex-col gap-4">
+                                      {room.show_result !== false ? (
                                       <div className="flex items-center justify-between">
                                         <div className="flex gap-2">
                                           <div className="flex flex-col items-center bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-100 dark:border-emerald-800/50 py-2 px-3 rounded-xl min-w-[50px]">
@@ -693,6 +694,7 @@ const StudentDashboardPage = () => {
                                           </div>
                                         </div>
                                       </div>
+                                      ) : null}
                                       
                                       <div className="-mx-6 -mb-6 mt-2 px-6 py-3 bg-emerald-500 text-white flex items-center justify-between shadow-inner">
                                         <span className="text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
