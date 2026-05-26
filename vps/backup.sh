@@ -9,11 +9,22 @@ set -e
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; CYAN='\033[0;36m'; NC='\033[0m'
 log()  { echo -e "${GREEN}[✓]${NC} $1"; }
 info() { echo -e "${CYAN}[→]${NC} $1"; }
-warn() { echo -e "${YELLOW}[!]${NC} $1"; }
 
 DATE=$(date +%F)
 BACKUP_DIR="/tmp/examaa-backup-${DATE}"
 BACKUP_FILE="/tmp/examaa-backup-${DATE}.tar.gz"
+TOTAL_STEPS=9
+CURRENT_STEP=0
+
+progress() {
+    CURRENT_STEP=$((CURRENT_STEP + 1))
+    PCT=$((CURRENT_STEP * 100 / TOTAL_STEPS))
+    BAR_LEN=30
+    FILLED=$((PCT * BAR_LEN / 100))
+    EMPTY=$((BAR_LEN - FILLED))
+    BAR=$(printf "%${FILLED}s" | tr ' ' '█')$(printf "%${EMPTY}s" | tr ' ' '░')
+    echo -e "\n${CYAN}[${BAR}] ${PCT}%${NC} — $1\n"
+}
 
 echo ""
 echo "=========================================="
@@ -22,15 +33,11 @@ echo "   Tanggal: ${DATE}"
 echo "=========================================="
 echo ""
 
-# Bersihkan backup lama
 rm -rf "$BACKUP_DIR"
 mkdir -p "$BACKUP_DIR"
 
 # ============================================================
-# 1. STOP SERVICES (opsional, untuk konsistensi data)
-# ============================================================
-info "Menghentikan services sementara untuk konsistensi data..."
-# Hentikan semua PocketBase agar database tidak corrupt saat di-copy
+progress "Menghentikan services..."
 systemctl list-units --type=service --state=running | grep "pb-" | awk '{print $1}' | while read svc; do
     systemctl stop "$svc" 2>/dev/null || true
 done
@@ -38,71 +45,59 @@ sleep 2
 log "Services dihentikan"
 
 # ============================================================
-# 2. BACKUP POCKETBASE DATA
-# ============================================================
-info "Backup PocketBase (master + semua sekolah)..."
+progress "Backup PocketBase (master + sekolah)..."
 cp -a /opt/pocketbase "$BACKUP_DIR/pocketbase"
-log "PocketBase data: $(du -sh /opt/pocketbase | awk '{print $1}')"
+log "PocketBase: $(du -sh /opt/pocketbase | awk '{print $1}')"
 
 # ============================================================
-# 3. BACKUP FRONTEND
-# ============================================================
-info "Backup frontend dist..."
+progress "Backup frontend dist..."
 cp -a /opt/frontend "$BACKUP_DIR/frontend"
 log "Frontend: $(du -sh /opt/frontend | awk '{print $1}')"
 
 # ============================================================
-# 4. BACKUP CADDY CONFIG
-# ============================================================
-info "Backup Caddy config..."
+progress "Backup Caddy config..."
 mkdir -p "$BACKUP_DIR/caddy"
 cp /etc/caddy/Caddyfile "$BACKUP_DIR/caddy/"
 cp -a /etc/caddy/conf.d "$BACKUP_DIR/caddy/" 2>/dev/null || true
-log "Caddy config backed up"
+log "Caddy config OK"
 
 # ============================================================
-# 5. BACKUP SYSTEMD SERVICES
-# ============================================================
-info "Backup systemd services..."
+progress "Backup systemd services..."
 mkdir -p "$BACKUP_DIR/systemd"
 cp /etc/systemd/system/pb-*.service "$BACKUP_DIR/systemd/" 2>/dev/null || true
-log "$(ls "$BACKUP_DIR/systemd/" | wc -l) service files"
+log "$(ls "$BACKUP_DIR/systemd/" 2>/dev/null | wc -l) service files"
 
 # ============================================================
-# 6. BACKUP HELPER SCRIPTS
-# ============================================================
-info "Backup helper scripts..."
+progress "Backup helper scripts..."
 mkdir -p "$BACKUP_DIR/scripts"
 cp /usr/local/bin/add-school.sh "$BACKUP_DIR/scripts/" 2>/dev/null || true
 cp /usr/local/bin/remove-school.sh "$BACKUP_DIR/scripts/" 2>/dev/null || true
-log "Helper scripts backed up"
-
-# ============================================================
-# 7. BACKUP KERNEL TUNING
-# ============================================================
 cp /etc/sysctl.d/99-exam-aa.conf "$BACKUP_DIR/" 2>/dev/null || true
+log "Scripts & config OK"
 
 # ============================================================
-# 8. RESTART SERVICES
-# ============================================================
-info "Menjalankan kembali services..."
+progress "Menjalankan kembali services..."
 systemctl list-unit-files --type=service | grep "pb-" | grep enabled | awk '{print $1}' | while read svc; do
     systemctl start "$svc" 2>/dev/null || true
 done
 systemctl restart caddy
-log "Semua services kembali aktif"
+log "Semua services aktif"
 
 # ============================================================
-# 9. COMPRESS
-# ============================================================
-info "Mengompres backup..."
+progress "Mengompres backup..."
 cd /tmp && tar -czf "$BACKUP_FILE" "examaa-backup-${DATE}"
 rm -rf "$BACKUP_DIR"
+log "Compressed"
 
+# ============================================================
+progress "Selesai!"
 SIZE=$(du -sh "$BACKUP_FILE" | awk '{print $1}')
-log "Backup selesai: $BACKUP_FILE ($SIZE)"
 echo ""
-echo "=========================================="
-echo "   Download dengan:"
-echo "   scp root@IP:${BACKUP_FILE} ."
-echo "=========================================="
+echo -e "${GREEN}=========================================="
+echo "   BACKUP SELESAI"
+echo "   File: ${BACKUP_FILE}"
+echo "   Size: ${SIZE}"
+echo ""
+echo "   Download:"
+echo "   scp root@$(curl -s ifconfig.me 2>/dev/null || echo 'IP'):${BACKUP_FILE} ."
+echo -e "==========================================${NC}"

@@ -946,7 +946,7 @@ Hanya JSON.`;
       ? `STIMULUS LITERASI:\n${existingWacana}\n\nBuat 1 soal ${typeLabel} baru dari stimulus di atas. Jangan tanya definisi. Variasi bentuk pertanyaan.`
       : `Topik: "${topic}". Buat 1 soal ${typeLabel}. Variasi bentuk pertanyaan.`;
 
-    const maxTokens = ctx.isReligious ? 900 : 500;
+    const maxTokens = ctx.isReligious ? 900 : (type === "menjodohkan" || type === "urutkan" || type === "drag_drop" || type === "uraian") ? 800 : 600;
 
     const content = await fetchAI({
       pb, messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userPrompt }],
@@ -959,11 +959,16 @@ Hanya JSON.`;
       text: stripUnwantedLatex(result.text || result.question || "", isExact),
       type: result.type || type,
       choices: (() => {
-        const c = result.choices || {};
-        if (!isExact && c && Object.keys(c).length > 0) {
+        const c = result.choices || result.options || {};
+        if (c && typeof c === 'object' && Object.keys(c).length > 0) {
           const cleaned: any = {};
           Object.keys(c).forEach(k => {
-            cleaned[k] = { ...c[k], text: stripUnwantedLatex(c[k]?.text || "", isExact) };
+            const val = c[k];
+            if (typeof val === 'string') {
+              cleaned[k] = { text: stripUnwantedLatex(val, isExact), isCorrect: false };
+            } else if (val && typeof val === 'object') {
+              cleaned[k] = { ...val, text: stripUnwantedLatex(val.text || String(val) || "", isExact) };
+            }
           });
           return cleaned;
         }
@@ -971,7 +976,7 @@ Hanya JSON.`;
       })(),
       pairs: result.pairs,
       items: result.items,
-      answerKey: result.answerKey || result.answer_key || "",
+      answerKey: result.answerKey || result.answer_key || result.correctAnswer || "",
       groupId: "",
       groupText: existingWacana
     };

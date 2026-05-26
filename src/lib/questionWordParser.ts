@@ -108,11 +108,70 @@ export const parseQuestionsFromWord = async (file: File, options?: { includeEssa
   const doc = parser.parseFromString(html, "text/html");
   
   // Ambil semua p, li, dan td, tapi saring td yang sudah punya p di dalamnya
+  // Also collect standalone tables that are NOT literasi format tables
   const paragraphs = Array.from(doc.querySelectorAll("p, li, td")).filter(el => {
     if (el.tagName === 'TD') return el.querySelectorAll('p').length === 0;
     if (el.tagName === 'LI') return el.querySelectorAll('p').length === 0;
     return true;
   });
+
+  // Identify content tables (tables that are part of question text, not literasi format)
+  const contentTables = new Set<Element>();
+  const allTables = Array.from(doc.querySelectorAll("table"));
+  allTables.forEach(table => {
+    const rows = Array.from(table.querySelectorAll("tr"));
+    if (rows.length === 0) return;
+    
+    // A table is a "literasi format" table if:
+    // - First cell of first row looks like a literasi code (short text, 2-30 chars)
+    //   AND second cell has substantial text (>20 chars) or is empty
+    // - OR first cell contains a question number pattern (1. 2. etc)
+    // - OR first cell contains a choice letter pattern (A. B. etc)
+    // Otherwise it's a content/data table that should be preserved as HTML
+    
+    const firstRow = rows[0];
+    const cells = Array.from(firstRow.querySelectorAll("td, th"));
+    if (cells.length < 2) {
+      // Single-column tables are likely content tables
+      contentTables.add(table);
+      return;
+    }
+    
+    const firstCellText = (cells[0].textContent?.trim() || "");
+    
+    // Check if this looks like a data/content table (has header row with multiple columns)
+    const hasHeaderRow = cells.length >= 3 || 
+      firstRow.querySelector("th") !== null ||
+      (cells.every(c => {
+        const t = c.textContent?.trim() || "";
+        return t.length > 0 && t.length < 30;
+      }) && cells.length >= 2 && !firstCellText.match(/^[\(]?\d+[\.\s\)]+/) && !firstCellText.match(/^[A-Ea-e][\.\)\s]/));
+    
+    // If first cell is a question number or choice letter, it's a structured format table
+    const isStructuredFormat = firstCellText.match(/^[\(]?\d+[\.\s\)]+/) || 
+      firstCellText.match(/^[A-Ea-e][\.\)\s]/) ||
+      // Check if it matches literasi code pattern
+      (firstCellText.length >= 2 && firstCellText.length <= 30 &&
+        !firstCellText.match(/^\d+[\.\)\s]*$/) &&
+        !firstCellText.match(/^[A-Ea-e][\.\)\s]*$/) &&
+        rows.length <= 2 && cells.length === 2 &&
+        ((cells[1].textContent?.trim() || "").length === 0 || (cells[1].textContent?.trim() || "").length > 20));
+    
+    if (!isStructuredFormat && hasHeaderRow) {
+      contentTables.add(table);
+    }
+  });
+
+  // Build a set of TD elements that belong to content tables (to skip in main loop)
+  const contentTableTds = new Set<Element>();
+  contentTables.forEach(table => {
+    table.querySelectorAll("td, th").forEach(cell => contentTableTds.add(cell));
+    // Also mark any <p> elements inside content tables
+    table.querySelectorAll("p").forEach(p => contentTableTds.add(p));
+  });
+
+  // Track which content tables have been injected already
+  const injectedTables = new Set<Element>();
 
   const questions: ParsedQuestion[] = [];
 
@@ -231,6 +290,24 @@ export const parseQuestionsFromWord = async (file: File, options?: { includeEssa
     const firstImage = images.length > 0 ? images[0] : undefined;
     const textOnly = getCleanText(p);
     const line = p.innerHTML?.trim() || "";
+
+    // ─── CONTENT TABLE HANDLING ──────────────────────────────────────────
+    // If this element belongs to a content table, inject the full table HTML
+    // into the current question text (only once per table)
+    if (contentTableTds.has(p)) {
+      const parentTable = p.closest('table');
+      if (parentTable && contentTables.has(parentTable) && !injectedTables.has(parentTable)) {
+        injectedTables.add(parentTable);
+        // Generate clean table HTML with basic styling
+        const tableHtml = parentTable.outerHTML;
+        if (currentQuestion) {
+          currentQuestion.text += " " + tableHtml;
+        } else if (currentGroupId && currentGroupText !== undefined) {
+          currentGroupText += " " + tableHtml;
+        }
+      }
+      return; // Skip individual cell processing
+    }
 
     // Ignore Headers
     if (textOnly.match(/^(Nama Guru|Kelas|Mapel|Mata Pelajaran|Nama Sekolah|Waktu|Hari|Tanggal|Petunjuk|Pilihlah|Berilah|Kerjakan)\s*[:]/i)) return;

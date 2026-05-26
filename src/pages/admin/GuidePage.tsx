@@ -116,7 +116,7 @@ const GuidePage = () => {
     { id: "akun", label: "Manajemen Akun", icon: User, keywords: "password ganti profil" },
     { id: "data-master", label: "Data Master & Import", icon: Database, keywords: "siswa guru kelas excel nisn" },
     { id: "bank-soal", label: "Pengelolaan Bank Soal", icon: BookOpen, keywords: "tipe soal pg kompleks literasi" },
-    { id: "ai-magic", label: "Teknologi AI & PDF", icon: Bot, keywords: "magic ai pdf extraction generator llm" },
+    { id: "ai-magic", label: "Teknologi AI & Import", icon: Bot, keywords: "magic ai json extraction generator llm import" },
     { id: "ruang-ujian", label: "Siklus Ruang Ujian", icon: ClipboardList, keywords: "sesi token durasi waktu" },
     { id: "monitoring", label: "Anti-Cheat & Pengawasan", icon: Monitor, keywords: "lock gembok pelanggaran monitor" },
     { id: "nilai", label: "Laporan & Analisis", icon: PieChart, keywords: "rekap excel nilai statistik" },
@@ -413,9 +413,30 @@ const GuidePage = () => {
 
                 <div className="space-y-2">
                   <Step number="1" title="Konfigurasi Paket">Tentukan Mata Pelajaran dan target Kelas. Paket yang sudah dibuat dapat di-duplikasi (copy) ke tahun ajaran berikutnya.</Step>
-                  <Step number="2" title="Rich Text Editor (Quill)">Masukkan teks soal. Gunakan menu <strong>Image</strong> untuk upload gambar pendukung. Untuk rumus matematika, Anda dapat mengetik langsung atau copy-paste dari editor eksternal.</Step>
+                  <Step number="2" title="Rich Text Editor (Quill)">Masukkan teks soal. Gunakan menu <strong>Image</strong> untuk upload gambar pendukung. Copy-paste tabel dari Word akan otomatis dipreservasi. Untuk rumus matematika, gunakan format LaTeX ($...$) atau KaTeX (\(...\)).</Step>
                   <Step number="3" title="Mode Literasi">Aktifkan switch <strong>Literasi</strong> jika soal memiliki wacana/bacaan yang sama untuk beberapa nomor soal. Bacaan akan muncul secara berdampingan dengan soal di layar siswa.</Step>
                 </div>
+
+                <SubSection title="Import & Export Soal">
+                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="p-4 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50/50">
+                         <h6 className="text-[11px] font-black text-emerald-600 mb-1">IMPORT EXCEL</h6>
+                         <p className="text-[10px] text-slate-500 leading-relaxed font-medium">Gunakan template XLSX yang disediakan. Cocok untuk input massal soal pilihan ganda.</p>
+                      </div>
+                      <div className="p-4 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50/50">
+                         <h6 className="text-[11px] font-black text-blue-600 mb-1">IMPORT WORD (.DOCX)</h6>
+                         <p className="text-[10px] text-slate-500 leading-relaxed font-medium">Deteksi otomatis soal, kunci jawaban, gambar, tabel, dan rumus (equation) dari file Word.</p>
+                      </div>
+                      <div className="p-4 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50/50">
+                         <h6 className="text-[11px] font-black text-orange-600 mb-1">IMPORT / EXPORT JSON</h6>
+                         <p className="text-[10px] text-slate-500 leading-relaxed font-medium">Format data mentah. Bisa export dari satu bank soal lalu import ke bank soal lain. Tanpa AI.</p>
+                      </div>
+                      <div className="p-4 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50/50">
+                         <h6 className="text-[11px] font-black text-indigo-600 mb-1">SMART AI IMPORT</h6>
+                         <p className="text-[10px] text-slate-500 leading-relaxed font-medium">Tempel teks dari manapun, AI akan mendeteksi dan merapikan soal secara otomatis.</p>
+                      </div>
+                   </div>
+                </SubSection>
 
                 <SubSection title="Detail 8 Tipe Soal">
                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -440,8 +461,8 @@ const GuidePage = () => {
               </div>
             </DocSection>
 
-            {/* 5. AI Magic & PDF */}
-            <DocSection id="ai-magic" title="Teknologi AI & PDF" icon={Bot}>
+            {/* 5. AI Magic */}
+            <DocSection id="ai-magic" title="Teknologi AI & Import" icon={Bot}>
               <div className="space-y-10">
                 <p className="text-base font-medium">EXAM AA menggunakan integrasi <strong>Large Language Models (LLM)</strong> mutakhir untuk mengotomatisasi pembuatan soal dari sumber manapun.</p>
 
@@ -458,30 +479,30 @@ const GuidePage = () => {
 
                 <div className="space-y-6 border-t border-slate-100 dark:border-slate-800 pt-10">
                    <h4 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                      <FileBox size={18} className="text-blue-500" /> AI PDF Extraction (Cara Kerja Detail)
+                      <FileBox size={18} className="text-blue-500" /> Smart AI Import (Teks/Materi)
                    </h4>
-                   <p className="text-sm text-slate-600 dark:text-slate-400">Fitur ini memungkinkan Anda mengubah Buku Paket PDF atau Modul Ajar menjadi bank soal siap pakai.</p>
+                   <p className="text-sm text-slate-600 dark:text-slate-400">Tempel teks soal dari manapun (Word, PDF, website) ke dalam kotak teks. AI akan mendeteksi dan merapikan soal secara otomatis.</p>
                    
                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                       <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 space-y-2">
-                         <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-xs">01</div>
-                         <h6 className="text-[11px] font-black uppercase tracking-tight">PDF Parsing</h6>
-                         <p className="text-[10px] text-slate-500 leading-relaxed font-medium">Sistem memindai setiap halaman PDF dan mengekstrak teks menggunakan teknologi PDF.js.</p>
+                         <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold text-xs">01</div>
+                         <h6 className="text-[11px] font-black uppercase tracking-tight">Ekstraksi (Detect)</h6>
+                         <p className="text-[10px] text-slate-500 leading-relaxed font-medium">Tempel naskah soal mentah. AI mendeteksi nomor soal, pilihan jawaban, dan kunci jawaban.</p>
                       </div>
                       <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 space-y-2">
-                         <div className="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-xs">02</div>
-                         <h6 className="text-[11px] font-black uppercase tracking-tight">AI Summarization</h6>
-                         <p className="text-[10px] text-slate-500 leading-relaxed font-medium">Teks yang diekstrak dianalisis oleh AI untuk menentukan poin-poin materi yang paling esensial.</p>
+                         <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-xs">02</div>
+                         <h6 className="text-[11px] font-black uppercase tracking-tight">Generate dari Materi</h6>
+                         <p className="text-[10px] text-slate-500 leading-relaxed font-medium">Tempel materi/artikel. AI membuat soal baru berdasarkan konten yang Anda berikan.</p>
                       </div>
                       <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 space-y-2">
-                         <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold text-xs">03</div>
-                         <h6 className="text-[11px] font-black uppercase tracking-tight">Quiz Formulation</h6>
-                         <p className="text-[10px] text-slate-500 leading-relaxed font-medium">AI menyusun butir-butir soal sesuai dengan materi yang benar-benar ada di dalam file PDF tersebut.</p>
+                         <div className="w-8 h-8 rounded-lg bg-orange-100 text-orange-600 flex items-center justify-center font-bold text-xs">03</div>
+                         <h6 className="text-[11px] font-black uppercase tracking-tight">Import JSON (Tanpa AI)</h6>
+                         <p className="text-[10px] text-slate-500 leading-relaxed font-medium">Tempel data JSON langsung. Tidak memerlukan AI — diproses instan tanpa kuota token.</p>
                       </div>
                    </div>
 
-                   <AlertBox type="info" title="Format PDF Ideal">
-                      Gunakan PDF yang memiliki teks (Selectable Text). PDF hasil foto/scan yang tidak memiliki lapisan teks mungkin akan sulit diekstraksi. Pastikan ukuran file di bawah 10MB untuk kecepatan optimal.
+                   <AlertBox type="info" title="Format Rumus Matematika">
+                      Sistem mendukung dua format penulisan rumus: LaTeX ($...$) dan KaTeX (\(...\)). Keduanya otomatis dirender. Import dari Word juga otomatis mengkonversi equation ke LaTeX. HTML pecahan (sup/sub) dari copy-paste Word dikonversi otomatis.
                    </AlertBox>
                 </div>
               </div>
@@ -666,6 +687,11 @@ const GuidePage = () => {
                 <p className="text-[10px] font-bold text-slate-400 dark:text-slate-600 uppercase tracking-tighter">
                   © 2026 Alfaruq Asri. Hak Cipta Dilindungi Undang-Undang. Dokumentasi ini bersifat internal institusi.
                 </p>
+                <div className="flex items-center gap-3 mt-2">
+                  <a href="/privacy-policy.html" target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold text-blue-500 hover:text-blue-700 transition-colors">Privacy Policy</a>
+                  <span className="text-slate-300">·</span>
+                  <a href="/terms-of-service.html" target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold text-blue-500 hover:text-blue-700 transition-colors">Terms of Service</a>
+                </div>
               </div>
             </DocSection>
 

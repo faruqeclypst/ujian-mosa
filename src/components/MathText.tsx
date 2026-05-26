@@ -150,6 +150,24 @@ export const MathText: React.FC<MathTextProps> = ({ content, className = "" }) =
     if (!html) return "";
     let processed = html;
     
+    // 1. Convert HTML fractions to LaTeX (e.g. <sup>3</sup>&frasl;<sub>2</sub> → $\frac{3}{2}$)
+    processed = processed.replace(
+      /<sup>([^<]+)<\/sup>\s*(?:&frasl;|\/)\s*<sub>([^<]+)<\/sub>/gi,
+      (_, num, den) => "$\\frac{" + num.trim() + "}{" + den.trim() + "}$"
+    );
+    
+    // 2. Convert HTML log with base (e.g. <sup>2</sup>log → ${}^{2}\log$)
+    processed = processed.replace(
+      /<sup>([^<]+)<\/sup>\s*log/gi,
+      (_, base) => "${}^{" + base.trim() + "}\\!\\log$"
+    );
+
+    // 3. Convert standalone <sup>x</sup><sub>y</sub> patterns that look like fractions
+    processed = processed.replace(
+      /<sup>([^<]+)<\/sup>\s*<sub>([^<]+)<\/sub>/gi,
+      (_, num, den) => "$\\frac{" + num.trim() + "}{" + den.trim() + "}$"
+    );
+    
     // 2. Arabic Detection & Styling (Premium Quranic Look)
     // Skip if content already has dir="rtl" (AI already formatted it)
     if (processed.includes('dir="rtl"')) {

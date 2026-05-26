@@ -16,7 +16,6 @@ import FormField from "../../components/forms/FormField";
 import { uploadInventoryImage, deleteImageFromStorage, deleteImagesFromStorage } from "../../lib/storage";
 import { ImportButton } from "../../components/ui/import-button";
 import { parseQuestionsFromWord } from "../../lib/questionWordParser";
-import { parseQuestionsFromPdf, parseQuestionsFromText } from "../../lib/questionTextParser";
 import { Select } from "../../components/ui/select";
 
 import { downloadQuestionTemplate, parseQuestionImportExcel } from "../../lib/questionExcel";
@@ -26,6 +25,54 @@ import ImageResize from "quill-image-resize-module-react";
 import "react-quill/dist/quill.snow.css";
 
 Quill.register("modules/imageResize", ImageResize);
+
+// 🏗️ REGISTER TABLE EMBED (preserve tables from Word copy-paste as non-editable blocks)
+const BlockEmbed = Quill.import('blots/block/embed');
+
+class TableEmbed extends BlockEmbed {
+  static blotName = 'tableEmbed';
+  static tagName = 'div';
+  static className = 'ql-table-embed';
+
+  static create(value: string) {
+    const node = super.create() as HTMLElement;
+    node.innerHTML = value;
+    node.setAttribute('contenteditable', 'false');
+    node.style.margin = '0.75rem 0';
+    node.style.overflowX = 'auto';
+    return node;
+  }
+
+  static value(node: HTMLElement) {
+    return node.innerHTML;
+  }
+}
+Quill.register(TableEmbed);
+
+/**
+ * Wrap raw <table> tags in the ql-table-embed div so Quill can handle them.
+ * Also handles the reverse: when saving, unwrap back to raw <table> for clean storage.
+ */
+const wrapTablesForQuill = (html: string): string => {
+  if (!html || !html.includes('<table')) return html;
+  // If already wrapped, don't double-wrap
+  if (html.includes('ql-table-embed')) return html;
+  // Strip all inline style/width/height from table elements for auto-fit
+  let cleaned = html;
+  // Remove style, width, height attributes from table-related tags
+  cleaned = cleaned.replace(/<(table|tr|td|th|thead|tbody|col|colgroup)([^>]*?)\s+(style|width|height)="[^"]*"/gi, '<$1$2');
+  cleaned = cleaned.replace(/<(table|tr|td|th|thead|tbody|col|colgroup)([^>]*?)\s+(style|width|height)="[^"]*"/gi, '<$1$2');
+  cleaned = cleaned.replace(/<(table|tr|td|th|thead|tbody|col|colgroup)([^>]*?)\s+(style|width|height)="[^"]*"/gi, '<$1$2');
+  // Remove colgroup elements
+  cleaned = cleaned.replace(/<colgroup[\s\S]*?<\/colgroup>/gi, '');
+  // Wrap all <table>...</table> blocks
+  return cleaned.replace(/(<table[\s\S]*?<\/table>)/gi, '<div class="ql-table-embed" contenteditable="false">$1</div>');
+};
+
+const unwrapTablesForStorage = (html: string): string => {
+  if (!html || !html.includes('ql-table-embed')) return html;
+  return html.replace(/<div class="ql-table-embed"[^>]*>([\s\S]*?)<\/div>/gi, '$1');
+};
 
 // 🛠️ REGISTER CUSTOM FORMATS TO PRESERVE INDENTATION (TABS)
 const Parchment = Quill.import('parchment');
@@ -51,7 +98,8 @@ const quillFormats = [
   'link', 'image', 'video', 'formula',
   'color', 'background',
   'align', 'code-block',
-  'text-indent', 'margin-left', 'line-height'
+  'text-indent', 'margin-left', 'line-height',
+  'tableEmbed'
 ];
 
 // Allow standard CSS styles that might come from Word/Mammoth
@@ -266,6 +314,7 @@ const QuestionsPage = () => {
   });
 
   const [isLiterasiActive, setIsLiterasiActive] = useState(false);
+  const [showPreview, setShowPreview] = useState(true);
   const [literasiMode, setLiterasiMode] = useState<"select" | "create">("select");
   const [isRenamingLiterasi, setIsRenamingLiterasi] = useState(false);
   const [renameLiterasiValue, setRenameLiterasiValue] = useState("");
@@ -307,7 +356,7 @@ const QuestionsPage = () => {
   // 🤖 AI Import State
   const [isAIImportOpen, setIsAIImportOpen] = useState(false);
   const [importText, setImportText] = useState("");
-  const [importMode, setImportMode] = useState<'extract' | 'generate'>('extract');
+  const [importMode, setImportMode] = useState<'extract' | 'generate' | 'json'>('extract');
   const [importCount, setImportCount] = useState(5);
   const [importType, setImportType] = useState('pilihan_ganda');
   const [isParsing, setIsParsing] = useState(false);
@@ -532,6 +581,7 @@ const QuestionsPage = () => {
 
   const [isBatchModalOpen, setIsBatchModalOpen] = useState(false);
   const [isSavingBatch, setIsSavingBatch] = useState(false);
+  const [isSavingQuestion, setIsSavingQuestion] = useState(false);
   const [batchDragState, setBatchDragState] = useState<{ questionIndex: number; itemIndex: number } | null>(null);
   const [confirmModal, setConfirmModal] = useState<any>({ isOpen: false, title: "", description: "", type: "info", confirmLabel: "Ok", onConfirm: () => { } });
 
@@ -749,16 +799,21 @@ const QuestionsPage = () => {
     setIsRegeneratingIndex(index);
     try {
       const q = batchQuestions[index];
+      const topicFallback = [aiTopic, exam?.subject, exam?.name?.split(' ')[0]].filter(Boolean).join(' ') || "Umum";
       const regenerated = await generateSingleQuestionAI(
         pb,
-        aiTopic || (exam?.subject + " " + (exam?.name?.split(' ')[0] || "")) || "Umum",
-        q.type || aiType,
-        aiLevel,
-        aiSubject || (exam?.subject || ""),
-        aiDifficulty,
-        aiFocus,
+        topicFallback,
+        q.type || aiType || "pilihan_ganda",
+        aiLevel || exam?.level || "Umum",
+        aiSubject || exam?.subject || "Umum",
+        aiDifficulty || "sedang",
+        aiFocus || "umum",
         q.groupText || ""
       );
+
+      if (!regenerated || !regenerated.text) {
+        throw new Error("AI tidak menghasilkan soal yang valid.");
+      }
 
       const choicesBatch: Record<string, { text: string }> = {};
       let correctKey = (regenerated.answerKey || "").toLowerCase();
@@ -822,6 +877,70 @@ const QuestionsPage = () => {
 
   const handleAIParse = async () => {
     if (!importText.trim() || !pb) return;
+    
+    // JSON mode: parse directly without AI
+    if (importMode === 'json') {
+      try {
+        const data = JSON.parse(importText.trim());
+        const questionsArr: any[] = Array.isArray(data) ? data : (data.questions || data.soal || data.data || []);
+        
+        if (questionsArr.length === 0) {
+          addToast({ title: "Gagal", description: "JSON tidak berisi soal yang valid.", type: "error" });
+          return;
+        }
+
+        const results = questionsArr.map((q: any) => {
+          const choices = q.choices || q.options || {};
+          let correctKey = q.answerKey || q.answer_key || q.correctAnswer || q.correct_answer || "";
+          
+          // Normalize choices
+          const normalizedChoices: any = {};
+          if (choices && typeof choices === 'object') {
+            Object.keys(choices).forEach(k => {
+              const val = choices[k];
+              if (typeof val === 'string') {
+                normalizedChoices[k] = { text: val, isCorrect: correctKey.includes(k) };
+              } else if (typeof val === 'object' && val) {
+                normalizedChoices[k] = { text: val.text || "", imageUrl: val.imageUrl || val.image_url || undefined, isCorrect: !!val.isCorrect };
+                if (val.isCorrect && !correctKey) correctKey = k;
+              }
+            });
+          }
+          
+          if (!correctKey && normalizedChoices) {
+            const correctKeys = Object.keys(normalizedChoices).filter(k => normalizedChoices[k].isCorrect);
+            correctKey = correctKeys.join(",");
+          }
+
+          return {
+            text: q.text || q.question || "",
+            type: q.type || "pilihan_ganda",
+            choices: normalizedChoices,
+            answerKey: correctKey,
+            imageUrl: q.imageUrl || q.image_url || "",
+            groupId: q.groupId || q.group_id || "",
+            groupText: q.groupText || q.group_text || "",
+            pairs: q.pairs || undefined,
+            items: q.items || undefined,
+          };
+        }).filter((q: any) => q.text);
+
+        setParsedResults(results);
+        addToast({
+          title: "Parsing Berhasil",
+          description: `Ditemukan ${results.length} soal dari JSON. Silakan tinjau sebelum menyimpan.`,
+          type: "success"
+        });
+      } catch (err: any) {
+        addToast({
+          title: "Format JSON Salah",
+          description: err.message || "Pastikan JSON valid dan sesuai format.",
+          type: "error"
+        });
+      }
+      return;
+    }
+
     setIsParsing(true);
     startAIProgress();
     aiAbortRef.current = new AbortController();
@@ -1265,6 +1384,26 @@ const QuestionsPage = () => {
         image: imageHandler
       }
     },
+    clipboard: {
+      matchers: [
+        ['table', function(_node: any, _delta: any) {
+          const Delta = Quill.import('delta');
+          // Strip ALL inline styles from table elements for clean auto-fit
+          const tableEl = _node as HTMLElement;
+          tableEl.removeAttribute('style');
+          tableEl.removeAttribute('width');
+          tableEl.removeAttribute('height');
+          tableEl.querySelectorAll('tr, td, th, thead, tbody, colgroup, col').forEach((el: Element) => {
+            (el as HTMLElement).removeAttribute('style');
+            (el as HTMLElement).removeAttribute('width');
+            (el as HTMLElement).removeAttribute('height');
+          });
+          // Remove colgroup entirely (Word uses it for fixed widths)
+          tableEl.querySelectorAll('colgroup').forEach((el: Element) => el.remove());
+          return new Delta().insert({ tableEmbed: tableEl.outerHTML });
+        }]
+      ]
+    },
     keyboard: {
       bindings: {
         tab: {
@@ -1291,6 +1430,24 @@ const QuestionsPage = () => {
       [{ 'indent': '-1' }, { 'indent': '+1' }],
       ['code-block', 'clean']
     ],
+    clipboard: {
+      matchers: [
+        ['table', function(_node: any, _delta: any) {
+          const Delta = Quill.import('delta');
+          const tableEl = _node as HTMLElement;
+          tableEl.removeAttribute('style');
+          tableEl.removeAttribute('width');
+          tableEl.removeAttribute('height');
+          tableEl.querySelectorAll('tr, td, th, thead, tbody, colgroup, col').forEach((el: Element) => {
+            (el as HTMLElement).removeAttribute('style');
+            (el as HTMLElement).removeAttribute('width');
+            (el as HTMLElement).removeAttribute('height');
+          });
+          tableEl.querySelectorAll('colgroup').forEach((el: Element) => el.remove());
+          return new Delta().insert({ tableEmbed: tableEl.outerHTML });
+        }]
+      ]
+    },
     keyboard: {
       bindings: {
         tab: {
@@ -1496,7 +1653,7 @@ const QuestionsPage = () => {
     setQuestionFile(null);
     setChoiceFiles({});
     setFormValues({
-      text: q.text,
+      text: wrapTablesForQuill(q.text),
       type: q.type || "pilihan_ganda",
       imageUrl: q.imageUrl,
       groupId: q.groupId || "",
@@ -1584,10 +1741,12 @@ const QuestionsPage = () => {
   const handleSubmit = async (e: any, stayOpen: boolean = false) => {
     e.preventDefault();
     if (!pb) return;
+    if (isSavingQuestion) return; // Prevent double-click
 
-    // 1. Validasi Teks Pertanyaan
-    const isQuestionEmpty = !formValues.text || formValues.text.replace(/<[^>]*>/g, '').trim() === "";
-    if (isQuestionEmpty) {
+    // 1. Validasi Teks Pertanyaan (teks ATAU gambar harus ada)
+    const hasQuestionText = formValues.text && formValues.text.replace(/<[^>]*>/g, '').trim() !== "";
+    const hasQuestionImage = !!formValues.imageUrl || !!questionFile || (formValues.text && formValues.text.includes("<img"));
+    if (!hasQuestionText && !hasQuestionImage) {
       showAlert("Gagal", "Teks pertanyaan tidak boleh kosong.", "danger");
       return;
     }
@@ -1599,7 +1758,11 @@ const QuestionsPage = () => {
         showAlert("Gagal", "Soal wajib memiliki minimal satu kunci jawaban.", "danger");
         return;
       }
-      const filledChoicesCount = Object.values(formValues.choices).filter(c => c.text && c.text.replace(/<[^>]*>/g, '').trim() !== "").length;
+      const filledChoicesCount = Object.entries(formValues.choices).filter(([key, c]) => {
+        const hasText = c.text && c.text.replace(/<[^>]*>/g, '').trim() !== "";
+        const hasImage = !!c.imageUrl || !!(choiceFiles as any)[key] || (c.text && c.text.includes("<img"));
+        return hasText || hasImage;
+      }).length;
       if (filledChoicesCount < 2) {
         showAlert("Gagal", "Minimal harus mengisi atau membuat 2 pilihan jawaban.", "danger");
         return;
@@ -1621,6 +1784,7 @@ const QuestionsPage = () => {
       }
     }
 
+    setIsSavingQuestion(true);
     try {
       const uploadBase64ToR2 = async (base64Data: string, prefix: string) => {
         try {
@@ -1638,7 +1802,7 @@ const QuestionsPage = () => {
       };
 
       let imageUrl = formValues.imageUrl || "";
-      let textToSave = formValues.text;
+      let textToSave = unwrapTablesForStorage(formValues.text);
 
       // 🖼️ 1. Upload file Cover Soal (dari tombol input file)
       if (questionFile) {
@@ -1826,6 +1990,8 @@ const QuestionsPage = () => {
       }
     } catch (error) {
       showAlert("Gagal", "Gagal menyimpan soal ke PocketBase.", "danger");
+    } finally {
+      setIsSavingQuestion(false);
     }
   };
 
@@ -2446,85 +2612,110 @@ const QuestionsPage = () => {
     }
   };
 
-  const handleImportPdfText = async (file: File) => {
+  const handleImportJson = async (file: File) => {
     if (!pb) return;
     setIsImporting(true);
     setBatchProgress({
       isOpen: true,
-      total: 0,
       current: 0,
-      message: "Menganalisis file...",
-      title: "Import dari PDF/Teks"
+      total: 0,
+      message: "Membaca file JSON...",
+      title: "Import dari JSON"
     });
 
     try {
-      let parsed;
-      if (file.type === "application/pdf" || file.name.endsWith(".pdf")) {
-        parsed = await parseQuestionsFromPdf(file);
-      } else {
-        const text = await file.text();
-        parsed = parseQuestionsFromText(text);
-      }
-
-      if (parsed.length === 0) {
+      const text = await file.text();
+      const data = JSON.parse(text);
+      
+      // Support both array format and {questions: [...]} format
+      const questionsArr: any[] = Array.isArray(data) ? data : (data.questions || data.soal || data.data || []);
+      
+      if (questionsArr.length === 0) {
         setBatchProgress(prev => ({ ...prev, isOpen: false }));
-        return showAlert("Tidak Ditemukan", "Tidak ada soal yang dikenali. Pastikan format soal menggunakan penomoran (1. 2. 3.) dan opsi (A. B. C. D. E.).", "warning");
+        showAlert("Gagal", "File JSON tidak berisi soal yang valid.", "danger");
+        return;
       }
 
-      setBatchProgress(prev => ({ ...prev, total: parsed.length, message: "Memulai import..." }));
+      setBatchProgress(prev => ({ ...prev, total: questionsArr.length, message: `Mengimport ${questionsArr.length} soal...` }));
+
+      const typeMap: Record<string, string> = {
+        pilihan_ganda: "multiple_choice",
+        pilihan_ganda_kompleks: "complex_choice",
+        menjodohkan: "matching",
+        benar_salah: "true_false",
+        isian_singkat: "short_answer",
+        uraian: "essay",
+        urutkan: "sequence",
+        drag_drop: "drag_drop",
+        multiple_choice: "multiple_choice",
+        complex_choice: "complex_choice",
+        matching: "matching",
+        true_false: "true_false",
+        short_answer: "short_answer",
+        essay: "essay",
+        sequence: "sequence",
+      };
 
       let importedCount = 0;
-      const chunkSize = 10;
-      for (let i = 0; i < parsed.length; i += chunkSize) {
-        const chunk = parsed.slice(i, i + chunkSize);
+      for (let i = 0; i < questionsArr.length; i++) {
+        const q = questionsArr[i];
+        if (!q.text && !q.question) continue;
 
-        await Promise.all(chunk.map(async (q, index) => {
-          const actualIndex = i + index;
-          const choices: Record<string, any> = {};
-          Object.entries(q.choices).forEach(([key, val]) => {
-            choices[key.toLowerCase()] = {
-              text: val.text,
-              isCorrect: val.isCorrect || false,
-              imageUrl: ""
-            };
+        const qType = q.type || "pilihan_ganda";
+        const choices = q.choices || q.options || {};
+        
+        // Determine correct answer
+        let correctAnswer = q.answerKey || q.answer_key || q.correctAnswer || q.correct_answer || "";
+        if (!correctAnswer && choices) {
+          const correctKeys = Object.keys(choices).filter(k => {
+            const c = choices[k];
+            return typeof c === 'object' && c.isCorrect;
           });
+          correctAnswer = correctKeys.join(",");
+        }
 
-          const answerKey = Object.entries(choices).find(([_, v]) => v.isCorrect)?.[0] || "";
+        const payload: any = {
+          examId,
+          text: q.text || q.question || "",
+          field: typeMap[qType] || "multiple_choice",
+          options: {},
+          correctAnswer: correctAnswer,
+          imageUrl: q.imageUrl || q.image_url || "",
+          order: q.order || (questions.length + i + 1),
+          groupId: q.groupId || q.group_id || "",
+          group_id: q.groupId || q.group_id || "",
+          groupText: q.groupText || q.group_text || "",
+          group_text: q.groupText || q.group_text || "",
+        };
 
-          const payload = {
-            examId,
-            text: q.text,
-            field: "multiple_choice",
-            type: "pilihan_ganda",
-            options: choices,
-            answerKey: answerKey.toLowerCase(),
-            groupId: q.groupId || "",
-            groupText: q.groupText || "",
-            order: (questions.length || 0) + actualIndex + 1,
-            imageUrl: ""
-          };
+        // Build options based on type
+        if (qType === "pilihan_ganda" || qType === "pilihan_ganda_kompleks" || qType === "benar_salah" || qType === "multiple_choice" || qType === "complex_choice" || qType === "true_false") {
+          const opts: any = {};
+          Object.keys(choices).forEach(k => {
+            const val = choices[k];
+            if (typeof val === 'string') {
+              opts[k] = { text: val, isCorrect: correctAnswer.includes(k) };
+            } else if (typeof val === 'object') {
+              opts[k] = { text: val.text || "", imageUrl: val.imageUrl || val.image_url || undefined, isCorrect: !!val.isCorrect };
+            }
+          });
+          payload.options = opts;
+        } else if (qType === "menjodohkan" || qType === "matching") {
+          payload.options = { pairs: q.pairs || [] };
+        } else if (qType === "urutkan" || qType === "drag_drop" || qType === "sequence") {
+          payload.options = { items: q.items || [] };
+        }
 
-          try {
-            await pb!.collection('questions').create(payload);
-            importedCount++;
-          } catch (createErr) {
-            console.error("Gagal membuat soal pada index:", actualIndex, createErr);
-          }
-        }));
-
-        const currentProcessed = Math.min(i + chunkSize, parsed.length);
-        setBatchProgress(prev => ({
-          ...prev,
-          current: currentProcessed,
-          message: `Mengimport soal (${currentProcessed}/${parsed.length})`
-        }));
+        await pb.collection('questions').create(payload);
+        importedCount++;
+        setBatchProgress(prev => ({ ...prev, current: importedCount, message: `${importedCount}/${questionsArr.length} soal diimport...` }));
       }
 
       loadQuestions();
-      showAlert("Import Berhasil", `${importedCount} soal berhasil diimport.`, "success");
+      showAlert("Import Berhasil", `${importedCount} soal berhasil diimport dari JSON.`, "success");
     } catch (err: any) {
-      console.error("Import PDF/Text Error:", err);
-      showAlert("Gagal Import", err.message || "Gagal mengimport file.", "danger");
+      console.error("Import JSON Error:", err);
+      showAlert("Gagal Import", err.message || "Gagal mengimport JSON. Pastikan format file benar.", "danger");
     } finally {
       setIsImporting(false);
       setBatchProgress(prev => ({ ...prev, isOpen: false }));
@@ -2978,14 +3169,14 @@ const QuestionsPage = () => {
 
                             <DropdownMenuItem 
                               className="p-2.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-900 transition-all cursor-pointer group flex items-center gap-3"
-                              onClick={() => document.getElementById("pdftext-import-input")?.click()}
+                              onClick={() => document.getElementById("json-import-input")?.click()}
                             >
-                              <div className="h-10 w-10 shrink-0 rounded-lg bg-rose-50 dark:bg-rose-900/30 text-rose-600 flex items-center justify-center group-hover:scale-110 transition-transform">
-                                <FileText className="h-5 w-5" />
+                              <div className="h-10 w-10 shrink-0 rounded-lg bg-orange-50 dark:bg-orange-900/30 text-orange-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                <FileJson className="h-5 w-5" />
                               </div>
                               <div className="flex flex-col min-w-0 text-left">
-                                <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">Import dari PDF / Teks</span>
-                                <span className="text-[10px] text-slate-400 mt-1">Ekstrak soal otomatis tanpa AI</span>
+                                <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">Import dari JSON</span>
+                                <span className="text-[10px] text-slate-400 mt-1">File hasil export JSON</span>
                               </div>
                             </DropdownMenuItem>
 
@@ -3076,10 +3267,10 @@ const QuestionsPage = () => {
                             <div className="space-y-4">
                               <h3 className="text-xl font-bold flex items-center gap-3 text-emerald-700 dark:text-emerald-400">
                                 <FileText className="h-6 w-6" />
-                                1. Menggunakan Microsoft Word
+                                1. Import dari Word (.docx)
                               </h3>
                               <div className="bg-emerald-50/50 dark:bg-emerald-900/20 p-5 rounded-2xl border border-emerald-100 dark:border-emerald-800/50 space-y-3">
-                                <p className="text-sm text-slate-700 dark:text-slate-300">Tulis kata kunci <b className="text-emerald-600">LITERASI:</b> diikuti narasi Anda di luar tabel soal.</p>
+                                <p className="text-sm text-slate-700 dark:text-slate-300">Tulis kata kunci <b className="text-emerald-600">LITERASI:</b> diikuti narasi Anda di luar tabel soal. Tabel data di dalam soal akan otomatis dipreservasi.</p>
                                 <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 font-mono text-xs shadow-sm leading-relaxed">
                                   <div className="text-emerald-600 font-bold mb-1 underline">LITERASI: Mengenal Ekosistem Hutan</div>
                                   <div className="text-slate-400 mb-4 italic">Hutan adalah paruparu dunia yang harus kita jaga...</div>
@@ -3093,7 +3284,7 @@ const QuestionsPage = () => {
                                 </div>
                                 <div className="flex items-start gap-2 text-[11px] text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 p-2 rounded-lg italic">
                                   <Check className="h-3 w-3 mt-0.5 shrink-0" />
-                                  <span>Semua soal di bawah judul tsb akan otomatis menjadi satu grup literasi.</span>
+                                  <span>Semua soal di bawah judul tsb akan otomatis menjadi satu grup literasi. Tabel data dari Word juga akan ditampilkan dengan rapi.</span>
                                 </div>
                               </div>
                             </div>
@@ -3103,7 +3294,7 @@ const QuestionsPage = () => {
                             <div className="space-y-4">
                               <h3 className="text-xl font-bold flex items-center gap-3 text-indigo-700 dark:text-indigo-400">
                                 <FileSpreadsheet className="h-6 w-6" />
-                                2. Menggunakan Excel
+                                2. Import dari Excel
                               </h3>
                               <div className="bg-indigo-50/50 dark:bg-indigo-900/20 p-5 rounded-2xl border border-indigo-100 dark:border-indigo-800/50 space-y-4">
                                 <p className="text-sm text-slate-700 dark:text-slate-300">Gunakan kolom <b className="text-indigo-600">GroupId</b> untuk mengelompokkan soal.</p>
@@ -3120,14 +3311,21 @@ const QuestionsPage = () => {
                                 <p className="text-[11px] text-slate-500 italic">Cukup tuliskan Teks Literasi pada baris pertama dalam satu grup ID.</p>
                               </div>
                             </div>
-                            
-                            <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-100 dark:border-orange-800/50 p-4 rounded-2xl">
-                              <h4 className="text-xs font-bold text-orange-700 dark:text-orange-400 flex items-center gap-2 mb-1">
-                                <Sparkles className="h-3.5 w-3.5" /> Tips Import Gambar
-                              </h4>
-                              <p className="text-[11px] text-orange-600 dark:text-orange-300 leading-normal">
-                                Untuk Word, gambar di dalam wacana literasi harus diletakkan tepat di bawah judul LITERASI agar terbaca sempurna oleh sistem.
-                              </p>
+
+                            <Separator />
+
+                            <div className="space-y-4">
+                              <h3 className="text-xl font-bold flex items-center gap-3 text-orange-700 dark:text-orange-400">
+                                <FileJson className="h-6 w-6" />
+                                3. Import dari JSON
+                              </h3>
+                              <div className="bg-orange-50/50 dark:bg-orange-900/20 p-5 rounded-2xl border border-orange-100 dark:border-orange-800/50 space-y-3">
+                                <p className="text-sm text-slate-700 dark:text-slate-300">Gunakan field <b className="text-orange-600">groupId</b> dan <b className="text-orange-600">groupText</b> untuk literasi.</p>
+                                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 font-mono text-[10px] shadow-sm leading-relaxed overflow-x-auto">
+                                  <span className="text-slate-400">{'[{"text":"...","groupId":"LIT-1","groupText":"Bacaan stimulus...","choices":{...}}]'}</span>
+                                </div>
+                                <p className="text-[11px] text-slate-500 italic">Soal dengan groupId yang sama akan ditampilkan bersama stimulus yang sama. Tidak perlu AI.</p>
+                              </div>
                             </div>
                           </div>
 
@@ -3367,14 +3565,28 @@ const QuestionsPage = () => {
           <form onSubmit={(e) => handleSubmit(e, false)} className="space-y-4 pt-2">
             <div className="flex items-center justify-between mb-1">
               <label className="text-xs font-semibold text-slate-500">Pertanyaan Utama</label>
-              <button 
-                type="button" 
-                onClick={() => setIsMathGuideOpen(true)}
-                className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800/40 text-[10px] font-bold hover:bg-amber-100 transition-all shadow-sm"
-              >
-                <Sparkles className="w-3 h-3" />
-                Panduan Rumus
-              </button>
+              <div className="flex items-center gap-2">
+                <button 
+                  type="button" 
+                  onClick={() => setShowPreview(!showPreview)}
+                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold transition-all shadow-sm border ${
+                    showPreview 
+                    ? "bg-indigo-50 dark:bg-indigo-950/30 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800/40 hover:bg-indigo-100" 
+                    : "bg-slate-50 dark:bg-slate-900 text-slate-400 border-slate-200 dark:border-slate-700 hover:bg-slate-100"
+                  }`}
+                >
+                  <Eye className="w-3 h-3" />
+                  {showPreview ? "Pratinjau ON" : "Pratinjau OFF"}
+                </button>
+                <button 
+                  type="button" 
+                  onClick={() => setIsMathGuideOpen(true)}
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800/40 text-[10px] font-bold hover:bg-amber-100 transition-all shadow-sm"
+                >
+                  <Sparkles className="w-3 h-3" />
+                  Panduan Rumus
+                </button>
+              </div>
             </div>
             <FormField id="text" label="" error={undefined}>
               <div className="bg-card rounded-md border flex flex-col">
@@ -3390,6 +3602,7 @@ const QuestionsPage = () => {
                   className="[&_.ql-editor]:min-h-[120px] [&_.ql-container]:border-none [&_.ql-toolbar]:border-none [&_.ql-toolbar]:border-b"
                 />
                 {/* Pratinjau Tampilan */}
+                {showPreview && (
                 <div className="p-4 bg-slate-50/50 dark:bg-slate-900/30 border-t border-slate-200 dark:border-slate-800 rounded-b-md">
                    <div className="flex items-center gap-2 mb-2.5 opacity-60">
                       <div className="w-1.5 h-3 bg-indigo-500 rounded-full"></div>
@@ -3397,6 +3610,7 @@ const QuestionsPage = () => {
                    </div>
                    <MathText content={formValues.text} className="text-sm font-serif ql-editor !p-0 text-slate-800 dark:text-slate-200 leading-relaxed" />
                 </div>
+                )}
               </div>
             </FormField>
 
@@ -3673,7 +3887,7 @@ const QuestionsPage = () => {
                                 className="[&_.ql-editor]:min-h-[42px] [&_.ql-editor]:py-2 [&_.ql-container]:border-none [&_.ql-toolbar]:border-none [&_.ql-toolbar]:border-b [&_.ql-toolbar]:px-1 [&_.ql-toolbar]:py-0 [&_.ql-formats]:mr-1"
                               />
                               {/* Pratinjau Opsi */}
-                              {formValues.choices[letter].text && (
+                              {showPreview && formValues.choices[letter].text && (
                                 <div className="p-2 bg-slate-50/50 dark:bg-slate-900/40 border-t border-slate-100 dark:border-slate-800 rounded-b-md">
                                   <MathText content={formValues.choices[letter].text} className="text-[11px] font-serif ql-editor !p-0 text-slate-600 dark:text-slate-400" />
                                 </div>
@@ -3876,16 +4090,18 @@ const QuestionsPage = () => {
                 <Button 
                   type="button" 
                   onClick={(e) => handleSubmit(e, true)} 
+                  disabled={isSavingQuestion}
                   className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-2xl h-11 shadow-lg shadow-emerald-500/20"
                 >
-                  <Plus className="mr-2 h-4 w-4" /> Simpan & Tambah Lagi
+                  {isSavingQuestion ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Menyimpan...</> : <><Plus className="mr-2 h-4 w-4" /> Simpan & Tambah Lagi</>}
                 </Button>
               )}
               <Button 
                 type="submit" 
+                disabled={isSavingQuestion}
                 className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl h-11 shadow-lg shadow-blue-500/20"
               >
-                {dialogMode === "edit" ? "Perbarui" : "Simpan & Tutup"}
+                {isSavingQuestion ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Menyimpan...</> : (dialogMode === "edit" ? "Perbarui" : "Simpan & Tutup")}
               </Button>
             </DialogFooter>
           </form>
@@ -4923,8 +5139,8 @@ const QuestionsPage = () => {
                 <FileText className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
               </div>
               <div>
-                <DialogTitle className="text-xl font-bold text-slate-800 dark:text-slate-100">Smart AI Import</DialogTitle>
-                <p className="text-xs text-slate-500 font-medium tracking-tight">Tempel teks dari PDF/Word, biarkan AI yang merapikannya.</p>
+                <DialogTitle className="text-xl font-bold text-slate-800 dark:text-slate-100">{importMode === 'json' ? 'Import JSON' : 'Smart AI Import'}</DialogTitle>
+                <p className="text-xs text-slate-500 font-medium tracking-tight">{importMode === 'json' ? 'Tempel data JSON, langsung diproses tanpa AI.' : 'Tempel teks dari PDF/Word, biarkan AI yang merapikannya.'}</p>
               </div>
             </div>
           </DialogHeader>
@@ -4954,6 +5170,16 @@ const QuestionsPage = () => {
                   >
                     Buat dari Materi (Gen)
                   </button>
+                  <button
+                    onClick={() => setImportMode('json')}
+                    className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${
+                      importMode === 'json' 
+                      ? "bg-white dark:bg-slate-700 text-orange-600 shadow-sm" 
+                      : "text-slate-500 hover:text-slate-700"
+                    }`}
+                  >
+                    Import JSON
+                  </button>
                 </div>
 
                 {importMode === 'generate' && (
@@ -4982,6 +5208,7 @@ const QuestionsPage = () => {
                   </div>
                 )}
 
+                {importMode !== 'json' && (
                 <div className="flex items-center gap-3">
                    <div className="relative flex-1">
                       <label className="flex items-center justify-center gap-2 w-full p-4 border-2 border-dashed border-emerald-200 dark:border-emerald-800/40 rounded-2xl bg-emerald-50/30 dark:bg-emerald-950/10 cursor-pointer hover:bg-emerald-50 dark:hover:bg-emerald-950/20 transition-all group">
@@ -4995,6 +5222,7 @@ const QuestionsPage = () => {
                      {importMode === 'extract' ? "Tempel soal-soal mentah di bawah ini" : "Tempel materi bacaan/artikel di bawah ini"}
                    </div>
                 </div>
+                )}
 
                 <div className="p-5 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/10 dark:to-indigo-900/10 border border-blue-100/50 dark:border-blue-800/40 rounded-3xl relative overflow-hidden group">
                   <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:scale-110 transition-transform">
@@ -5020,6 +5248,21 @@ const QuestionsPage = () => {
                             <li className="flex items-start gap-2">
                               <span className="w-4 h-4 rounded-full bg-blue-100 dark:bg-blue-800 text-[10px] flex items-center justify-center font-bold shrink-0 mt-0.5">3</span>
                               <span>Tinjau hasil deteksi, lalu klik "Simpan" untuk memasukkannya ke sistem.</span>
+                            </li>
+                          </>
+                        ) : importMode === 'json' ? (
+                          <>
+                            <li className="flex items-start gap-2">
+                              <span className="w-4 h-4 rounded-full bg-orange-100 dark:bg-orange-800 text-[10px] flex items-center justify-center font-bold shrink-0 mt-0.5">1</span>
+                              <span>Tempel data JSON hasil export atau buat manual sesuai format.</span>
+                            </li>
+                            <li className="flex items-start gap-2">
+                              <span className="w-4 h-4 rounded-full bg-orange-100 dark:bg-orange-800 text-[10px] flex items-center justify-center font-bold shrink-0 mt-0.5">2</span>
+                              <span>Klik "Parse JSON" — tidak memerlukan AI, langsung diproses.</span>
+                            </li>
+                            <li className="flex items-start gap-2">
+                              <span className="w-4 h-4 rounded-full bg-orange-100 dark:bg-orange-800 text-[10px] flex items-center justify-center font-bold shrink-0 mt-0.5">3</span>
+                              <span>Format: {`[{"text":"...","choices":{"a":{"text":"...","isCorrect":true},...},"answerKey":"a"}]`}</span>
                             </li>
                           </>
                         ) : (
@@ -5053,7 +5296,7 @@ const QuestionsPage = () => {
                 <div className="relative group">
                   <textarea
                     className="w-full h-[400px] p-6 bg-slate-50/50 dark:bg-slate-900/40 border-2 border-slate-100 dark:border-slate-800 rounded-[2.5rem] text-xs font-mono focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 outline-none transition-all resize-none shadow-inner"
-                    placeholder="Contoh: Buatkan 5 soal literasi tentang ekosistem laut... atau tempelkan naskah soal Anda di sini."
+                    placeholder={importMode === 'json' ? '[{"text":"Pertanyaan...","choices":{"a":{"text":"Jawaban A","isCorrect":true},"b":{"text":"Jawaban B","isCorrect":false}},"answerKey":"a"}]' : "Contoh: Buatkan 5 soal literasi tentang ekosistem laut... atau tempelkan naskah soal Anda di sini."}
                     value={importText}
                     onChange={(e) => setImportText(e.target.value)}
                   />
@@ -5173,7 +5416,9 @@ const QuestionsPage = () => {
                 onClick={handleAIParse}
                 disabled={isParsing || !importText.trim()}
                 className={`w-full h-14 rounded-[1.5rem] font-black uppercase text-xs tracking-widest shadow-xl transition-all active:scale-95 ${
-                  importMode === 'extract'
+                  importMode === 'json'
+                  ? "bg-orange-600 hover:bg-orange-700 text-white shadow-orange-200/50"
+                  : importMode === 'extract'
                   ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-200/50"
                   : "bg-blue-600 hover:bg-blue-700 text-white shadow-blue-200/50"
                 }`}
@@ -5194,8 +5439,8 @@ const QuestionsPage = () => {
                   </div>
                 ) : (
                   <>
-                    <Sparkles className="mr-2 h-5 w-5" />
-                    {importMode === 'extract' ? "Analisis Dokumen Sekarang" : "Buat Soal dari Materi Sekarang"}
+                    {importMode === 'json' ? <FileJson className="mr-2 h-5 w-5" /> : <Sparkles className="mr-2 h-5 w-5" />}
+                    {importMode === 'json' ? "Parse JSON Sekarang" : importMode === 'extract' ? "Analisis Dokumen Sekarang" : "Buat Soal dari Materi Sekarang"}
                   </>
                 )}
               </Button>
@@ -5287,202 +5532,152 @@ const QuestionsPage = () => {
       </Dialog>
       {/* 📘 MODAL PUSAT BANTUAN PENULISAN STEM */}
       <Dialog open={isMathGuideOpen} onOpenChange={setIsMathGuideOpen}>
-        <DialogContent className="max-w-2xl rounded-[1.5rem] overflow-hidden p-0 border-none shadow-2xl bg-white dark:bg-slate-950">
+        <DialogContent className="max-w-3xl rounded-[1.5rem] overflow-hidden p-0 border-none shadow-2xl bg-white dark:bg-slate-950">
           <div className="bg-slate-900 p-8 text-white relative">
             <BookOpen className="h-16 w-16 opacity-5 absolute right-8 top-8" />
-            <h2 className="text-2xl font-bold mb-1 tracking-tight">Pusat Bantuan Penulisan STEM</h2>
-            <p className="text-slate-400 text-sm font-medium">Dokumentasi format penulisan rumus Matematika, Fisika, dan Kimia.</p>
+            <h2 className="text-2xl font-bold mb-1 tracking-tight">Panduan Penulisan Rumus</h2>
+            <p className="text-slate-400 text-sm font-medium">Cara menulis rumus Matematika, Fisika, dan Kimia agar tampil sempurna di soal ujian.</p>
           </div>
           
-          <div className="p-8 space-y-6 max-h-[60vh] overflow-y-auto custom-scrollbar">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Dasar */}
-              <div className="space-y-3">
-                <h3 className="text-[10px] font-black text-indigo-500 uppercase tracking-[0.2em]">Dasar Notasi</h3>
-                <div className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800 space-y-4">
-                  <div>
-                    <p className="text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-2">Penulisan dalam Kalimat</p>
-                    <div className="group relative">
-                      <div className="p-3 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl">
-                        <code className="text-xs font-mono text-indigo-600 dark:text-indigo-400 select-all">$ x = 2 $</code>
-                      </div>
-                      <button 
-                         onClick={() => copyToClipboard("$ x = 2 $")}
-                         className={`absolute right-2 top-1/2 -translate-y-1/2 transition-all p-1.5 rounded-lg text-[10px] font-bold flex items-center gap-1.5 shadow-sm border ${
-                            copiedId === "$ x = 2 $" 
-                            ? "bg-emerald-500 text-white border-emerald-500 opacity-100" 
-                            : "bg-white dark:bg-slate-900 text-slate-500 hover:text-indigo-600 border-slate-200 dark:border-slate-800 opacity-0 group-hover:opacity-100"
-                         }`}
-                      >
-                         {copiedId === "$ x = 2 $" ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                         {copiedId === "$ x = 2 $" ? "Tersalin" : "Salin"}
-                      </button>
-                    </div>
-                  </div>
-                  <div>
-                    <p className="text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-2">Penulisan Baris Terpisah</p>
-                    <div className="group relative">
-                      <div className="p-3 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl">
-                        <code className="text-xs font-mono text-indigo-600 dark:text-indigo-400 select-all">$$ E = mc^2 $$</code>
-                      </div>
-                      <button 
-                         onClick={() => copyToClipboard("$$ E = mc^2 $$")}
-                         className={`absolute right-2 top-1/2 -translate-y-1/2 transition-all p-1.5 rounded-lg text-[10px] font-bold flex items-center gap-1.5 shadow-sm border ${
-                            copiedId === "$$ E = mc^2 $$" 
-                            ? "bg-emerald-500 text-white border-emerald-500 opacity-100" 
-                            : "bg-white dark:bg-slate-900 text-slate-500 hover:text-indigo-600 border-slate-200 dark:border-slate-800 opacity-0 group-hover:opacity-100"
-                         }`}
-                      >
-                         {copiedId === "$$ E = mc^2 $$" ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                         {copiedId === "$$ E = mc^2 $$" ? "Tersalin" : "Salin"}
-                      </button>
-                    </div>
-                  </div>
+          <div className="p-8 space-y-8 max-h-[65vh] overflow-y-auto custom-scrollbar">
+            
+            {/* ATURAN UTAMA */}
+            <div className="p-5 rounded-2xl bg-rose-50 dark:bg-rose-900/10 border-2 border-rose-200 dark:border-rose-800/40 space-y-3">
+              <h4 className="text-sm font-black text-rose-700 dark:text-rose-400 flex items-center gap-2">
+                <span className="w-6 h-6 rounded-full bg-rose-600 text-white flex items-center justify-center text-[10px] font-black">!</span>
+                ATURAN PENTING
+              </h4>
+              <p className="text-sm text-rose-800/80 dark:text-rose-300 leading-relaxed">
+                Semua rumus <strong>WAJIB</strong> dibungkus dengan tanda dollar (<code className="bg-rose-100 dark:bg-rose-900/30 px-1.5 py-0.5 rounded font-mono text-rose-700">$...$</code>). Tanpa tanda dollar, rumus akan tampil sebagai teks biasa.
+              </p>
+              <div className="grid grid-cols-2 gap-3 mt-3">
+                <div className="p-3 bg-white dark:bg-slate-900 rounded-xl border border-rose-200 dark:border-rose-800">
+                  <div className="text-[10px] font-black text-rose-500 mb-1.5">❌ SALAH</div>
+                  <code className="text-xs font-mono text-slate-600">{"\\frac{a}{b}"}</code>
+                  <div className="mt-2 text-[10px] text-slate-400 italic">Tampil sebagai teks biasa</div>
                 </div>
-              </div>
-
-              {/* Kamus Simbol */}
-              <div className="space-y-3">
-                <h3 className="text-[10px] font-black text-indigo-500 uppercase tracking-[0.2em]">Kamus Simbol</h3>
-                <div className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800 space-y-3 text-xs">
-                  <div className="flex justify-between items-center text-[10px] font-bold text-slate-400 uppercase tracking-widest pb-1 border-b border-slate-200">
-                    <span>Simbol</span>
-                    <span className="mr-8">Kode / Hasil</span>
-                  </div>
-                  {[
-                    { label: "Pecahan", code: "\\frac{a}{b}" },
-                    { label: "Akar", code: "\\sqrt{x}" },
-                    { label: "Derajat", code: "30^\\circ" },
-                    { label: "Integral", code: "\\int x \\,dx" },
-                    { label: "Limit", code: "\\lim_{x \\to 0}" }
-                  ].map((item) => (
-                    <div key={item.label} className="group flex justify-between items-center border-b border-slate-200/50 dark:border-slate-800 pb-2.5 text-slate-600 dark:text-slate-400 font-medium">
-                      <div className="flex flex-col">
-                        <span>{item.label}</span>
-                        <div className="mt-1 opacity-80">
-                           <MathText content={`$ ${item.code} $`} />
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <code className="text-indigo-500 font-bold select-all tracking-wide">{item.code}</code>
-                        <button 
-                          onClick={() => copyToClipboard(item.code)}
-                          className={`transition-all p-1.5 rounded shadow-sm border ${
-                            copiedId === item.code 
-                            ? "bg-emerald-500 text-white border-emerald-500 opacity-100" 
-                            : "bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-indigo-600 border-slate-200 dark:border-slate-800 opacity-0 group-hover:opacity-100"
-                          }`}
-                        >
-                          {copiedId === item.code ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                        </button>
-                      </div>
-                    </div>
-                  ))}
+                <div className="p-3 bg-white dark:bg-slate-900 rounded-xl border border-emerald-200 dark:border-emerald-800">
+                  <div className="text-[10px] font-black text-emerald-500 mb-1.5">✓ BENAR</div>
+                  <code className="text-xs font-mono text-indigo-600">{"$ \\frac{a}{b} $"}</code>
+                  <div className="mt-2"><MathText content="$ \frac{a}{b} $" className="text-sm" /></div>
                 </div>
               </div>
             </div>
 
-            <div className="space-y-4 pt-2">
-              <h3 className="text-[10px] font-black text-indigo-500 uppercase tracking-[0.2em]">Referensi Lab Sains</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="group p-5 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3 relative">
-                  <div className="flex justify-between items-center">
-                    <p className="text-[10px] font-black text-slate-900 dark:text-slate-100 uppercase tracking-widest">Persamaan Kimia</p>
-                    <MathText content="$ H_2O $" className="text-xs" />
-                  </div>
-                  <div className="p-3 bg-slate-100 dark:bg-slate-800/50 rounded-xl relative group-hover:bg-slate-200 transition-colors">
-                    <code className="text-[10px] text-slate-600 dark:text-slate-400 font-mono italic select-all">
-                      $ H_2O + \dots $
-                    </code>
-                    <button 
-                         onClick={() => copyToClipboard("$ H_2O + \\dots $")}
-                         className={`absolute right-2 top-1/2 -translate-y-1/2 transition-all p-1.5 rounded-lg border shadow-sm flex items-center gap-1.5 text-[10px] font-bold ${
-                           copiedId === "$ H_2O + \\dots $"
-                           ? "bg-emerald-500 text-white border-emerald-500 opacity-100"
-                           : "bg-white dark:bg-slate-900 text-slate-500 hover:text-indigo-600 border-slate-200 dark:border-slate-800 opacity-0 group-hover:opacity-100"
-                         }`}
-                      >
-                         {copiedId === "$ H_2O + \\dots $" ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                         {copiedId === "$ H_2O + \\dots $" ? "Tersalin" : "Salin"}
-                      </button>
-                  </div>
-                  <p className="text-[10px] text-slate-500 leading-relaxed font-medium">Gunakan subscript (_) untuk angka atom.</p>
-                </div>
-                <div className="group p-5 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3 relative">
-                  <div className="flex justify-between items-center">
-                    <p className="text-[10px] font-black text-slate-900 dark:text-slate-100 uppercase tracking-widest">Persamaan Fisika</p>
-                    <MathText content="$ \vec{F} $" className="text-xs" />
-                  </div>
-                  <div className="p-3 bg-slate-100 dark:bg-slate-800/50 rounded-xl relative group-hover:bg-slate-200 transition-colors">
-                    <code className="text-[10px] text-slate-600 dark:text-slate-400 font-mono italic select-all">
-                      $ \vec{"{F}"} = m \cdot \vec{"{a}"} $
-                    </code>
-                     <button 
-                         onClick={() => copyToClipboard("$ \\vec{F} = m \\cdot \\vec{a} $")}
-                         className={`absolute right-2 top-1/2 -translate-y-1/2 transition-all p-1.5 rounded-lg border shadow-sm flex items-center gap-1.5 text-[10px] font-bold ${
-                            copiedId === "$ \\vec{F} = m \\cdot \\vec{a} $"
-                            ? "bg-emerald-500 text-white border-emerald-500 opacity-100"
-                            : "bg-white dark:bg-slate-900 text-slate-500 hover:text-indigo-600 border-slate-200 dark:border-slate-800 opacity-0 group-hover:opacity-100"
-                         }`}
-                      >
-                         {copiedId === "$ \\vec{F} = m \\cdot \\vec{a} $" ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                         {copiedId === "$ \\vec{F} = m \\cdot \\vec{a} $" ? "Tersalin" : "Salin"}
-                      </button>
-                  </div>
-                  <p className="text-[10px] text-slate-500 leading-relaxed font-medium">Gunakan \vec untuk tanda panah vektor.</p>
-                </div>
+            {/* KAMUS SIMBOL LENGKAP */}
+            <div className="space-y-3">
+              <h4 className="text-[10px] font-black text-indigo-500 uppercase tracking-widest">Kamus Simbol (Klik baris untuk menyalin)</h4>
+              <div className="overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800">
+                <table className="w-full text-xs">
+                  <thead className="bg-slate-50 dark:bg-slate-900">
+                    <tr>
+                      <th className="text-left p-3 font-bold text-slate-500 text-[10px] uppercase">Nama</th>
+                      <th className="text-left p-3 font-bold text-slate-500 text-[10px] uppercase">Kode (tulis di antara $...$)</th>
+                      <th className="text-left p-3 font-bold text-slate-500 text-[10px] uppercase">Hasil</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {[
+                      { name: "Pecahan", code: "\\frac{a}{b}", full: "$ \\frac{a}{b} $" },
+                      { name: "Pecahan Besar", code: "\\dfrac{a}{b}", full: "$ \\dfrac{a}{b} $" },
+                      { name: "Akar Kuadrat", code: "\\sqrt{x}", full: "$ \\sqrt{x} $" },
+                      { name: "Akar Pangkat n", code: "\\sqrt[3]{x}", full: "$ \\sqrt[3]{x} $" },
+                      { name: "Pangkat", code: "x^{2}", full: "$ x^{2} $" },
+                      { name: "Indeks/Subscript", code: "x_{1}", full: "$ x_{1} $" },
+                      { name: "Log basis a", code: "{}^{a}\\!\\log b", full: "$ {}^{a}\\!\\log b $" },
+                      { name: "Log natural", code: "\\ln x", full: "$ \\ln x $" },
+                      { name: "Derajat", code: "90^\\circ", full: "$ 90^\\circ $" },
+                      { name: "Perkalian (dot)", code: "a \\cdot b", full: "$ a \\cdot b $" },
+                      { name: "Perkalian (cross)", code: "a \\times b", full: "$ a \\times b $" },
+                      { name: "Tidak Sama Dengan", code: "\\neq", full: "$ \\neq $" },
+                      { name: "Kurang/Lebih sama", code: "\\leq \\geq", full: "$ \\leq \\geq $" },
+                      { name: "Integral", code: "\\int_{a}^{b} f(x)\\,dx", full: "$ \\int_{a}^{b} f(x)\\,dx $" },
+                      { name: "Sigma/Jumlah", code: "\\sum_{i=1}^{n} x_i", full: "$ \\sum_{i=1}^{n} x_i $" },
+                      { name: "Limit", code: "\\lim_{x \\to \\infty}", full: "$ \\lim_{x \\to \\infty} $" },
+                      { name: "Vektor", code: "\\vec{F}", full: "$ \\vec{F} $" },
+                      { name: "Teks dalam rumus", code: "5\\text{ kg}", full: "$ 5\\text{ kg} $" },
+                      { name: "Kurung besar", code: "\\left( \\frac{a}{b} \\right)", full: "$ \\left( \\frac{a}{b} \\right) $" },
+                      { name: "Panah reaksi", code: "\\rightarrow", full: "$ \\rightarrow $" },
+                      { name: "Panah kesetimbangan", code: "\\rightleftharpoons", full: "$ \\rightleftharpoons $" },
+                      { name: "Delta (perubahan)", code: "\\Delta H", full: "$ \\Delta H $" },
+                      { name: "Omega (ohm)", code: "\\Omega", full: "$ \\Omega $" },
+                      { name: "Theta (sudut)", code: "\\theta", full: "$ \\theta $" },
+                      { name: "Alpha/Beta/Gamma", code: "\\alpha \\beta \\gamma", full: "$ \\alpha \\beta \\gamma $" },
+                      { name: "Koma desimal", code: "9{,}8", full: "$ 9{,}8 $" },
+                      { name: "Kimia (H₂O)", code: "\\text{H}_2\\text{O}", full: "$ \\text{H}_2\\text{O} $" },
+                      { name: "Ion (Na⁺)", code: "\\text{Na}^+", full: "$ \\text{Na}^+ $" },
+                      { name: "Keadaan (gas)", code: "\\text{CO}_2(g)", full: "$ \\text{CO}_2(g) $" },
+                      { name: "Satuan (m/s²)", code: "\\text{m/s}^2", full: "$ \\text{m/s}^2 $" },
+                    ].map((item) => (
+                      <tr key={item.name} className="group hover:bg-indigo-50 dark:hover:bg-indigo-950/20 cursor-pointer transition-colors" onClick={() => copyToClipboard(item.full, item.name)}>
+                        <td className="p-2.5 font-medium text-slate-700 dark:text-slate-300">{item.name}</td>
+                        <td className="p-2.5 font-mono text-indigo-600 dark:text-indigo-400 text-[10px]">{item.code}</td>
+                        <td className="p-2.5"><MathText content={item.full} className="text-sm" /></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
 
-            {/* NEW SECTION: READY TO COPY EXAMPLES */}
+            {/* CONTOH SOAL LENGKAP */}
             <div className="space-y-4 pt-4 border-t border-slate-100 dark:border-slate-800">
-               <h3 className="text-[10px] font-black text-indigo-500 uppercase tracking-[0.2em]">Templat Soal Siap Pakai</h3>
-               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  {[
-                    {
-                      category: "MATEMATIKA",
-                      text: "Hitunglah luas daerah yang dibatasi kurva $ y = x^2 $, sumbu-x, garis $ x = 1 $ dan $ x = 3 $ menggunakan $ \\int_1^3 x^2 \\,dx $?",
-                      preview: "Kalkulus (Integral)"
-                    },
-                    {
-                      category: "FISIKA",
-                      text: "Sebuah benda bermassa $ m = 2 \\text{ kg} $ ditarik dengan gaya $ \\vec{F} = 10 \\text{ N} $. Berapakah percepatan $ \\vec{a} $ benda tersebut?",
-                      preview: "Hukum II Newton"
-                    },
-                    {
-                      category: "KIMIA",
-                      text: "Berapakah jumlah atom hidrogen dalam senyawa $ 2\\text{H}_2\\text{O} $?",
-                      preview: "Molekul Air"
-                    }
-                  ].map((tpl) => (
-                    <button 
-                      key={tpl.preview}
-                      onClick={() => copyToClipboard(tpl.text, tpl.preview)}
-                      className={`group p-4 border rounded-2xl text-left transition-all flex flex-col gap-2 ${
-                        copiedId === tpl.preview 
-                        ? "bg-emerald-50 dark:bg-emerald-950/20 border-emerald-500 shadow-lg shadow-emerald-500/10 scale-[1.02]" 
-                        : "bg-slate-50 dark:bg-slate-900 border-slate-100 dark:border-slate-800 hover:border-indigo-400 dark:hover:border-indigo-600"
-                      }`}
-                    >
-                      <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{tpl.category}</span>
-                      <MathText content={tpl.text} className="text-[11px] line-clamp-3 text-slate-600 dark:text-slate-400 font-serif ql-editor !p-0 leading-relaxed h-[2.5rem]" />
-                      <div className="mt-2 flex items-center justify-between">
-                         <span className="text-[10px] font-bold text-indigo-500">{tpl.preview}</span>
-                         <div className={`px-2 py-0.5 rounded-md text-[9px] font-bold transition-all ${
-                            copiedId === tpl.preview 
-                            ? "bg-emerald-500 text-white opacity-100" 
-                            : "bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 opacity-0 group-hover:opacity-100"
-                         }`}>
-                             {copiedId === tpl.preview ? "TERPEROLEH!" : "SALIN SOAL"}
-                         </div>
-                      </div>
-                    </button>
-                  ))}
-               </div>
+              <h4 className="text-[10px] font-black text-indigo-500 uppercase tracking-widest">Contoh Soal per Mata Pelajaran (Klik untuk Salin)</h4>
+              <div className="space-y-3">
+                {[
+                  { label: "MATEMATIKA — Logaritma", code: "Nilai dari $ \\dfrac{{}^{2}\\!\\log \\sqrt{5} + 2 \\cdot {}^{4}\\!\\log 5}{{}^{2}\\!\\log 3 \\cdot {}^{3}\\!\\log 5} $ = ..." },
+                  { label: "MATEMATIKA — Integral", code: "Hitunglah $ \\int_{0}^{2} (3x^2 + 2x) \\, dx $ = ..." },
+                  { label: "MATEMATIKA — Limit", code: "Nilai $ \\lim_{x \\to 2} \\dfrac{x^2 - 4}{x - 2} $ = ..." },
+                  { label: "MATEMATIKA — Trigonometri", code: "Jika $ \\sin \\alpha = \\dfrac{3}{5} $ dan $ \\alpha $ di kuadran I, tentukan nilai $ \\cos 2\\alpha $ = ..." },
+                  { label: "MATEMATIKA — Barisan & Deret", code: "Jumlah $ n $ suku pertama deret geometri $ S_n = \\dfrac{a(1 - r^n)}{1 - r} $. Jika $ a = 3 $, $ r = 2 $, dan $ n = 5 $, maka $ S_5 $ = ..." },
+                  { label: "MATEMATIKA — Matriks", code: "Diketahui matriks $ A = \\begin{pmatrix} 2 & 1 \\\\ 3 & 4 \\end{pmatrix} $. Tentukan $ \\det(A) $ = ..." },
+                  { label: "MATEMATIKA — Turunan", code: "Jika $ f(x) = 3x^4 - 2x^3 + x - 5 $, maka $ f'(x) $ = ..." },
+                  { label: "MATEMATIKA — Peluang", code: "Dari 52 kartu bridge, peluang terambil kartu As atau kartu berwarna merah $ P(A \\cup B) = P(A) + P(B) - P(A \\cap B) $ = ..." },
+                  { label: "FISIKA — Hukum Newton", code: "Benda bermassa $ m = 5 \\text{ kg} $ di atas bidang miring $ \\theta = 30^\\circ $. Jika $ g = 10 \\text{ m/s}^2 $ dan $ \\mu_k = 0{,}2 $, percepatan benda $ a $ = ..." },
+                  { label: "FISIKA — Listrik", code: "Hambatan total rangkaian seri $ R_1 = 4 \\, \\Omega $ dan $ R_2 = 6 \\, \\Omega $ dengan tegangan $ V = 20 \\text{ V} $. Arus listrik $ I = \\dfrac{V}{R_{total}} $ = ..." },
+                  { label: "FISIKA — Gelombang", code: "Gelombang berjalan $ y = 0{,}2 \\sin(4\\pi t - 2\\pi x) $ m. Tentukan amplitudo $ A $, frekuensi $ f $, dan panjang gelombang $ \\lambda $." },
+                  { label: "FISIKA — Termodinamika", code: "Gas ideal mengalami proses isobarik. Usaha yang dilakukan gas $ W = P \\cdot \\Delta V $. Jika $ P = 2 \\times 10^5 \\text{ Pa} $ dan $ \\Delta V = 0{,}01 \\text{ m}^3 $, maka $ W $ = ..." },
+                  { label: "FISIKA — Relativitas", code: "Energi total partikel bermassa $ m $ bergerak dengan kecepatan $ v $: $ E = \\dfrac{m_0 c^2}{\\sqrt{1 - \\dfrac{v^2}{c^2}}} $" },
+                  { label: "FISIKA — Optik", code: "Lensa cembung dengan jarak fokus $ f = 20 \\text{ cm} $. Benda diletakkan $ s = 30 \\text{ cm} $. Jarak bayangan $ \\dfrac{1}{s'} = \\dfrac{1}{f} - \\dfrac{1}{s} $ = ..." },
+                  { label: "KIMIA — Reaksi", code: "Reaksi: $ 2\\text{H}_2 + \\text{O}_2 \\rightarrow 2\\text{H}_2\\text{O} $. Jika 4 mol $ \\text{H}_2 $ bereaksi sempurna, berapa mol $ \\text{H}_2\\text{O} $ yang dihasilkan?" },
+                  { label: "KIMIA — pH", code: "Larutan $ \\text{CH}_3\\text{COOH} $ 0,1 M dengan $ K_a = 10^{-5} $. Tentukan pH! ($ [\\text{H}^+] = \\sqrt{K_a \\cdot C} $)" },
+                  { label: "KIMIA — Termokimia", code: "Diketahui: $ \\text{C}(s) + \\text{O}_2(g) \\rightarrow \\text{CO}_2(g) \\quad \\Delta H = -393{,}5 \\text{ kJ/mol} $. Hitunglah kalor jika 24 g karbon dibakar! ($ A_r \\text{ C} = 12 $)" },
+                  { label: "KIMIA — Kesetimbangan", code: "Reaksi: $ \\text{N}_2(g) + 3\\text{H}_2(g) \\rightleftharpoons 2\\text{NH}_3(g) $. Tentukan $ K_c $ jika $ [\\text{NH}_3] = 0{,}4 $ M, $ [\\text{N}_2] = 0{,}2 $ M, $ [\\text{H}_2] = 0{,}1 $ M." },
+                  { label: "KIMIA — Elektrokimia", code: "Sel volta: $ \\text{Zn}(s) | \\text{Zn}^{2+}(aq) || \\text{Cu}^{2+}(aq) | \\text{Cu}(s) $. Jika $ E^\\circ_{\\text{Zn}} = -0{,}76 $ V dan $ E^\\circ_{\\text{Cu}} = +0{,}34 $ V, maka $ E^\\circ_{sel} $ = ..." },
+                  { label: "BIOLOGI — Genetika", code: "Persilangan $ \\text{Aa} \\times \\text{Aa} $ menghasilkan rasio genotip $ 1\\text{AA} : 2\\text{Aa} : 1\\text{aa} $. Berapa probabilitas fenotip dominan?" },
+                  { label: "BIOLOGI — Pertumbuhan", code: "Populasi bakteri: $ N_t = N_0 \\cdot 2^{t/g} $, dengan $ N_0 = 100 $, waktu generasi $ g = 20 $ menit. Jumlah bakteri setelah $ t = 60 $ menit = ..." },
+                  { label: "BIOLOGI — Enzim", code: "Laju reaksi enzim mengikuti persamaan Michaelis-Menten: $ v = \\dfrac{V_{max} \\cdot [S]}{K_m + [S]} $. Jika $ V_{max} = 100 $, $ K_m = 5 $, dan $ [S] = 10 $, maka $ v $ = ..." },
+                  { label: "EKONOMI — Keseimbangan", code: "Fungsi permintaan $ Q_d = 100 - 2P $ dan penawaran $ Q_s = -20 + 3P $. Harga keseimbangan $ P_e $ dan kuantitas $ Q_e $ = ..." },
+                  { label: "EKONOMI — Elastisitas", code: "Elastisitas permintaan $ E_d = \\dfrac{\\Delta Q / Q}{\\Delta P / P} $. Jika harga naik dari $ P_1 = 5000 $ ke $ P_2 = 6000 $ dan $ Q $ turun dari 100 ke 80, maka $ E_d $ = ..." },
+                  { label: "INFORMATIKA — Konversi Bilangan", code: "Konversikan $ (1011{,}01)_2 $ ke desimal: $ 1 \\cdot 2^3 + 0 \\cdot 2^2 + 1 \\cdot 2^1 + 1 \\cdot 2^0 + 0 \\cdot 2^{-1} + 1 \\cdot 2^{-2} $ = ..." },
+                ].map((ex) => (
+                  <div key={ex.label} onClick={() => copyToClipboard(ex.code, ex.label)} className={`group p-4 rounded-2xl border cursor-pointer transition-all ${copiedId === ex.label ? "bg-emerald-50 dark:bg-emerald-950/20 border-emerald-300" : "bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 hover:border-indigo-300"}`}>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-[10px] font-black text-slate-400 uppercase">{ex.label}</span>
+                      <span className={`text-[9px] font-bold px-2 py-0.5 rounded ${copiedId === ex.label ? "bg-emerald-500 text-white" : "bg-slate-200 text-slate-500 opacity-0 group-hover:opacity-100"}`}>{copiedId === ex.label ? "TERSALIN!" : "KLIK SALIN"}</span>
+                    </div>
+                    <MathText content={ex.code} className="text-sm font-serif leading-relaxed" />
+                    <code className="block mt-2 text-[9px] font-mono text-slate-400 break-all">{ex.code}</code>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* TIPS */}
+            <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/40 space-y-2">
+              <h4 className="text-[10px] font-black text-amber-700 uppercase tracking-widest">Tips Penting</h4>
+              <ul className="text-[11px] text-amber-800/80 dark:text-amber-300 space-y-1.5">
+                <li>• Gunakan <code className="font-mono bg-amber-100 dark:bg-amber-900/30 px-1 rounded">{"\\dfrac"}</code> untuk pecahan besar yang lebih mudah dibaca</li>
+                <li>• Untuk teks biasa di dalam rumus, bungkus dengan <code className="font-mono bg-amber-100 dark:bg-amber-900/30 px-1 rounded">{"\\text{...}"}</code></li>
+                <li>• Import dari Word otomatis mengkonversi equation ke LaTeX</li>
+                <li>• Copy-paste pecahan HTML dari Word juga otomatis dikonversi</li>
+                <li>• AI Generator sudah otomatis menggunakan format LaTeX yang benar</li>
+                <li>• Format KaTeX <code className="font-mono bg-amber-100 dark:bg-amber-900/30 px-1 rounded">{"\\(...\\)"}</code> juga didukung sebagai alternatif <code className="font-mono bg-amber-100 dark:bg-amber-900/30 px-1 rounded">{"$...$"}</code></li>
+              </ul>
             </div>
           </div>
 
-          <DialogFooter className="p-8 bg-slate-50 dark:bg-slate-900/50 border-t border-slate-100 dark:border-slate-800">
+          <DialogFooter className="p-6 bg-slate-50 dark:bg-slate-900/50 border-t border-slate-100 dark:border-slate-800">
             <Button onClick={() => setIsMathGuideOpen(false)} className="w-full h-12 bg-slate-900 hover:bg-black text-white rounded-xl font-bold transition-all shadow-xl shadow-slate-200 dark:shadow-none">
               Tutup Dokumentasi
             </Button>
@@ -5500,9 +5695,9 @@ const QuestionsPage = () => {
         if (file) handleImportWord(file);
         e.target.value = "";
       }} />
-      <input id="pdftext-import-input" type="file" className="hidden" accept=".pdf,.txt,.text" onChange={(e) => {
+      <input id="json-import-input" type="file" className="hidden" accept=".json" onChange={(e) => {
         const file = e.target.files?.[0];
-        if (file) handleImportPdfText(file);
+        if (file) handleImportJson(file);
         e.target.value = "";
       }} />
     </div>

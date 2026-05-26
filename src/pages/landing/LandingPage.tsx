@@ -617,11 +617,13 @@ const LandingPage = () => {
             </div>
             <span className="font-bold text-slate-800 text-sm">EXAM AA</span>
           </div>
-          <div className="flex gap-4 sm:gap-5 text-sm text-slate-500">
+          <div className="flex flex-wrap justify-center gap-4 sm:gap-5 text-sm text-slate-500">
             <button onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} className="hover:text-blue-600 transition-colors">Beranda</button>
             <button onClick={() => document.getElementById("features")?.scrollIntoView({ behavior: "smooth" })} className="hover:text-blue-600 transition-colors">Fitur</button>
             <button onClick={() => document.getElementById("testimonials")?.scrollIntoView({ behavior: "smooth" })} className="hover:text-blue-600 transition-colors">Testimoni</button>
             <button onClick={() => document.getElementById("pricing")?.scrollIntoView({ behavior: "smooth" })} className="hover:text-blue-600 transition-colors text-nowrap">Harga</button>
+            <a href="/privacy-policy.html" className="hover:text-blue-600 transition-colors text-nowrap">Privacy Policy</a>
+            <a href="/terms-of-service.html" className="hover:text-blue-600 transition-colors text-nowrap">Terms of Service</a>
             <a href="https://wa.me/6285359907696" target="_blank" rel="noopener noreferrer" className="hover:text-emerald-600 transition-colors flex items-center gap-1 text-nowrap">
               <MessageCircle size={14} /> Hubungi CS
             </a>
