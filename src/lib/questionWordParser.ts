@@ -95,9 +95,15 @@ export const parseQuestionsFromWord = async (file: File, options?: { includeEssa
   // Step 1: Extract equations and inject placeholders
   const { modifiedBuffer, equationMap } = await extractEquationsFromDocx(arrayBuffer);
   
-  // Step 2: Convert to HTML with mammoth (using modified buffer with placeholders)
+  // Step 2: Convert to HTML with mammoth
   const result = await mammoth.convertToHtml({ arrayBuffer: modifiedBuffer });
   let html = result.value;
+
+  // Step 2b: Post-process — convert tab/nbsp indentation to margin-left style
+  html = html.replace(/<p>((?:&nbsp;|\t|\u00A0){2,})/g, (match, spaces) => {
+    const indentLevel = Math.min(Math.floor(spaces.replace(/&nbsp;/g, ' ').length / 4), 4);
+    return `<p style="margin-left:${indentLevel * 2}em">`;
+  });
 
   // Step 3: Replace placeholders with LaTeX in the HTML
   equationMap.forEach((latex, placeholder) => {
@@ -115,49 +121,15 @@ export const parseQuestionsFromWord = async (file: File, options?: { includeEssa
     return true;
   });
 
-  // Identify content tables (tables that are part of question text, not literasi format)
+  // Identify content tables (tables nested inside other tables = data tables in questions/literasi)
+  // Only the TOP-LEVEL structured table (with question numbers, choices, literasi codes) should be parsed per-cell.
+  // Any table that is NESTED inside another table is a content/data table and should be preserved as HTML.
   const contentTables = new Set<Element>();
   const allTables = Array.from(doc.querySelectorAll("table"));
   allTables.forEach(table => {
-    const rows = Array.from(table.querySelectorAll("tr"));
-    if (rows.length === 0) return;
-    
-    // A table is a "literasi format" table if:
-    // - First cell of first row looks like a literasi code (short text, 2-30 chars)
-    //   AND second cell has substantial text (>20 chars) or is empty
-    // - OR first cell contains a question number pattern (1. 2. etc)
-    // - OR first cell contains a choice letter pattern (A. B. etc)
-    // Otherwise it's a content/data table that should be preserved as HTML
-    
-    const firstRow = rows[0];
-    const cells = Array.from(firstRow.querySelectorAll("td, th"));
-    if (cells.length < 2) {
-      // Single-column tables are likely content tables
-      contentTables.add(table);
-      return;
-    }
-    
-    const firstCellText = (cells[0].textContent?.trim() || "");
-    
-    // Check if this looks like a data/content table (has header row with multiple columns)
-    const hasHeaderRow = cells.length >= 3 || 
-      firstRow.querySelector("th") !== null ||
-      (cells.every(c => {
-        const t = c.textContent?.trim() || "";
-        return t.length > 0 && t.length < 30;
-      }) && cells.length >= 2 && !firstCellText.match(/^[\(]?\d+[\.\s\)]+/) && !firstCellText.match(/^[A-Ea-e][\.\)\s]/));
-    
-    // If first cell is a question number or choice letter, it's a structured format table
-    const isStructuredFormat = firstCellText.match(/^[\(]?\d+[\.\s\)]+/) || 
-      firstCellText.match(/^[A-Ea-e][\.\)\s]/) ||
-      // Check if it matches literasi code pattern
-      (firstCellText.length >= 2 && firstCellText.length <= 30 &&
-        !firstCellText.match(/^\d+[\.\)\s]*$/) &&
-        !firstCellText.match(/^[A-Ea-e][\.\)\s]*$/) &&
-        rows.length <= 2 && cells.length === 2 &&
-        ((cells[1].textContent?.trim() || "").length === 0 || (cells[1].textContent?.trim() || "").length > 20));
-    
-    if (!isStructuredFormat && hasHeaderRow) {
+    // If this table is inside another table's cell, it's a content/data table
+    const parentTd = table.parentElement?.closest('td');
+    if (parentTd) {
       contentTables.add(table);
     }
   });
@@ -165,9 +137,16 @@ export const parseQuestionsFromWord = async (file: File, options?: { includeEssa
   // Build a set of TD elements that belong to content tables (to skip in main loop)
   const contentTableTds = new Set<Element>();
   contentTables.forEach(table => {
-    table.querySelectorAll("td, th").forEach(cell => contentTableTds.add(cell));
-    // Also mark any <p> elements inside content tables
-    table.querySelectorAll("p").forEach(p => contentTableTds.add(p));
+    // Mark cells and paragraphs that are DIRECT descendants of this content table
+    // (not elements that happen to be in a parent table that contains this content table)
+    table.querySelectorAll("td, th").forEach(cell => {
+      // Only include if the closest table ancestor is THIS content table
+      if (cell.closest('table') === table) contentTableTds.add(cell);
+    });
+    table.querySelectorAll("p").forEach(p => {
+      // Only include if the closest table ancestor is THIS content table
+      if (p.closest('table') === table) contentTableTds.add(p);
+    });
   });
 
   // Track which content tables have been injected already
@@ -298,12 +277,15 @@ export const parseQuestionsFromWord = async (file: File, options?: { includeEssa
       const parentTable = p.closest('table');
       if (parentTable && contentTables.has(parentTable) && !injectedTables.has(parentTable)) {
         injectedTables.add(parentTable);
-        // Generate clean table HTML with basic styling
         const tableHtml = parentTable.outerHTML;
         if (currentQuestion) {
           currentQuestion.text += " " + tableHtml;
         } else if (currentGroupId && currentGroupText !== undefined) {
-          currentGroupText += " " + tableHtml;
+          // Only inject if groupText doesn't already contain this table
+          // (it might already be included via secondCellHtml)
+          if (!currentGroupText.includes('<table')) {
+            currentGroupText += " " + tableHtml;
+          }
         }
       }
       return; // Skip individual cell processing
@@ -466,7 +448,18 @@ export const parseQuestionsFromWord = async (file: File, options?: { includeEssa
               literasiSetForCurrentBlock = true;
               
               if (secondCellText && secondCellText.length > 10) {
-                literasiRegistry.set(kode, secondCellHtml || secondCellText);
+                // Extract only the stimulus text (before the first question number)
+                // Remove question numbers, choices, and answer keys from groupText
+                let stimulusHtml = secondCellHtml || secondCellText;
+                // Find where questions start (first "1." or numbered pattern in the cell)
+                const questionStartMatch = stimulusHtml.match(/(<p[^>]*>)?\s*[\(]?\d+[\.\s\)]/);
+                if (questionStartMatch && questionStartMatch.index !== undefined) {
+                  stimulusHtml = stimulusHtml.substring(0, questionStartMatch.index).trim();
+                }
+                // Also remove "Kunci Jawaban" lines
+                stimulusHtml = stimulusHtml.replace(/<p[^>]*>.*?[Kk]unci\s*[Jj]awaban.*?<\/p>/gi, '');
+                
+                literasiRegistry.set(kode, stimulusHtml);
                 currentGroupId = kode;
                 currentGroupText = literasiRegistry.get(kode)!;
               } else {
@@ -482,7 +475,8 @@ export const parseQuestionsFromWord = async (file: File, options?: { includeEssa
             }
           }
           
-          // Skip second cell content if first cell is a literasi kode
+          // Skip second cell content ONLY if it's the literasi text (before any question number)
+          // Don't skip if the content looks like a question number or choice letter
           if (parentTd === secondCell) {
             const firstCellText = (firstCell.textContent?.trim() || "");
             const isFirstKode = firstCellText &&
@@ -494,7 +488,18 @@ export const parseQuestionsFromWord = async (file: File, options?: { includeEssa
               !firstCellText.match(/^(Nama|Kelas|Mapel|Mata|Guru|Waktu|Hari|Tanggal|Petunjuk)/i) &&
               !firstCellText.match(/^\d+[\.\)]\s+\S/) &&
               !firstCellText.match(/^[A-Ea-e][\.\)]\s+\S/);
-            if (isFirstKode) return;
+            if (isFirstKode) {
+              // Only skip if this element is NOT a question/choice/answer key
+              // Allow question numbers, choice letters, and answer keys to pass through
+              const isQuestionOrChoice = textOnly.match(/^[\(]?(\d+)[\.\s\)]+/) || 
+                textOnly.match(/^[A-Ea-e][.\s)]+/) ||
+                textOnly.match(/^(kunci|jawaban|answer)/i);
+              if (!isQuestionOrChoice) {
+                // Skip — groupText was already set from secondCellHtml when literasi kode was detected
+                return;
+              }
+              // If it IS a question/choice, let it fall through to normal processing
+            }
           }
         }
       }
@@ -641,10 +646,12 @@ export const parseQuestionsFromWord = async (file: File, options?: { includeEssa
             currentChoices[pendingLetter].imageUrl = firstImage;
           }
           pendingLetter = null;
-        } else if (!currentQuestion.imageUrl) {
+        } else if (!currentQuestion.text && !currentQuestion.imageUrl) {
+          // Only set as cover if question text hasn't started yet
           currentQuestion.imageUrl = firstImage;
         } else {
-          currentQuestion.text += ` <img src="${firstImage}" />`;
+          // Embed image in question text (it's part of the question content)
+          currentQuestion.text += `<br><img src="${firstImage}" />`;
         }
       }
       return;
@@ -669,13 +676,18 @@ export const parseQuestionsFromWord = async (file: File, options?: { includeEssa
         // Continuation for question text (before choices start)
         if (textOnly || firstImage) {
           if (!currentChoices["a"] && !currentAnswerKey) {
-            // In essay section, preserve HTML formatting (bullets, etc.)
-            if (isEssaySection && line) {
-              currentQuestion.text += "<br>" + line;
-            } else if (textOnly) {
-              currentQuestion.text += " " + textOnly;
+            // Preserve HTML formatting with proper paragraph separation
+            // Use innerHTML (line) which contains formatting like bold, italic, styles
+            const htmlContent = (line && line !== textOnly) ? line : textOnly;
+            // If the source element is a <p> with style, preserve it as-is
+            const pStyle = p.tagName === 'P' && p.getAttribute('style') ? ` style="${p.getAttribute('style')}"` : '';
+            if (pStyle) {
+              currentQuestion.text += `<p${pStyle}>${htmlContent}</p>`;
+            } else {
+              currentQuestion.text += "<br>" + htmlContent;
             }
             if (firstImage && !currentQuestion.imageUrl) currentQuestion.imageUrl = firstImage;
+            else if (firstImage) currentQuestion.text += `<br><img src="${firstImage}" />`;
           }
         }
       }

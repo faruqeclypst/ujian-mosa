@@ -509,7 +509,7 @@ const buildFormatRules = (ctx: SubjectContext): string => {
   }
   
   if (ctx.isProgramming) {
-    rules.push(`Kode program: <pre class="ql-syntax" data-language="BAHASA">...</pre>.`);
+    rules.push(`KODE PROGRAM: Gunakan <pre class="ql-syntax" data-language="BAHASA">...</pre> HANYA untuk potongan kode/sintaks program yang sebenarnya. JANGAN gunakan code block untuk teks narasi, penjelasan, atau stimulus bacaan — tulis sebagai teks biasa/HTML.`);
   }
   if (ctx.explicitlyWantsArabic) {
     rules.push(`WAJIB sertakan ayat Al-Quran/Hadits dalam TEKS ARAB ASLI ber-harakat. Format: <p dir="rtl" style="text-align:right;font-size:1.3em;line-height:2;margin:12px 0;">AYAT ARAB</p> lalu terjemahan dalam <p style="font-style:italic;margin:8px 0;color:#555;">Terjemahan: "..."</p>.`);

@@ -74,31 +74,25 @@ const unwrapTablesForStorage = (html: string): string => {
   return html.replace(/<div class="ql-table-embed"[^>]*>([\s\S]*?)<\/div>/gi, '$1');
 };
 
-// 🛠️ REGISTER CUSTOM FORMATS TO PRESERVE INDENTATION (TABS)
+// 🛠️ REGISTER CUSTOM FORMATS (only line-height, NOT margin-left/text-indent which trap indentation)
 const Parchment = Quill.import('parchment');
-const IndentStyle = new Parchment.Attributor.Style('text-indent', 'text-indent', {
-  scope: Parchment.Scope.BLOCK
-});
-const MarginLeftStyle = new Parchment.Attributor.Style('margin-left', 'margin-left', {
-  scope: Parchment.Scope.BLOCK
-});
 const LineHeightStyle = new Parchment.Attributor.Style('line-height', 'line-height', {
   scope: Parchment.Scope.BLOCK
 });
 
-Quill.register(IndentStyle, true);
-Quill.register(MarginLeftStyle, true);
+Quill.register(LineHeightStyle, true);
 Quill.register(LineHeightStyle, true);
 
 // 📜 FORMATS WHITELIST (Penting agar Quill tidak menghapus tag/style kustom)
 const quillFormats = [
   'header', 'font', 'size',
   'bold', 'italic', 'underline', 'strike', 'blockquote',
+  'script',
   'list', 'bullet', 'indent',
   'link', 'image', 'video', 'formula',
   'color', 'background',
   'align', 'code-block',
-  'text-indent', 'margin-left', 'line-height',
+  'line-height',
   'tableEmbed'
 ];
 
@@ -180,8 +174,8 @@ const compressImage = (file: File): Promise<File> => {
         canvas.toBlob(
           (blob) => {
             if (blob) {
-              const compressedFile = new File([blob], file.name.replace(/\.[^/.]+$/, "") + ".jpg", {
-                type: "image/jpeg",
+              const compressedFile = new File([blob], file.name.replace(/\.[^/.]+$/, "") + ".webp", {
+                type: "image/webp",
                 lastModified: Date.now(),
               });
               resolve(compressedFile);
@@ -189,8 +183,8 @@ const compressImage = (file: File): Promise<File> => {
               reject(new Error("Gagal mengompresi gambar"));
             }
           },
-          "image/jpeg",
-          0.75 // 75% kualitas sangat tinggi untuk visual tp hemat bytes
+          "image/webp",
+          0.80 // 80% kualitas WebP — lebih kecil dari JPEG dengan kualitas setara
         );
       };
     };
@@ -1361,6 +1355,61 @@ const QuestionsPage = () => {
 
   const quillRef = useRef<any>(null); // <--- Reference to Question Quill
 
+  // Auto-detect LaTeX in plain text and wrap with $...$
+  const autoDetectLatex = (html: string): string => {
+    if (!html || !html.includes('\\')) return html;
+    // Don't process if already has $ delimiters or \( \) delimiters
+    if (html.includes('$') || html.includes('\\(') || html.includes('\\[')) return html;
+    
+    // Common LaTeX commands that indicate math content
+    const latexCommands = /\\(frac|dfrac|sqrt|int|sum|prod|lim|log|ln|sin|cos|tan|vec|text|left|right|cdot|times|div|pm|mp|leq|geq|neq|approx|infty|alpha|beta|gamma|theta|sigma|delta|Delta|Omega|pi|circ|rightarrow|leftarrow|rightleftharpoons)\b/;
+    
+    if (!latexCommands.test(html)) return html;
+    
+    // Strategy: find LaTeX expressions within text and wrap them individually
+    // A LaTeX expression starts with \ command and may include {}, ^, _, etc.
+    const processed = html.replace(
+      /(<p[^>]*>)((?:(?!<\/p>).)*)(<\/p>)/gi,
+      (match, open, content, close) => {
+        if (content.includes('$') || content.includes('\\(')) return match;
+        if (!latexCommands.test(content)) return match;
+        
+        const stripped = content.replace(/<[^>]*>/g, '').trim();
+        
+        // If entire paragraph looks like pure math expression
+        if (latexCommands.test(stripped) && stripped.length < 500) {
+          // Check if it's mixed text + math or pure math
+          const textBeforeMath = stripped.match(/^([^\\]*?)(\\(?:frac|dfrac|sqrt|int|sum|prod|lim|log|ln|sin|cos|tan|vec|left|right|cdot|times|div|pm|leq|geq|neq|approx|infty|alpha|beta|gamma|theta|sigma|delta|Delta|Omega|pi|circ|rightarrow|leftarrow|rightleftharpoons))/);
+          if (textBeforeMath && textBeforeMath[1].length > 5) {
+            // Mixed: wrap only the math part (from first \ command to end)
+            const mathStart = stripped.indexOf(textBeforeMath[2]);
+            const textPart = stripped.substring(0, mathStart);
+            const mathPart = stripped.substring(mathStart);
+            return open + textPart + '$ ' + mathPart + ' $' + close;
+          }
+          // Pure math paragraph
+          return open + '$ ' + content + ' $' + close;
+        }
+        return match;
+      }
+    );
+    
+    // Handle bare text (not wrapped in <p>)
+    if (processed === html && !html.includes('<p')) {
+      const stripped = html.replace(/<[^>]*>/g, '').trim();
+      if (latexCommands.test(stripped) && stripped.length < 500) {
+        const textBeforeMath = stripped.match(/^([^\\]*?)(\\(?:frac|dfrac|sqrt|int|sum|lim|log|ln|sin|cos|tan|vec|cdot|times|alpha|beta|gamma|theta|pi))/);
+        if (textBeforeMath && textBeforeMath[1].length > 5) {
+          const mathStart = stripped.indexOf(textBeforeMath[2]);
+          return stripped.substring(0, mathStart) + '$ ' + stripped.substring(mathStart) + ' $';
+        }
+        return '$ ' + html + ' $';
+      }
+    }
+    
+    return processed;
+  };
+
   const imageHandler = useCallback(function (this: any) {
     const quill = this.quill; // <--- Instance editor yang sedang diklik toolbar-nya
     
@@ -1388,7 +1437,6 @@ const QuestionsPage = () => {
       matchers: [
         ['table', function(_node: any, _delta: any) {
           const Delta = Quill.import('delta');
-          // Strip ALL inline styles from table elements for clean auto-fit
           const tableEl = _node as HTMLElement;
           tableEl.removeAttribute('style');
           tableEl.removeAttribute('width');
@@ -1398,9 +1446,28 @@ const QuestionsPage = () => {
             (el as HTMLElement).removeAttribute('width');
             (el as HTMLElement).removeAttribute('height');
           });
-          // Remove colgroup entirely (Word uses it for fixed widths)
           tableEl.querySelectorAll('colgroup').forEach((el: Element) => el.remove());
           return new Delta().insert({ tableEmbed: tableEl.outerHTML });
+        }],
+        [Node.ELEMENT_NODE, function(_node: any, delta: any) {
+          // Strip background color AND text color from pasted content
+          // This prevents Word/website styling from breaking dark mode
+          if (delta && delta.ops) {
+            delta.ops = delta.ops.map((op: any) => {
+              if (op.attributes) {
+                delete op.attributes.background;
+                // Remove black/dark colors that won't show in dark mode
+                if (op.attributes.color) {
+                  const c = op.attributes.color.toLowerCase();
+                  if (c === '#000000' || c === '#000' || c === 'black' || c === '#333333' || c === '#333' || c === '#444444' || c === '#444' || c === 'rgb(0, 0, 0)' || c === 'rgb(0,0,0)' || c === '#1e1e1e' || c === 'windowtext') {
+                    delete op.attributes.color;
+                  }
+                }
+              }
+              return op;
+            });
+          }
+          return delta;
         }]
       ]
     },
@@ -1445,6 +1512,23 @@ const QuestionsPage = () => {
           });
           tableEl.querySelectorAll('colgroup').forEach((el: Element) => el.remove());
           return new Delta().insert({ tableEmbed: tableEl.outerHTML });
+        }],
+        [Node.ELEMENT_NODE, function(_node: any, delta: any) {
+          if (delta && delta.ops) {
+            delta.ops = delta.ops.map((op: any) => {
+              if (op.attributes) {
+                delete op.attributes.background;
+                if (op.attributes.color) {
+                  const c = op.attributes.color.toLowerCase();
+                  if (c === '#000000' || c === '#000' || c === 'black' || c === '#333333' || c === '#333' || c === '#444444' || c === '#444' || c === 'rgb(0, 0, 0)' || c === 'rgb(0,0,0)' || c === '#1e1e1e' || c === 'windowtext') {
+                    delete op.attributes.color;
+                  }
+                }
+              }
+              return op;
+            });
+          }
+          return delta;
         }]
       ]
     },
@@ -1507,7 +1591,31 @@ const QuestionsPage = () => {
         };
       });
 
-      setQuestions(mapped as any);
+      // Group-aware sorting: keep questions with same groupId together
+      const grouped: any[] = [];
+      const seen = new Set<string>();
+      
+      mapped.forEach((q: any) => {
+        if (seen.has(q.id)) return;
+        if (q.groupId) {
+          if (!seen.has('group_' + q.groupId)) {
+            seen.add('group_' + q.groupId);
+            // Add all questions in this group together
+            const groupQuestions = mapped.filter((gq: any) => gq.groupId === q.groupId);
+            groupQuestions.forEach((gq: any) => {
+              if (!seen.has(gq.id)) {
+                seen.add(gq.id);
+                grouped.push(gq);
+              }
+            });
+          }
+        } else {
+          seen.add(q.id);
+          grouped.push(q);
+        }
+      });
+
+      setQuestions(grouped as any);
     } catch (e) {
       setQuestions([]);
     } finally {
@@ -1802,7 +1910,7 @@ const QuestionsPage = () => {
       };
 
       let imageUrl = formValues.imageUrl || "";
-      let textToSave = unwrapTablesForStorage(formValues.text);
+      let textToSave = autoDetectLatex(unwrapTablesForStorage(formValues.text));
 
       // 🖼️ 1. Upload file Cover Soal (dari tombol input file)
       if (questionFile) {
@@ -2311,6 +2419,7 @@ const QuestionsPage = () => {
             {item.groupId && (
               <span className="p-1 px-1.5 rounded-md bg-amber-50 text-amber-600 dark:bg-amber-950/20 dark:text-amber-400 flex items-center gap-1 font-bold text-[9px] border border-amber-200 dark:border-amber-800/40 uppercase tracking-tight">
                 🔖 Paket: {item.groupId}
+                {questions.findIndex(q => q.groupId === item.groupId) === questions.indexOf(item) && <span className="ml-1 px-1 py-0.5 rounded bg-amber-500 text-white text-[7px] font-black">MAIN</span>}
               </span>
             )}
           </div>
@@ -2393,7 +2502,22 @@ const QuestionsPage = () => {
 
     try {
       const parsed = await parseQuestionsFromWord(file);
+      console.log("📋 Word Parser Results:", parsed.length, "soal ditemukan", parsed.map((q, i) => `[${i+1}] type=${q.type} groupId=${q.groupId} text=${(q.text||"").substring(0,50)}`));
       if (parsed.length === 0) throw new Error("Tidak ada soal yang dikenali dalam file.");
+
+      // ─── FILTER BY ALLOWED TYPES ──────────────────────────────────────
+      // Only import question types that are enabled by admin
+      const filteredByType = parsed.filter(q => {
+        const qType = q.type || "pilihan_ganda";
+        return allowedTypes[qType] !== false; // default true if not set
+      });
+      
+      const skippedByType = parsed.length - filteredByType.length;
+      if (filteredByType.length === 0) {
+        setBatchProgress(prev => ({ ...prev, isOpen: false }));
+        const disabledTypes = parsed.map(q => q.type).filter((v, i, a) => a.indexOf(v) === i && allowedTypes[v || "pilihan_ganda"] === false);
+        throw new Error(`Semua soal bertipe ${disabledTypes.join(", ")} yang belum diaktifkan admin. Aktifkan tipe soal tersebut di Pengaturan terlebih dahulu.`);
+      }
 
       // ─── DUPLICATE DETECTION & UNIQUE GROUP ID ─────────────────────────
       // Fetch existing questions for this exam to check duplicates
@@ -2402,7 +2526,7 @@ const QuestionsPage = () => {
       const existingGroupIds = new Set(existingQuestions.map(q => q.groupId || q.group_id || "").filter(Boolean));
 
       // Filter out duplicates (same question text already exists)
-      const uniqueParsed = parsed.filter(q => {
+      const uniqueParsed = filteredByType.filter(q => {
         const cleanText = (q.text || "").replace(/<[^>]*>/g, '').trim().toLowerCase().substring(0, 80);
         return cleanText.length > 0 && !existingTexts.has(cleanText);
       });
@@ -2428,9 +2552,9 @@ const QuestionsPage = () => {
         }
       });
 
-      const skippedCount = parsed.length - uniqueParsed.length;
+      const skippedCount = filteredByType.length - uniqueParsed.length;
 
-      setBatchProgress(prev => ({ ...prev, total: uniqueParsed.length, message: `Menyiapkan import ${uniqueParsed.length} soal${skippedCount > 0 ? ` (${skippedCount} duplikat dilewati)` : ''}...` }));
+      setBatchProgress(prev => ({ ...prev, total: uniqueParsed.length, message: `Menyiapkan import ${uniqueParsed.length} soal${skippedCount > 0 ? ` (${skippedCount} duplikat dilewati)` : ''}${skippedByType > 0 ? ` (${skippedByType} tipe tidak aktif)` : ''}...` }));
 
       let importedCount = 0;
       const chunkSize = 5;
@@ -2523,6 +2647,7 @@ const QuestionsPage = () => {
 
       let message = `${importedCount} soal berhasil diimport.`;
       if (skippedCount > 0) message += ` ${skippedCount} soal duplikat dilewati.`;
+      if (skippedByType > 0) message += ` ${skippedByType} soal dilewati (tipe belum diaktifkan).`;
       loadQuestions();
       showAlert("Berhasil", message, "success");
     } catch (err: any) {
@@ -3143,40 +3268,18 @@ const QuestionsPage = () => {
                             
                             <DropdownMenuItem 
                               className="p-2.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-900 transition-all cursor-pointer group flex items-center gap-3"
-                              onClick={() => document.getElementById("excel-import-input")?.click()}
-                            >
-                              <div className="h-10 w-10 shrink-0 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 flex items-center justify-center group-hover:scale-110 transition-transform">
-                                <FileSpreadsheet className="h-5 w-5" />
-                              </div>
-                              <div className="flex flex-col min-w-0 text-left">
-                                <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">Import dari Excel</span>
-                                <span className="text-[10px] text-slate-400 mt-1">Gunakan template XLSX</span>
-                              </div>
-                            </DropdownMenuItem>
-
-                            <DropdownMenuItem 
-                              className="p-2.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-900 transition-all cursor-pointer group flex items-center gap-3"
-                              onClick={() => document.getElementById("word-import-input")?.click()}
+                              onClick={() => document.getElementById("unified-import-input")?.click()}
                             >
                               <div className="h-10 w-10 shrink-0 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-600 flex items-center justify-center group-hover:scale-110 transition-transform">
-                                <FileText className="h-5 w-5" />
+                                <Download className="h-5 w-5 rotate-180" />
                               </div>
                               <div className="flex flex-col min-w-0 text-left">
-                                <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">Import dari Word</span>
-                                <span className="text-[10px] text-slate-400 mt-1">Pilih file .docx / .docm</span>
-                              </div>
-                            </DropdownMenuItem>
-
-                            <DropdownMenuItem 
-                              className="p-2.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-900 transition-all cursor-pointer group flex items-center gap-3"
-                              onClick={() => document.getElementById("json-import-input")?.click()}
-                            >
-                              <div className="h-10 w-10 shrink-0 rounded-lg bg-orange-50 dark:bg-orange-900/30 text-orange-600 flex items-center justify-center group-hover:scale-110 transition-transform">
-                                <FileJson className="h-5 w-5" />
-                              </div>
-                              <div className="flex flex-col min-w-0 text-left">
-                                <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">Import dari JSON</span>
-                                <span className="text-[10px] text-slate-400 mt-1">File hasil export JSON</span>
+                                <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">Import Soal</span>
+                                <div className="flex items-center gap-1 mt-1">
+                                  <span className="px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400 text-[8px] font-black uppercase">.xlsx</span>
+                                  <span className="px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-400 text-[8px] font-black uppercase">.docx</span>
+                                  <span className="px-1.5 py-0.5 rounded bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-400 text-[8px] font-black uppercase">.json</span>
+                                </div>
                               </div>
                             </DropdownMenuItem>
 
@@ -3231,11 +3334,14 @@ const QuestionsPage = () => {
                                 className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 focus:bg-slate-50 dark:focus:bg-slate-900 transition-colors group"
                               >
                                 <div className="h-10 w-10 shrink-0 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-600 flex items-center justify-center group-hover:scale-110 transition-transform">
-                                  <FileSpreadsheet className="h-5 w-5" />
+                                  <FileText className="h-5 w-5" />
                                 </div>
                                 <div className="flex flex-col min-w-0">
-                                  <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight tracking-tight">Template Word</span>
-                                  <span className="text-[10px] text-slate-400 mt-1">Download format Template Word</span>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight tracking-tight">Template Word</span>
+                                    <span className="px-1.5 py-0.5 rounded-full bg-emerald-500 text-white text-[9px] font-bold">★</span>
+                                  </div>
+                                  <span className="text-[10px] text-slate-400 mt-0.5">Format tabel + literasi + rumus</span>
                                 </div>
                               </DropdownMenuItem>
                             <DropdownMenuItem 
@@ -3320,11 +3426,58 @@ const QuestionsPage = () => {
                                 3. Import dari JSON
                               </h3>
                               <div className="bg-orange-50/50 dark:bg-orange-900/20 p-5 rounded-2xl border border-orange-100 dark:border-orange-800/50 space-y-3">
-                                <p className="text-sm text-slate-700 dark:text-slate-300">Gunakan field <b className="text-orange-600">groupId</b> dan <b className="text-orange-600">groupText</b> untuk literasi.</p>
-                                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 font-mono text-[10px] shadow-sm leading-relaxed overflow-x-auto">
-                                  <span className="text-slate-400">{'[{"text":"...","groupId":"LIT-1","groupText":"Bacaan stimulus...","choices":{...}}]'}</span>
+                                <p className="text-sm text-slate-700 dark:text-slate-300">Gunakan field <b className="text-orange-600">groupId</b> dan <b className="text-orange-600">groupText</b> untuk literasi. Bisa juga minta ChatGPT buatkan soal dengan format ini.</p>
+                                
+                                <div className="space-y-2">
+                                  <p className="text-[10px] font-black text-orange-600 uppercase tracking-widest">Template Prompt untuk ChatGPT (Klik untuk Salin):</p>
+                                  <div 
+                                    onClick={() => {
+                                      const prompt = `Buatkan 10 soal pilihan ganda untuk mata pelajaran [ISI MAPEL] kelas [ISI KELAS] dengan format JSON berikut. Gunakan format KaTeX \\(...\\) untuk rumus matematika. Untuk soal literasi, isi groupId dan groupText.
+
+Format JSON:
+[{"text": "<p>Teks pertanyaan \\\\(rumus\\\\) ...</p>","type": "pilihan_ganda","groupId": "","groupText": "","choices": {"a": {"isCorrect": false,"text": "Pilihan A"},"b": {"isCorrect": false,"text": "Pilihan B"},"c": {"isCorrect": true,"text": "Pilihan C"},"d": {"isCorrect": false,"text": "Pilihan D"},"e": {"isCorrect": false,"text": "Pilihan E"}},"answerKey": "c","order": 1}]
+
+Aturan:
+- type: pilihan_ganda (wajib 5 opsi a-e, 1 isCorrect: true)
+- Untuk literasi: isi groupId (misal "LIT-1") dan groupText (teks bacaan HTML)
+- Soal dengan groupId sama akan berbagi stimulus yang sama
+- Untuk rumus: gunakan \\\\(...\\\\) sebagai delimiter
+- answerKey: huruf kecil dari jawaban benar
+- Output HANYA JSON array, tanpa penjelasan`;
+                                      navigator.clipboard.writeText(prompt);
+                                      addToast({ title: "Tersalin!", description: "Prompt template sudah di-copy. Paste ke ChatGPT.", type: "success", duration: 3000 });
+                                    }}
+                                    className="p-3 bg-white dark:bg-slate-900 border border-orange-200 dark:border-orange-800 rounded-xl cursor-pointer hover:bg-orange-50 dark:hover:bg-orange-950/30 transition-all group"
+                                  >
+                                    <code className="text-[10px] font-mono text-slate-600 dark:text-slate-400 leading-relaxed block">
+                                      Buatkan 10 soal pilihan ganda untuk mata pelajaran [MAPEL] kelas [KELAS] dengan format JSON... (klik untuk salin prompt lengkap)
+                                    </code>
+                                    <div className="flex items-center gap-1.5 mt-2 text-[9px] font-bold text-orange-500 group-hover:text-orange-700">
+                                      <Copy className="w-3 h-3" /> Klik untuk salin prompt ke ChatGPT
+                                    </div>
+                                  </div>
                                 </div>
-                                <p className="text-[11px] text-slate-500 italic">Soal dengan groupId yang sama akan ditampilkan bersama stimulus yang sama. Tidak perlu AI.</p>
+
+                                <div className="space-y-2">
+                                  <p className="text-[10px] font-black text-orange-600 uppercase tracking-widest">Contoh Hasil JSON (Klik untuk Salin):</p>
+                                  <div 
+                                    onClick={() => {
+                                      const sample = JSON.stringify([{"text":"<p>Perangkat keras komputer yang berfungsi menampilkan hasil proses adalah ...</p>","type":"pilihan_ganda","groupId":"","groupText":"","choices":{"a":{"isCorrect":false,"text":"Keyboard"},"b":{"isCorrect":false,"text":"Mouse"},"c":{"isCorrect":true,"text":"Monitor"},"d":{"isCorrect":false,"text":"Scanner"},"e":{"isCorrect":false,"text":"Microphone"}},"answerKey":"c","order":1}], null, 2);
+                                      navigator.clipboard.writeText(sample);
+                                      addToast({ title: "Tersalin!", description: "Contoh JSON sudah di-copy.", type: "success", duration: 3000 });
+                                    }}
+                                    className="p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl cursor-pointer hover:bg-slate-50 transition-all group max-h-24 overflow-hidden"
+                                  >
+                                    <code className="text-[9px] font-mono text-slate-500 leading-relaxed block">
+                                      {'[{"text":"<p>Perangkat keras...</p>","type":"pilihan_ganda","choices":{"a":{"isCorrect":false,"text":"Keyboard"},...},"answerKey":"c"}]'}
+                                    </code>
+                                    <div className="flex items-center gap-1.5 mt-2 text-[9px] font-bold text-slate-400 group-hover:text-indigo-600">
+                                      <Copy className="w-3 h-3" /> Klik untuk salin contoh JSON
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <p className="text-[11px] text-orange-600/80 italic">Paste hasil dari ChatGPT ke tab "Import JSON" di Smart AI Import. Tidak perlu API key.</p>
                               </div>
                             </div>
                           </div>
@@ -3608,7 +3761,7 @@ const QuestionsPage = () => {
                       <div className="w-1.5 h-3 bg-indigo-500 rounded-full"></div>
                       <p className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Pratinjau Tampilan (Sesuai Ujian)</p>
                    </div>
-                   <MathText content={formValues.text} className="text-sm font-serif ql-editor !p-0 text-slate-800 dark:text-slate-200 leading-relaxed" />
+                   <MathText content={autoDetectLatex(formValues.text)} className="text-sm font-serif ql-editor !p-0 text-slate-800 dark:text-slate-200 leading-relaxed" />
                 </div>
                 )}
               </div>
@@ -3889,7 +4042,7 @@ const QuestionsPage = () => {
                               {/* Pratinjau Opsi */}
                               {showPreview && formValues.choices[letter].text && (
                                 <div className="p-2 bg-slate-50/50 dark:bg-slate-900/40 border-t border-slate-100 dark:border-slate-800 rounded-b-md">
-                                  <MathText content={formValues.choices[letter].text} className="text-[11px] font-serif ql-editor !p-0 text-slate-600 dark:text-slate-400" />
+                                  <MathText content={autoDetectLatex(formValues.choices[letter].text)} className="text-[11px] font-serif ql-editor !p-0 text-slate-600 dark:text-slate-400" />
                                 </div>
                               )}
                             </div>
@@ -5685,6 +5838,17 @@ const QuestionsPage = () => {
         </DialogContent>
       </Dialog>
       {/* Hidden inputs for imports moved here for reliability */}
+      <input id="unified-import-input" type="file" className="hidden" accept=".xlsx,.xls,.docx,.docm,.json" onChange={(e) => {
+        const file = e.target.files?.[0];
+        if (file) {
+          const ext = file.name.split('.').pop()?.toLowerCase();
+          if (ext === 'xlsx' || ext === 'xls') handleImportExcel(file);
+          else if (ext === 'docx' || ext === 'docm') handleImportWord(file);
+          else if (ext === 'json') handleImportJson(file);
+          else addToast({ title: "Format Tidak Didukung", description: "Gunakan file .xlsx, .docx, atau .json", type: "error" });
+        }
+        e.target.value = "";
+      }} />
       <input id="excel-import-input" type="file" className="hidden" accept=".xlsx,.xls" onChange={(e) => {
         const file = e.target.files?.[0];
         if (file) handleImportExcel(file);

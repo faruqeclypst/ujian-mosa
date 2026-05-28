@@ -118,6 +118,44 @@ body {
   margin-right: auto !important;
 }
 
+/* 📸 Limit inline images in question text display (preview & CBT) to medium size */
+.html-segment img,
+.math-content img {
+  max-width: 350px;
+  height: auto;
+  display: block;
+  margin: 0.5rem auto;
+  border-radius: 0.5rem;
+  cursor: zoom-in;
+  transition: opacity 0.3s;
+  background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  min-height: 60px;
+}
+
+.html-segment img[src]:not([src=""]),
+.math-content img[src]:not([src=""]) {
+  animation: none;
+  background: transparent;
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.dark .html-segment img,
+.dark .math-content img {
+  background: linear-gradient(90deg, #1e293b 25%, #334155 50%, #1e293b 75%);
+  background-size: 200% 100%;
+}
+
+.html-segment img:hover,
+.math-content img:hover {
+  opacity: 0.9;
+}
+
 /* 📊 Table styling for imported Word document tables */
 .ql-editor table,
 .html-segment table,
@@ -267,21 +305,100 @@ body {
 }
 
 /* 🌑 Force light text for rich text content in Dark Mode to ensure readability */
+/* Only override DEFAULT text color (elements without explicit color style) */
 .dark .ql-editor,
+.dark .html-segment,
+.dark .math-content {
+  color: #f1f5f9;
+}
+
 .dark .ql-editor p,
 .dark .ql-editor li,
 .dark .ql-editor strong,
 .dark .ql-editor b,
 .dark .ql-editor i,
 .dark .ql-editor em,
-.dark .ql-editor u {
-  color: #ffffff !important; 
+.dark .ql-editor u,
+.dark .html-segment p,
+.dark .html-segment span:not([style*="color"]),
+.dark .html-segment strong,
+.dark .html-segment b,
+.dark .html-segment i,
+.dark .html-segment em,
+.dark .html-segment u {
+  color: inherit;
 }
 
-/* Handle specific background-colors if any were set in the editor */
-.dark .ql-editor [style*="background-color: black"],
-.dark .ql-editor [style*="background-color: #000000"] {
+/* Strip ALL background-color highlights in dark mode (from Word/website paste) */
+.dark .ql-editor [style*="background-color"],
+.dark .ql-editor [style*="background"],
+.dark .html-segment [style*="background-color"],
+.dark .html-segment [style*="background"],
+.dark .math-content [style*="background-color"],
+.dark .math-content [style*="background"] {
   background-color: transparent !important;
+  background: transparent !important;
+}
+
+/* Map dark/unreadable text colors to lighter versions in dark mode */
+.dark .ql-editor [style*="color: black"],
+.dark .ql-editor [style*="color: #000"],
+.dark .ql-editor [style*="color: rgb(0, 0, 0"],
+.dark .ql-editor [style*="color:#000"],
+.dark .ql-editor [style*="color: windowtext"],
+.dark .html-segment [style*="color: black"],
+.dark .html-segment [style*="color: #000"],
+.dark .html-segment [style*="color: rgb(0, 0, 0"],
+.dark .html-segment [style*="color:#000"],
+.dark .math-content [style*="color: black"],
+.dark .math-content [style*="color: #000"],
+.dark .math-content [style*="color: rgb(0, 0, 0"],
+.dark .math-content [style*="color:#000"] {
+  color: #f1f5f9 !important;
+}
+
+/* Brighten dark colors that are hard to read on dark bg */
+.dark .ql-editor [style*="color: #800"],
+.dark .ql-editor [style*="color: darkred"],
+.dark .ql-editor [style*="color: maroon"],
+.dark .html-segment [style*="color: #800"],
+.dark .html-segment [style*="color: darkred"],
+.dark .html-segment [style*="color: maroon"] {
+  color: #fca5a5 !important;
+}
+
+.dark .ql-editor [style*="color: #008"],
+.dark .ql-editor [style*="color: darkblue"],
+.dark .ql-editor [style*="color: navy"],
+.dark .html-segment [style*="color: #008"],
+.dark .html-segment [style*="color: darkblue"],
+.dark .html-segment [style*="color: navy"] {
+  color: #93c5fd !important;
+}
+
+.dark .ql-editor [style*="color: #080"],
+.dark .ql-editor [style*="color: darkgreen"],
+.dark .ql-editor [style*="color: green"],
+.dark .html-segment [style*="color: #080"],
+.dark .html-segment [style*="color: darkgreen"],
+.dark .html-segment [style*="color: green"] {
+  color: #86efac !important;
+}
+
+/* Also strip background in light mode (unwanted highlights from paste) */
+.ql-editor [style*="background-color"],
+.html-segment [style*="background-color"],
+.math-content [style*="background-color"] {
+  background-color: transparent !important;
+}
+
+/* Strip unwanted indentation from Word/website paste */
+.html-segment [style*="margin-left"],
+.html-segment [style*="text-indent"],
+.math-content [style*="margin-left"],
+.math-content [style*="text-indent"] {
+  margin-left: 0 !important;
+  text-indent: 0 !important;
 }
 
 @layer utilities {

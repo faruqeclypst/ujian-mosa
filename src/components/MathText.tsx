@@ -62,11 +62,35 @@ export const MathText: React.FC<MathTextProps> = ({ content, className = "" }) =
     }
   };
 
+  const [zoomedImage, setZoomedImage] = useState<string | null>(null);
+
+  // Close lightbox on Android back button
+  useEffect(() => {
+    if (!zoomedImage) return;
+    const handleBack = (e: PopStateEvent) => {
+      e.preventDefault();
+      setZoomedImage(null);
+    };
+    window.history.pushState(null, '', window.location.href);
+    window.addEventListener('popstate', handleBack);
+    return () => window.removeEventListener('popstate', handleBack);
+  }, [zoomedImage]);
+
   useEffect(() => {
     if (containerRef.current) {
       // Run KaTeX on all HTML segments
       const segments = containerRef.current.querySelectorAll('.html-segment');
       segments.forEach(seg => runKatex(seg as HTMLElement));
+
+      // Add click-to-zoom on images
+      const imgs = containerRef.current.querySelectorAll('.html-segment img, .math-content img');
+      imgs.forEach(img => {
+        (img as HTMLElement).style.cursor = 'zoom-in';
+        img.addEventListener('click', (e) => {
+          const src = (e.target as HTMLImageElement).src;
+          if (src) setZoomedImage(src);
+        });
+      });
     }
   }, [content]);
 
@@ -149,6 +173,11 @@ export const MathText: React.FC<MathTextProps> = ({ content, className = "" }) =
   const processHtml = (html: string) => {
     if (!html) return "";
     let processed = html;
+
+    // 0. Strip leading whitespace/nbsp from paragraph content
+    processed = processed.replace(/<p([^>]*)>((?:&nbsp;|\s|\u00A0)+)/gi, '<p$1>');
+    // Also strip leading nbsp from bare text (not in <p>)
+    processed = processed.replace(/^((?:&nbsp;|\u00A0)+)/, '');
     
     // 1. Convert HTML fractions to LaTeX (e.g. <sup>3</sup>&frasl;<sub>2</sub> → $\frac{3}{2}$)
     processed = processed.replace(
@@ -221,26 +250,42 @@ export const MathText: React.FC<MathTextProps> = ({ content, className = "" }) =
   };
 
   return (
-    <div ref={containerRef} className={`math-content premium-math ${className}`}>
-      {parsedContent.length === 0 ? (
+    <>
+      <div ref={containerRef} className={`math-content premium-math ${className}`}>
+        {parsedContent.length === 0 ? (
+          <div 
+            className="html-segment" 
+            dangerouslySetInnerHTML={{ __html: processHtml(content) }} 
+          />
+        ) : (
+          parsedContent.map((part, i) => (
+            part.type === 'code' ? (
+              <CodeSegment key={i} value={part.value} language={part.language} />
+            ) : (
+              <div 
+                key={i} 
+                className="html-segment" 
+                dangerouslySetInnerHTML={{ __html: processHtml(part.value) }} 
+              />
+            )
+          ))
+        )}
+      </div>
+      {/* Image Lightbox */}
+      {zoomedImage && (
         <div 
-          className="html-segment" 
-          dangerouslySetInnerHTML={{ __html: processHtml(content) }} 
-        />
-      ) : (
-        parsedContent.map((part, i) => (
-          part.type === 'code' ? (
-            <CodeSegment key={i} value={part.value} language={part.language} />
-          ) : (
-            <div 
-              key={i} 
-              className="html-segment" 
-              dangerouslySetInnerHTML={{ __html: processHtml(part.value) }} 
-            />
-          )
-        ))
+          className="fixed inset-0 z-[9999] backdrop-blur-sm bg-black/50 flex items-center justify-center p-4 animate-in fade-in duration-200"
+          onTouchStart={(e) => { e.preventDefault(); setZoomedImage(null); }}
+          onClick={() => setZoomedImage(null)}
+        >
+          <img 
+            src={zoomedImage} 
+            alt="Zoom" 
+            className="max-w-[90vw] max-h-[85vh] object-contain rounded-2xl shadow-2xl pointer-events-none"
+          />
+        </div>
       )}
-    </div>
+    </>
   );
 };
 
