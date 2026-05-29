@@ -118,10 +118,10 @@ body {
   margin-right: auto !important;
 }
 
-/* 📸 Limit inline images in question text display (preview & CBT) to medium size */
+/* 📸 Inline images in question text display */
 .html-segment img,
 .math-content img {
-  max-width: 350px;
+  max-width: 100%;
   height: auto;
   display: block;
   margin: 0.5rem auto;
@@ -149,11 +149,6 @@ body {
 .dark .math-content img {
   background: linear-gradient(90deg, #1e293b 25%, #334155 50%, #1e293b 75%);
   background-size: 200% 100%;
-}
-
-.html-segment img:hover,
-.math-content img:hover {
-  opacity: 0.9;
 }
 
 /* 📊 Table styling for imported Word document tables */
@@ -517,4 +512,33 @@ body {
   color: #1e293b;
   border: none !important;
   box-shadow: none !important;
+}
+
+/* 🔒 CBT Image Protection - prevent copy/save but allow click-to-zoom */
+.math-content img,
+.html-segment img,
+.ql-editor img {
+  -webkit-user-select: none !important;
+  user-select: none !important;
+  -webkit-user-drag: none !important;
+  -webkit-touch-callout: none !important;
+  cursor: zoom-in !important;
+  pointer-events: auto !important;
+}
+
+/* Prevent right-click context menu on images in CBT */
+.math-content img::selection,
+.html-segment img::selection,
+.ql-editor img::selection {
+  background: transparent;
+}
+
+/* 🔒 CBT Text Protection - block text selection on exam content but allow input */
+textarea,
+input[type="text"],
+input[type="number"],
+input[type="search"],
+[contenteditable="true"] {
+  -webkit-user-select: text !important;
+  user-select: text !important;
 }

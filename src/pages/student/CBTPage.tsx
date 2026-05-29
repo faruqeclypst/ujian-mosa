@@ -113,6 +113,186 @@ const isFuzzyMatch = (studentAns: any, correctKey: string) => {
   return dist <= maxAllowed;
 };
 
+// Image Zoom Overlay with pinch-to-zoom and button controls
+const ImageZoomOverlay = ({ src, onClose }: { src: string; onClose: () => void }) => {
+  const [scale, setScale] = useState(1);
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [lastPinchDist, setLastPinchDist] = useState<number | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const handleZoomIn = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setScale(prev => Math.min(prev + 0.5, 5));
+  };
+
+  const handleZoomOut = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setScale(prev => {
+      const newScale = Math.max(prev - 0.5, 1);
+      if (newScale === 1) setPosition({ x: 0, y: 0 });
+      return newScale;
+    });
+  };
+
+  const handleReset = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setScale(1);
+    setPosition({ x: 0, y: 0 });
+  };
+
+  const handleDoubleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (scale > 1) {
+      setScale(1);
+      setPosition({ x: 0, y: 0 });
+    } else {
+      setScale(2.5);
+    }
+  };
+
+  // Mouse drag for panning
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (scale <= 1) return;
+    e.preventDefault();
+    setIsDragging(true);
+    setDragStart({ x: e.clientX - position.x, y: e.clientY - position.y });
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging || scale <= 1) return;
+    setPosition({ x: e.clientX - dragStart.x, y: e.clientY - dragStart.y });
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  // Touch events for pinch-to-zoom and drag
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 2) {
+      const dist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      setLastPinchDist(dist);
+    } else if (e.touches.length === 1 && scale > 1) {
+      setIsDragging(true);
+      setDragStart({ x: e.touches[0].clientX - position.x, y: e.touches[0].clientY - position.y });
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (e.touches.length === 2 && lastPinchDist !== null) {
+      e.preventDefault();
+      const dist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      const delta = dist - lastPinchDist;
+      setScale(prev => Math.min(Math.max(prev + delta * 0.01, 1), 5));
+      setLastPinchDist(dist);
+    } else if (e.touches.length === 1 && isDragging && scale > 1) {
+      setPosition({ x: e.touches[0].clientX - dragStart.x, y: e.touches[0].clientY - dragStart.y });
+    }
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (e.touches.length < 2) setLastPinchDist(null);
+    setIsDragging(false);
+    if (scale <= 1) setPosition({ x: 0, y: 0 });
+  };
+
+  // Wheel zoom
+  const handleWheel = (e: React.WheelEvent) => {
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? -0.2 : 0.2;
+    setScale(prev => {
+      const newScale = Math.min(Math.max(prev + delta, 1), 5);
+      if (newScale === 1) setPosition({ x: 0, y: 0 });
+      return newScale;
+    });
+  };
+
+  return (
+    <div
+      ref={containerRef}
+      className="fixed inset-0 z-[9999] bg-black/90 flex items-center justify-center animate-in fade-in duration-150"
+      onClick={onClose}
+      onWheel={handleWheel}
+      onContextMenu={(e) => e.preventDefault()}
+    >
+      {/* Close button */}
+      <button
+        onClick={onClose}
+        className="absolute top-4 right-4 z-10 w-10 h-10 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center text-white hover:bg-white/20 transition-colors"
+      >
+        <X className="w-5 h-5" />
+      </button>
+
+      {/* Zoom controls */}
+      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 bg-white/10 backdrop-blur-sm rounded-full px-3 py-2">
+        <button
+          onClick={handleZoomOut}
+          disabled={scale <= 1}
+          className="w-8 h-8 rounded-full flex items-center justify-center text-white hover:bg-white/20 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+        >
+          <ZoomOut className="w-4 h-4" />
+        </button>
+        <button
+          onClick={handleReset}
+          className="px-2 py-1 text-xs font-bold text-white/80 hover:text-white transition-colors min-w-[3rem] text-center"
+        >
+          {Math.round(scale * 100)}%
+        </button>
+        <button
+          onClick={handleZoomIn}
+          disabled={scale >= 5}
+          className="w-8 h-8 rounded-full flex items-center justify-center text-white hover:bg-white/20 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+        >
+          <ZoomIn className="w-4 h-4" />
+        </button>
+      </div>
+
+      {/* Hint text */}
+      {scale === 1 && (
+        <p className="absolute top-4 left-1/2 -translate-x-1/2 z-10 text-white/50 text-xs font-medium">
+          Double-tap atau scroll untuk zoom
+        </p>
+      )}
+
+      {/* Image */}
+      <div
+        className="relative flex items-center justify-center"
+        onClick={(e) => e.stopPropagation()}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onDoubleClick={handleDoubleClick}
+        style={{ cursor: scale > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default', touchAction: 'none', overflow: 'visible' }}
+      >
+        <img
+          src={src}
+          className="max-w-[95vw] max-h-[95vh] object-contain rounded-2xl shadow-2xl border border-white/10 select-none"
+          alt="Preview"
+          draggable={false}
+          style={{
+            transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
+            transition: isDragging ? 'none' : 'transform 0.2s ease-out',
+            userSelect: 'none',
+            WebkitUserDrag: 'none',
+          } as React.CSSProperties}
+        />
+      </div>
+    </div>
+  );
+};
+
 const formatStudentName = (name?: string) => {
   if (!name) return "";
   const parts = name.trim().split(/\s+/);
@@ -239,7 +419,27 @@ const CBTPage = () => {
   const [draggingOption, setDraggingOption] = useState<string | null>(null);
   const [dragOverSlot, setDragOverSlot] = useState<string | null>(null);
   const [flaggedQuestions, setFlaggedQuestions] = useState<Record<string, boolean>>({});
-  const [fontSize, setFontSize] = useState(1); // 1.0, 1.1, 1.2, 1.3, 1.4, 1.5
+  const [fontSize, setFontSize] = useState(() => {
+    const saved = localStorage.getItem('cbt_font_size');
+    return saved ? parseFloat(saved) : 1.0;
+  });
+
+  // Save fontSize to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('cbt_font_size', fontSize.toString());
+  }, [fontSize]);
+
+  const increaseFontSize = () => {
+    setFontSize(prev => Math.min(prev + 0.1, 1.5)); // Max 1.5x
+  };
+
+  const decreaseFontSize = () => {
+    setFontSize(prev => Math.max(prev - 0.1, 0.8)); // Min 0.8x
+  };
+
+  const resetFontSize = () => {
+    setFontSize(1.0);
+  };
 
   const parseSafeDate = (d: any) => {
     if (!d) return null;
@@ -1172,12 +1372,50 @@ const CBTPage = () => {
           <p className="text-[8px] sm:text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-none mt-0.5 sm:mt-1">{roomData?.room_name}</p>
         </div>
 
-        <div className="flex items-center gap-2 sm:gap-4 ml-auto">
-          {/* Zoom Controls */}
-          <div className="hidden sm:flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-700">
-            <button onClick={() => setFontSize(p => Math.max(0.5, p - 0.1))} className="w-8 h-8 flex items-center justify-center rounded-xl bg-white dark:bg-slate-900 text-slate-600 hover:text-emerald-600 transition-colors shadow-sm disabled:opacity-30" disabled={fontSize <= 0.5}><ZoomOut className="w-4 h-4" /></button>
-            <div className="px-2 text-[10px] font-black text-slate-500 uppercase tracking-widest w-[45px] text-center">{Math.round(fontSize * 100)}%</div>
-            <button onClick={() => setFontSize(p => Math.min(1.5, p + 0.1))} className="w-8 h-8 flex items-center justify-center rounded-xl bg-white dark:bg-slate-900 text-slate-600 hover:text-emerald-600 transition-colors shadow-sm disabled:opacity-30" disabled={fontSize >= 1.5}><ZoomIn className="w-4 h-4" /></button>
+        <div className="flex items-center gap-2 sm:gap-4 ml-auto relative z-10">
+          {/* Zoom Controls - Visible on both mobile and desktop */}
+          <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-700 relative z-10">
+            <button 
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                decreaseFontSize();
+              }}
+              onTouchEnd={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (fontSize > 0.8) decreaseFontSize();
+              }}
+              className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center rounded-xl bg-white dark:bg-slate-900 text-slate-600 hover:text-emerald-600 transition-colors shadow-sm disabled:opacity-30 active:scale-90 touch-manipulation select-none" 
+              disabled={fontSize <= 0.8}
+              title="Perkecil teks"
+              style={{ WebkitTapHighlightColor: 'transparent' }}
+            >
+              <ZoomOut className="w-3.5 h-3.5 sm:w-4 sm:h-4 pointer-events-none" />
+            </button>
+            <div className="px-1.5 sm:px-2 text-[9px] sm:text-[10px] font-black text-slate-500 uppercase tracking-widest w-[38px] sm:w-[45px] text-center select-none">
+              {Math.round(fontSize * 100)}%
+            </div>
+            <button 
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                increaseFontSize();
+              }}
+              onTouchEnd={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (fontSize < 1.5) increaseFontSize();
+              }}
+              className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center rounded-xl bg-white dark:bg-slate-900 text-slate-600 hover:text-emerald-600 transition-colors shadow-sm disabled:opacity-30 active:scale-90 touch-manipulation select-none" 
+              disabled={fontSize >= 1.5}
+              title="Perbesar teks"
+              style={{ WebkitTapHighlightColor: 'transparent' }}
+            >
+              <ZoomIn className="w-3.5 h-3.5 sm:w-4 sm:h-4 pointer-events-none" />
+            </button>
           </div>
           {/* Refresh Button (PC only) — soft refresh without leaving fullscreen */}
           <button onClick={() => { setLoading(true); setRefreshTrigger(p => p + 1); }} className="hidden sm:flex w-8 h-8 items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-emerald-600 border border-slate-200 dark:border-slate-700 transition-colors" title="Refresh data">
@@ -1238,7 +1476,23 @@ const CBTPage = () => {
       <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
         <div 
           className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 space-y-4 sm:space-y-6 text-slate-800"
-          style={{ fontSize: `${fontSize === 1 ? 'inherit' : `${fontSize * 100}%`}` }}
+          onClick={(e) => {
+            const target = e.target as HTMLElement;
+            // Only handle clicks on images inside MathText/rich-text content (not SmartImage which has its own handler)
+            if (target.tagName === 'IMG' && target.closest('.html-segment, .math-content') && !target.closest('[data-smart-image]')) {
+              e.stopPropagation();
+              const src = (target as HTMLImageElement).src;
+              if (src) setPreviewImage(src);
+            }
+          }}
+          onContextMenu={(e) => {
+            e.preventDefault();
+          }}
+          style={{ 
+            fontSize: `${fontSize === 1 ? 'inherit' : `${fontSize * 100}%`}`,
+            WebkitUserSelect: 'none',
+            userSelect: 'none'
+          }}
         >
           {!loading && questions.length === 0 && (
             <div className="flex flex-col items-center justify-center h-full space-y-6 animate-in fade-in zoom-in duration-500">
@@ -1291,13 +1545,15 @@ const CBTPage = () => {
                 </div>
 
                 {currentQuestion.imageUrl && (
-                  <div className="relative group cursor-zoom-in" onClick={() => setPreviewImage(currentQuestion.imageUrl!)}>
+                  <div className="relative group cursor-zoom-in select-none" onClick={() => setPreviewImage(currentQuestion.imageUrl!)}>
                     <SmartImage
                       src={currentQuestion.imageUrl}
-                      className="max-w-full h-auto mx-auto block rounded-2xl border border-slate-100 mb-4 sm:mb-6 transition-transform hover:scale-[1.01]"
+                      className="max-w-full h-auto mx-auto block rounded-2xl border border-slate-100 mb-4 sm:mb-6 transition-transform hover:scale-[1.01] select-none"
                       alt="Soal"
+                      draggable={false}
+                      style={{ userSelect: 'none', WebkitUserDrag: 'none' } as React.CSSProperties}
                     />
-                    <div className="absolute inset-0 bg-black/5 opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl flex items-center justify-center">
+                    <div className="absolute inset-0 bg-black/5 opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl flex items-center justify-center pointer-events-none">
                       <Maximize2 className="w-8 h-8 text-white drop-shadow-lg" />
                     </div>
                   </div>
@@ -1356,13 +1612,15 @@ const CBTPage = () => {
                           <div className="flex-1 overflow-hidden">
                             <MathText content={c.text} className={`break-words font-serif ql-editor !p-0 [&_img]:max-w-[300px] [&_img]:h-auto [&_img]:rounded-xl [&_img]:mt-2 text-inherit ${isS ? "font-bold" : "font-normal"}`} />
                             {c.imageUrl && (
-                              <div className="relative inline-block cursor-zoom-in group mt-4" onClick={(e) => { e.stopPropagation(); setPreviewImage(c.imageUrl!); }}>
+                              <div className="relative inline-block cursor-zoom-in group mt-4 select-none" onClick={(e) => { e.stopPropagation(); setPreviewImage(c.imageUrl!); }}>
                                 <SmartImage
                                   src={c.imageUrl}
-                                  className="max-h-[200px] rounded-2xl border border-slate-100 group-hover:brightness-90 transition-all"
+                                  className="max-h-[200px] rounded-2xl border border-slate-100 group-hover:brightness-90 transition-all select-none"
                                   alt="Choice"
+                                  draggable={false}
+                                  style={{ userSelect: 'none', WebkitUserDrag: 'none' } as React.CSSProperties}
                                 />
-                                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
                                   <Maximize2 className="w-6 h-6 text-white drop-shadow-md" />
                                 </div>
                               </div>
@@ -1625,7 +1883,12 @@ const CBTPage = () => {
         </DialogContent>
       </Dialog>
       <Dialog open={isResetModalOpen} onOpenChange={() => { }}><DialogContent className="max-w-md rounded-2xl p-6 text-center pointer-events-auto bg-white dark:bg-slate-950 border-none shadow-2xl"><AlertCircle className="w-12 h-12 text-red-600 mx-auto mb-2 animate-bounce" /><DialogTitle className="text-lg font-bold dark:text-white">Sesi Ujian Di-Reset</DialogTitle><p className="text-slate-500 dark:text-slate-400 text-sm mt-1">Sesi Anda telah di-reset oleh Pengawas. Silakan login kembali.</p><Button onClick={() => logoutStudent()} className="w-full bg-red-600 hover:bg-red-700 text-white rounded-xl h-11 mt-4"><LogOut className="w-4 h-4 mr-2" /> Keluar & Login Ulang</Button></DialogContent></Dialog>
-      <Dialog open={!!previewImage} onOpenChange={() => setPreviewImage(null)}><DialogContent className="max-w-3xl bg-transparent border-none p-0 flex items-center justify-center pointer-events-auto shadow-none">{previewImage && <img src={previewImage} className="max-w-full max-h-[85vh] rounded-2xl shadow-2xl border border-white/10" alt="Preview" />}</DialogContent></Dialog>
+      
+      {/* Custom Preview Image Overlay - Full Screen with Zoom */}
+      {previewImage && (
+        <ImageZoomOverlay src={previewImage} onClose={() => setPreviewImage(null)} />
+      )}
+      
       <Dialog open={isSubmitModalOpen} onOpenChange={setIsSubmitModalOpen}><DialogContent className="max-w-md rounded-2xl p-6 pointer-events-auto text-center bg-white dark:bg-slate-950 border-none shadow-2xl">{isAllAnswered ? (<><CheckCircle2 className="w-12 h-12 text-green-600 mx-auto mb-2" /><DialogTitle className="text-lg font-bold dark:text-white">Kumpulkan Ujian?</DialogTitle><p className="text-slate-500 dark:text-slate-400 text-sm mt-1">Yakin ingin mengakhiri sekarang?</p><div className="mt-6 flex gap-2"><Button variant="outline" onClick={() => setIsSubmitModalOpen(false)} className="flex-1 rounded-xl dark:border-slate-800 dark:text-slate-300">Batal</Button><Button onClick={() => { setIsSubmitModalOpen(false); handleSubmitExam(); }} className="flex-1 bg-green-600 hover:bg-green-700 text-white rounded-xl">Kumpulkan</Button></div></>) : (<><AlertCircle className="w-12 h-12 text-amber-600 mx-auto mb-2" /><DialogTitle className="text-lg font-bold dark:text-white">Belum Selesai</DialogTitle><p className="text-slate-500 dark:text-slate-400 text-sm mt-1">Ada {unansweredCount} soal belum dijawab. Yakin?</p><div className="mt-6"><Button onClick={() => setIsSubmitModalOpen(false)} className="w-full bg-amber-600 hover:bg-amber-700 text-white rounded-xl">Kembali Mengerjakan</Button></div></>)}</DialogContent></Dialog>
       <Dialog open={isSkipNoticeOpen} onOpenChange={setIsSkipNoticeOpen}><DialogContent className="max-w-xs rounded-[2rem] p-6 pointer-events-auto border-none bg-white dark:bg-slate-950 shadow-2xl text-center"><HelpCircle className="w-14 h-14 text-amber-600 mx-auto mb-4" /><DialogTitle className="text-base font-black uppercase tracking-tight dark:text-white">Soal Belum Dijawab</DialogTitle><p className="text-slate-500 dark:text-slate-400 text-[11px] font-medium leading-relaxed">Anda belum memberikan jawaban. Yakin ingin melewati?</p><div className="grid grid-cols-2 gap-3 mt-6"><Button variant="outline" onClick={() => setIsSkipNoticeOpen(false)} className="rounded-xl text-[10px] font-black uppercase tracking-widest border-emerald-100 dark:border-emerald-900/30 text-emerald-600 dark:text-emerald-400">Kembali</Button><Button onClick={() => { if (targetIndex !== null) goToQuestion(targetIndex); setIsSkipNoticeOpen(false); }} className="bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[10px] rounded-xl uppercase tracking-widest shadow-lg shadow-emerald-600/20">Lompati</Button></div></DialogContent></Dialog>
       <Dialog open={isAdminFinishedModalOpen} onOpenChange={() => { }}>

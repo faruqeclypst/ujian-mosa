@@ -458,6 +458,126 @@ const GuidePage = () => {
                       </div>
                    </div>
                 </SubSection>
+
+                <SubSection title="Panduan Lengkap Rumus Matematika & Trigonometri" icon={Sparkles}>
+                   <p className="text-sm mb-4">EXAM AA mendukung penulisan rumus matematika menggunakan format <strong>LaTeX/KaTeX</strong>. Sistem akan otomatis mendeteksi dan merender rumus dengan indah.</p>
+                   
+                   <AlertBox type="info" title="Format Penulisan">
+                      Gunakan delimiter berikut untuk menulis rumus:<br/>
+                      • <code className="px-2 py-0.5 bg-slate-200 dark:bg-slate-700 rounded text-xs">$rumus$</code> untuk rumus inline (dalam teks)<br/>
+                      • <code className="px-2 py-0.5 bg-slate-200 dark:bg-slate-700 rounded text-xs">$$rumus$$</code> untuk rumus display (baris terpisah)<br/>
+                      • <code className="px-2 py-0.5 bg-slate-200 dark:bg-slate-700 rounded text-xs">\(rumus\)</code> atau <code className="px-2 py-0.5 bg-slate-200 dark:bg-slate-700 rounded text-xs">\[rumus\]</code> juga didukung
+                   </AlertBox>
+
+                   <div className="space-y-6 mt-6">
+                      <div className="p-5 rounded-2xl border border-blue-100 dark:border-blue-900/30 bg-blue-50/30 dark:bg-blue-950/20">
+                         <h6 className="text-sm font-black text-blue-700 dark:text-blue-400 mb-3 flex items-center gap-2">
+                            📐 TRIGONOMETRI LENGKAP
+                         </h6>
+                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                            <div>
+                               <p className="font-bold text-slate-700 dark:text-slate-300 mb-2">Fungsi Dasar:</p>
+                               <ul className="space-y-1 text-slate-600 dark:text-slate-400 font-mono text-[10px]">
+                                  <li>• sin, cos, tan</li>
+                                  <li>• cot, sec, csc</li>
+                               </ul>
+                               <p className="mt-2 text-[10px] text-slate-500">Contoh: <code className="bg-white dark:bg-slate-800 px-1 rounded">$sin(30°)$</code></p>
+                            </div>
+                            <div>
+                               <p className="font-bold text-slate-700 dark:text-slate-300 mb-2">Fungsi Inverse:</p>
+                               <ul className="space-y-1 text-slate-600 dark:text-slate-400 font-mono text-[10px]">
+                                  <li>• arcsin, arccos, arctan</li>
+                                  <li>• arccot, arcsec, arccsc</li>
+                               </ul>
+                               <p className="mt-2 text-[10px] text-slate-500">Contoh: <code className="bg-white dark:bg-slate-800 px-1 rounded">$arcsin(0.5)$</code></p>
+                            </div>
+                            <div>
+                               <p className="font-bold text-slate-700 dark:text-slate-300 mb-2">Fungsi Hiperbolik:</p>
+                               <ul className="space-y-1 text-slate-600 dark:text-slate-400 font-mono text-[10px]">
+                                  <li>• sinh, cosh, tanh</li>
+                                  <li>• coth, sech, csch</li>
+                                  <li>• arcsinh, arccosh, arctanh</li>
+                               </ul>
+                               <p className="mt-2 text-[10px] text-slate-500">Contoh: <code className="bg-white dark:bg-slate-800 px-1 rounded">$sinh(x)$</code></p>
+                            </div>
+                         </div>
+                      </div>
+
+                      <div className="p-5 rounded-2xl border border-emerald-100 dark:border-emerald-900/30 bg-emerald-50/30 dark:bg-emerald-950/20">
+                         <h6 className="text-sm font-black text-emerald-700 dark:text-emerald-400 mb-3 flex items-center gap-2">
+                            🔢 FUNGSI MATEMATIKA UMUM
+                         </h6>
+                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                            <div>
+                               <p className="font-bold text-slate-700 dark:text-slate-300 mb-2">Kalkulus & Operator:</p>
+                               <ul className="space-y-1 text-slate-600 dark:text-slate-400 font-mono text-[10px]">
+                                  <li>• int (integral), sum (sigma), prod (produk)</li>
+                                  <li>• lim (limit), infty (tak hingga)</li>
+                                  <li>• partial (turunan parsial), nabla (del)</li>
+                               </ul>
+                               <p className="mt-2 text-[10px] text-slate-500">Contoh: <code className="bg-white dark:bg-slate-800 px-1 rounded">$\int_0^\infty$</code></p>
+                            </div>
+                            <div>
+                               <p className="font-bold text-slate-700 dark:text-slate-300 mb-2">Fungsi Lainnya:</p>
+                               <ul className="space-y-1 text-slate-600 dark:text-slate-400 font-mono text-[10px]">
+                                  <li>• sqrt (akar), log, ln, exp</li>
+                                  <li>• max, min, sup, inf</li>
+                                  <li>• det, dim, deg, gcd, lcm, mod</li>
+                               </ul>
+                               <p className="mt-2 text-[10px] text-slate-500">Contoh: <code className="bg-white dark:bg-slate-800 px-1 rounded">{'$\\sqrt{x^2+y^2}$'}</code></p>
+                            </div>
+                         </div>
+                      </div>
+
+                      <div className="p-5 rounded-2xl border border-purple-100 dark:border-purple-900/30 bg-purple-50/30 dark:bg-purple-950/20">
+                         <h6 className="text-sm font-black text-purple-700 dark:text-purple-400 mb-3 flex items-center gap-2">
+                            🔤 HURUF YUNANI & SIMBOL
+                         </h6>
+                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                            <div>
+                               <p className="font-bold text-slate-700 dark:text-slate-300 mb-2">Huruf Yunani Kecil:</p>
+                               <p className="text-slate-600 dark:text-slate-400 font-mono text-[10px] leading-relaxed">
+                                  alpha, beta, gamma, delta, epsilon, theta, lambda, mu, pi, sigma, tau, phi, omega, dll.
+                               </p>
+                               <p className="mt-2 text-[10px] text-slate-500">Contoh: <code className="bg-white dark:bg-slate-800 px-1 rounded">$\alpha + \beta = \gamma$</code></p>
+                            </div>
+                            <div>
+                               <p className="font-bold text-slate-700 dark:text-slate-300 mb-2">Huruf Yunani Besar:</p>
+                               <p className="text-slate-600 dark:text-slate-400 font-mono text-[10px] leading-relaxed">
+                                  Gamma, Delta, Theta, Lambda, Pi, Sigma, Phi, Omega
+                               </p>
+                               <p className="mt-2 text-[10px] text-slate-500">Contoh: <code className="bg-white dark:bg-slate-800 px-1 rounded">$\Delta x$</code></p>
+                            </div>
+                         </div>
+                      </div>
+
+                      <div className="p-5 rounded-2xl border border-orange-100 dark:border-orange-900/30 bg-orange-50/30 dark:bg-orange-950/20">
+                         <h6 className="text-sm font-black text-orange-700 dark:text-orange-400 mb-3 flex items-center gap-2">
+                            ➗ OPERATOR & RELASI
+                         </h6>
+                         <div className="text-xs space-y-2">
+                            <p className="text-slate-600 dark:text-slate-400 font-mono text-[10px]">
+                              <strong>Aritmatika:</strong> times (×), div (÷), pm (±), mp (∓), cdot (·), frac (pecahan)
+                            </p>
+                            <p className="text-slate-600 dark:text-slate-400 font-mono text-[10px]">
+                              <strong>Relasi:</strong> leq (≤), geq (≥), neq (≠), approx (≈), equiv (≡), propto (∝)
+                            </p>
+                            <p className="text-slate-600 dark:text-slate-400 font-mono text-[10px]">
+                              <strong>Himpunan:</strong> subset (⊂), supset (⊃), in (∈), notin (∉), cup (∪), cap (∩)
+                            </p>
+                            <p className="mt-2 text-[10px] text-slate-500">Contoh: <code className="bg-white dark:bg-slate-800 px-1 rounded">{'$x \\leq y$'}</code> atau <code className="bg-white dark:bg-slate-800 px-1 rounded">{'$\\frac{a}{b}$'}</code></p>
+                         </div>
+                      </div>
+                   </div>
+
+                   <AlertBox type="success" title="Auto-Fix Cerdas">
+                      Sistem EXAM AA memiliki fitur <strong>auto-fix</strong> yang otomatis menambahkan backslash (\) pada kata-kata matematika yang lupa ditulis. Jadi Anda bisa menulis <code className="px-2 py-0.5 bg-slate-200 dark:bg-slate-700 rounded text-xs">$sin(x) + cos(x)$</code> dan sistem akan otomatis memperbaikinya menjadi <code className="px-2 py-0.5 bg-slate-200 dark:bg-slate-700 rounded text-xs">$\sin(x) + \cos(x)$</code>
+                   </AlertBox>
+
+                   <AlertBox type="warning" title="Import dari Word">
+                      Saat import soal dari Word (.docx), rumus yang dibuat menggunakan <strong>Equation Editor</strong> di Word akan otomatis terdeteksi dan dikonversi ke format LaTeX. Trigonometri dan semua fungsi matematika didukung penuh!
+                   </AlertBox>
+                </SubSection>
               </div>
             </DocSection>
 

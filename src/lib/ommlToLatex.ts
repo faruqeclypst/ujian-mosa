@@ -212,8 +212,20 @@ const convertFunction = (el: Element): string => {
   const nameLatex = fName ? convertChildren(fName).trim() : "";
   const eLatex = e ? convertChildren(e) : "";
 
-  // Common function names
-  const knownFuncs = ["sin", "cos", "tan", "cot", "sec", "csc", "log", "ln", "exp", "lim", "max", "min", "det", "gcd"];
+  // Common function names - including trigonometry (basic, inverse, hyperbolic)
+  const knownFuncs = [
+    // Trigonometri dasar
+    "sin", "cos", "tan", "cot", "sec", "csc",
+    // Trigonometri inverse
+    "arcsin", "arccos", "arctan", "arccot", "arcsec", "arccsc",
+    // Trigonometri hiperbolik
+    "sinh", "cosh", "tanh", "coth", "sech", "csch",
+    // Trigonometri hiperbolik inverse
+    "arcsinh", "arccosh", "arctanh", "arccoth", "arcsech", "arccsch",
+    // Fungsi lainnya
+    "log", "ln", "exp", "lim", "max", "min", "det", "gcd", "lcm", "mod",
+    "sup", "inf", "dim", "deg"
+  ];
   const cleanName = nameLatex.replace(/\\/g, "");
   if (knownFuncs.includes(cleanName.toLowerCase())) {
     return `\\${cleanName.toLowerCase()} ${eLatex}`;

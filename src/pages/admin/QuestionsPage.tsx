@@ -3761,7 +3761,11 @@ Aturan:
                       <div className="w-1.5 h-3 bg-indigo-500 rounded-full"></div>
                       <p className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Pratinjau Tampilan (Sesuai Ujian)</p>
                    </div>
-                   <MathText content={autoDetectLatex(formValues.text)} className="text-sm font-serif ql-editor !p-0 text-slate-800 dark:text-slate-200 leading-relaxed" />
+                   <MathText 
+                     key={formValues.text} 
+                     content={formValues.text || ''} 
+                     className="text-sm font-serif ql-editor !p-0 text-slate-800 dark:text-slate-200 leading-relaxed" 
+                   />
                 </div>
                 )}
               </div>
@@ -4714,7 +4718,11 @@ Aturan:
                                       <Sparkles className="w-3 h-3 text-indigo-500" />
                                       <p className="text-[8px] font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-widest">Preview Math</p>
                                     </div>
-                                    <MathText content={q.choices[letter].text} className="text-base font-serif ql-editor !p-0 text-slate-800 dark:text-slate-200" />
+                                    <MathText 
+                                      key={q.choices[letter].text} 
+                                      content={q.choices[letter].text} 
+                                      className="text-base font-serif ql-editor !p-0 text-slate-800 dark:text-slate-200" 
+                                    />
                                   </div>
                                 )}
                               </div>

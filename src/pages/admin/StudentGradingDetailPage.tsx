@@ -11,6 +11,12 @@ import { useToast } from "../../components/ui/toast";
 import { gradeEssayWithAI } from "../../lib/ai";
 import { ConfirmationDialog } from "../../components/ui/confirmation-dialog";
 
+// Strip HTML tags for clean text display
+const stripHtml = (html: string): string => {
+  if (!html) return "";
+  return html.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/\s+/g, ' ').trim();
+};
+
 const isFuzzyMatch = (studentAns: any, correctKey: string) => {
   if (typeof studentAns !== "string" || !correctKey) return false;
   // Strip HTML tags first, then normalize
@@ -226,13 +232,15 @@ const StudentGradingDetailPage = () => {
     const rows = questions.map((q, idx) => {
       const correct = isQuestionCorrect(q);
       const status = correct === null ? "Belum" : correct ? "Benar" : "Salah";
-      return `<tr style="page-break-inside:avoid;">
+      const rowBg = correct === true ? "background:#f0fdf4;" : correct === false ? "background:#fef2f2;" : "";
+      const statusStyle = correct === true ? "color:#16a34a;font-weight:bold;" : correct === false ? "color:#dc2626;font-weight:bold;" : "color:#d97706;";
+      return `<tr style="page-break-inside:avoid;${rowBg}">
         <td class="cell center">${idx + 1}</td>
         <td class="cell soal">${q.text?.replace(/<[^>]*>/g, '').substring(0, 150) || "-"}</td>
         <td class="cell center"><span class="badge">${typeLabels[q.type] || q.type}</span></td>
         <td class="cell">${getAnswerText(q)}</td>
         <td class="cell">${getKeyText(q)}</td>
-        <td class="cell center status-ok">${status}</td>
+        <td class="cell center" style="${statusStyle}">${status}</td>
       </tr>`;
     }).join("");
 
@@ -275,10 +283,11 @@ const StudentGradingDetailPage = () => {
   <tr><td class="info-label">${terminology?.id || 'NISN'}</td><td class="info-value">: ${(student as any)?.nisn || "-"}</td><td class="info-label">Ruang Ujian</td><td class="info-value">: ${room?.roomName || "-"}</td></tr>
 </tbody></table>
 <div class="scores">
+  <div class="col"><div class="label">Nilai Final</div><div class="value">${finalScore}</div><div class="sub">${hasEssay ? '40% obj + 60% essay' : '100% objektif'}</div></div>
+  <div class="col"><div class="label">Benar</div><div class="value" style="color:#16a34a;">${questions.filter(q => isQuestionCorrect(q) === true).length}</div><div class="sub">dari ${questions.length} soal</div></div>
+  <div class="col"><div class="label">Salah</div><div class="value" style="color:#dc2626;">${questions.filter(q => isQuestionCorrect(q) === false).length}</div><div class="sub">dari ${questions.length} soal</div></div>
   <div class="col"><div class="label">Objektif</div><div class="value">${objScore}</div><div class="sub">${objCorrect}/${objectiveQuestions.length} benar</div></div>
   <div class="col"><div class="label">Subjektif</div><div class="value">${hasEssay ? essScore : '-'}</div><div class="sub">${hasEssay ? `${essCorrect}/${essayQuestions.length} benar` : '-'}</div></div>
-  <div class="col"><div class="label">Nilai Final</div><div class="value">${finalScore}</div><div class="sub">${hasEssay ? '40% obj + 60% essay' : '100% objektif'}</div></div>
-  <div class="col"><div class="label">Total Soal</div><div class="value">${questions.length}</div><div class="sub">${objectiveQuestions.length} obj + ${essayQuestions.length} essay</div></div>
 </div>
 <table><thead><tr><th style="width:30px;">No</th><th style="width:28%;">Soal</th><th style="width:60px;">Tipe</th><th style="width:22%;">Jawaban Siswa</th><th style="width:22%;">Kunci Jawaban</th><th style="width:60px;">Status</th></tr></thead><tbody>${rows}</tbody></table>
 <div class="footer">Dicetak pada ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>
@@ -330,8 +339,8 @@ const StudentGradingDetailPage = () => {
     if (!ans) return <span className="text-slate-300 italic">Tidak dijawab</span>;
 
     if (q.type === "pilihan_ganda" || q.type === "benar_salah") {
-      const choiceLabel = q.choices?.[ans]?.text || ans;
-      return <span>{String(ans).toUpperCase()}. {choiceLabel}</span>;
+      const choiceText = q.choices?.[ans]?.text || ans;
+      return <span className="inline-flex items-baseline gap-1"><span className="font-bold">{String(ans).toUpperCase()}.</span> <MathText content={choiceText} className="inline text-xs [&_p]:inline [&_p]:m-0 [&_img]:hidden" /></span>;
     }
     if (q.type === "pilihan_ganda_kompleks") {
       return Array.isArray(ans) ? ans.map((k: string) => String(k).toUpperCase()).join(", ") : String(ans);
@@ -342,7 +351,7 @@ const StudentGradingDetailPage = () => {
         <div className="space-y-0.5">
           {pairs.map((p: any) => (
             <div key={p.id} className="text-xs">
-              <span className="text-slate-500">{p.left}</span> → <span className="font-medium">{ans[p.id] || "?"}</span>
+              <span className="text-slate-500">{stripHtml(p.left)}</span> → <span className="font-medium">{stripHtml(ans[p.id] || "?")}</span>
               {ans[p.id] === p.right ? <span className="text-emerald-500 ml-1">✓</span> : <span className="text-rose-500 ml-1">✗</span>}
             </div>
           ))}
@@ -352,7 +361,7 @@ const StudentGradingDetailPage = () => {
     if (q.type === "urutkan" || q.type === "drag_drop") {
       return Array.isArray(ans) ? ans.map((id: string) => {
         const item = (q.items || []).find((it: any) => it.id === id);
-        return item?.text || id;
+        return stripHtml(item?.text || id);
       }).join(" → ") : String(ans);
     }
     return String(ans);
@@ -362,7 +371,8 @@ const StudentGradingDetailPage = () => {
     if (q.type === "pilihan_ganda" || q.type === "benar_salah") {
       const correctKey = Object.keys(q.choices || {}).find(k => q.choices[k].isCorrect);
       if (!correctKey) return "-";
-      return <span>{correctKey.toUpperCase()}. {q.choices[correctKey]?.text || ""}</span>;
+      const choiceText = q.choices[correctKey]?.text || "";
+      return <span className="inline-flex items-baseline gap-1"><span className="font-bold">{correctKey.toUpperCase()}.</span> <MathText content={choiceText} className="inline text-xs [&_p]:inline [&_p]:m-0 [&_img]:hidden" /></span>;
     }
     if (q.type === "pilihan_ganda_kompleks") {
       const correctKeys = Object.keys(q.choices || {}).filter(k => q.choices[k].isCorrect);
@@ -370,13 +380,13 @@ const StudentGradingDetailPage = () => {
     }
     if (q.type === "menjodohkan") {
       const pairs = q.pairs || [];
-      return pairs.map((p: any) => `${p.left} → ${p.right}`).join(", ");
+      return pairs.map((p: any) => `${stripHtml(p.left)} → ${stripHtml(p.right)}`).join(", ");
     }
     if (q.type === "urutkan" || q.type === "drag_drop") {
-      return (q.items || []).map((it: any) => it.text).join(" → ");
+      return (q.items || []).map((it: any) => stripHtml(it.text)).join(" → ");
     }
     if (q.type === "isian_singkat" || q.type === "uraian") {
-      return q.answerKey || "-";
+      return <MathText content={q.answerKey || "-"} className="inline text-xs [&_p]:inline [&_p]:m-0 [&_img]:hidden" />;
     }
     return "-";
   };
@@ -441,7 +451,22 @@ const StudentGradingDetailPage = () => {
       </div>
 
       {/* Score Summary */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 text-center">
+          <p className="text-[10px] uppercase tracking-widest text-slate-400 mb-1">Nilai Final</p>
+          <p className={`text-2xl font-black ${finalScore >= 75 ? "text-emerald-600" : finalScore >= 50 ? "text-amber-600" : "text-rose-600"}`}>{attempt ? finalScore : "-"}</p>
+          <p className="text-[10px] text-slate-400">{hasEssay ? "40% obj + 60% essay" : "100% objektif"}</p>
+        </div>
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-emerald-100 dark:border-emerald-800/30 p-4 text-center">
+          <p className="text-[10px] uppercase tracking-widest text-emerald-500 mb-1">Benar</p>
+          <p className="text-2xl font-black text-emerald-600">{attempt ? questions.filter(q => isQuestionCorrect(q) === true).length : 0}</p>
+          <p className="text-[10px] text-slate-400">dari {questions.length} soal</p>
+        </div>
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-rose-100 dark:border-rose-800/30 p-4 text-center">
+          <p className="text-[10px] uppercase tracking-widest text-rose-500 mb-1">Salah</p>
+          <p className="text-2xl font-black text-rose-600">{attempt ? questions.filter(q => isQuestionCorrect(q) === false).length : 0}</p>
+          <p className="text-[10px] text-slate-400">dari {questions.length} soal</p>
+        </div>
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 text-center">
           <p className="text-[10px] uppercase tracking-widest text-slate-400 mb-1">Objektif</p>
           <p className={`text-2xl font-black ${objScore >= 75 ? "text-emerald-600" : objScore >= 50 ? "text-amber-600" : "text-rose-600"}`}>{objScore}</p>
@@ -454,34 +479,26 @@ const StudentGradingDetailPage = () => {
           </p>
           <p className="text-[10px] text-slate-400">{essGraded < essayQuestions.length ? "belum selesai" : `${essCorrect}/${essayQuestions.length} benar`}</p>
         </div>
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 text-center">
-          <p className="text-[10px] uppercase tracking-widest text-slate-400 mb-1">Nilai Final</p>
-          <p className={`text-2xl font-black ${finalScore >= 75 ? "text-emerald-600" : finalScore >= 50 ? "text-amber-600" : "text-rose-600"}`}>{attempt ? finalScore : "-"}</p>
-          <p className="text-[10px] text-slate-400">{hasEssay ? "40% obj + 60% essay" : "100% objektif"}</p>
-        </div>
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 text-center">
-          <p className="text-[10px] uppercase tracking-widest text-slate-400 mb-1">Status</p>
-          <p className={`text-sm font-bold ${attempt ? "text-emerald-600" : "text-slate-400"}`}>{attempt ? "Sudah Mengerjakan" : "Belum Mengerjakan"}</p>
-        </div>
       </div>
 
       {/* Questions Detail */}
       {attempt && (
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
-          <div className="px-5 py-3 border-b border-slate-100 dark:border-slate-800">
+          <div className="px-5 py-3 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
             <h2 className="text-sm font-bold text-slate-700 dark:text-slate-200">Detail Jawaban</h2>
+            <span className="text-[10px] text-slate-400 font-medium">{questions.length} soal</span>
           </div>
           <div className="overflow-x-auto">
             <Table>
-              <TableHeader className="bg-slate-50 dark:bg-slate-800/50">
+              <TableHeader className="bg-slate-50/80 dark:bg-slate-800/50">
                 <TableRow>
-                  <TableHead className="w-10 text-center text-[10px]">No</TableHead>
-                  <TableHead className="text-[10px] min-w-[200px]">Soal</TableHead>
-                  <TableHead className="text-[10px] w-24">Tipe</TableHead>
-                  <TableHead className="text-[10px] min-w-[150px]">Jawaban Siswa</TableHead>
-                  <TableHead className="text-[10px] min-w-[150px]">Kunci Jawaban</TableHead>
-                  <TableHead className="text-center text-[10px] w-20">Status</TableHead>
-                  <TableHead className="text-right text-[10px] w-36">Aksi</TableHead>
+                  <TableHead className="w-10 text-center text-[10px] font-bold">No</TableHead>
+                  <TableHead className="text-[10px] font-bold min-w-[220px]">Soal</TableHead>
+                  <TableHead className="text-[10px] font-bold w-20 text-center">Tipe</TableHead>
+                  <TableHead className="text-[10px] font-bold min-w-[140px]">Jawaban Siswa</TableHead>
+                  <TableHead className="text-[10px] font-bold min-w-[140px]">Kunci Jawaban</TableHead>
+                  <TableHead className="text-center text-[10px] font-bold w-16">Status</TableHead>
+                  <TableHead className="text-right text-[10px] font-bold w-28">Aksi</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -492,63 +509,83 @@ const StudentGradingDetailPage = () => {
                   const isManuallyGraded = overrides[q.id] !== undefined;
                   const typeLabels: Record<string, string> = {
                     pilihan_ganda: "PG",
-                    pilihan_ganda_kompleks: "PG Kompleks",
-                    menjodohkan: "Menjodohkan",
+                    pilihan_ganda_kompleks: "PGK",
+                    menjodohkan: "Jodoh",
                     benar_salah: "B/S",
                     isian_singkat: "Isian",
                     uraian: "Uraian",
-                    urutkan: "Urutan",
-                    drag_drop: "Drag & Drop",
+                    urutkan: "Urut",
+                    drag_drop: "D&D",
+                  };
+                  const typeColors: Record<string, string> = {
+                    pilihan_ganda: "bg-blue-50 text-blue-600 border-blue-100 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-800/30",
+                    pilihan_ganda_kompleks: "bg-indigo-50 text-indigo-600 border-indigo-100 dark:bg-indigo-950/30 dark:text-indigo-400 dark:border-indigo-800/30",
+                    menjodohkan: "bg-amber-50 text-amber-600 border-amber-100 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-800/30",
+                    benar_salah: "bg-cyan-50 text-cyan-600 border-cyan-100 dark:bg-cyan-950/30 dark:text-cyan-400 dark:border-cyan-800/30",
+                    isian_singkat: "bg-purple-50 text-purple-600 border-purple-100 dark:bg-purple-950/30 dark:text-purple-400 dark:border-purple-800/30",
+                    uraian: "bg-pink-50 text-pink-600 border-pink-100 dark:bg-pink-950/30 dark:text-pink-400 dark:border-pink-800/30",
+                    urutkan: "bg-teal-50 text-teal-600 border-teal-100 dark:bg-teal-950/30 dark:text-teal-400 dark:border-teal-800/30",
+                    drag_drop: "bg-orange-50 text-orange-600 border-orange-100 dark:bg-orange-950/30 dark:text-orange-400 dark:border-orange-800/30",
                   };
 
                   return (
-                    <TableRow key={q.id} className={`hover:bg-slate-50 dark:hover:bg-slate-800/30 ${isEssay ? "bg-purple-50/30 dark:bg-purple-950/10" : ""}`}>
-                      <TableCell className="text-center text-xs text-slate-400 font-mono">{idx + 1}</TableCell>
-                      <TableCell className="text-xs">
-                        <MathText content={q.text?.replace(/<[^>]*>/g, '').substring(0, 120) || "-"} />
+                    <TableRow key={q.id} className={`group transition-colors ${correct === true ? "hover:bg-emerald-50/50 dark:hover:bg-emerald-950/10" : correct === false ? "hover:bg-rose-50/50 dark:hover:bg-rose-950/10" : "hover:bg-slate-50 dark:hover:bg-slate-800/30"} ${isEssay ? "bg-purple-50/20 dark:bg-purple-950/5" : ""}`}>
+                      <TableCell className="text-center">
+                        <span className="text-[10px] font-bold text-slate-400 font-mono">{idx + 1}</span>
                       </TableCell>
                       <TableCell>
-                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${isEssay ? "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300" : "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"}`}>
+                        <div className="text-[11px] leading-snug text-slate-700 dark:text-slate-300 line-clamp-2">
+                          <MathText content={q.text} className="text-[11px] [&_p]:m-0 [&_p]:inline [&_img]:hidden [&_br]:hidden line-clamp-2" />
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <span className={`text-[9px] px-2 py-0.5 rounded-md font-bold border ${typeColors[q.type] || "bg-slate-50 text-slate-500 border-slate-100"}`}>
                           {typeLabels[q.type] || q.type}
                         </span>
                       </TableCell>
-                      <TableCell className="text-xs text-slate-700 dark:text-slate-300 max-w-[200px]">
-                        <div className="line-clamp-3">{getStudentAnswer(q)}</div>
+                      <TableCell>
+                        <div className="text-[11px] text-slate-700 dark:text-slate-300 line-clamp-2 leading-snug">{getStudentAnswer(q)}</div>
                       </TableCell>
-                      <TableCell className="text-xs text-slate-500 max-w-[200px]">
-                        <div className="line-clamp-3">{getCorrectAnswer(q)}</div>
+                      <TableCell>
+                        <div className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2 leading-snug">{getCorrectAnswer(q)}</div>
                       </TableCell>
                       <TableCell className="text-center">
                         {correct === null ? (
-                          <span className="text-[10px] text-amber-500 font-medium">Belum</span>
+                          <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/30" title="Belum dinilai">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                          </span>
                         ) : correct ? (
-                          <span className="inline-flex items-center gap-0.5 text-[10px] text-emerald-600 font-bold"><CheckCircle2 className="w-3.5 h-3.5" /> Benar</span>
+                          <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/30" title="Benar">
+                            <CheckCircle2 className="w-3 h-3 text-emerald-500" />
+                          </span>
                         ) : (
-                          <span className="inline-flex items-center gap-0.5 text-[10px] text-rose-600 font-bold"><X className="w-3.5 h-3.5" /> Salah</span>
+                          <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800/30" title="Salah">
+                            <X className="w-3 h-3 text-rose-500" />
+                          </span>
                         )}
                       </TableCell>
                       <TableCell className="text-right">
-                        <div className="inline-flex items-center gap-1 justify-end">
+                        <div className="inline-flex items-center gap-0.5 justify-end opacity-60 group-hover:opacity-100 transition-opacity">
                           {isEssay && (
                             <button
                               onClick={() => handleAIGradeQuestion(q.id)}
                               disabled={aiGradingId === q.id}
-                              className={`p-1.5 rounded-lg text-xs ${aiGradingId === q.id ? "animate-spin text-indigo-500" : "text-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/30"}`}
+                              className={`p-1 rounded-md text-xs transition-colors ${aiGradingId === q.id ? "animate-spin text-indigo-500" : "text-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/30"}`}
                               title="AI Grading"
                             >
-                              <Sparkles className="w-4 h-4" />
+                              <Sparkles className="w-3.5 h-3.5" />
                             </button>
                           )}
                           <button
                             onClick={() => handleGrade(q.id, true)}
-                            className={`p-1.5 rounded-lg ${isManuallyGraded && overrides[q.id] ? "bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30" : "text-slate-300 hover:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-950/30"}`}
+                            className={`p-1 rounded-md transition-colors ${isManuallyGraded && overrides[q.id] ? "bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30" : "text-slate-300 hover:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-950/30"}`}
                             title="Tandai Benar"
                           >
-                            <CheckCircle2 className="w-4 h-4" />
+                            <CheckCircle2 className="w-3.5 h-3.5" />
                           </button>
                           <button
                             onClick={() => handleGrade(q.id, false)}
-                            className={`p-1.5 rounded-lg ${isManuallyGraded && !overrides[q.id] ? "bg-rose-100 text-rose-600 dark:bg-rose-900/30" : "text-slate-300 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30"}`}
+                            className={`p-1 rounded-md transition-colors ${isManuallyGraded && !overrides[q.id] ? "bg-rose-100 text-rose-600 dark:bg-rose-900/30" : "text-slate-300 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30"}`}
                             title="Tandai Salah"
                           >
                             <X className="w-4 h-4" />

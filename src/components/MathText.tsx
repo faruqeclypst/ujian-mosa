@@ -1,5 +1,4 @@
 import React, { useEffect, useRef, useMemo, useState } from "react";
-import katex from "katex";
 import renderMathInElement from "katex/dist/contrib/auto-render";
 import "katex/dist/katex.min.css";
 import "katex/dist/contrib/mhchem";
@@ -7,7 +6,7 @@ import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus, ghcolors } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { Terminal, Check, Copy } from "lucide-react";
 import { useTheme } from "../context/ThemeContext";
-
+  
 interface MathTextProps {
   content: string;
   className?: string;
@@ -35,17 +34,68 @@ export const MathText: React.FC<MathTextProps> = ({ content, className = "" }) =
         preProcess: (math) => {
           let processed = math.trim();
           
-          // Skip processing jika sudah jelas formula valid (ada backslash command)
-          if (processed.match(/\\[a-zA-Z]/)) {
-            return processed;
+          // 🔧 Fix arrow notation FIRST (before any other processing)
+          // This ensures → and -> are converted to \to everywhere
+          processed = processed.replace(/→/g, '\\to');
+          processed = processed.replace(/->/g, '\\to');
+          
+          // Skip auto-fix if already has proper LaTeX commands
+          const hasLatexCommands = processed.match(/\\[a-zA-Z]/);
+          
+          if (!hasLatexCommands) {
+            // Auto-fix: kata-kata math yang lupa backslash (hanya jika BELUM ada backslash di depannya)
+            const fixList = [
+              // Trigonometri dasar
+              'sin', 'cos', 'tan', 'cot', 'sec', 'csc',
+              // Trigonometri inverse
+              'arcsin', 'arccos', 'arctan', 'arccot', 'arcsec', 'arccsc',
+              // Trigonometri hiperbolik
+              'sinh', 'cosh', 'tanh', 'coth', 'sech', 'csch',
+              // Trigonometri hiperbolik inverse
+              'arcsinh', 'arccosh', 'arctanh', 'arccoth', 'arcsech', 'arccsch',
+              // Kalkulus & operator
+              'int', 'sum', 'prod', 'lim', 'infty', 'partial', 'nabla',
+              // Fungsi matematika
+              'sqrt', 'log', 'ln', 'exp', 'max', 'min', 'sup', 'inf',
+              'det', 'dim', 'deg', 'gcd', 'lcm', 'mod',
+              // Huruf Yunani kecil
+              'alpha', 'beta', 'gamma', 'delta', 'epsilon', 'varepsilon', 'zeta', 'eta', 
+              'theta', 'vartheta', 'iota', 'kappa', 'lambda', 'mu', 'nu', 'xi', 
+              'pi', 'varpi', 'rho', 'varrho', 'sigma', 'varsigma', 'tau', 'upsilon', 
+              'phi', 'varphi', 'chi', 'psi', 'omega',
+              // Huruf Yunani besar
+              'Gamma', 'Delta', 'Theta', 'Lambda', 'Xi', 'Pi', 'Sigma', 'Upsilon', 
+              'Phi', 'Psi', 'Omega',
+              // Operator & simbol
+              'frac', 'dfrac', 'tfrac', 'binom', 'left', 'right', 
+              'times', 'div', 'pm', 'mp', 'cdot', 'ast', 'star', 'circ', 'bullet',
+              'leq', 'geq', 'neq', 'approx', 'equiv', 'cong', 'sim', 'propto',
+              'subset', 'supset', 'subseteq', 'supseteq', 'in', 'notin', 'ni',
+              'cup', 'cap', 'wedge', 'vee', 'oplus', 'ominus', 'otimes',
+              // Panah
+              'to', 'rightarrow', 'leftarrow', 'leftrightarrow', 'Rightarrow', 'Leftarrow', 'Leftrightarrow',
+              'mapsto', 'implies', 'iff',
+              // Dekorasi
+              'vec', 'hat', 'bar', 'tilde', 'dot', 'ddot', 'overline', 'underline',
+              // Titik-titik
+              'ldots', 'cdots', 'vdots', 'ddots',
+              // Logika
+              'forall', 'exists', 'nexists', 'neg', 'land', 'lor',
+              // Lain-lain
+              'angle', 'degree', 'prime', 'emptyset', 'varnothing'
+            ];
+            
+            fixList.forEach(word => {
+              const regex = new RegExp(`(?<!\\\\)\\b${word}\\b`, 'g');
+              processed = processed.replace(regex, `\\${word}`);
+            });
           }
           
-          // Auto-fix: kata-kata math yang lupa backslash (hanya jika BELUM ada backslash di depannya)
-          const fixList = ['int', 'sum', 'sqrt', 'pi', 'alpha', 'beta', 'gamma', 'theta', 'sigma', 'infty', 'lim', 'log', 'ln', 'sin', 'cos', 'tan', 'cot', 'sec', 'csc', 'frac', 'left', 'right', 'vec', 'hat', 'bar', 'dot', 'times', 'div', 'pm', 'mp', 'leq', 'geq', 'neq', 'approx', 'equiv', 'cdot', 'ldots', 'cdots', 'forall', 'exists', 'partial', 'nabla', 'Delta', 'Omega'];
-          fixList.forEach(word => {
-            const regex = new RegExp(`(?<!\\\\)\\b${word}\\b`, 'g');
-            processed = processed.replace(regex, `\\${word}`);
-          });
+          // 🔧 Fix limit notation with subscripts
+          // Handles: \lim_{x\to 0}, \lim x\to 0, lim_{x\to 0}, etc.
+          // The subscript should be wrapped in {} and use \to
+          processed = processed.replace(/\\lim\s*_?\s*\{?\s*([a-zA-Z])\s*\\to\s*([^}]+)\}?/gi, '\\lim_{$1 \\to $2}');
+          processed = processed.replace(/\\lim\s+([a-zA-Z])\s*\\to\s*(\S+)/gi, '\\lim_{$1 \\to $2}');
           
           // Jika setelah fix masih tidak ada command math sama sekali, 
           // dan panjang > 2, dan tidak mengandung operator/angka math, wrap sebagai teks
@@ -62,35 +112,11 @@ export const MathText: React.FC<MathTextProps> = ({ content, className = "" }) =
     }
   };
 
-  const [zoomedImage, setZoomedImage] = useState<string | null>(null);
-
-  // Close lightbox on Android back button
-  useEffect(() => {
-    if (!zoomedImage) return;
-    const handleBack = (e: PopStateEvent) => {
-      e.preventDefault();
-      setZoomedImage(null);
-    };
-    window.history.pushState(null, '', window.location.href);
-    window.addEventListener('popstate', handleBack);
-    return () => window.removeEventListener('popstate', handleBack);
-  }, [zoomedImage]);
-
   useEffect(() => {
     if (containerRef.current) {
       // Run KaTeX on all HTML segments
       const segments = containerRef.current.querySelectorAll('.html-segment');
       segments.forEach(seg => runKatex(seg as HTMLElement));
-
-      // Add click-to-zoom on images
-      const imgs = containerRef.current.querySelectorAll('.html-segment img, .math-content img');
-      imgs.forEach(img => {
-        (img as HTMLElement).style.cursor = 'zoom-in';
-        img.addEventListener('click', (e) => {
-          const src = (e.target as HTMLImageElement).src;
-          if (src) setZoomedImage(src);
-        });
-      });
     }
   }, [content]);
 
@@ -250,42 +276,26 @@ export const MathText: React.FC<MathTextProps> = ({ content, className = "" }) =
   };
 
   return (
-    <>
-      <div ref={containerRef} className={`math-content premium-math ${className}`}>
-        {parsedContent.length === 0 ? (
-          <div 
-            className="html-segment" 
-            dangerouslySetInnerHTML={{ __html: processHtml(content) }} 
-          />
-        ) : (
-          parsedContent.map((part, i) => (
-            part.type === 'code' ? (
-              <CodeSegment key={i} value={part.value} language={part.language} />
-            ) : (
-              <div 
-                key={i} 
-                className="html-segment" 
-                dangerouslySetInnerHTML={{ __html: processHtml(part.value) }} 
-              />
-            )
-          ))
-        )}
-      </div>
-      {/* Image Lightbox */}
-      {zoomedImage && (
+    <div ref={containerRef} className={`math-content premium-math ${className}`}>
+      {parsedContent.length === 0 ? (
         <div 
-          className="fixed inset-0 z-[9999] backdrop-blur-sm bg-black/50 flex items-center justify-center p-4 animate-in fade-in duration-200"
-          onTouchStart={(e) => { e.preventDefault(); setZoomedImage(null); }}
-          onClick={() => setZoomedImage(null)}
-        >
-          <img 
-            src={zoomedImage} 
-            alt="Zoom" 
-            className="max-w-[90vw] max-h-[85vh] object-contain rounded-2xl shadow-2xl pointer-events-none"
-          />
-        </div>
+          className="html-segment" 
+          dangerouslySetInnerHTML={{ __html: processHtml(content) }} 
+        />
+      ) : (
+        parsedContent.map((part, i) => (
+          part.type === 'code' ? (
+            <CodeSegment key={i} value={part.value} language={part.language} />
+          ) : (
+            <div 
+              key={i} 
+              className="html-segment" 
+              dangerouslySetInnerHTML={{ __html: processHtml(part.value) }} 
+            />
+          )
+        ))
       )}
-    </>
+    </div>
   );
 };
 

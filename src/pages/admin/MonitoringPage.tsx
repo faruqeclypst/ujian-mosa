@@ -142,6 +142,12 @@ const StudentTimer = ({ attempt, room }: { attempt: any, room: any }) => {
   );
 };
 
+// Strip HTML tags from rich text content for display
+const stripHtmlTags = (html: string): string => {
+  if (!html) return "";
+  return html.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/\s+/g, ' ').trim();
+};
+
 // 🛡️ Fuzzy Match Helper for Short Answers
 const isFuzzyMatch = (studentAns: any, correctKey: string) => {
   if (typeof studentAns !== "string" || !correctKey) return false;
@@ -1470,7 +1476,7 @@ const MonitoringPage = () => {
                                       <div key={q.id} className="bg-white dark:bg-slate-800 p-3 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col gap-2">
                                         <div className="flex gap-2">
                                           <span className="text-[10px] font-black text-slate-400 shrink-0">#{qIdx + 1}</span>
-                                          <MathText content={q.text} className="text-[11px] font-medium leading-tight text-slate-700 dark:text-slate-300 line-clamp-3" />
+                                          <MathText content={q.text} className="text-[9px] font-medium leading-tight text-slate-700 dark:text-slate-300 line-clamp-3" />
                                         </div>
                                         {/* Kunci Jawaban */}
                                         <div className="px-2 py-1.5 rounded-lg bg-blue-50/50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-800/30">
@@ -1480,21 +1486,23 @@ const MonitoringPage = () => {
                                               const t = q.type || "pilihan_ganda";
                                               if (t === "pilihan_ganda" || t === "benar_salah") {
                                                 const ck = Object.keys(q.choices || {}).find(k => q.choices[k]?.isCorrect);
-                                                return ck ? `${ck.toUpperCase()}. ${q.choices[ck]?.text || ""}`.substring(0, 40) : (q.answerKey || "-");
+                                                if (!ck) return stripHtmlTags(q.answerKey || "-");
+                                                const choiceText = q.choices[ck]?.text || "";
+                                                return <span className="inline-flex items-baseline gap-0.5"><span>{ck.toUpperCase()}.</span> <MathText content={choiceText} className="inline text-[10px] [&_p]:inline [&_p]:m-0 [&_img]:hidden" /></span>;
                                               }
                                               if (t === "pilihan_ganda_kompleks") {
                                                 const cks = Object.keys(q.choices || {}).filter(k => q.choices[k]?.isCorrect);
                                                 return cks.map(k => k.toUpperCase()).join(", ") || "-";
                                               }
-                                              if (t === "isian_singkat" || t === "uraian") return (q.answerKey || "-").substring(0, 50);
+                                              if (t === "isian_singkat" || t === "uraian") return <MathText content={q.answerKey || "-"} className="inline text-[10px] [&_p]:inline [&_p]:m-0 [&_img]:hidden" />;
                                               if (t === "menjodohkan") return `${(q.pairs || []).length} pasangan`;
-                                              if (t === "urutkan" || t === "drag_drop") return (q.items || []).map((it: any) => it.text?.substring(0, 10)).join(" → ");
-                                              return q.answerKey || "-";
+                                              if (t === "urutkan" || t === "drag_drop") return (q.items || []).map((it: any) => stripHtmlTags(it.text || "").substring(0, 10)).join(" → ");
+                                              return stripHtmlTags(q.answerKey || "-");
                                             })()}
                                           </span>
                                         </div>
                                         <div className={`mt-auto p-2 rounded-lg flex items-center justify-between ${correct ? "bg-emerald-50 text-emerald-700" : ans ? "bg-rose-50 text-rose-700" : "bg-slate-50 text-slate-500"}`}>
-                                          <span className="text-[10px] font-bold truncate max-w-[60%]">Jawab: {ans ? (typeof ans === 'object' ? JSON.stringify(ans).substring(0, 30) : String(ans).substring(0, 30)) : "-"}</span>
+                                          <span className="text-[10px] font-bold truncate max-w-[60%]">Jawab: {ans ? (typeof ans === 'object' ? JSON.stringify(ans).substring(0, 30) : stripHtmlTags(String(ans)).substring(0, 30)) : "-"}</span>
                                           <div className="flex gap-1">
                                             {(role === "admin" || (role === "teacher" && teacherFullAccess)) && (
                                               <>
