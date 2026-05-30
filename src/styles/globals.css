@@ -257,6 +257,7 @@ body {
 }
 
 /* 📝 Quill Indentation Utilities untuk Pratinjau & Lembar Ujian */
+.ql-editor { tab-size: 4; -moz-tab-size: 4; }
 .ql-editor .ql-indent-1 { padding-left: 3em !important; }
 .ql-editor .ql-indent-2 { padding-left: 6em !important; }
 .ql-editor .ql-indent-3 { padding-left: 9em !important; }
@@ -265,6 +266,16 @@ body {
 .ql-editor .ql-indent-6 { padding-left: 18em !important; }
 .ql-editor .ql-indent-7 { padding-left: 21em !important; }
 .ql-editor .ql-indent-8 { padding-left: 24em !important; }
+
+/* Indentasi untuk render di luar editor (preview, ujian, stimulus) */
+.ql-indent-1 { padding-left: 3em; }
+.ql-indent-2 { padding-left: 6em; }
+.ql-indent-3 { padding-left: 9em; }
+.ql-indent-4 { padding-left: 12em; }
+.ql-indent-5 { padding-left: 15em; }
+.ql-indent-6 { padding-left: 18em; }
+.ql-indent-7 { padding-left: 21em; }
+.ql-indent-8 { padding-left: 24em; }
 
 /* Menangani indentasi untuk list items */
 .ql-editor li.ql-indent-1 { padding-left: 4.5em !important; }

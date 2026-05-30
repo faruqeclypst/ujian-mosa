@@ -4,7 +4,7 @@ import { ArrowLeft, Plus, Edit, Trash, Check, Copy, Image, ChevronDown, FileText
 import { Reorder } from "framer-motion";
 import { MathText } from "../../components/MathText";
 import { SmartImage } from "../../components/ui/smart-image";
-import { generateQuestionsAI, generateSingleQuestionAI, getTopicSuggestionsAI, parseQuestionsAI, generateFromMaterialAI, AI_MODELS } from "../../lib/ai";
+import { generateQuestionsAI, generateSingleQuestionAI, getTopicSuggestionsAI, parseQuestionsAI, generateFromMaterialAI, generateObjectivesAI, AI_MODELS } from "../../lib/ai";
 import { Button } from "../../components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "../../components/ui/dialog";
 import { Progress } from "../../components/ui/progress";
@@ -19,6 +19,7 @@ import { parseQuestionsFromWord } from "../../lib/questionWordParser";
 import { Select } from "../../components/ui/select";
 
 import { downloadQuestionTemplate, parseQuestionImportExcel } from "../../lib/questionExcel";
+import { jsonrepair } from "jsonrepair";
 import mammoth from "mammoth";
 import ReactQuill, { Quill } from "react-quill";
 import ImageResize from "quill-image-resize-module-react";
@@ -142,6 +143,9 @@ export interface QuestionData {
 
 const compressImage = (file: File): Promise<File> => {
   return new Promise((resolve, reject) => {
+    // Timeout: if compression takes > 8s, return original file
+    const timeout = setTimeout(() => resolve(file), 8000);
+    
     const reader = new FileReader();
     reader.readAsDataURL(file);
     reader.onload = (event) => {
@@ -151,7 +155,7 @@ const compressImage = (file: File): Promise<File> => {
         const canvas = document.createElement("canvas");
         let width = img.width;
         let height = img.height;
-        const MAX_WIDTH = 1200; // Resolusi max agar tetap tajam tapi ringan
+        const MAX_WIDTH = 1200;
         const MAX_HEIGHT = 1200;
 
         if (width > height) {
@@ -173,6 +177,7 @@ const compressImage = (file: File): Promise<File> => {
 
         canvas.toBlob(
           (blob) => {
+            clearTimeout(timeout);
             if (blob) {
               const compressedFile = new File([blob], file.name.replace(/\.[^/.]+$/, "") + ".webp", {
                 type: "image/webp",
@@ -180,15 +185,16 @@ const compressImage = (file: File): Promise<File> => {
               });
               resolve(compressedFile);
             } else {
-              reject(new Error("Gagal mengompresi gambar"));
+              resolve(file); // fallback to original instead of rejecting
             }
           },
           "image/webp",
-          0.80 // 80% kualitas WebP — lebih kecil dari JPEG dengan kualitas setara
+          0.80
         );
       };
+      img.onerror = () => { clearTimeout(timeout); resolve(file); };
     };
-    reader.onerror = (e) => reject(e);
+    reader.onerror = () => { clearTimeout(timeout); resolve(file); };
   });
 };
 
@@ -638,12 +644,36 @@ const QuestionsPage = () => {
   const [isAiLiteracy, setIsAiLiteracy] = useState(false);
   const [aiPassageLength, setAiPassageLength] = useState("sedang");
   const [aiDifficulty, setAiDifficulty] = useState("sedang"); 
-  const [aiFocus, setAiFocus] = useState("umum");
+  const [aiTaxonomy, setAiTaxonomy] = useState<string[]>(["C1","C2","C3","C4","C5","C6"]); // multi-select C1-C6
+  const [aiMaterialFile, setAiMaterialFile] = useState<File | null>(null);
+  const [aiMaterialText, setAiMaterialText] = useState("");
+  const [aiMaterialFileName, setAiMaterialFileName] = useState("");
+  const [isExtractingMaterial, setIsExtractingMaterial] = useState(false);
+  const [aiObjectives, setAiObjectives] = useState<string[]>([]); // tujuan pembelajaran dari AI
+  const [isFetchingObjectives, setIsFetchingObjectives] = useState(false);
 
-  const focusDescriptions: Record<string, string> = {
-    umum: "Soal sesuai materi kurikulum sekolah pada umumnya (K13/Merdeka).",
-    akm: "Standar Asesmen Nasional. Fokus pada Literasi, Numerasi, & HOTS kontekstual.",
-    pisa: "Standar Internasional (OECD). Menekankan penalaran tingkat tinggi & aplikasi dunia nyata."
+  const toggleTaxonomy = (level: string) => {
+    setAiTaxonomy(prev => {
+      if (prev.includes(level)) {
+        const next = prev.filter(l => l !== level);
+        return next.length === 0 ? [level] : next; // minimal 1 harus dipilih
+      }
+      return [...prev, level];
+    });
+  };
+
+  const setTaxonomyPreset = (preset: "lots" | "hots" | "campuran") => {
+    if (preset === "lots") setAiTaxonomy(["C1", "C2", "C3"]);
+    else if (preset === "hots") setAiTaxonomy(["C4", "C5", "C6"]);
+    else setAiTaxonomy(["C1", "C2", "C3", "C4", "C5", "C6"]);
+  };
+
+  const getTaxonomyPreset = (): string => {
+    const sorted = [...aiTaxonomy].sort();
+    if (sorted.join(",") === "C1,C2,C3") return "lots";
+    if (sorted.join(",") === "C4,C5,C6") return "hots";
+    if (sorted.join(",") === "C1,C2,C3,C4,C5,C6") return "campuran";
+    return "";
   };
 
   const [dynamicSuggestions, setDynamicSuggestions] = useState<string[]>([]);
@@ -661,7 +691,7 @@ const QuestionsPage = () => {
             aiSubject, 
             aiDifficulty, 
             aiType, 
-            aiFocus, 
+            "umum", 
             isAiLiteracy
           );
           if (suggestions && suggestions[0] === "AI_RATE_LIMIT") {
@@ -681,7 +711,64 @@ const QuestionsPage = () => {
 
     const timer = setTimeout(fetchSuggestions, 1500);
     return () => clearTimeout(timer);
-  }, [aiLevel, aiSubject, aiFocus, isAiLiteracy]);
+  }, [aiLevel, aiSubject, aiTaxonomy, isAiLiteracy]);
+
+  // 🎯 Auto-generate Tujuan Pembelajaran berdasarkan topik + taksonomi (per-level C)
+  useEffect(() => {
+    const fetchObjectives = async () => {
+      if ((aiTopic.trim().length > 3 || aiMaterialText.trim().length > 20) && aiTaxonomy.length > 0 && pb) {
+        setIsFetchingObjectives(true);
+        try {
+          const objectives = await generateObjectivesAI(
+            pb,
+            aiTopic || "(dari bahan materi)",
+            aiTaxonomy,
+            aiLevel,
+            aiSubject,
+            aiMaterialText
+          );
+          if (objectives && objectives.length > 0) {
+            setAiObjectives(objectives);
+          }
+        } catch (err) {
+          console.error("Failed to fetch objectives:", err);
+        } finally {
+          setIsFetchingObjectives(false);
+        }
+      } else {
+        setAiObjectives([]);
+      }
+    };
+
+    const timer = setTimeout(fetchObjectives, 2000);
+    return () => clearTimeout(timer);
+  }, [aiTopic, aiTaxonomy, aiLevel, aiSubject, aiMaterialText]);
+
+  // 🪄 Auto-generate Topik dari AI berdasarkan jenjang + mapel + materi
+  const [isGeneratingTopic, setIsGeneratingTopic] = useState(false);
+  const handleGenerateTopic = async () => {
+    if (!pb) return;
+    if (!aiSubject && !aiMaterialText) {
+      addToast({ type: "warning", title: "Isi dulu", description: "Isi Mata Pelajaran atau upload bahan materi terlebih dahulu.", duration: 2500 });
+      return;
+    }
+    setIsGeneratingTopic(true);
+    try {
+      const suggestions = await getTopicSuggestionsAI(
+        pb, aiLevel || "Umum", aiSubject || "Umum", aiDifficulty, aiType, "umum", isAiLiteracy
+      );
+      if (suggestions && suggestions.length > 0 && suggestions[0] !== "AI_RATE_LIMIT") {
+        // Pick a random one
+        const picked = suggestions[Math.floor(Math.random() * suggestions.length)];
+        setAiTopic(String(picked));
+        addToast({ type: "success", title: "Topik Digenerate", description: String(picked), duration: 2000 });
+      }
+    } catch (err) {
+      console.error("Generate topic error:", err);
+    } finally {
+      setIsGeneratingTopic(false);
+    }
+  };
 
 
   const handleRandomFill = () => {
@@ -705,6 +792,88 @@ const QuestionsPage = () => {
     });
   };
 
+  const handleAIMaterialUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsExtractingMaterial(true);
+    try {
+      let extractedText = "";
+      const extension = file.name.split('.').pop()?.toLowerCase();
+
+      if (extension === "docx" || extension === "docm") {
+        const arrayBuffer = await file.arrayBuffer();
+        const result = await mammoth.extractRawText({ arrayBuffer });
+        extractedText = result.value;
+      } else if (extension === "pdf") {
+        let pdfjs = (window as any).pdfjsLib;
+        if (!pdfjs) {
+          await new Promise<void>((resolve) => {
+            const script = document.createElement("script");
+            script.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js";
+            script.onload = () => {
+              (window as any).pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js";
+              resolve();
+            };
+            document.head.appendChild(script);
+          });
+          pdfjs = (window as any).pdfjsLib;
+        }
+        const arrayBuffer = await file.arrayBuffer();
+        const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
+        let fullText = "";
+        for (let i = 1; i <= pdf.numPages; i++) {
+          const page = await pdf.getPage(i);
+          const textContent = await page.getTextContent();
+          const pageText = textContent.items.map((item: any) => item.str).join(" ");
+          fullText += pageText + "\n";
+        }
+        extractedText = fullText;
+      } else if (extension === "pptx" || extension === "ppt") {
+        // Basic PPTX text extraction via JSZip
+        const JSZip = (await import("jszip")).default;
+        const arrayBuffer = await file.arrayBuffer();
+        const zip = await JSZip.loadAsync(arrayBuffer);
+        let fullText = "";
+        const slideFiles = Object.keys(zip.files).filter(f => f.match(/ppt\/slides\/slide\d+\.xml/)).sort();
+        for (const slideFile of slideFiles) {
+          const content = await zip.files[slideFile].async("text");
+          const textMatches = content.match(/<a:t>([^<]*)<\/a:t>/g);
+          if (textMatches) {
+            const slideText = textMatches.map(m => m.replace(/<\/?a:t>/g, "")).join(" ");
+            fullText += slideText + "\n";
+          }
+        }
+        extractedText = fullText;
+      } else if (extension === "png" || extension === "jpg" || extension === "jpeg") {
+        // For images, we store the file and let AI handle it via description
+        setAiMaterialFile(file);
+        setAiMaterialFileName(file.name);
+        setAiMaterialText(`[Gambar: ${file.name}] - AI akan menganalisis gambar ini sebagai referensi materi.`);
+        addToast({ title: "Gambar Dimuat", description: `${file.name} siap digunakan sebagai referensi.`, type: "success", duration: 2000 });
+        setIsExtractingMaterial(false);
+        if (e.target) e.target.value = "";
+        return;
+      }
+
+      if (extractedText.trim()) {
+        // Limit to ~4000 chars to fit in prompt context
+        const trimmed = extractedText.trim().substring(0, 4000);
+        setAiMaterialText(trimmed);
+        setAiMaterialFileName(file.name);
+        setAiMaterialFile(file);
+        addToast({ title: "Materi Berhasil Diekstrak", description: `${file.name} (${Math.round(trimmed.length / 1000)}k karakter)`, type: "success", duration: 2000 });
+      } else {
+        throw new Error("Gagal mengekstrak teks dari file.");
+      }
+    } catch (err: any) {
+      addToast({ title: "Gagal Membaca File", description: err.message || "Pastikan file tidak rusak.", type: "error" });
+    } finally {
+      setIsExtractingMaterial(false);
+      if (e.target) e.target.value = "";
+    }
+  };
+
   const handleAIGenerateDirect = async () => {
     if (!pb) return;
     setIsAIGeneratingDirect(true);
@@ -721,7 +890,10 @@ const QuestionsPage = () => {
         isAiLiteracy,
         aiPassageLength,
         aiDifficulty,
-        aiFocus
+        "umum",
+        aiTaxonomy.join(","),
+        aiMaterialText,
+        aiObjectives
       );
       
       const questionsForReview = generated.map(q => {
@@ -773,11 +945,7 @@ const QuestionsPage = () => {
           showAlert("Limit Tercapai", "Server AI sedang sibuk karena terlalu banyak permintaan. Silakan tunggu sekitar 1-2 menit sebelum mencoba lagi.", "danger");
         }
       } else {
-        addToast({
-          type: "error",
-          title: "Gagal Generasi",
-          description: (err.message || "Gagal meramu paket soal baru.") + " Silakan coba ganti model AI di Pengaturan.",
-        });
+        addToast({ type: "error", title: "Gagal", description: "Generasi gagal setelah beberapa percobaan. Coba lagi." });
       }
     } finally {
       stopAIProgress(true);
@@ -801,7 +969,7 @@ const QuestionsPage = () => {
         aiLevel || exam?.level || "Umum",
         aiSubject || exam?.subject || "Umum",
         aiDifficulty || "sedang",
-        aiFocus || "umum",
+        "umum",
         q.groupText || ""
       );
 
@@ -858,11 +1026,7 @@ const QuestionsPage = () => {
           showAlert("Limit Tercapai", "Permintaan terlalu cepat. Silakan tunggu 1 menit agar AI siap kembali.", "danger");
         }
       } else {
-        addToast({
-          type: "error",
-          title: "Gagal Regenerasi",
-          description: (err.message || "AI gagal meramu soal baru.") + " Silakan coba ganti model AI di Pengaturan.",
-        });
+        addToast({ type: "error", title: "Gagal", description: "Regenerasi gagal setelah beberapa percobaan. Coba lagi." });
       }
     } finally {
       setIsRegeneratingIndex(null);
@@ -875,8 +1039,25 @@ const QuestionsPage = () => {
     // JSON mode: parse directly without AI
     if (importMode === 'json') {
       try {
-        const data = JSON.parse(importText.trim());
-        const questionsArr: any[] = Array.isArray(data) ? data : (data.questions || data.soal || data.data || []);
+        let parsed: any;
+        let trimmed = importText.trim();
+        
+        // Handle concatenated arrays: ][  → merge into single array
+        if (trimmed.includes('][')) {
+          trimmed = trimmed.replace(/\]\s*\[/g, ',');
+        }
+        
+        try {
+          parsed = JSON.parse(trimmed);
+        } catch {
+          // Fallback: repair JSON (handles trailing commas, missing quotes, etc.)
+          try {
+            parsed = JSON.parse(jsonrepair(trimmed));
+          } catch {
+            throw new Error("JSON tidak valid. Periksa format data Anda.");
+          }
+        }
+        const questionsArr: any[] = Array.isArray(parsed) ? parsed : (parsed.questions || parsed.soal || parsed.data || []);
         
         if (questionsArr.length === 0) {
           addToast({ title: "Gagal", description: "JSON tidak berisi soal yang valid.", type: "error" });
@@ -1000,11 +1181,14 @@ const QuestionsPage = () => {
       });
 
       let count = 0;
-      for (const q of parsedResults) {
+      // Ambil order tertinggi dari soal yang sudah ada
+      const maxOrder = questions.reduce((max, q) => Math.max(max, q.order || 0), 0);
+      
+      // Build all payloads first
+      const payloads = parsedResults.map((q, idx) => {
         const type = q.type || "pilihan_ganda";
         const field = typeMap[type] || "multiple_choice";
         
-        // Handle Options mapping for different types
         let options: any = {};
         if (type === "pilihan_ganda" || type === "pilihan_ganda_kompleks" || type === "benar_salah") {
           options = q.choices || {};
@@ -1014,7 +1198,6 @@ const QuestionsPage = () => {
           options = { items: q.items || [] };
         }
 
-        // Determine correct answer
         let correctAnswer = "";
         if (type === "pilihan_ganda" || type === "pilihan_ganda_kompleks" || type === "benar_salah") {
           correctAnswer = q.correctAnswer || q.answerKey || "";
@@ -1025,30 +1208,28 @@ const QuestionsPage = () => {
         } else if (type === "isian_singkat" || type === "uraian") {
           correctAnswer = q.answerKey || "";
         }
-        // menjodohkan/urutkan/drag_drop: correctAnswer stays empty, answer is in options structure
 
         const createPayload: any = {
           examId,
           text: q.text || "Pertanyaan Tanpa Judul",
-          field: field,
-          options: options,
-          correctAnswer: correctAnswer,
-          order: (questions.length || 0) + count + 1
+          field,
+          options,
+          correctAnswer,
+          order: maxOrder + idx + 1
         };
-        
-        // Only add optional fields if they have values
         if (q.groupId) { createPayload.groupId = q.groupId; createPayload.group_id = q.groupId; }
         if (q.groupText) { createPayload.groupText = q.groupText; createPayload.group_text = q.groupText; }
+        return createPayload;
+      });
 
-        await pb.collection("questions").create(createPayload);
-        count++;
-        const progress = Math.round((count / parsedResults.length) * 100);
-        setImportProgress(progress);
-        setBatchProgress(prev => ({
-          ...prev,
-          current: count,
-          message: `Menyimpan soal AI (${count}/${parsedResults.length})`
-        }));
+      // Save in parallel chunks of 10
+      const chunkSize = 10;
+      for (let i = 0; i < payloads.length; i += chunkSize) {
+        const chunk = payloads.slice(i, i + chunkSize);
+        await Promise.all(chunk.map(p => pb.collection("questions").create(p)));
+        count = Math.min(i + chunkSize, payloads.length);
+        setImportProgress(Math.round((count / payloads.length) * 100));
+        setBatchProgress(prev => ({ ...prev, current: count, message: `Menyimpan soal (${count}/${payloads.length})` }));
       }
       setIsAIImportOpen(false);
       addToast({
@@ -1092,7 +1273,10 @@ const QuestionsPage = () => {
         isAiLiteracy,
         aiPassageLength,
         aiDifficulty,
-        aiFocus
+        "umum",
+        aiTaxonomy.join(","),
+        aiMaterialText,
+        aiObjectives
       );
       
       if (!generated || generated.length === 0 || !Array.isArray(generated)) {
@@ -1154,11 +1338,7 @@ const QuestionsPage = () => {
           showAlert("Server Sedang Limit", "Terlalu banyak permintaan AI. Silakan jeda sejenak (1 menit) sebelum memulai generasi baru.", "danger");
         }
       } else {
-        addToast({
-          type: "error",
-          title: "Gagal Generasi AI",
-          description: (err.message || "Gagal meramu soal.") + " Silakan coba ganti model AI di Pengaturan.",
-        });
+        addToast({ type: "error", title: "Gagal", description: "Generasi gagal setelah beberapa percobaan. Coba lagi." });
       }
     } finally {
       stopAIProgress(!isAIGenerating);
@@ -1317,15 +1497,15 @@ const QuestionsPage = () => {
 
         const payload: any = {
           examId,
-          text: q.isFromAI ? q.text : `<p>${q.text}</p>`, 
+          text: await uploadInlineBase64Images(q.isFromAI ? q.text : `<p>${q.text}</p>`), 
           field: typeMap[qType] || "multiple_choice", 
           options: optionsToSave,
           correctAnswer: correctAnswer,
           order: currentOrder++,
           groupId: q.groupId || "",
           group_id: q.groupId || "",
-          groupText: q.groupText || "",
-          group_text: q.groupText || ""
+          groupText: q.groupText ? await uploadInlineBase64Images(q.groupText) : "",
+          group_text: q.groupText ? await uploadInlineBase64Images(q.groupText) : ""
         };
 
         if (imageUrl) {
@@ -1475,9 +1655,24 @@ const QuestionsPage = () => {
       bindings: {
         tab: {
           key: 9,
-          handler: function(this: any, range: any, context: any) {
-            if (context.format.list) return true;
-            this.quill.insertText(range.index, "\u00A0\u00A0\u00A0\u00A0"); 
+          handler: function(this: any, range: any) {
+            // Insert non-breaking spaces (preserved by Quill on save/reload)
+            this.quill.insertText(range.index, '\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0');
+            this.quill.setSelection(range.index + 8);
+            return false;
+          }
+        },
+        shiftTab: {
+          key: 9,
+          shiftKey: true,
+          handler: function(this: any, range: any) {
+            // Remove nbsp before cursor if present
+            const text = this.quill.getText(Math.max(0, range.index - 8), 8);
+            const nbspCount = (text.match(/\u00A0/g) || []).length;
+            if (nbspCount > 0) {
+              const deleteCount = Math.min(nbspCount, 8);
+              this.quill.deleteText(range.index - deleteCount, deleteCount);
+            }
             return false;
           }
         }
@@ -1536,8 +1731,9 @@ const QuestionsPage = () => {
       bindings: {
         tab: {
           key: 9,
-          handler: function(this: any, range: any, context: any) {
-            this.quill.insertText(range.index, "\u00A0\u00A0\u00A0\u00A0");
+          handler: function(this: any, range: any) {
+            this.quill.insertText(range.index, '\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0');
+            this.quill.setSelection(range.index + 8);
             return false;
           }
         }
@@ -1702,12 +1898,15 @@ const QuestionsPage = () => {
         // 2. Load Questions
         await loadQuestions();
 
-        // 3. Subscribe Realtime
+        // 3. Subscribe Realtime (debounced to prevent rapid re-renders during batch operations)
+        let realtimeTimer: ReturnType<typeof setTimeout> | null = null;
         const unsubscribe = await pb!.collection('questions').subscribe("*", (e) => {
-          loadQuestions();
+          if (realtimeTimer) clearTimeout(realtimeTimer);
+          realtimeTimer = setTimeout(() => { loadQuestions(); }, 800);
         });
 
         return () => {
+          if (realtimeTimer) clearTimeout(realtimeTimer);
           if (pb!.authStore.isValid) {
             pb!.collection('questions').unsubscribe("*");
           }
@@ -1846,6 +2045,49 @@ const QuestionsPage = () => {
     }));
   };
 
+  // 🖼️ Convert base64 images in HTML to R2 URLs (compressed to webp) before saving
+  const uploadInlineBase64Images = async (html: string): Promise<string> => {
+    if (!html || !html.includes("data:image")) return html;
+    
+    const imgRegex = /<img[^>]+src="(data:image\/[^;]+;base64,[^"]+)"[^>]*>/g;
+    let result = html;
+    let match;
+    const matches: { full: string; base64: string }[] = [];
+    
+    while ((match = imgRegex.exec(html)) !== null) {
+      matches.push({ full: match[0], base64: match[1] });
+    }
+    
+    // Upload all images in parallel for speed
+    const uploads = await Promise.allSettled(matches.map(async (m) => {
+      try {
+        const response = await fetch(m.base64);
+        const blob = await response.blob();
+        let file = new File([blob], `inline-${Date.now()}-${Math.random().toString(36).substr(2, 5)}.webp`, { type: blob.type });
+        
+        // Only compress if not already webp or if large
+        if (blob.type !== "image/webp" && blob.size > 30 * 1024) {
+          try { file = await compressImage(file); } catch { /* keep original */ }
+        }
+        
+        const schoolFolder = school?.slug || "unknown";
+        const uploaded = await uploadInventoryImage(`schools/${schoolFolder}/exams/${examId}`, file);
+        return { base64: m.base64, url: uploaded.url };
+      } catch (err) {
+        console.warn("Gagal upload inline image ke R2:", err);
+        return null;
+      }
+    }));
+    
+    for (const r of uploads) {
+      if (r.status === "fulfilled" && r.value) {
+        result = result.replace(r.value.base64, r.value.url);
+      }
+    }
+    
+    return result;
+  };
+
   const handleSubmit = async (e: any, stayOpen: boolean = false) => {
     e.preventDefault();
     if (!pb) return;
@@ -1897,9 +2139,11 @@ const QuestionsPage = () => {
       const uploadBase64ToR2 = async (base64Data: string, prefix: string) => {
         try {
           const blob = await (await fetch(base64Data)).blob();
-          const ext = blob.type.split("/")[1] || "png";
-          const fileToUpload = new File([blob], `${prefix}_${Date.now()}.${ext}`, { type: blob.type });
-          // 🛡️ Isolation: Kelompokkan gambar soal berdasarkan slug sekolah
+          let fileToUpload = new File([blob], `${prefix}_${Date.now()}.webp`, { type: blob.type });
+          // Only compress if not already webp or if large
+          if (blob.type !== "image/webp" && blob.size > 30 * 1024) {
+            try { fileToUpload = await compressImage(fileToUpload); } catch { /* keep original */ }
+          }
           const schoolFolder = school?.slug || "unknown";
           const uploadSnap = await uploadInventoryImage(`schools/${schoolFolder}/exams/${examId}`, fileToUpload);
           return uploadSnap.url;
@@ -1932,16 +2176,18 @@ const QuestionsPage = () => {
         imageUrl = await uploadBase64ToR2(imageUrl, "cover_manual");
       }
 
-      // 🖼️ 2. Scan teks Soal untuk base64
+      // 🖼️ 2. Scan teks Soal untuk base64 (parallel upload)
       if (textToSave.includes("data:image/")) {
         const doc = new DOMParser().parseFromString(textToSave, "text/html");
-        const ims = doc.querySelectorAll("img[src^='data:image/']");
-        for (let i = 0; i < ims.length; i++) {
-          const base64 = ims[i].getAttribute("src")!;
-          const url = await uploadBase64ToR2(base64, "text_manual");
-          ims[i].setAttribute("src", url);
+        const ims = Array.from(doc.querySelectorAll("img[src^='data:image/']"));
+        if (ims.length > 0) {
+          const results = await Promise.allSettled(ims.map(async (img) => {
+            const base64 = img.getAttribute("src")!;
+            return { img, url: await uploadBase64ToR2(base64, "text_manual") };
+          }));
+          results.forEach(r => { if (r.status === "fulfilled" && r.value.url !== r.value.img.getAttribute("src")) r.value.img.setAttribute("src", r.value.url); });
+          textToSave = doc.body.innerHTML;
         }
-        textToSave = doc.body.innerHTML;
       }
 
       // 🖼️ 3. Upload file Pilihan Manual ke R2
@@ -1964,28 +2210,27 @@ const QuestionsPage = () => {
         }
       }
 
-      // 🖼️ 4. Scan teks Pilihan untuk base64 (terutama jika ada paste)
-      for (const key in updatedChoices) {
+      // 🖼️ 4. Scan teks Pilihan untuk base64 (parallel)
+      await Promise.allSettled(Object.keys(updatedChoices).map(async (key) => {
         const choice = updatedChoices[key];
-        // Cek properti imageUrl (jika ada data URL sisa)
         if (choice.imageUrl && choice.imageUrl.startsWith("data:image/")) {
           choice.imageUrl = await uploadBase64ToR2(choice.imageUrl, `choice_manual_${key}`);
         } else if (!choice.imageUrl) {
           delete choice.imageUrl;
         }
-
-        // Cek teks pilihan
         if (choice.text && choice.text.includes("data:image/")) {
           const cDoc = new DOMParser().parseFromString(choice.text, "text/html");
-          const cIms = cDoc.querySelectorAll("img[src^='data:image/']");
-          for (let i = 0; i < cIms.length; i++) {
-            const b64 = cIms[i].getAttribute("src")!;
-            const url = await uploadBase64ToR2(b64, `choice_text_manual_${key}`);
-            cIms[i].setAttribute("src", url);
+          const cIms = Array.from(cDoc.querySelectorAll("img[src^='data:image/']"));
+          if (cIms.length > 0) {
+            await Promise.allSettled(cIms.map(async (img) => {
+              const b64 = img.getAttribute("src")!;
+              const url = await uploadBase64ToR2(b64, `choice_text_manual_${key}`);
+              img.setAttribute("src", url);
+            }));
+            choice.text = cDoc.body.innerHTML;
           }
-          choice.text = cDoc.body.innerHTML;
         }
-      }
+      }));
 
       const typeMap: Record<string, string> = {
         pilihan_ganda: "multiple_choice",
@@ -2004,7 +2249,7 @@ const QuestionsPage = () => {
         field: typeMap[formValues.type] || "multiple_choice", 
         options: {}, 
         correctAnswer: "",
-        order: selectedQuestion?.order || questions.length + 1
+        order: selectedQuestion?.order || (questions.reduce((max, q) => Math.max(max, q.order || 0), 0) + 1)
       };
 
       if (formValues.type === "pilihan_ganda" || formValues.type === "pilihan_ganda_kompleks" || formValues.type === "benar_salah") {
@@ -2026,12 +2271,17 @@ const QuestionsPage = () => {
       // 🛡️ LITERALISASI / WACANA (Fix Save Logic + Dual Convention)
       if (isLiterasiActive) {
         const gid = formValues.groupId || "";
-        const gtxt = formValues.groupText || "";
+        let gtxt = formValues.groupText || "";
+        
+        // Upload base64 images in groupText to R2
+        if (gtxt.includes("data:image/")) {
+          gtxt = await uploadInlineBase64Images(gtxt);
+        }
         
         payload.groupId = gid;
-        payload.group_id = gid; // Snake case fallback
+        payload.group_id = gid;
         payload.groupText = gtxt;
-        payload.group_text = gtxt; // Snake case fallback
+        payload.group_text = gtxt;
         
         // Validasi: Wajib ada kode grup jika literasi aktif
         if (!gid.trim()) {
@@ -2166,6 +2416,25 @@ const QuestionsPage = () => {
         console.warn("Gagal membersihkan gambar dari R2 Storage. Ini mungkin karena masalah CORS setelah ganti domain.", storageError);
       }
 
+      // 📚 Jika soal ini adalah "MAIN" literasi (punya groupText), transfer ke soal berikutnya dalam grup
+      if (questionToDelete.groupId && questionToDelete.groupText) {
+        const groupSiblings = questions.filter(q => q.groupId === questionToDelete.groupId && q.id !== questionToDelete.id);
+        if (groupSiblings.length > 0) {
+          // Pastikan soal berikutnya punya groupText (transfer stimulus)
+          const nextMain = groupSiblings[0];
+          if (!nextMain.groupText) {
+            try {
+              await pb.collection('questions').update(nextMain.id, {
+                groupText: questionToDelete.groupText,
+                group_text: questionToDelete.groupText
+              });
+            } catch (e) {
+              console.warn("Gagal transfer groupText ke soal berikutnya:", e);
+            }
+          }
+        }
+      }
+
       await pb.collection('questions').delete(questionToDelete.id);
       showAlert("Berhasil", "Soal berhasil dihapus.", "success");
     } catch (error) {
@@ -2287,7 +2556,10 @@ const QuestionsPage = () => {
         }));
       }
 
-      if (pb.authStore.isValid) await pb.collection('questions').subscribe("*", () => loadQuestions());
+      if (pb.authStore.isValid) {
+        let rt: ReturnType<typeof setTimeout> | null = null;
+        await pb.collection('questions').subscribe("*", () => { if (rt) clearTimeout(rt); rt = setTimeout(() => loadQuestions(), 800); });
+      }
 
       loadQuestions();
       showAlert("Berhasil", "Semua soal berhasil dikosongkan.", "success");
@@ -2319,6 +2591,22 @@ const QuestionsPage = () => {
       if (selectedQuestions.length === 0) {
         setBatchProgress(prev => ({ ...prev, isOpen: false }));
         return;
+      }
+
+      // 📚 Transfer groupText ke soal berikutnya jika "main" literasi dihapus
+      const groupsToTransfer = new Map<string, string>();
+      selectedQuestions.forEach(q => {
+        if (q.groupId && q.groupText && !groupsToTransfer.has(q.groupId)) {
+          groupsToTransfer.set(q.groupId, q.groupText);
+        }
+      });
+      for (const [groupId, groupText] of groupsToTransfer) {
+        const survivingSiblings = questions.filter(q => q.groupId === groupId && !selectedIds.includes(q.id));
+        if (survivingSiblings.length > 0 && !survivingSiblings[0].groupText) {
+          try {
+            await pb.collection('questions').update(survivingSiblings[0].id, { groupText, group_text: groupText });
+          } catch (e) { console.warn("Transfer groupText gagal:", e); }
+        }
       }
 
       // 1. Gather keys
@@ -3135,19 +3423,19 @@ const QuestionsPage = () => {
   const handleExportToJson = () => {
     if (questions.length === 0) return;
     
-    // Create a clean version of questions for export
-    const exportData = questions.map(q => ({
-      text: q.text,
-      type: q.type,
-      imageUrl: q.imageUrl,
-      groupId: q.groupId,
-      groupText: q.groupText,
-      choices: q.choices,
-      pairs: q.pairs,
-      answerKey: q.answerKey,
-      items: q.items,
-      order: q.order
-    }));
+    // Create a clean version of questions for export (remove undefined/null fields)
+    const exportData = questions.map(q => {
+      const clean: any = { text: q.text || "", type: q.type || "pilihan_ganda" };
+      if (q.imageUrl) clean.imageUrl = q.imageUrl;
+      if (q.groupId) clean.groupId = q.groupId;
+      if (q.groupText) clean.groupText = q.groupText;
+      if (q.choices && Object.keys(q.choices).length > 0) clean.choices = q.choices;
+      if (q.pairs && q.pairs.length > 0) clean.pairs = q.pairs;
+      if (q.items && q.items.length > 0) clean.items = q.items;
+      if (q.answerKey) clean.answerKey = q.answerKey;
+      if (q.order) clean.order = q.order;
+      return clean;
+    });
 
     const dataStr = JSON.stringify(exportData, null, 2);
     const blob = new Blob([dataStr], { type: 'application/json' });
@@ -3165,6 +3453,138 @@ const QuestionsPage = () => {
     URL.revokeObjectURL(url);
     
     addToast({ title: "Export Sukses", description: "File JSON berhasil diunduh.", type: "success" });
+  };
+
+  // 📤 Export Selected Questions to JSON
+  const handleExportSelectedToJson = () => {
+    const selectedQuestions = questions.filter(q => selectedIds.includes(q.id));
+    if (selectedQuestions.length === 0) return;
+
+    const exportData = selectedQuestions.map(q => {
+      const clean: any = { text: q.text || "", type: q.type || "pilihan_ganda" };
+      if (q.imageUrl) clean.imageUrl = q.imageUrl;
+      if (q.groupId) clean.groupId = q.groupId;
+      if (q.groupText) clean.groupText = q.groupText;
+      if (q.choices && Object.keys(q.choices).length > 0) clean.choices = q.choices;
+      if (q.pairs && q.pairs.length > 0) clean.pairs = q.pairs;
+      if (q.items && q.items.length > 0) clean.items = q.items;
+      if (q.answerKey) clean.answerKey = q.answerKey;
+      if (q.order) clean.order = q.order;
+      return clean;
+    });
+
+    const dataStr = JSON.stringify(exportData, null, 2);
+    const blob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+
+    const dateStr = new Date().toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-');
+    const fileName = `SOAL_TERPILIH_${selectedQuestions.length}_${dateStr}.json`;
+
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    addToast({ title: "Export Sukses", description: `${selectedQuestions.length} soal berhasil diexport ke JSON.`, type: "success" });
+  };
+
+  // 📤 Export Selected Questions to Word
+  const handleExportSelectedToWord = async () => {
+    const selectedQuestions = questions.filter(q => selectedIds.includes(q.id));
+    if (selectedQuestions.length === 0) return;
+
+    // Reuse the existing Word export logic but with selected questions only
+    setBatchProgress({ isOpen: true, total: selectedQuestions.length, current: 0, message: "Menyiapkan export...", title: "Export Terpilih ke Word" });
+
+    try {
+      const processLatex = (text: string): string => {
+        if (!text) return "";
+        return text
+          .replace(/\$\$([^$]+)\$\$/g, '\\[$1\\]')
+          .replace(/\$([^$]+)\$/g, '\\($1\\)');
+      };
+
+      const cleanForWord = (html: string): string => {
+        if (!html) return "";
+        let clean = html;
+        clean = clean.replace(/<pre[^>]*class="ql-syntax"[^>]*>([\s\S]*?)<\/pre>/gi, '<p style="font-family:Consolas,monospace;background:#f3f4f6;padding:8px;border:1px solid #e5e7eb;white-space:pre-wrap;">$1</p>');
+        return clean;
+      };
+
+      let html = `<html><head><meta charset="utf-8"><style>
+        body { font-family: 'Times New Roman', serif; font-size: 12pt; line-height: 1.5; margin: 2cm; }
+        table { border-collapse: collapse; width: 100%; margin: 10px 0; }
+        td, th { border: 1px solid #000; padding: 6px 8px; vertical-align: top; font-size: 11pt; }
+        .soal { margin-bottom: 16px; }
+        .opsi { margin-left: 20px; }
+        .kunci { color: #059669; font-weight: bold; }
+        .stimulus { border: 1px solid #059669; padding: 12px; margin-bottom: 12px; background: #f0fdf4; }
+      </style></head><body>`;
+
+      html += `<h2 style="text-align:center;">EXPORT SOAL TERPILIH</h2>`;
+      html += `<p style="text-align:center;font-size:10pt;color:#666;">${exam?.subject || ""} — ${selectedQuestions.length} soal — ${new Date().toLocaleDateString('id-ID')}</p><hr/>`;
+
+      let currentGroupId = "";
+      selectedQuestions.forEach((q, idx) => {
+        // Show stimulus if new group
+        if (q.groupId && q.groupId !== currentGroupId && q.groupText) {
+          html += `<div class="stimulus"><b>STIMULUS:</b><br/>${cleanForWord(processLatex(q.groupText))}</div>`;
+          currentGroupId = q.groupId;
+        }
+
+        html += `<div class="soal"><b>${idx + 1}.</b> ${cleanForWord(processLatex(q.text || ""))}`;
+
+        if (q.choices && (q.type === "pilihan_ganda" || q.type === "pilihan_ganda_kompleks" || q.type === "benar_salah")) {
+          html += `<div class="opsi">`;
+          Object.keys(q.choices).sort().forEach(key => {
+            const choice = q.choices![key];
+            const isCorrect = choice.isCorrect;
+            html += `<p>${isCorrect ? '<span class="kunci">' : ''}${key.toUpperCase()}. ${cleanForWord(processLatex(choice.text || ""))}${isCorrect ? ' ✓</span>' : ''}</p>`;
+          });
+          html += `</div>`;
+        } else if (q.type === "menjodohkan" && q.pairs) {
+          html += `<table><tr><th>Kiri</th><th>Kanan</th></tr>`;
+          q.pairs.forEach(p => { html += `<tr><td>${p.left}</td><td>${p.right}</td></tr>`; });
+          html += `</table>`;
+        } else if ((q.type === "urutkan" || q.type === "drag_drop") && q.items) {
+          html += `<ol>`;
+          q.items.forEach(item => { html += `<li>${item.text}</li>`; });
+          html += `</ol>`;
+        }
+
+        if (q.answerKey) {
+          html += `<p class="kunci">Kunci: ${q.answerKey.toUpperCase()}</p>`;
+        }
+        html += `</div>`;
+
+        setBatchProgress(prev => ({ ...prev, current: idx + 1, message: `Memproses soal ${idx + 1}/${selectedQuestions.length}` }));
+      });
+
+      html += `</body></html>`;
+
+      const blob = new Blob([html], { type: 'application/msword' });
+      const url = URL.createObjectURL(blob);
+      const dateStr = new Date().toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-');
+      const fileName = `SOAL_TERPILIH_${selectedQuestions.length}_${dateStr}.doc`;
+
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      addToast({ title: "Export Sukses", description: `${selectedQuestions.length} soal berhasil diexport ke Word.`, type: "success" });
+    } catch (err) {
+      console.error("Export Selected Word Error:", err);
+      addToast({ title: "Gagal", description: "Gagal export ke Word.", type: "error" });
+    } finally {
+      setBatchProgress(prev => ({ ...prev, isOpen: false }));
+    }
   };
 
   const copyToClipboard = (text: string, id?: string) => {
@@ -3496,6 +3916,7 @@ Aturan:
                       </Dialog>
 
                       {questions.length > 0 && selectedIds.length > 0 && isOwner && (
+                        <>
                         <Button
                           onClick={() => setBulkDeleteDialogOpen(true)}
                           variant="default"
@@ -3505,6 +3926,25 @@ Aturan:
                           <Trash className="h-3.5 w-3.5" />
                           Hapus ({selectedIds.length})
                         </Button>
+                        <Button
+                          onClick={handleExportSelectedToWord}
+                          variant="secondary"
+                          size="sm"
+                          className="rounded-2xl bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800/30 font-bold h-9 px-4 text-xs"
+                        >
+                          <Download className="h-3.5 w-3.5 mr-1.5" />
+                          Word
+                        </Button>
+                        <Button
+                          onClick={handleExportSelectedToJson}
+                          variant="secondary"
+                          size="sm"
+                          className="rounded-2xl bg-slate-50 text-slate-700 hover:bg-slate-100 border border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700 font-bold h-9 px-4 text-xs"
+                        >
+                          <FileJson className="h-3.5 w-3.5 mr-1.5" />
+                          JSON
+                        </Button>
+                        </>
                       )}
 
                       {questions.length > 0 && selectedIds.length === 0 && isOwner && (
@@ -3943,7 +4383,7 @@ Aturan:
                             placeholder="Ketikkan teks stimulus / literasi di sini..."
                             modules={quillModules}
                             formats={quillFormats}
-                            className="[&_.ql-editor]:min-h-[100px] [&_.ql-container]:border-none [&_.ql-toolbar]:border-none [&_.ql-toolbar]:border-b"
+                            className="[&_.ql-editor]:min-h-[200px] [&_.ql-editor_p]:leading-[1.8] [&_.ql-editor_p]:text-justify [&_.ql-container]:border-none [&_.ql-toolbar]:border-none [&_.ql-toolbar]:border-b"
                           />
                         </div>
                       </FormField>
@@ -5065,93 +5505,84 @@ Aturan:
 
       {/* 🪄 MODAL GENERASI AI */}
       <Dialog open={isAIModalOpen} onOpenChange={setIsAIModalOpen}>
-        <DialogContent className="max-w-md rounded-3xl p-0 overflow-hidden border-none shadow-2xl">
-          <div className="bg-slate-50 dark:bg-slate-800/50 p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-100 dark:shadow-none">
-                <Sparkles className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <DialogTitle className="text-lg font-black tracking-tight text-slate-900 dark:text-white uppercase leading-none">AI Question Lab</DialogTitle>
-                <div className="flex items-center gap-1.5 mt-1.5">
-                   <p className="text-slate-500 dark:text-slate-400 text-[10px] font-bold uppercase tracking-wider">Mode:</p>
-                   <span className="px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400 text-[9px] font-black border border-indigo-100 dark:border-indigo-800 uppercase">
-                      {AI_MODELS.find((m: any) => m.id === activeAIConfig.model)?.name || activeAIConfig.model} ({activeAIConfig.provider})
-                   </span>
-                </div>
-              </div>
+        <DialogContent className="max-w-lg rounded-2xl p-0 overflow-hidden border border-slate-200 dark:border-slate-800 shadow-xl">
+          <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+            <div>
+              <DialogTitle className="text-sm font-bold text-slate-900 dark:text-white">Generate Soal</DialogTitle>
+              <p className="text-[10px] text-slate-400 mt-0.5">{AI_MODELS.find((m: any) => m.id === activeAIConfig.model)?.name || activeAIConfig.model}</p>
             </div>
-            <Button 
-              type="button"
-              variant="outline" 
-              size="sm" 
-              onClick={handleRandomFill}
-              className="rounded-xl flex items-center gap-2 border-slate-200 dark:border-slate-800 text-indigo-600 dark:text-indigo-400 hover:bg-white dark:hover:bg-slate-800 transition-all shadow-sm h-10 px-4"
-            >
-              <RefreshCw className="w-3.5 h-3.5" />
-              <span className="text-[10px] font-black uppercase tracking-widest">Acak</span>
-            </Button>
+            <button type="button" onClick={handleRandomFill} className="text-[10px] font-medium text-slate-500 hover:text-indigo-600 transition-colors flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800">
+              <RefreshCw className="w-3 h-3" /> Isi Contoh
+            </button>
           </div>
 
-          <div className="p-6 space-y-5 bg-white dark:bg-slate-900 max-h-[70vh] overflow-y-auto custom-scrollbar">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <FormField id="aiLevel" label="Jenjang / Kelas" error={undefined}>
-                <Input
-                  value={aiLevel}
-                  onChange={(e) => setAiLevel(e.target.value)}
-                  placeholder="Misal: Kelas 10 SMA"
-                  className="rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-800 h-11 text-xs font-semibold"
-                />
-              </FormField>
-
-              <FormField id="aiSubject" label="Mata Pelajaran" error={undefined}>
-                <Input
-                  value={aiSubject}
-                  onChange={(e) => setAiSubject(e.target.value)}
-                  placeholder="Misal: IPA"
-                  className="rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-800 h-11 text-xs font-semibold"
-                />
-              </FormField>
+          <div className="px-6 py-5 space-y-5 max-h-[70vh] overflow-y-auto">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-400">Jenjang / Kelas</label>
+                <Input value={aiLevel} onChange={(e) => setAiLevel(e.target.value)} placeholder="SMA Kelas 11" className="h-10 rounded-lg text-xs" />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-400">Mata Pelajaran</label>
+                <Input value={aiSubject} onChange={(e) => setAiSubject(e.target.value)} placeholder="Informatika" className="h-10 rounded-lg text-xs" />
+              </div>
             </div>
 
-            <FormField id="aiTopic" label="Topik atau Materi Spesifik" error={undefined}>
-              <textarea
-                value={aiTopic}
-                onChange={(e) => setAiTopic(e.target.value)}
-                placeholder="Misal: Dampak Pencemaran Plastik di Lautan..."
-                className="w-full min-h-[100px] p-4 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-800 focus:ring-2 focus:ring-indigo-500 text-xs resize-none font-medium text-slate-800 dark:text-white placeholder:text-slate-400"
-              />
-              {isFetchingSuggestions ? (
-                <div className="mt-3 flex items-center gap-2 text-[10px] text-slate-400 font-bold uppercase tracking-widest animate-pulse p-2 bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
-                  <RefreshCw className="h-3 w-3 animate-spin text-indigo-500" /> Menganalisis kurikulum & materi...
-                </div>
-              ) : dynamicSuggestions.length > 0 && (
-                <div className="mt-3 flex flex-wrap gap-2 animate-in fade-in slide-in-from-top-2 duration-500">
-                  <div className="flex items-center gap-2 w-full mb-1">
-                    <Sparkles className="h-3 w-3 text-indigo-500" />
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block underline decoration-indigo-200 decoration-2 underline-offset-4">Rekomendasi Materi Berbasis AI :</span>
-                  </div>
-                  {dynamicSuggestions.map((suggestion, idx) => (
-                    <button
-                      key={idx}
-                      type="button"
-                      onClick={() => setAiTopic(String(suggestion))}
-                      className="px-3 py-1.5 rounded-full bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-100 dark:border-indigo-800 text-[10px] font-bold text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-all font-sans shadow-sm hover:shadow"
-                    >
-                      {String(suggestion)}
-                    </button>
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-400">Topik</label>
+              <div className="flex gap-2">
+                <Input value={aiTopic} onChange={(e) => setAiTopic(e.target.value)} placeholder="Jaringan Komputer, Fotosintesis..." className="flex-1 h-10 rounded-lg text-xs" />
+                <button type="button" onClick={handleGenerateTopic} disabled={isGeneratingTopic} className="shrink-0 h-10 px-3 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-500 hover:text-indigo-600 hover:border-indigo-300 transition-all disabled:opacity-50" title="Generate topik otomatis">
+                  {isGeneratingTopic ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Wand2 className="w-3.5 h-3.5" />}
+                </button>
+              </div>
+              {dynamicSuggestions.length > 0 && !isFetchingSuggestions && (
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {dynamicSuggestions.map((s, i) => (
+                    <button key={i} type="button" onClick={() => setAiTopic(String(s))} className="px-2.5 py-1 rounded-md bg-slate-100 dark:bg-slate-800 text-[10px] font-medium text-slate-600 dark:text-slate-400 hover:bg-indigo-50 hover:text-indigo-600 transition-colors">{String(s)}</button>
                   ))}
                 </div>
               )}
-            </FormField>
+            </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <FormField id="aiType" label="Tipe Soal" error={undefined}>
-                <select
-                  value={aiType}
-                  onChange={(e) => setAiType(e.target.value)}
-                  className="w-full h-11 px-3 rounded-2xl text-xs font-bold bg-slate-50 dark:bg-slate-800 border-none focus:ring-2 focus:ring-indigo-500 outline-none appearance-none"
-                >
+            {/* 📚 Bahan Materi (upload/paste) */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-400">Bahan Materi <span className="font-normal text-slate-400">(opsional)</span></label>
+                {aiMaterialFileName && (
+                  <button 
+                    onClick={() => { setAiMaterialFile(null); setAiMaterialText(""); setAiMaterialFileName(""); }}
+                    className="text-[10px] text-rose-500 hover:text-rose-600 font-medium"
+                  >
+                    Hapus
+                  </button>
+                )}
+              </div>
+
+              {aiMaterialFileName ? (
+                <div className="flex items-center gap-2 p-2.5 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
+                  <FileText className="w-4 h-4 text-slate-400 shrink-0" />
+                  <span className="text-[10px] font-medium text-slate-600 truncate flex-1">{aiMaterialFileName}</span>
+                  <span className="text-[9px] text-slate-400">{Math.round(aiMaterialText.length / 1000)}k</span>
+                </div>
+              ) : (
+                <label className="flex items-center gap-2 px-3 py-2 rounded-lg border border-dashed border-slate-300 dark:border-slate-700 cursor-pointer hover:border-indigo-300 hover:bg-slate-50 transition-all">
+                  <Plus className="w-3.5 h-3.5 text-slate-400" />
+                  <span className="text-[10px] text-slate-500">{isExtractingMaterial ? "Mengekstrak..." : "Upload Word, PDF, PPT, atau Gambar"}</span>
+                  <input type="file" className="hidden" accept=".pdf,.docx,.docm,.pptx,.ppt,.png,.jpg,.jpeg" onChange={handleAIMaterialUpload} disabled={isExtractingMaterial} />
+                </label>
+              )}
+
+              <textarea value={aiMaterialText} onChange={(e) => setAiMaterialText(e.target.value.substring(0, 4000))} placeholder="Atau paste materi di sini (dari buku, artikel, modul)..." className="w-full min-h-[56px] p-3 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 text-[11px] resize-none text-slate-700 dark:text-slate-300 placeholder:text-slate-400" />
+              {aiMaterialText && <p className="text-[9px] text-slate-400 text-right">{aiMaterialText.length}/4000</p>}
+            </div>
+
+            <Separator />
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-400">Tipe Soal</label>
+                <select value={aiType} onChange={(e) => setAiType(e.target.value)} className="w-full h-10 px-3 rounded-lg text-xs font-medium bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:ring-1 focus:ring-indigo-500 outline-none">
                   {allowedTypes.pilihan_ganda && <option value="pilihan_ganda">Pilihan Ganda</option>}
                   {allowedTypes.pilihan_ganda_kompleks && <option value="pilihan_ganda_kompleks">PG Kompleks</option>}
                   {allowedTypes.benar_salah && <option value="benar_salah">Benar / Salah</option>}
@@ -5161,132 +5592,105 @@ Aturan:
                   {allowedTypes.drag_drop && <option value="drag_drop">Drag & Drop</option>}
                   {allowedTypes.uraian && <option value="uraian">Uraian / Essay</option>}
                 </select>
-              </FormField>
-
-              <FormField id="aiCount" label="Jumlah Soal" error={undefined}>
-                 <div className="flex items-center gap-3 bg-slate-50 dark:bg-slate-800 p-1 px-3 rounded-2xl h-11">
-                    <button onClick={() => setAiCount(Math.max(1, aiCount - 1))} className="text-slate-400 hover:text-indigo-600 transition-colors font-bold text-lg">-</button>
-                    <input 
-                      type="number" 
-                      value={aiCount} 
-                      onChange={(e) => setAiCount(parseInt(e.target.value) || 1)}
-                      className="w-full text-center bg-transparent font-black text-slate-800 dark:text-white outline-none text-xs [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                    />
-                    <button onClick={() => setAiCount(Math.min(10, aiCount + 1))} className="text-slate-400 hover:text-indigo-600 transition-colors font-bold text-lg">+</button>
-                 </div>
-              </FormField>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <FormField id="aiDifficulty" label="Tingkat Kesulitan" error={undefined}>
-                <div className="grid grid-cols-3 gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
-                  {['mudah', 'sedang', 'sulit'].map((d) => (
-                    <button
-                      key={d}
-                      onClick={() => setAiDifficulty(d)}
-                      className={`py-1.5 rounded-lg text-[9px] font-bold uppercase transition-all ${
-                        aiDifficulty === d ? 'bg-white dark:bg-slate-700 text-indigo-600 shadow-sm' : 'text-slate-400'
-                      }`}
-                    >
-                      {d}
-                    </button>
-                  ))}
-                </div>
-              </FormField>
-
-              <FormField id="aiFocus" label="Fokus Standar" error={undefined}>
-                <div className="grid grid-cols-3 gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
-                  {['umum', 'akm', 'pisa'].map((f) => (
-                    <button
-                      key={f}
-                      onClick={() => setAiFocus(f)}
-                      className={`py-1.5 rounded-lg text-[9px] font-bold uppercase transition-all ${
-                        aiFocus === f ? 'bg-white dark:bg-slate-700 text-indigo-600 shadow-sm' : 'text-slate-400'
-                      }`}
-                    >
-                      {f}
-                    </button>
-                  ))}
-                </div>
-                <p className="mt-2 text-[9px] text-slate-500 italic font-medium leading-tight">
-                  {focusDescriptions[aiFocus]}
-                </p>
-              </FormField>
-            </div>
-            <div className="flex flex-col gap-4 p-4 bg-indigo-50/50 dark:bg-indigo-900/10 rounded-2xl border border-indigo-100 dark:border-indigo-800/40">
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <p className="text-xs font-bold text-indigo-700 dark:text-indigo-300">Mode Literasi</p>
-                  <p className="text-[10px] text-indigo-600/70 dark:text-indigo-400/70 leading-tight">AI akan membuatkan teks bacaan panjang sebelum soal.</p>
-                </div>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input 
-                    type="checkbox" 
-                    className="sr-only peer" 
-                    checked={isAiLiteracy}
-                    onChange={(e) => setIsAiLiteracy(e.target.checked)}
-                  />
-                  <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-indigo-600"></div>
-                </label>
               </div>
-
-              {isAiLiteracy && (
-                <div className="pt-3 border-t border-indigo-100 dark:border-indigo-800/40 animate-in slide-in-from-top-2 duration-300">
-                  <FormField id="aiPassageLength" label="Panjang Stimulus" error={undefined}>
-                    <div className="grid grid-cols-3 gap-2 mt-1">
-                      {['pendek', 'sedang', 'panjang'].map((len) => (
-                        <button
-                          key={len}
-                          type="button"
-                          onClick={() => setAiPassageLength(len)}
-                          className={`py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all border ${
-                            aiPassageLength === len 
-                              ? 'bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-200 dark:shadow-none' 
-                              : 'bg-white dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700 hover:border-indigo-300'
-                          }`}
-                        >
-                          {len}
-                        </button>
-                      ))}
-                    </div>
-                  </FormField>
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-400">Jumlah Soal</label>
+                <div className="flex items-center h-10 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3">
+                  <button onClick={() => setAiCount(Math.max(1, aiCount - 1))} className="text-slate-400 hover:text-slate-700 font-bold text-sm">−</button>
+                  <input type="number" value={aiCount} onChange={(e) => setAiCount(parseInt(e.target.value) || 1)} className="flex-1 text-center bg-transparent font-bold text-slate-800 dark:text-white outline-none text-xs [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+                  <button onClick={() => setAiCount(Math.min(10, aiCount + 1))} className="text-slate-400 hover:text-slate-700 font-bold text-sm">+</button>
                 </div>
-              )}
+              </div>
             </div>
 
-            <DialogFooter className="flex flex-col gap-2 sm:gap-0 sm:flex-row p-0 pt-2 border-t border-slate-100 dark:border-slate-800">
-               {(isAIGenerating && aiProgress > 0) ? (
-                 <div className="flex-1 flex flex-col gap-2 p-2">
-                   <div className="flex items-center justify-between">
-                     <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">Generating... {aiProgress}%</span>
-                     <button onClick={cancelAIGeneration} className="px-3 py-1 rounded-lg bg-rose-50 text-rose-600 text-[10px] font-bold border border-rose-200 hover:bg-rose-100 transition-colors">
-                       Batalkan
-                     </button>
-                   </div>
-                   <div className="w-full h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                     <div className="h-full bg-gradient-to-r from-indigo-500 to-blue-500 rounded-full transition-all duration-300 ease-out" style={{ width: `${aiProgress}%` }} />
-                   </div>
-                 </div>
-               ) : (
-                 <>
-                   <Button
-                    variant="ghost"
-                    onClick={() => setIsAIModalOpen(false)}
-                    className="rounded-xl font-bold uppercase text-xs"
-                   >
-                    Batal
-                   </Button>
-                   <Button
-                    onClick={handleAIGenerate}
-                    disabled={isAIGenerating || !aiTopic.trim()}
-                    className="flex-1 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-200 dark:shadow-none font-bold uppercase text-xs group py-6"
-                   >
-                    <Sparkles className="mr-2 h-4 w-4 group-hover:rotate-12 transition-transform" />
-                    Mulai Generasi
-                   </Button>
-                 </>
-               )}
-            </DialogFooter>
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-400">Kesulitan</label>
+              <div className="grid grid-cols-3 gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
+                {['mudah', 'sedang', 'sulit'].map((d) => (
+                  <button key={d} onClick={() => setAiDifficulty(d)} className={`py-2 rounded-md text-[10px] font-semibold capitalize transition-all ${aiDifficulty === d ? 'bg-white dark:bg-slate-700 text-slate-800 dark:text-white shadow-sm' : 'text-slate-400'}`}>{d}</button>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-400">Taksonomi Bloom</label>
+              <div className="grid grid-cols-3 gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
+                {([['lots', 'LOTS (C1-C3)'], ['campuran', 'Campuran'], ['hots', 'HOTS (C4-C6)']] as [string, string][]).map(([key, label]) => (
+                  <button key={key} onClick={() => setTaxonomyPreset(key as "lots" | "hots" | "campuran")} className={`py-2 rounded-md text-[10px] font-semibold transition-all ${getTaxonomyPreset() === key ? 'bg-white dark:bg-slate-700 text-slate-800 dark:text-white shadow-sm' : 'text-slate-400'}`}>{label}</button>
+                ))}
+              </div>
+              <div className="grid grid-cols-6 gap-1.5">
+                {(['C1', 'C2', 'C3', 'C4', 'C5', 'C6'] as string[]).map((c) => (
+                  <button key={c} onClick={() => toggleTaxonomy(c)} className={`py-2 rounded-lg text-[10px] font-bold transition-all border ${aiTaxonomy.includes(c) ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white dark:bg-slate-800 text-slate-400 border-slate-200 dark:border-slate-700 hover:border-indigo-300'}`}>{c}</button>
+                ))}
+              </div>
+              <p className="text-[9px] text-slate-400">{aiTaxonomy.sort().map(c => { const l: Record<string,string> = {C1:"Mengingat",C2:"Memahami",C3:"Menerapkan",C4:"Menganalisis",C5:"Mengevaluasi",C6:"Mencipta"}; return `${c}: ${l[c]}`; }).join(" · ")}</p>
+            </div>
+
+            {(aiObjectives.length > 0 || isFetchingObjectives) && (
+              <div className="space-y-2 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700">
+                <div className="flex items-center gap-2">
+                  <p className="text-[10px] font-semibold text-slate-600 dark:text-slate-400">Indikator Soal</p>
+                  {isFetchingObjectives && <RefreshCw className="w-3 h-3 text-slate-400 animate-spin" />}
+                </div>
+                {aiObjectives.length > 0 && (
+                  <ul className="space-y-1.5">
+                    {aiObjectives.map((obj, idx) => {
+                      const cMatch = obj.match(/^(C[1-6])\s*[:\-]/);
+                      const cLevel = cMatch ? cMatch[1] : "";
+                      const text = cMatch ? obj.replace(/^C[1-6]\s*[:\-]\s*/, "") : obj;
+                      return (
+                        <li key={idx} className="flex items-start gap-2 text-[10px] leading-relaxed text-slate-600 dark:text-slate-300">
+                          {cLevel && <span className="shrink-0 px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-700 text-[8px] font-bold mt-0.5">{cLevel}</span>}
+                          <span>{text}</span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </div>
+            )}
+
+            <div className="flex items-center justify-between p-3 rounded-lg border border-slate-200 dark:border-slate-700">
+              <div>
+                <p className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">Mode Literasi</p>
+                <p className="text-[9px] text-slate-400 mt-0.5">{aiMaterialText ? "Buat stimulus dari materi, lalu soal." : "Buat teks bacaan sebelum soal."}</p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" className="sr-only peer" checked={isAiLiteracy} onChange={(e) => setIsAiLiteracy(e.target.checked)} />
+                <div className="w-9 h-5 bg-slate-200 rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
+              </label>
+            </div>
+
+            {isAiLiteracy && (
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-400">Panjang Stimulus</label>
+                <div className="grid grid-cols-3 gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
+                  {['pendek', 'sedang', 'panjang'].map((len) => (
+                    <button key={len} type="button" onClick={() => setAiPassageLength(len)} className={`py-2 rounded-md text-[10px] font-semibold capitalize transition-all ${aiPassageLength === len ? 'bg-white dark:bg-slate-700 text-slate-800 dark:text-white shadow-sm' : 'text-slate-400'}`}>{len}</button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="px-6 py-4 border-t border-slate-100 dark:border-slate-800">
+            {(isAIGenerating && aiProgress > 0) ? (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-medium text-slate-600">Generating... {aiProgress}%</span>
+                  <button onClick={cancelAIGeneration} className="text-[10px] font-medium text-rose-500 hover:text-rose-600">Batalkan</button>
+                </div>
+                <div className="w-full h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                  <div className="h-full bg-indigo-600 rounded-full transition-all duration-300" style={{ width: `${aiProgress}%` }} />
+                </div>
+              </div>
+            ) : (
+              <div className="flex gap-3">
+                <Button variant="ghost" onClick={() => setIsAIModalOpen(false)} className="rounded-lg text-xs font-medium">Batal</Button>
+                <Button onClick={handleAIGenerate} disabled={isAIGenerating || !aiTopic.trim()} className="flex-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold h-10">Generate {aiCount} Soal</Button>
+              </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>

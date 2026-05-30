@@ -669,6 +669,42 @@ const validateQuestions = (questions: any[], isExactSubject: boolean = false, re
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// 🧠 Taxonomy & Thinking Level Prompt Builder
+// ═══════════════════════════════════════════════════════════════════════════════
+const buildTaxonomyInstruction = (taxonomy: string): string => {
+  const levels = taxonomy.split(",").map(s => s.trim()).filter(Boolean);
+  
+  const taxonomyMap: Record<string, string> = {
+    C1: "C1 (Mengingat/Remember): mengingat fakta, definisi, istilah",
+    C2: "C2 (Memahami/Understand): menjelaskan, menafsirkan, merangkum",
+    C3: "C3 (Menerapkan/Apply): menggunakan konsep/rumus dalam situasi baru",
+    C4: "C4 (Menganalisis/Analyze): mengurai informasi, membandingkan, sebab-akibat",
+    C5: "C5 (Mengevaluasi/Evaluate): menilai, mengkritisi, membuat keputusan",
+    C6: "C6 (Mencipta/Create): merancang, merumuskan, menghasilkan ide baru"
+  };
+
+  const sorted = [...levels].sort();
+  const isLOTS = sorted.join(",") === "C1,C2,C3";
+  const isHOTS = sorted.join(",") === "C4,C5,C6";
+  const isFull = sorted.join(",") === "C1,C2,C3,C4,C5,C6";
+
+  const parts: string[] = [];
+
+  if (isFull) {
+    parts.push("TAKSONOMI BLOOM: Variasi level kognitif C1-C6. Campuran LOTS (C1-C3) dan HOTS (C4-C6).");
+  } else if (isLOTS) {
+    parts.push("TAKSONOMI BLOOM: LOTS (Lower Order Thinking Skills). Semua soal WAJIB level C1-C3: mengingat fakta, memahami konsep, menerapkan prosedur. Soal langsung dan jelas. DILARANG soal analisis/evaluasi/kreasi tingkat tinggi.");
+  } else if (isHOTS) {
+    parts.push("TAKSONOMI BLOOM: HOTS (Higher Order Thinking Skills). Semua soal WAJIB level C4-C6: analisis, evaluasi, atau kreasi. Gunakan stimulus/kasus/skenario. DILARANG soal hafalan/ingatan sederhana.");
+  } else {
+    const selectedLabels = levels.map(l => taxonomyMap[l] || l).join("; ");
+    parts.push(`TAKSONOMI BLOOM: Soal WAJIB pada level berikut: ${selectedLabels}. Variasi di antara level yang dipilih.`);
+  }
+
+  return parts.join("\n");
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // 🎯 MAIN: Generate Questions with AI (OPTIMIZED)
 // - Single API call for literacy (combined stimulus + questions)
 // - Parallel batch for large counts (>7)
@@ -685,7 +721,51 @@ export const generateQuestionsAI = async (
   isLiteracy: boolean = false,
   passageLength: string = "sedang",
   difficulty: string = "sedang",
-  focus: string = "umum"
+  focus: string = "umum",
+  taxonomy: string = "C1,C2,C3,C4,C5,C6",
+  materialReference: string = "",
+  objectives: string[] = []
+): Promise<AIGeneratedQuestion[]> => {
+  const MAX_RETRIES = 3;
+  let lastError: any = null;
+
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const result = await _generateQuestionsAIInternal(pb, topic, count, level, subject, type, isLiteracy, passageLength, difficulty, focus, taxonomy, materialReference, objectives);
+      return result;
+    } catch (err: any) {
+      lastError = err;
+      // Don't retry rate limit errors
+      if (err.message?.includes("AI_RATE_LIMIT")) throw err;
+      // Don't retry if aborted
+      if (err.name === "AbortError") throw err;
+      
+      console.warn(`[AI] Attempt ${attempt}/${MAX_RETRIES} failed: ${err.message}. ${attempt < MAX_RETRIES ? "Retrying..." : "Giving up."}`);
+      
+      if (attempt < MAX_RETRIES) {
+        // Wait before retry (exponential backoff: 1s, 2s)
+        await new Promise(r => setTimeout(r, attempt * 1000));
+      }
+    }
+  }
+
+  throw lastError;
+};
+
+const _generateQuestionsAIInternal = async (
+  pb: PocketBase,
+  topic: string, 
+  count: number = 5, 
+  level: string = "Umum", 
+  subject: string = "",
+  type: string = "pilihan_ganda",
+  isLiteracy: boolean = false,
+  passageLength: string = "sedang",
+  difficulty: string = "sedang",
+  focus: string = "umum",
+  taxonomy: string = "C1,C2,C3,C4,C5,C6",
+  materialReference: string = "",
+  objectives: string[] = []
 ): Promise<AIGeneratedQuestion[]> => {
   try {
     const ctx = detectSubjectContext(subject, topic);
@@ -713,7 +793,7 @@ export const generateQuestionsAI = async (
       
       const results = await Promise.allSettled(
         batches.map(batchCount => 
-          generateQuestionsAI(pb, topic, batchCount, level, subject, type, false, passageLength, difficulty, focus)
+          generateQuestionsAI(pb, topic, batchCount, level, subject, type, false, passageLength, difficulty, focus, taxonomy, materialReference, objectives)
         )
       );
       
@@ -767,23 +847,34 @@ export const generateQuestionsAI = async (
           : (type === "urutkan" || type === "drag_drop") ? "Buat 4-6 item yang harus disusun berdasarkan stimulus." 
           : "");
 
-      const systemPrompt = `Anda adalah Spesialis Evaluasi Pendidikan. Buat stimulus literasi + ${count} soal ${typeLabel} dalam SATU respons.
-Jenjang: ${level}, Mapel: ${subject}, Kesulitan: ${difficulty}, Fokus: ${focus}.
+      const taxonomyInstruction = buildTaxonomyInstruction(taxonomy);
+      const objectivesSection = objectives.length > 0 ? `\nTUJUAN PEMBELAJARAN (soal WAJIB mengukur pencapaian tujuan ini):\n${objectives.map((o, i) => `${i + 1}. ${o}`).join("\n")}\n` : "";
 
+      // Jika ada materi referensi, stimulus WAJIB berdasarkan materi tersebut
+      const hasMaterial = materialReference && materialReference.trim().length > 10;
+      const stimulusInstruction = hasMaterial
+        ? `1. Buat stimulus/wacana berdasarkan MATERI REFERENSI yang diberikan, sepanjang ${lengthMap[passageLength] || lengthMap.sedang}. Olah materi menjadi artikel/studi kasus menarik yang memuat fakta & informasi dari materi. WAJIB menyinggung isi materi referensi. Format HTML: <h2 style="text-align:center;color:#1e3a8a;margin-bottom:32px;font-weight:900;">[JUDUL]</h2> lalu <p style="text-indent:30px;margin-bottom:24px;line-height:1.8;text-align:justify;">paragraf</p>.`
+        : `1. Buat stimulus/wacana bertema "${topic}" sepanjang ${lengthMap[passageLength] || lengthMap.sedang}. Sajikan sebagai artikel/studi kasus menarik (bukan definisi). Format HTML: <h2 style="text-align:center;color:#1e3a8a;margin-bottom:32px;font-weight:900;">[JUDUL]</h2> lalu <p style="text-indent:30px;margin-bottom:24px;line-height:1.8;text-align:justify;">paragraf</p>.`;
+
+      const systemPrompt = `Anda adalah Spesialis Evaluasi Pendidikan. Buat stimulus literasi + ${count} soal ${typeLabel} dalam SATU respons.
+Jenjang: ${level}, Mapel: ${subject}, Kesulitan: ${difficulty}.
+${taxonomyInstruction}
+${objectivesSection}
 INSTRUKSI:
-1. Buat stimulus/wacana bertema "${topic}" sepanjang ${lengthMap[passageLength] || lengthMap.sedang}. Sajikan sebagai artikel/studi kasus menarik (bukan definisi). Format HTML: <h2 style="text-align:center;color:#1e3a8a;margin-bottom:32px;font-weight:900;">[JUDUL]</h2> lalu <p style="text-indent:30px;margin-bottom:24px;line-height:1.8;text-align:justify;">paragraf</p>.
-2. Buat ${count} soal ${typeLabel} berdasarkan stimulus. Variasi pola: konsep, aplikasi, analisis, evaluasi. ${litTypeInstructions}
+${stimulusInstruction}
+2. Buat ${count} soal ${typeLabel} berdasarkan stimulus.${hasMaterial ? " Soal WAJIB menguji pemahaman terhadap isi materi referensi yang diolah dalam stimulus." : ""} ${litTypeInstructions}
 ${formatRules ? `3. FORMAT KHUSUS:\n${formatRules}` : ""}${fewShotLit ? `\n${fewShotLit}` : ""}
 
 OUTPUT JSON (WAJIB):
 ${litTypeFormat}
 Hanya JSON. Pastikan stimulus SELESAI SEMPURNA (tidak terpotong).`;
 
+      const materialSection = hasMaterial ? `MATERI REFERENSI (WAJIB jadi dasar stimulus & soal):\n${materialReference}\n\n` : "";
       const topicLower = topic.toLowerCase();
       const isTopicInstruction = topic.length > 50 || topicLower.includes('buat') || topicLower.includes('berikan');
       const userPrompt = isTopicInstruction
-        ? `INSTRUKSI: ${topic}\nBuat stimulus + ${count} soal sesuai instruksi di atas.`
-        : `Topik: "${topic}". Buat stimulus literasi + ${count} soal ${typeLabel}.`;
+        ? `${materialSection}INSTRUKSI: ${topic}\nBuat stimulus berdasarkan materi + ${count} soal sesuai instruksi di atas.`
+        : `${materialSection}Topik: "${topic}". Buat stimulus literasi${hasMaterial ? " berdasarkan materi referensi di atas" : ""} + ${count} soal ${typeLabel}.`;
 
       // Token estimation: stimulus + questions combined
       const stimulusTokens = ({ pendek: 500, sedang: 1000, panjang: 1800 }[passageLength] || 1000);
@@ -844,18 +935,24 @@ CATATAN: items berisi 4-6 item yang harus disusun/dikelompokkan. Urutan dalam ar
 
     const typeOutputFormat = getTypeOutputFormat(type);
     
-    const systemPrompt = `Buat ${count} soal ${typeLabel}, ${level} - ${subject}, kesulitan ${difficulty}, fokus ${focus}.
-Variasi pola: konsep, aplikasi, analisis, evaluasi. Variasi panjang stem.${type === "pilihan_ganda" || type === "pilihan_ganda_kompleks" ? " Opsi A-E ringkas & logis. Kunci jawaban acak." : ""}
+    const taxonomyInstruction = buildTaxonomyInstruction(taxonomy);
+    const hasMaterial = materialReference && materialReference.trim().length > 10;
+    const objectivesSection = objectives.length > 0 ? `\nTUJUAN PEMBELAJARAN (soal WAJIB mengukur pencapaian tujuan ini):\n${objectives.map((o, i) => `${i + 1}. ${o}`).join("\n")}\n` : "";
+    
+    const systemPrompt = `Buat ${count} soal ${typeLabel}, ${level} - ${subject}, kesulitan ${difficulty}.
+${taxonomyInstruction}
+${objectivesSection}${hasMaterial ? "PENTING: Soal WAJIB berdasarkan & menyinggung isi MATERI REFERENSI yang diberikan. Gunakan fakta, konsep, dan informasi dari materi sebagai konteks soal.\n" : ""}Variasi panjang stem.${type === "pilihan_ganda" || type === "pilihan_ganda_kompleks" ? " Opsi A-E ringkas & logis. Kunci jawaban acak." : ""}
 ${formatRules ? `\n${formatRules}\n` : ""}${fewShot ? `\n${fewShot}\n` : ""}
 ${typeOutputFormat}
 Hanya JSON.`;
 
+    const materialSection = hasMaterial ? `MATERI REFERENSI (soal WAJIB berdasarkan isi materi ini):\n${materialReference}\n\n` : "";
     const topicLower = topic.toLowerCase();
     const isTopicInstruction = topic.length > 50 || topic.includes(',') || topicLower.includes('buat') || topicLower.includes('berikan') || topicLower.includes('pakai');
     
     const userPrompt = isTopicInstruction
-      ? `INSTRUKSI PENGGUNA: ${topic}\nBuat ${count} soal ${typeLabel}, ${level} - ${subject}. Ikuti instruksi di atas.`
-      : `Topik: "${topic}". Buat ${count} soal ${typeLabel}, ${level} - ${subject}. Variasi panjang stem & tipe pertanyaan.`;
+      ? `${materialSection}INSTRUKSI PENGGUNA: ${topic}\nBuat ${count} soal ${typeLabel}, ${level} - ${subject}. Soal harus menyinggung isi materi.`
+      : `${materialSection}Topik: "${topic}". Buat ${count} soal ${typeLabel}, ${level} - ${subject}.${hasMaterial ? " Soal WAJIB berdasarkan & menyinggung isi materi referensi di atas." : " Variasi panjang stem & tipe pertanyaan."}`;
 
     const baseTokens = (ctx.isReligious || ctx.explicitlyWantsArabic) ? 700 : 350;
     const maxTokens = Math.min(Math.max(count * baseTokens, 1500), 8000);
@@ -886,6 +983,32 @@ Hanya JSON.`;
 // 🔄 Generate Single Question (for regeneration)
 // ═══════════════════════════════════════════════════════════════════════════════
 export const generateSingleQuestionAI = async (
+  pb: PocketBase,
+  topic: string,
+  type: string = "pilihan_ganda",
+  level: string = "Umum",
+  subject: string = "",
+  difficulty: string = "sedang",
+  focus: string = "akm",
+  existingWacana: string = ""
+): Promise<AIGeneratedQuestion> => {
+  const MAX_RETRIES = 3;
+  let lastError: any = null;
+
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      return await _generateSingleQuestionInternal(pb, topic, type, level, subject, difficulty, focus, existingWacana);
+    } catch (err: any) {
+      lastError = err;
+      if (err.message?.includes("AI_RATE_LIMIT")) throw err;
+      console.warn(`[AI Single] Attempt ${attempt}/${MAX_RETRIES} failed. ${attempt < MAX_RETRIES ? "Retrying..." : ""}`);
+      if (attempt < MAX_RETRIES) await new Promise(r => setTimeout(r, attempt * 1000));
+    }
+  }
+  throw lastError;
+};
+
+const _generateSingleQuestionInternal = async (
   pb: PocketBase,
   topic: string,
   type: string = "pilihan_ganda",
@@ -1026,6 +1149,85 @@ Output JSON: {"topics":["...","..."]}`;
   } catch (err: any) {
     if (err.message?.includes("AI_RATE_LIMIT")) return ["AI_RATE_LIMIT"];
     console.error("AI Suggestion Error:", err);
+    return [];
+  }
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 🎯 Generate Learning Objectives (Tujuan Pembelajaran) based on Topic + Taxonomy
+// ═══════════════════════════════════════════════════════════════════════════════
+export const generateObjectivesAI = async (
+  pb: PocketBase,
+  topic: string,
+  taxonomy: string[],
+  level: string = "Umum",
+  subject: string = "",
+  materialReference: string = ""
+): Promise<string[]> => {
+  try {
+    const taxonomyMap: Record<string, string> = {
+      C1: "Mengingat", C2: "Memahami", C3: "Menerapkan",
+      C4: "Menganalisis", C5: "Mengevaluasi", C6: "Mencipta"
+    };
+    
+    const sorted = [...taxonomy].sort();
+    const selectedLevels = sorted.map(c => `${c} (${taxonomyMap[c] || c})`).join(", ");
+    
+    // Detect fase from level
+    const levelLower = level.toLowerCase();
+    let fase = "";
+    if (levelLower.includes("sd") || levelLower.includes("mi")) {
+      if (/[1-2]/.test(levelLower)) fase = "Fase A";
+      else if (/[3-4]/.test(levelLower)) fase = "Fase B";
+      else fase = "Fase C";
+    } else if (levelLower.includes("smp") || levelLower.includes("mts")) {
+      fase = "Fase D";
+    } else if (levelLower.includes("sma") || levelLower.includes("smk") || levelLower.includes("ma")) {
+      if (/1[0-1]/.test(levelLower)) fase = "Fase E";
+      else fase = "Fase F";
+    }
+    const faseInfo = fase ? ` (${fase} Kurikulum Merdeka)` : "";
+
+    const materialContext = materialReference && materialReference.trim().length > 20 
+      ? `\nBahan Materi (gunakan sebagai konteks):\n${materialReference.substring(0, 1500)}\n` : "";
+
+    const systemPrompt = `Anda adalah ahli kurikulum pendidikan Indonesia. Buat tujuan pembelajaran (indikator soal) yang spesifik dan terukur.
+WAJIB buat 1 tujuan untuk SETIAP level taksonomi yang diminta. Format: "C[n]: Peserta didik mampu [kata kerja operasional] ..."
+Kata kerja operasional Bloom:
+- C1 (Mengingat): menyebutkan, mendefinisikan, mengidentifikasi, mengenali
+- C2 (Memahami): menjelaskan, membedakan, menafsirkan, merangkum, memberi contoh
+- C3 (Menerapkan): menghitung, menggunakan, menerapkan, melaksanakan, menyelesaikan
+- C4 (Menganalisis): menganalisis, membandingkan, mengurai, menemukan hubungan, mengkategorikan
+- C5 (Mengevaluasi): menilai, mengkritisi, mempertimbangkan, menyimpulkan, memutuskan
+- C6 (Mencipta): merancang, merumuskan, menghasilkan, menyusun, mengembangkan
+
+Output JSON: {"objectives":["C1: Peserta didik mampu ...","C4: Peserta didik mampu ..."]}
+Buat tepat ${sorted.length} tujuan (1 per level). Singkat, jelas, terukur, relevan dengan topik/materi.`;
+
+    const userPrompt = `Topik: "${topic}"
+Jenjang: ${level}${faseInfo}
+Mapel: ${subject || "Umum"}
+Level Taksonomi yang diminta: ${selectedLevels}
+${materialContext}
+Buat tujuan pembelajaran/indikator soal untuk SETIAP level taksonomi di atas.`;
+
+    const content = await fetchAI({
+      pb, messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt }
+      ],
+      maxTokens: 400, temperature: 0.6
+    });
+
+    const parsed = robustJSONParse(content);
+    const raw = parsed.objectives || parsed.tujuan || parsed.data || (Array.isArray(parsed) ? parsed : []);
+    
+    return raw.map((t: any) => typeof t === "string" ? t : (t.text || t.objective || t.tujuan || String(t)))
+      .filter((s: string) => s.length > 5)
+      .slice(0, 6);
+  } catch (err: any) {
+    if (err.message?.includes("AI_RATE_LIMIT")) return [];
+    console.error("AI Objectives Error:", err);
     return [];
   }
 };
