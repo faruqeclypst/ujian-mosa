@@ -23,7 +23,7 @@ import {
   Clock,
   ShieldAlert
 } from "lucide-react";
-import { Sparkles } from "lucide-react";
+import { Sparkles, RotateCcw, Copy, Check } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import * as XLSX from "xlsx-js-style";
 import { Button } from "../../components/ui/button";
@@ -430,7 +430,13 @@ const MonitoringPage = () => {
             answerKey: q.correctAnswer || q.answerKey
           };
         });
-        setMonitorQuestions(mappedQuestions);
+        setMonitorQuestions(mappedQuestions.sort((a: any, b: any) => {
+          const aIsEssay = a.type === "isian_singkat" || a.type === "uraian";
+          const bIsEssay = b.type === "isian_singkat" || b.type === "uraian";
+          if (aIsEssay && !bIsEssay) return 1;
+          if (!aIsEssay && bIsEssay) return -1;
+          return 0;
+        }));
       }
 
       // 3. Ambil DATA PENGERJAAN
@@ -728,7 +734,124 @@ const MonitoringPage = () => {
     } catch (error) { console.error(error); }
   };
 
+  const handleClearOverride = async (studentId: string, qId: string) => {
+    try {
+      const studentAttempts = attempts.filter(a => a.studentId === studentId || (a as any).student_id === studentId);
+      const att = studentAttempts.sort((a, b) => new Date(b.created).getTime() - new Date(a.created).getTime())[0];
+      if (!att) return;
+
+      // Get current overrides and remove the specific question
+      let currentOverrides: Record<string, boolean> = {};
+      try {
+        const fromField = typeof att.overrides === 'string' ? JSON.parse(att.overrides) : (att.overrides || {});
+        const fromAnswers = (att.answers as any)?.__overrides__ || {};
+        currentOverrides = { ...fromField, ...fromAnswers };
+      } catch (e) { currentOverrides = {}; }
+
+      const newOverrides = { ...currentOverrides };
+      delete newOverrides[qId];
+
+      // Recalculate score without the override
+      const sisAnswers = att.answers || {};
+      let objCorrect = 0, objTotal = 0, essCorrect = 0, essTotal = 0;
+      monitorQuestions.forEach((q: any) => {
+        const type = q.type || "pilihan_ganda";
+        const isEssay = type === "isian_singkat" || type === "uraian";
+        let itemCorrect = false;
+        if (newOverrides[q.id] !== undefined) {
+          itemCorrect = newOverrides[q.id];
+        } else {
+          const ansId = sisAnswers[q.id];
+          if (ansId) {
+            if (type === "pilihan_ganda" || type === "benar_salah") { const ck = Object.keys(q.choices || {}).find(k => k.toLowerCase() === String(ansId).toLowerCase()); itemCorrect = ck ? q.choices[ck].isCorrect === true : false; }
+            else if (type === "pilihan_ganda_kompleks") { const ck = Object.keys(q.choices || {}).filter(k => q.choices[k].isCorrect).map(k => k.toLowerCase()); const sk = Array.isArray(ansId) ? ansId.map((k: any) => String(k).toLowerCase()) : []; itemCorrect = sk.length === ck.length && sk.every((k: string) => ck.includes(k)); }
+            else if (type === "isian_singkat") itemCorrect = isFuzzyMatch(ansId, q.answerKey);
+            else if (type === "urutkan" || type === "drag_drop") { const co = (q.items || []).map((it: any) => it.id); itemCorrect = Array.isArray(ansId) && ansId.length === co.length && ansId.every((v: any, i: number) => v === co[i]); }
+            else if (type === "menjodohkan") { const pairs = q.pairs || []; itemCorrect = pairs.length > 0 && pairs.every((p: any) => ansId[p.id] === p.right); }
+          }
+        }
+        if (isEssay) { essTotal++; if (itemCorrect) essCorrect++; }
+        else { objTotal++; if (itemCorrect) objCorrect++; }
+      });
+
+      let finalScore: number;
+      if (essTotal === 0) {
+        finalScore = objTotal > 0 ? Math.round((objCorrect / objTotal) * 100) : 0;
+      } else {
+        const objScore = objTotal > 0 ? (objCorrect / objTotal) * 100 : 0;
+        const essScore = essTotal > 0 ? (essCorrect / essTotal) * 100 : 0;
+        finalScore = Math.round(objScore * 0.4 + essScore * 0.6);
+      }
+
+      if (!pb) return;
+      const updatedAnswers = { ...(att.answers || {}), __overrides__: newOverrides };
+      await pb.collection('attempts').update(att.id, {
+        overrides: newOverrides,
+        answers: updatedAnswers,
+        score: finalScore
+      });
+
+      setAttempts(prev => prev.map(a => a.id === att.id ? { ...a, overrides: newOverrides, answers: updatedAnswers, score: finalScore } : a));
+    } catch (error) { console.error(error); }
+  };
+
   const [aiGradingId, setAiGradingId] = useState<string | null>(null);
+  const [waCopied, setWaCopied] = useState(false);
+
+  const handleCopyBelumUjian = () => {
+    const absentStudents = students
+      .map(s => ({
+        ...s,
+        className: examClasses.find(c => c.id === s.classId)?.name || "N/A"
+      }))
+      .filter(s => {
+        if (monitorRoom?.allClasses) {
+          if (monitorClassFilter !== "all" && examClasses.find(c => c.id === s.classId)?.name !== monitorClassFilter) return false;
+          return true;
+        }
+        const allowedIds = Array.isArray(monitorRoom?.classId) ? monitorRoom?.classId : String(monitorRoom?.classId || "").split(",");
+        if (!allowedIds.includes(s.classId)) return false;
+        if (monitorClassFilter !== "all" && examClasses.find(c => c.id === s.classId)?.name !== monitorClassFilter) return false;
+        return true;
+      })
+      .filter(s => !attempts.find(a => a.studentId === s.id || a.student_id === s.id))
+      .sort((a, b) => {
+        const ca = examClasses.find(c => c.id === a.classId)?.name || "N/A";
+        const cb = examClasses.find(c => c.id === b.classId)?.name || "N/A";
+        return ca.localeCompare(cb) || a.name.localeCompare(b.name);
+      });
+
+    if (absentStudents.length === 0) {
+      showAlert("Info", "Semua siswa sudah ikut ujian.", "info");
+      return;
+    }
+
+    // Group per kelas
+    const grouped: Record<string, typeof absentStudents> = {};
+    absentStudents.forEach(s => {
+      const cls = examClasses.find(c => c.id === s.classId)?.name || "N/A";
+      if (!grouped[cls]) grouped[cls] = [];
+      grouped[cls].push(s);
+    });
+
+    const now = new Date().toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+    let text = `*SISWA BELUM UJIAN*\n`;
+    text += `${monitorRoom?.room_name || monitorRoom?.examTitle || "Ujian"} — ${now}\n`;
+    text += `━━━━━━━━━━━━━━━━━━━━\n\n`;
+    text += `Total: *${absentStudents.length} siswa* belum mengerjakan\n\n`;
+
+    Object.keys(grouped).sort().forEach(cls => {
+      text += `*Kelas ${cls}* (${grouped[cls].length} siswa):\n`;
+      grouped[cls].forEach((s, i) => {
+        text += `${i + 1}. ${s.name}\n`;
+      });
+      text += `\n`;
+    });
+
+    navigator.clipboard.writeText(text);
+    setWaCopied(true);
+    setTimeout(() => setWaCopied(false), 2500);
+  };
 
   const handleAIGrade = async (studentId: string, qId: string) => {
     const q = monitorQuestions.find((x: any) => x.id === qId);
@@ -776,24 +899,75 @@ const MonitoringPage = () => {
     if (!monitorRoom) return;
     const workbook = XLSX.utils.book_new();
 
-    // Helper for answer comparison
-    const checkAns = (q: any, studentAns: any) => {
+    // Helper for answer comparison (all types)
+    const checkAns = (q: any, studentAns: any, overrides?: Record<string, boolean>) => {
+      if (overrides && overrides[q.id] !== undefined) return overrides[q.id];
       if (!studentAns) return false;
-      const key = q.answerKey || q.correctAnswer;
       const type = q.type || q.field || "pilihan_ganda";
 
       if (type === "pilihan_ganda" || type === "benar_salah") {
-        return String(studentAns).toUpperCase() === String(key).toUpperCase();
+        const ck = Object.keys(q.choices || {}).find(k => k.toLowerCase() === String(studentAns).toLowerCase());
+        return ck ? q.choices[ck].isCorrect === true : false;
       }
       if (type === "pilihan_ganda_kompleks") {
-        const sArr = Array.isArray(studentAns) ? studentAns : [studentAns];
-        const kArr = Array.isArray(key) ? key : [key];
-        return sArr.length === kArr.length && sArr.every(v => kArr.includes(v));
+        const correctKeys = Object.keys(q.choices || {}).filter(k => q.choices[k].isCorrect).map(k => k.toLowerCase());
+        const studentKeys = Array.isArray(studentAns) ? studentAns.map((k: any) => String(k).toLowerCase()) : [];
+        return studentKeys.length === correctKeys.length && studentKeys.every((k: string) => correctKeys.includes(k));
       }
       if (type === "isian_singkat") {
-        return isFuzzyMatch(studentAns, String(key));
+        return isFuzzyMatch(studentAns, q.answerKey);
       }
-      return JSON.stringify(studentAns) === JSON.stringify(key);
+      if (type === "urutkan" || type === "drag_drop") {
+        const co = (q.items || []).map((it: any) => it.id);
+        return Array.isArray(studentAns) && studentAns.length === co.length && studentAns.every((v: any, i: number) => v === co[i]);
+      }
+      if (type === "menjodohkan") {
+        const pairs = q.pairs || [];
+        return pairs.length > 0 && pairs.every((p: any) => studentAns[p.id] === p.right);
+      }
+      return false;
+    };
+
+    // Helper: format answer for display in Excel
+    const formatAnswer = (q: any, studentAns: any) => {
+      if (!studentAns) return "-";
+      const type = q.type || "pilihan_ganda";
+
+      if (type === "pilihan_ganda" || type === "benar_salah") {
+        return String(studentAns).toUpperCase();
+      }
+      if (type === "pilihan_ganda_kompleks") {
+        return Array.isArray(studentAns) ? studentAns.map((k: any) => String(k).toUpperCase()).join(",") : String(studentAns).toUpperCase();
+      }
+      if (type === "isian_singkat" || type === "uraian") {
+        const text = String(studentAns).replace(/<[^>]*>/g, '').trim();
+        return text.length > 100 ? text.substring(0, 100) + "..." : text;
+      }
+      if (type === "urutkan" || type === "drag_drop") {
+        return Array.isArray(studentAns) ? studentAns.join(" → ") : String(studentAns);
+      }
+      if (type === "menjodohkan") {
+        if (typeof studentAns === "object" && !Array.isArray(studentAns)) {
+          return Object.entries(studentAns).map(([k, v]) => `${k}=${v}`).join(", ");
+        }
+        return String(studentAns);
+      }
+      return String(studentAns);
+    };
+
+    // Type label for header
+    const typeLabel = (type: string) => {
+      switch (type) {
+        case "pilihan_ganda": return "PG";
+        case "pilihan_ganda_kompleks": return "PGK";
+        case "benar_salah": return "BS";
+        case "menjodohkan": return "JDH";
+        case "urutkan": return "URU";
+        case "drag_drop": return "DD";
+        case "isian_singkat": return "IS";
+        case "uraian": return "UR";
+        default: return "PG";
+      }
     };
 
     // Prepare style tokens
@@ -832,10 +1006,14 @@ const MonitoringPage = () => {
     };
 
     const COL_WIDTHS = [
-      { wch: 4 }, { wch: 15 }, { wch: 30 }, { wch: 12 }, { wch: 18 },
-      { wch: 10 }, { wch: 18 }, { wch: 6 }, { wch: 6 }, { wch: 6 }, { wch: 8 }
+      { wch: 4 }, { wch: 15 }, { wch: 30 }, { wch: 12 }, { wch: 22 },
+      { wch: 10 }, { wch: 8 }, { wch: 16 }, { wch: 16 }, { wch: 8 }
     ];
-    monitorQuestions.forEach(() => COL_WIDTHS.push({ wch: 10 }));
+    monitorQuestions.forEach((q) => {
+      const type = q.type || "pilihan_ganda";
+      const isEssay = type === "isian_singkat" || type === "uraian";
+      COL_WIDTHS.push({ wch: isEssay ? 30 : 10 });
+    });
 
     const filteredStudents = students
       .map(s => ({
@@ -858,8 +1036,11 @@ const MonitoringPage = () => {
 
     // Function to build a sheet for a set of students
     const buildSheet = (groupStudents: any[], sheetName: string) => {
-      const headerRow = ["No", terminology.id, "Nama", terminology.class, "Login", "Durasi", "Submit", "Cheat", "B", "S", "Nilai"];
-      monitorQuestions.forEach((_, i) => headerRow.push(`Q${i + 1}`));
+      const headerRow = ["No", terminology.id, "Nama", terminology.class, "Login", "Durasi", "Submit", "Objektif", "Subjektif", "Nilai"];
+      monitorQuestions.forEach((q, i) => {
+        const type = q.type || "pilihan_ganda";
+        headerRow.push(`Q${i + 1} (${typeLabel(type)})`);
+      });
 
       const rows: any[][] = [headerRow.map(h => ({ v: h, s: STYLES.header }))];
 
@@ -867,11 +1048,29 @@ const MonitoringPage = () => {
         const atts = attempts.filter(a => a.studentId === std.id || a.student_id === std.id);
         const att = atts.sort((ax, bx) => new Date(bx.created).getTime() - new Date(ax.created).getTime())[0];
         const answers = att?.answers || {};
-        let score = att?.score || 0;
+        // Merge overrides from both field and answers.__overrides__ backup
+        const rawOverrides = typeof att?.overrides === 'string' ? JSON.parse(att.overrides) : (att?.overrides || {});
+        const answersOverrides = (answers as any)?.__overrides__ || {};
+        const overrides: Record<string, boolean> = { ...answersOverrides, ...rawOverrides };
 
-        // Fallback for missing scores in finished attempts
-        if (att?.status === "finished" && score === 0) {
-          score = getLiveScore(answers, att?.overrides || {});
+        // Calculate scores per category
+        let objCorrect = 0, objTotal = 0, essCorrect = 0, essTotal = 0;
+        monitorQuestions.forEach((q: any) => {
+          const type = q.type || "pilihan_ganda";
+          const isEssay = type === "isian_singkat" || type === "uraian";
+          const ic = checkAns(q, answers[q.id], overrides);
+          if (isEssay) { essTotal++; if (ic) essCorrect++; }
+          else { objTotal++; if (ic) objCorrect++; }
+        });
+
+        const objScore = objTotal > 0 ? Math.round((objCorrect / objTotal) * 100) : 0;
+        const essScore = essTotal > 0 ? Math.round((essCorrect / essTotal) * 100) : 0;
+        let finalScore = att?.score || 0;
+        if (att?.status === "finished" && finalScore === 0) {
+          finalScore = getLiveScore(answers, overrides);
+        }
+        if (!finalScore) {
+          finalScore = essTotal === 0 ? objScore : Math.round(objScore * 0.4 + essScore * 0.6);
         }
 
         // Calculate duration
@@ -891,6 +1090,8 @@ const MonitoringPage = () => {
             : `${dMins}m ${dSecs}d`;
         }
 
+        const essGraded = Object.keys(overrides).filter(k => { const q = monitorQuestions.find((x: any) => x.id === k); return q && (q.type === "isian_singkat" || q.type === "uraian"); }).length;
+
         const row = [
           { v: idx + 1, s: STYLES.cellCenter },
           { v: std.nisn, s: STYLES.cellCenter },
@@ -899,19 +1100,19 @@ const MonitoringPage = () => {
           { v: loginTime ? new Date(loginTime).toLocaleString("id-ID", { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' }) : "-", s: STYLES.cellCenter },
           { v: durationStr, s: STYLES.cellCenter },
           { v: att?.submitTime ? new Date(att.submitTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : (att?.submittedAt ? new Date(att.submittedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : (att?.status === "finished" ? "Selesai" : (att ? "Proses" : "-"))), s: STYLES.cellCenter },
-          { v: att?.cheatCount || 0, s: STYLES.cellCenter },
-          { v: att?.correct || 0, s: STYLES.correct },
-          { v: monitorQuestions.length - (att?.correct || 0), s: STYLES.wrong },
-          { v: Number(score.toFixed(1)), s: { ...STYLES.cellCenter, font: { bold: true } } }
+          { v: `${objCorrect}/${objTotal} (${objScore})`, s: STYLES.cellCenter },
+          { v: essTotal > 0 ? (essGraded < essTotal ? `${essGraded}/${essTotal} dinilai` : `${essCorrect}/${essTotal} (${essScore})`) : "-", s: STYLES.cellCenter },
+          { v: Number(finalScore.toFixed ? finalScore.toFixed(1) : finalScore), s: { ...STYLES.cellCenter, font: { bold: true } } }
         ];
 
         monitorQuestions.forEach(q => {
           const ans = answers[q.id];
-          const isCorrect = checkAns(q, ans);
-          const display = ans ? (Array.isArray(ans) ? ans.join(",") : String(ans).toUpperCase()) : "-";
+          const isOverridden = overrides[q.id] !== undefined;
+          const isCorrect = checkAns(q, ans, overrides);
+          const display = isOverridden ? `${formatAnswer(q, ans)} ✓` : formatAnswer(q, ans);
           row.push({
             v: display,
-            s: ans ? (isCorrect ? STYLES.correct : STYLES.wrong) : STYLES.neutral
+            s: ans || isOverridden ? (isCorrect ? STYLES.correct : STYLES.wrong) : STYLES.neutral
           });
         });
 
@@ -932,6 +1133,36 @@ const MonitoringPage = () => {
     classesArray.forEach(cls => {
       buildSheet(filteredStudents.filter(s => s.className === cls), cls);
     });
+
+    // Sheet: Siswa Belum Ujian
+    const absentStudents = filteredStudents.filter(s => {
+      const att = attempts.filter(a => a.studentId === s.id || a.student_id === s.id)[0];
+      return !att;
+    }).sort((a, b) => a.className.localeCompare(b.className) || a.name.localeCompare(b.name));
+
+    if (absentStudents.length > 0) {
+      const absentHeader = ["No", terminology.id, "Nama", terminology.class].map(h => ({
+        v: h,
+        s: {
+          fill: { fgColor: { rgb: "DC2626" } },
+          font: { color: { rgb: "FFFFFF" }, bold: true, sz: 11 },
+          alignment: { horizontal: "center", vertical: "center" },
+          border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } }
+        }
+      }));
+      const absentRows: any[][] = [absentHeader];
+      absentStudents.forEach((s, idx) => {
+        absentRows.push([
+          { v: idx + 1, s: STYLES.cellCenter },
+          { v: s.nisn, s: STYLES.cellCenter },
+          { v: s.name, s: STYLES.cell },
+          { v: s.className, s: STYLES.cellCenter },
+        ]);
+      });
+      const wsAbsent = XLSX.utils.aoa_to_sheet(absentRows);
+      wsAbsent["!cols"] = [{ wch: 4 }, { wch: 15 }, { wch: 30 }, { wch: 12 }];
+      XLSX.utils.book_append_sheet(workbook, wsAbsent, "Belum Ujian");
+    }
 
     XLSX.writeFile(workbook, `Rekap_${monitorRoom.room_name || "Monitoring"}_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
@@ -1168,6 +1399,9 @@ const MonitoringPage = () => {
                 <Button onClick={handleExportExcel} variant="secondary" className="w-full rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 dark:hover:bg-emerald-900/40 dark:border-emerald-800/40 text-emerald-700 font-semibold shadow-sm transition-all h-10">
                   <FileSpreadsheet className="mr-2 h-4 w-4" /> Export Excel
                 </Button>
+                <Button onClick={handleCopyBelumUjian} variant="secondary" className={`w-full rounded-xl border font-semibold shadow-sm transition-all h-10 ${waCopied ? "bg-green-100 border-green-300 text-green-700 dark:bg-green-900/30 dark:border-green-700 dark:text-green-400" : "bg-amber-50 hover:bg-amber-100 border-amber-100 dark:bg-amber-900/20 dark:text-amber-400 dark:hover:bg-amber-900/40 dark:border-amber-800/40 text-amber-700"}`}>
+                  {waCopied ? <><Check className="mr-2 h-4 w-4" /> Tersalin!</> : <><Copy className="mr-2 h-4 w-4" /> Copy Belum Ujian (WA)</>}
+                </Button>
                 {(role === "admin" || (role === "teacher" && teacherFullAccess)) && (
                   <>
                     <Button onClick={handleForceSubmitAll} variant="secondary" className="w-full rounded-xl bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-100 dark:bg-rose-950/40 dark:text-rose-400 dark:border dark:border-rose-800/30 shadow-sm font-semibold h-10 transition-all">
@@ -1236,12 +1470,18 @@ const MonitoringPage = () => {
                       onClick={() => toggleSort("nilai")}
                     >
                       <div className="flex items-center justify-center gap-1.5">
-                        Nilai
+                        Objektif
                         {monitorSortBy === 'nilai' ? (
                           monitorSortOrder === 'asc' ? <ChevronDown className="h-3 w-3 text-blue-600" /> : <ChevronDown className="h-3 w-3 text-blue-600 rotate-180" />
                         ) : <ChevronDown className="h-3 w-3 opacity-0 group-hover:opacity-40" />}
                       </div>
                     </TableHead>
+                    {monitorQuestions.some((q: any) => q.type === "isian_singkat" || q.type === "uraian") && (
+                      <TableHead className="w-20 text-center">Subjektif</TableHead>
+                    )}
+                    {monitorQuestions.some((q: any) => q.type === "isian_singkat" || q.type === "uraian") && (
+                      <TableHead className="w-20 text-center">Nilai</TableHead>
+                    )}
                     <TableHead className="text-center w-32 text-[10px]">Monitoring</TableHead>
                     <TableHead className="text-right">Aksi</TableHead>
                   </TableRow>
@@ -1311,7 +1551,7 @@ const MonitoringPage = () => {
                     const rows = currentData.map((student, localIdx) => {
                       const attempt = attempts.find(a => a.studentId === student.id || a.student_id === student.id);
                       const sisAnswers = attempt?.answers || {};
-                      const answered = Object.keys(sisAnswers).length;
+                      const answered = Object.keys(sisAnswers).filter(k => k !== "__overrides__").length;
                       const isExpanded = expandedstudent === student.id;
 
                       return (
@@ -1341,15 +1581,13 @@ const MonitoringPage = () => {
                               {(() => {
                                 if (!attempt) return "-";
                                 const overrides = attempt.overrides || (sisAnswers as any)?.__overrides__ || {};
-                                const liveScore = getLiveScore(sisAnswers, overrides);
                                 
-                                // Calculate detailed breakdown
-                                let objCorrect = 0, objTotal = 0, essCorrect = 0, essTotal = 0;
+                                // Calculate objective breakdown
+                                let objCorrect = 0, objTotal = 0;
                                 monitorQuestions.forEach((q: any) => {
                                   const type = q.type || "pilihan_ganda";
                                   const isEssay = type === "isian_singkat" || type === "uraian";
-                                  if (isEssay) { essTotal++; if (overrides[q.id]) essCorrect++; }
-                                  else {
+                                  if (!isEssay) {
                                     objTotal++;
                                     let ic = false;
                                     if (overrides[q.id] !== undefined) ic = overrides[q.id];
@@ -1365,27 +1603,89 @@ const MonitoringPage = () => {
                                     if (ic) objCorrect++;
                                   }
                                 });
-                                
                                 const objScore = objTotal > 0 ? Math.round((objCorrect/objTotal)*100) : 0;
-                                const essScore = essTotal > 0 ? Math.round((essCorrect/essTotal)*100) : 0;
-                                const essGraded = Object.keys(overrides).filter(k => { const q = monitorQuestions.find((x:any)=>x.id===k); return q && (q.type==="isian_singkat"||q.type==="uraian"); }).length;
-                                const finalScore = essTotal === 0 ? objScore : Math.round(objScore * 0.4 + essScore * 0.6);
-                                const displayScore = attempt.status === "finished" ? ((attempt.score === 0 && liveScore > 0) ? liveScore : (attempt.score || finalScore)) : finalScore;
 
                                 return (
-                                  <div className="flex flex-col items-center gap-0.5">
-                                    <span className={`text-base font-black ${attempt.status === "finished" ? "text-emerald-600" : "text-indigo-600 animate-pulse"}`}>{displayScore}</span>
-                                    {essTotal > 0 && (
-                                      <div className="flex items-center gap-1 text-[8px]">
-                                        <span className="text-blue-500" title="Objektif">O:{objScore}</span>
-                                        <span className="text-slate-300">|</span>
-                                        <span className={`${essGraded < essTotal ? "text-amber-500" : "text-purple-500"}`} title="Subjektif">S:{essGraded < essTotal ? `${essGraded}/${essTotal}` : essScore}</span>
-                                      </div>
-                                    )}
+                                  <div className="flex flex-col items-center">
+                                    <span className="text-blue-600 dark:text-blue-400 font-black text-sm">{objScore}</span>
+                                    <span className="text-[9px] text-slate-400">{objCorrect}/{objTotal}</span>
                                   </div>
                                 );
                               })()}
                             </TableCell>
+                            {monitorQuestions.some((q: any) => q.type === "isian_singkat" || q.type === "uraian") && (
+                              <TableCell className="text-center text-[11px] font-bold">
+                                {(() => {
+                                  if (!attempt) return "-";
+                                  const overrides = attempt.overrides || (sisAnswers as any)?.__overrides__ || {};
+                                  
+                                  let essCorrect = 0, essTotal = 0;
+                                  monitorQuestions.forEach((q: any) => {
+                                    const type = q.type || "pilihan_ganda";
+                                    if (type === "isian_singkat" || type === "uraian") {
+                                      essTotal++;
+                                      if (overrides[q.id]) essCorrect++;
+                                    }
+                                  });
+                                  const essGraded = Object.keys(overrides).filter(k => { const q = monitorQuestions.find((x:any)=>x.id===k); return q && (q.type==="isian_singkat"||q.type==="uraian"); }).length;
+                                  const essScore = essTotal > 0 ? Math.round((essCorrect/essTotal)*100) : 0;
+
+                                  if (essGraded < essTotal) {
+                                    return (
+                                      <div className="flex flex-col items-center">
+                                        <span className="text-amber-500 font-bold text-[10px]">{essGraded}/{essTotal}</span>
+                                        <span className="text-[9px] text-amber-400">dinilai</span>
+                                      </div>
+                                    );
+                                  }
+                                  return (
+                                    <div className="flex flex-col items-center">
+                                      <span className="text-purple-600 dark:text-purple-400 font-black text-sm">{essScore}</span>
+                                      <span className="text-[9px] text-slate-400">{essCorrect}/{essTotal}</span>
+                                    </div>
+                                  );
+                                })()}
+                              </TableCell>
+                            )}
+                            {monitorQuestions.some((q: any) => q.type === "isian_singkat" || q.type === "uraian") && (
+                              <TableCell className="text-center text-[11px] font-bold">
+                                {(() => {
+                                  if (!attempt) return "-";
+                                  const overrides = attempt.overrides || (sisAnswers as any)?.__overrides__ || {};
+                                  const liveScore = getLiveScore(sisAnswers, overrides);
+                                  
+                                  let objCorrect = 0, objTotal = 0, essCorrect = 0, essTotal = 0;
+                                  monitorQuestions.forEach((q: any) => {
+                                    const type = q.type || "pilihan_ganda";
+                                    const isEssay = type === "isian_singkat" || type === "uraian";
+                                    if (isEssay) { essTotal++; if (overrides[q.id]) essCorrect++; }
+                                    else {
+                                      objTotal++;
+                                      let ic = false;
+                                      if (overrides[q.id] !== undefined) ic = overrides[q.id];
+                                      else {
+                                        const a = sisAnswers[q.id];
+                                        if (a) {
+                                          if (type === "pilihan_ganda" || type === "benar_salah") { const ck = Object.keys(q.choices||{}).find(k=>k.toLowerCase()===String(a).toLowerCase()); ic = ck ? q.choices[ck].isCorrect===true : false; }
+                                          else if (type === "pilihan_ganda_kompleks") { const ck = Object.keys(q.choices||{}).filter(k=>q.choices[k].isCorrect).map(k=>k.toLowerCase()); const sk = Array.isArray(a)?a.map(k=>String(k).toLowerCase()):[]; ic = sk.length===ck.length && sk.every(k=>ck.includes(k)); }
+                                          else if (type === "menjodohkan") { const pairs = q.pairs||[]; ic = pairs.length>0 && pairs.every((p:any)=>a[p.id]===p.right); }
+                                          else if (type === "urutkan" || type === "drag_drop") { const co = (q.items||[]).map((it:any)=>it.id); ic = Array.isArray(a) && a.length===co.length && a.every((v:any,i:number)=>v===co[i]); }
+                                        }
+                                      }
+                                      if (ic) objCorrect++;
+                                    }
+                                  });
+                                  const objScore = objTotal > 0 ? Math.round((objCorrect/objTotal)*100) : 0;
+                                  const essScore = essTotal > 0 ? Math.round((essCorrect/essTotal)*100) : 0;
+                                  const finalScore = Math.round(objScore * 0.4 + essScore * 0.6);
+                                  const displayScore = attempt.status === "finished" ? ((attempt.score === 0 && liveScore > 0) ? liveScore : (attempt.score || finalScore)) : finalScore;
+
+                                  return (
+                                    <span className={`text-sm font-black ${attempt.status === "finished" ? "text-emerald-600" : "text-indigo-600 animate-pulse"}`}>{displayScore}</span>
+                                  );
+                                })()}
+                              </TableCell>
+                            )}
                             <TableCell className="text-center px-1">
                               <div className="flex items-center justify-center gap-1.5 text-[11px] font-bold">
                                 <span className="text-slate-600 font-bold">{answered}/{monitorQuestions.length}</span>
@@ -1513,6 +1813,9 @@ const MonitoringPage = () => {
                                                 )}
                                                 <button onClick={() => handleManualGrade(student.id, q.id, true)} className={`p-1 rounded ${overrides[q.id] === true ? "bg-emerald-200 text-emerald-700" : "hover:bg-white text-emerald-500"}`} title="Tandai Benar"><CheckCircle2 className="h-3 w-3" /></button>
                                                 <button onClick={() => handleManualGrade(student.id, q.id, false)} className={`p-1 rounded ${overrides[q.id] === false ? "bg-rose-200 text-rose-700" : "hover:bg-white text-rose-500"}`} title="Tandai Salah"><X className="h-3 w-3" /></button>
+                                                {overrides[q.id] !== undefined && (
+                                                  <button onClick={() => handleClearOverride(student.id, q.id)} className="p-1 rounded hover:bg-amber-50 text-amber-500" title="Netralkan (hapus override)"><RotateCcw className="h-3 w-3" /></button>
+                                                )}
                                               </>
                                             )}
                                             <span className="text-[9px] font-black">{correct ? "✓" : "✗"}</span>

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Plus, BookOpen, Trash, Edit, Archive, RotateCw, Copy } from "lucide-react";
+import { Plus, BookOpen, Trash, Edit, Archive, RotateCw, Copy, ClipboardList } from "lucide-react";
 import { Button } from "../../components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../../components/ui/dialog";
 import { DeleteConfirmationDialog } from "../../components/ui/delete-confirmation-dialog";
@@ -65,6 +65,8 @@ const ExamsPage = () => {
   const [examToDelete, setExamToDelete] = useState<ExamData | null>(null);
   const [questionCounts, setQuestionCounts] = useState<Record<string, number>>({});
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isReportOpen, setIsReportOpen] = useState(false);
+  const [reportCopied, setReportCopied] = useState(false);
 
   const fetchQuestionCounts = useCallback(async () => {
     if (!pb) return;
@@ -417,6 +419,102 @@ const ExamsPage = () => {
     }
   };
 
+  // === LAPORAN PROGRESS GURU ===
+  const reportData = useMemo(() => {
+    const activeExams = exams.filter(e => e.status !== "archive");
+    const teacherMap: Record<string, { name: string; exams: { title: string; subject: string; count: number; type: string }[]; totalQuestions: number }> = {};
+
+    activeExams.forEach(exam => {
+      const tId = exam.teacherId;
+      const teacher = teachers.find((t: any) => t.id === tId);
+      const subject = subjects.find((s: any) => s.id === exam.subjectId);
+      const qCount = questionCounts[exam.id] || 0;
+
+      if (!teacherMap[tId]) {
+        teacherMap[tId] = { name: teacher?.name || "Tidak Diketahui", exams: [], totalQuestions: 0 };
+      }
+      teacherMap[tId].exams.push({ title: exam.title, subject: subject?.name || "-", count: qCount, type: exam.examType || "-" });
+      teacherMap[tId].totalQuestions += qCount;
+    });
+
+    return Object.values(teacherMap).sort((a, b) => b.totalQuestions - a.totalQuestions);
+  }, [exams, teachers, subjects, questionCounts]);
+
+  const generateWAReport = () => {
+    const now = new Date();
+    const dateStr = now.toLocaleDateString("id-ID", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+    const activeExams = exams.filter(e => e.status !== "archive");
+    const totalExams = activeExams.length;
+    const activeExamIds = new Set(activeExams.map(e => e.id));
+    const totalQuestions = Object.entries(questionCounts)
+      .filter(([id]) => activeExamIds.has(id))
+      .reduce((a, [, b]) => a + b, 0);
+
+    let text = `*LAPORAN PROGRESS BANK SOAL*\n`;
+    text += `${dateStr}\n`;
+    text += `━━━━━━━━━━━━━━━━━━━━\n\n`;
+    text += `*Ringkasan:*\n`;
+    text += `- Total Bank Soal: *${totalExams}*\n`;
+    text += `- Total Soal: *${totalQuestions}*\n`;
+    text += `- Jumlah Guru: *${reportData.length}*\n\n`;
+    text += `━━━━━━━━━━━━━━━━━━━━\n\n`;
+
+    // Pisahkan guru yang sudah cukup (>=30) dan yang kurang (<30)
+    const guruCukup = reportData.filter(t => t.exams.every(e => e.count >= 30));
+    const guruKurang = reportData.filter(t => t.exams.some(e => e.count < 30));
+
+    if (guruCukup.length > 0) {
+      text += `*Sudah Memenuhi (>=30 soal):*\n\n`;
+      guruCukup.forEach((t, idx) => {
+        text += `*${idx + 1}. ${t.name}*\n`;
+        text += `   ${t.exams.length} bank soal, ${t.totalQuestions} soal\n`;
+        t.exams.forEach(e => {
+          text += `   - ${e.title} (${e.subject}) — ${e.count} soal\n`;
+        });
+        text += `\n`;
+      });
+    }
+
+    if (guruKurang.length > 0) {
+      text += `━━━━━━━━━━━━━━━━━━━━\n\n`;
+      text += `*Belum Memenuhi (<30 soal):*\n\n`;
+      guruKurang.forEach((t, idx) => {
+        text += `*${idx + 1}. ${t.name}*\n`;
+        t.exams.forEach(e => {
+          if (e.count < 30) {
+            text += `   - ${e.title} (${e.subject}) — ${e.count} soal, kurang ${30 - e.count}\n`;
+          } else {
+            text += `   - ${e.title} (${e.subject}) — ${e.count} soal\n`;
+          }
+        });
+        text += `\n`;
+      });
+    }
+
+    // Guru yang belum buat sama sekali
+    const teachersWithExams = new Set(activeExams.map(e => e.teacherId));
+    const teachersWithout = teachers.filter((t: any) => !teachersWithExams.has(t.id));
+    if (teachersWithout.length > 0) {
+      text += `━━━━━━━━━━━━━━━━━━━━\n\n`;
+      text += `*Guru Belum Membuat Bank Soal:*\n`;
+      teachersWithout.forEach((t: any) => {
+        text += `   - ${t.name}\n`;
+      });
+      text += `\n`;
+    }
+
+    text += `━━━━━━━━━━━━━━━━━━━━\n`;
+    text += `_Digenerate otomatis oleh sistem_`;
+    return text;
+  };
+
+  const handleCopyReport = () => {
+    const text = generateWAReport();
+    navigator.clipboard.writeText(text);
+    setReportCopied(true);
+    setTimeout(() => setReportCopied(false), 2500);
+  };
+
   return (
     <div className="space-y-5">
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between bg-card p-4 rounded-2xl border border-slate-200/60 dark:border-slate-800/40 shadow-sm backdrop-blur-sm">
@@ -449,9 +547,14 @@ const ExamsPage = () => {
                   Arsip
                 </button>
               </div>
-              <Button onClick={handleCreateClick} size="sm" className="rounded-2xl bg-blue-50 hover:bg-blue-100 border border-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 dark:border-blue-800/40 text-blue-700 font-bold shadow-sm h-9 px-4">
+              <Button onClick={handleCreateClick} size="sm" className="rounded-2xl bg-blue-50 hover:bg-blue-100 active:bg-blue-50 border border-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 dark:active:bg-blue-900/30 dark:border-blue-800/40 text-blue-700 font-bold shadow-sm h-9 px-4 focus-visible:ring-0 focus-visible:ring-offset-0">
                 <Plus className="mr-1 h-3.5 w-3.5" /> Tambah Ujian
               </Button>
+              {role === "admin" && (
+                <Button onClick={() => setIsReportOpen(true)} size="sm" className="rounded-2xl bg-emerald-50 hover:bg-emerald-100 active:bg-emerald-50 border border-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-400 dark:hover:bg-emerald-900/50 dark:active:bg-emerald-900/30 dark:border-emerald-800/40 text-emerald-700 font-bold shadow-sm h-9 px-4 focus-visible:ring-0 focus-visible:ring-offset-0">
+                  <ClipboardList className="mr-1 h-3.5 w-3.5" /> Laporan
+                </Button>
+              )}
             </>
           )}
         </div>
@@ -658,6 +761,101 @@ const ExamsPage = () => {
         type={confirmDialog.type}
         confirmLabel={confirmDialog.confirmLabel}
       />
+
+      {/* Dialog Laporan Progress Guru */}
+      <Dialog open={isReportOpen} onOpenChange={setIsReportOpen}>
+        <DialogContent className="max-w-lg bg-card max-h-[85vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold text-slate-800 dark:text-white flex items-center gap-2">
+              <ClipboardList className="h-4 w-4 text-emerald-500" />
+              Laporan Progress Bank Soal
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto space-y-4 pr-1">
+            {/* Ringkasan */}
+            <div className="grid grid-cols-3 gap-2">
+              <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-3 text-center border border-slate-100 dark:border-slate-800">
+                <p className="text-lg font-black text-slate-800 dark:text-white">{exams.filter(e => e.status !== "archive").length}</p>
+                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Bank Soal</p>
+              </div>
+              <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-3 text-center border border-slate-100 dark:border-slate-800">
+                <p className="text-lg font-black text-emerald-600 dark:text-emerald-400">{Object.values(questionCounts).reduce((a, b) => a + b, 0)}</p>
+                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Total Soal</p>
+              </div>
+              <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-3 text-center border border-slate-100 dark:border-slate-800">
+                <p className="text-lg font-black text-blue-600 dark:text-blue-400">{reportData.length}</p>
+                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Guru Aktif</p>
+              </div>
+            </div>
+
+            {/* Detail per Guru */}
+            <div className="space-y-2">
+              {reportData.map((t, idx) => (
+                <div key={idx} className="bg-slate-50 dark:bg-slate-800/30 rounded-xl p-3 border border-slate-100 dark:border-slate-800">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg flex items-center justify-center">
+                        <span className="text-[10px] font-black text-emerald-600 dark:text-emerald-400">{idx + 1}</span>
+                      </div>
+                      <span className="text-sm font-bold text-slate-800 dark:text-white">{t.name}</span>
+                    </div>
+                    <Badge variant="outline" className="text-[10px] font-bold border-emerald-200 dark:border-emerald-800 text-emerald-600 dark:text-emerald-400">
+                      {t.totalQuestions} soal
+                    </Badge>
+                  </div>
+                  <div className="space-y-1 ml-9">
+                    {t.exams.map((e, eIdx) => (
+                      <div key={eIdx} className="flex items-center gap-2 text-xs">
+                        <span className={`w-1.5 h-1.5 rounded-full ${e.count > 0 ? "bg-emerald-500" : "bg-amber-400"}`}></span>
+                        <span className="text-slate-600 dark:text-slate-400 truncate flex-1">{e.title}</span>
+                        <span className="text-slate-400 dark:text-slate-500 text-[10px] font-bold">{e.count}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+
+              {/* Guru belum buat */}
+              {(() => {
+                const teachersWithExams = new Set(exams.filter(e => e.status !== "archive").map(e => e.teacherId));
+                const teachersWithout = teachers.filter((t: any) => !teachersWithExams.has(t.id));
+                if (teachersWithout.length === 0) return null;
+                return (
+                  <div className="bg-amber-50 dark:bg-amber-950/20 rounded-xl p-3 border border-amber-100 dark:border-amber-800/40">
+                    <p className="text-[10px] font-black text-amber-600 dark:text-amber-400 uppercase tracking-widest mb-2">Belum Membuat Bank Soal</p>
+                    <div className="space-y-1">
+                      {teachersWithout.map((t: any) => (
+                        <div key={t.id} className="flex items-center gap-2 text-xs text-amber-700 dark:text-amber-400">
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                          <span>{t.name}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
+
+          {/* Tombol Copy untuk WA */}
+          <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
+            <Button
+              onClick={handleCopyReport}
+              className={`w-full h-11 rounded-xl font-bold text-sm transition-all ${
+                reportCopied 
+                  ? "bg-emerald-600 hover:bg-emerald-600 text-white" 
+                  : "bg-emerald-50 hover:bg-emerald-100 active:bg-emerald-50 border border-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-400 dark:hover:bg-emerald-900/50 dark:active:bg-emerald-900/30 dark:border-emerald-800/40 text-emerald-700"
+              }`}
+            >
+              {reportCopied ? (
+                <><Copy className="mr-2 h-4 w-4" /> Tersalin! Tinggal Paste ke WA</>
+              ) : (
+                <><Copy className="mr-2 h-4 w-4" /> Salin Laporan untuk WhatsApp</>
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

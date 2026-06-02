@@ -127,17 +127,25 @@ body {
   margin: 0.5rem auto;
   border-radius: 0.5rem;
   cursor: zoom-in;
-  transition: opacity 0.3s;
-  background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
-  background-size: 200% 100%;
-  animation: shimmer 1.5s infinite;
+  transition: opacity 0.4s ease;
   min-height: 60px;
 }
 
-.html-segment img[src]:not([src=""]),
-.math-content img[src]:not([src=""]) {
+/* Placeholder shimmer while image is loading */
+.html-segment img:not([data-loaded="true"]),
+.math-content img:not([data-loaded="true"]) {
+  background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  opacity: 0;
+}
+
+/* Once loaded, show image and remove placeholder */
+.html-segment img[data-loaded="true"],
+.math-content img[data-loaded="true"] {
   animation: none;
   background: transparent;
+  opacity: 1;
 }
 
 @keyframes shimmer {
@@ -145,8 +153,8 @@ body {
   100% { background-position: -200% 0; }
 }
 
-.dark .html-segment img,
-.dark .math-content img {
+.dark .html-segment img:not([data-loaded="true"]),
+.dark .math-content img:not([data-loaded="true"]) {
   background: linear-gradient(90deg, #1e293b 25%, #334155 50%, #1e293b 75%);
   background-size: 200% 100%;
 }
@@ -325,14 +333,16 @@ body {
 .dark .ql-editor i,
 .dark .ql-editor em,
 .dark .ql-editor u,
+.dark .ql-editor span,
 .dark .html-segment p,
-.dark .html-segment span:not([style*="color"]),
+.dark .html-segment span,
 .dark .html-segment strong,
 .dark .html-segment b,
 .dark .html-segment i,
 .dark .html-segment em,
-.dark .html-segment u {
-  color: inherit;
+.dark .html-segment u,
+.dark .html-segment li {
+  color: inherit !important;
 }
 
 /* Strip ALL background-color highlights in dark mode (from Word/website paste) */
@@ -347,19 +357,32 @@ body {
 }
 
 /* Map dark/unreadable text colors to lighter versions in dark mode */
+/* All text elements already forced to inherit via element selectors above,
+   but these attribute selectors serve as extra safety for edge cases */
 .dark .ql-editor [style*="color: black"],
 .dark .ql-editor [style*="color: #000"],
 .dark .ql-editor [style*="color: rgb(0, 0, 0"],
+.dark .ql-editor [style*="color: rgb(0,0,0"],
+.dark .ql-editor [style*="color: rgba(0, 0, 0"],
+.dark .ql-editor [style*="color: rgba(0,0,0"],
 .dark .ql-editor [style*="color:#000"],
 .dark .ql-editor [style*="color: windowtext"],
 .dark .html-segment [style*="color: black"],
 .dark .html-segment [style*="color: #000"],
 .dark .html-segment [style*="color: rgb(0, 0, 0"],
+.dark .html-segment [style*="color: rgb(0,0,0"],
+.dark .html-segment [style*="color: rgba(0, 0, 0"],
+.dark .html-segment [style*="color: rgba(0,0,0"],
 .dark .html-segment [style*="color:#000"],
+.dark .html-segment [style*="color: windowtext"],
 .dark .math-content [style*="color: black"],
 .dark .math-content [style*="color: #000"],
 .dark .math-content [style*="color: rgb(0, 0, 0"],
-.dark .math-content [style*="color:#000"] {
+.dark .math-content [style*="color: rgb(0,0,0"],
+.dark .math-content [style*="color: rgba(0, 0, 0"],
+.dark .math-content [style*="color: rgba(0,0,0"],
+.dark .math-content [style*="color:#000"],
+.dark .math-content [style*="color: windowtext"] {
   color: #f1f5f9 !important;
 }
 

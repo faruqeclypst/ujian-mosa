@@ -471,17 +471,17 @@ const ExamRoomsPage = () => {
   };
 
   const handleStartTimeChange = (val: string) => {
-    const newEndTime = calculateEndTime(val, formValues.duration);
-    setFormValues(prev => ({ ...prev, start_time: val, end_time: newEndTime }));
+    setFormValues(prev => ({ ...prev, start_time: val }));
   };
 
   const handleDurationChange = (dur: number) => {
-    const newEndTime = calculateEndTime(formValues.start_time, dur);
-    setFormValues(prev => ({ ...prev, duration: dur, end_time: newEndTime }));
+    setFormValues(prev => ({ ...prev, duration: dur }));
   };
 
   const handleSetNow = () => {
-    handleStartTimeChange(formatLocalDateTime(new Date()));
+    const now = new Date();
+    const end = new Date(now.getTime() + formValues.duration * 60 * 1000);
+    setFormValues(prev => ({ ...prev, start_time: formatLocalDateTime(now), end_time: formatLocalDateTime(end) }));
   };
 
   const handleCreateClick = () => {
@@ -518,8 +518,8 @@ const ExamRoomsPage = () => {
       classId: room.allClasses ? "" : (Array.isArray(room.classId) ? room.classId.join(",") : (room.classId || "")),
       allClasses: room.allClasses || false,
       token: room.token || "",
-      start_time: room.start_time && !isNaN(new Date(room.start_time).getTime()) ? new Date(room.start_time).toISOString().slice(0, 16) : "",
-      end_time: room.end_time && !isNaN(new Date(room.end_time).getTime()) ? new Date(room.end_time).toISOString().slice(0, 16) : "",
+      start_time: room.start_time && !isNaN(new Date(room.start_time).getTime()) ? formatLocalDateTime(new Date(room.start_time)) : "",
+      end_time: room.end_time && !isNaN(new Date(room.end_time).getTime()) ? formatLocalDateTime(new Date(room.end_time)) : "",
       duration: room.duration,
       cheat_limit: room.cheat_limit,
       submit_window: room.submit_window || 0,
@@ -679,6 +679,7 @@ const ExamRoomsPage = () => {
   const filteredExams = useMemo(() => {
     const q = examSearch.trim().toLowerCase();
     return exams
+      .filter((e) => e.status !== "archive") // Sembunyikan bank soal yang diarsipkan
       .filter((e) => role === "admin" || e.teacherId === teacherId || e.id === formValues.examId)
       .filter((e) => {
         if (!q) return true;
@@ -1087,9 +1088,10 @@ const ExamRoomsPage = () => {
                     <button 
                       type="button" 
                       onClick={() => {
-                        const now = new Date();
-                        now.setHours(7, 30, 0, 0);
-                        handleStartTimeChange(formatLocalDateTime(now));
+                        const start = new Date();
+                        start.setHours(7, 30, 0, 0);
+                        const end = new Date(start.getTime() + formValues.duration * 60 * 1000);
+                        setFormValues(prev => ({ ...prev, start_time: formatLocalDateTime(start), end_time: formatLocalDateTime(end) }));
                       }}
                       className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-[9px] font-bold border border-slate-200 dark:border-slate-700 hover:bg-slate-200 transition-colors"
                     >
@@ -1098,34 +1100,39 @@ const ExamRoomsPage = () => {
                     <button 
                       type="button" 
                       onClick={() => {
-                        const now = new Date();
-                        now.setHours(8, 0, 0, 0);
-                        handleStartTimeChange(formatLocalDateTime(now));
+                        const start = new Date();
+                        start.setHours(8, 0, 0, 0);
+                        const end = new Date(start.getTime() + formValues.duration * 60 * 1000);
+                        setFormValues(prev => ({ ...prev, start_time: formatLocalDateTime(start), end_time: formatLocalDateTime(end) }));
                       }}
                       className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-[9px] font-bold border border-slate-200 dark:border-slate-700 hover:bg-slate-200 transition-colors"
                     >
                       08:00
                     </button>
                   </div>
+                  <p className="text-[9px] text-slate-400 italic">Awal window - siswa mulai bisa masuk</p>
                 </div>
               </FormField>
               <FormField id="end_time" label="Waktu Berakhir" error={undefined}>
                 <div className="space-y-1.5">
                   <Input type="datetime-local" value={formValues.end_time} onChange={(e) => setFormValues({ ...formValues, end_time: e.target.value })} required />
-                  <p className="text-[9px] text-emerald-600 dark:text-emerald-400 font-medium italic">* Otomatis dari Mulai + Durasi</p>
+                  <p className="text-[9px] text-amber-600 dark:text-amber-400 font-medium italic">Akhir window - sistem tutup akses</p>
                 </div>
               </FormField>
             </div>
 
               <div className="grid grid-cols-3 gap-2 pt-2 border-t border-emerald-100 dark:border-emerald-900/30">
                 <FormField id="duration" label="Durasi (Menit)" error={undefined}>
-                  <Input type="number" value={formValues.duration} onChange={(e) => handleDurationChange(Number(e.target.value))} required />
+                  <div className="space-y-1">
+                    <Input type="number" value={formValues.duration || ""} onChange={(e) => handleDurationChange(e.target.value === "" ? 0 : parseInt(e.target.value, 10) || 0)} required />
+                    <p className="text-[9px] text-emerald-600 dark:text-emerald-400 italic">Waktu mengerjakan</p>
+                  </div>
                 </FormField>
                 <FormField id="cheat_limit" label="Batas Cheat" error={undefined}>
-                  <Input type="number" value={formValues.cheat_limit} onChange={(e) => setFormValues({ ...formValues, cheat_limit: Number(e.target.value) })} required />
+                  <Input type="number" value={formValues.cheat_limit || ""} onChange={(e) => setFormValues({ ...formValues, cheat_limit: e.target.value === "" ? 0 : parseInt(e.target.value, 10) || 0 })} required />
                 </FormField>
                 <FormField id="submit_window" label="Kumpul Dibuka" error={undefined}>
-                  <Input type="number" placeholder="Sisa menit" value={formValues.submit_window || ""} onChange={(e) => setFormValues({ ...formValues, submit_window: Number(e.target.value) })} />
+                  <Input type="number" placeholder="Sisa menit" value={formValues.submit_window || ""} onChange={(e) => setFormValues({ ...formValues, submit_window: e.target.value === "" ? 0 : parseInt(e.target.value, 10) || 0 })} />
                 </FormField>
               </div>
 

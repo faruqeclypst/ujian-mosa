@@ -83,7 +83,13 @@ const StudentGradingDetailPage = () => {
         const opts = q.options || {};
         return { ...q, type: t, choices: opts, pairs: t === "menjodohkan" ? opts.pairs : undefined, items: (t === "urutkan" || t === "drag_drop") ? opts.items : undefined, answerKey: q.correctAnswer || q.answerKey };
       });
-      setQuestions(mapped);
+      setQuestions(mapped.sort((a: any, b: any) => {
+        const aIsEssay = a.type === "isian_singkat" || a.type === "uraian";
+        const bIsEssay = b.type === "isian_singkat" || b.type === "uraian";
+        if (aIsEssay && !bIsEssay) return 1;
+        if (!aIsEssay && bIsEssay) return -1;
+        return 0;
+      }));
 
       const attList = await pb.collection("attempts").getFullList({ filter: `examRoomId = "${roomId}" && studentId = "${studentId}"` });
       setAttempt(attList.length > 0 ? attList[0] : null);

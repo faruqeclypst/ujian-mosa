@@ -356,6 +356,7 @@ const CBTPage = () => {
   const saveTimeoutRef = useRef<any>(null);
   const cheatTimerRef = useRef<any>(null);
   const lastLeftTimeRef = useRef<number | null>(null);
+  const orientationChangeRef = useRef<boolean>(false);
   const isIndexRestored = useRef(false);
   const isCreatingRef = useRef(false);
 
@@ -527,6 +528,12 @@ const CBTPage = () => {
           answers: u,
           isOnline: true,
           lastHeartbeat: new Date().toISOString()
+        }).catch((err: any) => {
+          // Jika attempt sudah dihapus/reset oleh admin
+          if (err?.status === 404 || err?.status === 403) {
+            sessionStorage.removeItem("activeCBTRoomId");
+            setIsResetModalOpen(true);
+          }
         });
       }, 2000);
       return u;
@@ -817,15 +824,21 @@ const CBTPage = () => {
       else setTimeLeft(d);
     }, 1000);
     const heartbeat = setInterval(async () => { 
-      if (attempt?.id) {
+      if (attempt?.id && pb) {
         try {
           await safeUpdateAttempt(attempt.id, { isOnline: true, lastHeartbeat: new Date().toISOString() });
         } catch (err: any) {
           // Jika 404/403 berarti sesi sudah dihapus/reset oleh admin
-          if (err.status === 404 || err.status === 403) {
+          if (err?.status === 404 || err?.status === 403) {
+            clearInterval(heartbeat);
+            clearInterval(timer);
             sessionStorage.removeItem("activeCBTRoomId");
+            if (student && roomId) {
+              localStorage.removeItem(`offline_answers_${student.id}_${roomId}`);
+              localStorage.removeItem(`local_attempt_${student.id}_${roomId}`);
+              localStorage.removeItem(`pending_sync_${student.id}_${roomId}`);
+            }
             setIsResetModalOpen(true);
-            setTimeout(() => { window.location.href = "/"; }, 2000);
           }
         }
       } 
@@ -862,6 +875,13 @@ const CBTPage = () => {
       if (document.visibilityState === "hidden" || e.type === "blur") {
         if (isCheatWarningOpen || isLocked) return;
 
+        // Ignore blur caused by screen rotation on mobile/tablet
+        if (e.type === "blur" && window.screen?.orientation) {
+          orientationChangeRef.current = true;
+          setTimeout(() => { orientationChangeRef.current = false; }, 1500);
+        }
+        if (orientationChangeRef.current) return;
+
         // Record departure time for mobile (where JS might pause)
         if (!lastLeftTimeRef.current) {
           lastLeftTimeRef.current = Date.now();
@@ -889,6 +909,19 @@ const CBTPage = () => {
 
         try { CheatAlert.stopAlarm(); } catch (err) { }
       }
+    };
+
+    const handleOrientationChange = () => {
+      // Mark orientation is changing so blur events are ignored
+      orientationChangeRef.current = true;
+      // Cancel any pending cheat timer triggered by orientation blur
+      if (cheatTimerRef.current) {
+        clearTimeout(cheatTimerRef.current);
+        cheatTimerRef.current = null;
+        try { CheatAlert.stopAlarm(); } catch (err) { }
+      }
+      lastLeftTimeRef.current = null;
+      setTimeout(() => { orientationChangeRef.current = false; }, 1500);
     };
 
     // 3. Native Capacitor App State Listener (More reliable for Android/iOS)
@@ -925,6 +958,10 @@ const CBTPage = () => {
       document.addEventListener("visibilitychange", handleCheatDetection);
       window.addEventListener("blur", handleCheatDetection);
       window.addEventListener("focus", handleCheatDetection);
+      window.addEventListener("orientationchange", handleOrientationChange);
+      if (window.screen?.orientation) {
+        window.screen.orientation.addEventListener("change", handleOrientationChange);
+      }
     }, 2000);
 
     return () => {
@@ -933,6 +970,10 @@ const CBTPage = () => {
       document.removeEventListener("visibilitychange", handleCheatDetection);
       window.removeEventListener("blur", handleCheatDetection);
       window.removeEventListener("focus", handleCheatDetection);
+      window.removeEventListener("orientationchange", handleOrientationChange);
+      if (window.screen?.orientation) {
+        window.screen.orientation.removeEventListener("change", handleOrientationChange);
+      }
       if (cheatTimerRef.current) {
         clearTimeout(cheatTimerRef.current);
         cheatTimerRef.current = null;
@@ -1106,14 +1147,14 @@ const CBTPage = () => {
   }
   if (isLocked) return (
     <div className="flex items-center justify-center min-h-screen bg-slate-50 dark:bg-slate-950 p-4">
-      <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] shadow-2xl text-center max-w-sm border border-red-100 relative overflow-hidden group">
+      <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] shadow-2xl text-center max-w-sm border border-red-100 dark:border-red-900/30 relative overflow-hidden group">
         <div className="absolute top-0 left-0 w-full h-2 bg-red-600"></div>
         <div className="relative z-10">
-          <div className="w-20 h-20 bg-red-100 rounded-3xl flex items-center justify-center mx-auto mb-6"><ShieldAlert className="w-10 h-10 text-red-600 animate-pulse" /></div>
+          <div className="w-20 h-20 bg-red-100 dark:bg-red-950/30 rounded-3xl flex items-center justify-center mx-auto mb-6"><ShieldAlert className="w-10 h-10 text-red-600 animate-pulse" /></div>
           <h2 className="text-2xl font-black text-red-600 mb-3 uppercase tracking-tighter">Ujian Terkunci!</h2>
-          <p className="text-slate-600 text-[13px] font-bold leading-relaxed mb-6">
+          <p className="text-slate-600 dark:text-slate-400 text-[13px] font-bold leading-relaxed mb-6">
             Anda sudah melewati batas yang diizinkan. Mohon jangan curang ya! <br />
-            <span className="text-red-600">Jika alasan tidak terbukti / tidak jelas / berbohong, maka tidak ada akses untuk melanjutkan ujian ini.</span>
+            <span className="text-red-600 dark:text-red-400">Jika alasan tidak terbukti / tidak jelas / berbohong, maka tidak ada akses untuk melanjutkan ujian ini.</span>
           </p>
 
           <div className="bg-slate-50 dark:bg-slate-800/50 p-6 rounded-[2rem] border border-slate-100 dark:border-slate-800 mb-8">
@@ -1180,15 +1221,12 @@ const CBTPage = () => {
     const cheatLimit = roomData?.cheat_limit || 3;
 
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-4">
-        <div className="w-full max-w-lg bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl border border-slate-100 dark:border-slate-800 overflow-hidden">
+      <div className="h-screen h-[100dvh] bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-4 overflow-hidden">
+        <div className="w-full max-w-lg max-h-full bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl border border-slate-100 dark:border-slate-800 overflow-y-auto">
           {/* Header */}
           <div className="bg-emerald-600 p-6 sm:p-8 text-center relative overflow-hidden">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.1),transparent)]"></div>
             <div className="relative z-10">
-              <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                <FileText className="w-8 h-8 text-white" />
-              </div>
               <h1 className="text-xl sm:text-2xl font-black text-white uppercase tracking-tight">{roomData?.examTitle || "Ujian"}</h1>
               <p className="text-emerald-100 text-xs font-bold mt-1">{roomData?.subject || ""} {roomData?.teacherName ? `• ${roomData.teacherName}` : ""}</p>
             </div>
@@ -1321,7 +1359,7 @@ const CBTPage = () => {
            <div className="flex flex-col gap-4 w-full max-w-xs">
              <Button
                onClick={() => window.location.reload()}
-               className="bg-white hover:bg-slate-100 text-slate-900 h-14 rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl"
+               className="bg-white hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-900 dark:text-white h-14 rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl"
              >
                Muat Ulang Halaman
              </Button>
@@ -1337,12 +1375,22 @@ const CBTPage = () => {
       <header className="sticky top-0 z-50 bg-white/90 dark:bg-slate-900/90 backdrop-blur-3xl border-b border-slate-100 dark:border-slate-800 h-16 sm:h-20 px-4 sm:px-8 flex items-center justify-between shadow-sm">
         <div className="flex items-center gap-2 sm:gap-4">
           <div className="flex items-center gap-2 sm:gap-3 bg-slate-100 dark:bg-slate-800 px-3 sm:px-4 py-1.5 sm:py-2 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
-            <Clock className={`h-4 w-4 sm:h-5 sm:w-5 ${timeLeft < 300 ? "text-rose-500 animate-pulse" : "text-emerald-500 dark:text-emerald-400"}`} />
+            {/* Mobile: sync icon replaces clock when syncing */}
+            {isSyncing ? (
+              <Cloud className="h-4 w-4 sm:h-5 sm:w-5 text-blue-500 animate-pulse sm:hidden" />
+            ) : !isOnline ? (
+              <WifiOff className="h-4 w-4 sm:h-5 sm:w-5 text-rose-500 sm:hidden" />
+            ) : (
+              <Clock className={`h-4 w-4 sm:hidden ${timeLeft < 300 ? "text-rose-500 animate-pulse" : "text-emerald-500 dark:text-emerald-400"}`} />
+            )}
+            {/* Desktop: always show clock */}
+            <Clock className={`hidden sm:block h-5 w-5 ${timeLeft < 300 ? "text-rose-500 animate-pulse" : "text-emerald-500 dark:text-emerald-400"}`} />
             <span className={`font-mono font-black text-sm sm:text-lg tracking-wider ${timeLeft < 300 ? "text-rose-600" : "text-emerald-600 dark:text-emerald-400"}`}>
               {Math.floor(timeLeft / 60).toString().padStart(2, "0")}:{(timeLeft % 60).toString().padStart(2, "0")}
             </span>
           </div>
-          <div className="flex items-center justify-center gap-1 sm:gap-2 px-1 sm:px-3 py-1.5 sm:py-2 rounded-2xl bg-white/50 dark:bg-slate-800/30 border border-slate-100 dark:border-slate-800 min-w-[40px] sm:min-w-[110px] shrink-0 overflow-hidden">
+          {/* Sync status — hidden on mobile, visible on desktop */}
+          <div className="hidden sm:flex items-center justify-center gap-1 sm:gap-2 px-1 sm:px-3 py-1.5 sm:py-2 rounded-2xl bg-white/50 dark:bg-slate-800/30 border border-slate-100 dark:border-slate-800 min-w-[40px] sm:min-w-[110px] shrink-0 overflow-hidden">
             {!isOnline ? (
               <div className="flex items-center gap-1.5">
                 <WifiOff className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-rose-500 shrink-0" />
@@ -1373,54 +1421,17 @@ const CBTPage = () => {
         </div>
 
         <div className="flex items-center gap-2 sm:gap-4 ml-auto relative z-10">
-          {/* Zoom Controls - Visible on both mobile and desktop */}
-          <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-700 relative z-10">
-            <button 
-              type="button"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                decreaseFontSize();
-              }}
-              onTouchEnd={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                if (fontSize > 0.8) decreaseFontSize();
-              }}
-              className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center rounded-xl bg-white dark:bg-slate-900 text-slate-600 hover:text-emerald-600 transition-colors shadow-sm disabled:opacity-30 active:scale-90 touch-manipulation select-none" 
-              disabled={fontSize <= 0.8}
-              title="Perkecil teks"
-              style={{ WebkitTapHighlightColor: 'transparent' }}
-            >
-              <ZoomOut className="w-3.5 h-3.5 sm:w-4 sm:h-4 pointer-events-none" />
-            </button>
-            <div className="px-1.5 sm:px-2 text-[9px] sm:text-[10px] font-black text-slate-500 uppercase tracking-widest w-[38px] sm:w-[45px] text-center select-none">
-              {Math.round(fontSize * 100)}%
-            </div>
-            <button 
-              type="button"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                increaseFontSize();
-              }}
-              onTouchEnd={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                if (fontSize < 1.5) increaseFontSize();
-              }}
-              className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center rounded-xl bg-white dark:bg-slate-900 text-slate-600 hover:text-emerald-600 transition-colors shadow-sm disabled:opacity-30 active:scale-90 touch-manipulation select-none" 
-              disabled={fontSize >= 1.5}
-              title="Perbesar teks"
-              style={{ WebkitTapHighlightColor: 'transparent' }}
-            >
-              <ZoomIn className="w-3.5 h-3.5 sm:w-4 sm:h-4 pointer-events-none" />
-            </button>
-          </div>
           {/* Refresh Button (PC only) — soft refresh without leaving fullscreen */}
           <button onClick={() => { setLoading(true); setRefreshTrigger(p => p + 1); }} className="hidden sm:flex w-8 h-8 items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-emerald-600 border border-slate-200 dark:border-slate-700 transition-colors" title="Refresh data">
             <RefreshCcw className="w-4 h-4" />
           </button>
+
+          {/* Desktop Zoom Controls — next to name */}
+          <div className="hidden lg:flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700">
+            <button onClick={() => setFontSize(p => Math.max(0.8, p - 0.1))} className="w-7 h-7 flex items-center justify-center rounded-lg bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:text-emerald-600 transition-colors shadow-sm disabled:opacity-30" disabled={fontSize <= 0.8}><ZoomOut className="w-3.5 h-3.5" /></button>
+            <div className="px-1 text-[9px] font-black text-slate-500 dark:text-slate-400 w-[32px] text-center">{Math.round(fontSize * 100)}%</div>
+            <button onClick={() => setFontSize(p => Math.min(1.5, p + 0.1))} className="w-7 h-7 flex items-center justify-center rounded-lg bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:text-emerald-600 transition-colors shadow-sm disabled:opacity-30" disabled={fontSize >= 1.5}><ZoomIn className="w-3.5 h-3.5" /></button>
+          </div>
 
           <div className="flex items-center gap-x-2 sm:gap-4 ml-1 sm:ml-4 border-l border-slate-100 dark:border-slate-800 pl-2 sm:pl-4">
             {/* Nama & Kelas */}
@@ -1503,7 +1514,7 @@ const CBTPage = () => {
                 <h3 className="text-lg font-black text-slate-800 dark:text-white uppercase tracking-tight">Daftar Soal Kosong</h3>
                 <p className="text-sm text-slate-500 dark:text-slate-400 max-w-xs mx-auto">Tidak ditemukan pertanyaan dalam paket soal ini. Silakan hubungi proktor.</p>
               </div>
-              <Button onClick={() => navigate("/")} variant="outline" className="rounded-2xl h-12 px-8 font-black uppercase text-[10px] tracking-widest border-2">Kembali ke Dashboard</Button>
+              <Button onClick={() => navigate("/")} variant="outline" className="rounded-2xl h-12 px-8 font-black uppercase text-[10px] tracking-widest border-2 dark:border-slate-700 dark:text-slate-300">Kembali ke Dashboard</Button>
             </div>
           )}
 
@@ -1518,14 +1529,14 @@ const CBTPage = () => {
               </div>
               <div className="flex flex-col sm:flex-row gap-3">
                 <Button onClick={() => handleSubmitExam()} className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl h-12 px-8 font-black uppercase text-[10px] tracking-widest shadow-lg shadow-emerald-500/20">Selesaikan Ujian</Button>
-                <Button onClick={() => navigate("/")} variant="outline" className="rounded-2xl h-12 px-8 font-black uppercase text-[10px] tracking-widest border-2">Ke Dashboard</Button>
+                <Button onClick={() => navigate("/")} variant="outline" className="rounded-2xl h-12 px-8 font-black uppercase text-[10px] tracking-widest border-2 dark:border-slate-700 dark:text-slate-300">Ke Dashboard</Button>
               </div>
             </div>
           )}
 
           {currentQuestion && !isExamOver && (
             <Card className="rounded-[25px] sm:rounded-[35px] border border-slate-100 dark:border-slate-800 overflow-hidden bg-white dark:bg-slate-900 shadow-sm transition-all duration-300">
-              <CardHeader className="p-5 sm:p-8 pb-0">
+              <CardHeader className="p-5 sm:p-8 pb-0 sm:pb-2">
                 <div className="relative flex items-center justify-between gap-4 mb-4 sm:mb-6 min-h-[48px] sm:min-h-[56px]">
                   <div className="flex items-center gap-3 sm:gap-4">
                     <div className="w-11 h-11 sm:w-14 sm:h-14 bg-emerald-600 text-white rounded-2xl sm:rounded-[35%] flex items-center justify-center font-black text-xl sm:text-2xl shrink-0">{currentQuestionIndex + 1}</div>
@@ -1548,7 +1559,8 @@ const CBTPage = () => {
                   <div className="relative group cursor-zoom-in select-none" onClick={() => setPreviewImage(currentQuestion.imageUrl!)}>
                     <SmartImage
                       src={currentQuestion.imageUrl}
-                      className="max-w-full h-auto mx-auto block rounded-2xl border border-slate-100 mb-4 sm:mb-6 transition-transform hover:scale-[1.01] select-none"
+                      className="max-w-full h-auto mx-auto block rounded-2xl border border-slate-100 dark:border-slate-800 mb-4 sm:mb-6 transition-transform hover:scale-[1.01] select-none"
+                      containerClassName="min-h-[120px] rounded-2xl"
                       alt="Soal"
                       draggable={false}
                       style={{ userSelect: 'none', WebkitUserDrag: 'none' } as React.CSSProperties}
@@ -1600,6 +1612,7 @@ const CBTPage = () => {
                     </span>
                   </div>
                 )}
+                <div className="h-4 sm:h-2" />
               </CardHeader>
               <CardContent className="px-5 sm:px-8 pb-6 sm:pb-8 space-y-3">
                 {(currentQuestion.type === "pilihan_ganda" || currentQuestion.type === "pilihan_ganda_kompleks") && (
@@ -1607,15 +1620,16 @@ const CBTPage = () => {
                     {(choicesOrder[currentQuestion.id] || Object.keys(currentQuestion.choices || {})).map((choiceId, idx) => {
                       const c = currentQuestion.choices![choiceId]; const isM = currentQuestion.type === "pilihan_ganda_kompleks"; const isS = isM ? (answers[currentQuestion.id] || []).includes(choiceId) : answers[currentQuestion.id] === choiceId;
                       return (
-                        <button key={choiceId} onClick={() => { if (isM) { const a = answers[currentQuestion.id] || []; handleAnswerSelect(currentQuestion.id, a.includes(choiceId) ? a.filter((i: any) => i !== choiceId) : [...a, choiceId]); } else handleAnswerSelect(currentQuestion.id, choiceId); }} className={`w-full text-left p-2 sm:p-3 rounded-xl sm:rounded-2xl border-2 flex items-center gap-2.5 sm:gap-4 transition-all outline-none group active:scale-[0.99] ${isS ? "bg-emerald-50 border-emerald-600 dark:bg-emerald-900/30 dark:border-emerald-500" : "bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 hover:border-emerald-200 dark:hover:border-emerald-700"}`}>
-                          <div className={`w-8 h-8 sm:w-9 sm:h-9 shrink-0 rounded-lg sm:rounded-xl border flex items-center justify-center font-black text-xs sm:text-sm transition-colors ${isS ? "bg-emerald-600 border-emerald-600 text-white" : "bg-slate-50 dark:bg-slate-900 text-slate-400 border-slate-100 dark:border-slate-800 group-hover:bg-emerald-50 group-hover:text-emerald-900"}`}>{String.fromCharCode(65 + idx)}</div>
+                        <button key={`${currentQuestion.id}-${choiceId}`} onClick={() => { if (isM) { const a = answers[currentQuestion.id] || []; handleAnswerSelect(currentQuestion.id, a.includes(choiceId) ? a.filter((i: any) => i !== choiceId) : [...a, choiceId]); } else handleAnswerSelect(currentQuestion.id, choiceId); }} className={`w-full text-left p-2 sm:p-3 rounded-xl sm:rounded-2xl border-2 flex items-center gap-2.5 sm:gap-4 outline-none group active:scale-[0.99] ${isS ? "bg-emerald-50 border-emerald-600 dark:bg-emerald-900/30 dark:border-emerald-500" : "bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 hover:border-emerald-200 dark:hover:border-emerald-700"}`}>
+                          <div className={`w-8 h-8 sm:w-9 sm:h-9 shrink-0 rounded-lg sm:rounded-xl border flex items-center justify-center font-black text-xs sm:text-sm ${isS ? "bg-emerald-600 border-emerald-600 text-white" : "bg-slate-50 dark:bg-slate-900 text-slate-400 border-slate-100 dark:border-slate-800 group-hover:bg-emerald-50 group-hover:text-emerald-900"}`}>{String.fromCharCode(65 + idx)}</div>
                           <div className="flex-1 overflow-hidden">
                             <MathText content={c.text} className={`break-words font-serif ql-editor !p-0 [&_img]:max-w-[300px] [&_img]:h-auto [&_img]:rounded-xl [&_img]:mt-2 text-inherit ${isS ? "font-bold" : "font-normal"}`} />
                             {c.imageUrl && (
                               <div className="relative inline-block cursor-zoom-in group mt-4 select-none" onClick={(e) => { e.stopPropagation(); setPreviewImage(c.imageUrl!); }}>
                                 <SmartImage
                                   src={c.imageUrl}
-                                  className="max-h-[200px] rounded-2xl border border-slate-100 group-hover:brightness-90 transition-all select-none"
+                                  className="max-h-[200px] rounded-2xl border border-slate-100 dark:border-slate-800 group-hover:brightness-90 transition-all select-none"
+                                  containerClassName="min-h-[80px] rounded-2xl"
                                   alt="Choice"
                                   draggable={false}
                                   style={{ userSelect: 'none', WebkitUserDrag: 'none' } as React.CSSProperties}
@@ -1775,8 +1789,8 @@ const CBTPage = () => {
                       )}
                       <button 
                         onClick={() => handleNavClick(i)} 
-                        className={`aspect-square rounded-xl flex items-center justify-center font-black text-xl border-2 transition-all active:scale-[0.85] ${i === currentQuestionIndex
-                          ? "bg-emerald-700 border-emerald-700 text-white shadow-lg shadow-emerald-700/30 ring-2 ring-emerald-500 ring-offset-2 dark:ring-offset-slate-900"
+                        className={`aspect-square rounded-xl flex items-center justify-center font-black text-xl border-2 transition-all active:scale-[0.85] outline-none focus:outline-none ${i === currentQuestionIndex
+                          ? "bg-emerald-700 border-emerald-700 text-white shadow-lg shadow-emerald-700/30"
                           : isQuestionAnswered(q.id)
                             ? "bg-emerald-500 border-emerald-500 text-white shadow-md shadow-emerald-500/20"
                             : flaggedQuestions[q.id]
@@ -1808,7 +1822,7 @@ const CBTPage = () => {
       <div className="sticky bottom-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl border-t border-slate-100 dark:border-slate-800 p-4 sm:p-6 lg:hidden flex justify-between items-center z-40">
         <Button variant="outline" size="sm" disabled={currentQuestionIndex === 0} onClick={() => setCurrentQuestionIndex(p => p - 1)} className="rounded-2xl h-14 px-8 font-black uppercase text-[12px] tracking-[0.2em] border-2 border-emerald-50 dark:border-emerald-900/40 bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 active:scale-90 transition-all">Back</Button>
         <Button variant="ghost" className="font-black text-emerald-800 dark:text-emerald-100 uppercase tracking-[0.3em] text-[16px]" onClick={() => setIsNavModalOpen(true)}>{currentQuestionIndex + 1} / {questions.length}</Button>
-        <Button onClick={() => currentQuestionIndex === questions.length - 1 ? setIsSubmitModalOpen(true) : handleNextClick()} size="sm" className="rounded-2xl h-14 px-8 text-white font-black uppercase text-[12px] tracking-[0.2em] bg-emerald-600 dark:bg-emerald-500 active:scale-90 transition-all shadow-lg shadow-emerald-600/20">{currentQuestionIndex === questions.length - 1 ? "Kumpulkan" : "Next"}</Button>
+        <Button onClick={() => currentQuestionIndex === questions.length - 1 ? setIsSubmitModalOpen(true) : handleNextClick()} size="sm" className="rounded-2xl h-14 px-8 text-white font-black uppercase text-[12px] tracking-[0.2em] bg-emerald-600 dark:bg-emerald-500 active:scale-90 transition-all shadow-lg shadow-emerald-600/20">{currentQuestionIndex === questions.length - 1 ? "End" : "Next"}</Button>
       </div>
 
       <Dialog open={isNavModalOpen} onOpenChange={setIsNavModalOpen}>
@@ -1817,10 +1831,10 @@ const CBTPage = () => {
             <DialogTitle className="text-xl font-black text-emerald-800 dark:text-emerald-400 uppercase tracking-tighter">Navigasi Soal</DialogTitle>
 
             {/* Mobile Zoom Controls */}
-            <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-2xl border border-slate-200 sm:hidden">
-              <button onClick={() => setFontSize(p => Math.max(0.5, p - 0.1))} className="w-8 h-8 flex items-center justify-center rounded-xl bg-white text-slate-600 active:bg-emerald-50 shadow-sm" disabled={fontSize <= 0.5}><ZoomOut className="w-4 h-4" /></button>
-              <div className="px-2 text-[10px] font-black text-slate-500 uppercase w-[35px] text-center">{Math.round(fontSize * 100)}%</div>
-              <button onClick={() => setFontSize(p => Math.min(1.5, p + 0.1))} className="w-8 h-8 flex items-center justify-center rounded-xl bg-white text-slate-600 active:bg-emerald-50 shadow-sm" disabled={fontSize >= 1.5}><ZoomIn className="w-4 h-4" /></button>
+            <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-2xl border border-slate-200 dark:border-slate-700 sm:hidden">
+              <button onClick={() => setFontSize(p => Math.max(0.5, p - 0.1))} className="w-8 h-8 flex items-center justify-center rounded-xl bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 active:bg-emerald-50 dark:active:bg-emerald-950 shadow-sm disabled:opacity-30" disabled={fontSize <= 0.5}><ZoomOut className="w-4 h-4" /></button>
+              <div className="px-2 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase w-[35px] text-center">{Math.round(fontSize * 100)}%</div>
+              <button onClick={() => setFontSize(p => Math.min(1.5, p + 0.1))} className="w-8 h-8 flex items-center justify-center rounded-xl bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 active:bg-emerald-50 dark:active:bg-emerald-950 shadow-sm disabled:opacity-30" disabled={fontSize >= 1.5}><ZoomIn className="w-4 h-4" /></button>
             </div>
           </div>
 
@@ -1865,8 +1879,8 @@ const CBTPage = () => {
                         <div className="flex-1 h-px bg-amber-200 dark:bg-amber-800/40"></div>
                       </div>
                     )}
-                    <button onClick={() => { setCurrentQuestionIndex(i); setIsNavModalOpen(false); }} className={`aspect-square rounded-2xl flex items-center justify-center font-black text-xl border-3 transition-all active:scale-90 ${i === currentQuestionIndex
-                      ? "bg-emerald-700 border-emerald-700 text-white shadow-2xl ring-2 ring-emerald-500 ring-offset-2 dark:ring-offset-slate-950"
+                    <button onClick={() => { setCurrentQuestionIndex(i); setIsNavModalOpen(false); }} className={`aspect-square rounded-2xl flex items-center justify-center font-black text-xl border-3 transition-all active:scale-90 outline-none focus:outline-none ${i === currentQuestionIndex
+                      ? "bg-emerald-700 border-emerald-700 text-white shadow-2xl"
                       : isQuestionAnswered(q.id)
                         ? "bg-emerald-500 border-emerald-500 text-white shadow-md shadow-emerald-500/20"
                         : flaggedQuestions[q.id]
@@ -1917,7 +1931,7 @@ const CBTPage = () => {
       </Dialog>
 
       <Dialog open={isCheatWarningOpen} onOpenChange={setIsCheatWarningOpen}>
-        <DialogContent className="max-w-xs rounded-[2rem] p-6 text-center border-none shadow-2xl pointer-events-auto">
+        <DialogContent className="max-w-xs rounded-[2rem] p-6 text-center border-none shadow-2xl pointer-events-auto bg-white dark:bg-slate-950">
           <AlertCircle className="w-16 h-16 text-red-600 mx-auto mb-4 animate-pulse" />
           <DialogTitle className="text-xl font-black text-red-600 uppercase tracking-tighter">Pelanggaran!</DialogTitle>
           <div className="space-y-3 mt-2">

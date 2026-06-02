@@ -42,6 +42,7 @@ const MonitoringPage = lazy(() => import("./pages/admin/MonitoringPage"));
 const GradingPage = lazy(() => import("./pages/admin/GradingPage"));
 const StudentGradingDetailPage = lazy(() => import("./pages/admin/StudentGradingDetailPage"));
 const GuidePage = lazy(() => import("./pages/admin/GuidePage"));
+const TokenViewPage = lazy(() => import("./pages/TokenViewPage"));
 
 // Landing & SaaS pages
 import LandingPage from "./pages/landing/LandingPage";
@@ -174,6 +175,7 @@ const SchoolAppContent = () => {
 
             {/* Root redirect */}
             <Route path="/" element={<Navigate to="/exam" replace />} />
+            <Route path="/token-view" element={<TokenViewPage />} />
             <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </Suspense>

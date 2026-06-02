@@ -105,6 +105,19 @@ export const parseQuestionsFromWord = async (file: File, options?: { includeEssa
     return `<p style="margin-left:${indentLevel * 2}em">`;
   });
 
+  // Step 2c: Fix ordered lists inside table cells — mammoth always uses decimal,
+  // but Word's a) b) c) style should render as lower-alpha.
+  // Since CSS list-style-type may be overridden, we convert <ol><li> to explicit lettered paragraphs.
+  html = html.replace(/<ol[^>]*>([\s\S]*?)<\/ol>/g, (match, content) => {
+    let index = 0;
+    const items = content.replace(/<li[^>]*>([\s\S]*?)<\/li>/g, (_: string, inner: string) => {
+      const letter = String.fromCharCode(97 + index); // a, b, c, ...
+      index++;
+      return `<p style="margin-left:1.5em;">${letter}) ${inner.trim()}</p>`;
+    });
+    return items;
+  });
+
   // Step 3: Replace placeholders with LaTeX in the HTML
   equationMap.forEach((latex, placeholder) => {
     html = html.split(placeholder).join(latex);
@@ -263,7 +276,149 @@ export const parseQuestionsFromWord = async (file: File, options?: { includeEssa
     }
   }
 
-  // ─── MAIN PARSE ───────────────────────────────────────────────────────
+  // ─── PRE-PROCESS: Handle "per-question table" format ───────────────────
+  // Format: each question is its own table (may span multiple tables if page-broken):
+  //   Row: | 21 | Question text with a) b) c) list |
+  //   Row: | A  | a – b – c |
+  //   Row: | B  | b – c – d |
+  //   ...
+  //   Row: |    | Kunci Jawaban: E |
+  const topLevelTables = allTables.filter(t => !t.parentElement?.closest('table'));
+
+  // Helper: extract all rows from a table (direct children only)
+  const getTableRows = (table: Element) =>
+    Array.from(table.querySelectorAll(':scope > tbody > tr, :scope > tr'));
+
+  // Detect if a table is a "question table" — first row has a number in col 0
+  const isQuestionTable = (table: Element): boolean => {
+    const rows = getTableRows(table);
+    if (rows.length < 1) return false;
+    const firstCells = Array.from(rows[0].querySelectorAll(':scope > td, :scope > th'));
+    if (firstCells.length < 1) return false;
+    return !!firstCells[0].textContent?.trim().match(/^\d+$/);
+  };
+
+  // Detect if a table is a "continuation table" — starts with A-E (choices) or Kunci
+  const isContinuationTable = (table: Element): boolean => {
+    const rows = getTableRows(table);
+    if (rows.length < 1) return false;
+    const firstCells = Array.from(rows[0].querySelectorAll(':scope > td, :scope > th'));
+    if (firstCells.length < 1) return false;
+    const c = firstCells[0].textContent?.trim() || "";
+    return !!(c.match(/^[A-Ea-e]$/) || c.match(/^kunci/i) || rows[0].textContent?.match(/kunci\s*jawaban/i));
+  };
+
+  // Group tables: merge question table with any following continuation tables
+  const tableGroups: Element[][] = [];
+  let i = 0;
+  while (i < topLevelTables.length) {
+    const t = topLevelTables[i];
+    if (isQuestionTable(t)) {
+      const group = [t];
+      let j = i + 1;
+      // Merge following tables that are continuations (choices/kunci)
+      while (j < topLevelTables.length && isContinuationTable(topLevelTables[j])) {
+        group.push(topLevelTables[j]);
+        j++;
+      }
+      tableGroups.push(group);
+      i = j;
+    } else {
+      i++;
+    }
+  }
+
+  const processedTableQuestions: ParsedQuestion[] = [];
+
+  tableGroups.forEach(group => {
+    let qText = "";
+    let qKey = "";
+    const qChoices: Record<string, { text: string; isCorrect: boolean }> = {};
+    let questionRowDone = false;
+
+    group.forEach(table => {
+      const rows = getTableRows(table);
+
+      rows.forEach(row => {
+        const cells = Array.from(row.querySelectorAll(':scope > td, :scope > th'));
+        if (cells.length < 1) return;
+
+        const cellA = cells[0]?.textContent?.trim() || "";
+        const cellB = cells.length >= 2 ? (cells[1]?.textContent?.trim() || "") : "";
+        const cellBHtml = cells.length >= 2 ? (cells[1]?.innerHTML?.trim() || "") : "";
+        const fullText = cells.map(c => c.textContent?.trim()).join(" ").trim();
+
+        // Answer key row — check first
+        const answerMatch = fullText.match(/kunci\s*jawaban\s*[:\s]+([A-Ea-e])/i);
+        if (answerMatch) {
+          qKey = answerMatch[1].toLowerCase();
+          return;
+        }
+
+        // Question number row
+        if (!questionRowDone && cellA.match(/^\d+$/)) {
+          if (cells.length >= 2) {
+            qText = (cells[1] as HTMLElement)?.innerHTML?.trim() || cellB;
+          } else {
+            qText = cellBHtml || cellA;
+          }
+          questionRowDone = true;
+          return;
+        }
+
+        // UPPERCASE A-E → choice row
+        if (questionRowDone && cellA.match(/^[A-E]$/)) {
+          const letter = cellA.toLowerCase();
+          const choiceHtml = cells.length >= 2 ? (cells[1]?.innerHTML?.trim() || "") : "";
+          const choiceText = cells.length >= 2 ? (cells[1]?.textContent?.trim() || "") : "";
+          qChoices[letter] = { text: choiceHtml || choiceText, isCorrect: false };
+          return;
+        }
+
+        // lowercase a-e: treat as list item inside question text (before choices)
+        // OR treat as choice if after uppercase choices already collected
+        if (questionRowDone && cellA.match(/^[a-e]$/)) {
+          if (Object.keys(qChoices).length === 0) {
+            // Still in question context — append as list item
+            const itemHtml = cells.length >= 2 ? (cells[1]?.innerHTML?.trim() || "") : "";
+            const itemText = cells.length >= 2 ? (cells[1]?.textContent?.trim() || "") : "";
+            if (itemText) qText += `<br>${cellA}) ${itemHtml || itemText}`;
+          } else {
+            // After choices started — treat as choice
+            const letter = cellA;
+            const choiceHtml = cells.length >= 2 ? (cells[1]?.innerHTML?.trim() || "") : "";
+            const choiceText = cells.length >= 2 ? (cells[1]?.textContent?.trim() || "") : "";
+            qChoices[letter] = { text: choiceHtml || choiceText, isCorrect: false };
+          }
+          return;
+        }
+
+        // Continuation of question text (no letter, not number, choices not started)
+        if (questionRowDone && !Object.keys(qChoices).length && cellA && !cellA.match(/^[A-Ea-e\d]$/)) {
+          qText += "<br>" + (cellBHtml || cellB || cellA);
+        }
+      });
+    });
+
+    if (qText && Object.keys(qChoices).length >= 2) {
+      if (qKey && qChoices[qKey]) {
+        qChoices[qKey].isCorrect = true;
+      }
+      processedTableQuestions.push({
+        text: qText,
+        type: "pilihan_ganda",
+        choices: qChoices,
+        answerKey: qKey,
+      });
+    }
+  });
+
+  // If we found per-question tables, return them
+  if (processedTableQuestions.length > 0) {
+    return processedTableQuestions;
+  }
+
+  // ─── MAIN PARSE ──────────────────────────────────────────────────────
   paragraphs.forEach((p) => {
     const images = extractImages(p);
     const firstImage = images.length > 0 ? images[0] : undefined;
@@ -627,9 +782,11 @@ export const parseQuestionsFromWord = async (file: File, options?: { includeEssa
     }
 
     // C. Detect Answer Key ("Kunci: A") — this is the PRIMARY answer detection
-    const answerMatch = textOnly.match(/(Kunci|Answer|Kunci Jawaban|Jawaban)[.\s:]+([A-Ea-e])/i);
+    // Must be at the START of the text (or after separator) to avoid matching "terkunci" etc.
+    const answerMatch = textOnly.match(/^(?:Kunci|Answer|Kunci Jawaban|Jawaban)\s*[:\.\s]+([A-Ea-e])\s*$/i)
+      || textOnly.match(/^(?:Kunci|Answer|Kunci Jawaban|Jawaban)\s*[:\.\s]+([A-Ea-e])\b/i);
     if (answerMatch && currentQuestion) {
-      currentAnswerKey = answerMatch[2].toLowerCase();
+      currentAnswerKey = answerMatch[1].toLowerCase();
       // Immediately mark the correct choice
       Object.keys(currentChoices).forEach(k => { currentChoices[k].isCorrect = false; });
       if (currentChoices[currentAnswerKey]) {

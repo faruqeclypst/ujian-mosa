@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+﻿import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, Plus, Edit, Trash, Check, Copy, Image, ChevronDown, FileText, Download, Eye, FolderOpen, Sparkles, Wand2, RefreshCw, BookOpen, Loader2, FileSpreadsheet, Search, X, Bookmark, Forward, CheckCircle2, Menu, Maximize2, HelpCircle, FileJson, GripVertical, ChevronLeft, ChevronRight } from "lucide-react";
 import { Reorder } from "framer-motion";
@@ -27,7 +27,7 @@ import "react-quill/dist/quill.snow.css";
 
 Quill.register("modules/imageResize", ImageResize);
 
-// 🏗️ REGISTER TABLE EMBED (preserve tables from Word copy-paste as non-editable blocks)
+// REGISTER TABLE EMBED (preserve tables from Word copy-paste as non-editable blocks)
 const BlockEmbed = Quill.import('blots/block/embed');
 
 class TableEmbed extends BlockEmbed {
@@ -75,7 +75,7 @@ const unwrapTablesForStorage = (html: string): string => {
   return html.replace(/<div class="ql-table-embed"[^>]*>([\s\S]*?)<\/div>/gi, '$1');
 };
 
-// 🛠️ REGISTER CUSTOM FORMATS (only line-height, NOT margin-left/text-indent which trap indentation)
+// REGISTER CUSTOM FORMATS (only line-height, NOT margin-left/text-indent which trap indentation)
 const Parchment = Quill.import('parchment');
 const LineHeightStyle = new Parchment.Attributor.Style('line-height', 'line-height', {
   scope: Parchment.Scope.BLOCK
@@ -84,7 +84,7 @@ const LineHeightStyle = new Parchment.Attributor.Style('line-height', 'line-heig
 Quill.register(LineHeightStyle, true);
 Quill.register(LineHeightStyle, true);
 
-// 📜 FORMATS WHITELIST (Penting agar Quill tidak menghapus tag/style kustom)
+// FORMATS WHITELIST (Penting agar Quill tidak menghapus tag/style kustom)
 const quillFormats = [
   'header', 'font', 'size',
   'bold', 'italic', 'underline', 'strike', 'blockquote',
@@ -218,7 +218,7 @@ const QuestionsPage = () => {
   const { addToast } = useToast();
   const { subjects, teachers, teacherFullAccess, teacherAIAccess } = useExamData();
 
-  // 📝 Manage Allowed Question Types
+  // Manage Allowed Question Types
   const [allowedTypes, setAllowedTypes] = useState<Record<string, boolean>>({
     pilihan_ganda: true,
     pilihan_ganda_kompleks: true,
@@ -353,7 +353,7 @@ const QuestionsPage = () => {
   const [galleryGroups, setGalleryGroups] = useState<{ title: string; images: string[] }[]>([]);
   const [galleryTarget, setGalleryTarget] = useState<{ type: "cover" | "choice" | "batch" | "quill"; letter?: string; index?: number; quillInstance?: any; quillIndex?: number } | null>(null);
 
-  // 🤖 AI Import State
+  // AI Import State
   const [isAIImportOpen, setIsAIImportOpen] = useState(false);
   const [importText, setImportText] = useState("");
   const [importMode, setImportMode] = useState<'extract' | 'generate' | 'json'>('extract');
@@ -601,7 +601,7 @@ const QuestionsPage = () => {
     });
   };
 
-  // 🪄 AI States
+  // AI States
   const [isAIModalOpen, setIsAIModalOpen] = useState(false);
   const [isAIGenerating, setIsAIGenerating] = useState(false);
   const [isAIGeneratingDirect, setIsAIGeneratingDirect] = useState(false);
@@ -713,7 +713,7 @@ const QuestionsPage = () => {
     return () => clearTimeout(timer);
   }, [aiLevel, aiSubject, aiTaxonomy, isAiLiteracy]);
 
-  // 🎯 Auto-generate Tujuan Pembelajaran berdasarkan topik + taksonomi (per-level C)
+  // Auto-generate Tujuan Pembelajaran berdasarkan topik + taksonomi (per-level C)
   useEffect(() => {
     const fetchObjectives = async () => {
       if ((aiTopic.trim().length > 3 || aiMaterialText.trim().length > 20) && aiTaxonomy.length > 0 && pb) {
@@ -744,7 +744,7 @@ const QuestionsPage = () => {
     return () => clearTimeout(timer);
   }, [aiTopic, aiTaxonomy, aiLevel, aiSubject, aiMaterialText]);
 
-  // 🪄 Auto-generate Topik dari AI berdasarkan jenjang + mapel + materi
+  // Auto-generate Topik dari AI berdasarkan jenjang + mapel + materi
   const [isGeneratingTopic, setIsGeneratingTopic] = useState(false);
   const handleGenerateTopic = async () => {
     if (!pb) return;
@@ -940,7 +940,7 @@ const QuestionsPage = () => {
         const parts = err.message.split("|");
         if (parts.length >= 5) {
           const [, limit, used, remaining, requested] = parts;
-          showAlert("Limit Harian Tercapai", `Kuota token harian habis.\n\n• Limit: ${Number(limit).toLocaleString()} token/hari\n• Terpakai: ${Number(used).toLocaleString()} token\n• Sisa: ${Number(remaining).toLocaleString()} token\n• Diminta: ${Number(requested).toLocaleString()} token\n\nSilakan tunggu reset harian atau upgrade plan Groq.`, "danger");
+          showAlert("Limit Harian Tercapai", `Kuota token harian habis.\n\n Limit: ${Number(limit).toLocaleString()} token/hari\n Terpakai: ${Number(used).toLocaleString()} token\n Sisa: ${Number(remaining).toLocaleString()} token\n Diminta: ${Number(requested).toLocaleString()} token\n\nSilakan tunggu reset harian atau upgrade plan Groq.`, "danger");
         } else {
           showAlert("Limit Tercapai", "Server AI sedang sibuk karena terlalu banyak permintaan. Silakan tunggu sekitar 1-2 menit sebelum mencoba lagi.", "danger");
         }
@@ -1021,7 +1021,7 @@ const QuestionsPage = () => {
         const parts = err.message.split("|");
         if (parts.length >= 5) {
           const [, limit, used, remaining, requested] = parts;
-          showAlert("Limit Harian Tercapai", `Kuota token harian habis.\n• Limit: ${Number(limit).toLocaleString()} token/hari\n• Terpakai: ${Number(used).toLocaleString()}\n• Sisa: ${Number(remaining).toLocaleString()}\n• Diminta: ${Number(requested).toLocaleString()}\n\nTunggu reset harian atau upgrade plan.`, "danger");
+          showAlert("Limit Harian Tercapai", `Kuota token harian habis.\n Limit: ${Number(limit).toLocaleString()} token/hari\n Terpakai: ${Number(used).toLocaleString()}\n Sisa: ${Number(remaining).toLocaleString()}\n Diminta: ${Number(requested).toLocaleString()}\n\nTunggu reset harian atau upgrade plan.`, "danger");
         } else {
           showAlert("Limit Tercapai", "Permintaan terlalu cepat. Silakan tunggu 1 menit agar AI siap kembali.", "danger");
         }
@@ -1042,7 +1042,7 @@ const QuestionsPage = () => {
         let parsed: any;
         let trimmed = importText.trim();
         
-        // Handle concatenated arrays: ][  → merge into single array
+        // Handle concatenated arrays: ][ merge into single array
         if (trimmed.includes('][')) {
           trimmed = trimmed.replace(/\]\s*\[/g, ',');
         }
@@ -1181,8 +1181,9 @@ const QuestionsPage = () => {
       });
 
       let count = 0;
-      // Ambil order tertinggi dari soal yang sudah ada
-      const maxOrder = questions.reduce((max, q) => Math.max(max, q.order || 0), 0);
+      // Ambil order tertinggi dari database (bukan state) agar akurat
+      const dbQuestions = await pb.collection('questions').getFullList({ filter: `examId = "${examId}"`, fields: 'order' });
+      const maxOrder = dbQuestions.reduce((max, q) => Math.max(max, q.order || 0), 0);
       
       // Build all payloads first
       const payloads = parsedResults.map((q, idx) => {
@@ -1283,7 +1284,7 @@ const QuestionsPage = () => {
         throw new Error("AI tidak menghasilkan format soal yang valid.");
       }
 
-      // 🪄 NEW SYSTEM: Populate Batch Modal for Review instead of saving directly
+      // NEW SYSTEM: Populate Batch Modal for Review instead of saving directly
       const questionsForReview = generated.map(q => {
         const choicesBatch: Record<string, { text: string }> = {};
         let correctKey = (q.answerKey || "").toLowerCase();
@@ -1333,7 +1334,7 @@ const QuestionsPage = () => {
         const parts = err.message.split("|");
         if (parts.length >= 5) {
           const [, limit, used, remaining, requested] = parts;
-          showAlert("Limit Harian Tercapai", `Kuota token harian habis.\n• Limit: ${Number(limit).toLocaleString()} token/hari\n• Terpakai: ${Number(used).toLocaleString()}\n• Sisa: ${Number(remaining).toLocaleString()}\n• Diminta: ${Number(requested).toLocaleString()}\n\nTunggu reset harian atau upgrade plan.`, "danger");
+          showAlert("Limit Harian Tercapai", `Kuota token harian habis.\n Limit: ${Number(limit).toLocaleString()} token/hari\n Terpakai: ${Number(used).toLocaleString()}\n Sisa: ${Number(remaining).toLocaleString()}\n Diminta: ${Number(requested).toLocaleString()}\n\nTunggu reset harian atau upgrade plan.`, "danger");
         } else {
           showAlert("Server Sedang Limit", "Terlalu banyak permintaan AI. Silakan jeda sejenak (1 menit) sebelum memulai generasi baru.", "danger");
         }
@@ -1443,7 +1444,13 @@ const QuestionsPage = () => {
     setIsBatchModalOpen(false);
 
     try {
-      let currentOrder = questions.length + 1;
+      // Get the actual max order from database to avoid conflicts
+      const existingQuestions = await pb.collection('questions').getFullList({
+        filter: `examId = "${examId}"`,
+        fields: 'order',
+        sort: '-order',
+      });
+      let currentOrder = (existingQuestions.length > 0 ? Math.max(...existingQuestions.map(q => q.order || 0)) : 0) + 1;
       let count = 0;
       
       for (const q of validQuestions) {
@@ -1603,6 +1610,7 @@ const QuestionsPage = () => {
   const quillModules = useMemo(() => ({
     toolbar: {
       container: [
+        [{ 'header': [1, 2, 3, false] }],
         ['bold', 'italic', 'underline', 'strike'],
         [{ 'align': [] }],
         [{ 'color': [] }, { 'background': [] }],
@@ -1686,12 +1694,19 @@ const QuestionsPage = () => {
   }), [imageHandler]);
 
   const quillModulesChoice = useMemo(() => ({
-    toolbar: [
-      ['bold', 'italic', 'underline'],
-      [{ 'color': [] }],
-      [{ 'indent': '-1' }, { 'indent': '+1' }],
-      ['code-block', 'clean']
-    ],
+    toolbar: {
+      container: [
+        [{ 'header': [1, 2, 3, false] }],
+        ['bold', 'italic', 'underline', 'strike'],
+        [{ 'align': [] }],
+        [{ 'color': [] }, { 'background': [] }],
+        [{ 'list': 'ordered' }, { 'list': 'bullet' }, { 'indent': '-1' }, { 'indent': '+1' }],
+        ['image', 'formula', 'code-block', 'clean']
+      ],
+      handlers: {
+        image: imageHandler
+      }
+    },
     clipboard: {
       matchers: [
         ['table', function(_node: any, _delta: any) {
@@ -1736,15 +1751,33 @@ const QuestionsPage = () => {
             this.quill.setSelection(range.index + 8);
             return false;
           }
+        },
+        shiftTab: {
+          key: 9,
+          shiftKey: true,
+          handler: function(this: any, range: any) {
+            const text = this.quill.getText(Math.max(0, range.index - 8), 8);
+            const nbspCount = (text.match(/\u00A0/g) || []).length;
+            if (nbspCount > 0) {
+              const deleteCount = Math.min(nbspCount, 8);
+              this.quill.deleteText(range.index - deleteCount, deleteCount);
+            }
+            return false;
+          }
         }
       }
+    },
+    formula: true,
+    imageResize: {
+      parchment: Quill.import('parchment'),
+      modules: ['Resize', 'DisplaySize', 'Toolbar']
     }
-  }), []);
+  }), [imageHandler]);
 
 
 
 
-  // 🔄 Load Questions dari PocketBase
+  //Load Questions dari PocketBase
   const loadQuestions = useCallback(async () => {
     if (!examId || !pb) return;
     try {
@@ -1833,7 +1866,7 @@ const QuestionsPage = () => {
         const result = await mammoth.extractRawText({ arrayBuffer });
         extractedText = result.value;
       } else if (extension === "pdf") {
-        // 📄 Dynamic Loader for PDF.js to avoid npm install wait if possible
+        // Dynamic Loader for PDF.js to avoid npm install wait if possible
         let pdfjs = (window as any).pdfjsLib;
         if (!pdfjs) {
           addToast({ title: "Menyiapkan PDF Reader", description: "Sedang memuat library PDF, mohon tunggu sebentar...", type: "info" });
@@ -1976,7 +2009,7 @@ const QuestionsPage = () => {
       answerKey: q.answerKey || "",
       items: q.items || [{ id: "1", text: "" }]
     });
-    // 🔒 Deteksi apakah ini soal pertama di grupnya agar hanya soal #1 yang bisa edit teks wacana
+    // Deteksi apakah ini soal pertama di grupnya agar hanya soal #1 yang bisa edit teks wacana
     const groupItems = questions.filter(item => q.groupId && item.groupId === q.groupId);
     const isFirstInGroup = groupItems.length > 0 
       ? groupItems[0].id === q.id 
@@ -2045,7 +2078,7 @@ const QuestionsPage = () => {
     }));
   };
 
-  // 🖼️ Convert base64 images in HTML to R2 URLs (compressed to webp) before saving
+  // Convert base64 images in HTML to R2 URLs (compressed to webp) before saving
   const uploadInlineBase64Images = async (html: string): Promise<string> => {
     if (!html || !html.includes("data:image")) return html;
     
@@ -2156,7 +2189,7 @@ const QuestionsPage = () => {
       let imageUrl = formValues.imageUrl || "";
       let textToSave = autoDetectLatex(unwrapTablesForStorage(formValues.text));
 
-      // 🖼️ 1. Upload file Cover Soal (dari tombol input file)
+      // 1. Upload file Cover Soal (dari tombol input file)
       if (questionFile) {
         let fileToUpload = questionFile;
         if (questionFile.size > 200 * 1024) { // kompress > 200KB
@@ -2176,7 +2209,7 @@ const QuestionsPage = () => {
         imageUrl = await uploadBase64ToR2(imageUrl, "cover_manual");
       }
 
-      // 🖼️ 2. Scan teks Soal untuk base64 (parallel upload)
+      // 2. Scan teks Soal untuk base64 (parallel upload)
       if (textToSave.includes("data:image/")) {
         const doc = new DOMParser().parseFromString(textToSave, "text/html");
         const ims = Array.from(doc.querySelectorAll("img[src^='data:image/']"));
@@ -2190,7 +2223,7 @@ const QuestionsPage = () => {
         }
       }
 
-      // 🖼️ 3. Upload file Pilihan Manual ke R2
+      // 3. Upload file Pilihan Manual ke R2
       const updatedChoices = JSON.parse(JSON.stringify(formValues.choices));
       for (const key in choiceFiles) {
         const file = choiceFiles[key];
@@ -2210,7 +2243,7 @@ const QuestionsPage = () => {
         }
       }
 
-      // 🖼️ 4. Scan teks Pilihan untuk base64 (parallel)
+      // 4. Scan teks Pilihan untuk base64 (parallel)
       await Promise.allSettled(Object.keys(updatedChoices).map(async (key) => {
         const choice = updatedChoices[key];
         if (choice.imageUrl && choice.imageUrl.startsWith("data:image/")) {
@@ -2268,7 +2301,7 @@ const QuestionsPage = () => {
         payload.imageUrl = imageUrl;
       }
 
-      // 🛡️ LITERALISASI / WACANA (Fix Save Logic + Dual Convention)
+      // LITERALISASI / WACANA (Fix Save Logic + Dual Convention)
       if (isLiterasiActive) {
         const gid = formValues.groupId || "";
         let gtxt = formValues.groupText || "";
@@ -2296,7 +2329,7 @@ const QuestionsPage = () => {
         payload.group_text = "";
       }
       
-      console.log("💾 Menempelkan Payload Soal (Dual Format):", payload);
+      console.log("Menempelkan Payload Soal (Dual Format):", payload);
 
       if (dialogMode === "edit" && selectedQuestion) {
         // Jika ini soal utama literasi dan groupId/groupText berubah, propagate ke semua soal sepaket
@@ -2409,14 +2442,14 @@ const QuestionsPage = () => {
     if (!questionToDelete || !pb) return;
     setIsDeleting(true);
     try {
-      // 🗑️ Hapus gambar di R2 (Non-blocking: jika gagal tetap hapus record DB)
+      // Hapus gambar di R2 (Non-blocking: jika gagal tetap hapus record DB)
       try {
         await cleanupQuestionImages(questionToDelete);
       } catch (storageError) {
         console.warn("Gagal membersihkan gambar dari R2 Storage. Ini mungkin karena masalah CORS setelah ganti domain.", storageError);
       }
 
-      // 📚 Jika soal ini adalah "MAIN" literasi (punya groupText), transfer ke soal berikutnya dalam grup
+      // Jika soal ini adalah "MAIN" literasi (punya groupText), transfer ke soal berikutnya dalam grup
       if (questionToDelete.groupId && questionToDelete.groupText) {
         const groupSiblings = questions.filter(q => q.groupId === questionToDelete.groupId && q.id !== questionToDelete.id);
         if (groupSiblings.length > 0) {
@@ -2446,7 +2479,7 @@ const QuestionsPage = () => {
     }
   };
 
-  // ═══ Hapus Paket Literasi (hapus groupId & groupText dari semua soal dalam grup) ═══
+  // Hapus Paket Literasi (hapus groupId & groupText dari semua soal dalam grup) 
   const handleDeleteLiterasi = async (groupId: string) => {
     if (!pb || !groupId) return;
     showAlert(
@@ -2472,7 +2505,7 @@ const QuestionsPage = () => {
     );
   };
 
-  // ═══ Rename Paket Literasi (update groupId di semua soal dalam grup) ═══
+  //  Rename Paket Literasi (update groupId di semua soal dalam grup) 
   const handleRenameLiterasi = async (oldGroupId: string, newGroupId: string) => {
     if (!pb || !oldGroupId || !newGroupId.trim()) return;
     if (oldGroupId === newGroupId.trim()) {
@@ -2486,7 +2519,7 @@ const QuestionsPage = () => {
           groupId: newGroupId.trim(), group_id: newGroupId.trim()
         });
       }
-      addToast({ title: "Berhasil", description: `Paket literasi diubah dari "${oldGroupId}" → "${newGroupId.trim()}".`, type: "success" });
+      addToast({ title: "Berhasil", description: `Paket literasi diubah dari "${oldGroupId}"  "${newGroupId.trim()}".`, type: "success" });
       setIsRenamingLiterasi(false);
       setFormValues(prev => ({ ...prev, groupId: newGroupId.trim() }));
       loadQuestions();
@@ -2593,7 +2626,7 @@ const QuestionsPage = () => {
         return;
       }
 
-      // 📚 Transfer groupText ke soal berikutnya jika "main" literasi dihapus
+      // Transfer groupText ke soal berikutnya jika "main" literasi dihapus
       const groupsToTransfer = new Map<string, string>();
       selectedQuestions.forEach(q => {
         if (q.groupId && q.groupText && !groupsToTransfer.has(q.groupId)) {
@@ -2701,12 +2734,12 @@ const QuestionsPage = () => {
           <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
             {(item.imageUrl || item.text.includes("<img")) && (
               <span className="p-1 px-1.5 rounded-md bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400 flex items-center gap-1 font-bold text-[9px] border border-blue-200 dark:border-blue-800/40 uppercase tracking-tight">
-                🖼️ Bergambar
+                Bergambar
               </span>
             )}
             {item.groupId && (
               <span className="p-1 px-1.5 rounded-md bg-amber-50 text-amber-600 dark:bg-amber-950/20 dark:text-amber-400 flex items-center gap-1 font-bold text-[9px] border border-amber-200 dark:border-amber-800/40 uppercase tracking-tight">
-                🔖 Paket: {item.groupId}
+                Paket: {item.groupId}
                 {questions.findIndex(q => q.groupId === item.groupId) === questions.indexOf(item) && <span className="ml-1 px-1 py-0.5 rounded bg-amber-500 text-white text-[7px] font-black">MAIN</span>}
               </span>
             )}
@@ -2790,10 +2823,10 @@ const QuestionsPage = () => {
 
     try {
       const parsed = await parseQuestionsFromWord(file);
-      console.log("📋 Word Parser Results:", parsed.length, "soal ditemukan", parsed.map((q, i) => `[${i+1}] type=${q.type} groupId=${q.groupId} text=${(q.text||"").substring(0,50)}`));
+      console.log("Word Parser Results:", parsed.length, "soal ditemukan", parsed.map((q, i) => `[${i+1}] type=${q.type} groupId=${q.groupId} text=${(q.text||"").substring(0,50)}`));
       if (parsed.length === 0) throw new Error("Tidak ada soal yang dikenali dalam file.");
 
-      // ─── FILTER BY ALLOWED TYPES ──────────────────────────────────────
+      //  FILTER BY ALLOWED TYPES
       // Only import question types that are enabled by admin
       const filteredByType = parsed.filter(q => {
         const qType = q.type || "pilihan_ganda";
@@ -2807,11 +2840,12 @@ const QuestionsPage = () => {
         throw new Error(`Semua soal bertipe ${disabledTypes.join(", ")} yang belum diaktifkan admin. Aktifkan tipe soal tersebut di Pengaturan terlebih dahulu.`);
       }
 
-      // ─── DUPLICATE DETECTION & UNIQUE GROUP ID ─────────────────────────
+      //  DUPLICATE DETECTION & UNIQUE GROUP ID
       // Fetch existing questions for this exam to check duplicates
       const existingQuestions = await pb!.collection('questions').getFullList({ filter: `examId = "${examId}"` });
       const existingTexts = new Set(existingQuestions.map(q => (q.text || "").replace(/<[^>]*>/g, '').trim().toLowerCase().substring(0, 80)));
       const existingGroupIds = new Set(existingQuestions.map(q => q.groupId || q.group_id || "").filter(Boolean));
+      const maxExistingOrder = existingQuestions.reduce((max, q) => Math.max(max, q.order || 0), 0);
 
       // Filter out duplicates (same question text already exists)
       const uniqueParsed = filteredByType.filter(q => {
@@ -2911,7 +2945,7 @@ const QuestionsPage = () => {
             answerKey: questionType === "pilihan_ganda" ? answerKey.toLowerCase() : (q.answerKey || ""),
             groupId: q.groupId || "",
             groupText: q.groupText || "",
-            order: (questions.length || 0) + actualIndex + 1,
+            order: maxExistingOrder + actualIndex + 1,
             imageUrl: imageUrl
           };
 
@@ -2968,6 +3002,10 @@ const QuestionsPage = () => {
 
       setBatchProgress(prev => ({ ...prev, total: parsed.length, message: "Memulai import..." }));
 
+      // Get max order from database
+      const excelExisting = await pb.collection('questions').getFullList({ filter: `examId = "${examId}"`, fields: 'order' });
+      const maxExistingOrder = excelExisting.reduce((max, q) => Math.max(max, q.order || 0), 0);
+
       let importedCount = 0;
       const chunkSize = 10;
       for (let i = 0; i < parsed.length; i += chunkSize) {
@@ -2994,7 +3032,7 @@ const QuestionsPage = () => {
             answerKey: answerKey,
             groupId: q.groupId || "",
             groupText: q.groupText || "",
-            order: (questions.length || 0) + actualIndex + 1,
+            order: maxExistingOrder + actualIndex + 1,
             imageUrl: ""
           };
 
@@ -3051,6 +3089,10 @@ const QuestionsPage = () => {
 
       setBatchProgress(prev => ({ ...prev, total: questionsArr.length, message: `Mengimport ${questionsArr.length} soal...` }));
 
+      // Get max order from database
+      const existingForOrder = await pb.collection('questions').getFullList({ filter: `examId = "${examId}"`, fields: 'order' });
+      const jsonMaxOrder = existingForOrder.reduce((max, q) => Math.max(max, q.order || 0), 0);
+
       const typeMap: Record<string, string> = {
         pilihan_ganda: "multiple_choice",
         pilihan_ganda_kompleks: "complex_choice",
@@ -3094,7 +3136,7 @@ const QuestionsPage = () => {
           options: {},
           correctAnswer: correctAnswer,
           imageUrl: q.imageUrl || q.image_url || "",
-          order: q.order || (questions.length + i + 1),
+          order: q.order || (jsonMaxOrder + i + 1),
           groupId: q.groupId || q.group_id || "",
           group_id: q.groupId || q.group_id || "",
           groupText: q.groupText || q.group_text || "",
@@ -3264,17 +3306,17 @@ const QuestionsPage = () => {
       const displayRegex = /(\$\$|\\\[)([\s\S]*?)(\$\$|\\\])/g;
       let m;
       while ((m = displayRegex.exec(text)) !== null) {
-        const f = m[2].trim().replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').replace(/…/g, '\\ldots').replace(/\.\.\./g, '\\ldots');
+        const f = m[2].trim().replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').replace(/\u2026/g, '\\ldots').replace(/\.\.\./g, '\\ldots');
         if (f.length > 2) allFormulas.push({ formula: f, dpi: 200 });
       }
       const inlineRegex = /(?<!\$)\$([^\$\n]+?)\$(?!\$)/g;
       while ((m = inlineRegex.exec(text)) !== null) {
-        const f = m[1].trim().replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').replace(/…/g, '\\ldots').replace(/\.\.\./g, '\\ldots');
+        const f = m[1].trim().replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').replace(/\u2026/g, '\\ldots').replace(/\.\.\./g, '\\ldots');
         if (f.length > 1 && /[\\^_{}]/.test(f)) allFormulas.push({ formula: f, dpi: 200 });
       }
       const parenRegex = /\\\(([\s\S]*?)\\\)/g;
       while ((m = parenRegex.exec(text)) !== null) {
-        const f = m[1].trim().replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').replace(/…/g, '\\ldots').replace(/\.\.\./g, '\\ldots');
+        const f = m[1].trim().replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').replace(/\u2026/g, '\\ldots').replace(/\.\.\./g, '\\ldots');
         if (f.length > 1) allFormulas.push({ formula: f, dpi: 200 });
       }
     };
@@ -3302,7 +3344,7 @@ const QuestionsPage = () => {
     const processLatex = (htmlInput: string) => {
       if (!htmlInput) return htmlInput;
       let result = htmlInput;
-      const fixFormula = (f: string) => f.trim().replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').replace(/…/g, '\\ldots').replace(/\.\.\./g, '\\ldots');
+      const fixFormula = (f: string) => f.trim().replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').replace(/\u2026/g, '\\ldots').replace(/\.\.\./g, '\\ldots');
       
       result = result.replace(/(\$\$|\\\[)([\s\S]*?)(\$\$|\\\])/g, (_, _s, formula) => {
         const clean = fixFormula(formula);
@@ -3455,7 +3497,7 @@ const QuestionsPage = () => {
     addToast({ title: "Export Sukses", description: "File JSON berhasil diunduh.", type: "success" });
   };
 
-  // 📤 Export Selected Questions to JSON
+  // Export Selected Questions to JSON
   const handleExportSelectedToJson = () => {
     const selectedQuestions = questions.filter(q => selectedIds.includes(q.id));
     if (selectedQuestions.length === 0) return;
@@ -3491,7 +3533,7 @@ const QuestionsPage = () => {
     addToast({ title: "Export Sukses", description: `${selectedQuestions.length} soal berhasil diexport ke JSON.`, type: "success" });
   };
 
-  // 📤 Export Selected Questions to Word
+  // Export Selected Questions to Word
   const handleExportSelectedToWord = async () => {
     const selectedQuestions = questions.filter(q => selectedIds.includes(q.id));
     if (selectedQuestions.length === 0) return;
@@ -3525,7 +3567,7 @@ const QuestionsPage = () => {
       </style></head><body>`;
 
       html += `<h2 style="text-align:center;">EXPORT SOAL TERPILIH</h2>`;
-      html += `<p style="text-align:center;font-size:10pt;color:#666;">${exam?.subject || ""} — ${selectedQuestions.length} soal — ${new Date().toLocaleDateString('id-ID')}</p><hr/>`;
+      html += `<p style="text-align:center;font-size:10pt;color:#666;">${exam?.subject || ""} - ${selectedQuestions.length} soal - ${new Date().toLocaleDateString('id-ID')}</p><hr/>`;
 
       let currentGroupId = "";
       selectedQuestions.forEach((q, idx) => {
@@ -3542,7 +3584,7 @@ const QuestionsPage = () => {
           Object.keys(q.choices).sort().forEach(key => {
             const choice = q.choices![key];
             const isCorrect = choice.isCorrect;
-            html += `<p>${isCorrect ? '<span class="kunci">' : ''}${key.toUpperCase()}. ${cleanForWord(processLatex(choice.text || ""))}${isCorrect ? ' ✓</span>' : ''}</p>`;
+            html += `<p>${isCorrect ? '<span class="kunci">' : ''}${key.toUpperCase()}. ${cleanForWord(processLatex(choice.text || ""))}${isCorrect ? ' œ“</span>' : ''}</p>`;
           });
           html += `</div>`;
         } else if (q.type === "menjodohkan" && q.pairs) {
@@ -3674,7 +3716,7 @@ const QuestionsPage = () => {
                     </div>
                   ) : (
                       <div className="flex items-center gap-2">
-                        {/* ⚙️ OPSI DATA DROPDOWN (Combined Import/Export) */}
+                        {/* OPSI DATA DROPDOWN (Combined Import/Export) */}
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="secondary" size="sm" className="rounded-2xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 dark:hover:bg-emerald-900/40 dark:border-emerald-800/40 text-emerald-700 font-bold shadow-sm transition-all h-9 px-4">
@@ -3759,7 +3801,7 @@ const QuestionsPage = () => {
                                 <div className="flex flex-col min-w-0">
                                   <div className="flex items-center gap-2">
                                     <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight tracking-tight">Template Word</span>
-                                    <span className="px-1.5 py-0.5 rounded-full bg-emerald-500 text-white text-[9px] font-bold">★</span>
+                                    <span className="px-1.5 py-0.5 rounded-full bg-emerald-500 text-white text-[9px] font-bold">˜…</span>
                                   </div>
                                   <span className="text-[10px] text-slate-400 mt-0.5">Format tabel + literasi + rumus</span>
                                 </div>
@@ -3780,7 +3822,7 @@ const QuestionsPage = () => {
                         </DropdownMenu>
                       
 
-                      {/* 📘 MODAL PANDUAN LITERASI */}
+                      {/* MODAL PANDUAN LITERASI */}
                       <Dialog open={isLiterasiGuideOpen} onOpenChange={setIsLiterasiGuideOpen}>
                         <DialogContent className="max-w-2xl rounded-3xl overflow-hidden p-0 border-none shadow-2xl">
                           <div className="bg-gradient-to-br from-sky-600 to-indigo-700 p-8 text-white relative">
@@ -4348,11 +4390,11 @@ Aturan:
                       </div>
                     )}
                     
-                    {/* 🔒 Pratinjau Terkunci (Read-Only) untuk Pilih Mode */}
+                    {/*Pratinjau Terkunci (Read-Only) untuk Pilih Mode */}
                     {literasiMode === "select" && formValues.groupId && existingLiteracies[formValues.groupId] && (
                       <div className="mt-2 bg-slate-50 dark:bg-slate-900/40 p-2.5 rounded-lg border border-slate-100 dark:border-slate-800 flex flex-col gap-1">
                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide flex items-center gap-1">
-                          🔒 Stimulus / Literasi Terkunci (Hanya Edit di Soal #1 grup ini)
+                          Stimulus / Literasi Terkunci (Hanya Edit di Soal #1 grup ini)
                         </span>
                         <MathText 
                           content={existingLiteracies[formValues.groupId]}
@@ -4417,7 +4459,7 @@ Aturan:
                       />
                       {coverSizeInfo && (
                         <span className="text-[9px] text-green-600 font-semibold bg-green-50/80 px-1 py-0.5 rounded border border-green-200 dark:bg-green-950/40 dark:text-green-400 dark:border-green-800/40 shadow-sm">
-                          ⚡ {coverSizeInfo}
+                          š¡ {coverSizeInfo}
                         </span>
                       )}
                     </div>
@@ -4577,7 +4619,7 @@ Aturan:
                           onChange={(e) => handlePairChange(pair.id, "left", e.target.value)}
                           className="h-9 text-xs"
                         />
-                        <span className="text-slate-300">➔</span>
+                        <span className="text-slate-300">ž”</span>
                         <Input
                           placeholder="Kanan..."
                           value={pair.right}
@@ -4928,7 +4970,7 @@ Aturan:
           </DialogHeader>
 
           <div className="space-y-6 pt-3">
-            {/* 📖 BATCH LITERACY STIMULUS DISPLAY */}
+            {/* BATCH LITERACY STIMULUS DISPLAY */}
             {batchQuestions.length > 0 && batchQuestions[0].groupText && (
               <div className="bg-blue-50 dark:bg-blue-950/20 border-2 border-blue-200 dark:border-blue-800/40 rounded-3xl p-6 space-y-4 animate-in fade-in slide-in-from-top-4 duration-500">
                 <div className="flex items-center justify-between">
@@ -5160,7 +5202,7 @@ Aturan:
                                     </div>
                                     <MathText 
                                       key={q.choices[letter].text} 
-                                      content={q.choices[letter].text} 
+                                      content={q.choices[letter].text.startsWith('<') ? q.choices[letter].text : `<p>${q.choices[letter].text}</p>`} 
                                       className="text-base font-serif ql-editor !p-0 text-slate-800 dark:text-slate-200" 
                                     />
                                   </div>
@@ -5202,7 +5244,7 @@ Aturan:
                   <div className="space-y-3 pt-2">
                     <div className="flex items-center gap-2">
                       <div className="w-1.5 h-6 bg-purple-500 rounded-full"></div>
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Pasangan (Kiri → Kanan)</p>
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Pasangan (Kiri  Kanan)</p>
                     </div>
                     {(!q.pairs || q.pairs.length === 0) ? (
                       <div className="text-center py-4 text-xs text-slate-400 italic">
@@ -5283,7 +5325,7 @@ Aturan:
                     <div className="flex items-center gap-2">
                       <div className={`w-1.5 h-6 ${q.type === "urutkan" ? "bg-orange-500" : "bg-cyan-500"} rounded-full`}></div>
                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                        {q.type === "urutkan" ? "Urutan Benar (atas → bawah)" : "Item (urutan benar)"}
+                        {q.type === "urutkan" ? "Urutan Benar (atas  bawah)" : "Item (urutan benar)"}
                       </p>
                     </div>
                     {(!q.items || q.items.length === 0) ? (
@@ -5503,7 +5545,7 @@ Aturan:
       />
 
 
-      {/* 🪄 MODAL GENERASI AI */}
+      {/* MODAL GENERASI AI */}
       <Dialog open={isAIModalOpen} onOpenChange={setIsAIModalOpen}>
         <DialogContent className="max-w-lg rounded-2xl p-0 overflow-hidden border border-slate-200 dark:border-slate-800 shadow-xl">
           <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
@@ -5545,7 +5587,7 @@ Aturan:
               )}
             </div>
 
-            {/* 📚 Bahan Materi (upload/paste) */}
+            {/* Bahan Materi (upload/paste) */}
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
                 <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-400">Bahan Materi <span className="font-normal text-slate-400">(opsional)</span></label>
@@ -5596,8 +5638,8 @@ Aturan:
               <div className="space-y-1.5">
                 <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-400">Jumlah Soal</label>
                 <div className="flex items-center h-10 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3">
-                  <button onClick={() => setAiCount(Math.max(1, aiCount - 1))} className="text-slate-400 hover:text-slate-700 font-bold text-sm">−</button>
-                  <input type="number" value={aiCount} onChange={(e) => setAiCount(parseInt(e.target.value) || 1)} className="flex-1 text-center bg-transparent font-bold text-slate-800 dark:text-white outline-none text-xs [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+                  <button onClick={() => setAiCount(Math.max(1, aiCount - 1))} className="text-slate-400 hover:text-slate-700 font-bold text-sm">-</button>
+                  <input type="number" value={aiCount || ""} onChange={(e) => setAiCount(e.target.value === "" ? 1 : parseInt(e.target.value, 10) || 1)} className="flex-1 text-center bg-transparent font-bold text-slate-800 dark:text-white outline-none text-xs [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
                   <button onClick={() => setAiCount(Math.min(10, aiCount + 1))} className="text-slate-400 hover:text-slate-700 font-bold text-sm">+</button>
                 </div>
               </div>
@@ -5695,25 +5737,35 @@ Aturan:
         </DialogContent>
       </Dialog>
 
-      {/* 🤖 Smart AI Import Dialog */}
+      {/* Smart AI Import Dialog */}
       <Dialog open={isAIImportOpen} onOpenChange={setIsAIImportOpen}>
-        <DialogContent className="max-w-4xl bg-card max-h-[90vh] overflow-hidden flex flex-col p-0 border-none shadow-2xl">
+        <DialogContent className="max-w-4xl bg-white dark:bg-slate-900 max-h-[90vh] overflow-hidden flex flex-col p-0 border-none shadow-2xl">
           <DialogHeader className="p-6 pb-2 border-b border-slate-100 dark:border-slate-800">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 flex items-center justify-center border border-emerald-100 dark:border-emerald-800/40 shadow-sm">
-                <FileText className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
+            {parsedResults.length > 0 ? (
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-black text-slate-800 dark:text-slate-100 uppercase tracking-tighter">Hasil Ekstraksi Cerdas</h3>
+                  <span className="bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800/40">{parsedResults.length} Butir</span>
+                </div>
+                <Button variant="ghost" size="sm" onClick={() => setParsedResults([])} className="h-8 text-[10px] font-black uppercase text-slate-400 hover:text-rose-500 transition-colors">Ulangi Proses</Button>
               </div>
-              <div>
-                <DialogTitle className="text-xl font-bold text-slate-800 dark:text-slate-100">{importMode === 'json' ? 'Import JSON' : 'Smart AI Import'}</DialogTitle>
-                <p className="text-xs text-slate-500 font-medium tracking-tight">{importMode === 'json' ? 'Tempel data JSON, langsung diproses tanpa AI.' : 'Tempel teks dari PDF/Word, biarkan AI yang merapikannya.'}</p>
+            ) : (
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 flex items-center justify-center border border-emerald-100 dark:border-emerald-800/40 shadow-sm">
+                  <FileText className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
+                </div>
+                <div>
+                  <DialogTitle className="text-xl font-bold text-slate-800 dark:text-slate-100">{importMode === 'json' ? 'Import JSON' : 'Smart AI Import'}</DialogTitle>
+                  <p className="text-xs text-slate-500 font-medium tracking-tight">{importMode === 'json' ? 'Tempel data JSON, langsung diproses tanpa AI.' : 'Tempel teks dari PDF/Word, biarkan AI yang merapikannya.'}</p>
+                </div>
               </div>
-            </div>
+            )}
           </DialogHeader>
 
           <div className="flex-1 overflow-y-auto p-6 pt-2 space-y-6 scrollbar-thin">
             {parsedResults.length === 0 ? (
               <div className="space-y-6 animate-in fade-in duration-500">
-                {/* 🏷️ Mode Selection */}
+                {/* Mode Selection */}
                 <div className="flex p-1 bg-slate-100 dark:bg-slate-800/50 rounded-xl w-fit">
                   <button
                     onClick={() => setImportMode('extract')}
@@ -5823,7 +5875,7 @@ Aturan:
                             </li>
                             <li className="flex items-start gap-2">
                               <span className="w-4 h-4 rounded-full bg-orange-100 dark:bg-orange-800 text-[10px] flex items-center justify-center font-bold shrink-0 mt-0.5">2</span>
-                              <span>Klik "Parse JSON" — tidak memerlukan AI, langsung diproses.</span>
+                              <span>Klik "Parse JSON" - tidak memerlukan AI, langsung diproses.</span>
                             </li>
                             <li className="flex items-start gap-2">
                               <span className="w-4 h-4 rounded-full bg-orange-100 dark:bg-orange-800 text-[10px] flex items-center justify-center font-bold shrink-0 mt-0.5">3</span>
@@ -5877,14 +5929,7 @@ Aturan:
               </div>
             ) : (
               <div className="space-y-4 animate-in slide-in-from-bottom-4 duration-500">
-                <div className="flex items-center justify-between sticky top-0 bg-card/80 backdrop-blur-md py-3 z-10 border-b border-slate-100 dark:border-slate-800 -mx-6 px-6">
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-sm font-black text-slate-800 dark:text-slate-100 uppercase tracking-tighter">Hasil Ekstraksi Cerdas</h3>
-                    <span className="bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800/40">{parsedResults.length} Butir</span>
-                  </div>
-                  <Button variant="ghost" size="sm" onClick={() => setParsedResults([])} className="h-8 text-[10px] font-black uppercase text-slate-400 hover:text-rose-500 transition-colors">Ulangi Proses</Button>
-                </div>
-                <div className="space-y-4 pb-6 mt-4">
+                <div className="space-y-4 pb-6">
                   {parsedResults.map((q, idx) => (
                     <div key={idx} className="p-5 border border-slate-200/60 dark:border-slate-800 rounded-3xl bg-card hover:border-indigo-200 dark:hover:border-indigo-900/40 transition-colors shadow-sm">
                       <div className="flex gap-4">
@@ -6095,7 +6140,7 @@ Aturan:
           </div>
         </DialogContent>
       </Dialog>
-      {/* 📘 MODAL PUSAT BANTUAN PENULISAN STEM */}
+      {/* MODAL PUSAT BANTUAN PENULISAN STEM */}
       <Dialog open={isMathGuideOpen} onOpenChange={setIsMathGuideOpen}>
         <DialogContent className="max-w-3xl rounded-[1.5rem] overflow-hidden p-0 border-none shadow-2xl bg-white dark:bg-slate-950">
           <div className="bg-slate-900 p-8 text-white relative">
@@ -6117,12 +6162,12 @@ Aturan:
               </p>
               <div className="grid grid-cols-2 gap-3 mt-3">
                 <div className="p-3 bg-white dark:bg-slate-900 rounded-xl border border-rose-200 dark:border-rose-800">
-                  <div className="text-[10px] font-black text-rose-500 mb-1.5">❌ SALAH</div>
+                  <div className="text-[10px] font-black text-rose-500 mb-1.5">Œ SALAH</div>
                   <code className="text-xs font-mono text-slate-600">{"\\frac{a}{b}"}</code>
                   <div className="mt-2 text-[10px] text-slate-400 italic">Tampil sebagai teks biasa</div>
                 </div>
                 <div className="p-3 bg-white dark:bg-slate-900 rounded-xl border border-emerald-200 dark:border-emerald-800">
-                  <div className="text-[10px] font-black text-emerald-500 mb-1.5">✓ BENAR</div>
+                  <div className="text-[10px] font-black text-emerald-500 mb-1.5">œ“ BENAR</div>
                   <code className="text-xs font-mono text-indigo-600">{"$ \\frac{a}{b} $"}</code>
                   <div className="mt-2"><MathText content="$ \frac{a}{b} $" className="text-sm" /></div>
                 </div>
@@ -6169,8 +6214,8 @@ Aturan:
                       { name: "Theta (sudut)", code: "\\theta", full: "$ \\theta $" },
                       { name: "Alpha/Beta/Gamma", code: "\\alpha \\beta \\gamma", full: "$ \\alpha \\beta \\gamma $" },
                       { name: "Koma desimal", code: "9{,}8", full: "$ 9{,}8 $" },
-                      { name: "Kimia (H₂O)", code: "\\text{H}_2\\text{O}", full: "$ \\text{H}_2\\text{O} $" },
-                      { name: "Ion (Na⁺)", code: "\\text{Na}^+", full: "$ \\text{Na}^+ $" },
+                      { name: "Kimia (H‚‚O)", code: "\\text{H}_2\\text{O}", full: "$ \\text{H}_2\\text{O} $" },
+                      { name: "Ion (Naº)", code: "\\text{Na}^+", full: "$ \\text{Na}^+ $" },
                       { name: "Keadaan (gas)", code: "\\text{CO}_2(g)", full: "$ \\text{CO}_2(g) $" },
                       { name: "Satuan (m/s²)", code: "\\text{m/s}^2", full: "$ \\text{m/s}^2 $" },
                     ].map((item) => (
@@ -6190,31 +6235,31 @@ Aturan:
               <h4 className="text-[10px] font-black text-indigo-500 uppercase tracking-widest">Contoh Soal per Mata Pelajaran (Klik untuk Salin)</h4>
               <div className="space-y-3">
                 {[
-                  { label: "MATEMATIKA — Logaritma", code: "Nilai dari $ \\dfrac{{}^{2}\\!\\log \\sqrt{5} + 2 \\cdot {}^{4}\\!\\log 5}{{}^{2}\\!\\log 3 \\cdot {}^{3}\\!\\log 5} $ = ..." },
-                  { label: "MATEMATIKA — Integral", code: "Hitunglah $ \\int_{0}^{2} (3x^2 + 2x) \\, dx $ = ..." },
-                  { label: "MATEMATIKA — Limit", code: "Nilai $ \\lim_{x \\to 2} \\dfrac{x^2 - 4}{x - 2} $ = ..." },
-                  { label: "MATEMATIKA — Trigonometri", code: "Jika $ \\sin \\alpha = \\dfrac{3}{5} $ dan $ \\alpha $ di kuadran I, tentukan nilai $ \\cos 2\\alpha $ = ..." },
-                  { label: "MATEMATIKA — Barisan & Deret", code: "Jumlah $ n $ suku pertama deret geometri $ S_n = \\dfrac{a(1 - r^n)}{1 - r} $. Jika $ a = 3 $, $ r = 2 $, dan $ n = 5 $, maka $ S_5 $ = ..." },
-                  { label: "MATEMATIKA — Matriks", code: "Diketahui matriks $ A = \\begin{pmatrix} 2 & 1 \\\\ 3 & 4 \\end{pmatrix} $. Tentukan $ \\det(A) $ = ..." },
-                  { label: "MATEMATIKA — Turunan", code: "Jika $ f(x) = 3x^4 - 2x^3 + x - 5 $, maka $ f'(x) $ = ..." },
-                  { label: "MATEMATIKA — Peluang", code: "Dari 52 kartu bridge, peluang terambil kartu As atau kartu berwarna merah $ P(A \\cup B) = P(A) + P(B) - P(A \\cap B) $ = ..." },
-                  { label: "FISIKA — Hukum Newton", code: "Benda bermassa $ m = 5 \\text{ kg} $ di atas bidang miring $ \\theta = 30^\\circ $. Jika $ g = 10 \\text{ m/s}^2 $ dan $ \\mu_k = 0{,}2 $, percepatan benda $ a $ = ..." },
-                  { label: "FISIKA — Listrik", code: "Hambatan total rangkaian seri $ R_1 = 4 \\, \\Omega $ dan $ R_2 = 6 \\, \\Omega $ dengan tegangan $ V = 20 \\text{ V} $. Arus listrik $ I = \\dfrac{V}{R_{total}} $ = ..." },
-                  { label: "FISIKA — Gelombang", code: "Gelombang berjalan $ y = 0{,}2 \\sin(4\\pi t - 2\\pi x) $ m. Tentukan amplitudo $ A $, frekuensi $ f $, dan panjang gelombang $ \\lambda $." },
-                  { label: "FISIKA — Termodinamika", code: "Gas ideal mengalami proses isobarik. Usaha yang dilakukan gas $ W = P \\cdot \\Delta V $. Jika $ P = 2 \\times 10^5 \\text{ Pa} $ dan $ \\Delta V = 0{,}01 \\text{ m}^3 $, maka $ W $ = ..." },
-                  { label: "FISIKA — Relativitas", code: "Energi total partikel bermassa $ m $ bergerak dengan kecepatan $ v $: $ E = \\dfrac{m_0 c^2}{\\sqrt{1 - \\dfrac{v^2}{c^2}}} $" },
-                  { label: "FISIKA — Optik", code: "Lensa cembung dengan jarak fokus $ f = 20 \\text{ cm} $. Benda diletakkan $ s = 30 \\text{ cm} $. Jarak bayangan $ \\dfrac{1}{s'} = \\dfrac{1}{f} - \\dfrac{1}{s} $ = ..." },
-                  { label: "KIMIA — Reaksi", code: "Reaksi: $ 2\\text{H}_2 + \\text{O}_2 \\rightarrow 2\\text{H}_2\\text{O} $. Jika 4 mol $ \\text{H}_2 $ bereaksi sempurna, berapa mol $ \\text{H}_2\\text{O} $ yang dihasilkan?" },
-                  { label: "KIMIA — pH", code: "Larutan $ \\text{CH}_3\\text{COOH} $ 0,1 M dengan $ K_a = 10^{-5} $. Tentukan pH! ($ [\\text{H}^+] = \\sqrt{K_a \\cdot C} $)" },
-                  { label: "KIMIA — Termokimia", code: "Diketahui: $ \\text{C}(s) + \\text{O}_2(g) \\rightarrow \\text{CO}_2(g) \\quad \\Delta H = -393{,}5 \\text{ kJ/mol} $. Hitunglah kalor jika 24 g karbon dibakar! ($ A_r \\text{ C} = 12 $)" },
-                  { label: "KIMIA — Kesetimbangan", code: "Reaksi: $ \\text{N}_2(g) + 3\\text{H}_2(g) \\rightleftharpoons 2\\text{NH}_3(g) $. Tentukan $ K_c $ jika $ [\\text{NH}_3] = 0{,}4 $ M, $ [\\text{N}_2] = 0{,}2 $ M, $ [\\text{H}_2] = 0{,}1 $ M." },
-                  { label: "KIMIA — Elektrokimia", code: "Sel volta: $ \\text{Zn}(s) | \\text{Zn}^{2+}(aq) || \\text{Cu}^{2+}(aq) | \\text{Cu}(s) $. Jika $ E^\\circ_{\\text{Zn}} = -0{,}76 $ V dan $ E^\\circ_{\\text{Cu}} = +0{,}34 $ V, maka $ E^\\circ_{sel} $ = ..." },
-                  { label: "BIOLOGI — Genetika", code: "Persilangan $ \\text{Aa} \\times \\text{Aa} $ menghasilkan rasio genotip $ 1\\text{AA} : 2\\text{Aa} : 1\\text{aa} $. Berapa probabilitas fenotip dominan?" },
-                  { label: "BIOLOGI — Pertumbuhan", code: "Populasi bakteri: $ N_t = N_0 \\cdot 2^{t/g} $, dengan $ N_0 = 100 $, waktu generasi $ g = 20 $ menit. Jumlah bakteri setelah $ t = 60 $ menit = ..." },
-                  { label: "BIOLOGI — Enzim", code: "Laju reaksi enzim mengikuti persamaan Michaelis-Menten: $ v = \\dfrac{V_{max} \\cdot [S]}{K_m + [S]} $. Jika $ V_{max} = 100 $, $ K_m = 5 $, dan $ [S] = 10 $, maka $ v $ = ..." },
-                  { label: "EKONOMI — Keseimbangan", code: "Fungsi permintaan $ Q_d = 100 - 2P $ dan penawaran $ Q_s = -20 + 3P $. Harga keseimbangan $ P_e $ dan kuantitas $ Q_e $ = ..." },
-                  { label: "EKONOMI — Elastisitas", code: "Elastisitas permintaan $ E_d = \\dfrac{\\Delta Q / Q}{\\Delta P / P} $. Jika harga naik dari $ P_1 = 5000 $ ke $ P_2 = 6000 $ dan $ Q $ turun dari 100 ke 80, maka $ E_d $ = ..." },
-                  { label: "INFORMATIKA — Konversi Bilangan", code: "Konversikan $ (1011{,}01)_2 $ ke desimal: $ 1 \\cdot 2^3 + 0 \\cdot 2^2 + 1 \\cdot 2^1 + 1 \\cdot 2^0 + 0 \\cdot 2^{-1} + 1 \\cdot 2^{-2} $ = ..." },
+                  { label: "MATEMATIKA - Logaritma", code: "Nilai dari $ \\dfrac{{}^{2}\\!\\log \\sqrt{5} + 2 \\cdot {}^{4}\\!\\log 5}{{}^{2}\\!\\log 3 \\cdot {}^{3}\\!\\log 5} $ = ..." },
+                  { label: "MATEMATIKA - Integral", code: "Hitunglah $ \\int_{0}^{2} (3x^2 + 2x) \\, dx $ = ..." },
+                  { label: "MATEMATIKA - Limit", code: "Nilai $ \\lim_{x \\to 2} \\dfrac{x^2 - 4}{x - 2} $ = ..." },
+                  { label: "MATEMATIKA - Trigonometri", code: "Jika $ \\sin \\alpha = \\dfrac{3}{5} $ dan $ \\alpha $ di kuadran I, tentukan nilai $ \\cos 2\\alpha $ = ..." },
+                  { label: "MATEMATIKA - Barisan & Deret", code: "Jumlah $ n $ suku pertama deret geometri $ S_n = \\dfrac{a(1 - r^n)}{1 - r} $. Jika $ a = 3 $, $ r = 2 $, dan $ n = 5 $, maka $ S_5 $ = ..." },
+                  { label: "MATEMATIKA - Matriks", code: "Diketahui matriks $ A = \\begin{pmatrix} 2 & 1 \\\\ 3 & 4 \\end{pmatrix} $. Tentukan $ \\det(A) $ = ..." },
+                  { label: "MATEMATIKA - Turunan", code: "Jika $ f(x) = 3x^4 - 2x^3 + x - 5 $, maka $ f'(x) $ = ..." },
+                  { label: "MATEMATIKA - Peluang", code: "Dari 52 kartu bridge, peluang terambil kartu As atau kartu berwarna merah $ P(A \\cup B) = P(A) + P(B) - P(A \\cap B) $ = ..." },
+                  { label: "FISIKA - Hukum Newton", code: "Benda bermassa $ m = 5 \\text{ kg} $ di atas bidang miring $ \\theta = 30^\\circ $. Jika $ g = 10 \\text{ m/s}^2 $ dan $ \\mu_k = 0{,}2 $, percepatan benda $ a $ = ..." },
+                  { label: "FISIKA - Listrik", code: "Hambatan total rangkaian seri $ R_1 = 4 \\, \\Omega $ dan $ R_2 = 6 \\, \\Omega $ dengan tegangan $ V = 20 \\text{ V} $. Arus listrik $ I = \\dfrac{V}{R_{total}} $ = ..." },
+                  { label: "FISIKA - Gelombang", code: "Gelombang berjalan $ y = 0{,}2 \\sin(4\\pi t - 2\\pi x) $ m. Tentukan amplitudo $ A $, frekuensi $ f $, dan panjang gelombang $ \\lambda $." },
+                  { label: "FISIKA - Termodinamika", code: "Gas ideal mengalami proses isobarik. Usaha yang dilakukan gas $ W = P \\cdot \\Delta V $. Jika $ P = 2 \\times 10^5 \\text{ Pa} $ dan $ \\Delta V = 0{,}01 \\text{ m}^3 $, maka $ W $ = ..." },
+                  { label: "FISIKA - Relativitas", code: "Energi total partikel bermassa $ m $ bergerak dengan kecepatan $ v $: $ E = \\dfrac{m_0 c^2}{\\sqrt{1 - \\dfrac{v^2}{c^2}}} $" },
+                  { label: "FISIKA - Optik", code: "Lensa cembung dengan jarak fokus $ f = 20 \\text{ cm} $. Benda diletakkan $ s = 30 \\text{ cm} $. Jarak bayangan $ \\dfrac{1}{s'} = \\dfrac{1}{f} - \\dfrac{1}{s} $ = ..." },
+                  { label: "KIMIA - Reaksi", code: "Reaksi: $ 2\\text{H}_2 + \\text{O}_2 \\rightarrow 2\\text{H}_2\\text{O} $. Jika 4 mol $ \\text{H}_2 $ bereaksi sempurna, berapa mol $ \\text{H}_2\\text{O} $ yang dihasilkan?" },
+                  { label: "KIMIA - pH", code: "Larutan $ \\text{CH}_3\\text{COOH} $ 0,1 M dengan $ K_a = 10^{-5} $. Tentukan pH! ($ [\\text{H}^+] = \\sqrt{K_a \\cdot C} $)" },
+                  { label: "KIMIA - Termokimia", code: "Diketahui: $ \\text{C}(s) + \\text{O}_2(g) \\rightarrow \\text{CO}_2(g) \\quad \\Delta H = -393{,}5 \\text{ kJ/mol} $. Hitunglah kalor jika 24 g karbon dibakar! ($ A_r \\text{ C} = 12 $)" },
+                  { label: "KIMIA - Kesetimbangan", code: "Reaksi: $ \\text{N}_2(g) + 3\\text{H}_2(g) \\rightleftharpoons 2\\text{NH}_3(g) $. Tentukan $ K_c $ jika $ [\\text{NH}_3] = 0{,}4 $ M, $ [\\text{N}_2] = 0{,}2 $ M, $ [\\text{H}_2] = 0{,}1 $ M." },
+                  { label: "KIMIA - Elektrokimia", code: "Sel volta: $ \\text{Zn}(s) | \\text{Zn}^{2+}(aq) || \\text{Cu}^{2+}(aq) | \\text{Cu}(s) $. Jika $ E^\\circ_{\\text{Zn}} = -0{,}76 $ V dan $ E^\\circ_{\\text{Cu}} = +0{,}34 $ V, maka $ E^\\circ_{sel} $ = ..." },
+                  { label: "BIOLOGI - Genetika", code: "Persilangan $ \\text{Aa} \\times \\text{Aa} $ menghasilkan rasio genotip $ 1\\text{AA} : 2\\text{Aa} : 1\\text{aa} $. Berapa probabilitas fenotip dominan?" },
+                  { label: "BIOLOGI - Pertumbuhan", code: "Populasi bakteri: $ N_t = N_0 \\cdot 2^{t/g} $, dengan $ N_0 = 100 $, waktu generasi $ g = 20 $ menit. Jumlah bakteri setelah $ t = 60 $ menit = ..." },
+                  { label: "BIOLOGI - Enzim", code: "Laju reaksi enzim mengikuti persamaan Michaelis-Menten: $ v = \\dfrac{V_{max} \\cdot [S]}{K_m + [S]} $. Jika $ V_{max} = 100 $, $ K_m = 5 $, dan $ [S] = 10 $, maka $ v $ = ..." },
+                  { label: "EKONOMI - Keseimbangan", code: "Fungsi permintaan $ Q_d = 100 - 2P $ dan penawaran $ Q_s = -20 + 3P $. Harga keseimbangan $ P_e $ dan kuantitas $ Q_e $ = ..." },
+                  { label: "EKONOMI - Elastisitas", code: "Elastisitas permintaan $ E_d = \\dfrac{\\Delta Q / Q}{\\Delta P / P} $. Jika harga naik dari $ P_1 = 5000 $ ke $ P_2 = 6000 $ dan $ Q $ turun dari 100 ke 80, maka $ E_d $ = ..." },
+                  { label: "INFORMATIKA - Konversi Bilangan", code: "Konversikan $ (1011{,}01)_2 $ ke desimal: $ 1 \\cdot 2^3 + 0 \\cdot 2^2 + 1 \\cdot 2^1 + 1 \\cdot 2^0 + 0 \\cdot 2^{-1} + 1 \\cdot 2^{-2} $ = ..." },
                 ].map((ex) => (
                   <div key={ex.label} onClick={() => copyToClipboard(ex.code, ex.label)} className={`group p-4 rounded-2xl border cursor-pointer transition-all ${copiedId === ex.label ? "bg-emerald-50 dark:bg-emerald-950/20 border-emerald-300" : "bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 hover:border-indigo-300"}`}>
                     <div className="flex items-center justify-between mb-2">
@@ -6232,12 +6277,12 @@ Aturan:
             <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/40 space-y-2">
               <h4 className="text-[10px] font-black text-amber-700 uppercase tracking-widest">Tips Penting</h4>
               <ul className="text-[11px] text-amber-800/80 dark:text-amber-300 space-y-1.5">
-                <li>• Gunakan <code className="font-mono bg-amber-100 dark:bg-amber-900/30 px-1 rounded">{"\\dfrac"}</code> untuk pecahan besar yang lebih mudah dibaca</li>
-                <li>• Untuk teks biasa di dalam rumus, bungkus dengan <code className="font-mono bg-amber-100 dark:bg-amber-900/30 px-1 rounded">{"\\text{...}"}</code></li>
-                <li>• Import dari Word otomatis mengkonversi equation ke LaTeX</li>
-                <li>• Copy-paste pecahan HTML dari Word juga otomatis dikonversi</li>
-                <li>• AI Generator sudah otomatis menggunakan format LaTeX yang benar</li>
-                <li>• Format KaTeX <code className="font-mono bg-amber-100 dark:bg-amber-900/30 px-1 rounded">{"\\(...\\)"}</code> juga didukung sebagai alternatif <code className="font-mono bg-amber-100 dark:bg-amber-900/30 px-1 rounded">{"$...$"}</code></li>
+                <li> Gunakan <code className="font-mono bg-amber-100 dark:bg-amber-900/30 px-1 rounded">{"\\dfrac"}</code> untuk pecahan besar yang lebih mudah dibaca</li>
+                <li> Untuk teks biasa di dalam rumus, bungkus dengan <code className="font-mono bg-amber-100 dark:bg-amber-900/30 px-1 rounded">{"\\text{...}"}</code></li>
+                <li> Import dari Word otomatis mengkonversi equation ke LaTeX</li>
+                <li> Copy-paste pecahan HTML dari Word juga otomatis dikonversi</li>
+                <li> AI Generator sudah otomatis menggunakan format LaTeX yang benar</li>
+                <li> Format KaTeX <code className="font-mono bg-amber-100 dark:bg-amber-900/30 px-1 rounded">{"\\(...\\)"}</code> juga didukung sebagai alternatif <code className="font-mono bg-amber-100 dark:bg-amber-900/30 px-1 rounded">{"$...$"}</code></li>
               </ul>
             </div>
           </div>

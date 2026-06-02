@@ -141,6 +141,7 @@ const StudentTable = ({
     { 
       key: "gender", 
       label: "L/P", 
+      sortable: true,
       className: "w-[60px] text-center",
       render: (gender: string) => (
         <Badge variant="outline" className={cn(
@@ -161,6 +162,20 @@ const StudentTable = ({
           <Badge variant="secondary" className="bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border-transparent text-[10px] font-bold px-2 py-0.5">
             {cls?.name || `Tanpa ${terminology.class}`}
           </Badge>
+        );
+      }
+    },
+    {
+      key: "hasChangedPassword",
+      label: "Password",
+      sortable: true,
+      className: "w-[140px]",
+      render: (_: any, student: StudentData) => {
+        const hasChanged = student.hasChangedPassword;
+        return (
+          <span className={cn("text-[10px] font-semibold px-2 py-1 rounded-lg inline-flex items-center gap-1", hasChanged ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-800/40" : "bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400 border border-amber-100 dark:border-amber-800/40")}>
+            {hasChanged ? "✓ Diubah" : "⚠ Default"}
+          </span>
         );
       }
     },

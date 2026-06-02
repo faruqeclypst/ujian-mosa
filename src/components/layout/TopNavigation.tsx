@@ -16,7 +16,7 @@ import ChangePasswordModal from "../auth/ChangePasswordModal";
 import AISettingsModal from "../auth/AISettingsModal";
 
 const TopNavigation = () => {
-  const { user, signOut, usernameFromEmail } = useAuth();
+  const { user, role, signOut, usernameFromEmail } = useAuth();
   const { setMobileOpen } = useSidebar();
   const { school, pb, terminology } = useTenant();
   const { theme, setTheme } = useTheme();
@@ -293,12 +293,14 @@ const TopNavigation = () => {
                                  </p>
                                </div>
                               <Button
-                                onClick={() => handleUnlockStudent(a.id)}
+                                onClick={() => role === "admin" && handleUnlockStudent(a.id)}
                                 size="sm"
-                                className="w-full mt-3 h-8 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold gap-1.5 shadow-sm shadow-blue-500/20"
+                                disabled={role !== "admin"}
+                                className="w-full mt-3 h-8 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold gap-1.5 shadow-sm shadow-blue-500/20 disabled:opacity-40 disabled:cursor-not-allowed"
+                                title={role !== "admin" ? "Hanya admin yang dapat membuka kunci" : "Buka kunci siswa"}
                               >
                                 <Unlock className="h-3.5 w-3.5" />
-                                Buka Kunci Navigasi
+                                {role === "admin" ? "Buka Kunci Navigasi" : "Hanya Admin"}
                               </Button>
                             </div>
                           </div>

@@ -191,7 +191,11 @@ export const AI_MODELS = [
   { id: "qwen/qwen3-32b", name: "Qwen 3 32B (Latest)", speed: "Powerful", status: "preview", provider: "openrouter" },
   { id: "openai/gpt-oss-120b", name: "GPT-OSS 120B (OpenAI Architecture)", speed: "Colossal", status: "preview", provider: "openrouter" },
   { id: "openai/gpt-oss-20b", name: "GPT-OSS 20B", speed: "Fast", status: "preview", provider: "openrouter" },
+  { id: "google/gemini-2.5-flash", name: "Gemini 2.5 Flash (Terbaru)", speed: "Hyper Fast", status: "production", provider: "openrouter" },
+  { id: "google/gemini-2.5-flash-preview-09-2025", name: "Gemini 2.5 Flash Preview", speed: "Hyper Fast", status: "preview", provider: "openrouter" },
+  { id: "google/gemini-2.0-flash-001", name: "Gemini 2.0 Flash", speed: "Hyper Fast", status: "production", provider: "openrouter" },
   { id: "google/gemini-flash-1.5", name: "Gemini 1.5 Flash", speed: "Fast", status: "production", provider: "openrouter" },
+  { id: "google/gemini-flash-latest", name: "Gemini Flash (Latest)", speed: "Fast", status: "production", provider: "openrouter" },
   { id: "deepseek/deepseek-r1:free", name: "DeepSeek R1 (Free)", speed: "Powerful", status: "production", provider: "openrouter" },
 
   // --- GROQ EXPERIMENTAL ---
@@ -298,8 +302,18 @@ const getAIConfig = async (pb: PocketBase): Promise<AIConfig> => {
     rawModel = config?.ai_model || AI_MODELS[0].id;
     rawProvider = config?.ai_provider || "groq";
   } else {
-    rawModel = (user as any)?.ai_model || config?.ai_model || AI_MODELS[0].id;
-    rawProvider = (user as any)?.ai_provider || config?.ai_provider || "groq";
+    // Cek apakah admin punya key aktif — kalau ya, pakai setting admin
+    const tempSettings = config;
+    const adminHasKey = (tempSettings?.ai_provider === "groq" ? tempSettings?.groq_api_key : tempSettings?.ai_gateway_key)?.trim();
+    if (adminHasKey) {
+      // Pakai provider & model dari admin
+      rawModel = config?.ai_model || AI_MODELS[0].id;
+      rawProvider = config?.ai_provider || "groq";
+    } else {
+      // Fallback ke setting user sendiri
+      rawModel = (user as any)?.ai_model || config?.ai_model || AI_MODELS[0].id;
+      rawProvider = (user as any)?.ai_provider || config?.ai_provider || "groq";
+    }
   }
 
   const isCustom = rawProvider === "custom";
@@ -342,15 +356,19 @@ const getAIConfig = async (pb: PocketBase): Promise<AIConfig> => {
     apiKey = finalProvider === "groq" ? config?.groq_api_key : config?.ai_gateway_key;
     if (!apiKey?.trim()) throw new Error(`API Key untuk Provider ${finalProvider.toUpperCase()} belum diatur.`);
   } else {
-    // Guru: pakai key pribadi, fallback ke key admin jika teacher_ai_access aktif
-    const teacherHasOwnKey = userApiKey && userApiKey.trim();
+    // Guru: admin key diprioritaskan, user key hanya fallback jika admin key kosong
     const adminKey = finalProvider === "groq" ? config?.groq_api_key : config?.ai_gateway_key;
+    const teacherHasOwnKey = userApiKey && userApiKey.trim();
     const isAIAccess = config?.teacher_ai_access ?? false;
 
-    if (teacherHasOwnKey) {
-      apiKey = userApiKey;
-    } else if (isAIAccess && adminKey?.trim()) {
+    if (adminKey?.trim()) {
+      // Admin key selalu diprioritaskan
       apiKey = adminKey;
+    } else if (teacherHasOwnKey) {
+      // Fallback ke key pribadi guru jika admin key kosong
+      apiKey = userApiKey;
+    } else if (isAIAccess) {
+      throw new Error("Admin belum mengatur API Key AI. Hubungi Admin.");
     } else {
       throw new Error("Anda belum memiliki API Key AI. Hubungi Admin untuk mengaktifkan akses AI atau masukkan API Key pribadi di Pengaturan AI.");
     }
@@ -562,6 +580,32 @@ const stripUnwantedLatex = (text: string, isExactSubject: boolean): string => {
 };
 
 const validateQuestions = (questions: any[], isExactSubject: boolean = false, requestedType?: string): AIGeneratedQuestion[] => {
+  // Helper: unescape double backslashes that may remain after JSON parsing edge cases
+  const unescapeLatex = (text: string): string => {
+    if (!text) return text;
+    // Fix \\frac -> \frac, \\pi -> \pi, etc. (double backslash to single)
+    return text.replace(/\\\\([a-zA-Z{}\[\]^_])/g, '\\$1');
+  };
+
+  // Helper: auto-wrap bare LaTeX commands in HTML text with $...$
+  const wrapLatexInHtml = (html: string): string => {
+    if (!html) return html;
+    // If already has $ delimiters, just return as-is
+    if (html.includes('$')) return html;
+    // Look for bare LaTeX commands like \frac, \sin, \sqrt etc. inside HTML text nodes
+    // Replace text outside HTML tags that contains LaTeX commands
+    return html.replace(/>([^<]+)</g, (match, textContent) => {
+      if (!textContent.trim()) return match;
+      const hasLatex = /\\[a-zA-Z]+/.test(textContent);
+      if (!hasLatex) return match;
+      // Wrap segments that look like LaTeX expressions
+      const wrapped = textContent.replace(
+        /((?:\\[a-zA-Z]+(?:\{[^}]*\})*(?:\^[{^]?[^}\s]+}?)?(?:_[{_]?[^}\s]+}?)?)+)/g,
+        '$$$1$$'
+      );
+      return `>${wrapped}<`;
+    });
+  };
   return questions.filter(q => {
     // Must have text
     if (!q.text?.trim() && !q.question?.trim()) return false;
@@ -647,14 +691,21 @@ const validateQuestions = (questions: any[], isExactSubject: boolean = false, re
     
     return true;
   }).map(q => ({
-    text: stripUnwantedLatex(q.text || q.question || "", isExactSubject),
+    text: stripUnwantedLatex(unescapeLatex(q.text || q.question || ""), isExactSubject),
     type: q.type || requestedType || "pilihan_ganda",
     choices: (() => {
       const c = q.choices || q.options || undefined;
       if (c && !isExactSubject) {
         const cleaned: any = {};
         Object.keys(c).forEach(k => {
-          cleaned[k] = { ...c[k], text: stripUnwantedLatex(c[k]?.text || "", isExactSubject) };
+          cleaned[k] = { ...c[k], text: stripUnwantedLatex(unescapeLatex(c[k]?.text || ""), isExactSubject) };
+        });
+        return cleaned;
+      }
+      if (c && isExactSubject) {
+        const cleaned: any = {};
+        Object.keys(c).forEach(k => {
+          cleaned[k] = { ...c[k], text: unescapeLatex(c[k]?.text || "") };
         });
         return cleaned;
       }
@@ -664,7 +715,7 @@ const validateQuestions = (questions: any[], isExactSubject: boolean = false, re
     items: q.items || undefined,
     answerKey: q.answerKey || q.answer_key || q.answer || "",
     groupId: q.groupId || "",
-    groupText: q.groupText || ""
+    groupText: wrapLatexInHtml(unescapeLatex(q.groupText || ""))
   }));
 };
 
@@ -877,9 +928,9 @@ Hanya JSON. Pastikan stimulus SELESAI SEMPURNA (tidak terpotong).`;
         : `${materialSection}Topik: "${topic}". Buat stimulus literasi${hasMaterial ? " berdasarkan materi referensi di atas" : ""} + ${count} soal ${typeLabel}.`;
 
       // Token estimation: stimulus + questions combined
-      const stimulusTokens = ({ pendek: 500, sedang: 1000, panjang: 1800 }[passageLength] || 1000);
-      const questionTokens = count * (ctx.isReligious || ctx.explicitlyWantsArabic ? 700 : 400);
-      const totalTokens = Math.min(stimulusTokens + questionTokens + 200, 12000);
+      const stimulusTokens = ({ pendek: 800, sedang: 1500, panjang: 2500 }[passageLength] || 1500);
+      const questionTokens = count * (ctx.isReligious || ctx.explicitlyWantsArabic ? 900 : 550);
+      const totalTokens = Math.min(stimulusTokens + questionTokens + 300, 32000);
 
       const content = await fetchAI({
         pb, messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userPrompt }],
@@ -954,8 +1005,8 @@ Hanya JSON.`;
       ? `${materialSection}INSTRUKSI PENGGUNA: ${topic}\nBuat ${count} soal ${typeLabel}, ${level} - ${subject}. Soal harus menyinggung isi materi.`
       : `${materialSection}Topik: "${topic}". Buat ${count} soal ${typeLabel}, ${level} - ${subject}.${hasMaterial ? " Soal WAJIB berdasarkan & menyinggung isi materi referensi di atas." : " Variasi panjang stem & tipe pertanyaan."}`;
 
-    const baseTokens = (ctx.isReligious || ctx.explicitlyWantsArabic) ? 700 : 350;
-    const maxTokens = Math.min(Math.max(count * baseTokens, 1500), 8000);
+    const baseTokens = (ctx.isReligious || ctx.explicitlyWantsArabic) ? 900 : 500;
+    const maxTokens = Math.min(Math.max(count * baseTokens, 2500), 32000);
 
     const content = await fetchAI({
       pb, messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userPrompt }],
@@ -1461,12 +1512,13 @@ Hanya JSON murni.`;
     if (count > 7) {
       const batchSize = Math.ceil(count / 2);
       const batches = [batchSize, count - batchSize];
+
       const results = await Promise.allSettled(
         batches.map(batchCount => {
           const batchUserPrompt = `MATERI:\n\n${material}\n\nBuat ${batchCount} soal ${typeDesc}, kesulitan ${difficulty}. WAJIB variasi pola pertanyaan.`;
           return fetchAI({
             pb, messages: [{ role: "system", content: systemPrompt }, { role: "user", content: batchUserPrompt }],
-            maxTokens: batchCount * 1200, temperature: 0.7
+            maxTokens: batchCount * 1400, temperature: 0.7
           }).then(content => {
             const parsed = robustJSONParse(content);
             let raw = parsed.questions || parsed.data || parsed.soal || (Array.isArray(parsed) ? parsed : []);
@@ -1486,7 +1538,7 @@ Hanya JSON murni.`;
 
     const content = await fetchAI({
       pb, messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userPrompt }],
-      maxTokens: count * 1200, temperature: 0.7
+      maxTokens: Math.min(count * 1400, 32000), temperature: 0.7
     });
 
     const parsed = robustJSONParse(content);

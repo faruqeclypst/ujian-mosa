@@ -117,6 +117,17 @@ export const MathText: React.FC<MathTextProps> = ({ content, className = "" }) =
       // Run KaTeX on all HTML segments
       const segments = containerRef.current.querySelectorAll('.html-segment');
       segments.forEach(seg => runKatex(seg as HTMLElement));
+
+      // Add load handlers to images for placeholder support
+      const images = containerRef.current.querySelectorAll('img');
+      images.forEach(img => {
+        if (img.complete && img.naturalWidth > 0) {
+          img.setAttribute('data-loaded', 'true');
+        } else {
+          img.addEventListener('load', () => img.setAttribute('data-loaded', 'true'), { once: true });
+          img.addEventListener('error', () => img.setAttribute('data-loaded', 'true'), { once: true });
+        }
+      });
     }
   }, [content]);
 
@@ -200,10 +211,18 @@ export const MathText: React.FC<MathTextProps> = ({ content, className = "" }) =
     if (!html) return "";
     let processed = html;
 
-    // 0. Strip leading whitespace/nbsp from paragraph content
-    processed = processed.replace(/<p([^>]*)>((?:&nbsp;|\s|\u00A0)+)/gi, '<p$1>');
-    // Also strip leading nbsp from bare text (not in <p>)
-    processed = processed.replace(/^((?:&nbsp;|\u00A0)+)/, '');
+    // 0. Strip dark text colors so they inherit parent color (fixes dark mode readability)
+    // Remove color styles that are dark/black — they become invisible in dark mode
+    const darkColors = /color\s*:\s*(#[0-3][0-9a-f]{5}|#[0-3][0-9a-f]{2}|black|rgb\s*\(\s*[0-9]{1,2}\s*,\s*[0-9]{1,2}\s*,\s*[0-9]{1,2}\s*\)|windowtext)/gi;
+    processed = processed.replace(/style="([^"]*)"/gi, (match, styleContent) => {
+      const cleaned = styleContent.replace(darkColors, '').replace(/;\s*;/g, ';').replace(/^\s*;\s*/, '').replace(/\s*;\s*$/, '');
+      if (!cleaned.trim()) return '';
+      return `style="${cleaned}"`;
+    });
+    // Also strip color attribute on <span> from Quill (e.g. <span style="color: #000;">)
+    processed = processed.replace(/<span\s+style="\s*">/gi, '<span>');
+    // Remove empty spans that are left over
+    processed = processed.replace(/<span>([^<]*)<\/span>/gi, '$1');
     
     // 1. Convert HTML fractions to LaTeX (e.g. <sup>3</sup>&frasl;<sub>2</sub> → $\frac{3}{2}$)
     processed = processed.replace(
