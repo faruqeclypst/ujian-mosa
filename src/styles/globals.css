@@ -169,6 +169,9 @@ body {
   width: auto;
   max-width: 100%;
   table-layout: auto;
+  display: block;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .ql-editor table th,
@@ -345,13 +348,21 @@ body {
   color: inherit !important;
 }
 
-/* Strip ALL background-color highlights in dark mode (from Word/website paste) */
-.dark .ql-editor [style*="background-color"],
-.dark .ql-editor [style*="background"],
-.dark .html-segment [style*="background-color"],
-.dark .html-segment [style*="background"],
-.dark .math-content [style*="background-color"],
-.dark .math-content [style*="background"] {
+/* In dark mode, strip background only for elements that look like Word paste artifacts
+   (white/light backgrounds that would be invisible on dark bg).
+   Keep colored highlights (yellow, green, etc.) intentionally set by teacher. */
+.dark .html-segment [style*="background-color: white"],
+.dark .html-segment [style*="background-color: #fff"],
+.dark .html-segment [style*="background-color: #ffffff"],
+.dark .html-segment [style*="background-color: rgb(255, 255, 255)"],
+.dark .html-segment [style*="background: white"],
+.dark .html-segment [style*="background: #fff"],
+.dark .math-content [style*="background-color: white"],
+.dark .math-content [style*="background-color: #fff"],
+.dark .math-content [style*="background-color: #ffffff"],
+.dark .math-content [style*="background-color: rgb(255, 255, 255)"],
+.dark .math-content [style*="background: white"],
+.dark .math-content [style*="background: #fff"] {
   background-color: transparent !important;
   background: transparent !important;
 }
@@ -414,11 +425,12 @@ body {
   color: #86efac !important;
 }
 
-/* Also strip background in light mode (unwanted highlights from paste) */
+/* Also strip background in light mode (unwanted highlights from paste) —
+   but KEEP intentional highlights set by user in editor */
 .ql-editor [style*="background-color"],
 .html-segment [style*="background-color"],
 .math-content [style*="background-color"] {
-  background-color: transparent !important;
+  /* Allow background-color through — user may have set it intentionally */
 }
 
 /* Strip unwanted indentation from Word/website paste */
@@ -475,17 +487,38 @@ body {
   line-height: 1.5;
 }
 
+/* Inline KaTeX — allow horizontal scroll if too wide on mobile */
 .premium-math .katex {
   font-size: 1.15em !important;
   color: inherit;
   white-space: nowrap;
+  max-width: 100%;
 }
 
+/* Wrap inline katex in scrollable container when it overflows */
+.premium-math .katex-html {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  display: inline-block;
+  vertical-align: middle;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Display/block KaTeX */
 .premium-math .katex-display {
   margin: 0.5em 0;
   overflow-x: auto;
   overflow-y: hidden;
   padding: 0.25em 0;
+  -webkit-overflow-scrolling: touch;
+  max-width: 100%;
+}
+
+.premium-math .katex-display > .katex {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
 }
 
 /* Fix for small symbols in inline mode when using \displaystyle */

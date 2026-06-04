@@ -37,8 +37,7 @@ const DashboardPage = () => {
   const [activityTrend, setActivityTrend] = useState<any[]>([]);
   const [localLoading, setLocalLoading] = useState(true);
 
-  const [activeDashboardTab, setActiveDashboardTab] = useState<"performa" | "pelanggaran" | "selesai" | "mapel">("performa");
-  const [subjectStats, setSubjectStats] = useState<any[]>([]);
+  const [activeDashboardTab, setActiveDashboardTab] = useState<"performa" | "pelanggaran" | "selesai">("performa");
   const [logActivity, setLogActivity] = useState<{
     violations: any[];
     recentFinished: any[];
@@ -138,25 +137,7 @@ const DashboardPage = () => {
           recentFinished: finished.slice(0, 10),
         });
 
-        // C. Subject Stats
-        const subMap: Record<string, { total: number; count: number }> = {};
-        examsData.forEach((e) => {
-          const sub = subjects.find((s) => s.id === e.subjectId);
-          if (!sub) return;
-          const relatedAttempts = attemptsData.filter((a) => a.examId === e.id && (a.score || 0) > 0);
-          relatedAttempts.forEach((ra) => {
-            if (!subMap[sub.name]) subMap[sub.name] = { total: 0, count: 0 };
-            subMap[sub.name].total += ra.score;
-            subMap[sub.name].count++;
-          });
-        });
-        setSubjectStats(
-          Object.entries(subMap)
-            .map(([name, data]) => ({ name, avgScore: Math.round(data.total / data.count) }))
-            .sort((a, b) => b.avgScore - a.avgScore)
-        );
-
-        // D. Type Distribution
+        // C. Type Distribution
         const types: Record<string, number> = {};
         examsData.forEach((e: any) => {
           const t = e.examType || e.examtype || "UMUM";
@@ -164,7 +145,7 @@ const DashboardPage = () => {
         });
         setTypeDistribution(Object.entries(types).map(([name, value]) => ({ name, value })));
 
-        // E. Activity Trend
+        // D. Activity Trend
         const trendMap: Record<string, number> = {};
         attemptsData.slice(0, 50).reverse().forEach((a: any) => {
           const date = new Date(a.updated || a.created).toLocaleTimeString("id-ID", {
@@ -194,7 +175,7 @@ const DashboardPage = () => {
       unsubRooms.then((u: any) => u());
       unsubAttempts.then((u: any) => u());
     };
-  }, [students, classes, subjects]);
+  }, [students, classes]);
 
   const totalTeachers = teachers.length;
   const totalClasses = classes.length;
@@ -209,7 +190,6 @@ const DashboardPage = () => {
     { id: "performa" as const, label: "Performa" },
     { id: "pelanggaran" as const, label: "Pelanggaran" },
     { id: "selesai" as const, label: "Terbaru" },
-    { id: "mapel" as const, label: terminology.subject },
   ];
 
   return (
@@ -451,30 +431,7 @@ const DashboardPage = () => {
                   </div>
                 )}
 
-                {/* Mapel */}
-                {activeDashboardTab === "mapel" && (
-                  <div className="h-72 sm:h-80">
-                    {subjectStats.length === 0 ? (
-                      <div className="h-full flex flex-col items-center justify-center text-slate-300 gap-3">
-                        <BarChart2 size={40} strokeWidth={1.5} />
-                        <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest">Belum ada data nilai</p>
-                      </div>
-                    ) : (
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={subjectStats} layout="vertical" margin={{ top: 5, right: 20, left: 50, bottom: 5 }}>
-                          <CartesianGrid strokeDasharray="3 3" horizontal={false} vertical={true} stroke="#E2E8F0" opacity={0.5} />
-                          <XAxis type="number" axisLine={false} tickLine={false} fontSize={10} fontWeight={600} tick={{ fill: "#94A3B8" }} />
-                          <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} fontSize={9} fontWeight={600} tick={{ fill: "#64748B" }} width={90} />
-                          <Tooltip
-                            contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "0 10px 25px -5px rgba(0,0,0,0.1)", padding: "10px 14px" }}
-                            cursor={{ fill: "#F8FAFC" }}
-                          />
-                          <Bar name="Rerata Skor" dataKey="avgScore" fill="#8B5CF6" radius={[0, 6, 6, 0]} barSize={18} />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    )}
-                  </div>
-                )}
+                {/* Mapel — removed */}
               </div>
             )}
           </div>

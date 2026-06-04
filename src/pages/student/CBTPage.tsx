@@ -359,6 +359,7 @@ const CBTPage = () => {
   const orientationChangeRef = useRef<boolean>(false);
   const isIndexRestored = useRef(false);
   const isCreatingRef = useRef(false);
+  const isSubmittingRef = useRef(false);
 
   // 🛡️ Enhanced Screen Wake Lock (WakeLock API + Video Hack)
   useEffect(() => {
@@ -532,6 +533,7 @@ const CBTPage = () => {
           // Jika attempt sudah dihapus/reset oleh admin
           if (err?.status === 404 || err?.status === 403) {
             sessionStorage.removeItem("activeCBTRoomId");
+            setIsSubmitModalOpen(false);
             setIsResetModalOpen(true);
           }
         });
@@ -781,6 +783,7 @@ const CBTPage = () => {
     const unsubAttempt = pb!.collection("attempts").subscribe(attempt.id, (e) => {
       if (e.action === "delete") {
         sessionStorage.removeItem("activeCBTRoomId");
+        setIsSubmitModalOpen(false);
         setIsResetModalOpen(true);
         setTimeout(() => { window.location.href = "/"; }, 2500);
       }
@@ -799,7 +802,7 @@ const CBTPage = () => {
             sessionStorage.removeItem("activeCBTRoomId");
             window.location.href = "/";
           }
-        } else if ((newS === "finished" || newS === "submitted") && !isSubmitting) {
+        } else if ((newS === "finished" || newS === "submitted") && !isSubmittingRef.current) {
           setIsAdminFinishedModalOpen(true);
         }
       }
@@ -809,7 +812,7 @@ const CBTPage = () => {
       unsubRoom.then(u => u());
       unsubAttempt.then(u => u());
     };
-  }, [roomData, roomId, attempt, navigate, loadExamData, isSubmitting]);
+  }, [roomData, roomId, attempt, navigate, loadExamData]);
 
   useEffect(() => {
     if (loading || isExamOver || !roomData || !attempt) return;
@@ -838,6 +841,7 @@ const CBTPage = () => {
               localStorage.removeItem(`local_attempt_${student.id}_${roomId}`);
               localStorage.removeItem(`pending_sync_${student.id}_${roomId}`);
             }
+            setIsSubmitModalOpen(false);
             setIsResetModalOpen(true);
           }
         }
@@ -992,8 +996,15 @@ const CBTPage = () => {
     if (!student || !roomId || !attempt || (attempt.status !== "ongoing" && attempt.status !== "LOCKED") || isSubmitting) return;
 
     setIsSubmitting(true);
+    isSubmittingRef.current = true;
     setLoading(true);
     try {
+      // Flush pending debounced save
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+        saveTimeoutRef.current = null;
+      }
+
       let objectiveCorrect = 0;
       let objectiveTotal = 0;
       let essayTotal = 0;
@@ -1001,43 +1012,34 @@ const CBTPage = () => {
       
       questions.forEach((q: any) => {
         const t = q.type || "pilihan_ganda";
-        
-        // Isian singkat & uraian → dinilai terpisah (manual/AI)
-        if (t === "isian_singkat" || t === "uraian") {
-          essayTotal++;
-          return;
-        }
-        
+        if (t === "isian_singkat" || t === "uraian") { essayTotal++; return; }
         objectiveTotal++;
-        
         if (ovr[q.id] !== undefined) { if (ovr[q.id] === true) objectiveCorrect++; return; }
         const sa = answers[q.id]; if (!sa) return;
-        
         if (t === "pilihan_ganda" || t === "benar_salah") { if (q.choices?.[sa]?.isCorrect === true) objectiveCorrect++; }
         else if (t === "pilihan_ganda_kompleks") { const ck = Object.keys(q.choices).filter(k => q.choices[k].isCorrect).map(k => k.toLowerCase()); const sk = Array.isArray(sa) ? sa.map(k => String(k).toLowerCase()) : []; if (sk.length === ck.length && sk.every(k => ck.includes(k))) objectiveCorrect++; }
         else if (t === "menjodohkan") { let cp = 0; (q.pairs || []).forEach((p: any) => { if (sa[p.id] === p.right) cp++; }); if (q.pairs?.length > 0) objectiveCorrect += (cp / q.pairs.length); }
         else if (t === "urutkan" || t === "drag_drop") { const co = (q.items || []).map((it: any) => it.id); if (Array.isArray(sa) && sa.length === co.length && sa.every((v, index) => v === co[index])) objectiveCorrect++; }
       });
-      
-      // Weighted scoring: 40% objektif, 60% essay (jika ada essay)
+
       const totalQuestions = objectiveTotal + essayTotal;
-      
       let score: number;
       if (essayTotal === 0) {
-        // Tidak ada essay → penilaian murni objektif (100% objektif)
         score = objectiveTotal > 0 ? Math.round((objectiveCorrect / objectiveTotal) * 100) : 0;
       } else {
-        // Ada essay → bobot 40:60
         const objectiveScore = objectiveTotal > 0 ? (objectiveCorrect / objectiveTotal) * 100 : 0;
-        // Essay belum dinilai saat submit, skor sementara hanya dari objektif (40%)
         score = Math.round(objectiveScore * 0.4);
       }
-      
       const objectiveScore = objectiveTotal > 0 ? Math.round((objectiveCorrect / objectiveTotal) * 100) : 0;
       const st = attempt.startedAt || attempt.startTime || attempt.created || Date.now();
       const usedTime = Math.floor((Date.now() - new Date(st as any).getTime()) / 1000);
+      const submittedAt = new Date().toISOString();
 
-      await safeUpdateAttempt(attempt.id, {
+      // Gabungkan answers + status finished dalam SATU request — atomic, tidak bisa setengah-setengah
+      const finalPayload = {
+        answers,
+        isOnline: true,
+        lastHeartbeat: submittedAt,
         score,
         objectiveScore,
         objectiveCorrect: Math.floor(objectiveCorrect),
@@ -1050,8 +1052,36 @@ const CBTPage = () => {
         total: totalQuestions,
         usedTime: Math.max(0, usedTime),
         status: "finished",
-        submittedAt: new Date().toISOString()
-      });
+        submittedAt,
+      };
+
+      // Simpan ke localStorage sebagai fallback SEBELUM kirim ke server
+      if (student && roomId) {
+        localStorage.setItem(`offline_answers_${student.id}_${roomId}`, JSON.stringify(answers));
+        const localAtt = { ...(attempt || {}), ...finalPayload, id: attempt.id };
+        localStorage.setItem(`local_attempt_${student.id}_${roomId}`, JSON.stringify(localAtt));
+      }
+
+      try {
+        await pb!.collection("attempts").update(attempt.id, finalPayload);
+        // Berhasil — hapus pending sync flag
+        if (student && roomId) {
+          localStorage.removeItem(`pending_sync_${student.id}_${roomId}`);
+        }
+      } catch (serverErr: any) {
+        // Gagal kirim ke server — tandai pending sync agar di-retry saat online
+        if (student && roomId) {
+          localStorage.setItem(`pending_sync_${student.id}_${roomId}`, "true");
+        }
+        // Jika 404 (attempt dihapus admin), jangan tampilkan error submit biasa
+        if (serverErr?.status === 404 || serverErr?.status === 403) {
+          setIsSubmitModalOpen(false);
+          setIsResetModalOpen(true);
+          return;
+        }
+        // Network error lain → tetap navigate, data tersimpan di localStorage untuk sync nanti
+        console.warn("Submit gagal ke server, data disimpan lokal:", serverErr);
+      }
 
       const pr = `${student.nisn}_${roomId}`;
       sessionStorage.removeItem(`order_${pr}`);
@@ -1060,6 +1090,7 @@ const CBTPage = () => {
     } catch (e) {
       console.error(e);
       setIsSubmitting(false);
+      isSubmittingRef.current = false;
       setLoading(false);
     }
   }, [student, roomId, attempt, questions, answers, navigate, isSubmitting]);

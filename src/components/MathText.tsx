@@ -213,7 +213,8 @@ export const MathText: React.FC<MathTextProps> = ({ content, className = "" }) =
 
     // 0. Strip dark text colors so they inherit parent color (fixes dark mode readability)
     // Remove color styles that are dark/black — they become invisible in dark mode
-    const darkColors = /color\s*:\s*(#[0-3][0-9a-f]{5}|#[0-3][0-9a-f]{2}|black|rgb\s*\(\s*[0-9]{1,2}\s*,\s*[0-9]{1,2}\s*,\s*[0-9]{1,2}\s*\)|windowtext)/gi;
+    // IMPORTANT: Use negative lookbehind to avoid stripping "background-color" 
+    const darkColors = /(?<!background-)color\s*:\s*(#[0-3][0-9a-f]{5}|#[0-3][0-9a-f]{2}|black|rgb\s*\(\s*[0-9]{1,2}\s*,\s*[0-9]{1,2}\s*,\s*[0-9]{1,2}\s*\)|windowtext)/gi;
     processed = processed.replace(/style="([^"]*)"/gi, (match, styleContent) => {
       const cleaned = styleContent.replace(darkColors, '').replace(/;\s*;/g, ';').replace(/^\s*;\s*/, '').replace(/\s*;\s*$/, '');
       if (!cleaned.trim()) return '';

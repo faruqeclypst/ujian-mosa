@@ -321,7 +321,7 @@ const StudentsPage = () => {
       total: selectedIds.length,
       current: 0,
       message: "Menyiapkan pemindahan kelas...",
-      title: `${terminology.class} Pindah Massal`
+      title: `{terminology.class} Pindah Massal`
     });
 
     try {
@@ -351,7 +351,7 @@ const StudentsPage = () => {
     if (selectedIds.length === 0) return;
     showAlert(
       `Hapus ${terminology.student} Massal`,
-      `Apakah Anda yakin ingin menghapus ${selectedIds.length} ${terminology.student.toLowerCase()} terpilih?`,
+      `Apakah Anda yakin ingin menghapus {selectedIds.length} {terminology.student.toLowerCase()} terpilih?`,
       "danger",
       async () => {
         setBatchProgress({
@@ -678,7 +678,7 @@ const StudentsPage = () => {
               >
                 <option value="ALL">Semua {terminology.class}</option>
                 <option value="NONE">Tanpa {terminology.class}</option>
-                <optgroup label={`Daftar ${terminology.class}`}>
+                <optgroup label={`Daftar {terminology.class}`}>
                   {sortedClasses.map(cls => (
                     <option key={cls.id} value={cls.id}>{cls.name}</option>
                   ))}
@@ -719,21 +719,21 @@ const StudentsPage = () => {
           <DialogHeader>
             <DialogTitle className="text-base font-bold text-slate-800 dark:text-white flex items-center gap-2">
               <ArrowLeftRight className="h-5 w-5 text-orange-500" />
-              Pindah ${terminology.class} ({selectedIds.length} ${terminology.student})
+              Pindah {terminology.class} ({selectedIds.length} {terminology.student})
             </DialogTitle>
             <DialogDescription className="text-xs">
-              Pilih ${terminology.class.toLowerCase()} baru untuk ${terminology.student.toLowerCase()}-${terminology.student.toLowerCase()} yang terpilih.
+              Pilih {terminology.class.toLowerCase()} baru untuk {terminology.student.toLowerCase()}-{terminology.student.toLowerCase()} yang terpilih.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Pilih ${terminology.class} Tujuan:</label>
+              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Pilih {terminology.class} Tujuan:</label>
               <select
                 value={targetClassId}
                 onChange={(e) => setTargetClassId(e.target.value)}
                 className="w-full h-10 rounded-xl border border-slate-200 bg-slate-50/50 px-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-orange-500/20 transition-all cursor-pointer dark:bg-slate-900/50 dark:border-slate-800"
               >
-                <option value="">-- Pilih ${terminology.class} --</option>
+                <option value="">-- Pilih {terminology.class} --</option>
                 {sortedClasses.map(cls => (
                   <option key={cls.id} value={cls.id}>{cls.name}</option>
                 ))}
@@ -747,7 +747,7 @@ const StudentsPage = () => {
               onClick={handleBatchUpdateClass}
               className="bg-orange-600 hover:bg-orange-700 text-white rounded-xl shadow-lg shadow-orange-500/20"
             >
-              Proses Pindah ${terminology.class}
+              Proses Pindah {terminology.class}
             </Button>
           </div>
         </DialogContent>

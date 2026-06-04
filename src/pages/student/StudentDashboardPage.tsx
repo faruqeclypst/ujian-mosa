@@ -1,15 +1,15 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, memo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useStudentAuth } from "../../context/StudentAuthContext";
 import { Button } from "../../components/ui/button";
-import { Input } from "../../components/ui/input";
 import { useTenant } from "../../context/TenantContext";
 import {
-  Calendar, Clock, ChevronRight, User, AlertCircle,
+  Calendar, Clock, User, AlertCircle,
   Award, LogOut as LogoutIcon, Sun, Moon, Monitor, KeyRound, ClipboardCheck, Sparkles,
-  Lock, RefreshCcw, LogOut
+  Lock,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../../components/ui/dialog";
+import { Input } from "../../components/ui/input";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuLabel } from "../../components/ui/dropdown-menu";
 import { motion, AnimatePresence } from "framer-motion";
 import { Skeleton } from "../../components/ui/skeleton";
@@ -18,6 +18,92 @@ import { Card, CardHeader, CardContent } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
 import { cn } from "../../lib/utils";
 import { syncPendingData } from "../../lib/syncManager";
+import TokenDialog from "../../components/student/TokenDialog";
+
+// ── Isolated banner: typing name + rotating message ──
+// memo + own state = tidak ikut re-render parent
+const DesktopBanner = memo(({
+  studentName,
+  terminologyStudent,
+  messages,
+}: {
+  studentName: string;
+  terminologyStudent: string;
+  messages: { text: string; highlight: string; suffix: string }[];
+}) => {
+  const [displayedName, setDisplayedName] = useState("");
+  const [msgIdx, setMsgIdx] = useState(0);
+
+  useEffect(() => {
+    if (!studentName) return;
+    let i = 0;
+    const timer = setInterval(() => {
+      i++;
+      setDisplayedName(studentName.substring(0, i));
+      if (i >= studentName.length) clearInterval(timer);
+    }, 30);
+    return () => clearInterval(timer);
+  }, [studentName]);
+
+  useEffect(() => {
+    const t = setInterval(() => setMsgIdx(p => (p + 1) % messages.length), 4000);
+    return () => clearInterval(t);
+  }, [messages.length]);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: -20 }}
+      animate={{ opacity: 1, x: 0 }}
+      className="relative bg-emerald-600 rounded-[30px] p-8 sm:p-10 overflow-hidden shadow-2xl shadow-emerald-100 dark:shadow-none hidden lg:block"
+    >
+      <div className="absolute top-0 right-0 w-1/2 h-full bg-emerald-500/50 skew-x-[-20deg] translate-x-1/2" />
+      <div className="relative z-10 space-y-6">
+        <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/10 backdrop-blur-md rounded-full text-[10px] font-black text-slate-200 uppercase tracking-widest border border-white/5">
+          Verified {terminologyStudent} Account
+        </div>
+        <div className="relative">
+          {/* Invisible full name reserves space */}
+          <h2 className="text-2xl sm:text-3xl md:text-5xl font-black text-white/0 tracking-tight leading-[1.1] uppercase select-none pointer-events-none">
+            Selamat Datang Kembali, <br /><span>{studentName}</span>
+          </h2>
+          {/* Visible typing overlay */}
+          <h2 className="absolute top-0 left-0 w-full text-2xl sm:text-3xl md:text-5xl font-black text-white tracking-tight leading-[1.1] uppercase">
+            Selamat Datang Kembali, <br />
+            <span className="inline text-emerald-100">
+              {displayedName.slice(0, -1)}
+              <span className="relative inline">
+                {displayedName.slice(-1)}
+                {displayedName.length > 0 && (
+                  <span className="absolute left-0 -bottom-1 w-full h-1 bg-emerald-200 animate-pulse rounded-full" />
+                )}
+              </span>
+              {displayedName.length === 0 && (
+                <span className="inline-block w-4 h-1 bg-emerald-200 animate-pulse align-baseline shadow-sm rounded-full" />
+              )}
+            </span>
+          </h2>
+        </div>
+        <div className="relative z-10 h-6 overflow-hidden mt-4">
+          <AnimatePresence mode="wait">
+            <motion.p
+              key={msgIdx}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.5, ease: "anticipate" }}
+              className="text-[10px] sm:text-xs text-slate-100/70 font-bold uppercase tracking-widest leading-none flex items-center gap-1.5"
+            >
+              {messages[msgIdx].text}
+              <span className="text-white px-2 py-0.5 bg-white/10 rounded-lg">{messages[msgIdx].highlight}</span>
+              {messages[msgIdx].suffix}
+            </motion.p>
+          </AnimatePresence>
+        </div>
+      </div>
+    </motion.div>
+  );
+});
+DesktopBanner.displayName = "DesktopBanner";
 
 const getExamTypeColorClass = (type: string) => {
   switch (type?.toLowerCase()) {
@@ -40,9 +126,7 @@ const StudentDashboardPage = () => {
   const [schoolLogo, setSchoolLogo] = useState("");
 
   const [selectedRoom, setSelectedRoom] = useState<any>(null);
-  const [tokenInput, setTokenInput] = useState("");
-  const [tokenError, setTokenError] = useState("");
-  const [isValidating, setIsValidating] = useState(false);
+  const handleCloseTokenDialog = useCallback(() => setSelectedRoom(null), []);
 
   const [activeRooms, setActiveRooms] = useState<any[]>([]);
   const [userAttempts, setUserAttempts] = useState<Record<string, any>>({});
@@ -50,7 +134,6 @@ const StudentDashboardPage = () => {
   const [hasPendingSync, setHasPendingSync] = useState(false);
   const [isSyncingData, setIsSyncingData] = useState(false);
   const [isFirstLoadState, setIsFirstLoadState] = useState(true);
-  const [displayedName, setDisplayedName] = useState("");
   
   // Change Password Modal
   const [isChangePassOpen, setIsChangePassOpen] = useState(false);
@@ -60,52 +143,51 @@ const StudentDashboardPage = () => {
   const [isChangingPass, setIsChangingPass] = useState(false);
   const { changePassword } = useStudentAuth();
 
-  // ✨ TYPING EFFECT UNTUK NAMA ${terminology.student.toUpperCase()}
-  useEffect(() => {
-    if (!student?.name) return;
-    let i = 0;
-    const fullName = student.name;
-    const timer = setInterval(() => {
-      setDisplayedName(fullName.substring(0, i));
-      i++;
-      if (i > fullName.length) clearInterval(timer);
-    }, 50); // Kecepatan mengetik: 50ms per karakter
-    return () => clearInterval(timer);
-  }, [student?.name]);
+  const isSyncingRef = useRef(false);
 
   const handleManualSync = async () => {
-    if (!student || isSyncingData || !navigator.onLine || !pb) return;
+    if (!student || isSyncingRef.current || !navigator.onLine || !pb) return;
+    isSyncingRef.current = true;
     setIsSyncingData(true);
     try {
-      await syncPendingData(pb, student.id);
-      setHasPendingSync(false);
+      const synced = await syncPendingData(pb, student.id);
+      // Re-check localStorage setelah sync — bisa jadi masih ada pending dari room lain
+      const remaining = Object.keys(localStorage).filter(k => k.startsWith(`pending_sync_${student.id}_`));
+      setHasPendingSync(remaining.length > 0);
+      if (synced && synced.length > 0) fetchData(true);
     } catch (e) {
       setHasPendingSync(true);
     } finally {
+      isSyncingRef.current = false;
       setIsSyncingData(false);
     }
   };
 
-  // 🔄 BACKGROUND AUTO-SYNC (TANPA DISADARI ${terminology.student.toUpperCase()})
+  // 🔄 BACKGROUND AUTO-SYNC — cek tiap 8 detik, auto kirim jika online
   useEffect(() => {
     if (!student) return;
 
-    const checkAndSync = async () => {
-      const keys = Object.keys(localStorage);
-      const pendingKeys = keys.filter(k => k.startsWith(`pending_sync_${student.id}_`));
-      const hasPending = pendingKeys.length > 0;
-      
+    const checkAndSync = () => {
+      const pending = Object.keys(localStorage).filter(k => k.startsWith(`pending_sync_${student.id}_`));
+      const hasPending = pending.length > 0;
       setHasPendingSync(hasPending);
-
-      if (hasPending && navigator.onLine && !isSyncingData) {
+      if (hasPending && navigator.onLine && !isSyncingRef.current) {
         handleManualSync();
       }
     };
 
     checkAndSync();
-    const interval = setInterval(checkAndSync, 10000);
-    return () => clearInterval(interval);
-  }, [student, isSyncingData]);
+    const interval = setInterval(checkAndSync, 8000);
+
+    // Juga sync saat koneksi kembali online
+    const onOnline = () => { checkAndSync(); };
+    window.addEventListener("online", onOnline);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("online", onOnline);
+    };
+  }, [student?.id]); // hanya re-run saat student berubah, bukan setiap sync
 
   const fetchData = async (isSilent = false) => {
     if (!pb) return;
@@ -144,6 +226,41 @@ const StudentDashboardPage = () => {
         myStatus[att.examRoomId] = att;
         if (att.status === "LOCKED") lockedRoomId = att.examRoomId;
       });
+
+      // Overlay locally-confirmed "finished" status from localStorage
+      // Handles: offline submit, or network failure after navigate("/")
+      if (student) {
+        // First: clean up stale localStorage for rooms where server has NO attempt
+        // (admin deleted attempt or reset exam — localStorage must be cleared)
+        for (let i = localStorage.length - 1; i >= 0; i--) {
+          const key = localStorage.key(i);
+          if (key?.startsWith(`local_attempt_${student.id}_`)) {
+            const rId = key.replace(`local_attempt_${student.id}_`, "");
+            // If server has no attempt for this room, clear stale localStorage
+            if (!myStatus[rId]) {
+              localStorage.removeItem(key);
+              localStorage.removeItem(`offline_answers_${student.id}_${rId}`);
+              localStorage.removeItem(`pending_sync_${student.id}_${rId}`);
+            }
+          }
+        }
+
+        // Then: overlay localStorage "finished" only if server attempt exists but status not yet synced
+        Object.keys(myStatus).forEach(rId => {
+          try {
+            const localRaw = localStorage.getItem(`local_attempt_${student.id}_${rId}`);
+            if (localRaw) {
+              const local = JSON.parse(localRaw);
+              // Only trust localStorage if the attempt IDs match (same attempt, not a reset)
+              if (local.status === "finished" &&
+                  myStatus[rId]?.status !== "finished" &&
+                  local.id === myStatus[rId]?.id) {
+                myStatus[rId] = { ...myStatus[rId], status: "finished", submittedAt: local.submittedAt };
+              }
+            }
+          } catch {}
+        });
+      }
 
       // 3. Process Rooms
       const allRooms = roomsRecords.filter(room => {
@@ -229,61 +346,6 @@ const StudentDashboardPage = () => {
     }
   }, [student?.id]);
 
-  const handleValidateToken = async () => {
-    if (!selectedRoom || !student || !pb) return;
-    setTokenError("");
-    setIsValidating(true);
-    try {
-      // 🛡️ Ambil data terbaru langsung dari server dengan penanganan lebih kuat (Mempertimbangkan API Rules List vs View)
-      let freshRoom;
-      try {
-        const checkList = await pb.collection("exam_rooms").getFullList({
-          filter: `id = "${selectedRoom.id}"`,
-          limit: 1,
-          requestKey: null
-        });
-
-        if (checkList.length === 0) {
-          fetchData(true);
-          throw new Error("Ruangan ini sudah tidak aktif, sedang di-arsip, atau Anda tidak memiliki akses ke kelas ini lagi.");
-        }
-        freshRoom = checkList[0];
-      } catch (err: any) {
-        if (err.status === 404 || err.message.includes("tidak aktif")) {
-          throw new Error(err.message || "Ruangan tidak ditemukan.");
-        }
-        throw err;
-      }
-
-      const settingsRecords = await pb.collection("settings").getFullList({ limit: 1 });
-      const globalToken = (settingsRecords[0]?.universal_token || settingsRecords[0]?.global_token || settingsRecords[0]?.globalToken || "").toString().trim().toUpperCase();
-      const roomToken = (freshRoom.token || "").toString().trim().toUpperCase();
-
-      const input = tokenInput.trim().toUpperCase();
-
-      if (input !== globalToken && input !== roomToken) {
-        throw new Error("Token yang Anda masukkan belum tepat. Silakan cek kembali.");
-      }
-
-      sessionStorage.setItem("activeCBTRoomId", selectedRoom.id);
-
-      try {
-        const docEl = document.documentElement;
-        if (docEl.requestFullscreen) {
-          await docEl.requestFullscreen();
-        }
-      } catch (err) {
-        console.warn("Gagal otomatis masuk full screen:", err);
-      }
-
-      navigate(`/cbt`);
-    } catch (err: any) { 
-      setTokenError(err.message || "Terjadi kesalahan saat verifikasi."); 
-    } finally { 
-      setIsValidating(false); 
-    }
-  };
-
   const totalActive = activeRooms.filter(r => {
     const att = userAttempts[r.id];
     const finished = att && (att.status === "finished" || att.status === "submitted" || att.status === "graded");
@@ -297,12 +359,6 @@ const StudentDashboardPage = () => {
     const expired = r.timeStatus === "expired";
     return finished || expired;
   }).length;
-
-  const [messageIndex, setMessageIndex] = useState(0);
-  useEffect(() => {
-    const timer = setInterval(() => setMessageIndex(p => (p + 1) % 2), 4000);
-    return () => clearInterval(timer);
-  }, []);
 
   const bannerMessages = [
     { text: "Anda memiliki", highlight: `${totalActive} agenda ujian aktif`, suffix: "hari ini." },
@@ -394,66 +450,14 @@ const StudentDashboardPage = () => {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           {/* LEFT COLUMN: Exams */}
           <div className="lg:col-span-8 space-y-8">
-            {/* Desktop Banner */}
-            <motion.div 
-              initial={{ opacity: 0, x: -20 }} 
-              animate={{ opacity: 1, x: 0 }} 
-              className="relative bg-emerald-600 rounded-[30px] p-8 sm:p-10 overflow-hidden shadow-2xl shadow-emerald-100 dark:shadow-none hidden lg:block"
-            >
-              <div className="absolute top-0 right-0 w-1/2 h-full bg-emerald-500/50 skew-x-[-20deg] translate-x-1/2" />
-              
-              <div className="relative z-10 space-y-6">
-                <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/10 backdrop-blur-md rounded-full text-[10px] font-black text-slate-200 uppercase tracking-widest border border-white/5">
-                  Verified {terminology.student} Account
-                </div>
-                
-                {/* 👻 GHOST WRAPPER FOR STABILITY */}
-                <div className="relative">
-                  {/* Invisible Full Name (Reserves Space) */}
-                  <h2 className="text-2xl sm:text-3xl md:text-5xl font-black text-white/0 tracking-tight leading-[1.1] uppercase select-none pointer-events-none">
-                    Selamat Datang Kembali, <br />
-                    <span>{student?.name}</span>
-                  </h2>
-                  
-                  {/* Visible Typing Name (Layered on top) */}
-                  <h2 className="absolute top-0 left-0 w-full text-2xl sm:text-3xl md:text-5xl font-black text-white tracking-tight leading-[1.1] uppercase">
-                    Selamat Datang Kembali, <br />
-                    <span className="inline text-emerald-100">
-                      {displayedName.slice(0, -1)}
-                      <span className="relative inline">
-                        {displayedName.slice(-1)}
-                        {displayedName.length > 0 && (
-                          <span className="absolute left-0 -bottom-1 w-full h-1 bg-emerald-200 animate-pulse rounded-full" />
-                        )}
-                      </span>
-                      {displayedName.length === 0 && (
-                        <span className="inline-block w-4 h-1 bg-emerald-200 animate-pulse align-baseline shadow-sm rounded-full" />
-                      )}
-                    </span>
-                  </h2>
-                </div>
-
-                <div className="relative z-10 h-6 overflow-hidden mt-4">
-                  <AnimatePresence mode="wait">
-                    <motion.p
-                      key={messageIndex}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -10 }}
-                      transition={{ duration: 0.5, ease: "anticipate" }}
-                      className="text-[10px] sm:text-xs text-slate-100/70 font-bold uppercase tracking-widest leading-none flex items-center gap-1.5"
-                    >
-                      {bannerMessages[messageIndex].text}
-                      <span className="text-white px-2 py-0.5 bg-white/10 rounded-lg">{bannerMessages[messageIndex].highlight}</span>
-                      {bannerMessages[messageIndex].suffix}
-                    </motion.p>
-                  </AnimatePresence>
-                </div>
-              </div>
-            </motion.div>
+            <DesktopBanner
+              studentName={student?.name || ""}
+              terminologyStudent={terminology.student}
+              messages={bannerMessages}
+            />
 
             {/* Mobile Banner */}
-            <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="relative bg-emerald-600 rounded-[30px] p-6 overflow-hidden shadow-2xl shadow-emerald-100 dark:shadow-none lg:hidden">
+            <div className="relative bg-emerald-600 rounded-[30px] p-6 overflow-hidden shadow-2xl shadow-emerald-100 dark:shadow-none lg:hidden">
               <div className="absolute top-0 right-0 w-1/2 h-full bg-emerald-500/50 skew-x-[-20deg] translate-x-1/2" />
               <div className="relative z-10 text-center space-y-3">
                 <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/10 backdrop-blur-md rounded-full text-[8px] font-black text-slate-200 uppercase tracking-widest border border-white/5 mx-auto">
@@ -462,28 +466,16 @@ const StudentDashboardPage = () => {
                 <h2 className="text-xl font-black text-white tracking-tight leading-tight uppercase">
                   Halo, {student?.name?.split(" ")[0]}
                 </h2>
-                <div className="h-4 overflow-hidden flex justify-center">
-                  <AnimatePresence mode="wait">
-                    <motion.p
-                      key={messageIndex}
-                      initial={{ opacity: 0, y: 5 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -5 }}
-                      className="text-[9px] text-slate-100/70 font-bold uppercase tracking-widest leading-none"
-                    >
-                      {bannerMessages[messageIndex].highlight} {bannerMessages[messageIndex].suffix}
-                    </motion.p>
-                  </AnimatePresence>
-                </div>
+                <p className="text-[9px] text-slate-100/70 font-bold uppercase tracking-widest leading-none">
+                  {bannerMessages[0].highlight} {bannerMessages[0].suffix}
+                </p>
               </div>
-            </motion.div>
+            </div>
             
             {/* Mobile Feature Link */}
-            <motion.div 
-               initial={{ opacity: 0, scale: 0.9 }}
-               animate={{ opacity: 1, scale: 1 }}
+            <div
                onClick={() => navigate("/minat-bakat")}
-               className="lg:hidden p-5 bg-gradient-to-br from-indigo-600 to-indigo-800 rounded-[2.5rem] text-white overflow-hidden relative group shadow-xl active:scale-95 transition-all text-left"
+               className="lg:hidden p-5 bg-gradient-to-br from-indigo-600 to-indigo-800 rounded-[2.5rem] text-white overflow-hidden relative group shadow-xl active:scale-95 transition-transform text-left"
             >
               <div className="absolute top-0 right-0 p-4 opacity-10"><Sparkles className="h-10 w-10 rotate-12" /></div>
               <div className="flex items-center gap-2 mb-1">
@@ -492,7 +484,7 @@ const StudentDashboardPage = () => {
               </div>
               <p className="text-sm font-black leading-tight">{hasInterests ? "Lihat Hasil Minat" : "Cek Minat & Bakat"}</p>
               <p className="text-[9px] font-medium text-indigo-100/70 mt-1">{hasInterests ? "Tinjau kembali potensi karirmu." : "Temukan potensi terbaikmu di sini."}</p>
-            </motion.div>
+            </div>
 
             <div className="space-y-6 text-left">
               <AnimatePresence>
@@ -803,30 +795,10 @@ const StudentDashboardPage = () => {
         </div>
       </main>
 
-      <Dialog open={!!selectedRoom} onOpenChange={() => { if (!isValidating) setSelectedRoom(null); setTokenInput(""); setTokenError(""); }}>
-        <DialogContent className="sm:max-w-md bg-white dark:bg-slate-950 rounded-xl border-none shadow-2xl p-0">
-          <div className="bg-emerald-600 px-6 py-8 text-white relative">
-            <div className="absolute top-0 right-0 p-4 opacity-10"><KeyRound className="w-16 h-16" /></div>
-            <DialogHeader>
-              <DialogTitle className="text-lg font-bold uppercase tracking-tight">Verifikasi Akses</DialogTitle>
-              <p className="text-emerald-50/80 text-[10px] font-bold uppercase tracking-widest mt-1.5 opacity-90">Masukkan Token Ruangan</p>
-            </DialogHeader>
-          </div>
-          <div className="p-8 space-y-6">
-            <div className="space-y-4">
-              <div>
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 block">Token Ujian</label>
-                <Input value={tokenInput} onChange={(e) => setTokenInput(e.target.value)} placeholder="AB123" className="h-12 text-center text-xl font-black tracking-[0.3em] bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 rounded-lg uppercase" disabled={isValidating} />
-                {tokenError && <p className="text-rose-500 text-[9px] font-bold mt-2 flex items-center gap-1 uppercase text-left"><AlertCircle className="w-3 h-3" /> {tokenError}</p>}
-              </div>
-              <div className="bg-emerald-50/50 dark:bg-emerald-900/20 p-4 rounded-lg border border-emerald-100 dark:border-emerald-800 text-left"><p className="text-[10px] text-emerald-600 dark:text-emerald-400 leading-relaxed font-medium">⚠️ Pastikan koneksi internet stabil sebelum mulai. Pengerjaan Anda akan tercatat secara otomatis.</p></div>
-            </div>
-            <DialogFooter>
-              <Button onClick={handleValidateToken} disabled={!tokenInput || isValidating} className="w-full h-12 bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-600 text-white rounded-lg font-bold uppercase tracking-widest text-[10px] transition-all active:scale-95">{isValidating ? "Memverifikasi..." : "Konfirmasi & Masuk"}</Button>
-            </DialogFooter>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <TokenDialog
+        selectedRoom={selectedRoom}
+        onClose={handleCloseTokenDialog}
+      />
 
       {/* Manual Change Password Dialog */}
       <Dialog open={isChangePassOpen} onOpenChange={(open) => { if (!isChangingPass) setIsChangePassOpen(open); setPassError(""); setNewPass(""); setConfirmPass(""); }}>

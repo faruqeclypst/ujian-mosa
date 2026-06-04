@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { useTenant } from "../context/TenantContext";
+import PinGate from "../components/PinGate";
 
 const TOKEN_VIEW_PIN = (() => {
   const now = new Date();
@@ -24,8 +25,6 @@ const TokenViewPage = () => {
 
   // PIN gate
   const [pinUnlocked, setPinUnlocked] = useState(() => sessionStorage.getItem("token_view_unlocked") === "1");
-  const [pinInput, setPinInput] = useState("");
-  const [pinError, setPinError] = useState(false);
 
   // Token state
   const [token, setToken] = useState<string>("");
@@ -37,22 +36,6 @@ const TokenViewPage = () => {
   const [lockedStudents, setLockedStudents] = useState<LockedStudent[]>([]);
   const [unlocking, setUnlocking] = useState<string | null>(null);
   const [unlockSuccess, setUnlockSuccess] = useState<string | null>(null);
-
-  // PIN handlers
-  const handlePinSubmit = useCallback(() => {
-    if (pinInput === TOKEN_VIEW_PIN) {
-      sessionStorage.setItem("token_view_unlocked", "1");
-      setPinUnlocked(true);
-      setPinError(false);
-    } else {
-      setPinError(true);
-      setPinInput("");
-    }
-  }, [pinInput]);
-
-  useEffect(() => {
-    if (pinInput.length === 6) handlePinSubmit();
-  }, [pinInput, handlePinSubmit]);
 
   // Fetch token from settings
   useEffect(() => {
@@ -94,32 +77,67 @@ const TokenViewPage = () => {
   const fetchLockedStudents = useCallback(async () => {
     if (!pb) return;
     try {
-      const [attempts, students, classes, rooms, questions] = await Promise.all([
-        pb.collection("attempts").getFullList({ filter: 'status = "LOCKED"', expand: "studentId" }),
-        pb.collection("students").getFullList({ fields: "id,username,name,classId" }),
-        pb.collection("classes").getFullList({ fields: "id,name" }),
-        pb.collection("exam_rooms").getFullList({ fields: "id,room_name,examId" }),
-        pb.collection("questions").getFullList({ fields: "id,examId" }),
+      // Hanya fetch attempts yang LOCKED, expand relasi yang dibutuhkan sekaligus
+      const attempts = await pb.collection("attempts").getFullList({
+        filter: 'status = "LOCKED"',
+        expand: "studentId,examRoomId",
+      });
+
+      if (attempts.length === 0) {
+        setLockedStudents([]);
+        return;
+      }
+
+      // Kumpulkan classId dan examId unik saja
+      const classIds = [...new Set(
+        attempts.map((a: any) => a.expand?.studentId?.classId).filter(Boolean)
+      )];
+      const examIds = [...new Set(
+        attempts.map((a: any) => a.expand?.examRoomId?.examId).filter(Boolean)
+      )];
+
+      // Fetch classes & question counts secara paralel — filter hanya yang relevan
+      const [classes, questionCounts] = await Promise.all([
+        classIds.length > 0
+          ? pb.collection("classes").getFullList({
+              filter: classIds.map(id => `id = "${id}"`).join(" || "),
+              fields: "id,name",
+            })
+          : Promise.resolve([]),
+        examIds.length > 0
+          ? Promise.all(
+              examIds.map((examId: string) =>
+                pb.collection("questions")
+                  .getList(1, 1, { filter: `examId = "${examId}"`, fields: "id", skipTotal: false })
+                  .then((r: any) => ({ examId, total: r.totalItems }))
+              )
+            )
+          : Promise.resolve([]),
       ]);
 
+      const classMap = Object.fromEntries(classes.map((c: any) => [c.id, c.name]));
+      const questionCountMap = Object.fromEntries(
+        (questionCounts as { examId: string; total: number }[]).map(({ examId, total }) => [examId, total])
+      );
+
       const mapped: LockedStudent[] = attempts.map((att: any) => {
-        const student = att.expand?.studentId || students.find((s: any) => s.id === att.studentId);
-        const cls = classes.find((c: any) => c.id === student?.classId);
-        const room = rooms.find((r: any) => r.id === att.examRoomId);
-        const examQuestions = questions.filter((q: any) => q.examId === room?.examId);
+        const student = att.expand?.studentId;
+        const room = att.expand?.examRoomId;
         const answers = att.answers || {};
-        const answeredCount = Object.keys(answers).filter(k => k !== "__overrides__" && answers[k] !== null && answers[k] !== undefined && answers[k] !== "").length;
+        const answeredCount = Object.keys(answers).filter(
+          k => k !== "__overrides__" && answers[k] !== null && answers[k] !== undefined && answers[k] !== ""
+        ).length;
 
         return {
           attId: att.id,
           studentId: att.studentId,
           studentName: student?.name || "Tidak Dikenal",
           nisn: student?.username || student?.nisn || "-",
-          className: cls?.name || "-",
+          className: classMap[student?.classId] || "-",
           roomName: room?.room_name || "-",
           cheatCount: att.cheatCount || 0,
           answeredCount,
-          totalQuestions: examQuestions.length,
+          totalQuestions: questionCountMap[room?.examId] ?? 0,
         };
       });
 
@@ -181,37 +199,10 @@ const TokenViewPage = () => {
 
       {/* PIN Gate */}
       {!pinUnlocked && (
-        <div className="absolute inset-0 z-50 bg-slate-950 flex flex-col items-center justify-center gap-6 animate-in fade-in duration-300">
-          <div className="flex flex-col items-center gap-2 mb-2">
-            <div className="w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mb-2">
-              <svg className="w-7 h-7 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-              </svg>
-            </div>
-            <p className="text-slate-300 text-base font-black uppercase tracking-[0.3em]">Masukkan PIN</p>
-            <p className="text-slate-600 text-xs font-medium">PIN: tanggal hari ini + 0426</p>
-          </div>
-          <div className="flex gap-3">
-            {[...Array(6)].map((_, i) => (
-              <div key={i} className={`w-4 h-4 rounded-full border-2 transition-all duration-150 ${i < pinInput.length ? "bg-amber-400 border-amber-400" : "bg-transparent border-slate-700"}`} />
-            ))}
-          </div>
-          <div className="grid grid-cols-3 gap-3 mt-2">
-            {[1,2,3,4,5,6,7,8,9].map(n => (
-              <button key={n} onClick={() => { if (pinInput.length < 6) setPinInput(p => p + n); }}
-                className="w-16 h-16 rounded-2xl bg-slate-800 hover:bg-slate-700 active:bg-slate-600 text-white text-xl font-black transition-all active:scale-95 border border-slate-700/50">
-                {n}
-              </button>
-            ))}
-            <button onClick={() => setPinInput(p => p.slice(0, -1))}
-              className="w-16 h-16 rounded-2xl bg-slate-800 hover:bg-slate-700 active:bg-slate-600 text-slate-400 text-sm font-black transition-all active:scale-95 border border-slate-700/50">⌫</button>
-            <button onClick={() => { if (pinInput.length < 6) setPinInput(p => p + "0"); }}
-              className="w-16 h-16 rounded-2xl bg-slate-800 hover:bg-slate-700 active:bg-slate-600 text-white text-xl font-black transition-all active:scale-95 border border-slate-700/50">0</button>
-            <button onClick={handlePinSubmit}
-              className="w-16 h-16 rounded-2xl bg-amber-500 hover:bg-amber-400 active:bg-amber-600 text-slate-950 text-sm font-black transition-all active:scale-95">✓</button>
-          </div>
-          {pinError && <p className="text-rose-400 text-xs font-bold animate-in fade-in duration-200">PIN salah, coba lagi</p>}
-        </div>
+        <PinGate
+          correctPin={TOKEN_VIEW_PIN}
+          onUnlocked={() => setPinUnlocked(true)}
+        />
       )}
 
       {/* Background decoration */}

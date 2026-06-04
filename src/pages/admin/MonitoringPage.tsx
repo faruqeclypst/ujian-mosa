@@ -23,7 +23,7 @@ import {
   Clock,
   ShieldAlert
 } from "lucide-react";
-import { Sparkles, RotateCcw, Copy, Check } from "lucide-react";
+import { Sparkles, RotateCcw, Copy, Check, Pencil } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import * as XLSX from "xlsx-js-style";
 import { Button } from "../../components/ui/button";
@@ -798,6 +798,49 @@ const MonitoringPage = () => {
   const [aiGradingId, setAiGradingId] = useState<string | null>(null);
   const [waCopied, setWaCopied] = useState(false);
 
+  // ✏️ Edit Jawaban Siswa
+  const [editAnswerDialog, setEditAnswerDialog] = useState<{
+    open: boolean;
+    studentId: string;
+    studentName: string;
+    question: any;
+    currentAnswer: string;
+    qIdx: number;
+  } | null>(null);
+
+  const handleEditAnswer = async (newAnswer: string) => {
+    if (!editAnswerDialog || !pb) return;
+    const { studentId, question } = editAnswerDialog;
+    const att = attempts.find(a => a.studentId === studentId || (a as any).student_id === studentId);
+    if (!att) return;
+
+    try {
+      const updatedAnswers = { ...(att.answers || {}), [question.id]: newAnswer };
+      // Hapus override untuk soal ini agar penilaian otomatis berlaku
+      const currentOverrides = typeof att.overrides === 'string' ? JSON.parse(att.overrides) : (att.overrides || {});
+      const newOverrides = { ...currentOverrides };
+      delete newOverrides[question.id];
+      // Juga hapus dari __overrides__ backup
+      if (updatedAnswers.__overrides__) {
+        const backup = { ...(updatedAnswers.__overrides__ as any) };
+        delete backup[question.id];
+        updatedAnswers.__overrides__ = backup;
+      }
+      const newScore = getLiveScore(updatedAnswers, newOverrides);
+      await pb.collection('attempts').update(att.id, {
+        answers: updatedAnswers,
+        overrides: newOverrides,
+        score: newScore,
+      });
+      setAttempts(prev => prev.map(a =>
+        a.id === att.id ? { ...a, answers: updatedAnswers, overrides: newOverrides, score: newScore } : a
+      ));
+      setEditAnswerDialog(null);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   const handleCopyBelumUjian = () => {
     const absentStudents = students
       .map(s => ({
@@ -1282,56 +1325,121 @@ const MonitoringPage = () => {
       </div>
 
       {/* 📊 Session Summary Cards - Now at the Top */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <div className="group bg-card p-4 rounded-3xl border border-slate-200/60 dark:border-slate-800 shadow-sm hover:border-blue-500/30 transition-all flex items-center justify-between">
-          <div className="flex items-center gap-3.5">
-            <div className="p-3 rounded-2xl bg-blue-50 dark:bg-blue-900/10 text-blue-600 dark:text-blue-400 group-hover:scale-110 transition-transform">
-              <Users className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-0.5">Total Peserta</p>
-              <h4 className="text-xl font-black text-slate-800 dark:text-white leading-none">
-                {isLoading ? <Skeleton className="h-6 w-12" /> : (function () {
-                  const filteredArr = students.filter((s) => {
-                    if (monitorRoom?.allClasses) return true;
-                    const allowedIds = Array.isArray(monitorRoom?.classId) ? monitorRoom?.classId : String(monitorRoom?.classId || "").split(",");
-                    return allowedIds.includes(s.classId);
-                  });
-                  return filteredArr.length;
-                })()}
-              </h4>
-            </div>
-          </div>
-        </div>
+      {(() => {
+        // Helper: siswa eligible berdasarkan room + filter kelas aktif
+        const eligibleStudents = students.filter(s => {
+          if (monitorRoom?.allClasses) {
+            if (monitorClassFilter !== "all" && examClasses.find(c => c.id === s.classId)?.name !== monitorClassFilter) return false;
+            return true;
+          }
+          const allowedIds = Array.isArray(monitorRoom?.classId) ? monitorRoom?.classId : String(monitorRoom?.classId || "").split(",");
+          if (!allowedIds.includes(s.classId)) return false;
+          if (monitorClassFilter !== "all" && examClasses.find(c => c.id === s.classId)?.name !== monitorClassFilter) return false;
+          return true;
+        });
+        const eligibleIds = new Set(eligibleStudents.map(s => s.id));
 
-        <div className="group bg-card p-4 rounded-3xl border border-slate-200/60 dark:border-slate-800 shadow-sm hover:border-emerald-500/30 transition-all flex items-center justify-between">
-          <div className="flex items-center gap-3.5">
-            <div className="p-3 rounded-2xl bg-emerald-50 dark:bg-emerald-900/10 text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform">
-              <Monitor className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-0.5">Sedang Ujian</p>
-              <h4 className="text-xl font-black text-emerald-600 dark:text-emerald-400 leading-none">
-                {isLoading ? <Skeleton className="h-6 w-8" /> : attempts.filter(a => a.status === 'ongoing').length}
-              </h4>
-            </div>
-          </div>
-        </div>
+        // Filter attempts hanya untuk siswa eligible
+        const filteredAttempts = attempts.filter(a => eligibleIds.has(a.studentId || a.student_id));
 
-        <div className="group bg-card p-4 rounded-3xl border border-slate-200/60 dark:border-slate-800 shadow-sm hover:border-rose-500/30 transition-all flex items-center justify-between">
-          <div className="flex items-center gap-3.5">
-            <div className="p-3 rounded-2xl bg-rose-50 dark:bg-rose-900/10 text-rose-600 dark:text-rose-400 group-hover:scale-110 transition-transform">
-              <Lock className="h-5 w-5" />
+        const ongoingCount  = filteredAttempts.filter(a => a.status === 'ongoing').length;
+        const finishedCount = filteredAttempts.filter(a => a.status === 'finished' || a.status === 'submitted' || a.status === 'graded').length;
+        const lockedCount   = filteredAttempts.filter(a => a.status === 'LOCKED').length;
+
+        const absentList = eligibleStudents
+          .filter(s => !filteredAttempts.find(a => (a.studentId || a.student_id) === s.id))
+          .sort((a, b) => {
+            const ca = examClasses.find(c => c.id === a.classId)?.name || "";
+            const cb = examClasses.find(c => c.id === b.classId)?.name || "";
+            return ca.localeCompare(cb) || a.name.localeCompare(b.name);
+          });
+
+        return (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
+            {/* Total Peserta */}
+            <div className="group bg-card p-4 rounded-3xl border border-slate-200/60 dark:border-slate-800 shadow-sm hover:border-blue-500/30 transition-all flex items-center justify-between">
+              <div className="flex items-center gap-3.5">
+                <div className="p-3 rounded-2xl bg-blue-50 dark:bg-blue-900/10 text-blue-600 dark:text-blue-400 group-hover:scale-110 transition-transform">
+                  <Users className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-0.5">Total Peserta</p>
+                  <h4 className="text-xl font-black text-slate-800 dark:text-white leading-none">
+                    {isLoading ? <Skeleton className="h-6 w-12" /> : eligibleStudents.length}
+                  </h4>
+                </div>
+              </div>
             </div>
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-0.5">Terkunci</p>
-              <h4 className="text-xl font-black text-rose-600 dark:text-rose-400 leading-none">
-                {isLoading ? <Skeleton className="h-6 w-6" /> : attempts.filter(a => a.status === 'LOCKED').length}
-              </h4>
+
+            {/* Sedang Ujian */}
+            <div className="group bg-card p-4 rounded-3xl border border-slate-200/60 dark:border-slate-800 shadow-sm hover:border-emerald-500/30 transition-all flex items-center justify-between">
+              <div className="flex items-center gap-3.5">
+                <div className="p-3 rounded-2xl bg-emerald-50 dark:bg-emerald-900/10 text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform">
+                  <Monitor className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-0.5">Sedang Ujian</p>
+                  <h4 className="text-xl font-black text-emerald-600 dark:text-emerald-400 leading-none">
+                    {isLoading ? <Skeleton className="h-6 w-8" /> : ongoingCount}
+                  </h4>
+                </div>
+              </div>
+            </div>
+
+            {/* Selesai */}
+            <div className="group relative bg-card p-4 rounded-3xl border border-slate-200/60 dark:border-slate-800 shadow-sm hover:border-blue-500/30 transition-all flex items-center justify-between cursor-default">
+              <div className="flex items-center gap-3.5">
+                <div className="p-3 rounded-2xl bg-blue-50 dark:bg-blue-900/10 text-blue-600 dark:text-blue-400 group-hover:scale-110 transition-transform">
+                  <CheckCircle2 className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-0.5">Selesai</p>
+                  {isLoading ? <Skeleton className="h-6 w-16" /> : (
+                    <h4 className="text-xl font-black text-blue-600 dark:text-blue-400 leading-none">
+                      {finishedCount}<span className="text-sm font-bold text-slate-400">/{eligibleStudents.length}</span>
+                    </h4>
+                  )}
+                </div>
+              </div>
+
+              {/* Hover popup — siswa belum ujian */}
+              {!isLoading && absentList.length > 0 && (
+                <div className="absolute bottom-full left-0 mb-2 w-72 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl p-3 z-50 opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-200 translate-y-1 group-hover:translate-y-0">
+                  <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 px-1">
+                    Belum Ujian ({absentList.length} siswa)
+                  </p>
+                  <div className="max-h-52 overflow-y-auto space-y-1 pr-1">
+                    {absentList.map(s => {
+                      const cls = examClasses.find(c => c.id === s.classId)?.name || "-";
+                      return (
+                        <div key={s.id} className="flex items-center justify-between px-2.5 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-800">
+                          <span className="text-xs font-semibold text-slate-700 dark:text-slate-200 truncate max-w-[160px]">{s.name}</span>
+                          <span className="text-[10px] font-bold text-slate-400 shrink-0 ml-2">{cls}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Terkunci */}
+            <div className="group bg-card p-4 rounded-3xl border border-slate-200/60 dark:border-slate-800 shadow-sm hover:border-rose-500/30 transition-all flex items-center justify-between">
+              <div className="flex items-center gap-3.5">
+                <div className="p-3 rounded-2xl bg-rose-50 dark:bg-rose-900/10 text-rose-600 dark:text-rose-400 group-hover:scale-110 transition-transform">
+                  <Lock className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-0.5">Terkunci</p>
+                  <h4 className="text-xl font-black text-rose-600 dark:text-rose-400 leading-none">
+                    {isLoading ? <Skeleton className="h-6 w-6" /> : lockedCount}
+                  </h4>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-      </div>
+        );
+      })()}
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {/* SIDEBAR - Enhanced & Integrated */}
@@ -1559,8 +1667,7 @@ const MonitoringPage = () => {
                           <TableRow className={`hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors h-16 ${isExpanded ? "bg-blue-50/30 dark:bg-blue-900/10" : ""}`}>
                             <TableCell className="text-center text-slate-400 text-[10px] px-1">{startIndex + localIdx + 1}</TableCell>
                             <TableCell>
-                              <div className="flex flex-col cursor-pointer" onClick={() => navigate(`/admin/penilaian/${student.id}`)}>
-                                <span className="font-bold text-indigo-600 dark:text-indigo-400 hover:underline">{student.name}</span>
+                              <div className="flex flex-col cursor-pointer" onClick={() => { sessionStorage.setItem("activeGradingRoomId", roomId || ""); navigate(`/admin/penilaian/${student.id}`); }}>                                <span className="font-bold text-indigo-600 dark:text-indigo-400 hover:underline">{student.name}</span>
                                 <span className="text-[10px] text-slate-500 font-medium">{student.nisn} • {student.className}</span>
                               </div>
                             </TableCell>
@@ -1811,6 +1918,23 @@ const MonitoringPage = () => {
                                                     <Sparkles className={`h-3 w-3 ${aiGradingId === `${student.id}_${q.id}` ? "animate-spin" : ""}`} />
                                                   </button>
                                                 )}
+                                                {/* Edit jawaban — hanya pilihan ganda */}
+                                                {(q.type === "pilihan_ganda" || q.type === "benar_salah" || !q.type) && (
+                                                  <button
+                                                    onClick={() => setEditAnswerDialog({
+                                                      open: true,
+                                                      studentId: student.id,
+                                                      studentName: student.name,
+                                                      question: q,
+                                                      currentAnswer: ans || "",
+                                                      qIdx,
+                                                    })}
+                                                    className="p-1 rounded hover:bg-amber-50 text-amber-500"
+                                                    title="Edit jawaban siswa"
+                                                  >
+                                                    <Pencil className="h-3 w-3" />
+                                                  </button>
+                                                )}
                                                 <button onClick={() => handleManualGrade(student.id, q.id, true)} className={`p-1 rounded ${overrides[q.id] === true ? "bg-emerald-200 text-emerald-700" : "hover:bg-white text-emerald-500"}`} title="Tandai Benar"><CheckCircle2 className="h-3 w-3" /></button>
                                                 <button onClick={() => handleManualGrade(student.id, q.id, false)} className={`p-1 rounded ${overrides[q.id] === false ? "bg-rose-200 text-rose-700" : "hover:bg-white text-rose-500"}`} title="Tandai Salah"><X className="h-3 w-3" /></button>
                                                 {overrides[q.id] !== undefined && (
@@ -1988,6 +2112,113 @@ const MonitoringPage = () => {
         confirmLabel={confirmDialog.confirmLabel}
         requireWord={confirmDialog.requireWord}
       />
+
+      {/* ✏️ Dialog Edit Jawaban Siswa */}
+      <Dialog open={!!editAnswerDialog?.open} onOpenChange={(open) => { if (!open) setEditAnswerDialog(null); }}>
+        <DialogContent className="max-w-lg bg-white dark:bg-slate-950 rounded-2xl border-none shadow-2xl p-0 overflow-hidden flex flex-col max-h-[90vh]">
+          {editAnswerDialog && (() => {
+            const q = editAnswerDialog.question;
+            const choices: Record<string, { text: string; isCorrect: boolean }> = q.choices || {};
+            const choiceKeys = Object.keys(choices).sort();
+            const currentAns = editAnswerDialog.currentAnswer;
+
+            return (
+              <>
+                <div className="bg-amber-500 px-6 py-5 text-white">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
+                      <Pencil className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-widest opacity-80">Edit Jawaban Siswa</p>
+                      <DialogTitle className="text-base font-black leading-tight">
+                        Soal #{editAnswerDialog.qIdx + 1} — {editAnswerDialog.studentName}
+                      </DialogTitle>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-6 space-y-5 overflow-y-auto flex-1">
+                  {/* Teks Soal */}
+                  <div className="bg-slate-50 dark:bg-slate-900 rounded-xl p-4 border border-slate-200 dark:border-slate-800">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Soal</p>
+                    <MathText content={q.text} className="text-sm leading-relaxed text-slate-800 dark:text-slate-200" />
+                    {q.image && (
+                      <img src={q.image} className="mt-3 rounded-lg max-h-48 object-contain" alt="gambar soal" />
+                    )}
+                  </div>
+
+                  {/* Pilihan Jawaban */}
+                  <div className="space-y-2">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Pilih Jawaban</p>
+                    {choiceKeys.length > 0 ? (
+                      choiceKeys.map(key => {
+                        const choice = choices[key];
+                        const isSelected = currentAns === key;
+                        const isCorrectKey = choice.isCorrect;
+                        return (
+                          <button
+                            key={key}
+                            onClick={() => setEditAnswerDialog(prev => prev ? { ...prev, currentAnswer: key } : prev)}
+                            className={`w-full flex items-start gap-3 p-3 rounded-xl border text-left transition-all ${
+                              isSelected
+                                ? "border-amber-400 bg-amber-50 dark:bg-amber-900/20"
+                                : "border-slate-200 dark:border-slate-700 hover:border-slate-300 bg-white dark:bg-slate-900"
+                            }`}
+                          >
+                            <span className={`shrink-0 w-7 h-7 rounded-lg flex items-center justify-center text-xs font-black border-2 ${
+                              isSelected
+                                ? "bg-amber-500 border-amber-500 text-white"
+                                : "border-slate-300 dark:border-slate-600 text-slate-500"
+                            }`}>
+                              {key.toUpperCase()}
+                            </span>
+                            <div className="flex-1 min-w-0">
+                              <MathText content={choice.text} className="text-sm text-slate-700 dark:text-slate-300 leading-snug" />
+                            </div>
+                            {isCorrectKey && (
+                              <span className="shrink-0 text-[9px] font-black text-emerald-600 bg-emerald-50 dark:bg-emerald-900/30 px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800">
+                                KUNCI
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })
+                    ) : (
+                      <p className="text-xs text-slate-400 italic">Soal ini tidak memiliki pilihan ganda.</p>
+                    )}
+                  </div>
+
+                  {/* Jawaban saat ini */}
+                  <div className="flex items-center justify-between text-xs text-slate-500 bg-slate-50 dark:bg-slate-900 rounded-xl px-4 py-3 border border-slate-200 dark:border-slate-800">
+                    <span>Jawaban dipilih:</span>
+                    <span className="font-black text-amber-600 text-sm">
+                      {editAnswerDialog.currentAnswer ? editAnswerDialog.currentAnswer.toUpperCase() : "— (belum dipilih)"}
+                    </span>
+                  </div>
+
+                  {/* Tombol aksi */}
+                  <div className="flex gap-3 pt-1">
+                    <button
+                      onClick={() => setEditAnswerDialog(null)}
+                      className="flex-1 h-11 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-black uppercase tracking-widest text-slate-500 hover:bg-slate-50 transition-colors"
+                    >
+                      Batal
+                    </button>
+                    <button
+                      onClick={() => handleEditAnswer(editAnswerDialog.currentAnswer)}
+                      disabled={!editAnswerDialog.currentAnswer}
+                      className="flex-1 h-11 rounded-xl bg-amber-500 hover:bg-amber-600 disabled:opacity-40 text-white text-xs font-black uppercase tracking-widest transition-colors"
+                    >
+                      Simpan Jawaban
+                    </button>
+                  </div>
+                </div>
+              </>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
 
       {/* Zoom Image Dialog */}
       <Dialog open={!!previewImage} onOpenChange={() => setPreviewImage(null)}>
