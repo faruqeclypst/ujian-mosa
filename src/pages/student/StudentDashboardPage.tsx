@@ -255,7 +255,16 @@ const StudentDashboardPage = () => {
               if (local.status === "finished" &&
                   myStatus[rId]?.status !== "finished" &&
                   local.id === myStatus[rId]?.id) {
-                myStatus[rId] = { ...myStatus[rId], status: "finished", submittedAt: local.submittedAt };
+                  myStatus[rId] = {
+                  ...myStatus[rId],
+                  status: "finished",
+                  submittedAt: local.submittedAt,
+                  score: local.score ?? myStatus[rId]?.score,
+                  objectiveScore: local.objectiveScore ?? myStatus[rId]?.objectiveScore,
+                  objectiveCorrect: local.objectiveCorrect ?? myStatus[rId]?.objectiveCorrect,
+                  objectiveTotal: local.objectiveTotal ?? myStatus[rId]?.objectiveTotal,
+                  essayTotal: local.essayTotal ?? myStatus[rId]?.essayTotal,
+                };
               }
             }
           } catch {}
@@ -324,17 +333,8 @@ const StudentDashboardPage = () => {
       fetchData(true);
     });
 
-    // Subscribe ONLY to this student's attempts to prevent massive load
-    const unsubA = pb.collection("attempts").subscribe("*", (e) => {
-      if (e.record.studentId === student.id) {
-        console.log("My Attempt Change Detected, updating UI silently...");
-        fetchData(true);
-      }
-    });
-
     return () => {
       unsubR.then(u => u()).catch(() => { });
-      unsubA.then(u => u()).catch(() => { });
     };
   }, [student?.id]);
 
@@ -664,29 +664,53 @@ const StudentDashboardPage = () => {
                                                 <div className="mt-auto pt-4 border-t border-slate-50 dark:border-slate-800/50">
                                   {isFinished ? (
                                     <div className="flex flex-col gap-4">
-                                      {room.show_result !== false ? (
-                                      <div className="flex items-center justify-between">
-                                        <div className="flex gap-2">
-                                          <div className="flex flex-col items-center bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-100 dark:border-emerald-800/50 py-2 px-3 rounded-xl min-w-[50px]">
-                                            <span className="text-[8px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest leading-none mb-1">Benar</span>
-                                            <span className="text-sm font-black text-emerald-700 dark:text-emerald-300">{attempt?.correct || 0}</span>
+                                      {room.show_result !== false ? (() => {
+                                        // Baca metadata dari answers.__meta (tidak perlu field baru di DB)
+                                        const meta = attempt?.answers?.__meta;
+                                        const essayTotal = meta?.essayTotal ?? attempt?.essayTotal ?? 0;
+                                        const objectiveCorrect = meta?.objectiveCorrect ?? attempt?.objectiveCorrect ?? attempt?.correct ?? 0;
+                                        const objectiveTotal = meta?.objectiveTotal ?? attempt?.objectiveTotal ?? attempt?.total ?? 0;
+                                        // Selalu tampilkan nilai objektif murni (100%), tidak ada bobot essay
+                                        // Gunakan attempt?.score terlebih dahulu jika ada, untuk menghindari fallback ke default '0' di kolom objectiveScore
+                                        const displayScore = attempt?.score ?? attempt?.objectiveScore ?? meta?.objectiveScore ?? 0;
+                                        return (
+                                        <>
+                                        <div className="flex items-center justify-between">
+                                          <div className="flex gap-2">
+                                            <div className="flex flex-col items-center bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-100 dark:border-emerald-800/50 py-2 px-3 rounded-xl min-w-[50px]">
+                                              <span className="text-[8px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest leading-none mb-1">Benar</span>
+                                              <span className="text-sm font-black text-emerald-700 dark:text-emerald-300">{objectiveCorrect}</span>
+                                            </div>
+                                            <div className="flex flex-col items-center bg-rose-50 dark:bg-rose-950/30 border border-rose-100 dark:border-rose-800/50 py-2 px-3 rounded-xl min-w-[50px]">
+                                              <span className="text-[8px] font-black text-rose-600 dark:text-rose-400 uppercase tracking-widest leading-none mb-1">Salah</span>
+                                              <span className="text-sm font-black text-rose-700 dark:text-rose-300">{Math.max(0, objectiveTotal - objectiveCorrect)}</span>
+                                            </div>
                                           </div>
-                                          <div className="flex flex-col items-center bg-rose-50 dark:bg-rose-950/30 border border-rose-100 dark:border-rose-800/50 py-2 px-3 rounded-xl min-w-[50px]">
-                                            <span className="text-[8px] font-black text-rose-600 dark:text-rose-400 uppercase tracking-widest leading-none mb-1">Salah</span>
-                                            <span className="text-sm font-black text-rose-700 dark:text-rose-300">{(attempt?.total || 0) - (attempt?.correct || 0)}</span>
-                                          </div>
-                                        </div>
-                                        <div className="flex flex-col items-end">
-                                          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Nilai Akhir</span>
-                                          <div className="flex items-baseline gap-1">
-                                            <span className="text-3xl font-black text-slate-900 dark:text-white tabular-nums tracking-tighter">
-                                              {Number(attempt?.score || 0).toFixed(1)}
+                                          <div className="flex flex-col items-end">
+                                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
+                                              Nilai Objektif
                                             </span>
-                                            <span className="text-[10px] font-bold text-slate-400">/ 100</span>
+                                            <div className="flex items-baseline gap-1">
+                                              <span className="text-3xl font-black text-slate-900 dark:text-white tabular-nums tracking-tighter">
+                                                {Number(displayScore).toFixed(1)}
+                                              </span>
+                                              <span className="text-[10px] font-bold text-slate-400">/ 100</span>
+                                            </div>
                                           </div>
                                         </div>
-                                      </div>
-                                      ) : null}
+
+                                        {/* Keterangan jika ada essay — nilai essay tidak ditampilkan ke siswa */}
+                                        {essayTotal > 0 && (
+                                          <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/40 rounded-xl">
+                                            <span className="text-amber-500 text-base">📝</span>
+                                            <p className="text-[10px] font-black text-amber-700 dark:text-amber-400 uppercase tracking-wide leading-none">
+                                              {essayTotal} soal essay/isian dinilai oleh guru
+                                            </p>
+                                          </div>
+                                        )}
+                                        </>
+                                        );
+                                      })() : null}
                                       
                                       <div className="-mx-6 -mb-6 mt-2 px-6 py-3 bg-emerald-500 text-white flex items-center justify-between shadow-inner">
                                         <span className="text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
@@ -758,7 +782,7 @@ const StudentDashboardPage = () => {
                   </h5>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="p-4 rounded-[1.5rem] bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-100/50 dark:border-indigo-900/50 text-center">
-                      <p className="text-xl font-black text-indigo-700 dark:text-indigo-400 leading-none">{Object.values(userAttempts).filter(a => a.status !== "ongoing" && a.status !== "LOCKED").length}</p>
+                      <p className="text-xl font-black text-indigo-700 dark:text-indigo-400 leading-none">{totalFinished}</p>
                       <p className="text-[8px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-tighter mt-1">Selesai</p>
                     </div>
                     <div className="p-4 rounded-[1.5rem] bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-100/50 dark:border-emerald-900/50 text-center">

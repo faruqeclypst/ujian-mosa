@@ -3,6 +3,7 @@ import { Activity, Server, Database, Cloud, CheckCircle, RefreshCw, AlertCircle,
 import SuperAdminLayout from "../../components/layout/SuperAdminLayout";
 import { masterPb } from "../../lib/pocketbase";
 import { cn } from "../../lib/utils";
+import { getSchoolDomain } from "../../utils/domainHelper";
 
 interface SchoolNode {
   id: string;
@@ -173,7 +174,7 @@ const SuperAdminInfraPage = () => {
                 <tr key={node.id} className="hover:bg-slate-50/60 transition-colors">
                   <td className="px-5 py-3.5">
                     <p className="font-semibold text-slate-900 text-sm">{node.name}</p>
-                    <p className="text-xs text-slate-400">{node.slug}.alfaruqasri.my.id</p>
+                    <p className="text-xs text-slate-400">{getSchoolDomain(node.slug)}</p>
                   </td>
                   <td className="px-5 py-3.5">
                     <a href={node.pb_url} target="_blank" rel="noreferrer"
@@ -237,7 +238,7 @@ const SuperAdminInfraPage = () => {
               <div className="flex items-start justify-between gap-2">
                 <div>
                   <p className="font-semibold text-slate-900 text-sm">{node.name}</p>
-                  <p className="text-xs text-slate-400">{node.slug}.alfaruqasri.my.id</p>
+                  <p className="text-xs text-slate-400">{getSchoolDomain(node.slug)}</p>
                 </div>
                 {node.status === "checking" ? (
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-100 text-slate-500 rounded-full text-[10px] font-bold border border-slate-200 flex-shrink-0">

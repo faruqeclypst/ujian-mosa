@@ -23,7 +23,7 @@ import {
   Clock,
   ShieldAlert
 } from "lucide-react";
-import { Sparkles, RotateCcw, Copy, Check, Pencil } from "lucide-react";
+import { Sparkles, RotateCcw, Copy, Check, Pencil, Trophy } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import * as XLSX from "xlsx-js-style";
 import { Button } from "../../components/ui/button";
@@ -131,8 +131,8 @@ const StudentTimer = ({ attempt, room }: { attempt: any, room: any }) => {
 
   return (
     <div className={`flex items-center gap-1.5 px-1.5 py-0.5 rounded-lg bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10 transition-all ${timeLeft === "HABIS" || timeLeft === "TERKUNCI" ? "text-rose-600 border-rose-100 bg-rose-50" :
-        timeLeft.startsWith("Selesai") ? "text-emerald-600 border-emerald-100 bg-emerald-50" :
-          "text-blue-600 border-blue-50 bg-blue-50/30"
+      timeLeft.startsWith("Selesai") ? "text-emerald-600 border-emerald-100 bg-emerald-50" :
+        "text-blue-600 border-blue-50 bg-blue-50/30"
       }`}>
       <Timer className={`h-3 w-3 ${iconColor} ${attempt?.status === "ongoing" ? "animate-pulse" : ""}`} />
       <span className="font-mono font-bold text-[9px] tracking-tight whitespace-nowrap">
@@ -176,6 +176,35 @@ const isFuzzyMatch = (studentAns: any, correctKey: string) => {
   return dist <= maxAllowed;
 };
 
+// Helper for answer comparison (all types)
+const checkAns = (q: any, studentAns: any, overrides?: Record<string, boolean>) => {
+  if (overrides && overrides[q.id] !== undefined) return overrides[q.id];
+  if (!studentAns) return false;
+  const type = q.type || q.field || "pilihan_ganda";
+
+  if (type === "pilihan_ganda" || type === "benar_salah") {
+    const ck = Object.keys(q.choices || {}).find(k => k.toLowerCase() === String(studentAns).toLowerCase());
+    return ck ? q.choices[ck].isCorrect === true : false;
+  }
+  if (type === "pilihan_ganda_kompleks") {
+    const correctKeys = Object.keys(q.choices || {}).filter(k => q.choices[k].isCorrect).map(k => k.toLowerCase());
+    const studentKeys = Array.isArray(studentAns) ? studentAns.map((k: any) => String(k).toLowerCase()) : [];
+    return studentKeys.length === correctKeys.length && studentKeys.every((k: string) => correctKeys.includes(k));
+  }
+  if (type === "isian_singkat") {
+    return isFuzzyMatch(studentAns, q.answerKey);
+  }
+  if (type === "urutkan" || type === "drag_drop") {
+    const co = (q.items || []).map((it: any) => it.id);
+    return Array.isArray(studentAns) && studentAns.length === co.length && studentAns.every((v: any, i: number) => v === co[i]);
+  }
+  if (type === "menjodohkan") {
+    const pairs = q.pairs || [];
+    return pairs.length > 0 && pairs.every((p: any) => studentAns[p.id] === p.right);
+  }
+  return false;
+};
+
 const MonitoringPage = () => {
   const navigate = useNavigate();
   const [roomId, setRoomId] = useState<string | null>(() => sessionStorage.getItem("activeMonitoringRoomId"));
@@ -204,7 +233,7 @@ const MonitoringPage = () => {
   const [monitorPage, setMonitorPage] = useState(1);
   const [monitorPageSize, setMonitorPageSize] = useState(25);
   const [monitorClassFilter, setMonitorClassFilter] = useState("all");
-  const [monitorSortBy, setMonitorSortBy] = useState<"default" | "nama" | "nilai" | "login" | "status">("status");
+  const [monitorSortBy, setMonitorSortBy] = useState<"default" | "nama" | "nilai" | "login" | "status" | "monitoring">("status");
   const [monitorSortOrder, setMonitorSortOrder] = useState<"asc" | "desc">("desc");
 
   const toggleSort = (key: typeof monitorSortBy) => {
@@ -271,15 +300,25 @@ const MonitoringPage = () => {
       }
     });
 
-    // Weighted final score: 40% objektif, 60% essay (jika ada essay)
+    // Weighted final score: 60% objektif, 40% essay (jika ada essay)
     if (essayTotal === 0) {
       // Tidak ada essay → 100% objektif
       return objectiveTotal > 0 ? Math.round((objectiveCorrect / objectiveTotal) * 100) : 0;
     }
-    
+
     const objScore = objectiveTotal > 0 ? (objectiveCorrect / objectiveTotal) * 100 : 0;
     const essScore = essayTotal > 0 ? (essayCorrect / essayTotal) * 100 : 0;
-    return Math.round(objScore * 0.4 + essScore * 0.6);
+    return Math.round(objScore * 0.6 + essScore * 0.4);
+  };
+
+  const getAttemptScore = (attempt: any) => {
+    if (!attempt) return 0;
+    const sisAnswers = attempt.answers || {};
+    const overrides = attempt.overrides || (sisAnswers as any)?.__overrides__ || {};
+    const liveScore = getLiveScore(sisAnswers, overrides);
+    return attempt.status === "finished"
+      ? (attempt.score === 0 && liveScore > 0 ? liveScore : (attempt.score ?? liveScore))
+      : liveScore;
   };
 
   // 🛡️ Self-Healing Logic: Automatically fix 0 scores for FINISHED attempts
@@ -289,7 +328,11 @@ const MonitoringPage = () => {
     const fixScores = async () => {
       const candidates = attempts.filter(a =>
         a.status === "finished" &&
-        (a.score === 0 || a.score === undefined || a.score === null) &&
+        (
+          (a.score === 0 || a.score === undefined || a.score === null) ||
+          // Fix objectiveCorrect > objectiveTotal (data lama dari partial credit bug)
+          (a.objectiveCorrect !== undefined && a.objectiveTotal !== undefined && a.objectiveCorrect > a.objectiveTotal)
+        ) &&
         Object.keys(a.answers || {}).length > 0
       );
 
@@ -301,8 +344,32 @@ const MonitoringPage = () => {
         const score = getLiveScore(att.answers, att.overrides || {});
         if (score > 0 && pb) {
           try {
-            await pb.collection('attempts').update(att.id, { score: score });
-            console.log(`Self-healed score for ${att.id}: ${score}`);
+            // Recalculate objectiveCorrect/objectiveTotal dari scratch
+            let objCorrect = 0, objTotal = 0;
+            monitorQuestions.forEach((q: any) => {
+              const type = q.type || "pilihan_ganda";
+              const isEssay = type === "isian_singkat" || type === "uraian";
+              if (!isEssay) {
+                objTotal++;
+                const a = (att.answers || {})[q.id];
+                let ic = (att.overrides || {})[q.id];
+                if (ic === undefined && a) {
+                  if (type === "pilihan_ganda" || type === "benar_salah") { const ck = Object.keys(q.choices || {}).find((k: string) => k.toLowerCase() === String(a).toLowerCase()); ic = ck ? q.choices[ck].isCorrect === true : false; }
+                  else if (type === "pilihan_ganda_kompleks") { const ck = Object.keys(q.choices || {}).filter((k: string) => q.choices[k].isCorrect).map((k: string) => k.toLowerCase()); const sk = Array.isArray(a) ? a.map((k: any) => String(k).toLowerCase()) : []; ic = sk.length === ck.length && sk.every((k: string) => ck.includes(k)); }
+                  else if (type === "menjodohkan") { const pairs = q.pairs || []; ic = pairs.length > 0 && pairs.every((p: any) => a[p.id] === p.right); }
+                  else if (type === "urutkan" || type === "drag_drop") { const co = (q.items || []).map((it: any) => it.id); ic = Array.isArray(a) && a.length === co.length && a.every((v: any, i: number) => v === co[i]); }
+                }
+                if (ic) objCorrect++;
+              }
+            });
+            objCorrect = Math.min(objCorrect, objTotal);
+            await pb.collection('attempts').update(att.id, {
+              score,
+              objectiveScore: objTotal > 0 ? Math.round((objCorrect / objTotal) * 100) : 0,
+              objectiveCorrect: objCorrect,
+              objectiveTotal: objTotal,
+            });
+            console.log(`Self-healed score for ${att.id}: ${score}, obj: ${objCorrect}/${objTotal}`);
           } catch (e) {
             console.error("Failed to self-heal score", e);
           }
@@ -430,13 +497,17 @@ const MonitoringPage = () => {
             answerKey: q.correctAnswer || q.answerKey
           };
         });
-        setMonitorQuestions(mappedQuestions.sort((a: any, b: any) => {
-          const aIsEssay = a.type === "isian_singkat" || a.type === "uraian";
-          const bIsEssay = b.type === "isian_singkat" || b.type === "uraian";
-          if (aIsEssay && !bIsEssay) return 1;
-          if (!aIsEssay && bIsEssay) return -1;
-          return 0;
-        }));
+        setMonitorQuestions(
+          // Deduplicate berdasarkan ID — cegah soal ganda dari DB
+          Array.from(new Map(mappedQuestions.map((q: any) => [q.id, q])).values())
+            .sort((a: any, b: any) => {
+              const aIsEssay = a.type === "isian_singkat" || a.type === "uraian";
+              const bIsEssay = b.type === "isian_singkat" || b.type === "uraian";
+              if (aIsEssay && !bIsEssay) return 1;
+              if (!aIsEssay && bIsEssay) return -1;
+              return 0;
+            })
+        );
       }
 
       // 3. Ambil DATA PENGERJAAN
@@ -453,6 +524,94 @@ const MonitoringPage = () => {
 
         setAnswersList(grouped);
         setAttempts(loadedAttempts);
+
+        // Auto-sync out-of-sync finished attempts in background
+        const finishedAttempts = loadedAttempts.filter(att => att.status === "finished");
+        if (finishedAttempts.length > 0 && monitorQuestions.length > 0) {
+          const syncPromises = finishedAttempts.map(async (att) => {
+            const answers = att.answers || {};
+            const rawOverrides = typeof att.overrides === 'string' ? JSON.parse(att.overrides) : (att.overrides || {});
+            const answersOverrides = answers.__overrides__ || {};
+            const overrides = { ...answersOverrides, ...rawOverrides };
+
+            let objCorrect = 0, objTotal = 0, essCorrect = 0, essTotal = 0;
+            monitorQuestions.forEach((q: any) => {
+              const type = q.type || "pilihan_ganda";
+              const isEssay = type === "isian_singkat" || type === "uraian";
+              const ic = checkAns(q, answers[q.id], overrides);
+              if (isEssay) { essTotal++; if (ic) essCorrect++; }
+              else { objTotal++; if (ic) objCorrect++; }
+            });
+
+            const objScore = objTotal > 0 ? Math.round((objCorrect / objTotal) * 100) : 0;
+            const essScore = essTotal > 0 ? Math.round((essCorrect / essTotal) * 100) : 0;
+            let finalScore = att.score || 0;
+            if (finalScore === 0) {
+              finalScore = getLiveScore(answers, overrides);
+            }
+            if (!finalScore) {
+              finalScore = essTotal === 0 ? objScore : Math.round(objScore * 0.6 + essScore * 0.4);
+            }
+
+            const essGraded = Object.keys(overrides).filter(k => {
+              const q = monitorQuestions.find((x: any) => x.id === k);
+              return q && (q.type === "isian_singkat" || q.type === "uraian");
+            }).length;
+
+            const meta = answers.__meta || {};
+            const needsSync =
+              att.essayTotal !== essTotal ||
+              att.essayGraded !== essGraded ||
+              att.essayCorrect !== essCorrect ||
+              att.essayScore !== essScore ||
+              att.objectiveCorrect !== objCorrect ||
+              att.objectiveTotal !== objTotal ||
+              att.objectiveScore !== objScore ||
+              att.score !== finalScore ||
+              meta.essayGraded !== essGraded ||
+              meta.essayCorrect !== essCorrect;
+
+            if (needsSync) {
+              const updatedAnswers = {
+                ...answers,
+                __meta: {
+                  ...meta,
+                  objectiveScore: objScore,
+                  objectiveCorrect: objCorrect,
+                  objectiveTotal: objTotal,
+                  essayTotal: essTotal,
+                  essayCorrect: essCorrect,
+                  essayScore: essScore,
+                  essayGraded: essGraded
+                }
+              };
+              try {
+                await pb.collection('attempts').update(att.id, {
+                  answers: updatedAnswers,
+                  correct: Math.floor(objCorrect + essCorrect),
+                  objectiveCorrect: Math.floor(objCorrect),
+                  objectiveTotal: objTotal,
+                  objectiveScore: objScore,
+                  essayCorrect: essCorrect,
+                  essayTotal: essTotal,
+                  essayScore: essScore,
+                  essayGraded: essGraded,
+                  score: finalScore
+                });
+                console.log(`Auto-synchronized scores for student attempt ${att.id}`);
+              } catch (err) {
+                console.error(`Error auto-syncing attempt ${att.id}:`, err);
+              }
+            }
+          });
+          // Run sync in background without blocking
+          Promise.all(syncPromises).then(() => {
+            // Re-fetch loaded attempts to update local state if anything changed
+            pb.collection('attempts').getFullList({ filter: `examRoomId = "${id}"` }).then(res => {
+              setAttempts(res);
+            }).catch(() => {});
+          });
+        }
       }
     } catch (e) {
       console.error("Refresh Monitor Error:", e);
@@ -655,7 +814,7 @@ const MonitoringPage = () => {
 
       const newOverrides = { ...currentOverrides, [qId]: isForcedCorrect };
       const sisAnswers = att.answers || {};
-      
+
       // Weighted scoring: separate objective vs essay
       let objectiveCorrect = 0;
       let objectiveTotal = 0;
@@ -665,7 +824,7 @@ const MonitoringPage = () => {
       monitorQuestions.forEach((q: any) => {
         const type = q.type || "pilihan_ganda";
         const isEssay = type === "isian_singkat" || type === "uraian";
-        
+
         let itemCorrect = false;
         if (newOverrides[q.id] !== undefined) {
           itemCorrect = newOverrides[q.id];
@@ -689,7 +848,7 @@ const MonitoringPage = () => {
             }
           }
         }
-        
+
         if (isEssay) {
           essayTotal++;
           if (itemCorrect) essayCorrect++;
@@ -699,19 +858,39 @@ const MonitoringPage = () => {
         }
       });
 
-      // Weighted final score: 40% objektif, 60% essay (jika ada essay)
+      // Weighted final score: 60% objektif, 40% essay (jika ada essay)
       let finalScore: number;
       if (essayTotal === 0) {
         finalScore = objectiveTotal > 0 ? Math.round((objectiveCorrect / objectiveTotal) * 100) : 0;
       } else {
         const objScore = objectiveTotal > 0 ? (objectiveCorrect / objectiveTotal) * 100 : 0;
         const essScore = essayTotal > 0 ? (essayCorrect / essayTotal) * 100 : 0;
-        finalScore = Math.round(objScore * 0.4 + essScore * 0.6);
+        finalScore = Math.round(objScore * 0.6 + essScore * 0.4);
       }
 
       if (!pb) return;
+      
+      const essGradedVal = Object.keys(newOverrides).filter(k => {
+        const q = monitorQuestions.find((x: any) => x.id === k);
+        return q && (q.type === "isian_singkat" || q.type === "uraian");
+      }).length;
+
       // Simpan overrides juga di dalam field answers sebagai backup (key: __overrides__)
-      const updatedAnswers = { ...(att.answers || {}), __overrides__: newOverrides };
+      const updatedAnswers = { 
+        ...(att.answers || {}), 
+        __overrides__: newOverrides,
+        __meta: {
+          ...((att.answers || {}).__meta || {}),
+          objectiveScore: objectiveTotal > 0 ? Math.round((objectiveCorrect / objectiveTotal) * 100) : 0,
+          objectiveCorrect: Math.floor(objectiveCorrect),
+          objectiveTotal,
+          essayTotal,
+          essayCorrect,
+          essayScore: essayTotal > 0 ? Math.round((essayCorrect / essayTotal) * 100) : 0,
+          essayGraded: essGradedVal
+        }
+      };
+
       await pb.collection('attempts').update(att.id, {
         overrides: newOverrides,
         answers: updatedAnswers,
@@ -722,13 +901,10 @@ const MonitoringPage = () => {
         essayCorrect,
         essayTotal,
         essayScore: essayTotal > 0 ? Math.round((essayCorrect / essayTotal) * 100) : 0,
-        essayGraded: Object.keys(newOverrides).filter(k => {
-          const q = monitorQuestions.find((x: any) => x.id === k);
-          return q && (q.type === "isian_singkat" || q.type === "uraian");
-        }).length,
+        essayGraded: essGradedVal,
         score: finalScore
       });
-      
+
       // Update local state immediately to prevent race condition on next grade
       setAttempts(prev => prev.map(a => a.id === att.id ? { ...a, overrides: newOverrides, answers: updatedAnswers, score: finalScore } : a));
     } catch (error) { console.error(error); }
@@ -780,7 +956,7 @@ const MonitoringPage = () => {
       } else {
         const objScore = objTotal > 0 ? (objCorrect / objTotal) * 100 : 0;
         const essScore = essTotal > 0 ? (essCorrect / essTotal) * 100 : 0;
-        finalScore = Math.round(objScore * 0.4 + essScore * 0.6);
+        finalScore = Math.round(objScore * 0.6 + essScore * 0.4);
       }
 
       if (!pb) return;
@@ -899,7 +1075,7 @@ const MonitoringPage = () => {
   const handleAIGrade = async (studentId: string, qId: string) => {
     const q = monitorQuestions.find((x: any) => x.id === qId);
     if (!q || !pb) return;
-    
+
     const studentAttempts = attempts.filter(a => a.studentId === studentId || (a as any).student_id === studentId);
     const att = studentAttempts.sort((a, b) => new Date(b.created).getTime() - new Date(a.created).getTime())[0];
     if (!att) return;
@@ -915,7 +1091,7 @@ const MonitoringPage = () => {
       // Better text extraction: preserve meaningful content
       const questionText = (q.text || "").replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
       const answerKey = q.answerKey || q.correctAnswer || "";
-      
+
       const result = await gradeEssayWithAI(
         pb,
         questionText,
@@ -923,9 +1099,9 @@ const MonitoringPage = () => {
         answerKey,
         q.type === "isian_singkat" ? "isian_singkat" : "uraian"
       );
-      
+
       await handleManualGrade(studentId, qId, result.isCorrect);
-      
+
       showAlert(
         result.isCorrect ? "✓ Benar" : "✗ Salah",
         `Skor: ${result.score}/100. ${result.feedback}`,
@@ -942,34 +1118,7 @@ const MonitoringPage = () => {
     if (!monitorRoom) return;
     const workbook = XLSX.utils.book_new();
 
-    // Helper for answer comparison (all types)
-    const checkAns = (q: any, studentAns: any, overrides?: Record<string, boolean>) => {
-      if (overrides && overrides[q.id] !== undefined) return overrides[q.id];
-      if (!studentAns) return false;
-      const type = q.type || q.field || "pilihan_ganda";
-
-      if (type === "pilihan_ganda" || type === "benar_salah") {
-        const ck = Object.keys(q.choices || {}).find(k => k.toLowerCase() === String(studentAns).toLowerCase());
-        return ck ? q.choices[ck].isCorrect === true : false;
-      }
-      if (type === "pilihan_ganda_kompleks") {
-        const correctKeys = Object.keys(q.choices || {}).filter(k => q.choices[k].isCorrect).map(k => k.toLowerCase());
-        const studentKeys = Array.isArray(studentAns) ? studentAns.map((k: any) => String(k).toLowerCase()) : [];
-        return studentKeys.length === correctKeys.length && studentKeys.every((k: string) => correctKeys.includes(k));
-      }
-      if (type === "isian_singkat") {
-        return isFuzzyMatch(studentAns, q.answerKey);
-      }
-      if (type === "urutkan" || type === "drag_drop") {
-        const co = (q.items || []).map((it: any) => it.id);
-        return Array.isArray(studentAns) && studentAns.length === co.length && studentAns.every((v: any, i: number) => v === co[i]);
-      }
-      if (type === "menjodohkan") {
-        const pairs = q.pairs || [];
-        return pairs.length > 0 && pairs.every((p: any) => studentAns[p.id] === p.right);
-      }
-      return false;
-    };
+    // Helper: format answer for display in Excel
 
     // Helper: format answer for display in Excel
     const formatAnswer = (q: any, studentAns: any) => {
@@ -1045,12 +1194,39 @@ const MonitoringPage = () => {
         font: { color: { rgb: "64748B" } },
         alignment: { horizontal: "center", vertical: "center" },
         border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } }
+      },
+      finalGreen: {
+        fill: { patternType: "solid", fgColor: { rgb: "D1FAE5" } },
+        font: { color: { rgb: "065F46" }, bold: true },
+        alignment: { horizontal: "center", vertical: "center" },
+        border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } }
+      },
+      finalYellow: {
+        fill: { patternType: "solid", fgColor: { rgb: "FEF9C3" } },
+        font: { color: { rgb: "854D0E" }, bold: true },
+        alignment: { horizontal: "center", vertical: "center" },
+        border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } }
+      },
+      finalRed: {
+        fill: { patternType: "solid", fgColor: { rgb: "FEE2E2" } },
+        font: { color: { rgb: "991B1B" }, bold: true },
+        alignment: { horizontal: "center", vertical: "center" },
+        border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } }
       }
+    };
+
+    const getFinalScoreStyle = (score: number) => {
+      if (score >= 75) return STYLES.finalGreen;
+      if (score >= 50) return STYLES.finalYellow;
+      return STYLES.finalRed;
     };
 
     const COL_WIDTHS = [
       { wch: 4 }, { wch: 15 }, { wch: 30 }, { wch: 12 }, { wch: 22 },
-      { wch: 10 }, { wch: 8 }, { wch: 16 }, { wch: 16 }, { wch: 8 }
+      { wch: 10 }, { wch: 8 },
+      { wch: 14 }, { wch: 8 }, { wch: 8 }, // Objektif: Jumlah Benar, 100%, 60%
+      { wch: 14 }, { wch: 8 }, // Subjektif: Jumlah Benar, 40%
+      { wch: 8 } // Nilai
     ];
     monitorQuestions.forEach((q) => {
       const type = q.type || "pilihan_ganda";
@@ -1076,16 +1252,43 @@ const MonitoringPage = () => {
       .sort((a, b) => a.name.localeCompare(b.name));
 
     const classesArray = Array.from(new Set(filteredStudents.map(s => s.className))).sort();
-
-    // Function to build a sheet for a set of students
     const buildSheet = (groupStudents: any[], sheetName: string) => {
-      const headerRow = ["No", terminology.id, "Nama", terminology.class, "Login", "Durasi", "Submit", "Objektif", "Subjektif", "Nilai"];
+      const headerRow1 = [
+        "No", terminology.id, "Nama", terminology.class, "Login", "Durasi", "Submit",
+        "Objektif", "", "", "Subjektif", "", "Nilai"
+      ];
+      const headerRow2 = [
+        "", "", "", "", "", "", "",
+        "Jumlah Benar", "100%", "60%", "Jumlah Benar", "40%", ""
+      ];
+
       monitorQuestions.forEach((q, i) => {
         const type = q.type || "pilihan_ganda";
-        headerRow.push(`Q${i + 1} (${typeLabel(type)})`);
+        headerRow1.push(`Q${i + 1} (${typeLabel(type)})`);
+        headerRow2.push("");
       });
 
-      const rows: any[][] = [headerRow.map(h => ({ v: h, s: STYLES.header }))];
+      const rows: any[][] = [
+        headerRow1.map(h => ({ v: h, s: STYLES.header })),
+        headerRow2.map(h => ({ v: h, s: STYLES.header }))
+      ];
+
+      const merges: any[] = [
+        { s: { r: 0, c: 0 }, e: { r: 1, c: 0 } },
+        { s: { r: 0, c: 1 }, e: { r: 1, c: 1 } },
+        { s: { r: 0, c: 2 }, e: { r: 1, c: 2 } },
+        { s: { r: 0, c: 3 }, e: { r: 1, c: 3 } },
+        { s: { r: 0, c: 4 }, e: { r: 1, c: 4 } },
+        { s: { r: 0, c: 5 }, e: { r: 1, c: 5 } },
+        { s: { r: 0, c: 6 }, e: { r: 1, c: 6 } },
+        { s: { r: 0, c: 7 }, e: { r: 0, c: 9 } },
+        { s: { r: 0, c: 10 }, e: { r: 0, c: 11 } },
+        { s: { r: 0, c: 12 }, e: { r: 1, c: 12 } }
+      ];
+
+      monitorQuestions.forEach((_, i) => {
+        merges.push({ s: { r: 0, c: 13 + i }, e: { r: 1, c: 13 + i } });
+      });
 
       groupStudents.forEach((std, idx) => {
         const atts = attempts.filter(a => a.studentId === std.id || a.student_id === std.id);
@@ -1113,7 +1316,7 @@ const MonitoringPage = () => {
           finalScore = getLiveScore(answers, overrides);
         }
         if (!finalScore) {
-          finalScore = essTotal === 0 ? objScore : Math.round(objScore * 0.4 + essScore * 0.6);
+          finalScore = essTotal === 0 ? objScore : Math.round(objScore * 0.6 + essScore * 0.4);
         }
 
         // Calculate duration
@@ -1123,7 +1326,7 @@ const MonitoringPage = () => {
           const startMs = new Date(loginTime).getTime();
           const endMs = att?.submitTime ? new Date(att.submitTime).getTime() :
             (att?.submittedAt ? new Date(att.submittedAt).getTime() :
-            (att?.status === "finished" ? new Date(att.updated || att.created).getTime() : Date.now()));
+              (att?.status === "finished" ? new Date(att.updated || att.created).getTime() : Date.now()));
           const diffMs = Math.max(0, endMs - startMs);
           const dHrs = Math.floor(diffMs / (1000 * 60 * 60));
           const dMins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
@@ -1135,6 +1338,9 @@ const MonitoringPage = () => {
 
         const essGraded = Object.keys(overrides).filter(k => { const q = monitorQuestions.find((x: any) => x.id === k); return q && (q.type === "isian_singkat" || q.type === "uraian"); }).length;
 
+        const finalVal = Math.round(finalScore) || 0;
+        const ri = idx + 3;
+
         const row = [
           { v: idx + 1, s: STYLES.cellCenter },
           { v: std.nisn, s: STYLES.cellCenter },
@@ -1143,9 +1349,16 @@ const MonitoringPage = () => {
           { v: loginTime ? new Date(loginTime).toLocaleString("id-ID", { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' }) : "-", s: STYLES.cellCenter },
           { v: durationStr, s: STYLES.cellCenter },
           { v: att?.submitTime ? new Date(att.submitTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : (att?.submittedAt ? new Date(att.submittedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : (att?.status === "finished" ? "Selesai" : (att ? "Proses" : "-"))), s: STYLES.cellCenter },
-          { v: `${objCorrect}/${objTotal} (${objScore})`, s: STYLES.cellCenter },
-          { v: essTotal > 0 ? (essGraded < essTotal ? `${essGraded}/${essTotal} dinilai` : `${essCorrect}/${essTotal} (${essScore})`) : "-", s: STYLES.cellCenter },
-          { v: Number(finalScore.toFixed ? finalScore.toFixed(1) : finalScore), s: { ...STYLES.cellCenter, font: { bold: true } } }
+          { t: "s", v: `${objCorrect}/${objTotal}`, z: "@", s: STYLES.cellCenter },
+          { t: "n", v: Number(objScore), s: getFinalScoreStyle(objScore) },
+          { t: "n", v: Math.round(objScore * 0.6), f: `ROUND(I${ri}*0.6,0)`, s: STYLES.cellCenter },
+          essTotal > 0 ? (
+            essGraded < essTotal ?
+              { t: "s", v: `${essGraded}/${essTotal} dinilai`, s: STYLES.cellCenter } :
+              { t: "s", v: `${essCorrect}/${essTotal}`, z: "@", s: STYLES.cellCenter }
+          ) : { t: "s", v: "-", s: STYLES.cellCenter },
+          { t: "n", v: essTotal > 0 ? Math.round(essScore * 0.4) : 0, s: STYLES.cellCenter },
+          { t: "n", v: finalVal, f: essTotal > 0 ? `ROUND(J${ri}+L${ri},0)` : `I${ri}`, s: getFinalScoreStyle(finalVal) }
         ];
 
         monitorQuestions.forEach(q => {
@@ -1153,9 +1366,17 @@ const MonitoringPage = () => {
           const isOverridden = overrides[q.id] !== undefined;
           const isCorrect = checkAns(q, ans, overrides);
           const display = isOverridden ? `${formatAnswer(q, ans)} ✓` : formatAnswer(q, ans);
+
+          let cellStyle = STYLES.neutral;
+          if (q.type === "uraian" && !isOverridden) {
+            cellStyle = STYLES.neutral;
+          } else if (ans || isOverridden) {
+            cellStyle = isCorrect ? STYLES.correct : STYLES.wrong;
+          }
+
           row.push({
             v: display,
-            s: ans || isOverridden ? (isCorrect ? STYLES.correct : STYLES.wrong) : STYLES.neutral
+            s: cellStyle
           });
         });
 
@@ -1164,6 +1385,7 @@ const MonitoringPage = () => {
 
       const ws = XLSX.utils.aoa_to_sheet(rows);
       ws["!cols"] = COL_WIDTHS;
+      ws["!merges"] = merges;
       XLSX.utils.book_append_sheet(workbook, ws, sheetName.substring(0, 31));
     };
 
@@ -1342,9 +1564,9 @@ const MonitoringPage = () => {
         // Filter attempts hanya untuk siswa eligible
         const filteredAttempts = attempts.filter(a => eligibleIds.has(a.studentId || a.student_id));
 
-        const ongoingCount  = filteredAttempts.filter(a => a.status === 'ongoing').length;
+        const ongoingCount = filteredAttempts.filter(a => a.status === 'ongoing').length;
         const finishedCount = filteredAttempts.filter(a => a.status === 'finished' || a.status === 'submitted' || a.status === 'graded').length;
-        const lockedCount   = filteredAttempts.filter(a => a.status === 'LOCKED').length;
+        const lockedCount = filteredAttempts.filter(a => a.status === 'LOCKED').length;
 
         const absentList = eligibleStudents
           .filter(s => !filteredAttempts.find(a => (a.studentId || a.student_id) === s.id))
@@ -1495,6 +1717,7 @@ const MonitoringPage = () => {
                     <option value="nama">Nama</option>
                     <option value="nilai">Nilai</option>
                     <option value="login">Login</option>
+                    <option value="monitoring">Monitoring</option>
                     <option value="default">Default</option>
                   </select>
                 </div>
@@ -1504,11 +1727,14 @@ const MonitoringPage = () => {
                 <Button onClick={() => { sessionStorage.setItem("activeGradingRoomId", roomId || ""); navigate("/admin/penilaian"); }} variant="secondary" className="w-full rounded-xl bg-indigo-50 hover:bg-indigo-100 border border-indigo-100 dark:bg-indigo-900/20 dark:text-indigo-400 dark:hover:bg-indigo-900/40 dark:border-indigo-800/40 text-indigo-700 font-semibold shadow-sm transition-all h-10">
                   <BookOpen className="mr-2 h-4 w-4" /> Detail Penilaian
                 </Button>
+                <Button onClick={() => navigate("/livescore-view")} variant="secondary" className="w-full rounded-xl bg-indigo-50 hover:bg-indigo-100 border border-indigo-100 dark:bg-indigo-900/20 dark:text-indigo-400 dark:hover:bg-indigo-900/40 dark:border-indigo-800/40 text-indigo-700 font-semibold shadow-sm transition-all h-10">
+                  <Trophy className="mr-2 h-4 w-4 text-amber-500" /> Papan Live Score
+                </Button>
                 <Button onClick={handleExportExcel} variant="secondary" className="w-full rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 dark:hover:bg-emerald-900/40 dark:border-emerald-800/40 text-emerald-700 font-semibold shadow-sm transition-all h-10">
                   <FileSpreadsheet className="mr-2 h-4 w-4" /> Export Excel
                 </Button>
                 <Button onClick={handleCopyBelumUjian} variant="secondary" className={`w-full rounded-xl border font-semibold shadow-sm transition-all h-10 ${waCopied ? "bg-green-100 border-green-300 text-green-700 dark:bg-green-900/30 dark:border-green-700 dark:text-green-400" : "bg-amber-50 hover:bg-amber-100 border-amber-100 dark:bg-amber-900/20 dark:text-amber-400 dark:hover:bg-amber-900/40 dark:border-amber-800/40 text-amber-700"}`}>
-                  {waCopied ? <><Check className="mr-2 h-4 w-4" /> Tersalin!</> : <><Copy className="mr-2 h-4 w-4" /> Copy Belum Ujian (WA)</>}
+                  {waCopied ? <><Check className="mr-2 h-4 w-4" /> Tersalin!</> : <><Copy className="mr-2 h-4 w-4" /> Belum Ujian</>}
                 </Button>
                 {(role === "admin" || (role === "teacher" && teacherFullAccess)) && (
                   <>
@@ -1533,13 +1759,13 @@ const MonitoringPage = () => {
                 <BookOpen className="w-4 h-4 text-white" />
               </div>
               <div className="flex-1">
-                <p className="font-black text-indigo-700 dark:text-indigo-300 text-[10px] uppercase tracking-widest mb-1">Rumus Penilaian (Bobot 40:60)</p>
+                <p className="font-black text-indigo-700 dark:text-indigo-300 text-[10px] uppercase tracking-widest mb-1">Rumus Penilaian (Bobot 60:40)</p>
                 <p className="text-indigo-600/80 dark:text-indigo-400/80 font-medium leading-relaxed">
-                  <span className="font-bold">Nilai Final</span> = (Skor Objektif × <span className="font-black">40%</span>) + (Skor Subjektif × <span className="font-black">60%</span>)
+                  <span className="font-bold">Nilai Final</span> = (Skor Objektif × <span className="font-black">60%</span>) + (Skor Subjektif × <span className="font-black">40%</span>)
                   <span className="mx-2 text-indigo-300">•</span>
-                  <span className="text-blue-600 dark:text-blue-400">O:{monitorQuestions.filter((q:any) => q.type !== "isian_singkat" && q.type !== "uraian").length} soal</span>
+                  <span className="text-blue-600 dark:text-blue-400">O:{monitorQuestions.filter((q: any) => q.type !== "isian_singkat" && q.type !== "uraian").length} soal</span>
                   <span className="mx-1 text-indigo-300">|</span>
-                  <span className="text-purple-600 dark:text-purple-400">S:{monitorQuestions.filter((q:any) => q.type === "isian_singkat" || q.type === "uraian").length} soal</span>
+                  <span className="text-purple-600 dark:text-purple-400">S:{monitorQuestions.filter((q: any) => q.type === "isian_singkat" || q.type === "uraian").length} soal</span>
                 </p>
               </div>
             </div>
@@ -1590,7 +1816,17 @@ const MonitoringPage = () => {
                     {monitorQuestions.some((q: any) => q.type === "isian_singkat" || q.type === "uraian") && (
                       <TableHead className="w-20 text-center">Nilai</TableHead>
                     )}
-                    <TableHead className="text-center w-32 text-[10px]">Monitoring</TableHead>
+                    <TableHead
+                      className="text-center w-32 cursor-pointer hover:text-blue-600 transition-colors group select-none text-[10px]"
+                      onClick={() => toggleSort("monitoring")}
+                    >
+                      <div className="flex items-center justify-center gap-1.5">
+                        Monitoring
+                        {monitorSortBy === 'monitoring' ? (
+                          monitorSortOrder === 'asc' ? <ChevronDown className="h-3 w-3 text-blue-600" /> : <ChevronDown className="h-3 w-3 text-blue-600 rotate-180" />
+                        ) : <ChevronDown className="h-3 w-3 opacity-0 group-hover:opacity-40" />}
+                      </div>
+                    </TableHead>
                     <TableHead className="text-right">Aksi</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -1632,7 +1868,7 @@ const MonitoringPage = () => {
 
                         let comparison = 0;
                         if (monitorSortBy === "nilai") {
-                          comparison = (attA?.score || 0) - (attB?.score || 0);
+                          comparison = getAttemptScore(attA) - getAttemptScore(attB);
                         } else if (monitorSortBy === "login") {
                           comparison = new Date(attA?.startTime || 0).getTime() - new Date(attB?.startTime || 0).getTime();
                         } else if (monitorSortBy === "status") {
@@ -1643,6 +1879,16 @@ const MonitoringPage = () => {
                             return 0;
                           };
                           comparison = getStatusRank(attA?.status) - getStatusRank(attB?.status);
+                        } else if (monitorSortBy === "monitoring") {
+                          const cheatA = attA?.cheatCount || 0;
+                          const cheatB = attB?.cheatCount || 0;
+                          if (cheatA !== cheatB) {
+                            comparison = cheatA - cheatB;
+                          } else {
+                            const ansA = Object.keys(attA?.answers || {}).filter(k => k !== "__overrides__" && monitorQuestions.some((q: any) => q.id === k)).length;
+                            const ansB = Object.keys(attB?.answers || {}).filter(k => k !== "__overrides__" && monitorQuestions.some((q: any) => q.id === k)).length;
+                            comparison = ansA - ansB;
+                          }
                         } else if (monitorSortBy === "nama") {
                           comparison = a.name.localeCompare(b.name);
                         }
@@ -1659,7 +1905,10 @@ const MonitoringPage = () => {
                     const rows = currentData.map((student, localIdx) => {
                       const attempt = attempts.find(a => a.studentId === student.id || a.student_id === student.id);
                       const sisAnswers = attempt?.answers || {};
-                      const answered = Object.keys(sisAnswers).filter(k => k !== "__overrides__").length;
+                      const answered = Object.keys(sisAnswers).filter(k =>
+                        k !== "__overrides__" &&
+                        monitorQuestions.some((q: any) => q.id === k)
+                      ).length;
                       const isExpanded = expandedstudent === student.id;
 
                       return (
@@ -1688,7 +1937,7 @@ const MonitoringPage = () => {
                               {(() => {
                                 if (!attempt) return "-";
                                 const overrides = attempt.overrides || (sisAnswers as any)?.__overrides__ || {};
-                                
+
                                 // Calculate objective breakdown
                                 let objCorrect = 0, objTotal = 0;
                                 monitorQuestions.forEach((q: any) => {
@@ -1701,16 +1950,17 @@ const MonitoringPage = () => {
                                     else {
                                       const a = sisAnswers[q.id];
                                       if (a) {
-                                        if (type === "pilihan_ganda" || type === "benar_salah") { const ck = Object.keys(q.choices||{}).find(k=>k.toLowerCase()===String(a).toLowerCase()); ic = ck ? q.choices[ck].isCorrect===true : false; }
-                                        else if (type === "pilihan_ganda_kompleks") { const ck = Object.keys(q.choices||{}).filter(k=>q.choices[k].isCorrect).map(k=>k.toLowerCase()); const sk = Array.isArray(a)?a.map(k=>String(k).toLowerCase()):[]; ic = sk.length===ck.length && sk.every(k=>ck.includes(k)); }
-                                        else if (type === "menjodohkan") { const pairs = q.pairs||[]; ic = pairs.length>0 && pairs.every((p:any)=>a[p.id]===p.right); }
-                                        else if (type === "urutkan" || type === "drag_drop") { const co = (q.items||[]).map((it:any)=>it.id); ic = Array.isArray(a) && a.length===co.length && a.every((v:any,i:number)=>v===co[i]); }
+                                        if (type === "pilihan_ganda" || type === "benar_salah") { const ck = Object.keys(q.choices || {}).find(k => k.toLowerCase() === String(a).toLowerCase()); ic = ck ? q.choices[ck].isCorrect === true : false; }
+                                        else if (type === "pilihan_ganda_kompleks") { const ck = Object.keys(q.choices || {}).filter(k => q.choices[k].isCorrect).map(k => k.toLowerCase()); const sk = Array.isArray(a) ? a.map(k => String(k).toLowerCase()) : []; ic = sk.length === ck.length && sk.every(k => ck.includes(k)); }
+                                        else if (type === "menjodohkan") { const pairs = q.pairs || []; ic = pairs.length > 0 && pairs.every((p: any) => a[p.id] === p.right); }
+                                        else if (type === "urutkan" || type === "drag_drop") { const co = (q.items || []).map((it: any) => it.id); ic = Array.isArray(a) && a.length === co.length && a.every((v: any, i: number) => v === co[i]); }
                                       }
                                     }
                                     if (ic) objCorrect++;
                                   }
                                 });
-                                const objScore = objTotal > 0 ? Math.round((objCorrect/objTotal)*100) : 0;
+                                objCorrect = Math.min(objCorrect, objTotal); // safety cap
+                                const objScore = objTotal > 0 ? Math.round((objCorrect / objTotal) * 100) : 0;
 
                                 return (
                                   <div className="flex flex-col items-center">
@@ -1725,7 +1975,7 @@ const MonitoringPage = () => {
                                 {(() => {
                                   if (!attempt) return "-";
                                   const overrides = attempt.overrides || (sisAnswers as any)?.__overrides__ || {};
-                                  
+
                                   let essCorrect = 0, essTotal = 0;
                                   monitorQuestions.forEach((q: any) => {
                                     const type = q.type || "pilihan_ganda";
@@ -1734,8 +1984,8 @@ const MonitoringPage = () => {
                                       if (overrides[q.id]) essCorrect++;
                                     }
                                   });
-                                  const essGraded = Object.keys(overrides).filter(k => { const q = monitorQuestions.find((x:any)=>x.id===k); return q && (q.type==="isian_singkat"||q.type==="uraian"); }).length;
-                                  const essScore = essTotal > 0 ? Math.round((essCorrect/essTotal)*100) : 0;
+                                  const essGraded = Object.keys(overrides).filter(k => { const q = monitorQuestions.find((x: any) => x.id === k); return q && (q.type === "isian_singkat" || q.type === "uraian"); }).length;
+                                  const essScore = essTotal > 0 ? Math.round((essCorrect / essTotal) * 100) : 0;
 
                                   if (essGraded < essTotal) {
                                     return (
@@ -1758,34 +2008,7 @@ const MonitoringPage = () => {
                               <TableCell className="text-center text-[11px] font-bold">
                                 {(() => {
                                   if (!attempt) return "-";
-                                  const overrides = attempt.overrides || (sisAnswers as any)?.__overrides__ || {};
-                                  const liveScore = getLiveScore(sisAnswers, overrides);
-                                  
-                                  let objCorrect = 0, objTotal = 0, essCorrect = 0, essTotal = 0;
-                                  monitorQuestions.forEach((q: any) => {
-                                    const type = q.type || "pilihan_ganda";
-                                    const isEssay = type === "isian_singkat" || type === "uraian";
-                                    if (isEssay) { essTotal++; if (overrides[q.id]) essCorrect++; }
-                                    else {
-                                      objTotal++;
-                                      let ic = false;
-                                      if (overrides[q.id] !== undefined) ic = overrides[q.id];
-                                      else {
-                                        const a = sisAnswers[q.id];
-                                        if (a) {
-                                          if (type === "pilihan_ganda" || type === "benar_salah") { const ck = Object.keys(q.choices||{}).find(k=>k.toLowerCase()===String(a).toLowerCase()); ic = ck ? q.choices[ck].isCorrect===true : false; }
-                                          else if (type === "pilihan_ganda_kompleks") { const ck = Object.keys(q.choices||{}).filter(k=>q.choices[k].isCorrect).map(k=>k.toLowerCase()); const sk = Array.isArray(a)?a.map(k=>String(k).toLowerCase()):[]; ic = sk.length===ck.length && sk.every(k=>ck.includes(k)); }
-                                          else if (type === "menjodohkan") { const pairs = q.pairs||[]; ic = pairs.length>0 && pairs.every((p:any)=>a[p.id]===p.right); }
-                                          else if (type === "urutkan" || type === "drag_drop") { const co = (q.items||[]).map((it:any)=>it.id); ic = Array.isArray(a) && a.length===co.length && a.every((v:any,i:number)=>v===co[i]); }
-                                        }
-                                      }
-                                      if (ic) objCorrect++;
-                                    }
-                                  });
-                                  const objScore = objTotal > 0 ? Math.round((objCorrect/objTotal)*100) : 0;
-                                  const essScore = essTotal > 0 ? Math.round((essCorrect/essTotal)*100) : 0;
-                                  const finalScore = Math.round(objScore * 0.4 + essScore * 0.6);
-                                  const displayScore = attempt.status === "finished" ? ((attempt.score === 0 && liveScore > 0) ? liveScore : (attempt.score || finalScore)) : finalScore;
+                                  const displayScore = getAttemptScore(attempt);
 
                                   return (
                                     <span className={`text-sm font-black ${attempt.status === "finished" ? "text-emerald-600" : "text-indigo-600 animate-pulse"}`}>{displayScore}</span>
@@ -2160,17 +2383,15 @@ const MonitoringPage = () => {
                           <button
                             key={key}
                             onClick={() => setEditAnswerDialog(prev => prev ? { ...prev, currentAnswer: key } : prev)}
-                            className={`w-full flex items-start gap-3 p-3 rounded-xl border text-left transition-all ${
-                              isSelected
+                            className={`w-full flex items-start gap-3 p-3 rounded-xl border text-left transition-all ${isSelected
                                 ? "border-amber-400 bg-amber-50 dark:bg-amber-900/20"
                                 : "border-slate-200 dark:border-slate-700 hover:border-slate-300 bg-white dark:bg-slate-900"
-                            }`}
+                              }`}
                           >
-                            <span className={`shrink-0 w-7 h-7 rounded-lg flex items-center justify-center text-xs font-black border-2 ${
-                              isSelected
+                            <span className={`shrink-0 w-7 h-7 rounded-lg flex items-center justify-center text-xs font-black border-2 ${isSelected
                                 ? "bg-amber-500 border-amber-500 text-white"
                                 : "border-slate-300 dark:border-slate-600 text-slate-500"
-                            }`}>
+                              }`}>
                               {key.toUpperCase()}
                             </span>
                             <div className="flex-1 min-w-0">

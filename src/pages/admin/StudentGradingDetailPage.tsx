@@ -129,7 +129,7 @@ const StudentGradingDetailPage = () => {
 
     const objScore = objectiveQuestions.length > 0 ? Math.round((objCorrect / objectiveQuestions.length) * 100) : 0;
     const essScore = essayQuestions.length > 0 ? Math.round((essCorrect / essayQuestions.length) * 100) : 0;
-    const finalScore = !hasEssay ? objScore : Math.round(objScore * 0.4 + essScore * 0.6);
+    const finalScore = !hasEssay ? objScore : Math.round(objScore * 0.6 + essScore * 0.4);
 
     return { objScore, essScore, finalScore, objCorrect, essCorrect, essGraded };
   };
@@ -139,13 +139,123 @@ const StudentGradingDetailPage = () => {
     const answers = attempt.answers || {};
     const currentOverrides = attempt.overrides || (answers as any)?.__overrides__ || {};
     const newOverrides = { ...currentOverrides, [qId]: isCorrect };
-    const updatedAnswers = { ...answers, __overrides__: newOverrides };
+
+    // Calculate new scores to save in DB
+    let objCorrect = 0;
+    objectiveQuestions.forEach(q => {
+      let ic = false;
+      if (newOverrides[q.id] !== undefined) { ic = newOverrides[q.id]; }
+      else {
+        const a = answers[q.id]; if (!a) return;
+        const t = q.type;
+        if (t === "pilihan_ganda" || t === "benar_salah") { const ck = Object.keys(q.choices || {}).find(k => k.toLowerCase() === String(a).toLowerCase()); ic = ck ? q.choices[ck].isCorrect === true : false; }
+        else if (t === "pilihan_ganda_kompleks") { const ck = Object.keys(q.choices || {}).filter(k => q.choices[k].isCorrect).map(k => k.toLowerCase()); const sk = Array.isArray(a) ? a.map((k: any) => String(k).toLowerCase()) : []; ic = sk.length === ck.length && sk.every((k: any) => ck.includes(k)); }
+        else if (t === "menjodohkan") { const pairs = q.pairs || []; ic = pairs.length > 0 && pairs.every((p: any) => a[p.id] === p.right); }
+        else if (t === "urutkan" || t === "drag_drop") { const co = (q.items || []).map((it: any) => it.id); ic = Array.isArray(a) && a.length === co.length && a.every((v: any, i: number) => v === co[i]); }
+      }
+      if (ic) objCorrect++;
+    });
+
+    let essCorrect = 0, essGraded = 0;
+    essayQuestions.forEach(q => {
+      if (newOverrides[q.id] !== undefined) { essGraded++; if (newOverrides[q.id]) essCorrect++; }
+      else if (q.type === "isian_singkat" && answers[q.id]) { essGraded++; if (isFuzzyMatch(answers[q.id], q.answerKey)) essCorrect++; }
+    });
+
+    const objScore = objectiveQuestions.length > 0 ? Math.round((objCorrect / objectiveQuestions.length) * 100) : 0;
+    const essScore = essayQuestions.length > 0 ? Math.round((essCorrect / essayQuestions.length) * 100) : 0;
+    const finalScore = !hasEssay ? objScore : Math.round(objScore * 0.6 + essScore * 0.4);
+
+    const updatedAnswers = { 
+      ...answers, 
+      __overrides__: newOverrides,
+      __meta: {
+        ...(answers.__meta || {}),
+        objectiveScore: objScore,
+        objectiveCorrect: Math.floor(objCorrect),
+        objectiveTotal: objectiveQuestions.length,
+        essayTotal: essayQuestions.length,
+        essayCorrect: essCorrect,
+        essayScore: essScore,
+        essayGraded: essGraded
+      }
+    };
 
     try {
-      await pb.collection("attempts").update(attempt.id, { overrides: newOverrides, answers: updatedAnswers });
-      setAttempt((prev: any) => prev ? { ...prev, overrides: newOverrides, answers: updatedAnswers } : prev);
+      const updatePayload = {
+        overrides: newOverrides,
+        answers: updatedAnswers,
+        correct: Math.floor(objCorrect + essCorrect),
+        objectiveCorrect: Math.floor(objCorrect),
+        objectiveTotal: objectiveQuestions.length,
+        objectiveScore: objScore,
+        essayCorrect: essCorrect,
+        essayTotal: essayQuestions.length,
+        essayScore: essScore,
+        essayGraded: essGraded,
+        score: finalScore
+      };
+      await pb.collection("attempts").update(attempt.id, updatePayload);
+      setAttempt((prev: any) => prev ? { ...prev, ...updatePayload } : prev);
     } catch (e) { console.error(e); }
   };
+
+  // Synchronize database scores if they are out of sync on load
+  useEffect(() => {
+    if (!attempt || !pb || loading || questions.length === 0) return;
+    
+    const { objScore, essScore, finalScore, objCorrect, essCorrect, essGraded } = getScoreBreakdown();
+    
+    const needsSync = 
+      attempt.essayTotal !== essayQuestions.length ||
+      attempt.essayGraded !== essGraded ||
+      attempt.essayCorrect !== essCorrect ||
+      attempt.essayScore !== essScore ||
+      attempt.objectiveCorrect !== objCorrect ||
+      attempt.objectiveTotal !== objectiveQuestions.length ||
+      attempt.objectiveScore !== objScore ||
+      attempt.score !== finalScore ||
+      attempt.answers?.__meta?.essayGraded !== essGraded ||
+      attempt.answers?.__meta?.essayCorrect !== essCorrect;
+      
+    if (needsSync) {
+      const syncDB = async () => {
+        try {
+          const updatedAnswers = { 
+            ...(attempt.answers || {}),
+            __meta: {
+              ...((attempt.answers || {}).__meta || {}),
+              objectiveScore: objScore,
+              objectiveCorrect: Math.floor(objCorrect),
+              objectiveTotal: objectiveQuestions.length,
+              essayTotal: essayQuestions.length,
+              essayCorrect: essCorrect,
+              essayScore: essScore,
+              essayGraded: essGraded
+            }
+          };
+          const updatePayload = {
+            answers: updatedAnswers,
+            correct: Math.floor(objCorrect + essCorrect),
+            objectiveCorrect: Math.floor(objCorrect),
+            objectiveTotal: objectiveQuestions.length,
+            objectiveScore: objScore,
+            essayCorrect: essCorrect,
+            essayTotal: essayQuestions.length,
+            essayScore: essScore,
+            essayGraded: essGraded,
+            score: finalScore
+          };
+          await pb.collection("attempts").update(attempt.id, updatePayload);
+          setAttempt((prev: any) => prev ? { ...prev, ...updatePayload } : prev);
+          console.log("Automatically synchronized grading scores in PocketBase.");
+        } catch (e) {
+          console.error("Failed to auto-sync scores in DB:", e);
+        }
+      };
+      syncDB();
+    }
+  }, [attempt, questions, loading, pb]);
 
   const handleAIGradeQuestion = async (qId: string) => {
     const q = questions.find(x => x.id === qId);
@@ -289,7 +399,7 @@ const StudentGradingDetailPage = () => {
   <tr><td class="info-label">${terminology?.id || 'NISN'}</td><td class="info-value">: ${(student as any)?.nisn || "-"}</td><td class="info-label">Ruang Ujian</td><td class="info-value">: ${room?.roomName || "-"}</td></tr>
 </tbody></table>
 <div class="scores">
-  <div class="col"><div class="label">Nilai Final</div><div class="value">${finalScore}</div><div class="sub">${hasEssay ? '40% obj + 60% essay' : '100% objektif'}</div></div>
+  <div class="col"><div class="label">Nilai Final</div><div class="value">${finalScore}</div><div class="sub">${hasEssay ? '60% obj + 40% essay' : '100% objektif'}</div></div>
   <div class="col"><div class="label">Benar</div><div class="value" style="color:#16a34a;">${questions.filter(q => isQuestionCorrect(q) === true).length}</div><div class="sub">dari ${questions.length} soal</div></div>
   <div class="col"><div class="label">Salah</div><div class="value" style="color:#dc2626;">${questions.filter(q => isQuestionCorrect(q) === false).length}</div><div class="sub">dari ${questions.length} soal</div></div>
   <div class="col"><div class="label">Objektif</div><div class="value">${objScore}</div><div class="sub">${objCorrect}/${objectiveQuestions.length} benar</div></div>
@@ -461,7 +571,7 @@ const StudentGradingDetailPage = () => {
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 text-center">
           <p className="text-[10px] uppercase tracking-widest text-slate-400 mb-1">Nilai Final</p>
           <p className={`text-2xl font-black ${finalScore >= 75 ? "text-emerald-600" : finalScore >= 50 ? "text-amber-600" : "text-rose-600"}`}>{attempt ? finalScore : "-"}</p>
-          <p className="text-[10px] text-slate-400">{hasEssay ? "40% obj + 60% essay" : "100% objektif"}</p>
+          <p className="text-[10px] text-slate-400">{hasEssay ? "60% obj + 40% essay" : "100% objektif"}</p>
         </div>
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-emerald-100 dark:border-emerald-800/30 p-4 text-center">
           <p className="text-[10px] uppercase tracking-widest text-emerald-500 mb-1">Benar</p>

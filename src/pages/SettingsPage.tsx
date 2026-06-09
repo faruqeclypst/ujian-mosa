@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useTenant } from "../context/TenantContext";
 import { masterPb } from "../lib/pocketbase";
-import { uploadInventoryImage } from "../lib/storage";
+import { uploadInventoryImage, deleteImageFromStorage } from "../lib/storage";
 import { AI_MODELS, testAIConnection } from "../lib/ai";
 import { Skeleton } from "../components/ui/skeleton";
 import { ThemeToggle } from "../components/ui/theme-toggle";
@@ -405,6 +405,35 @@ const SettingsPage = () => {
     return () => clearTimeout(timeout);
   }, [aiProvider, aiGatewayKey, groqApiKey, aiGatewayUrl, loading]);
 
+  const compressLogo = (file: File): Promise<File> =>
+    new Promise((resolve) => {
+      const timeout = setTimeout(() => resolve(file), 8000);
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (e) => {
+        const img = new window.Image();
+        img.src = e.target?.result as string;
+        img.onload = () => {
+          const MAX = 512;
+          let { width, height } = img;
+          if (width > MAX || height > MAX) {
+            if (width > height) { height = Math.round((height * MAX) / width); width = MAX; }
+            else { width = Math.round((width * MAX) / height); height = MAX; }
+          }
+          const canvas = document.createElement("canvas");
+          canvas.width = width; canvas.height = height;
+          canvas.getContext("2d")?.drawImage(img, 0, 0, width, height);
+          canvas.toBlob((blob) => {
+            clearTimeout(timeout);
+            if (blob) resolve(new File([blob], file.name.replace(/\.[^/.]+$/, "") + ".webp", { type: "image/webp", lastModified: Date.now() }));
+            else resolve(file);
+          }, "image/webp", 0.85);
+        };
+        img.onerror = () => { clearTimeout(timeout); resolve(file); };
+      };
+      reader.onerror = () => resolve(file);
+    });
+
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -427,7 +456,16 @@ const SettingsPage = () => {
       if (logoFile) {
         try {
           const schoolFolder = school?.slug || "unknown";
-          const uploadRes = await uploadInventoryImage(`schools/${schoolFolder}/identity`, logoFile);
+          // Compress & convert ke webp sebelum upload
+          const fileToUpload = logoFile.size > 100 * 1024 ? await compressLogo(logoFile) : logoFile;
+          // Hapus logo lama dari bucket jika ada
+          if (schoolLogo && !schoolLogo.startsWith("data:")) {
+            try {
+              const oldKey = new URL(schoolLogo).pathname.replace(/^\//, "");
+              if (oldKey) deleteImageFromStorage(oldKey); // fire & forget
+            } catch {}
+          }
+          const uploadRes = await uploadInventoryImage(`schools/${schoolFolder}/identity`, fileToUpload);
           if (uploadRes && uploadRes.url) {
             finalLogoUrl = uploadRes.url;
           }
@@ -536,6 +574,13 @@ const SettingsPage = () => {
   };
 
   const handleDeleteLogo = () => {
+    // Hapus dari bucket saat klik hapus (fire & forget)
+    if (schoolLogo && !schoolLogo.startsWith("data:")) {
+      try {
+        const oldKey = new URL(schoolLogo).pathname.replace(/^\//, "");
+        if (oldKey) deleteImageFromStorage(oldKey);
+      } catch {}
+    }
     setSchoolLogo("");
     setLogoPreview(null);
     setLogoFile(null);

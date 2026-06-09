@@ -20,9 +20,25 @@ cronAdd("autoFinishAndScore", "* * * * *", () => {
     try {
         const now = new Date();
         const ongoing = $app.findRecordsByFilter("attempts", 'status = "ongoing" || status = "LOCKED"');
+        if (ongoing.length === 0) return;
+
+        // Caching untuk menghindari query database berulang dalam satu perulangan cron
+        const roomsCache = {};
+        const questionsCache = {};
 
         ongoing.forEach(att => {
-            const room = $app.findRecordById("exam_rooms", att.get("examRoomId"));
+            const roomId = att.get("examRoomId");
+            
+            // Dapatkan room dari cache atau database
+            let room = roomsCache[roomId];
+            if (room === undefined) {
+                try {
+                    room = $app.findRecordById("exam_rooms", roomId);
+                    roomsCache[roomId] = room;
+                } catch (e) {
+                    roomsCache[roomId] = null;
+                }
+            }
             if (!room || room.get("isActive") === false) return;
 
             const start = new Date(att.get("startedAt") || att.get("created"));
@@ -30,9 +46,20 @@ cronAdd("autoFinishAndScore", "* * * * *", () => {
             const expiredAt = new Date(start.getTime() + duration);
 
             if (expiredAt < now) {
-                const answers = att.get("answers") || {};
-                const questions = $app.findRecordsByFilter("questions", `examId = "${room.get("examId")}"`);
+                const examId = room.get("examId");
+                
+                // Dapatkan questions dari cache atau database
+                let questions = questionsCache[examId];
+                if (questions === undefined) {
+                    try {
+                        questions = $app.findRecordsByFilter("questions", `examId = "${examId}"`);
+                        questionsCache[examId] = questions;
+                    } catch (e) {
+                        questionsCache[examId] = [];
+                    }
+                }
 
+                const answers = att.get("answers") || {};
                 let correctCount = 0;
                 questions.forEach(q => {
                     const studentAns = answers[q.id];

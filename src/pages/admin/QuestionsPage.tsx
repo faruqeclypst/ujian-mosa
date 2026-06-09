@@ -13,7 +13,7 @@ import { ConfirmationDialog } from "../../components/ui/confirmation-dialog";
 import { Input } from "../../components/ui/input";
 import { Separator } from "../../components/ui/separator";
 import FormField from "../../components/forms/FormField";
-import { uploadInventoryImage, deleteImageFromStorage, deleteImagesFromStorage } from "../../lib/storage";
+import { uploadInventoryImage, deleteImageFromStorage, deleteImagesFromStorage, safeDeleteImage, safeDeleteImages } from "../../lib/storage";
 import { ImportButton } from "../../components/ui/import-button";
 import { parseQuestionsFromWord } from "../../lib/questionWordParser";
 import { Select } from "../../components/ui/select";
@@ -26,6 +26,34 @@ import ImageResize from "quill-image-resize-module-react";
 import "react-quill/dist/quill.snow.css";
 
 Quill.register("modules/imageResize", ImageResize);
+
+// Allow width/height attributes on images (untuk ImageResize module)
+const ImageBlot = Quill.import('formats/image') as any;
+ImageBlot.sanitize = (url: string) => url; // allow all URLs
+const BaseImageFormat = Quill.import('formats/image') as any;
+const ImageFormatAttributesList = ['alt', 'height', 'width', 'style', 'class'];
+class CustomImageFormat extends BaseImageFormat {
+  static formats(domNode: HTMLElement) {
+    return ImageFormatAttributesList.reduce((formats: any, attribute) => {
+      if (domNode.hasAttribute(attribute)) {
+        formats[attribute] = domNode.getAttribute(attribute);
+      }
+      return formats;
+    }, {});
+  }
+  format(name: string, value: string) {
+    if (ImageFormatAttributesList.indexOf(name) > -1) {
+      if (value) {
+        this.domNode.setAttribute(name, value);
+      } else {
+        this.domNode.removeAttribute(name);
+      }
+    } else {
+      super.format(name, value);
+    }
+  }
+}
+Quill.register(CustomImageFormat, true);
 
 // REGISTER TABLE EMBED (preserve tables from Word copy-paste as non-editable blocks)
 const BlockEmbed = Quill.import('blots/block/embed');
@@ -94,7 +122,8 @@ const quillFormats = [
   'color', 'background',
   'align', 'code-block',
   'line-height',
-  'tableEmbed'
+  'tableEmbed',
+  'width', 'height', 'style', 'alt', 'class'
 ];
 
 // Allow standard CSS styles that might come from Word/Mammoth
@@ -2189,6 +2218,14 @@ const QuestionsPage = () => {
       let imageUrl = formValues.imageUrl || "";
       let textToSave = autoDetectLatex(unwrapTablesForStorage(formValues.text));
 
+      // Jika edit dan user hapus gambar (imageUrl dikosongkan, tidak ada file baru)
+      if (dialogMode === "edit" && selectedQuestion?.imageUrl && !imageUrl && !questionFile) {
+        const oldUrl = selectedQuestion.imageUrl;
+        if (oldUrl && !oldUrl.startsWith("data:")) {
+          safeDeleteImage(oldUrl, pb!, selectedQuestion.id); // fire & forget
+        }
+      }
+
       // 1. Upload file Cover Soal (dari tombol input file)
       if (questionFile) {
         let fileToUpload = questionFile;
@@ -2196,9 +2233,10 @@ const QuestionsPage = () => {
           fileToUpload = await compressImage(questionFile);
         }
         if (dialogMode === "edit" && selectedQuestion?.imageUrl) {
-          const extractKey = (url: string) => url.includes("/questions/") ? "questions/" + url.split("/questions/")[1].split("?")[0] : "";
-          const oldKey = extractKey(selectedQuestion.imageUrl);
-          if (oldKey) await deleteImageFromStorage(oldKey);
+          const oldUrl = selectedQuestion.imageUrl;
+          if (oldUrl && !oldUrl.startsWith("data:")) {
+            safeDeleteImage(oldUrl, pb!, selectedQuestion.id); // fire & forget
+          }
         }
         
         const schoolFolder = school?.slug || "unknown";
@@ -2209,7 +2247,23 @@ const QuestionsPage = () => {
         imageUrl = await uploadBase64ToR2(imageUrl, "cover_manual");
       }
 
-      // 2. Scan teks Soal untuk base64 (parallel upload)
+      // 2. Hapus gambar R2 yang dihapus dari teks Quill (diff lama vs baru)
+      if (dialogMode === "edit" && selectedQuestion?.text) {
+        const extractR2Urls = (html: string) => {
+          const doc = new DOMParser().parseFromString(html, "text/html");
+          return Array.from(doc.querySelectorAll("img"))
+            .map(img => img.getAttribute("src") || "")
+            .filter(src => src && !src.startsWith("data:"));
+        };
+        const oldUrls = new Set(extractR2Urls(selectedQuestion.text));
+        const newUrls = new Set(extractR2Urls(textToSave));
+        const removedUrls = [...oldUrls].filter(url => !newUrls.has(url));
+        if (removedUrls.length > 0) {
+          safeDeleteImages(removedUrls, pb!, selectedQuestion.id); // fire & forget
+        }
+      }
+
+      // 3. Scan teks Soal untuk base64 (parallel upload)
       if (textToSave.includes("data:image/")) {
         const doc = new DOMParser().parseFromString(textToSave, "text/html");
         const ims = Array.from(doc.querySelectorAll("img[src^='data:image/']"));
@@ -2233,9 +2287,10 @@ const QuestionsPage = () => {
             fileToUpload = await compressImage(file);
           }
           if (dialogMode === "edit" && selectedQuestion?.choices?.[key]?.imageUrl) {
-            const extractKey = (url: string) => url.includes("/questions/") ? "questions/" + url.split("/questions/")[1].split("?")[0] : "";
-            const oldKey = extractKey(selectedQuestion.choices[key].imageUrl);
-            if (oldKey) await deleteImageFromStorage(oldKey);
+            const oldUrl = selectedQuestion.choices[key].imageUrl!;
+            if (oldUrl && !oldUrl.startsWith("data:")) {
+              safeDeleteImage(oldUrl, pb!, selectedQuestion.id); // fire & forget
+            }
           }
           const schoolFolder = school?.slug || "unknown";
           const res = await uploadInventoryImage(`schools/${schoolFolder}/exams/${examId}`, fileToUpload);
@@ -2386,50 +2441,43 @@ const QuestionsPage = () => {
     }
   };
 
-  const getQuestionImageKeys = (q: QuestionData): string[] => {
-    const keys: string[] = [];
-    const extractKey = (url: string) => {
-      if (url && url.includes("/questions/")) return "questions/" + url.split("/questions/")[1].split("?")[0];
-      return "";
+  const getQuestionImageUrls = (q: QuestionData): string[] => {
+    const urls: string[] = [];
+
+    const addUrl = (url: string) => {
+      if (url && !url.startsWith("data:")) urls.push(url);
     };
 
-    if (q.imageUrl) {
-      const k = extractKey(q.imageUrl);
-      if (k) keys.push(k);
+    if (q.imageUrl) addUrl(q.imageUrl);
+
+    if (q.text && q.text.includes("<img")) {
+      const doc = new DOMParser().parseFromString(q.text, "text/html");
+      doc.querySelectorAll("img").forEach(img => addUrl(img.getAttribute("src") || ""));
     }
-    
+
     if (q.choices) {
       Object.values(q.choices).forEach((c) => {
-        if (c.imageUrl) {
-          const k = extractKey(c.imageUrl);
-          if (k) keys.push(k);
-        }
-        if (c.text && c.text.includes("/questions/")) {
+        if (c.imageUrl) addUrl(c.imageUrl);
+        if (c.text && c.text.includes("<img")) {
           const doc = new DOMParser().parseFromString(c.text, "text/html");
-          doc.querySelectorAll("img").forEach((img) => {
-            const src = img.getAttribute("src") || "";
-            const k = extractKey(src);
-            if (k) keys.push(k);
-          });
+          doc.querySelectorAll("img").forEach(img => addUrl(img.getAttribute("src") || ""));
         }
-      });
-    }
-    if (q.text && q.text.includes("/questions/")) {
-      const doc = new DOMParser().parseFromString(q.text, "text/html");
-      doc.querySelectorAll("img").forEach((img) => {
-        const src = img.getAttribute("src") || "";
-        const k = extractKey(src);
-        if (k) keys.push(k);
       });
     }
 
-    return Array.from(new Set(keys)); // Unique keys only
+    return Array.from(new Set(urls));
+  };
+
+  const getQuestionImageKeys = (q: QuestionData): string[] => {
+    return getQuestionImageUrls(q).map(url => {
+      try { return new URL(url).pathname.replace(/^\//, ""); } catch { return ""; }
+    }).filter(Boolean);
   };
 
   const cleanupQuestionImages = async (q: QuestionData) => {
-    const keys = getQuestionImageKeys(q);
-    if (keys.length > 0) {
-      await deleteImagesFromStorage(keys);
+    const urls = getQuestionImageUrls(q);
+    if (urls.length > 0 && pb) {
+      await safeDeleteImages(urls, pb, q.id);
     }
   };
 
@@ -2555,18 +2603,35 @@ const QuestionsPage = () => {
 
       setBatchProgress(prev => ({ ...prev, total: allQ.length, message: "Mengumpulkan kunci gambar..." }));
 
-      // 1. Gather all image keys across all questions
-      const allKeys: string[] = [];
+      // 1. Gather all image URLs across all questions
+      const allUrls: string[] = [];
       allQ.forEach(q => {
-        allKeys.push(...getQuestionImageKeys(q as any));
+        allUrls.push(...getQuestionImageUrls(q as any));
       });
-      const uniqueKeys = Array.from(new Set(allKeys));
+      const uniqueUrls = Array.from(new Set(allUrls));
 
-      // 2. Batch Delete Images (Non-blocking)
-      setBatchProgress(prev => ({ ...prev, message: `Menghapus ${uniqueKeys.length} gambar dari storage...` }));
-      if (uniqueKeys.length > 0) {
+      // 2. Batch Safe Delete Images (cek referensi dulu)
+      setBatchProgress(prev => ({ ...prev, message: `Menghapus ${uniqueUrls.length} gambar dari storage...` }));
+      if (uniqueUrls.length > 0 && pb) {
         try {
-          await deleteImagesFromStorage(uniqueKeys);
+          // Semua soal di exam ini dihapus, jadi IDs dari exam ini bisa diabaikan semua
+          // Cukup cek apakah URL masih dipakai di exam LAIN
+          const examIds = new Set(allQ.map(q => q.id));
+          await Promise.allSettled(uniqueUrls.map(async url => {
+            try {
+              const escapedUrl = url.replace(/'/g, "\\'");
+              const refByImageUrl = await pb.collection("questions").getList(1, 1, {
+                filter: `imageUrl = "${escapedUrl}" && ${Array.from(examIds).map(id => `id != "${id}"`).join(" && ")}`,
+              }).catch(() => ({ totalItems: 0 }));
+              if (refByImageUrl.totalItems > 0) return;
+              const refByText = await pb.collection("questions").getList(1, 1, {
+                filter: `(text ~ "${escapedUrl}" || options ~ "${escapedUrl}") && ${Array.from(examIds).map(id => `id != "${id}"`).join(" && ")}`,
+              }).catch(() => ({ totalItems: 0 }));
+              if (refByText.totalItems > 0) return;
+              const key = new URL(url).pathname.replace(/^\//, "");
+              if (key) await deleteImageFromStorage(key);
+            } catch {}
+          }));
         } catch (storageError) {
           console.warn("R2 Bulk Cleanup failed:", storageError);
         }
@@ -2642,16 +2707,32 @@ const QuestionsPage = () => {
         }
       }
 
-      // 1. Gather keys
-      const allKeys: string[] = [];
-      selectedQuestions.forEach(q => allKeys.push(...getQuestionImageKeys(q)));
-      const uniqueKeys = Array.from(new Set(allKeys));
+      // 1. Gather URLs
+      const allUrls: string[] = [];
+      selectedQuestions.forEach(q => allUrls.push(...getQuestionImageUrls(q)));
+      const uniqueUrls = Array.from(new Set(allUrls));
 
-      // 2. Batch Delete Images (Non-blocking)
+      // 2. Safe Delete Images (cek referensi di soal lain dulu)
       setBatchProgress(prev => ({ ...prev, message: "Membersihkan gambar di storage..." }));
-      if (uniqueKeys.length > 0) {
+      if (uniqueUrls.length > 0 && pb) {
         try {
-          await deleteImagesFromStorage(uniqueKeys);
+          const selectedIds2 = new Set(selectedQuestions.map(q => q.id));
+          await Promise.allSettled(uniqueUrls.map(async url => {
+            try {
+              const escapedUrl = url.replace(/'/g, "\\'");
+              const idExcludes = Array.from(selectedIds2).map(id => `id != "${id}"`).join(" && ");
+              const refByImageUrl = await pb.collection("questions").getList(1, 1, {
+                filter: `imageUrl = "${escapedUrl}" && ${idExcludes}`,
+              }).catch(() => ({ totalItems: 0 }));
+              if (refByImageUrl.totalItems > 0) return;
+              const refByText = await pb.collection("questions").getList(1, 1, {
+                filter: `(text ~ "${escapedUrl}" || options ~ "${escapedUrl}") && ${idExcludes}`,
+              }).catch(() => ({ totalItems: 0 }));
+              if (refByText.totalItems > 0) return;
+              const key = new URL(url).pathname.replace(/^\//, "");
+              if (key) await deleteImageFromStorage(key);
+            } catch {}
+          }));
         } catch (storageError) {
           console.warn("R2 Selection Cleanup failed:", storageError);
         }
@@ -4452,11 +4533,25 @@ Aturan:
                   </button>
                   {(questionFile || formValues.imageUrl) && (
                     <div className="flex flex-col items-center gap-1">
-                      <img
-                        src={questionFile ? URL.createObjectURL(questionFile) : formValues.imageUrl}
-                        alt="Pratinjau Soal"
-                        className="max-h-16 w-auto rounded-lg border border-slate-200/80 shadow-sm"
-                      />
+                      <div className="relative">
+                        <img
+                          src={questionFile ? URL.createObjectURL(questionFile) : formValues.imageUrl}
+                          alt="Pratinjau Soal"
+                          className="max-h-16 w-auto rounded-lg border border-slate-200/80 shadow-sm"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setFormValues((prev) => ({ ...prev, imageUrl: "" }));
+                            setQuestionFile(null);
+                            setCoverSizeInfo("");
+                          }}
+                          className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-rose-500 hover:bg-rose-600 text-white flex items-center justify-center shadow-md transition-colors"
+                          title="Hapus gambar"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
                       {coverSizeInfo && (
                         <span className="text-[9px] text-green-600 font-semibold bg-green-50/80 px-1 py-0.5 rounded border border-green-200 dark:bg-green-950/40 dark:text-green-400 dark:border-green-800/40 shadow-sm">
                           š¡ {coverSizeInfo}

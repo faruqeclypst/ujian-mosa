@@ -287,3 +287,311 @@ export function exportStudentLoginsToExcel(params: {
 }
 
 
+
+// ─── Export Nilai Semua Siswa per Mapel/Ruang (Admin Only) ───────────────────
+
+export interface ExamScoreRow {
+  nisn: string;
+  name: string;
+  className: string;
+  examTitle: string;
+  subjectName: string;
+  roomName: string;
+  objectiveCorrect: number;
+  objectiveTotal: number;
+  essayTotal: number;
+  essayCorrect: number;
+  objectiveScore: number;
+  essayScore: number;
+  finalScore: number | null;
+  status: string;
+  submittedAt: string;
+  essayGraded: number;
+}
+
+export async function exportAllStudentScores(params: {
+  pb: any;
+  students: StudentData[];
+  classes: ClassData[];
+  terminology?: any;
+  filename?: string;
+}) {
+  const { pb, students, classes, terminology } = params;
+  const studentLabel = terminology?.student || "Siswa";
+  const classLabel = terminology?.class || "Kelas";
+  const idLabel = terminology?.id || "NISN";
+  const filename = params.filename || `rekap-nilai-${studentLabel.toLowerCase()}.xlsx`;
+
+  // 1. Fetch semua attempt yang finished
+  const attempts = await pb.collection("attempts").getFullList({
+    filter: 'status = "finished"',
+    sort: "-submittedAt",
+  });
+
+  if (attempts.length === 0) {
+    throw new Error("Belum ada data nilai yang tersedia.");
+  }
+
+  // 2. Fetch semua exam_rooms
+  const rooms = await pb.collection("exam_rooms").getFullList({
+    expand: "examId,examId.subjectId",
+    sort: "created",
+  });
+
+  // Build lookup maps
+  const roomMap: Record<string, any> = {};
+  rooms.forEach((r: any) => {
+    roomMap[r.id] = r;
+  });
+
+  const studentMap: Record<string, StudentData> = {};
+  students.forEach(s => { studentMap[s.id] = s; });
+
+  const classMap: Record<string, string> = {};
+  classes.forEach(c => { classMap[c.id] = c.name; });
+
+  // 3. Build score rows
+  const rows: ExamScoreRow[] = [];
+  for (const att of attempts) {
+    const student = studentMap[att.studentId || att.student_id];
+    if (!student) continue;
+
+    const room = roomMap[att.examRoomId || att.exam_room_id];
+    if (!room) continue;
+
+    const exam = room.expand?.examId;
+    const subject = exam?.expand?.subjectId;
+
+    const meta = att.answers?.__meta;
+    const objCorrect = meta?.objectiveCorrect ?? att.objectiveCorrect ?? att.correct ?? 0;
+    const objTotal = meta?.objectiveTotal ?? att.objectiveTotal ?? att.total ?? 0;
+    const essayTotal = meta?.essayTotal ?? att.essayTotal ?? 0;
+    const essayCorrect = meta?.essayCorrect ?? att.essayCorrect ?? 0;
+
+    const objectiveScore = meta?.objectiveScore ?? att.objectiveScore ?? (objTotal > 0 ? Math.round((objCorrect / objTotal) * 100) : (att.score ?? 0));
+    const essayScore = meta?.essayScore ?? att.essayScore ?? (essayTotal > 0 ? Math.round((essayCorrect / essayTotal) * 100) : 0);
+    const finalScore = att.score ?? (essayTotal === 0 ? objectiveScore : Math.round(objectiveScore * 0.6 + essayScore * 0.4));
+
+    rows.push({
+      nisn: student.nisn,
+      name: student.name,
+      className: classMap[student.classId] || student.classId || "-",
+      examTitle: exam?.title || room.room_name || "-",
+      subjectName: subject?.name || "-",
+      roomName: room.room_name || room.name || "-",
+      objectiveCorrect: objCorrect,
+      objectiveTotal: objTotal,
+      essayTotal,
+      essayCorrect,
+      objectiveScore,
+      essayScore,
+      finalScore,
+      status: att.status || "-",
+      submittedAt: att.submittedAt
+        ? new Date(att.submittedAt).toLocaleString("id-ID")
+        : "-",
+      essayGraded: meta?.essayGraded ?? att.essayGraded ?? 0,
+    });
+  }
+
+  if (rows.length === 0) {
+    throw new Error("Tidak ada data nilai yang cocok dengan daftar siswa.");
+  }
+
+  // Sort: kelas ASC, lalu nama ASC
+  rows.sort((a, b) => {
+    const classCmp = a.className.localeCompare(b.className, undefined, { numeric: true, sensitivity: "base" });
+    if (classCmp !== 0) return classCmp;
+    return a.name.localeCompare(b.name, "id", { sensitivity: "base" });
+  });
+
+  // 4. Build Excel
+  const HEADER_STYLE = {
+    font: { bold: true, color: { rgb: "FFFFFF" } },
+    alignment: { horizontal: "center", vertical: "center", wrapText: true },
+    fill: { patternType: "solid", fgColor: { rgb: "1D4ED8" } },
+    border: {
+      top: { style: "thin", color: { rgb: "93C5FD" } },
+      bottom: { style: "thin", color: { rgb: "93C5FD" } },
+      left: { style: "thin", color: { rgb: "93C5FD" } },
+      right: { style: "thin", color: { rgb: "93C5FD" } },
+    },
+  };
+  const GOOD_STYLE   = { fill: { patternType: "solid", fgColor: { rgb: "D1FAE5" } }, font: { color: { rgb: "065F46" }, bold: true }, alignment: { horizontal: "center", vertical: "center" } }; // hijau ≥75
+  const MED_STYLE    = { fill: { patternType: "solid", fgColor: { rgb: "FEF9C3" } }, font: { color: { rgb: "854D0E" }, bold: true }, alignment: { horizontal: "center", vertical: "center" } }; // kuning 50-74
+  const BAD_STYLE    = { fill: { patternType: "solid", fgColor: { rgb: "FEE2E2" } }, font: { color: { rgb: "991B1B" }, bold: true }, alignment: { horizontal: "center", vertical: "center" } }; // merah <50
+  const CENTER_STYLE = { alignment: { horizontal: "center", vertical: "center" } };
+
+  const scoreStyle = (score: number | null) => {
+    if (score === null) return null;
+    if (score >= 75) return GOOD_STYLE;
+    if (score >= 50) return MED_STYLE;
+    return BAD_STYLE;
+  };
+
+  const wb = XLSX.utils.book_new();
+
+  // ── Sheet 1: Semua nilai (flat) ──────────────────────────────────────────
+  const headerRow1 = [
+    idLabel, `Nama ${studentLabel}`, classLabel,
+    "Mata Pelajaran",
+    "Objektif", "", "",
+    "Subjektif", "",
+    "Nilai Akhir",
+    "Status", "Waktu Submit"
+  ];
+  const headerRow2 = [
+    "", "", "", "",
+    "Jumlah Benar", "100%", "60%",
+    "Jumlah Benar", "40%",
+    "", "", ""
+  ];
+
+  const allData = [headerRow1, headerRow2, ...rows.map((r, idx) => {
+    const ri = idx + 3;
+    const isEssayGraded = r.essayGraded >= r.essayTotal;
+    return [
+      { t: "s", v: r.nisn, s: CENTER_STYLE },
+      { t: "s", v: r.name },
+      { t: "s", v: r.className, s: CENTER_STYLE },
+      { t: "s", v: r.subjectName },
+      { t: "s", v: `${r.objectiveCorrect}/${r.objectiveTotal}`, z: "@", s: CENTER_STYLE },
+      { t: "n", v: r.objectiveScore, s: scoreStyle(r.objectiveScore) || CENTER_STYLE },
+      { t: "n", v: Math.round(r.objectiveScore * 0.6), f: `ROUND(F${ri}*0.6,0)`, s: CENTER_STYLE },
+      r.essayTotal > 0 ? (
+        isEssayGraded ?
+          { t: "s", v: `${r.essayCorrect}/${r.essayTotal}`, z: "@", s: CENTER_STYLE } :
+          { t: "s", v: `${r.essayGraded}/${r.essayTotal} dinilai`, s: CENTER_STYLE }
+      ) : { t: "s", v: "-", s: CENTER_STYLE },
+      { t: "n", v: r.essayTotal > 0 ? Math.round(r.essayScore * 0.4) : 0, s: CENTER_STYLE },
+      { t: "n", v: r.finalScore ?? 0, f: r.essayTotal > 0 ? `ROUND(G${ri}+I${ri},0)` : `F${ri}`, s: scoreStyle(r.finalScore) || CENTER_STYLE },
+      { t: "s", v: r.status, s: CENTER_STYLE },
+      { t: "s", v: r.submittedAt, s: CENTER_STYLE }
+    ];
+  })];
+
+  const wsAll = XLSX.utils.aoa_to_sheet(allData);
+  for (let r = 0; r < 2; r++) {
+    for (let c = 0; c < headerRow1.length; c++) {
+      const addr = XLSX.utils.encode_cell({ r, c });
+      if (wsAll[addr]) (wsAll[addr] as any).s = HEADER_STYLE;
+    }
+  }
+
+  const mergesAll = [
+    { s: { r: 0, c: 0 }, e: { r: 1, c: 0 } }, // ID
+    { s: { r: 0, c: 1 }, e: { r: 1, c: 1 } }, // Nama
+    { s: { r: 0, c: 2 }, e: { r: 1, c: 2 } }, // Kelas
+    { s: { r: 0, c: 3 }, e: { r: 1, c: 3 } }, // Mata Pelajaran
+    { s: { r: 0, c: 4 }, e: { r: 0, c: 6 } }, // Objektif (4 to 6)
+    { s: { r: 0, c: 7 }, e: { r: 0, c: 8 } }, // Subjektif (7 to 8)
+    { s: { r: 0, c: 9 }, e: { r: 1, c: 9 } }, // Nilai Akhir
+    { s: { r: 0, c: 10 }, e: { r: 1, c: 10 } }, // Status
+    { s: { r: 0, c: 11 }, e: { r: 1, c: 11 } } // Waktu Submit
+  ];
+  wsAll["!merges"] = mergesAll;
+  (wsAll as any)["!cols"] = [
+    { wch: 16 }, { wch: 28 }, { wch: 16 }, { wch: 24 },
+    { wch: 14 }, { wch: 8 }, { wch: 8 }, // Objektif: Jumlah Benar, 100%, 60%
+    { wch: 14 }, { wch: 8 }, { wch: 12 }, // Subjektif: Jumlah Benar, 40%, Nilai Akhir
+    { wch: 12 }, { wch: 20 }
+  ];
+  XLSX.utils.book_append_sheet(wb, wsAll, `Semua Nilai`);
+
+  // ── Sheet per Mata Pelajaran ─────────────────────────────────────────────
+  const bySubject: Record<string, ExamScoreRow[]> = {};
+  rows.forEach(r => {
+    const key = r.subjectName || "Lainnya";
+    if (!bySubject[key]) bySubject[key] = [];
+    bySubject[key].push(r);
+  });
+
+  Object.keys(bySubject).sort().forEach(subject => {
+    const subRows = bySubject[subject];
+    // Group further by room within subject
+    const byRoom: Record<string, ExamScoreRow[]> = {};
+    subRows.forEach(r => {
+      if (!byRoom[r.roomName]) byRoom[r.roomName] = [];
+      byRoom[r.roomName].push(r);
+    });
+
+    // One sheet per subject, rows grouped by room
+    const sheetData: any[][] = [headerRow1, headerRow2];
+    const mergesSubject = [
+      { s: { r: 0, c: 0 }, e: { r: 1, c: 0 } }, // ID
+      { s: { r: 0, c: 1 }, e: { r: 1, c: 1 } }, // Nama
+      { s: { r: 0, c: 2 }, e: { r: 1, c: 2 } }, // Kelas
+      { s: { r: 0, c: 3 }, e: { r: 1, c: 3 } }, // Mata Pelajaran
+      { s: { r: 0, c: 4 }, e: { r: 0, c: 6 } }, // Objektif (4 to 6)
+      { s: { r: 0, c: 7 }, e: { r: 0, c: 8 } }, // Subjektif (7 to 8)
+      { s: { r: 0, c: 9 }, e: { r: 1, c: 9 } }, // Nilai Akhir
+      { s: { r: 0, c: 10 }, e: { r: 1, c: 10 } }, // Status
+      { s: { r: 0, c: 11 }, e: { r: 1, c: 11 } } // Waktu Submit
+    ];
+
+    Object.keys(byRoom).sort().forEach(room => {
+      // Room separator row - only if room name is valid and not "-"
+      const showSeparator = room !== "-" && room !== "";
+      if (showSeparator) {
+        const sepIdx = sheetData.length;
+        mergesSubject.push({ s: { r: sepIdx, c: 0 }, e: { r: sepIdx, c: 11 } });
+        const sepStyle = {
+          font: { bold: true, color: { rgb: "374151" } },
+          fill: { patternType: "solid", fgColor: { rgb: "F3F4F6" } },
+          alignment: { horizontal: "center", vertical: "center" }
+        };
+        sheetData.push([
+          { t: "s", v: `— Ruang: ${room} —`, s: sepStyle },
+          ...Array(11).fill("")
+        ]);
+      }
+      byRoom[room].forEach(r => {
+        const ri = sheetData.length + 1;
+        const isEssayGraded = r.essayGraded >= r.essayTotal;
+        sheetData.push([
+          { t: "s", v: r.nisn, s: CENTER_STYLE },
+          { t: "s", v: r.name },
+          { t: "s", v: r.className, s: CENTER_STYLE },
+          { t: "s", v: r.subjectName },
+          { t: "s", v: `${r.objectiveCorrect}/${r.objectiveTotal}`, z: "@", s: CENTER_STYLE },
+          { t: "n", v: r.objectiveScore, s: scoreStyle(r.objectiveScore) || CENTER_STYLE },
+          { t: "n", v: Math.round(r.objectiveScore * 0.6), f: `ROUND(F${ri}*0.6,0)`, s: CENTER_STYLE },
+          r.essayTotal > 0 ? (
+            isEssayGraded ?
+              { t: "s", v: `${r.essayCorrect}/${r.essayTotal}`, z: "@", s: CENTER_STYLE } :
+              { t: "s", v: `${r.essayGraded}/${r.essayTotal} dinilai`, s: CENTER_STYLE }
+          ) : { t: "s", v: "-", s: CENTER_STYLE },
+          { t: "n", v: r.essayTotal > 0 ? Math.round(r.essayScore * 0.4) : 0, s: CENTER_STYLE },
+          { t: "n", v: r.finalScore ?? 0, f: r.essayTotal > 0 ? `ROUND(G${ri}+I${ri},0)` : `F${ri}`, s: scoreStyle(r.finalScore) || CENTER_STYLE },
+          { t: "s", v: r.status, s: CENTER_STYLE },
+          { t: "s", v: r.submittedAt, s: CENTER_STYLE }
+        ]);
+      });
+    });
+
+    const ws = XLSX.utils.aoa_to_sheet(sheetData);
+    for (let r = 0; r < 2; r++) {
+      for (let c = 0; c < headerRow1.length; c++) {
+        const addr = XLSX.utils.encode_cell({ r, c });
+        if (ws[addr]) (ws[addr] as any).s = HEADER_STYLE;
+      }
+    }
+    ws["!merges"] = mergesSubject;
+    (ws as any)["!cols"] = [
+      { wch: 16 }, { wch: 28 }, { wch: 16 }, { wch: 24 },
+      { wch: 14 }, { wch: 8 }, { wch: 8 }, // Objektif: Jumlah Benar, 100%, 60%
+      { wch: 14 }, { wch: 8 }, { wch: 12 }, // Subjektif: Jumlah Benar, 40%, Nilai Akhir
+      { wch: 12 }, { wch: 20 }
+    ];
+
+    const safeName = subject.replace(/[\\\/\?\*\[\]\:]/g, "").substring(0, 31) || "Sheet";
+    let finalName = safeName;
+    let n = 1;
+    while (wb.SheetNames.includes(finalName)) {
+      finalName = `${safeName.substring(0, 28)}_${n++}`;
+    }
+    XLSX.utils.book_append_sheet(wb, ws, finalName);
+  });
+
+  XLSX.writeFile(wb, filename);
+}

@@ -9,6 +9,7 @@ import {
 import { masterPb } from "../../lib/pocketbase";
 import SuperAdminLayout from "../../components/layout/SuperAdminLayout";
 import { cn } from "../../lib/utils";
+import { getSchoolUrl, getSchoolDomain, getDomainSuffix } from "../../utils/domainHelper";
 
 interface SchoolRecord {
   id: string;
@@ -471,12 +472,12 @@ const SuperAdminDashboard = () => {
                       <td className="px-5 py-4">
                         <div className="flex flex-col gap-2">
                           <a
-                            href={`https://${school.slug}.alfaruqasri.my.id`}
+                            href={getSchoolUrl(school.slug)}
                             target="_blank" rel="noopener noreferrer"
                             className="flex items-center gap-2 text-[11px] font-bold bg-white text-slate-600 px-3 py-1.5 rounded-full w-fit border border-slate-200 hover:border-blue-300 hover:text-blue-600 hover:shadow-sm transition-all group/link"
                           >
                             <Monitor size={12} className="text-slate-400 group-hover/link:text-blue-500" />
-                            {school.slug}.alfaruqasri.my.id
+                            {getSchoolDomain(school.slug)}
                           </a>
                           <a
                             href={`${school.pb_url}${school.pb_url.endsWith("/") ? "" : "/"}_/`}
@@ -591,12 +592,12 @@ const SuperAdminDashboard = () => {
                   </div>
 
                   <a
-                    href={`https://${school.slug}.alfaruqasri.my.id`}
+                    href={getSchoolUrl(school.slug)}
                     target="_blank" rel="noopener noreferrer"
                     className="text-xs font-mono bg-slate-100 text-slate-600 px-2 py-1.5 rounded-lg flex items-center gap-1.5 hover:bg-blue-50 hover:text-blue-700 transition-colors"
                   >
                     <Globe size={11} />
-                    {school.slug}.alfaruqasri.my.id
+                    {getSchoolDomain(school.slug)}
                   </a>
 
                   <div className="flex items-center gap-2 pt-1">
@@ -684,7 +685,7 @@ const SuperAdminDashboard = () => {
                       </td>
                       <td className="px-5 py-3.5">
                         <code className="text-xs font-mono px-2 py-1 bg-amber-50 text-amber-700 border border-amber-200 rounded-md">
-                          {req.slug_request}.alfaruqasri.my.id
+                          {getSchoolDomain(req.slug_request)}
                         </code>
                       </td>
                       <td className="px-5 py-3.5">
@@ -760,7 +761,7 @@ const SuperAdminDashboard = () => {
                     </span>
                   </div>
                   <code className="text-xs font-mono px-2 py-1 bg-amber-50 text-amber-700 border border-amber-200 rounded-md block">
-                    {req.slug_request}.alfaruqasri.my.id
+                    {getSchoolDomain(req.slug_request)}
                   </code>
                   <p className="text-xs text-slate-600">{req.contact_email}</p>
                   <div className="flex gap-2">
@@ -1001,7 +1002,7 @@ const AddEditSchoolModal = ({
       setError("Nama institusi dan subdomain wajib diisi.");
       return;
     }
-    const autoPbUrl = `https://${form.slug}.alfaruqasri.my.id`;
+    const autoPbUrl = getSchoolUrl(form.slug);
     const finalForm = { ...form, pb_url: autoPbUrl, student_quota: Number(form.student_quota) || 0 };
     setLoading(true);
     try {
@@ -1101,7 +1102,7 @@ const AddEditSchoolModal = ({
                 )}
               />
               <p className="text-[10px] text-slate-400 mt-1 font-mono truncate">
-                {form.slug || "..."}.alfaruqasri.my.id
+                {form.slug ? getSchoolDomain(form.slug) : `...${getDomainSuffix()}`}
               </p>
               {isEdit && <p className="text-[10px] text-red-500 font-semibold">Tidak bisa diubah</p>}
             </div>

@@ -64,7 +64,10 @@
       { "name": "correctAnswer", "type": "select", "values": ["A", "B", "C", "D", "E"] },
       { "name": "imageUrl", "type": "url" }
     ],
-    "listRule": "@request.auth.id != ''"
+    "listRule": "@request.auth.id != ''",
+    "indexes": [
+      "CREATE INDEX `idx_questions_examId` ON `questions` (`examId`)"
+    ]
   },
   {
     "name": "exam_rooms",
@@ -93,7 +96,10 @@
       { "name": "status", "type": "select", "values": ["ongoing", "finished", "submitted"] }
     ],
     "listRule": "@request.auth.id != ''",
-    "createRule": "@request.auth.collectionName = 'students'"
+    "createRule": "@request.auth.collectionName = 'students'",
+    "indexes": [
+      "CREATE INDEX `idx_attempts_student_room` ON `attempts` (`studentId`, `examRoomId`)"
+    ]
   },
   {
     "name": "settings",

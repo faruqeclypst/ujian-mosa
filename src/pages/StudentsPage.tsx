@@ -16,7 +16,8 @@ import {
   Upload,
   FileText,
   Sparkles,
-  KeyRound
+  KeyRound,
+  BarChart2
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -38,7 +39,7 @@ import StudentTable from "../components/tables/StudentTable";
 import { ImportButton } from "../components/ui/import-button";
 import { ExportButton } from "../components/ui/export-button";
 import { ConfirmationDialog } from "../components/ui/confirmation-dialog";
-import { downloadStudentImportTemplate, exportStudentToExcel, exportStudentLoginsToExcel, parseStudentImportExcel } from "../lib/studentExcel";
+import { downloadStudentImportTemplate, exportStudentToExcel, exportStudentLoginsToExcel, parseStudentImportExcel, exportAllStudentScores } from "../lib/studentExcel";
 import FormField from "../components/forms/FormField";
 import { Select } from "../components/ui/select";
 import type { StudentData } from "../types/exam";
@@ -47,7 +48,7 @@ import StudentScoresDialog from "../components/exam/StudentScoresDialog";
 
 const StudentsPage = () => {
   const { role } = useAuth();
-  const { school, terminology } = useTenant();
+  const { school, terminology, pb } = useTenant();
   const { students, classes, loading, createStudent, updateStudent, deleteStudent, resetStudentPassword } = useExamData();
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -58,6 +59,7 @@ const StudentsPage = () => {
   const [studentToDelete, setStudentToDelete] = useState<StudentData | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
+  const [isExportingScores, setIsExportingScores] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   const [interestDialogOpen, setInterestDialogOpen] = useState(false);
@@ -280,6 +282,24 @@ const StudentsPage = () => {
 
   const handleExportStudentLogins = () => {
     exportStudentLoginsToExcel({ students: filteredStudents, classes, filename: `data-login-${terminology.student.toLowerCase()}.xlsx`, terminology });
+  };
+
+  const handleExportAllScores = async () => {
+    if (!pb) return;
+    setIsExportingScores(true);
+    try {
+      await exportAllStudentScores({
+        pb,
+        students,
+        classes,
+        terminology,
+        filename: `rekap-nilai-semua-${terminology.student.toLowerCase()}.xlsx`,
+      });
+    } catch (err: any) {
+      showAlert("Gagal Export", err.message || "Gagal mengekspor data nilai.", "danger");
+    } finally {
+      setIsExportingScores(false);
+    }
   };
 
   const defaultValues = useMemo(() =>
@@ -568,6 +588,21 @@ const StudentsPage = () => {
                     </DropdownMenuItem>
                     <DropdownMenuSeparator className="my-1 border-slate-100 dark:border-slate-800" />
                     <DropdownMenuItem
+                      onClick={isExportingScores ? undefined : handleExportAllScores}
+                      className={`flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 focus:bg-slate-50 dark:focus:bg-slate-900 transition-colors group ${isExportingScores ? "opacity-50 pointer-events-none" : ""}`}
+                    >
+                      <div className="h-10 w-10 shrink-0 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                        {isExportingScores ? <Loader2 className="h-5 w-5 animate-spin" /> : <BarChart2 className="h-5 w-5" />}
+                      </div>
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">
+                          {isExportingScores ? "Mengekspor..." : "Export Nilai per Mapel"}
+                        </span>
+                        <span className="text-[10px] text-slate-400 mt-1">Rekap nilai semua {terminology.student.toLowerCase()} per mata pelajaran & ruang</span>
+                      </div>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator className="my-1 border-slate-100 dark:border-slate-800" />
+                    <DropdownMenuItem
                       onClick={() => downloadStudentImportTemplate(terminology)}
                       className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 focus:bg-slate-50 dark:focus:bg-slate-900 transition-colors group"
                     >
@@ -581,6 +616,22 @@ const StudentsPage = () => {
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
+              )}
+
+              {role === "admin" && (
+                <Button
+                  onClick={handleExportAllScores}
+                  disabled={isExportingScores}
+                  size="sm"
+                  className="rounded-2xl bg-indigo-50 hover:bg-indigo-100 active:bg-indigo-50 border border-indigo-100 dark:bg-indigo-900/30 dark:text-indigo-400 dark:hover:bg-indigo-900/50 dark:active:bg-indigo-900/30 dark:border-indigo-800/40 text-indigo-700 font-bold shadow-sm h-9 px-4 focus-visible:ring-0 focus-visible:ring-offset-0"
+                >
+                  {isExportingScores ? (
+                    <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <FileSpreadsheet className="mr-1.5 h-3.5 w-3.5" />
+                  )}
+                  Export Nilai
+                </Button>
               )}
 
               {role === "admin" && (

@@ -352,6 +352,8 @@ const CBTPage = () => {
   const [isSkipNoticeOpen, setIsSkipNoticeOpen] = useState(false);
   const [targetIndex, setTargetIndex] = useState<number | null>(null);
   const [isAdminFinishedModalOpen, setIsAdminFinishedModalOpen] = useState(false);
+  const [isErrorModalOpen, setIsErrorModalOpen] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
 
   const saveTimeoutRef = useRef<any>(null);
   const cheatTimerRef = useRef<any>(null);
@@ -360,6 +362,8 @@ const CBTPage = () => {
   const isIndexRestored = useRef(false);
   const isCreatingRef = useRef(false);
   const isSubmittingRef = useRef(false);
+  const lastWriteTimeRef = useRef<number>(0);
+  const answersRef = useRef<Record<string, any>>({});
 
   // 🛡️ Enhanced Screen Wake Lock (WakeLock API + Video Hack)
   useEffect(() => {
@@ -485,6 +489,7 @@ const CBTPage = () => {
     try {
       const res = await pb.collection("attempts").update(attId, data);
       localStorage.removeItem(`pending_sync_${student?.id}_${roomId}`);
+      lastWriteTimeRef.current = Date.now();
       return res;
     } catch (err: any) {
       setSyncError(true);
@@ -515,6 +520,7 @@ const CBTPage = () => {
     if (isExamOver || isLocked || !attempt) return;
     setAnswers(p => {
       const u = { ...p, [questionId]: value };
+      answersRef.current = u;
       
       // 1. SIMPAN KE HP INSTAN (0 DETIK)
       if (student && roomId) {
@@ -542,8 +548,20 @@ const CBTPage = () => {
     });
   };
 
+  const isEssayQuestion = (q: Question | undefined) => {
+    const t = q?.type || "pilihan_ganda";
+    return t === "isian_singkat" || t === "uraian";
+  };
+
   const goToQuestion = (index: number) => {
     if (index === currentQuestionIndex) return;
+    // Blokir navigasi ke soal essay jika objektif belum semua dijawab
+    const targetQ = questions[index];
+    if (isEssayQuestion(targetQ)) {
+      const objQs = questions.filter(q => !isEssayQuestion(q));
+      const allObjDone = objQs.every(q => answers[q.id] !== undefined);
+      if (!allObjDone) return; // diam saja — tombol essay sudah disembunyikan di UI
+    }
     setTargetIndex(null); setCurrentQuestionIndex(index);
     sessionStorage.setItem(`currentIndex_${student?.nisn}_${roomId}`, index.toString());
   };
@@ -555,7 +573,16 @@ const CBTPage = () => {
     if (!isA && !(!q.type || q.type.startsWith("pilihan_ganda"))) {
       setTargetIndex(currentQuestionIndex + 1); setIsSkipNoticeOpen(true); return;
     }
-    if (currentQuestionIndex < questions.length - 1) goToQuestion(currentQuestionIndex + 1);
+    if (currentQuestionIndex < questions.length - 1) {
+      const nextQ = questions[currentQuestionIndex + 1];
+      // Jika soal berikutnya essay tapi objektif belum selesai, skip diam
+      if (isEssayQuestion(nextQ)) {
+        const objQs = questions.filter(q2 => !isEssayQuestion(q2));
+        const allObjDone = objQs.every(q2 => answers[q2.id] !== undefined);
+        if (!allObjDone) return;
+      }
+      goToQuestion(currentQuestionIndex + 1);
+    }
   };
 
   const handleNavClick = (idx: number) => {
@@ -656,6 +683,7 @@ const CBTPage = () => {
             } catch (e) {}
           }
           setAnswers(mergedAnswers);
+          answersRef.current = mergedAnswers;
           safeUpdateAttempt(att.id, { answers: mergedAnswers, isOnline: true, lastHeartbeat: new Date().toISOString() });
         } else {
           if (isCreatingRef.current) return;
@@ -664,6 +692,17 @@ const CBTPage = () => {
             const secondCheck = await pb.collection("attempts").getFullList({ filter: `studentId = "${student.id}" && examRoomId = "${roomId}"` });
             if (secondCheck.length > 0) { att = secondCheck[0]; }
             else {
+              // Clear old session data for fresh start
+              const pr = `${student.nisn}_${roomId}`;
+              sessionStorage.removeItem(`flags_${pr}`);
+              sessionStorage.removeItem(`order_${pr}`);
+              sessionStorage.removeItem(`choices_${pr}`);
+              sessionStorage.removeItem(`items_${pr}`);
+              sessionStorage.removeItem(`match_${pr}`);
+              sessionStorage.removeItem(`currentIndex_${pr}`);
+              sessionStorage.removeItem(`confirmed_${pr}`);
+              localStorage.removeItem(`offline_answers_${student.id}_${roomId}`);
+              
               att = await pb.collection("attempts").create({
                 examRoomId: roomId,
                 studentId: student.id,
@@ -682,6 +721,7 @@ const CBTPage = () => {
           try {
             att = JSON.parse(localAttData);
             setAnswers(att.answers || {});
+            answersRef.current = att.answers || {};
           } catch (e) { throw err; }
         } else {
           throw err;
@@ -722,6 +762,8 @@ const CBTPage = () => {
       if (sO) { 
         try { 
           order = JSON.parse(sO).filter((id: string) => curIds.includes(id)); 
+          // Deduplicate dari sessionStorage yang mungkin korup
+          order = Array.from(new Set(order));
           const n = curIds.filter(id => !order.includes(id)); 
           if (n.length > 0) order = [...order, ...clusterShuffle(n)]; 
           
@@ -729,6 +771,8 @@ const CBTPage = () => {
           const objOrder = order.filter(id => { const q = loaded.find(x => x.id === id); const t = q?.type || "pilihan_ganda"; return t !== "isian_singkat" && t !== "uraian"; });
           const essOrder = order.filter(id => { const q = loaded.find(x => x.id === id); const t = q?.type || "pilihan_ganda"; return t === "isian_singkat" || t === "uraian"; });
           order = [...objOrder, ...essOrder];
+          // Final dedup
+          order = Array.from(new Set(order));
           
           sessionStorage.setItem(`order_${pr}`, JSON.stringify(order)); 
         } catch (e) { } 
@@ -737,7 +781,10 @@ const CBTPage = () => {
         const pg = curIds.filter(id => { const q = loaded.find(x => x.id === id); return !q?.type || q.type.startsWith("pilihan_ganda"); });
         const es = curIds.filter(id => { const q = loaded.find(x => x.id === id); return q?.type === "isian_singkat" || q?.type === "uraian"; });
         const it = curIds.filter(id => !pg.includes(id) && !es.includes(id));
-        order = [...clusterShuffle(pg), ...clusterShuffle(it), ...clusterShuffle(es)];
+        // Essay/isian singkat TIDAK diacak — tetap urutan original (sesuai nomor soal di kertas)
+        order = [...clusterShuffle(pg), ...clusterShuffle(it), ...es];
+        // Deduplicate — cegah soal muncul 2x
+        order = Array.from(new Set(order));
         sessionStorage.setItem(`order_${pr}`, JSON.stringify(order));
       } else {
         // Restore choices/items/matching orders from sessionStorage even when question order already exists
@@ -746,7 +793,9 @@ const CBTPage = () => {
         const sM = sessionStorage.getItem(`match_${pr}`); if (sM) try { setMatchingOptions(JSON.parse(sM)); } catch (e) { }
       }
 
-      setQuestions(order.map(id => loaded.find(x => x.id === id)).filter(x => !!x) as Question[]);
+      // Deduplicate order sebelum set state — cegah soal muncul 2x di questions
+      const uniqueOrder = Array.from(new Set(order));
+      setQuestions(uniqueOrder.map(id => loaded.find(x => x.id === id)).filter(x => !!x) as Question[]);
       const sIndexStored = sessionStorage.getItem(`currentIndex_${pr}`);
       if (sIndexStored && !isIndexRestored.current) { const idx = parseInt(sIndexStored, 10); if (idx >= 0 && idx < order.length) setCurrentQuestionIndex(idx); }
       isIndexRestored.current = true;
@@ -828,6 +877,10 @@ const CBTPage = () => {
     }, 1000);
     const heartbeat = setInterval(async () => { 
       if (attempt?.id && pb) {
+        // Skip jika ada write sukses (seperti simpan jawaban) dalam 60 detik terakhir
+        if (Date.now() - lastWriteTimeRef.current < 60000) {
+          return;
+        }
         try {
           await safeUpdateAttempt(attempt.id, { isOnline: true, lastHeartbeat: new Date().toISOString() });
         } catch (err: any) {
@@ -992,17 +1045,26 @@ const CBTPage = () => {
     return () => { window.removeEventListener("contextmenu", p); window.removeEventListener("copy", p); window.removeEventListener("cut", p); window.removeEventListener("paste", p); window.removeEventListener("keydown", k); };
   }, []);
 
-  const handleSubmitExam = useCallback(async () => {
+  const handleSubmitExam = useCallback(async (isAuto = false) => {
     if (!student || !roomId || !attempt || (attempt.status !== "ongoing" && attempt.status !== "LOCKED") || isSubmitting) return;
 
     setIsSubmitting(true);
     isSubmittingRef.current = true;
     setLoading(true);
     try {
-      // Flush pending debounced save
+      // Flush pending debounced save ke server secara instan
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
         saveTimeoutRef.current = null;
+        try {
+          await safeUpdateAttempt(attempt.id, {
+            answers: answersRef.current,
+            isOnline: true,
+            lastHeartbeat: new Date().toISOString()
+          });
+        } catch (flushErr) {
+          console.warn("Gagal flush jawaban terakhir ke server, tetap melanjutkan submit:", flushErr);
+        }
       }
 
       let objectiveCorrect = 0;
@@ -1015,51 +1077,67 @@ const CBTPage = () => {
         if (t === "isian_singkat" || t === "uraian") { essayTotal++; return; }
         objectiveTotal++;
         if (ovr[q.id] !== undefined) { if (ovr[q.id] === true) objectiveCorrect++; return; }
-        const sa = answers[q.id]; if (!sa) return;
+        const sa = answersRef.current[q.id]; if (!sa) return;
         if (t === "pilihan_ganda" || t === "benar_salah") { if (q.choices?.[sa]?.isCorrect === true) objectiveCorrect++; }
         else if (t === "pilihan_ganda_kompleks") { const ck = Object.keys(q.choices).filter(k => q.choices[k].isCorrect).map(k => k.toLowerCase()); const sk = Array.isArray(sa) ? sa.map(k => String(k).toLowerCase()) : []; if (sk.length === ck.length && sk.every(k => ck.includes(k))) objectiveCorrect++; }
-        else if (t === "menjodohkan") { let cp = 0; (q.pairs || []).forEach((p: any) => { if (sa[p.id] === p.right) cp++; }); if (q.pairs?.length > 0) objectiveCorrect += (cp / q.pairs.length); }
+        else if (t === "menjodohkan") { const pairs = q.pairs || []; if (pairs.length > 0 && pairs.every((p: any) => sa[p.id] === p.right)) objectiveCorrect++; }
         else if (t === "urutkan" || t === "drag_drop") { const co = (q.items || []).map((it: any) => it.id); if (Array.isArray(sa) && sa.length === co.length && sa.every((v, index) => v === co[index])) objectiveCorrect++; }
       });
 
       const totalQuestions = objectiveTotal + essayTotal;
-      let score: number;
-      if (essayTotal === 0) {
-        score = objectiveTotal > 0 ? Math.round((objectiveCorrect / objectiveTotal) * 100) : 0;
-      } else {
-        const objectiveScore = objectiveTotal > 0 ? (objectiveCorrect / objectiveTotal) * 100 : 0;
-        score = Math.round(objectiveScore * 0.4);
-      }
+      // score yang disimpan = murni nilai objektif (100%), essay dinilai terpisah oleh guru
       const objectiveScore = objectiveTotal > 0 ? Math.round((objectiveCorrect / objectiveTotal) * 100) : 0;
-      const st = attempt.startedAt || attempt.startTime || attempt.created || Date.now();
-      const usedTime = Math.floor((Date.now() - new Date(st as any).getTime()) / 1000);
+      const score = objectiveScore;
+      const st = attempt.startedAt || attempt.startTime || attempt.start_time || attempt.created;
+      const startDate = parseSafeDate(st);
+      const usedTime = startDate ? Math.max(0, Math.floor((Date.now() - startDate.getTime()) / 1000)) : 0;
       const submittedAt = new Date().toISOString();
 
       // Gabungkan answers + status finished dalam SATU request — atomic, tidak bisa setengah-setengah
+      // Simpan objectiveScore & essayTotal sebagai metadata di dalam answers (tidak perlu field baru)
+      const answersWithMeta = {
+        ...answersRef.current,
+        __meta: {
+          objectiveScore,
+          objectiveCorrect: Math.floor(objectiveCorrect),
+          objectiveTotal,
+          essayTotal,
+        }
+      };
+
       const finalPayload = {
-        answers,
+        answers: answersWithMeta,
         isOnline: true,
         lastHeartbeat: submittedAt,
         score,
+        totalQuestions,
+        correct: Math.floor(objectiveCorrect),
+        total: totalQuestions,
+        usedTime: usedTime > 0 ? usedTime : undefined,
+        status: "finished",
+        submittedAt,
         objectiveScore,
         objectiveCorrect: Math.floor(objectiveCorrect),
         objectiveTotal,
         essayTotal,
-        essayScore: 0,
-        essayGraded: 0,
-        totalQuestions,
-        correct: Math.floor(objectiveCorrect),
-        total: totalQuestions,
-        usedTime: Math.max(0, usedTime),
-        status: "finished",
-        submittedAt,
       };
 
       // Simpan ke localStorage sebagai fallback SEBELUM kirim ke server
       if (student && roomId) {
-        localStorage.setItem(`offline_answers_${student.id}_${roomId}`, JSON.stringify(answers));
+        localStorage.setItem(`offline_answers_${student.id}_${roomId}`, JSON.stringify(answersRef.current));
         const localAtt = { ...(attempt || {}), ...finalPayload, id: attempt.id };
         localStorage.setItem(`local_attempt_${student.id}_${roomId}`, JSON.stringify(localAtt));
+      }
+      // Thundering Herd mitigation
+      if (isAuto) {
+        // Delay random antara 100ms s.d 8000ms (1 - 8 detik) untuk auto-submit
+        const jitter = Math.floor(Math.random() * 8000) + 100;
+        await new Promise(resolve => setTimeout(resolve, jitter));
+      } else {
+        // Delay acak kecil antara 100ms s.d 2000ms (0.1 - 2 detik) untuk manual submit
+        // guna mencegah penulisan database bersamaan jika diinstruksikan oleh guru
+        const jitter = Math.floor(Math.random() * 1900) + 100;
+        await new Promise(resolve => setTimeout(resolve, jitter));
       }
 
       try {
@@ -1079,8 +1157,14 @@ const CBTPage = () => {
           setIsResetModalOpen(true);
           return;
         }
-        // Network error lain → tetap navigate, data tersimpan di localStorage untuk sync nanti
-        console.warn("Submit gagal ke server, data disimpan lokal:", serverErr);
+        
+        // Gagal karena jaringan/koneksi lambat -> tampilkan info error, jangan navigate agar bisa kumpulkan kembali
+        setIsSubmitting(false);
+        isSubmittingRef.current = false;
+        setLoading(false);
+        setErrorMessage("Koneksi internet lambat atau terputus. Ujian gagal dikirim ke server. Silakan periksa jaringan Anda dan kumpulkan kembali.");
+        setIsErrorModalOpen(true);
+        return;
       }
 
       const pr = `${student.nisn}_${roomId}`;
@@ -1121,7 +1205,7 @@ const CBTPage = () => {
     return () => window.removeEventListener("popstate", handlePopState);
   }, [isLocked]);
 
-  useEffect(() => { if (isExamOver && !loading && (attempt?.status === "ongoing" || attempt?.status === "LOCKED")) handleSubmitExam(); }, [isExamOver, loading, attempt?.status, handleSubmitExam]);
+  useEffect(() => { if (isExamOver && !loading && (attempt?.status === "ongoing" || attempt?.status === "LOCKED")) handleSubmitExam(true); }, [isExamOver, loading, attempt?.status, handleSubmitExam]);
 
   if (loading) {
     return (
@@ -1751,7 +1835,7 @@ const CBTPage = () => {
                       </p>
                     </div>
                   ) : (
-                    <textarea value={answers[currentQuestion.id] || ""} onChange={(e) => handleAnswerSelect(currentQuestion.id, e.target.value)} placeholder="Tuliskan jawaban Anda di sini secara lengkap..." rows={currentQuestion.type === "uraian" ? 10 : 3} className="w-full p-6 sm:p-8 rounded-[30px] border-2 border-slate-100 dark:border-slate-800 bg-[#f8fafc] dark:bg-slate-950 font-bold text-sm sm:text-base resize-none focus:ring-4 focus:ring-emerald-100 focus:border-emerald-500 transition-all outline-none" />
+                    <textarea value={answers[currentQuestion.id] || ""} onChange={(e) => handleAnswerSelect(currentQuestion.id, e.target.value)} placeholder={currentQuestion.type === "uraian" ? 'Tuliskan jawaban Anda di sini secara lengkap...\n\n(Isi "lembar ujian" jika Anda mengerjakan di lembar ujian kertas)' : 'Tuliskan jawaban Anda...\n(Isi "lembar ujian" jika Anda mengerjakan di lembar ujian)'} rows={currentQuestion.type === "uraian" ? 10 : 3} className="w-full p-6 sm:p-8 rounded-[30px] border-2 border-slate-100 dark:border-slate-800 bg-[#f8fafc] dark:bg-slate-950 font-bold text-sm sm:text-base resize-none focus:ring-4 focus:ring-emerald-100 focus:border-emerald-500 transition-all outline-none" />
                   )
                 )}
                 {(currentQuestion.type === "urutkan" || currentQuestion.type === "drag_drop") && (() => {
@@ -1822,10 +1906,10 @@ const CBTPage = () => {
                         onClick={() => handleNavClick(i)} 
                         className={`aspect-square rounded-xl flex items-center justify-center font-black text-xl border-2 transition-all active:scale-[0.85] outline-none focus:outline-none ${i === currentQuestionIndex
                           ? "bg-emerald-700 border-emerald-700 text-white shadow-lg shadow-emerald-700/30"
-                          : isQuestionAnswered(q.id)
-                            ? "bg-emerald-500 border-emerald-500 text-white shadow-md shadow-emerald-500/20"
-                            : flaggedQuestions[q.id]
-                              ? "bg-amber-500 border-amber-600 text-white shadow-lg shadow-amber-500/20"
+                          : flaggedQuestions[q.id]
+                            ? "bg-amber-500 border-amber-600 text-white shadow-lg shadow-amber-500/20"
+                            : isQuestionAnswered(q.id)
+                              ? "bg-emerald-500 border-emerald-500 text-white shadow-md shadow-emerald-500/20"
                               : isEssay
                                 ? "bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800/40 text-amber-500 dark:text-amber-400"
                                 : "bg-slate-50 dark:bg-slate-800/50 border-slate-100 dark:border-slate-800 text-slate-400 dark:text-slate-500"
@@ -1912,10 +1996,10 @@ const CBTPage = () => {
                     )}
                     <button onClick={() => { setCurrentQuestionIndex(i); setIsNavModalOpen(false); }} className={`aspect-square rounded-2xl flex items-center justify-center font-black text-xl border-3 transition-all active:scale-90 outline-none focus:outline-none ${i === currentQuestionIndex
                       ? "bg-emerald-700 border-emerald-700 text-white shadow-2xl"
-                      : isQuestionAnswered(q.id)
-                        ? "bg-emerald-500 border-emerald-500 text-white shadow-md shadow-emerald-500/20"
-                        : flaggedQuestions[q.id]
-                          ? "bg-amber-500 border-amber-600 text-white shadow-xl shadow-amber-500/20"
+                      : flaggedQuestions[q.id]
+                        ? "bg-amber-500 border-amber-600 text-white shadow-xl shadow-amber-500/20"
+                        : isQuestionAnswered(q.id)
+                          ? "bg-emerald-500 border-emerald-500 text-white shadow-md shadow-emerald-500/20"
                           : isEssay
                             ? "bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800/40 text-amber-500 dark:text-amber-400"
                             : "bg-slate-50 dark:bg-slate-900 border-slate-100 dark:border-slate-800 text-slate-400 dark:text-slate-500"
@@ -1929,12 +2013,148 @@ const CBTPage = () => {
       </Dialog>
       <Dialog open={isResetModalOpen} onOpenChange={() => { }}><DialogContent className="max-w-md rounded-2xl p-6 text-center pointer-events-auto bg-white dark:bg-slate-950 border-none shadow-2xl"><AlertCircle className="w-12 h-12 text-red-600 mx-auto mb-2 animate-bounce" /><DialogTitle className="text-lg font-bold dark:text-white">Sesi Ujian Di-Reset</DialogTitle><p className="text-slate-500 dark:text-slate-400 text-sm mt-1">Sesi Anda telah di-reset oleh Pengawas. Silakan login kembali.</p><Button onClick={() => logoutStudent()} className="w-full bg-red-600 hover:bg-red-700 text-white rounded-xl h-11 mt-4"><LogOut className="w-4 h-4 mr-2" /> Keluar & Login Ulang</Button></DialogContent></Dialog>
       
+      <Dialog open={isErrorModalOpen} onOpenChange={setIsErrorModalOpen}>
+        <DialogContent className="max-w-md rounded-2xl p-6 text-center pointer-events-auto bg-white dark:bg-slate-950 border-none shadow-2xl">
+          <AlertCircle className="w-12 h-12 text-red-600 mx-auto mb-2 animate-pulse" />
+          <DialogTitle className="text-lg font-bold dark:text-white">Gagal Mengumpulkan Ujian</DialogTitle>
+          <p className="text-slate-500 dark:text-slate-400 text-sm mt-2">{errorMessage}</p>
+          <div className="mt-6 flex flex-col gap-2">
+            <Button 
+              onClick={() => {
+                setIsErrorModalOpen(false);
+                handleSubmitExam();
+              }} 
+              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl h-11 font-bold"
+            >
+              Coba Kumpulkan Lagi
+            </Button>
+            <Button 
+              variant="outline"
+              onClick={() => {
+                setIsErrorModalOpen(false);
+                logoutStudent();
+              }} 
+              className="w-full border-red-200 hover:bg-red-50 text-red-600 dark:border-red-900/30 dark:hover:bg-red-950/30 rounded-xl h-11 font-bold"
+            >
+              Keluar Ujian / Logout
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+      
       {/* Custom Preview Image Overlay - Full Screen with Zoom */}
       {previewImage && (
         <ImageZoomOverlay src={previewImage} onClose={() => setPreviewImage(null)} />
       )}
       
-      <Dialog open={isSubmitModalOpen} onOpenChange={setIsSubmitModalOpen}><DialogContent className="max-w-md rounded-2xl p-6 pointer-events-auto text-center bg-white dark:bg-slate-950 border-none shadow-2xl">{isAllAnswered ? (<><CheckCircle2 className="w-12 h-12 text-green-600 mx-auto mb-2" /><DialogTitle className="text-lg font-bold dark:text-white">Kumpulkan Ujian?</DialogTitle><p className="text-slate-500 dark:text-slate-400 text-sm mt-1">Yakin ingin mengakhiri sekarang?</p><div className="mt-6 flex gap-2"><Button variant="outline" onClick={() => setIsSubmitModalOpen(false)} className="flex-1 rounded-xl dark:border-slate-800 dark:text-slate-300">Batal</Button><Button onClick={() => { setIsSubmitModalOpen(false); handleSubmitExam(); }} className="flex-1 bg-green-600 hover:bg-green-700 text-white rounded-xl">Kumpulkan</Button></div></>) : (<><AlertCircle className="w-12 h-12 text-amber-600 mx-auto mb-2" /><DialogTitle className="text-lg font-bold dark:text-white">Belum Selesai</DialogTitle><p className="text-slate-500 dark:text-slate-400 text-sm mt-1">Ada {unansweredCount} soal belum dijawab. Yakin?</p><div className="mt-6"><Button onClick={() => setIsSubmitModalOpen(false)} className="w-full bg-amber-600 hover:bg-amber-700 text-white rounded-xl">Kembali Mengerjakan</Button></div></>)}</DialogContent></Dialog>
+      <Dialog open={isSubmitModalOpen} onOpenChange={setIsSubmitModalOpen}>
+        <DialogContent className="max-w-md rounded-2xl p-6 pointer-events-auto text-center bg-white dark:bg-slate-950 border-none shadow-2xl">
+          {(() => {
+            // Calculate flagged questions
+            const flaggedQuestionNumbers = questions
+              .map((q, idx) => ({ id: q.id, number: idx + 1 }))
+              .filter(q => flaggedQuestions[q.id])
+              .map(q => q.number);
+            const flaggedCount = flaggedQuestionNumbers.length;
+
+            if (!isAllAnswered) {
+              // Has unanswered questions
+              return (
+                <>
+                  <AlertCircle className="w-12 h-12 text-amber-600 mx-auto mb-2" />
+                  <DialogTitle className="text-lg font-bold dark:text-white">Belum Selesai</DialogTitle>
+                  <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
+                    Ada {unansweredCount} soal belum dijawab. Yakin?
+                  </p>
+                  <div className="mt-6">
+                    <Button 
+                      onClick={() => setIsSubmitModalOpen(false)} 
+                      className="w-full bg-amber-600 hover:bg-amber-700 text-white rounded-xl"
+                    >
+                      Kembali Mengerjakan
+                    </Button>
+                  </div>
+                </>
+              );
+            } else if (flaggedCount > 0) {
+              // All answered but has flagged questions
+              return (
+                <>
+                  <AlertCircle className="w-12 h-12 text-amber-500 mx-auto mb-2" />
+                  <DialogTitle className="text-lg font-bold dark:text-white">Soal Ditandai</DialogTitle>
+                  <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
+                    Ada {flaggedCount} soal yang masih ditandai:
+                  </p>
+                  <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/40 rounded-xl p-3 mt-3 max-h-[120px] overflow-y-auto">
+                    <div className="flex flex-wrap gap-2 justify-center">
+                      {flaggedQuestionNumbers.map((num) => (
+                        <span 
+                          key={num}
+                          className="inline-flex items-center justify-center w-8 h-8 bg-amber-500 text-white font-bold text-sm rounded-lg"
+                        >
+                          {num}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  <p className="text-slate-600 dark:text-slate-400 text-xs mt-3">
+                    Ingin cek ulang atau tetap kumpulkan?
+                  </p>
+                  <div className="mt-4 flex gap-2">
+                    <Button 
+                      variant="outline" 
+                      onClick={() => setIsSubmitModalOpen(false)} 
+                      className="flex-1 rounded-xl dark:border-slate-800 dark:text-slate-300"
+                    >
+                      Cek Ulang
+                    </Button>
+                    <Button 
+                      disabled={isSyncing}
+                      onClick={() => { 
+                        setIsSubmitModalOpen(false); 
+                        handleSubmitExam(); 
+                      }} 
+                      className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl"
+                    >
+                      {isSyncing ? "Menyimpan..." : "Tetap Kumpulkan"}
+                    </Button>
+                  </div>
+                </>
+              );
+            } else {
+              // All answered and no flagged questions
+              return (
+                <>
+                  <CheckCircle2 className="w-12 h-12 text-green-600 mx-auto mb-2" />
+                  <DialogTitle className="text-lg font-bold dark:text-white">Kumpulkan Ujian?</DialogTitle>
+                  <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
+                    Yakin ingin mengakhiri sekarang?
+                  </p>
+                  <div className="mt-6 flex gap-2">
+                    <Button 
+                      variant="outline" 
+                      onClick={() => setIsSubmitModalOpen(false)} 
+                      className="flex-1 rounded-xl dark:border-slate-800 dark:text-slate-300"
+                    >
+                      Batal
+                    </Button>
+                    <Button 
+                      disabled={isSyncing}
+                      onClick={() => { 
+                        setIsSubmitModalOpen(false); 
+                        handleSubmitExam(); 
+                      }} 
+                      className="flex-1 bg-green-600 hover:bg-green-700 text-white rounded-xl"
+                    >
+                      {isSyncing ? "Menyimpan..." : "Kumpulkan"}
+                    </Button>
+                  </div>
+                </>
+              );
+            }
+          })()}
+        </DialogContent>
+      </Dialog>
       <Dialog open={isSkipNoticeOpen} onOpenChange={setIsSkipNoticeOpen}><DialogContent className="max-w-xs rounded-[2rem] p-6 pointer-events-auto border-none bg-white dark:bg-slate-950 shadow-2xl text-center"><HelpCircle className="w-14 h-14 text-amber-600 mx-auto mb-4" /><DialogTitle className="text-base font-black uppercase tracking-tight dark:text-white">Soal Belum Dijawab</DialogTitle><p className="text-slate-500 dark:text-slate-400 text-[11px] font-medium leading-relaxed">Anda belum memberikan jawaban. Yakin ingin melewati?</p><div className="grid grid-cols-2 gap-3 mt-6"><Button variant="outline" onClick={() => setIsSkipNoticeOpen(false)} className="rounded-xl text-[10px] font-black uppercase tracking-widest border-emerald-100 dark:border-emerald-900/30 text-emerald-600 dark:text-emerald-400">Kembali</Button><Button onClick={() => { if (targetIndex !== null) goToQuestion(targetIndex); setIsSkipNoticeOpen(false); }} className="bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[10px] rounded-xl uppercase tracking-widest shadow-lg shadow-emerald-600/20">Lompati</Button></div></DialogContent></Dialog>
       <Dialog open={isAdminFinishedModalOpen} onOpenChange={() => { }}>
         <DialogContent className="max-w-md rounded-[2.5rem] p-8 text-center pointer-events-auto bg-white dark:bg-slate-950 border-none shadow-2xl">

@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { masterPb } from "../../lib/pocketbase";
 import { cn } from "../../lib/utils";
+import { getSchoolDomain, getDomainSuffix } from "../../utils/domainHelper";
 
 const RegisterSchoolPage = () => {
   const location = useLocation();
@@ -99,7 +100,7 @@ const RegisterSchoolPage = () => {
               <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1.5">Subdomain</p>
               <div className="flex items-center gap-1.5 text-blue-600 font-mono font-bold text-xs">
                 <Globe size={12} />
-                {form.slug_request}.alfaruqasri.my.id
+                {getSchoolDomain(form.slug_request)}
               </div>
             </div>
             <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-left">
@@ -352,7 +353,7 @@ const RegisterSchoolPage = () => {
                       <div className="flex items-center text-xs font-mono overflow-hidden min-w-0">
                         <span className="text-white/30">https://</span>
                         <span className="text-emerald-400 font-bold">{form.slug_request || "subdomain"}</span>
-                        <span className="text-white/50">.alfaruqasri.my.id</span>
+                        <span className="text-white/50">{getDomainSuffix()}</span>
                       </div>
                     </div>
                   </div>

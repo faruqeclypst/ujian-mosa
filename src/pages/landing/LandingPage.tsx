@@ -5,6 +5,7 @@ import {
   ArrowRight, CheckCircle, Building2, Menu, X, Globe, Star, Wand2, MessageCircle, Phone
 } from "lucide-react";
 import { cn } from "../../lib/utils";
+import { getDomainSuffix } from "../../utils/domainHelper";
 
 const LandingPage = () => {
   const navigate = useNavigate();
@@ -261,7 +262,7 @@ const LandingPage = () => {
             <div className="bg-slate-50 border border-slate-100 rounded-lg px-3 py-2 text-sm font-mono text-slate-500 flex items-center">
               <Globe size={12} className="text-slate-400 flex-shrink-0 mr-2" />
               <span className="text-slate-900 font-bold">sekolahanda</span>
-              <span className="text-slate-500">.alfaruqasri.my.id</span>
+              <span className="text-slate-500">{getDomainSuffix()}</span>
             </div>
           </div>
 

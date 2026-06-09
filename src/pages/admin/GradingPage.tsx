@@ -111,7 +111,7 @@ const GradingPage = () => {
 
     const objScore = objectiveQuestions.length > 0 ? Math.round((objCorrect / objectiveQuestions.length) * 100) : 0;
     const essScore = essayQuestions.length > 0 ? Math.round((essCorrect / essayQuestions.length) * 100) : 0;
-    const finalScore = !hasEssay ? objScore : Math.round(objScore * 0.4 + essScore * 0.6);
+    const finalScore = !hasEssay ? objScore : Math.round(objScore * 0.6 + essScore * 0.4);
 
     return { objScore, essScore, finalScore, objCorrect, essCorrect, essGraded };
   };
@@ -145,7 +145,7 @@ const GradingPage = () => {
       const att = attempts.find(a => a.studentId === std.id || a.student_id === std.id);
       const { objScore, essScore, finalScore, objCorrect, essCorrect } = getScoreBreakdown(att);
       const className = examClasses.find(c => c.id === std.classId)?.name || "-";
-      const formula = hasEssay ? `${objScore}×40% + ${essScore}×60% = ${finalScore}` : `${objScore} (100% objektif)`;
+      const formula = hasEssay ? `${objScore}×60% + ${essScore}×40% = ${finalScore}` : `${objScore} (100% objektif)`;
 
       rows.push([
         { v: idx + 1, s: STYLES.cellCenter },
@@ -218,9 +218,9 @@ const GradingPage = () => {
         </div>
         {hasEssay ? (
           <div className="space-y-2 text-sm text-indigo-700 dark:text-indigo-300">
-            <p><span className="font-black">Nilai Final</span> = (Skor Objektif × <span className="font-black text-blue-600">40%</span>) + (Skor Subjektif × <span className="font-black text-purple-600">60%</span>)</p>
+            <p><span className="font-black">Nilai Final</span> = (Skor Objektif × <span className="font-black text-blue-600">60%</span>) + (Skor Subjektif × <span className="font-black text-purple-600">40%</span>)</p>
             <p className="text-xs text-indigo-500">Skor Objektif = (Benar / {objectiveQuestions.length} soal) × 100 &nbsp;|&nbsp; Skor Subjektif = (Benar / {essayQuestions.length} soal) × 100</p>
-            <p className="text-xs text-indigo-500">Contoh semua benar: (100 × 0.4) + (100 × 0.6) = <span className="font-black">100</span></p>
+            <p className="text-xs text-indigo-500">Contoh semua benar: (100 × 0.6) + (100 × 0.4) = <span className="font-black">100</span></p>
           </div>
         ) : (
           <p className="text-sm text-indigo-600">Tidak ada soal essay. <span className="font-bold">Nilai = (Benar / {objectiveQuestions.length}) × 100</span> (100% objektif)</p>

@@ -104,7 +104,7 @@ const TokenDialog = memo(({ selectedRoom, onClose }: TokenDialogProps) => {
                 value={tokenInput}
                 onChange={(e) => setTokenInput(e.target.value.toUpperCase())}
                 onKeyDown={(e) => { if (e.key === "Enter" && tokenInput && !isValidating) handleValidateToken(); }}
-                placeholder="Contoh: EJ24A"
+                placeholder="ISI TOKEN"
                 className="h-14 text-center text-2xl font-black bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 rounded-lg uppercase"
                 disabled={isValidating}
                 inputMode="text"
