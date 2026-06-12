@@ -72,20 +72,20 @@ Buat file `.env` di root direktori proyek dengan variabel konfigurasi berikut:
 VITE_APP_NAME="EXAM AA"
 
 # SaaS Multi-Tenant Config
-VITE_MASTER_PB_URL=https://db.alfaruqasri.my.id   # Master PB database untuk registry sekolah
-VITE_MAIN_DOMAIN=alfaruqasri.my.id                # Domain utama platform SaaS (tanpa subdomain)
+VITE_MASTER_PB_URL=   # Master PB database untuk registry sekolah
+VITE_MAIN_DOMAIN=                # Domain utama platform SaaS (tanpa subdomain)
 VITE_LANDING_SUBDOMAIN=ujian                       # Subdomain halaman landing & super admin
-# VITE_DEV_SCHOOL_SLUG=modalbangsa                # Bypass halaman landing di localhost (testing)
+# VITE_DEV_SCHOOL_SLUG=                # Bypass halaman landing di localhost (testing)
 
 # Tenant Database Connection
-VITE_POCKETBASE_URL=https://db.alfaruqasri.my.id
+VITE_POCKETBASE_URL=
 
 # Keamanan Exambro (Isi 'true' untuk testing/nonaktifkan pengaman)
 VITE_DISABLE_EXAMBRO_GUARD=false
 
 # Media & Storage Cloudflare R2
-VITE_R2_PUBLIC_BASE_URL=https://assets.examku.my.id
-VITE_R2_WORKER_URL=https://examku-worker.faruq-blogger.workers.dev # CF Worker untuk upload/delete aman
+VITE_R2_PUBLIC_BASE_URL=
+VITE_R2_WORKER_URL=
 ```
 
 ---
