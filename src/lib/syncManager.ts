@@ -76,7 +76,7 @@ export async function syncPendingData(pb: PocketBase, studentId: string): Promis
       console.log(`✅ Synced offline data for room ${roomId} (status: ${parsedAtt.status})`);
     } catch (e: any) {
       // 404 = attempt dihapus admin → hapus data lokal, tidak perlu retry
-      if (e?.status === 404 || e?.status === 403) {
+      if (e?.status === 404) {
         localStorage.removeItem(key);
         localStorage.removeItem(`offline_answers_${studentId}_${roomId}`);
         localStorage.removeItem(`local_attempt_${studentId}_${roomId}`);

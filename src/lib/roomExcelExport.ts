@@ -166,6 +166,7 @@ interface ExportRoomsToZipParams {
   examClasses: any[];
   pb: any;
   terminology: any;
+  filename?: string;
 }
 
 export async function exportActiveRoomsToZip({
@@ -173,7 +174,8 @@ export async function exportActiveRoomsToZip({
   students,
   examClasses,
   pb,
-  terminology
+  terminology,
+  filename
 }: ExportRoomsToZipParams) {
   if (!pb || rooms.length === 0) return;
 
@@ -513,8 +515,15 @@ export async function exportActiveRoomsToZip({
 
     // Write Excel workbook to binary buffer
     const excelBuffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
-    const cleanRoomName = (room.room_name || `Ruang_${room.id}`).replace(/[^a-zA-Z0-9_\-]/g, "_");
-    zip.file(`Rekap_${cleanRoomName}_${new Date().toISOString().split('T')[0]}.xlsx`, excelBuffer);
+    const cleanFileNamePart = (name: string) => {
+      return name
+        .replace(/\//g, "_") // Ubah N/A menjadi N_A
+        .replace(/[^a-zA-Z0-9\s\(\)\-\_]/g, "") // Hanya izinkan karakter aman
+        .trim();
+    };
+    const cleanTeacherName = cleanFileNamePart(room.teacherName || "Guru");
+    const cleanRoomName = cleanFileNamePart(room.room_name || `Ruang_${room.id}`);
+    zip.file(`${cleanTeacherName} - (${cleanRoomName}).xlsx`, excelBuffer);
   }
 
   // Generate ZIP and trigger download
@@ -522,7 +531,8 @@ export async function exportActiveRoomsToZip({
   const url = window.URL.createObjectURL(content);
   const link = document.createElement("a");
   link.href = url;
-  link.setAttribute("download", `Rekap_Semua_Ruang_Aktif_${new Date().toISOString().split('T')[0]}.zip`);
+  const defaultFilename = `Rekap_Semua_Ruang_Aktif_${new Date().toISOString().split('T')[0]}.zip`;
+  link.setAttribute("download", filename || defaultFilename);
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);

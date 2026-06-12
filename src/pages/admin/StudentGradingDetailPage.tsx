@@ -650,8 +650,8 @@ const StudentGradingDetailPage = () => {
                         <span className="text-[10px] font-bold text-slate-400 font-mono">{idx + 1}</span>
                       </TableCell>
                       <TableCell>
-                        <div className="text-[11px] leading-snug text-slate-700 dark:text-slate-300 line-clamp-2">
-                          <MathText content={q.text} className="text-[11px] [&_p]:m-0 [&_p]:inline [&_img]:hidden [&_br]:hidden line-clamp-2" />
+                        <div className="text-[11px] leading-snug text-slate-700 dark:text-slate-300">
+                          <MathText content={q.text} className="text-[11px] [&_p]:m-0" />
                         </div>
                       </TableCell>
                       <TableCell className="text-center">
@@ -660,10 +660,10 @@ const StudentGradingDetailPage = () => {
                         </span>
                       </TableCell>
                       <TableCell>
-                        <div className="text-[11px] text-slate-700 dark:text-slate-300 line-clamp-2 leading-snug">{getStudentAnswer(q)}</div>
+                        <div className="text-[11px] text-slate-700 dark:text-slate-300 leading-snug whitespace-pre-wrap">{getStudentAnswer(q)}</div>
                       </TableCell>
                       <TableCell>
-                        <div className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2 leading-snug">{getCorrectAnswer(q)}</div>
+                        <div className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug whitespace-pre-wrap">{getCorrectAnswer(q)}</div>
                       </TableCell>
                       <TableCell className="text-center">
                         {correct === null ? (

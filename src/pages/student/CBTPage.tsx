@@ -336,6 +336,7 @@ const CBTPage = () => {
   const [isFullscreen, setIsFullscreen] = useState(!!document.fullscreenElement);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
+  const [isSessionExpiredModalOpen, setIsSessionExpiredModalOpen] = useState(false);
   const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [canFullscreen] = useState(() => !!document.documentElement.requestFullscreen);
@@ -536,11 +537,15 @@ const CBTPage = () => {
           isOnline: true,
           lastHeartbeat: new Date().toISOString()
         }).catch((err: any) => {
-          // Jika attempt sudah dihapus/reset oleh admin
-          if (err?.status === 404 || err?.status === 403) {
+          if (err?.status === 404) {
+            // Jika attempt sudah dihapus/reset oleh admin
             sessionStorage.removeItem("activeCBTRoomId");
             setIsSubmitModalOpen(false);
             setIsResetModalOpen(true);
+          } else if (err?.status === 403) {
+            // Sesi token expired atau invalid
+            setIsSubmitModalOpen(false);
+            setIsSessionExpiredModalOpen(true);
           }
         });
       }, 2000);
@@ -877,15 +882,15 @@ const CBTPage = () => {
     }, 1000);
     const heartbeat = setInterval(async () => { 
       if (attempt?.id && pb) {
-        // Skip jika ada write sukses (seperti simpan jawaban) dalam 60 detik terakhir
-        if (Date.now() - lastWriteTimeRef.current < 60000) {
+        // Skip jika ada write sukses (seperti simpan jawaban) dalam 90 detik terakhir
+        if (Date.now() - lastWriteTimeRef.current < 90000) {
           return;
         }
         try {
           await safeUpdateAttempt(attempt.id, { isOnline: true, lastHeartbeat: new Date().toISOString() });
         } catch (err: any) {
-          // Jika 404/403 berarti sesi sudah dihapus/reset oleh admin
-          if (err?.status === 404 || err?.status === 403) {
+          if (err?.status === 404) {
+            // Jika 404 berarti sesi sudah dihapus/reset oleh admin
             clearInterval(heartbeat);
             clearInterval(timer);
             sessionStorage.removeItem("activeCBTRoomId");
@@ -896,10 +901,16 @@ const CBTPage = () => {
             }
             setIsSubmitModalOpen(false);
             setIsResetModalOpen(true);
+          } else if (err?.status === 403) {
+            // Jika 403 berarti sesi token expired atau invalid
+            clearInterval(heartbeat);
+            clearInterval(timer);
+            setIsSubmitModalOpen(false);
+            setIsSessionExpiredModalOpen(true);
           }
         }
       } 
-    }, 30000); // Heartbeat setiap 30 detik
+    }, 90000); // Heartbeat setiap 90 detik
     return () => { clearInterval(timer); clearInterval(heartbeat); };
   }, [loading, isExamOver, roomData, attempt]);
 
@@ -1152,9 +1163,13 @@ const CBTPage = () => {
           localStorage.setItem(`pending_sync_${student.id}_${roomId}`, "true");
         }
         // Jika 404 (attempt dihapus admin), jangan tampilkan error submit biasa
-        if (serverErr?.status === 404 || serverErr?.status === 403) {
+        if (serverErr?.status === 404) {
           setIsSubmitModalOpen(false);
           setIsResetModalOpen(true);
+          return;
+        } else if (serverErr?.status === 403) {
+          setIsSubmitModalOpen(false);
+          setIsSessionExpiredModalOpen(true);
           return;
         }
         
@@ -2012,6 +2027,19 @@ const CBTPage = () => {
         </DialogContent>
       </Dialog>
       <Dialog open={isResetModalOpen} onOpenChange={() => { }}><DialogContent className="max-w-md rounded-2xl p-6 text-center pointer-events-auto bg-white dark:bg-slate-950 border-none shadow-2xl"><AlertCircle className="w-12 h-12 text-red-600 mx-auto mb-2 animate-bounce" /><DialogTitle className="text-lg font-bold dark:text-white">Sesi Ujian Di-Reset</DialogTitle><p className="text-slate-500 dark:text-slate-400 text-sm mt-1">Sesi Anda telah di-reset oleh Pengawas. Silakan login kembali.</p><Button onClick={() => logoutStudent()} className="w-full bg-red-600 hover:bg-red-700 text-white rounded-xl h-11 mt-4"><LogOut className="w-4 h-4 mr-2" /> Keluar & Login Ulang</Button></DialogContent></Dialog>
+      
+      <Dialog open={isSessionExpiredModalOpen} onOpenChange={() => { }}>
+        <DialogContent className="max-w-md rounded-2xl p-6 text-center pointer-events-auto bg-white dark:bg-slate-950 border-none shadow-2xl">
+          <AlertCircle className="w-12 h-12 text-amber-500 mx-auto mb-2 animate-bounce" />
+          <DialogTitle className="text-lg font-bold dark:text-white">Sesi Login Berakhir</DialogTitle>
+          <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
+            Sesi masuk Anda telah berakhir atau tidak valid. Tenang, jawaban Anda aman di penyimpanan lokal. Silakan login kembali untuk melanjutkan ujian.
+          </p>
+          <Button onClick={() => logoutStudent()} className="w-full bg-amber-500 hover:bg-amber-600 text-white rounded-xl h-11 mt-4">
+            <LogOut className="w-4 h-4 mr-2" /> Login Kembali
+          </Button>
+        </DialogContent>
+      </Dialog>
       
       <Dialog open={isErrorModalOpen} onOpenChange={setIsErrorModalOpen}>
         <DialogContent className="max-w-md rounded-2xl p-6 text-center pointer-events-auto bg-white dark:bg-slate-950 border-none shadow-2xl">

@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, Plus, Edit, Trash, Check, Copy, Image, ChevronDown, FileText, Download, Eye, FolderOpen, Sparkles, Wand2, RefreshCw, BookOpen, Loader2, FileSpreadsheet, Search, X, Bookmark, Forward, CheckCircle2, Menu, Maximize2, HelpCircle, FileJson, GripVertical, ChevronLeft, ChevronRight } from "lucide-react";
 import { Reorder } from "framer-motion";
@@ -101,6 +101,154 @@ const wrapTablesForQuill = (html: string): string => {
 const unwrapTablesForStorage = (html: string): string => {
   if (!html || !html.includes('ql-table-embed')) return html;
   return html.replace(/<div class="ql-table-embed"[^>]*>([\s\S]*?)<\/div>/gi, '$1');
+};
+
+const getAbsoluteUrl = (url: string): string => {
+  if (!url) return "";
+  if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("data:")) {
+    return url;
+  }
+  const cleanUrl = url.startsWith("/") ? url.substring(1) : url;
+  if (cleanUrl.startsWith("api/files/")) {
+    return `${window.location.origin}/${cleanUrl}`;
+  }
+  if (cleanUrl.startsWith("schools/")) {
+    const r2Base = import.meta.env.VITE_R2_PUBLIC_BASE_URL || "";
+    if (r2Base) {
+      const base = r2Base.replace(/\/$/, "");
+      return `${base}/${cleanUrl}`;
+    }
+  }
+  return `${window.location.origin}/${cleanUrl}`;
+};
+
+const forceSmallImage = (imgTag: string, physW: number, physH: number): string => {
+  // 1. Remove existing width/height HTML attributes from the tag (supports quoted and unquoted values)
+  let cleaned = imgTag
+    .replace(/\bwidth\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '')
+    .replace(/\bheight\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '');
+
+  // 2. Remove width/height from inline style attribute if present
+  cleaned = cleaned.replace(/(style=["'])([^"']*)(["'])/gi, (_, prefix, styleContent, suffix) => {
+    const cleanedStyle = styleContent
+      .replace(/\bwidth\s*:\s*[^;]+;?/gi, '')
+      .replace(/\bheight\s*:\s*[^;]+;?/gi, '');
+    return prefix + cleanedStyle + suffix;
+  });
+
+  // 3. Add explicit proportional width and height HTML attributes to prevent Word layout stretching
+  if (physW > 0 && physH > 0) {
+    const maxDisplayW = 290;
+    let displayW = physW;
+    let displayH = physH;
+    if (physW > maxDisplayW) {
+      displayH = Math.round((physH * maxDisplayW) / physW);
+      displayW = maxDisplayW;
+    }
+    cleaned = cleaned.replace(/\/?>$/, ` width="${displayW}" height="${displayH}"$&`);
+  } else {
+    cleaned = cleaned.replace(/\/?>$/, ' width="290"$&');
+  }
+  return cleaned;
+};
+
+const processHtmlInlineImages = (htmlText: string, imageMapping?: Map<string, { mappedUrl: string, base64: string, width: number, height: number }>): string => {
+  if (!htmlText) return "";
+  let result = htmlText;
+  const imgRegex = /<img[^>]+src="([^"]+)"[^>]*>/g;
+  let match;
+  const matches: { full: string; src: string }[] = [];
+  while ((match = imgRegex.exec(htmlText)) !== null) {
+    matches.push({ full: match[0], src: match[1] });
+  }
+  for (const m of matches) {
+    let replacedUrl = "";
+    let width = 0;
+    let height = 0;
+    if (imageMapping && imageMapping.has(m.src)) {
+      const info = imageMapping.get(m.src)!;
+      replacedUrl = info.mappedUrl;
+      width = info.width;
+      height = info.height;
+    } else {
+      replacedUrl = getAbsoluteUrl(m.src);
+    }
+    let replacedImg = m.full.replace(m.src, replacedUrl);
+    
+    // For Word export compatibility, strictly force standard images to be small and proportional
+    const isLatex = m.src.includes("latex.codecogs.com");
+    if (!isLatex) {
+      replacedImg = forceSmallImage(replacedImg, width, height);
+    }
+    
+    result = result.replace(m.full, replacedImg);
+  }
+  return result;
+};
+
+const convertToPngBase64 = async (url: string): Promise<{ base64: string, width: number, height: number }> => {
+  try {
+    const resp = await fetch(url);
+    if (!resp.ok) return { base64: "", width: 0, height: 0 };
+    const blob = await resp.blob();
+    
+    // LaTeX formulas from codecogs are already small and should never be resized (to avoid CORS/canvas scaling issues)
+    const isLatex = url.toLowerCase().includes("latex.codecogs.com");
+    if (isLatex) {
+      return await new Promise((resolve) => {
+        const img = new window.Image();
+        img.crossOrigin = "anonymous";
+        img.onload = () => {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            const dataUrl = reader.result as string || "";
+            const base64Data = dataUrl.split(",")[1] || "";
+            resolve({ base64: base64Data, width: img.width, height: img.height });
+          };
+          reader.readAsDataURL(blob);
+        };
+        img.onerror = () => {
+          resolve({ base64: "", width: 0, height: 0 });
+        };
+        img.src = URL.createObjectURL(blob);
+      });
+    }
+    
+    // For all other images (WebP, PNG, JPG), we load them onto a canvas and convert them to standard PNGs
+    // at their full original resolution to preserve absolute sharpness, while Word handles display scaling.
+    const img = new window.Image();
+    img.crossOrigin = "anonymous";
+    const objectUrl = URL.createObjectURL(blob);
+    return await new Promise((resolve) => {
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const w = img.width;
+        const h = img.height;
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext("2d");
+        ctx?.drawImage(img, 0, 0, w, h);
+        try {
+          const dataUrl = canvas.toDataURL("image/png");
+          URL.revokeObjectURL(objectUrl);
+          const base64Data = dataUrl.split(",")[1] || "";
+          resolve({ base64: base64Data, width: w, height: h });
+        } catch (canvasErr) {
+          console.warn("Canvas export failed for image:", canvasErr);
+          URL.revokeObjectURL(objectUrl);
+          resolve({ base64: "", width: 0, height: 0 });
+        }
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(objectUrl);
+        resolve({ base64: "", width: 0, height: 0 });
+      };
+      img.src = objectUrl;
+    });
+  } catch (err) {
+    console.error("Error converting image:", url, err);
+    return { base64: "", width: 0, height: 0 };
+  }
 };
 
 // REGISTER CUSTOM FORMATS (only line-height, NOT margin-left/text-indent which trap indentation)
@@ -1214,43 +1362,93 @@ const QuestionsPage = () => {
       const dbQuestions = await pb.collection('questions').getFullList({ filter: `examId = "${examId}"`, fields: 'order' });
       const maxOrder = dbQuestions.reduce((max, q) => Math.max(max, q.order || 0), 0);
       
-      // Build all payloads first
-      const payloads = parsedResults.map((q, idx) => {
+      // Build all payloads with localized images
+      const payloads = [];
+      for (let idx = 0; idx < parsedResults.length; idx++) {
+        const q = parsedResults[idx];
         const type = q.type || "pilihan_ganda";
         const field = typeMap[type] || "multiple_choice";
         
+        // Localize inline images
+        const localizedQText = await localizeInlineImages(q.text || "Pertanyaan Tanpa Judul");
+        const rawGroupText = q.groupText || q.group_text || "";
+        const localizedGroupText = rawGroupText ? await localizeInlineImages(rawGroupText) : "";
+
+        // Localize options
         let options: any = {};
         if (type === "pilihan_ganda" || type === "pilihan_ganda_kompleks" || type === "benar_salah") {
-          options = q.choices || {};
+          const rawChoices = q.choices || {};
+          const opts: any = {};
+          const keys = Object.keys(rawChoices);
+          for (let kIdx = 0; kIdx < keys.length; kIdx++) {
+            const k = keys[kIdx];
+            const val = rawChoices[k];
+            const choiceImg = val.imageUrl || val.image_url || "";
+            const localizedChoiceImg = choiceImg ? await localizeImage(choiceImg, `ai_opt_${idx}_${k}`) : undefined;
+            opts[k] = {
+              text: val.text ? await localizeInlineImages(val.text) : "",
+              imageUrl: localizedChoiceImg,
+              isCorrect: !!val.isCorrect
+            };
+          }
+          options = opts;
         } else if (type === "menjodohkan") {
-          options = { pairs: q.pairs || [] };
+          const pairs = q.pairs || [];
+          const localizedPairs = [];
+          for (let pIdx = 0; pIdx < pairs.length; pIdx++) {
+            const p = pairs[pIdx];
+            localizedPairs.push({
+              ...p,
+              left: await localizeInlineImages(p.left || ""),
+              right: await localizeInlineImages(p.right || "")
+            });
+          }
+          options = { pairs: localizedPairs };
         } else if (type === "urutkan" || type === "drag_drop") {
-          options = { items: q.items || [] };
+          const items = q.items || [];
+          const localizedItems = [];
+          for (let itIdx = 0; itIdx < items.length; itIdx++) {
+            const it = items[itIdx];
+            const itemImg = it.imageUrl || it.image_url || "";
+            const localizedItemImg = itemImg ? await localizeImage(itemImg, `ai_item_${idx}_${itIdx}`) : undefined;
+            localizedItems.push({
+              ...it,
+              text: await localizeInlineImages(it.text || ""),
+              imageUrl: localizedItemImg
+            });
+          }
+          options = { items: localizedItems };
         }
 
         let correctAnswer = "";
         if (type === "pilihan_ganda" || type === "pilihan_ganda_kompleks" || type === "benar_salah") {
           correctAnswer = q.correctAnswer || q.answerKey || "";
-          if (!correctAnswer && q.choices) {
-            const correctKeys = Object.keys(q.choices).filter(k => q.choices[k].isCorrect);
+          if (!correctAnswer && options) {
+            const correctKeys = Object.keys(options).filter(k => options[k].isCorrect);
             correctAnswer = correctKeys.join(",");
           }
         } else if (type === "isian_singkat" || type === "uraian") {
           correctAnswer = q.answerKey || "";
         }
 
+        // Localize main question imageUrl
+        const qImageUrl = q.imageUrl || q.image_url || "";
+        const localizedQImageUrl = qImageUrl ? await localizeImage(qImageUrl, `ai_q_${idx}`) : "";
+
         const createPayload: any = {
           examId,
-          text: q.text || "Pertanyaan Tanpa Judul",
+          text: localizedQText,
           field,
           options,
           correctAnswer,
+          imageUrl: localizedQImageUrl,
           order: maxOrder + idx + 1
         };
         if (q.groupId) { createPayload.groupId = q.groupId; createPayload.group_id = q.groupId; }
-        if (q.groupText) { createPayload.groupText = q.groupText; createPayload.group_text = q.groupText; }
-        return createPayload;
-      });
+        if (q.groupText) { createPayload.groupText = localizedGroupText; createPayload.group_text = localizedGroupText; }
+        
+        payloads.push(createPayload);
+      }
 
       // Save in parallel chunks of 10
       const chunkSize = 10;
@@ -2150,6 +2348,92 @@ const QuestionsPage = () => {
     return result;
   };
 
+  // Helper to localize a single image URL (remote or base64) to our Cloudflare R2 bucket
+  const localizeImage = async (url: string, filenamePrefix: string): Promise<string> => {
+    if (!url) return "";
+    
+    // 1. If base64
+    if (url.startsWith("data:image/")) {
+      try {
+        const response = await fetch(url);
+        const blob = await response.blob();
+        let file = new File([blob], `${filenamePrefix}-${Date.now()}.webp`, { type: blob.type });
+        // Compress if needed
+        if (blob.type !== "image/webp" && blob.size > 30 * 1024) {
+          try { file = await compressImage(file); } catch { /* keep original */ }
+        }
+        const schoolFolder = school?.slug || "unknown";
+        const uploaded = await uploadInventoryImage(`schools/${schoolFolder}/exams/${examId}`, file);
+        return uploaded.url;
+      } catch (err) {
+        console.warn("Gagal upload base64 image:", err);
+        return url;
+      }
+    }
+    
+    // 2. If external remote URL
+    const isRemote = url.startsWith("http") && !url.includes("assets.examku.my.id") && !url.includes("/api/files/");
+    if (isRemote) {
+      try {
+        // Fetch the remote image safely without PocketBase auth headers (to avoid preflight CORS failure)
+        const response = await fetch(url);
+        if (!response.ok) return url;
+        const blob = await response.blob();
+        
+        // Determine file extension from content-type or URL
+        let ext = "png";
+        if (blob.type === "image/jpeg") ext = "jpg";
+        else if (blob.type === "image/webp") ext = "webp";
+        else if (blob.type === "image/gif") ext = "gif";
+        
+        let file = new File([blob], `${filenamePrefix}-${Date.now()}.${ext}`, { type: blob.type });
+        if (blob.type !== "image/webp" && blob.size > 30 * 1024) {
+          try { file = await compressImage(file); } catch { /* keep original */ }
+        }
+        
+        const schoolFolder = school?.slug || "unknown";
+        const uploaded = await uploadInventoryImage(`schools/${schoolFolder}/exams/${examId}`, file);
+        return uploaded.url;
+      } catch (err) {
+        console.warn("Gagal localize remote image:", url, err);
+        return url;
+      }
+    }
+    
+    return url;
+  };
+
+  // Helper to localize all remote image URLs inside HTML content
+  const localizeInlineImages = async (html: string): Promise<string> => {
+    if (!html) return html;
+    
+    // Find all <img src="..."> tags
+    const imgRegex = /<img[^>]+src="([^"]+)"[^>]*>/g;
+    let result = html;
+    let match;
+    const matches: { full: string; src: string }[] = [];
+    
+    while ((match = imgRegex.exec(html)) !== null) {
+      matches.push({ full: match[0], src: match[1] });
+    }
+    
+    if (matches.length === 0) return html;
+    
+    // Localize each image URL in parallel
+    const localized = await Promise.allSettled(matches.map(async (m, idx) => {
+      const newUrl = await localizeImage(m.src, `inline-imported-${idx}`);
+      return { src: m.src, newUrl };
+    }));
+    
+    for (const r of localized) {
+      if (r.status === "fulfilled" && r.value) {
+        result = result.split(r.value.src).join(r.value.newUrl);
+      }
+    }
+    
+    return result;
+  };
+
   const handleSubmit = async (e: any, stayOpen: boolean = false) => {
     e.preventDefault();
     if (!pb) return;
@@ -2198,23 +2482,6 @@ const QuestionsPage = () => {
 
     setIsSavingQuestion(true);
     try {
-      const uploadBase64ToR2 = async (base64Data: string, prefix: string) => {
-        try {
-          const blob = await (await fetch(base64Data)).blob();
-          let fileToUpload = new File([blob], `${prefix}_${Date.now()}.webp`, { type: blob.type });
-          // Only compress if not already webp or if large
-          if (blob.type !== "image/webp" && blob.size > 30 * 1024) {
-            try { fileToUpload = await compressImage(fileToUpload); } catch { /* keep original */ }
-          }
-          const schoolFolder = school?.slug || "unknown";
-          const uploadSnap = await uploadInventoryImage(`schools/${schoolFolder}/exams/${examId}`, fileToUpload);
-          return uploadSnap.url;
-        } catch (e) {
-          console.error(`Gagal upload base64 image (${prefix}) to R2`, e);
-          return base64Data;
-        }
-      };
-
       let imageUrl = formValues.imageUrl || "";
       let textToSave = autoDetectLatex(unwrapTablesForStorage(formValues.text));
 
@@ -2242,9 +2509,8 @@ const QuestionsPage = () => {
         const schoolFolder = school?.slug || "unknown";
         const res = await uploadInventoryImage(`schools/${schoolFolder}/exams/${examId}`, fileToUpload);
         imageUrl = res.url;
-      } else if (imageUrl.startsWith("data:image/")) {
-        // Jika dari pratinjau tapi belum diupload
-        imageUrl = await uploadBase64ToR2(imageUrl, "cover_manual");
+      } else if (imageUrl) {
+        imageUrl = await localizeImage(imageUrl, "cover_manual");
       }
 
       // 2. Hapus gambar R2 yang dihapus dari teks Quill (diff lama vs baru)
@@ -2263,19 +2529,8 @@ const QuestionsPage = () => {
         }
       }
 
-      // 3. Scan teks Soal untuk base64 (parallel upload)
-      if (textToSave.includes("data:image/")) {
-        const doc = new DOMParser().parseFromString(textToSave, "text/html");
-        const ims = Array.from(doc.querySelectorAll("img[src^='data:image/']"));
-        if (ims.length > 0) {
-          const results = await Promise.allSettled(ims.map(async (img) => {
-            const base64 = img.getAttribute("src")!;
-            return { img, url: await uploadBase64ToR2(base64, "text_manual") };
-          }));
-          results.forEach(r => { if (r.status === "fulfilled" && r.value.url !== r.value.img.getAttribute("src")) r.value.img.setAttribute("src", r.value.url); });
-          textToSave = doc.body.innerHTML;
-        }
-      }
+      // 3. Scan teks Soal untuk remote & base64 inline images
+      textToSave = await localizeInlineImages(textToSave);
 
       // 3. Upload file Pilihan Manual ke R2
       const updatedChoices = JSON.parse(JSON.stringify(formValues.choices));
@@ -2298,25 +2553,16 @@ const QuestionsPage = () => {
         }
       }
 
-      // 4. Scan teks Pilihan untuk base64 (parallel)
+      // 4. Scan teks Pilihan untuk remote & base64 images
       await Promise.allSettled(Object.keys(updatedChoices).map(async (key) => {
         const choice = updatedChoices[key];
-        if (choice.imageUrl && choice.imageUrl.startsWith("data:image/")) {
-          choice.imageUrl = await uploadBase64ToR2(choice.imageUrl, `choice_manual_${key}`);
+        if (choice.imageUrl) {
+          choice.imageUrl = await localizeImage(choice.imageUrl, `choice_manual_${key}`);
         } else if (!choice.imageUrl) {
           delete choice.imageUrl;
         }
-        if (choice.text && choice.text.includes("data:image/")) {
-          const cDoc = new DOMParser().parseFromString(choice.text, "text/html");
-          const cIms = Array.from(cDoc.querySelectorAll("img[src^='data:image/']"));
-          if (cIms.length > 0) {
-            await Promise.allSettled(cIms.map(async (img) => {
-              const b64 = img.getAttribute("src")!;
-              const url = await uploadBase64ToR2(b64, `choice_text_manual_${key}`);
-              img.setAttribute("src", url);
-            }));
-            choice.text = cDoc.body.innerHTML;
-          }
+        if (choice.text) {
+          choice.text = await localizeInlineImages(choice.text);
         }
       }));
 
@@ -2361,10 +2607,8 @@ const QuestionsPage = () => {
         const gid = formValues.groupId || "";
         let gtxt = formValues.groupText || "";
         
-        // Upload base64 images in groupText to R2
-        if (gtxt.includes("data:image/")) {
-          gtxt = await uploadInlineBase64Images(gtxt);
-        }
+        // Localize remote & base64 images in groupText
+        gtxt = await localizeInlineImages(gtxt);
         
         payload.groupId = gid;
         payload.group_id = gid;
@@ -2967,39 +3211,18 @@ const QuestionsPage = () => {
         
         await Promise.all(chunk.map(async (q, index) => {
           const actualIndex = i + index;
-          let imageUrl = q.imageUrl || "";
+          
+          // Localize Question Image (handles base64 and remote URLs)
+          const imageUrl = q.imageUrl ? await localizeImage(q.imageUrl, `word_q_${actualIndex}`) : "";
 
-          // Upload Question Image if Base64
-          if (imageUrl.startsWith("data:image/")) {
-            try {
-              const blob = await (await fetch(imageUrl)).blob();
-              const file = new File([blob], `word_q_${actualIndex}.png`, { type: blob.type });
-              const { url } = await uploadInventoryImage("questions", file);
-              imageUrl = url;
-            } catch (err) {
-              console.error("Gagal upload gambar soal:", err);
-              imageUrl = ""; 
-            }
-          }
-
-          // Upload Choice Images and Map them
+          // Localize Choice Images and Map them
           const choices: Record<string, any> = {};
           await Promise.all(Object.entries(q.choices).map(async ([key, val]: [string, any]) => {
-            let choiceImgUrl = val.imageUrl || "";
-            if (choiceImgUrl.startsWith("data:image/")) {
-              try {
-                const blob = await (await fetch(choiceImgUrl)).blob();
-                const file = new File([blob], `word_opt_${actualIndex}_${key}.png`, { type: blob.type });
-                const { url } = await uploadInventoryImage("questions", file);
-                choiceImgUrl = url;
-              } catch (err) {
-                console.error(`Gagal upload gambar opsi ${key}:`, err);
-                choiceImgUrl = "";
-              }
-            }
+            const choiceImgUrl = val.imageUrl ? await localizeImage(val.imageUrl, `word_opt_${actualIndex}_${key}`) : "";
+            const choiceText = val.text ? await localizeInlineImages(val.text) : "";
 
             choices[key.toLowerCase()] = {
-              text: val.text,
+              text: choiceText,
               isCorrect: val.isCorrect || false,
               imageUrl: choiceImgUrl
             };
@@ -3016,16 +3239,20 @@ const QuestionsPage = () => {
           const questionType = q.type || "pilihan_ganda";
           const fieldType = typeMap[questionType] || "multiple_choice";
 
+          // Localize question text and group text HTML
+          const localizedQText = await localizeInlineImages(q.text || "");
+          const localizedGroupText = q.groupText ? await localizeInlineImages(q.groupText) : "";
+
           const payload: any = {
             examId,
-            text: q.text,
+            text: localizedQText,
             field: fieldType,
             type: questionType,
             options: questionType === "pilihan_ganda" ? choices : {},
             correctAnswer: questionType === "pilihan_ganda" ? answerKey.toLowerCase() : (q.answerKey || ""),
             answerKey: questionType === "pilihan_ganda" ? answerKey.toLowerCase() : (q.answerKey || ""),
             groupId: q.groupId || "",
-            groupText: q.groupText || "",
+            groupText: localizedGroupText,
             order: maxExistingOrder + actualIndex + 1,
             imageUrl: imageUrl
           };
@@ -3095,24 +3322,43 @@ const QuestionsPage = () => {
         await Promise.all(chunk.map(async (q, index) => {
           const actualIndex = i + index;
           
+          // Localize inline images in question and group text
+          const localizedQText = await localizeInlineImages(q.text || "");
+          const localizedGroupText = q.groupText ? await localizeInlineImages(q.groupText) : "";
+
+          // Localize choices
+          const choices: Record<string, any> = {};
+          if (q.choices) {
+            await Promise.all(Object.entries(q.choices).map(async ([key, val]: [string, any]) => {
+              const choiceImgUrl = val.imageUrl ? await localizeImage(val.imageUrl, `excel_opt_${actualIndex}_${key}`) : "";
+              const choiceText = val.text ? await localizeInlineImages(val.text) : "";
+              
+              choices[key.toLowerCase()] = {
+                text: choiceText,
+                isCorrect: val.isCorrect || false,
+                imageUrl: choiceImgUrl
+              };
+            }));
+          }
+          
           // Determine correct answer based on question type
           let answerKey = "";
           if (q.type === "isian_singkat" || q.type === "uraian") {
             answerKey = q.answerKey || "";
           } else {
-            answerKey = Object.entries(q.choices as any).find(([_, v]: any) => v.isCorrect)?.[0] || q.answerKey || "";
+            answerKey = Object.entries(choices).find(([_, v]: any) => v.isCorrect)?.[0] || q.answerKey || "";
           }
           
           const payload = {
             examId,
-            text: q.text,
+            text: localizedQText,
             field: q.field || "multiple_choice",
             type: q.type,
-            options: q.choices,
+            options: q.type === "pilihan_ganda" || q.type === "pilihan_ganda_kompleks" || q.type === "benar_salah" ? choices : q.choices,
             correctAnswer: answerKey,
             answerKey: answerKey,
             groupId: q.groupId || "",
-            groupText: q.groupText || "",
+            groupText: localizedGroupText,
             order: maxExistingOrder + actualIndex + 1,
             imageUrl: ""
           };
@@ -3210,36 +3456,73 @@ const QuestionsPage = () => {
           correctAnswer = correctKeys.join(",");
         }
 
+        // Localize remote image and inline images
+        const qImageUrl = q.imageUrl || q.image_url || "";
+        const localizedQImageUrl = qImageUrl ? await localizeImage(qImageUrl, `json_q_${i}`) : "";
+        const localizedQText = await localizeInlineImages(q.text || q.question || "");
+        const rawGroupText = q.groupText || q.group_text || "";
+        const localizedGroupText = rawGroupText ? await localizeInlineImages(rawGroupText) : "";
+
         const payload: any = {
           examId,
-          text: q.text || q.question || "",
+          text: localizedQText,
           field: typeMap[qType] || "multiple_choice",
           options: {},
           correctAnswer: correctAnswer,
-          imageUrl: q.imageUrl || q.image_url || "",
+          imageUrl: localizedQImageUrl,
           order: q.order || (jsonMaxOrder + i + 1),
           groupId: q.groupId || q.group_id || "",
           group_id: q.groupId || q.group_id || "",
-          groupText: q.groupText || q.group_text || "",
-          group_text: q.groupText || q.group_text || "",
+          groupText: localizedGroupText,
+          group_text: localizedGroupText,
         };
 
-        // Build options based on type
+        // Build options based on type with image localization
         if (qType === "pilihan_ganda" || qType === "pilihan_ganda_kompleks" || qType === "benar_salah" || qType === "multiple_choice" || qType === "complex_choice" || qType === "true_false") {
           const opts: any = {};
-          Object.keys(choices).forEach(k => {
+          const keys = Object.keys(choices);
+          for (let kIdx = 0; kIdx < keys.length; kIdx++) {
+            const k = keys[kIdx];
             const val = choices[k];
             if (typeof val === 'string') {
-              opts[k] = { text: val, isCorrect: correctAnswer.includes(k) };
+              opts[k] = { text: await localizeInlineImages(val), isCorrect: correctAnswer.includes(k) };
             } else if (typeof val === 'object') {
-              opts[k] = { text: val.text || "", imageUrl: val.imageUrl || val.image_url || undefined, isCorrect: !!val.isCorrect };
+              const choiceImg = val.imageUrl || val.image_url || "";
+              const localizedChoiceImg = choiceImg ? await localizeImage(choiceImg, `json_opt_${i}_${k}`) : undefined;
+              opts[k] = { 
+                text: await localizeInlineImages(val.text || ""), 
+                imageUrl: localizedChoiceImg, 
+                isCorrect: !!val.isCorrect 
+              };
             }
-          });
+          }
           payload.options = opts;
         } else if (qType === "menjodohkan" || qType === "matching") {
-          payload.options = { pairs: q.pairs || [] };
+          const pairs = q.pairs || [];
+          const localizedPairs = [];
+          for (let pIdx = 0; pIdx < pairs.length; pIdx++) {
+            const p = pairs[pIdx];
+            localizedPairs.push({
+              ...p,
+              left: await localizeInlineImages(p.left || ""),
+              right: await localizeInlineImages(p.right || "")
+            });
+          }
+          payload.options = { pairs: localizedPairs };
         } else if (qType === "urutkan" || qType === "drag_drop" || qType === "sequence") {
-          payload.options = { items: q.items || [] };
+          const items = q.items || [];
+          const localizedItems = [];
+          for (let itIdx = 0; itIdx < items.length; itIdx++) {
+            const it = items[itIdx];
+            const itemImg = it.imageUrl || it.image_url || "";
+            const localizedItemImg = itemImg ? await localizeImage(itemImg, `json_item_${i}_${itIdx}`) : undefined;
+            localizedItems.push({
+              ...it,
+              text: await localizeInlineImages(it.text || ""),
+              imageUrl: localizedItemImg
+            });
+          }
+          payload.options = { items: localizedItems };
         }
 
         await pb.collection('questions').create(payload);
@@ -3348,80 +3631,7 @@ const QuestionsPage = () => {
         .trim();
     };
 
-    // Convert LaTeX to base64 images (fetched from codecogs in parallel)
-    const latexCache = new Map<string, string>();
-    
-    const fetchLatexImage = async (formula: string, dpi: number): Promise<string> => {
-      const cacheKey = `${dpi}_${formula}`;
-      if (latexCache.has(cacheKey)) return latexCache.get(cacheKey)!;
-      
-      const url = `https://latex.codecogs.com/png.latex?\\dpi{${dpi}}\\bg_white ${encodeURIComponent(formula)}`;
-      try {
-        const resp = await fetch(url);
-        if (!resp.ok) return "";
-        const blob = await resp.blob();
-        // Get actual image dimensions
-        const imgBitmap = await createImageBitmap(blob);
-        const naturalW = imgBitmap.width;
-        const naturalH = imgBitmap.height;
-        imgBitmap.close();
-        
-        const b64 = await new Promise<string>((resolve) => {
-          const reader = new FileReader();
-          reader.onloadend = () => resolve(reader.result as string || "");
-          reader.readAsDataURL(blob);
-        });
-        // Store with dimensions: b64|width|height
-        const scaleFactor = dpi / 96; // scale down to ~96dpi display size
-        const displayW = Math.round(naturalW / scaleFactor);
-        const displayH = Math.round(naturalH / scaleFactor);
-        latexCache.set(cacheKey, `${b64}|${displayW}|${displayH}`);
-        return `${b64}|${displayW}|${displayH}`;
-      } catch { return ""; }
-    };
-
-    // Pre-collect all LaTeX formulas from all questions
-    const allFormulas: Array<{ formula: string; dpi: number }> = [];
-    const extractFormulas = (text: string) => {
-      if (!text) return;
-      const displayRegex = /(\$\$|\\\[)([\s\S]*?)(\$\$|\\\])/g;
-      let m;
-      while ((m = displayRegex.exec(text)) !== null) {
-        const f = m[2].trim().replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').replace(/\u2026/g, '\\ldots').replace(/\.\.\./g, '\\ldots');
-        if (f.length > 2) allFormulas.push({ formula: f, dpi: 200 });
-      }
-      const inlineRegex = /(?<!\$)\$([^\$\n]+?)\$(?!\$)/g;
-      while ((m = inlineRegex.exec(text)) !== null) {
-        const f = m[1].trim().replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').replace(/\u2026/g, '\\ldots').replace(/\.\.\./g, '\\ldots');
-        if (f.length > 1 && /[\\^_{}]/.test(f)) allFormulas.push({ formula: f, dpi: 200 });
-      }
-      const parenRegex = /\\\(([\s\S]*?)\\\)/g;
-      while ((m = parenRegex.exec(text)) !== null) {
-        const f = m[1].trim().replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').replace(/\u2026/g, '\\ldots').replace(/\.\.\./g, '\\ldots');
-        if (f.length > 1) allFormulas.push({ formula: f, dpi: 200 });
-      }
-    };
-
-    // Collect all formulas first
-    for (const q of questions) {
-      extractFormulas(q.text || "");
-      extractFormulas(q.groupText || "");
-      if (q.choices) {
-        Object.values(q.choices).forEach((c: any) => extractFormulas(c.text || ""));
-      }
-    }
-
-    // Fetch all formulas in parallel (batches of 10)
-    if (allFormulas.length > 0) {
-      const uniqueFormulas = [...new Map(allFormulas.map(f => [`${f.dpi}_${f.formula}`, f])).values()];
-      for (let i = 0; i < uniqueFormulas.length; i += 10) {
-        const batch = uniqueFormulas.slice(i, i + 10);
-        setBatchProgress(prev => ({ ...prev, current: Math.min(i + 10, uniqueFormulas.length), total: uniqueFormulas.length, message: `Mengunduh rumus ${Math.min(i + 10, uniqueFormulas.length)}/${uniqueFormulas.length}...` }));
-        await Promise.all(batch.map(f => fetchLatexImage(f.formula, f.dpi)));
-      }
-    }
-
-    // Replace LaTeX in text with base64 images
+    // Replace LaTeX in text with codecogs absolute image URLs directly
     const processLatex = (htmlInput: string) => {
       if (!htmlInput) return htmlInput;
       let result = htmlInput;
@@ -3429,28 +3639,100 @@ const QuestionsPage = () => {
       
       result = result.replace(/(\$\$|\\\[)([\s\S]*?)(\$\$|\\\])/g, (_, _s, formula) => {
         const clean = fixFormula(formula);
-        const cached = latexCache.get(`200_${clean}`) || "";
-        if (!cached) return `[${clean}]`;
-        const [b64, w, h] = cached.split('|');
-        return `<br/><img src="${b64}" width="${w}" height="${h}" /><br/>`;
+        const url = `https://latex.codecogs.com/png.latex?\\dpi{200}\\bg_white ${encodeURIComponent(clean)}`;
+        return `<br/><img src="${url}" class="latex-formula" /><br/>`;
       });
       result = result.replace(/(?<!\$)(\$)([^\$\n]+?)(\$)(?!\$)/g, (_, _s, formula) => {
         const clean = fixFormula(formula);
-        if (!/[\\^_{}]/.test(clean)) return formula; // plain number/text, keep as-is without $
-        const cached = latexCache.get(`200_${clean}`) || "";
-        if (!cached) return clean;
-        const [b64, w, h] = cached.split('|');
-        return ` <img src="${b64}" width="${w}" height="${h}" /> `;
+        if (!/[\\^_{}]/.test(clean)) return formula;
+        const url = `https://latex.codecogs.com/png.latex?\\dpi{200}\\bg_white ${encodeURIComponent(clean)}`;
+        return ` <img src="${url}" class="latex-formula" style="vertical-align: middle;" /> `;
       });
       result = result.replace(/(\\\()([\s\S]*?)(\\\))/g, (_, _s, formula) => {
         const clean = fixFormula(formula);
-        const cached = latexCache.get(`200_${clean}`) || "";
-        if (!cached) return clean;
-        const [b64, w, h] = cached.split('|');
-        return ` <img src="${b64}" width="${w}" height="${h}" /> `;
+        const url = `https://latex.codecogs.com/png.latex?\\dpi{200}\\bg_white ${encodeURIComponent(clean)}`;
+        return ` <img src="${url}" class="latex-formula" style="vertical-align: middle;" /> `;
       });
       return result;
     };
+
+    // 1. Pre-collect all image URLs
+    const urlsToConvert = new Set<string>();
+
+    const addUrl = (url: string | undefined) => {
+      if (!url) return;
+      const abs = getAbsoluteUrl(url);
+      if (abs) {
+        urlsToConvert.add(abs);
+      }
+    };
+
+    const collectFromHtml = (htmlText: string | undefined) => {
+      if (!htmlText) return;
+      const processed = processLatex(htmlText);
+      const imgRegex = /<img[^>]+src="([^"]+)"[^>]*>/g;
+      let match;
+      while ((match = imgRegex.exec(processed)) !== null) {
+        addUrl(match[1]);
+      }
+    };
+
+    for (const q of questions) {
+      collectFromHtml(q.groupText);
+      collectFromHtml(q.text);
+      addUrl(q.imageUrl);
+
+      if (q.choices && (q.type === "pilihan_ganda" || q.type === "pilihan_ganda_kompleks" || q.type === "benar_salah")) {
+        for (const letter of ['a', 'b', 'c', 'd', 'e']) {
+          const c = (q.choices as any)[letter];
+          if (c) {
+            collectFromHtml(c.text);
+            addUrl(c.imageUrl);
+          }
+        }
+      } else if (q.type === "menjodohkan" && q.pairs) {
+        for (const p of q.pairs) {
+          collectFromHtml(p.left);
+          collectFromHtml(p.right);
+        }
+      } else if ((q.type === "urutkan" || q.type === "drag_drop") && q.items) {
+        for (const item of q.items) {
+          collectFromHtml(item.text);
+          addUrl(item.imageUrl);
+        }
+      }
+    }
+
+    // 2. Download and convert all collected images to standard PNGs
+    const imageMapping = new Map<string, { mappedUrl: string, base64: string, width: number, height: number }>();
+    const urlList = Array.from(urlsToConvert);
+
+    setBatchProgress(prev => ({
+      ...prev,
+      total: urlList.length + questions.length,
+      current: 0,
+      message: `Mengunduh & mengonversi gambar (0/${urlList.length})...`
+    }));
+
+    for (let idx = 0; idx < urlList.length; idx++) {
+      const originalUrl = urlList[idx];
+      setBatchProgress(prev => ({
+        ...prev,
+        current: idx,
+        message: `Mengunduh & mengonversi gambar (${idx + 1}/${urlList.length})...`
+      }));
+
+      const result = await convertToPngBase64(originalUrl);
+      if (result.base64) {
+        const mappedUrl = `https://local-asset/img_${idx}.png`;
+        const mappedObj = { mappedUrl, base64: result.base64, width: result.width, height: result.height };
+        imageMapping.set(originalUrl, mappedObj);
+        const abs = getAbsoluteUrl(originalUrl);
+        if (abs !== originalUrl) {
+          imageMapping.set(abs, mappedObj);
+        }
+      }
+    }
 
     const dateStr = new Date().toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-');
 
@@ -3460,9 +3742,10 @@ const QuestionsPage = () => {
   @page { size: A4; margin: 2cm; }
   body { font-family: 'Times New Roman', serif; color: #000; font-size: 11pt; }
   .kop { text-align: center; border-bottom: 2pt solid #000; margin-bottom: 15px; padding-bottom: 5px; }
-  .hanging { padding-left: 25pt; text-indent: -25pt; margin-bottom: 3pt; text-align: left; }
+  .hanging { margin-left: 0pt; padding-left: 0pt; text-indent: 0pt; margin-bottom: 3pt; text-align: left; }
   .choice { padding-left: 45pt; text-indent: -20pt; margin-bottom: 1pt; text-align: left; }
-  img { display: block; margin: 5pt 0; max-width: 280pt; height: auto; border: none; }
+  img { display: block; margin: 5pt 0; border: none; }
+  img.latex-formula { display: inline; margin: 0; width: auto; height: auto; vertical-align: middle; }
   .wacana { border: 1pt solid #000; padding: 10pt; margin-bottom: 15pt; background: #f5f5f5; font-style: italic; }
   .spacer { margin: 0; padding: 0; line-height: 12pt; font-size: 12pt; height: 12pt; }
   p, div, span { margin: 0; padding: 0; line-height: 1.3; text-align: left; }
@@ -3491,30 +3774,99 @@ const QuestionsPage = () => {
 
     for (let i = 0; i < questions.length; i++) {
       const q = questions[i];
-      if (i % 5 === 0) {
-        setBatchProgress(prev => ({ ...prev, current: i + 1, message: `Memproses soal #${i + 1}...` }));
-      }
+      setBatchProgress(prev => ({ ...prev, current: urlList.length + i + 1, message: `Memproses soal #${i + 1}...` }));
 
       if (q.groupId && q.groupId !== currentGroupId && q.groupText) {
-        const cleanWacana = cleanForWord(processLatex(q.groupText || ""));
+        const cleanWacana = cleanForWord(processHtmlInlineImages(processLatex(q.groupText || ""), imageMapping));
         html += `<div class="wacana"><b>STIMULUS / BACAAN:</b><br/>${cleanWacana}</div>`;
         currentGroupId = q.groupId;
       }
 
-      const processedQText = cleanForWord(processLatex(q.text || ""));
-      html += `<div class="hanging"><b>${i + 1}.</b> <span>${processedQText}</span></div>`;
+      const processedQText = cleanForWord(processHtmlInlineImages(processLatex(q.text || ""), imageMapping));
+      html += `
+      <table border="0" cellpadding="0" cellspacing="0" style="width: 100%; margin-bottom: 3pt; border: none; border-collapse: collapse;">
+        <tr>
+          <td valign="top" width="25" style="width: 25pt; border: none; padding: 0; font-family: 'Times New Roman', serif; font-size: 11pt; line-height: 1.3;"><b>${i + 1}.</b></td>
+          <td valign="top" style="border: none; padding: 0; font-family: 'Times New Roman', serif; font-size: 11pt; line-height: 1.3; text-align: left;"><span>${processedQText}</span></td>
+        </tr>
+      </table>`;
 
-      if (q.choices) {
+      // Render main question imageUrl if present
+      if (q.imageUrl) {
+        const info = imageMapping.get(q.imageUrl);
+        if (info) {
+          const displayW = Math.round(info.width > 290 ? 290 : info.width);
+          const displayH = Math.round(info.width > 290 ? (info.height * 290) / info.width : info.height);
+          html += `<div style="margin: 5pt 0 5pt 25pt;"><img src="${info.mappedUrl}" width="${displayW}" height="${displayH}" alt="Gambar Soal" /></div>`;
+        } else {
+          const imgUrl = getAbsoluteUrl(q.imageUrl);
+          html += `<div style="margin: 5pt 0 5pt 25pt;"><img src="${imgUrl}" width="290" alt="Gambar Soal" /></div>`;
+        }
+      }
+
+      if (q.choices && (q.type === "pilihan_ganda" || q.type === "pilihan_ganda_kompleks" || q.type === "benar_salah")) {
         for (const letter of ['a', 'b', 'c', 'd', 'e']) {
           const c = (q.choices as any)[letter];
-          if (c && c.text) {
-            const processedCText = cleanForWord(processLatex(c.text || ""));
-            html += `<div class="choice">${letter.toUpperCase()}. <span>${processedCText}</span></div>`;
+          if (c && (c.text || c.imageUrl)) {
+            const processedCText = cleanForWord(processHtmlInlineImages(processLatex(c.text || ""), imageMapping));
+            let choiceHtml = `
+            <table border="0" cellpadding="0" cellspacing="0" style="width: 100%; margin-left: 25pt; margin-bottom: 1pt; border: none; border-collapse: collapse;">
+              <tr>
+                <td valign="top" width="20" style="width: 20pt; border: none; padding: 0; font-family: 'Times New Roman', serif; font-size: 11pt; line-height: 1.3;">${letter.toUpperCase()}.</td>
+                <td valign="top" style="border: none; padding: 0; font-family: 'Times New Roman', serif; font-size: 11pt; line-height: 1.3; text-align: left;">
+                  <span>${processedCText}</span>`;
+            if (c.imageUrl) {
+              const info = imageMapping.get(c.imageUrl);
+              if (info) {
+                const displayW = Math.round(info.width > 181 ? 181 : info.width);
+                const displayH = Math.round(info.width > 181 ? (info.height * 181) / info.width : info.height);
+                choiceHtml += `<br/><img src="${info.mappedUrl}" width="${displayW}" height="${displayH}" alt="Gambar Pilihan" />`;
+              } else {
+                const imgUrl = getAbsoluteUrl(c.imageUrl);
+                choiceHtml += `<br/><img src="${imgUrl}" width="181" alt="Gambar Pilihan" />`;
+              }
+            }
+            choiceHtml += `
+                </td>
+              </tr>
+            </table>`;
+            html += choiceHtml;
           }
         }
         html += `<p class="spacer">&nbsp;</p>`;
         const ans = Object.entries(q.choices).filter(([_, v]) => (v as any).isCorrect).map(([k]) => k.toUpperCase()).join(", ");
         keys += `<tr><td align="center">${i + 1}</td><td align="center"><b>${ans || "-"}</b></td></tr>`;
+      } else if (q.type === "menjodohkan" && q.pairs) {
+        html += `<div style="margin-left: 25pt; margin-bottom: 5pt;">`;
+        html += `<table border="1" cellpadding="4" style="border-collapse: collapse; width: 80%;">`;
+        html += `<tr style="background-color: #f3f4f6;"><th>Pernyataan 1</th><th>Pernyataan 2</th></tr>`;
+        for (const p of q.pairs) {
+          html += `<tr><td>${cleanForWord(processHtmlInlineImages(processLatex(p.left || ""), imageMapping))}</td><td>${cleanForWord(processHtmlInlineImages(processLatex(p.right || ""), imageMapping))}</td></tr>`;
+        }
+        html += `</table></div>`;
+        keys += `<tr><td align="center">${i + 1}</td><td>Menjodohkan (Lihat Lembar Jawaban)</td></tr>`;
+        html += `<p class="spacer">&nbsp;</p>`;
+      } else if ((q.type === "urutkan" || q.type === "drag_drop") && q.items) {
+        html += `<div style="margin-left: 25pt; margin-bottom: 5pt;"><ol>`;
+        for (const item of q.items) {
+          let itemHtml = `<li>${cleanForWord(processHtmlInlineImages(processLatex(item.text || ""), imageMapping))}`;
+          if (item.imageUrl) {
+            const info = imageMapping.get(item.imageUrl);
+            if (info) {
+              const displayW = Math.round(info.width > 145 ? 145 : info.width);
+              const displayH = Math.round(info.width > 145 ? (info.height * 145) / info.width : info.height);
+              itemHtml += `<br/><img src="${info.mappedUrl}" width="${displayW}" height="${displayH}" alt="Gambar Item" />`;
+            } else {
+              const imgUrl = getAbsoluteUrl(item.imageUrl);
+              itemHtml += `<br/><img src="${imgUrl}" width="145" alt="Gambar Item" />`;
+            }
+          }
+          itemHtml += `</li>`;
+          html += itemHtml;
+        }
+        html += `</ol></div>`;
+        keys += `<tr><td align="center">${i + 1}</td><td>${q.answerKey || "-"}</td></tr>`;
+        html += `<p class="spacer">&nbsp;</p>`;
       } else {
         keys += `<tr><td align="center">${i + 1}</td><td>${q.answerKey || "-"}</td></tr>`;
         html += `<p class="spacer">&nbsp;</p>`;
@@ -3530,7 +3882,37 @@ const QuestionsPage = () => {
   </table>
 </body></html>`;
 
-    const blob = new Blob(['\ufeff', html], { type: 'application/msword' });
+    // 3. Assemble as MHTML
+    const boundary = "----=_NextPart_Boundary_Ujian_CBT";
+    
+    let mhtml = "";
+    mhtml += "MIME-Version: 1.0\r\n";
+    mhtml += `Content-Type: multipart/related; boundary="${boundary}"\r\n\r\n`;
+    
+    // HTML Part
+    mhtml += `--${boundary}\r\n`;
+    mhtml += "Content-Type: text/html; charset=\"utf-8\"\r\n";
+    mhtml += "Content-Transfer-Encoding: 8bit\r\n\r\n";
+    mhtml += html + "\r\n\r\n";
+    
+    // Attached image parts
+    const attachedUrls = new Set<string>();
+    for (const [_, mapped] of imageMapping.entries()) {
+      if (attachedUrls.has(mapped.mappedUrl)) continue;
+      attachedUrls.add(mapped.mappedUrl);
+      
+      mhtml += `--${boundary}\r\n`;
+      mhtml += "Content-Type: image/png\r\n";
+      mhtml += "Content-Transfer-Encoding: base64\r\n";
+      mhtml += `Content-Location: ${mapped.mappedUrl}\r\n\r\n`;
+      
+      const base64Formatted = mapped.base64.replace(/(.{76})/g, "$1\r\n");
+      mhtml += base64Formatted + "\r\n\r\n";
+    }
+    
+    mhtml += `--${boundary}--\r\n`;
+
+    const blob = new Blob([mhtml], { type: 'application/msword' });
     const url = URL.createObjectURL(blob);
     const fileName = `${exam?.subject || "Ujian"} - ${exam?.teacherName || "Guru"} - ${dateStr}.doc`;
     
@@ -3619,23 +4001,118 @@ const QuestionsPage = () => {
     const selectedQuestions = questions.filter(q => selectedIds.includes(q.id));
     if (selectedQuestions.length === 0) return;
 
-    // Reuse the existing Word export logic but with selected questions only
     setBatchProgress({ isOpen: true, total: selectedQuestions.length, current: 0, message: "Menyiapkan export...", title: "Export Terpilih ke Word" });
 
     try {
-      const processLatex = (text: string): string => {
-        if (!text) return "";
-        return text
-          .replace(/\$\$([^$]+)\$\$/g, '\\[$1\\]')
-          .replace(/\$([^$]+)\$/g, '\\($1\\)');
+      const processLatex = (htmlInput: string) => {
+        if (!htmlInput) return htmlInput;
+        let result = htmlInput;
+        const fixFormula = (f: string) => f.trim().replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').replace(/\u2026/g, '\\ldots').replace(/\.\.\./g, '\\ldots');
+        
+        result = result.replace(/(\$\$|\\\[)([\s\S]*?)(\$\$|\\\])/g, (_, _s, formula) => {
+          const clean = fixFormula(formula);
+          const url = `https://latex.codecogs.com/png.latex?\\dpi{200}\\bg_white ${encodeURIComponent(clean)}`;
+          return `<br/><img src="${url}" class="latex-formula" /><br/>`;
+        });
+        result = result.replace(/(?<!\$)(\$)([^\$\n]+?)(\$)(?!\$)/g, (_, _s, formula) => {
+          const clean = fixFormula(formula);
+          if (!/[\\^_{}]/.test(clean)) return formula;
+          const url = `https://latex.codecogs.com/png.latex?\\dpi{200}\\bg_white ${encodeURIComponent(clean)}`;
+          return ` <img src="${url}" class="latex-formula" style="vertical-align: middle;" /> `;
+        });
+        result = result.replace(/(\\\()([\s\S]*?)(\\\))/g, (_, _s, formula) => {
+          const clean = fixFormula(formula);
+          const url = `https://latex.codecogs.com/png.latex?\\dpi{200}\\bg_white ${encodeURIComponent(clean)}`;
+          return ` <img src="${url}" class="latex-formula" style="vertical-align: middle;" /> `;
+        });
+        return result;
       };
 
-      const cleanForWord = (html: string): string => {
-        if (!html) return "";
-        let clean = html;
+      const cleanForWord = (htmlText: string): string => {
+        if (!htmlText) return "";
+        let clean = htmlText;
         clean = clean.replace(/<pre[^>]*class="ql-syntax"[^>]*>([\s\S]*?)<\/pre>/gi, '<p style="font-family:Consolas,monospace;background:#f3f4f6;padding:8px;border:1px solid #e5e7eb;white-space:pre-wrap;">$1</p>');
         return clean;
       };
+
+      // 1. Pre-collect all image URLs
+      const urlsToConvert = new Set<string>();
+
+      const addUrl = (url: string | undefined) => {
+        if (!url) return;
+        const abs = getAbsoluteUrl(url);
+        if (abs) {
+          urlsToConvert.add(abs);
+        }
+      };
+
+      const collectFromHtml = (htmlText: string | undefined) => {
+        if (!htmlText) return;
+        const processed = processLatex(htmlText);
+        const imgRegex = /<img[^>]+src="([^"]+)"[^>]*>/g;
+        let match;
+        while ((match = imgRegex.exec(processed)) !== null) {
+          addUrl(match[1]);
+        }
+      };
+
+      for (const q of selectedQuestions) {
+        collectFromHtml(q.groupText);
+        collectFromHtml(q.text);
+        addUrl(q.imageUrl);
+
+        if (q.choices && (q.type === "pilihan_ganda" || q.type === "pilihan_ganda_kompleks" || q.type === "benar_salah")) {
+          const keys = Object.keys(q.choices);
+          for (const key of keys) {
+            const choice = q.choices[key];
+            if (choice) {
+              collectFromHtml(choice.text);
+              addUrl(choice.imageUrl);
+            }
+          }
+        } else if (q.type === "menjodohkan" && q.pairs) {
+          for (const p of q.pairs) {
+            collectFromHtml(p.left);
+            collectFromHtml(p.right);
+          }
+        } else if ((q.type === "urutkan" || q.type === "drag_drop") && q.items) {
+          for (const item of q.items) {
+            collectFromHtml(item.text);
+            addUrl(item.imageUrl);
+          }
+        }
+      }
+
+      // 2. Download and convert all collected images to standard PNGs
+      const imageMapping = new Map<string, { mappedUrl: string, base64: string, width: number, height: number }>();
+      const urlList = Array.from(urlsToConvert);
+
+      setBatchProgress(prev => ({
+        ...prev,
+        total: urlList.length + selectedQuestions.length,
+        current: 0,
+        message: `Mengunduh & mengonversi gambar (0/${urlList.length})...`
+      }));
+
+      for (let idx = 0; idx < urlList.length; idx++) {
+        const originalUrl = urlList[idx];
+        setBatchProgress(prev => ({
+          ...prev,
+          current: idx,
+          message: `Mengunduh & mengonversi gambar (${idx + 1}/${urlList.length})...`
+        }));
+
+        const result = await convertToPngBase64(originalUrl);
+        if (result.base64) {
+          const mappedUrl = `https://local-asset/img_${idx}.png`;
+          const mappedObj = { mappedUrl, base64: result.base64, width: result.width, height: result.height };
+          imageMapping.set(originalUrl, mappedObj);
+          const abs = getAbsoluteUrl(originalUrl);
+          if (abs !== originalUrl) {
+            imageMapping.set(abs, mappedObj);
+          }
+        }
+      }
 
       let html = `<html><head><meta charset="utf-8"><style>
         body { font-family: 'Times New Roman', serif; font-size: 12pt; line-height: 1.5; margin: 2cm; }
@@ -3645,36 +4122,102 @@ const QuestionsPage = () => {
         .opsi { margin-left: 20px; }
         .kunci { color: #059669; font-weight: bold; }
         .stimulus { border: 1px solid #059669; padding: 12px; margin-bottom: 12px; background: #f0fdf4; }
+        img { display: block; margin: 5pt 0; border: none; }
+        img.latex-formula { display: inline; margin: 0; width: auto; height: auto; vertical-align: middle; }
       </style></head><body>`;
 
       html += `<h2 style="text-align:center;">EXPORT SOAL TERPILIH</h2>`;
       html += `<p style="text-align:center;font-size:10pt;color:#666;">${exam?.subject || ""} - ${selectedQuestions.length} soal - ${new Date().toLocaleDateString('id-ID')}</p><hr/>`;
 
       let currentGroupId = "";
-      selectedQuestions.forEach((q, idx) => {
+      for (let idx = 0; idx < selectedQuestions.length; idx++) {
+        const q = selectedQuestions[idx];
+        setBatchProgress(prev => ({ ...prev, current: urlList.length + idx + 1, message: `Memproses soal ${idx + 1}/${selectedQuestions.length}` }));
+
         // Show stimulus if new group
         if (q.groupId && q.groupId !== currentGroupId && q.groupText) {
-          html += `<div class="stimulus"><b>STIMULUS:</b><br/>${cleanForWord(processLatex(q.groupText))}</div>`;
+          html += `<div class="stimulus"><b>STIMULUS:</b><br/>${cleanForWord(processHtmlInlineImages(processLatex(q.groupText), imageMapping))}</div>`;
           currentGroupId = q.groupId;
         }
 
-        html += `<div class="soal"><b>${idx + 1}.</b> ${cleanForWord(processLatex(q.text || ""))}`;
+        const processedQText = cleanForWord(processHtmlInlineImages(processLatex(q.text || ""), imageMapping));
+        html += `
+        <div class="soal">
+          <table border="0" cellpadding="0" cellspacing="0" style="width: 100%; margin-bottom: 3pt; border: none; border-collapse: collapse;">
+            <tr>
+              <td valign="top" width="25" style="width: 25pt; border: none; padding: 0; font-family: 'Times New Roman', serif; font-size: 11pt; line-height: 1.5;"><b>${idx + 1}.</b></td>
+              <td valign="top" style="border: none; padding: 0; font-family: 'Times New Roman', serif; font-size: 11pt; line-height: 1.5; text-align: left;"><span>${processedQText}</span></td>
+            </tr>
+          </table>`;
+
+        // Render main question image
+        if (q.imageUrl) {
+          const info = imageMapping.get(q.imageUrl);
+          if (info) {
+            const displayW = Math.round(info.width > 290 ? 290 : info.width);
+            const displayH = Math.round(info.width > 290 ? (info.height * 290) / info.width : info.height);
+            html += `<br/><img src="${info.mappedUrl}" width="${displayW}" height="${displayH}" alt="Gambar Soal" /><br/>`;
+          } else {
+            const imgUrl = getAbsoluteUrl(q.imageUrl);
+            html += `<br/><img src="${imgUrl}" width="290" alt="Gambar Soal" /><br/>`;
+          }
+        }
 
         if (q.choices && (q.type === "pilihan_ganda" || q.type === "pilihan_ganda_kompleks" || q.type === "benar_salah")) {
           html += `<div class="opsi">`;
-          Object.keys(q.choices).sort().forEach(key => {
-            const choice = q.choices![key];
+          const keys = Object.keys(q.choices).sort();
+          for (const key of keys) {
+            const choice = q.choices[key];
             const isCorrect = choice.isCorrect;
-            html += `<p>${isCorrect ? '<span class="kunci">' : ''}${key.toUpperCase()}. ${cleanForWord(processLatex(choice.text || ""))}${isCorrect ? ' œ“</span>' : ''}</p>`;
-          });
+            const processedCText = cleanForWord(processHtmlInlineImages(processLatex(choice.text || ""), imageMapping));
+            let choiceHtml = `
+            <table border="0" cellpadding="0" cellspacing="0" style="width: 100%; margin-bottom: 1pt; border: none; border-collapse: collapse;">
+              <tr>
+                <td valign="top" width="20" style="width: 20pt; border: none; padding: 0; font-family: 'Times New Roman', serif; font-size: 11pt; line-height: 1.5;">${isCorrect ? '<span class="kunci">' : ''}${key.toUpperCase()}.${isCorrect ? '</span>' : ''}</td>
+                <td valign="top" style="border: none; padding: 0; font-family: 'Times New Roman', serif; font-size: 11pt; line-height: 1.5; text-align: left;">
+                  ${isCorrect ? '<span class="kunci">' : ''}${processedCText}`;
+            if (choice.imageUrl) {
+              const info = imageMapping.get(choice.imageUrl);
+              if (info) {
+                const displayW = Math.round(info.width > 181 ? 181 : info.width);
+                const displayH = Math.round(info.width > 181 ? (info.height * 181) / info.width : info.height);
+                choiceHtml += `<br/><img src="${info.mappedUrl}" width="${displayW}" height="${displayH}" alt="Gambar Pilihan" />`;
+              } else {
+                const imgUrl = getAbsoluteUrl(choice.imageUrl);
+                choiceHtml += `<br/><img src="${imgUrl}" width="181" alt="Gambar Pilihan" />`;
+              }
+            }
+            choiceHtml += `${isCorrect ? '</span>' : ''}
+                </td>
+              </tr>
+            </table>`;
+            html += choiceHtml;
+          }
           html += `</div>`;
         } else if (q.type === "menjodohkan" && q.pairs) {
           html += `<table><tr><th>Kiri</th><th>Kanan</th></tr>`;
-          q.pairs.forEach(p => { html += `<tr><td>${p.left}</td><td>${p.right}</td></tr>`; });
+          for (const p of q.pairs) {
+            html += `<tr><td>${cleanForWord(processHtmlInlineImages(processLatex(p.left || ""), imageMapping))}</td><td>${cleanForWord(processHtmlInlineImages(processLatex(p.right || ""), imageMapping))}</td></tr>`;
+          }
           html += `</table>`;
         } else if ((q.type === "urutkan" || q.type === "drag_drop") && q.items) {
           html += `<ol>`;
-          q.items.forEach(item => { html += `<li>${item.text}</li>`; });
+          for (const item of q.items) {
+            let itemHtml = `<li>${cleanForWord(processHtmlInlineImages(processLatex(item.text || ""), imageMapping))}`;
+            if (item.imageUrl) {
+              const info = imageMapping.get(item.imageUrl);
+              if (info) {
+                const displayW = Math.round(info.width > 145 ? 145 : info.width);
+                const displayH = Math.round(info.width > 145 ? (info.height * 145) / info.width : info.height);
+                itemHtml += `<br/><img src="${info.mappedUrl}" width="${displayW}" height="${displayH}" alt="Gambar Item" />`;
+              } else {
+                const imgUrl = getAbsoluteUrl(item.imageUrl);
+                itemHtml += `<br/><img src="${imgUrl}" width="145" alt="Gambar Item" />`;
+              }
+            }
+            itemHtml += `</li>`;
+            html += itemHtml;
+          }
           html += `</ol>`;
         }
 
@@ -3682,13 +4225,41 @@ const QuestionsPage = () => {
           html += `<p class="kunci">Kunci: ${q.answerKey.toUpperCase()}</p>`;
         }
         html += `</div>`;
-
-        setBatchProgress(prev => ({ ...prev, current: idx + 1, message: `Memproses soal ${idx + 1}/${selectedQuestions.length}` }));
-      });
+      }
 
       html += `</body></html>`;
 
-      const blob = new Blob([html], { type: 'application/msword' });
+      // 3. Assemble as MHTML
+      const boundary = "----=_NextPart_Boundary_Ujian_CBT";
+      
+      let mhtml = "";
+      mhtml += "MIME-Version: 1.0\r\n";
+      mhtml += `Content-Type: multipart/related; boundary="${boundary}"\r\n\r\n`;
+      
+      // HTML Part
+      mhtml += `--${boundary}\r\n`;
+      mhtml += "Content-Type: text/html; charset=\"utf-8\"\r\n";
+      mhtml += "Content-Transfer-Encoding: 8bit\r\n\r\n";
+      mhtml += html + "\r\n\r\n";
+      
+      // Attached image parts
+      const attachedUrls = new Set<string>();
+      for (const [_, mapped] of imageMapping.entries()) {
+        if (attachedUrls.has(mapped.mappedUrl)) continue;
+        attachedUrls.add(mapped.mappedUrl);
+        
+        mhtml += `--${boundary}\r\n`;
+        mhtml += "Content-Type: image/png\r\n";
+        mhtml += "Content-Transfer-Encoding: base64\r\n";
+        mhtml += `Content-Location: ${mapped.mappedUrl}\r\n\r\n`;
+        
+        const base64Formatted = mapped.base64.replace(/(.{76})/g, "$1\r\n");
+        mhtml += base64Formatted + "\r\n\r\n";
+      }
+      
+      mhtml += `--${boundary}--\r\n`;
+
+      const blob = new Blob([mhtml], { type: 'application/msword' });
       const url = URL.createObjectURL(blob);
       const dateStr = new Date().toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-');
       const fileName = `SOAL_TERPILIH_${selectedQuestions.length}_${dateStr}.doc`;

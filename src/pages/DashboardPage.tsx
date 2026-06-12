@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import {
   Users,
   LayoutTemplate,
@@ -29,6 +29,10 @@ const DashboardPage = () => {
   const planName = school?.plan ? school.plan.charAt(0).toUpperCase() + school.plan.slice(1) : "Free";
   const quota = school?.student_quota || 250;
 
+  const [exams, setExams] = useState<any[]>([]);
+  const [rooms, setRooms] = useState<any[]>([]);
+  const [attempts, setAttempts] = useState<any[]>([]);
+
   const [totalExams, setTotalExams] = useState(0);
   const [activeRooms, setActiveRooms] = useState(0);
   const [ongoingStudents, setOngoingStudents] = useState(0);
@@ -45,137 +49,258 @@ const DashboardPage = () => {
 
   const loading = contextLoading || localLoading;
 
+  // 1. Fetch Exams and Rooms on mount and subscribe to their updates
   useEffect(() => {
-    const initDashboard = async () => {
+    const initData = async () => {
       try {
-        // 1. Total Bank Soal
-        const examsData = await pb.collection("exams").getFullList();
-        setTotalExams(examsData.length);
-
-        // 2. Total Ruang Ujian Aktif
-        const roomsData = await pb.collection("exam_rooms").getFullList();
-        const active = roomsData.filter((r: any) => r.status !== "archive").length;
-        setActiveRooms(active);
-
-        // 3. Attempts
-        const attemptsData = await pb.collection("attempts").getFullList({ sort: "-updated" });
-
-        const ongoingUnique = new Set();
-        attemptsData.forEach((a: any) => {
-          if (a.status === "ongoing") ongoingUnique.add(a.studentId || a.student_id);
-        });
-        setOngoingStudents(ongoingUnique.size);
-
-        // A. Performa & Room Participation
-        const mappedChart = roomsData
-          .filter((room: any) => room.status !== "archive")
-          .map((room: any) => {
-            const roomAttempts = attemptsData.filter(
-              (a: any) => (a.examRoomId === room.id) || (a.exam_room_id === room.id)
-            );
-            const ongoingSet = new Set();
-            const finishedSet = new Set();
-            let totalScore = 0;
-            let finishedCount = 0;
-
-            roomAttempts.forEach((a: any) => {
-              const sId = a.studentId || a.student_id;
-              if (!sId) return;
-              if (a.status === "ongoing") ongoingSet.add(sId);
-              else if (["finished", "submitted", "graded"].includes(a.status)) {
-                finishedSet.add(sId);
-                totalScore += a.score || 0;
-                finishedCount++;
-              }
-            });
-
-            return {
-              name: room.room_name || room.title || room.room_code || "Ruang",
-              Mengerjakan: ongoingSet.size,
-              Selesai: finishedSet.size,
-              avgScore: finishedCount > 0 ? Math.round(totalScore / finishedCount) : 0,
-              total: ongoingSet.size + finishedSet.size,
-            };
-          })
-          .filter((r) => r.total > 0);
-
-        setChartData(mappedChart);
-
-        // B. Violations & Recent Activity
-        const violations: any[] = [];
-        const finished: any[] = [];
-
-        attemptsData.forEach((a) => {
-          const std = students.find((s) => s.id === (a.studentId || a.student_id));
-          const exm = examsData.find((e) => e.id === a.examId);
-          const cls = classes.find((c) => c.id === std?.classId);
-
-          if (a.status === "LOCKED" || (a.cheatCount || 0) > 0) {
-            const room = roomsData.find((r) => r.id === a.examRoomId);
-            violations.push({
-              name: std?.name || terminology.student,
-              className: cls?.name || "-",
-              cheatCount: a.cheatCount || 0,
-              cheatLimit: room?.cheat_limit || 0,
-              status: a.status,
-            });
-          }
-
-          if (["finished", "submitted", "graded"].includes(a.status)) {
-            finished.push({
-              name: std?.name || terminology.student,
-              className: cls?.name || "-",
-              score: a.score || 0,
-              examTitle: exm?.title || "Ujian",
-              time: new Date(a.updated).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }),
-            });
-          }
-        });
-
-        setLogActivity({
-          violations: violations.sort((a, b) => b.cheatCount - a.cheatCount),
-          recentFinished: finished.slice(0, 10),
-        });
-
-        // C. Type Distribution
-        const types: Record<string, number> = {};
-        examsData.forEach((e: any) => {
-          const t = e.examType || e.examtype || "UMUM";
-          types[t] = (types[t] || 0) + 1;
-        });
-        setTypeDistribution(Object.entries(types).map(([name, value]) => ({ name, value })));
-
-        // D. Activity Trend
-        const trendMap: Record<string, number> = {};
-        attemptsData.slice(0, 50).reverse().forEach((a: any) => {
-          const date = new Date(a.updated || a.created).toLocaleTimeString("id-ID", {
-            hour: "2-digit",
-            minute: "2-digit",
-          });
-          trendMap[date] = (trendMap[date] || 0) + 1;
-        });
-        setActivityTrend(
-          Object.entries(trendMap).slice(-10).map(([time, count]) => ({ time, count }))
-        );
+        const [examsData, roomsData] = await Promise.all([
+          pb.collection("exams").getFullList(),
+          pb.collection("exam_rooms").getFullList(),
+        ]);
+        setExams(examsData);
+        setRooms(roomsData);
       } catch (e) {
-        console.error("Dashboard init error:", e);
+        console.error("Dashboard mount error:", e);
       } finally {
         setLocalLoading(false);
       }
     };
 
-    initDashboard();
+    initData();
 
-    const unsubExams = pb.collection("exams").subscribe("*", initDashboard);
-    const unsubRooms = pb.collection("exam_rooms").subscribe("*", initDashboard);
-    const unsubAttempts = pb.collection("attempts").subscribe("*", initDashboard);
+    const unsubExams = pb.collection("exams").subscribe("*", async () => {
+      try {
+        const examsData = await pb.collection("exams").getFullList();
+        setExams(examsData);
+      } catch (e) {
+        console.error(e);
+      }
+    });
+
+    const unsubRooms = pb.collection("exam_rooms").subscribe("*", async () => {
+      try {
+        const roomsData = await pb.collection("exam_rooms").getFullList();
+        setRooms(roomsData);
+      } catch (e) {
+        console.error(e);
+      }
+    });
 
     return () => {
       unsubExams.then((u: any) => u());
       unsubRooms.then((u: any) => u());
-      unsubAttempts.then((u: any) => u());
     };
-  }, [students, classes]);
+  }, []);
+
+  // Compute active room IDs sorted and joined as a string to serve as a dependency
+  const activeRoomsList = rooms.filter((r: any) => r.status !== "archive");
+  const activeRoomIdsStr = activeRoomsList.map((r: any) => r.id).sort().join(",");
+
+  // 2. Fetch Attempts only for active rooms and only specific fields when activeRoomIdsStr changes
+  useEffect(() => {
+    let isMounted = true;
+    const fetchAttempts = async () => {
+      if (!activeRoomIdsStr) {
+        setAttempts([]);
+        return;
+      }
+      try {
+        const activeIds = activeRoomIdsStr.split(",");
+        const filterStr = activeIds.map((id) => `examRoomId = "${id}"`).join(" || ");
+        const attemptsData = await pb.collection("attempts").getFullList({
+          filter: filterStr,
+          sort: "-updated",
+          fields: "id,status,studentId,student_id,examRoomId,exam_room_id,score,cheatCount,updated,created,examId",
+        });
+        if (isMounted) {
+          setAttempts(attemptsData);
+        }
+      } catch (e) {
+        console.error("Error fetching attempts:", e);
+      }
+    };
+
+    fetchAttempts();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [activeRoomIdsStr]);
+
+  const activeRoomIdsRef = useRef<string[]>([]);
+  useEffect(() => {
+    activeRoomIdsRef.current = activeRoomIdsStr ? activeRoomIdsStr.split(",") : [];
+  }, [activeRoomIdsStr]);
+
+  // 3. Real-time Subscription for attempts
+  useEffect(() => {
+    if (!pb) return;
+    let isSubscribed = true;
+    let currentUnsub: (() => void) | null = null;
+
+    const startSubscribe = async () => {
+      try {
+        const unsub = await pb.collection("attempts").subscribe("*", (e) => {
+          if (!isSubscribed) return;
+
+          const recRoomId = e.record.examRoomId || e.record.exam_room_id || "";
+          if (!activeRoomIdsRef.current.includes(recRoomId)) return;
+
+          if (e.action === "create" || e.action === "update") {
+            setAttempts((prev) => {
+              const idx = prev.findIndex((a) => a.id === e.record.id);
+              const cleanRecord = {
+                id: e.record.id,
+                status: e.record.status,
+                studentId: e.record.studentId || e.record.student_id,
+                student_id: e.record.student_id || e.record.studentId,
+                examRoomId: e.record.examRoomId || e.record.exam_room_id,
+                exam_room_id: e.record.exam_room_id || e.record.examRoomId,
+                score: e.record.score,
+                cheatCount: e.record.cheatCount,
+                updated: e.record.updated,
+                created: e.record.created,
+                examId: e.record.examId,
+              };
+
+              if (idx > -1) {
+                const newArr = [...prev];
+                newArr[idx] = { ...newArr[idx], ...cleanRecord };
+                return newArr.sort((a, b) => new Date(b.updated).getTime() - new Date(a.updated).getTime());
+              }
+              return [cleanRecord, ...prev].sort((a, b) => new Date(b.updated).getTime() - new Date(a.updated).getTime());
+            });
+          } else if (e.action === "delete") {
+            setAttempts((prev) => prev.filter((a) => a.id !== e.record.id));
+          }
+        });
+
+        if (!isSubscribed) {
+          unsub();
+        } else {
+          currentUnsub = () => { unsub(); };
+        }
+      } catch (err) {
+        console.error("Attempts subscription error:", err);
+      }
+    };
+
+    startSubscribe();
+
+    return () => {
+      isSubscribed = false;
+      if (currentUnsub) currentUnsub();
+    };
+  }, [pb]);
+
+  // 4. Recalculate dashboard derived data whenever raw data or context variables change
+  useEffect(() => {
+    // A. Total Bank Soal
+    setTotalExams(exams.length);
+
+    // B. Total Ruang Ujian Aktif
+    const active = rooms.filter((r: any) => r.status !== "archive").length;
+    setActiveRooms(active);
+
+    // C. Ongoing Students count
+    const ongoingUnique = new Set();
+    attempts.forEach((a: any) => {
+      if (a.status === "ongoing") ongoingUnique.add(a.studentId || a.student_id);
+    });
+    setOngoingStudents(ongoingUnique.size);
+
+    // D. Performa & Room Participation
+    const mappedChart = rooms
+      .filter((room: any) => room.status !== "archive")
+      .map((room: any) => {
+        const roomAttempts = attempts.filter(
+          (a: any) => (a.examRoomId === room.id) || (a.exam_room_id === room.id)
+        );
+        const ongoingSet = new Set();
+        const finishedSet = new Set();
+        let totalScore = 0;
+        let finishedCount = 0;
+
+        roomAttempts.forEach((a: any) => {
+          const sId = a.studentId || a.student_id;
+          if (!sId) return;
+          if (a.status === "ongoing") ongoingSet.add(sId);
+          else if (["finished", "submitted", "graded"].includes(a.status)) {
+            finishedSet.add(sId);
+            totalScore += a.score || 0;
+            finishedCount++;
+          }
+        });
+
+        return {
+          name: room.room_name || room.title || room.room_code || "Ruang",
+          Mengerjakan: ongoingSet.size,
+          Selesai: finishedSet.size,
+          avgScore: finishedCount > 0 ? Math.round(totalScore / finishedCount) : 0,
+          total: ongoingSet.size + finishedSet.size,
+        };
+      })
+      .filter((r) => r.total > 0);
+
+    setChartData(mappedChart);
+
+    // E. Violations & Recent Activity
+    const violations: any[] = [];
+    const finished: any[] = [];
+
+    attempts.forEach((a) => {
+      const std = students.find((s) => s.id === (a.studentId || a.student_id));
+      const exm = exams.find((e) => e.id === a.examId);
+      const cls = classes.find((c) => c.id === std?.classId);
+
+      if (a.status === "LOCKED" || (a.cheatCount || 0) > 0) {
+        const room = rooms.find((r) => r.id === a.examRoomId);
+        violations.push({
+          name: std?.name || terminology.student,
+          className: cls?.name || "-",
+          cheatCount: a.cheatCount || 0,
+          cheatLimit: room?.cheat_limit || 0,
+          status: a.status,
+        });
+      }
+
+      if (["finished", "submitted", "graded"].includes(a.status)) {
+        finished.push({
+          name: std?.name || terminology.student,
+          className: cls?.name || "-",
+          score: a.score || 0,
+          examTitle: exm?.title || "Ujian",
+          time: new Date(a.updated).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }),
+        });
+      }
+    });
+
+    setLogActivity({
+      violations: violations.sort((a, b) => b.cheatCount - a.cheatCount),
+      recentFinished: finished.slice(0, 10),
+    });
+
+    // F. Type Distribution
+    const types: Record<string, number> = {};
+    exams.forEach((e: any) => {
+      const t = e.examType || e.examtype || "UMUM";
+      types[t] = (types[t] || 0) + 1;
+    });
+    setTypeDistribution(Object.entries(types).map(([name, value]) => ({ name, value })));
+
+    // G. Activity Trend
+    const trendMap: Record<string, number> = {};
+    attempts.slice(0, 50).reverse().forEach((a: any) => {
+      const date = new Date(a.updated || a.created).toLocaleTimeString("id-ID", {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+      trendMap[date] = (trendMap[date] || 0) + 1;
+    });
+    setActivityTrend(
+      Object.entries(trendMap).slice(-10).map(([time, count]) => ({ time, count }))
+    );
+  }, [exams, rooms, attempts, students, classes, terminology]);
 
   const totalTeachers = teachers.length;
   const totalClasses = classes.length;

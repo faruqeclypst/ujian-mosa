@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Plus, BookOpen, Trash, Edit, Archive, RotateCw, Copy, ClipboardList } from "lucide-react";
+import { Plus, BookOpen, Trash, Edit, Archive, RotateCw, Copy, ClipboardList, Download, Loader2 } from "lucide-react";
+import JSZip from "jszip";
 import { Button } from "../../components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../../components/ui/dialog";
+import { Progress } from "../../components/ui/progress";
 import { DeleteConfirmationDialog } from "../../components/ui/delete-confirmation-dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
 import { Input } from "../../components/ui/input";
@@ -26,7 +28,7 @@ export interface ExamData {
   teacherId: string;
   createdAt: string; // PocketBase uses ISO strings
   examType?: string;
-  status? : "archive" | null;
+  status?: "archive" | null;
 }
 
 export const getExamTypeColorClass = (type: string) => {
@@ -43,6 +45,152 @@ export const getExamTypeColorClass = (type: string) => {
   }
 };
 
+const forceSmallImage = (imgTag: string, physW: number, physH: number): string => {
+  let cleaned = imgTag
+    .replace(/\bwidth\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '')
+    .replace(/\bheight\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '');
+
+  cleaned = cleaned.replace(/(style=["'])([^"']*)(["'])/gi, (_, prefix, styleContent, suffix) => {
+    const cleanedStyle = styleContent
+      .replace(/\bwidth\s*:\s*[^;]+;?/gi, '')
+      .replace(/\bheight\s*:\s*[^;]+;?/gi, '');
+    return prefix + cleanedStyle + suffix;
+  });
+
+  if (physW > 0 && physH > 0) {
+    const maxDisplayW = 290;
+    let displayW = physW;
+    let displayH = physH;
+    if (physW > maxDisplayW) {
+      displayH = Math.round((physH * maxDisplayW) / physW);
+      displayW = maxDisplayW;
+    }
+    cleaned = cleaned.replace(/\/?>$/, ` width="${displayW}" height="${displayH}"$&`);
+  } else {
+    cleaned = cleaned.replace(/\/?>$/, ' width="290"$&');
+  }
+  return cleaned;
+};
+
+const processLatex = (htmlInput: string) => {
+  if (!htmlInput) return htmlInput;
+  let result = htmlInput;
+  const fixFormula = (f: string) => f.trim().replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').replace(/\u2026/g, '\\ldots').replace(/\.\.\./g, '\\ldots');
+  
+  result = result.replace(/(\$\$|\\\[)([\s\S]*?)(\$\$|\\\])/g, (_, _s, formula) => {
+    const clean = fixFormula(formula);
+    const url = `https://latex.codecogs.com/png.latex?\\dpi{200}\\bg_white ${encodeURIComponent(clean)}`;
+    return `<br/><img src="${url}" class="latex-formula" /><br/>`;
+  });
+  result = result.replace(/(?<!\$)(\$)([^\$\n]+?)(\$)(?!\$)/g, (_, _s, formula) => {
+    const clean = fixFormula(formula);
+    if (!/[\\^_{}]/.test(clean)) return formula;
+    const url = `https://latex.codecogs.com/png.latex?\\dpi{200}\\bg_white ${encodeURIComponent(clean)}`;
+    return ` <img src="${url}" class="latex-formula" style="vertical-align: middle;" /> `;
+  });
+  result = result.replace(/(\\\()([\s\S]*?)(\\\))/g, (_, _s, formula) => {
+    const clean = fixFormula(formula);
+    const url = `https://latex.codecogs.com/png.latex?\\dpi{200}\\bg_white ${encodeURIComponent(clean)}`;
+    return ` <img src="${url}" class="latex-formula" style="vertical-align: middle;" /> `;
+  });
+  return result;
+};
+
+const processHtmlInlineImages = (htmlText: string, getAbsoluteUrlFn: (url: string) => string, imageMapping?: Map<string, { mappedUrl: string, base64: string, width: number, height: number }>): string => {
+  if (!htmlText) return "";
+  let result = htmlText;
+  const imgRegex = /<img[^>]+src="([^"]+)"[^>]*>/g;
+  let match;
+  const matches: { full: string; src: string }[] = [];
+  while ((match = imgRegex.exec(htmlText)) !== null) {
+    matches.push({ full: match[0], src: match[1] });
+  }
+  for (const m of matches) {
+    let replacedUrl = "";
+    let width = 0;
+    let height = 0;
+    if (imageMapping && imageMapping.has(m.src)) {
+      const info = imageMapping.get(m.src)!;
+      replacedUrl = info.mappedUrl;
+      width = info.width;
+      height = info.height;
+    } else {
+      replacedUrl = getAbsoluteUrlFn(m.src);
+    }
+    let replacedImg = m.full.replace(m.src, replacedUrl);
+    
+    const isLatex = m.src.includes("latex.codecogs.com");
+    if (!isLatex) {
+      replacedImg = forceSmallImage(replacedImg, width, height);
+    }
+    
+    result = result.replace(m.full, replacedImg);
+  }
+  return result;
+};
+
+const convertToPngBase64 = async (url: string, pbToken?: string): Promise<{ base64: string, width: number, height: number }> => {
+  try {
+    const isPbFile = url.includes("/api/files/");
+    const resp = await fetch(url, (isPbFile && pbToken) ? { headers: { "Authorization": pbToken } } : undefined);
+    if (!resp.ok) return { base64: "", width: 0, height: 0 };
+    const blob = await resp.blob();
+    
+    const isLatex = url.toLowerCase().includes("latex.codecogs.com");
+    if (isLatex) {
+      return await new Promise((resolve) => {
+        const img = new window.Image();
+        img.crossOrigin = "anonymous";
+        img.onload = () => {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            const dataUrl = reader.result as string || "";
+            const base64Data = dataUrl.split(",")[1] || "";
+            resolve({ base64: base64Data, width: img.width, height: img.height });
+          };
+          reader.readAsDataURL(blob);
+        };
+        img.onerror = () => {
+          resolve({ base64: "", width: 0, height: 0 });
+        };
+        img.src = URL.createObjectURL(blob);
+      });
+    }
+    
+    const img = new window.Image();
+    img.crossOrigin = "anonymous";
+    const objectUrl = URL.createObjectURL(blob);
+    return await new Promise((resolve) => {
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const w = img.width;
+        const h = img.height;
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext("2d");
+        ctx?.drawImage(img, 0, 0, w, h);
+        try {
+          const dataUrl = canvas.toDataURL("image/png");
+          URL.revokeObjectURL(objectUrl);
+          const base64Data = dataUrl.split(",")[1] || "";
+          resolve({ base64: base64Data, width: w, height: h });
+        } catch (canvasErr) {
+          console.warn("Canvas export failed for image:", canvasErr);
+          URL.revokeObjectURL(objectUrl);
+          resolve({ base64: "", width: 0, height: 0 });
+        }
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(objectUrl);
+        resolve({ base64: "", width: 0, height: 0 });
+      };
+      img.src = objectUrl;
+    });
+  } catch (err) {
+    console.error("Error converting image:", url, err);
+    return { base64: "", width: 0, height: 0 };
+  }
+};
 
 const ExamsPage = () => {
   const navigate = useNavigate();
@@ -68,6 +216,19 @@ const ExamsPage = () => {
   const [isReportOpen, setIsReportOpen] = useState(false);
   const [reportCopied, setReportCopied] = useState(false);
 
+  // Batch Export State
+  const [batchExportProgress, setBatchExportProgress] = useState<{
+    isOpen: boolean;
+    current: number;
+    total: number;
+    message: string;
+  }>({
+    isOpen: false,
+    current: 0,
+    total: 0,
+    message: "",
+  });
+
   const fetchQuestionCounts = useCallback(async () => {
     if (!pb) return;
     try {
@@ -76,7 +237,7 @@ const ExamsPage = () => {
         fields: 'examId',
         requestKey: 'question_counts_fetch' // Prevent cancellation issues
       });
-      
+
       const counts: Record<string, number> = {};
       questions.forEach((q: any) => {
         const eId = q.examId || q.examid;
@@ -144,7 +305,7 @@ const ExamsPage = () => {
               </AvatarFallback>
             </Avatar>
             <div className="flex flex-col">
-               <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">{name}</span>
+              <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">{name}</span>
             </div>
           </div>
         );
@@ -165,7 +326,7 @@ const ExamsPage = () => {
     description: "",
     type: "info",
     confirmLabel: "Konfirmasi",
-    onConfirm: () => {}
+    onConfirm: () => { }
   });
 
 
@@ -189,8 +350,8 @@ const ExamsPage = () => {
 
   const handleArchiveExam = (exam: any) => {
     if (activeExamIds.includes(exam.id)) {
-       showAlert("Peringatan", "Batal mengarsipkan karena Bank Soal ini sedang diujikan di Ruang Ujian aktif.", "warning");
-       return;
+      showAlert("Peringatan", "Batal mengarsipkan karena Bank Soal ini sedang diujikan di Ruang Ujian aktif.", "warning");
+      return;
     }
 
     setConfirmDialog({
@@ -200,10 +361,10 @@ const ExamsPage = () => {
       type: "warning",
       confirmLabel: "Arsipkan",
       onConfirm: async () => {
-        if(!pb) return;
+        if (!pb) return;
         try {
           await pb.collection('exams').update(exam.id, { status: "archive" });
-        } catch (e) { 
+        } catch (e) {
           showAlert("Gagal", "Gagal mengarsipkan bank soal.", "danger");
         }
       }
@@ -221,7 +382,7 @@ const ExamsPage = () => {
         if (!pb) return;
         try {
           await pb.collection('exams').update(exam.id, { status: null });
-        } catch (e) { 
+        } catch (e) {
           showAlert("Gagal", "Gagal memulihkan bank soal.", "danger");
         }
       }
@@ -255,7 +416,7 @@ const ExamsPage = () => {
   useEffect(() => {
     const fetchExams = async () => {
       if (!pb) return;
-      
+
       try {
         const loaded = await pb.collection('exams').getFullList({
           sort: '-created'
@@ -266,10 +427,10 @@ const ExamsPage = () => {
           const sId = exam.subjectId || (exam as any).subjectid;
           const tId = exam.teacherId || (exam as any).teacherid;
           const type = exam.examType || (exam as any).examtype || "Latihan";
-          
+
           const subjectObj = subjects.find((s: any) => s.id === sId);
           const teacherObj = teachers.find((t: any) => t.id === tId);
-          
+
           const { id, ...rest } = exam;
           return {
             id,
@@ -310,11 +471,11 @@ const ExamsPage = () => {
   const handleCreateClick = () => {
     setDialogMode("create");
     setSelectedExam(null);
-    setFormValues({ 
-      title: "", 
-      subjectId: "", 
-      teacherId: role === "admin" ? "" : (teacherId || ""), 
-      examType: "Latihan" 
+    setFormValues({
+      title: "",
+      subjectId: "",
+      teacherId: role === "admin" ? "" : (teacherId || ""),
+      examType: "Latihan"
     });
     setIsDialogOpen(true);
   };
@@ -359,11 +520,11 @@ const ExamsPage = () => {
   const handleEditClick = (exam: ExamData) => {
     setDialogMode("edit");
     setSelectedExam(exam);
-    setFormValues({ 
-      title: exam.title, 
-      subjectId: exam.subjectId, 
-      teacherId: exam.teacherId || "", 
-      examType: exam.examType || "Latihan" 
+    setFormValues({
+      title: exam.title,
+      subjectId: exam.subjectId,
+      teacherId: exam.teacherId || "",
+      examType: exam.examType || "Latihan"
     });
     setIsDialogOpen(true);
   };
@@ -404,7 +565,7 @@ const ExamsPage = () => {
       const questions = await pb.collection('questions').getFullList({
         filter: `examId = "${examToDelete.id}"`
       });
-      
+
       for (const q of questions) {
         await pb.collection('questions').delete(q.id);
       }
@@ -515,6 +676,384 @@ const ExamsPage = () => {
     setTimeout(() => setReportCopied(false), 2500);
   };
 
+  const handleBatchExport = async () => {
+    if (!pb) return;
+    const targetExams = exams.filter(e => activeTab === "arsip" ? e.status === "archive" : e.status !== "archive");
+    if (targetExams.length === 0) {
+      addToast({ type: "warning", title: "Kosong", description: "Tidak ada bank soal untuk diexport." });
+      return;
+    }
+
+    setBatchExportProgress({ isOpen: true, current: 0, total: targetExams.length, message: "Menyiapkan export..." });
+
+    const getAbsoluteUrl = (url: string, rawRecord?: any): string => {
+      if (!url) return "";
+      if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("data:")) {
+        return url;
+      }
+      const cleanUrl = url.startsWith("/") ? url.substring(1) : url;
+      if (cleanUrl.startsWith("api/files/")) {
+        return `${window.location.origin}/${cleanUrl}`;
+      }
+      if (cleanUrl.startsWith("schools/")) {
+        const r2Base = import.meta.env.VITE_R2_PUBLIC_BASE_URL || "";
+        if (r2Base) {
+          const base = r2Base.replace(/\/$/, "");
+          return `${base}/${cleanUrl}`;
+        }
+      }
+      if (rawRecord && !url.includes("/")) {
+        try {
+          return pb.files.getUrl(rawRecord, url);
+        } catch (e) {
+          console.warn("Gagal getUrl dari pb:", e);
+        }
+      }
+      return `${window.location.origin}/${cleanUrl}`;
+    };
+
+    const buildWordMhtml = async (examTitle: string, subjectName: string, teacherName: string, rawQuestions: any[]): Promise<string> => {
+      const cleanForWord = (htmlText: string) => {
+        if (!htmlText) return "";
+        return htmlText
+          .replace(/<p>/gi, "")
+          .replace(/<\/p>/gi, "<br/>")
+          .replace(/<div>/gi, "")
+          .replace(/<\/div>/gi, "<br/>")
+          .replace(/(<br\/>)+$/, "")
+          .trim();
+      };
+
+      const stripTags = (html: string): string => {
+        if (!html) return "";
+        return html.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').trim();
+      };
+
+      const urlsToConvert = new Set<string>();
+
+      const addUrl = (url: string | undefined, rawRecord?: any) => {
+        if (!url) return;
+        const abs = getAbsoluteUrl(url, rawRecord);
+        if (abs) {
+          urlsToConvert.add(abs);
+        }
+      };
+
+      const collectFromHtml = (htmlText: string | undefined, rawRecord?: any) => {
+        if (!htmlText) return;
+        const processed = processLatex(htmlText);
+        const imgRegex = /<img[^>]+src="([^"]+)"[^>]*>/g;
+        let match;
+        while ((match = imgRegex.exec(processed)) !== null) {
+          addUrl(match[1], rawRecord);
+        }
+      };
+
+      for (const q of rawQuestions) {
+        const qType = q.type || "pilihan_ganda";
+        const opts = q.options || q.choices || {};
+
+        collectFromHtml(q.groupText, q);
+        collectFromHtml(q.text, q);
+        addUrl(q.imageUrl, q);
+
+        if (qType === "pilihan_ganda" || qType === "pilihan_ganda_kompleks" || qType === "benar_salah") {
+          ['a', 'b', 'c', 'd', 'e'].forEach(letter => {
+            const c = opts[letter];
+            if (c) {
+              const cText = typeof c === 'string' ? c : (c.text || "");
+              const cImg = typeof c === 'object' ? c.imageUrl : undefined;
+              collectFromHtml(cText, q);
+              addUrl(cImg, q);
+            }
+          });
+        } else if (qType === "menjodohkan" && opts.pairs) {
+          opts.pairs.forEach((p: any) => {
+            collectFromHtml(p.left, q);
+            collectFromHtml(p.right, q);
+          });
+        } else if ((qType === "urutkan" || qType === "drag_drop") && opts.items) {
+          opts.items.forEach((item: any) => {
+            collectFromHtml(item.text, q);
+            addUrl(item.imageUrl, q);
+          });
+        }
+      }
+
+      const imageMapping = new Map<string, { mappedUrl: string, base64: string, width: number, height: number }>();
+      const urlList = Array.from(urlsToConvert);
+      const token = pb.authStore.token;
+
+      for (let idx = 0; idx < urlList.length; idx++) {
+        const originalUrl = urlList[idx];
+        const result = await convertToPngBase64(originalUrl, token);
+        if (result.base64) {
+          const mappedUrl = `https://local-asset/img_${idx}.png`;
+          const mappedObj = { mappedUrl, base64: result.base64, width: result.width, height: result.height };
+          imageMapping.set(originalUrl, mappedObj);
+          
+          const abs = getAbsoluteUrl(originalUrl);
+          if (abs !== originalUrl) {
+            imageMapping.set(abs, mappedObj);
+          }
+        }
+      }
+
+      let html = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+<head><meta charset='utf-8'>
+<style>
+  @page { size: A4; margin: 2cm; }
+  body { font-family: 'Times New Roman', serif; color: #000; font-size: 11pt; }
+  .kop { text-align: center; border-bottom: 2pt solid #000; margin-bottom: 15px; padding-bottom: 5px; }
+  .hanging { margin-left: 0pt; padding-left: 0pt; text-indent: 0pt; margin-bottom: 3pt; text-align: left; }
+  .choice { padding-left: 45pt; text-indent: -20pt; margin-bottom: 1pt; text-align: left; }
+  img { display: block; margin: 5pt 0; border: none; }
+  img.latex-formula { display: inline; margin: 0; width: auto; height: auto; vertical-align: middle; }
+  .wacana { border: 1pt solid #000; padding: 10pt; margin-bottom: 15pt; background: #f5f5f5; font-style: italic; }
+  .spacer { margin: 0; padding: 0; line-height: 12pt; font-size: 12pt; height: 12pt; }
+  p, div, span { margin: 0; padding: 0; line-height: 1.3; text-align: left; }
+</style>
+</head>
+<body>
+  <div class="kop">
+    <p style="font-size: 14pt; font-weight: bold;">NASKAH SOAL UJIAN</p>
+    <p style="font-size: 12pt;">${examTitle}</p>
+    <p style="font-size: 10pt; font-weight: normal;">Mata Pelajaran: ${subjectName} | ${terminology.teacher}: ${teacherName}</p>
+  </div>
+  <table border="0" cellpadding="0" cellspacing="0" style="width:100%; font-size: 10pt; margin-bottom: 15pt; border: none; border-collapse: collapse;">
+    <tr>
+      <td width="15%" style="border:none; padding: 2px;">No. Peserta</td><td width="2%" style="border:none;">:</td><td width="33%" style="border:none; border-bottom: 0.5pt solid #000;"></td>
+      <td width="15%" style="border:none; padding: 2px;">${terminology.class}</td><td width="2%" style="border:none;">:</td><td style="border:none;">..........................</td>
+    </tr>
+    <tr>
+      <td style="border:none; padding: 2px;">Nama ${terminology.student}</td><td>:</td><td style="border:none; border-bottom: 0.5pt solid #000;"></td>
+      <td style="padding: 2px;">Hari/Tgl</td><td>:</td><td>..........................</td>
+    </tr>
+  </table>
+`;
+
+      let currentGroupId = "";
+      let keysRows = "";
+
+      for (let i = 0; i < rawQuestions.length; i++) {
+        const q = rawQuestions[i];
+        const num = i + 1;
+        const qType = q.type || "pilihan_ganda";
+        const opts = q.options || q.choices || {};
+        const correctAnswer: string = (q.correctAnswer || q.correct_answer || "").toLowerCase();
+
+        const qGroupId = q.groupId || q.group_id || "";
+        const qGroupText = q.groupText || q.group_text || "";
+        if (qGroupId && qGroupId !== currentGroupId && qGroupText) {
+          const cleanWacana = cleanForWord(processHtmlInlineImages(processLatex(qGroupText), getAbsoluteUrl, imageMapping));
+          html += `<div class="wacana"><b>STIMULUS / BACAAN:</b><br/>${cleanWacana}</div>`;
+          currentGroupId = qGroupId;
+        }
+
+        const processedQText = cleanForWord(processHtmlInlineImages(processLatex(q.text || ""), getAbsoluteUrl, imageMapping));
+        html += `
+        <table border="0" cellpadding="0" cellspacing="0" style="width: 100%; margin-bottom: 3pt; border: none; border-collapse: collapse;">
+          <tr>
+            <td valign="top" width="25" style="width: 25pt; border: none; padding: 0; font-family: 'Times New Roman', serif; font-size: 11pt; line-height: 1.3;"><b>${num}.</b></td>
+            <td valign="top" style="border: none; padding: 0; font-family: 'Times New Roman', serif; font-size: 11pt; line-height: 1.3; text-align: left;"><span>${processedQText}</span></td>
+          </tr>
+        </table>`;
+
+        if (q.imageUrl) {
+          const absImg = getAbsoluteUrl(q.imageUrl, q);
+          const info = imageMapping.get(absImg);
+          if (info) {
+            const displayW = Math.round(info.width > 290 ? 290 : info.width);
+            const displayH = Math.round(info.width > 290 ? (info.height * 290) / info.width : info.height);
+            html += `<div style="margin: 5pt 0 5pt 25pt;"><img src="${info.mappedUrl}" width="${displayW}" height="${displayH}" alt="Gambar Soal" /></div>`;
+          } else {
+            html += `<div style="margin: 5pt 0 5pt 25pt;"><img src="${absImg}" width="290" alt="Gambar Soal" /></div>`;
+          }
+        }
+
+        if (qType === "pilihan_ganda" || qType === "pilihan_ganda_kompleks" || qType === "benar_salah") {
+          const correctKeys = correctAnswer.split(/[,\s]+/).filter(Boolean);
+          
+          for (const letter of ['a', 'b', 'c', 'd', 'e']) {
+            const c = opts[letter];
+            if (c) {
+              const cText = typeof c === 'string' ? c : (c.text || "");
+              const cImg = typeof c === 'object' ? c.imageUrl : undefined;
+              
+              const processedCText = cleanForWord(processHtmlInlineImages(processLatex(cText), getAbsoluteUrl, imageMapping));
+              let choiceHtml = `
+              <table border="0" cellpadding="0" cellspacing="0" style="width: 100%; margin-left: 25pt; margin-bottom: 1pt; border: none; border-collapse: collapse;">
+                <tr>
+                  <td valign="top" width="20" style="width: 20pt; border: none; padding: 0; font-family: 'Times New Roman', serif; font-size: 11pt; line-height: 1.3;">${letter.toUpperCase()}.</td>
+                  <td valign="top" style="border: none; padding: 0; font-family: 'Times New Roman', serif; font-size: 11pt; line-height: 1.3; text-align: left;">
+                    <span>${processedCText}</span>`;
+              if (cImg) {
+                const absChoiceImg = getAbsoluteUrl(cImg, q);
+                const info = imageMapping.get(absChoiceImg);
+                if (info) {
+                  const displayW = Math.round(info.width > 181 ? 181 : info.width);
+                  const displayH = Math.round(info.width > 181 ? (info.height * 181) / info.width : info.height);
+                  choiceHtml += `<br/><img src="${info.mappedUrl}" width="${displayW}" height="${displayH}" alt="Gambar Pilihan" />`;
+                } else {
+                  choiceHtml += `<br/><img src="${absChoiceImg}" width="181" alt="Gambar Pilihan" />`;
+                }
+              }
+              choiceHtml += `
+                  </td>
+                </tr>
+              </table>`;
+              html += choiceHtml;
+            }
+          }
+          html += `<p class="spacer">&nbsp;</p>`;
+          
+          const ans = Object.entries(opts)
+            .filter(([k, v]: any) => v.isCorrect === true || (typeof v === 'object' && v.isCorrect) || correctKeys.includes(k))
+            .map(([k]) => k.toUpperCase())
+            .sort()
+            .join(", ");
+          keysRows += `<tr><td align="center">${num}</td><td align="center"><b>${ans || stripTags(correctAnswer).toUpperCase() || "-"}</b></td></tr>`;
+        } else if (qType === "menjodohkan" && opts.pairs) {
+          html += `<div style="margin-left: 25pt; margin-bottom: 5pt;">`;
+          html += `<table border="1" cellpadding="4" style="border-collapse: collapse; width: 80%;">`;
+          html += `<tr style="background-color: #f3f4f6;"><th>Pernyataan 1</th><th>Pernyataan 2</th></tr>`;
+          opts.pairs.forEach((p: any) => {
+            html += `<tr><td>${cleanForWord(processHtmlInlineImages(processLatex(p.left || ""), getAbsoluteUrl, imageMapping))}</td><td>${cleanForWord(processHtmlInlineImages(processLatex(p.right || ""), getAbsoluteUrl, imageMapping))}</td></tr>`;
+          });
+          html += `</table></div>`;
+          keysRows += `<tr><td align="center">${num}</td><td>Menjodohkan (Lihat Lembar Jawaban)</td></tr>`;
+          html += `<p class="spacer">&nbsp;</p>`;
+        } else if ((qType === "urutkan" || qType === "drag_drop") && opts.items) {
+          html += `<div style="margin-left: 25pt; margin-bottom: 5pt;"><ol>`;
+          opts.items.forEach((item: any) => {
+            let itemHtml = `<li>${cleanForWord(processHtmlInlineImages(processLatex(item.text || ""), getAbsoluteUrl, imageMapping))}`;
+            if (item.imageUrl) {
+              const absItemImg = getAbsoluteUrl(item.imageUrl, q);
+              const info = imageMapping.get(absItemImg);
+              if (info) {
+                const displayW = Math.round(info.width > 145 ? 145 : info.width);
+                const displayH = Math.round(info.width > 145 ? (info.height * 145) / info.width : info.height);
+                itemHtml += `<br/><img src="${info.mappedUrl}" width="${displayW}" height="${displayH}" alt="Gambar Item" />`;
+              } else {
+                itemHtml += `<br/><img src="${absItemImg}" width="145" alt="Gambar Item" />`;
+              }
+            }
+            itemHtml += `</li>`;
+            html += itemHtml;
+          });
+          html += `</ol></div>`;
+          keysRows += `<tr><td align="center">${num}</td><td>${q.answerKey || correctAnswer || "-"}</td></tr>`;
+          html += `<p class="spacer">&nbsp;</p>`;
+        } else {
+          if (qType === "uraian") {
+            html += `\n  <div style="margin:4pt 0 4pt 28pt;font-size:11pt;color:#555;font-style:italic;">Jawaban:</div>
+    <div style="margin:2pt 28pt 4pt 28pt;border-bottom:0.75pt solid #999;min-height:40pt;"></div>`;
+          } else {
+            html += `\n  <div style="margin:4pt 0 4pt 28pt;border-bottom:0.75pt solid #999;min-height:16pt;width:260pt;"></div>`;
+          }
+          const keyText = stripTags(q.answerKey || correctAnswer || "–");
+          keysRows += `<tr><td align="center">${num}</td><td>${keyText || "–"}</td></tr>`;
+          html += `<p class="spacer">&nbsp;</p>`;
+        }
+      }
+
+      html += `
+  <div style="page-break-before: always;"></div>
+  <p align="center" style="font-weight:bold; font-size:14pt; border-bottom:1pt solid #000;">KUNCI JAWABAN</p>
+  <table border="1" style="width:100%; border-collapse:collapse; margin-top:10px;">
+    <tr style="background:#eee;"><th>No</th><th>Jawaban</th></tr>
+    ${keysRows}
+  </table>
+</body></html>`;
+
+      const boundary = "----=_NextPart_Boundary_Ujian_CBT";
+      let mhtml = "";
+      mhtml += "MIME-Version: 1.0\r\n";
+      mhtml += `Content-Type: multipart/related; boundary="${boundary}"\r\n\r\n`;
+
+      mhtml += `--${boundary}\r\n`;
+      mhtml += "Content-Type: text/html; charset=\"utf-8\"\r\n";
+      mhtml += "Content-Transfer-Encoding: 8bit\r\n\r\n";
+      mhtml += html + "\r\n\r\n";
+
+      const attachedUrls = new Set<string>();
+      for (const [_, mapped] of imageMapping.entries()) {
+        if (attachedUrls.has(mapped.mappedUrl)) continue;
+        attachedUrls.add(mapped.mappedUrl);
+
+        mhtml += `--${boundary}\r\n`;
+        mhtml += "Content-Type: image/png\r\n";
+        mhtml += "Content-Transfer-Encoding: base64\r\n";
+        mhtml += `Content-Location: ${mapped.mappedUrl}\r\n\r\n`;
+
+        const base64Formatted = mapped.base64.replace(/(.{76})/g, "$1\r\n");
+        mhtml += base64Formatted + "\r\n\r\n";
+      }
+
+      mhtml += `--${boundary}--\r\n`;
+      return mhtml;
+    };
+
+    try {
+      const zip = new JSZip();
+
+      for (let i = 0; i < targetExams.length; i++) {
+        const exam = targetExams[i];
+        const teacherName = (teachers.find((t: any) => t.id === exam.teacherId) as any)?.name || "Unknown";
+        const subjectName = (subjects.find((s: any) => s.id === exam.subjectId) as any)?.name || "Unknown";
+
+        setBatchExportProgress(prev => ({
+          ...prev,
+          current: i + 1,
+          message: `Mengambil & memproses soal: ${exam.title} (${i + 1}/${targetExams.length})`,
+        }));
+
+        let questions: any[] = [];
+        try {
+          questions = await pb.collection("questions").getFullList({
+            filter: `examId = "${exam.id}"`,
+            sort: "order,created",
+          });
+        } catch (e) {
+          console.warn(`Gagal fetch soal untuk exam ${exam.id}: `, e);
+        }
+
+        const wordMhtml = await buildWordMhtml(exam.title, subjectName, teacherName, questions);
+
+        const safeName = `${teacherName} - ${exam.title}`
+          .replace(/[<>:"/\\|?*]/g, "_")
+          .replace(/\s+/g, " ")
+          .trim()
+          .substring(0, 100);
+
+        zip.file(`${safeName}.doc`, "\ufeff" + wordMhtml);
+      }
+
+      const label = activeTab === "arsip" ? "ARSIP" : "AKTIF";
+      const dateStr = new Date().toLocaleDateString("id-ID", { day: "2-digit", month: "2-digit", year: "numeric" }).replace(/\//g, "-");
+      const zipBlob = await zip.generateAsync({ type: "blob" });
+      const url = URL.createObjectURL(zipBlob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `EXPORT_BANK_SOAL_${label}_${dateStr}.zip`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      addToast({
+        type: "success",
+        title: "Export Berhasil",
+        description: `${targetExams.length} bank soal berhasil diexport ke ZIP (format Word).`,
+      });
+    } catch (err) {
+      console.error("Batch export error:", err);
+      addToast({ type: "error", title: "Gagal", description: "Gagal export batch." });
+    } finally {
+      setBatchExportProgress(prev => ({ ...prev, isOpen: false }));
+    }
+  };
+
   return (
     <div className="space-y-5">
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between bg-card p-4 rounded-2xl border border-slate-200/60 dark:border-slate-800/40 shadow-sm backdrop-blur-sm">
@@ -536,17 +1075,26 @@ const ExamsPage = () => {
               <div className="flex bg-slate-100 dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-800/80 p-1 rounded-xl text-xs font-semibold">
                 <button 
                   onClick={() => setActiveTab("aktif")} 
-                  className={`px-3 py-1.5 rounded-lg transition-all ${activeTab === "aktif" ? "bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 shadow-sm" : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"}`}
+                  className={`px-3 py-1.5 rounded-lg transition-all ${ activeTab === "aktif" ? "bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 shadow-sm" : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200" }`}
                 >
                   Aktif
                 </button>
                 <button 
                   onClick={() => setActiveTab("arsip")} 
-                  className={`px-3 py-1.5 rounded-lg transition-all ${activeTab === "arsip" ? "bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 shadow-sm" : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"}`}
+                  className={`px-3 py-1.5 rounded-lg transition-all ${ activeTab === "arsip" ? "bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 shadow-sm" : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200" }`}
                 >
                   Arsip
                 </button>
               </div>
+              {role === "admin" && (
+                <Button
+                  onClick={handleBatchExport}
+                  size="sm"
+                  className="rounded-2xl bg-violet-50 hover:bg-violet-100 active:bg-violet-50 border border-violet-100 dark:bg-violet-900/30 dark:text-violet-400 dark:hover:bg-violet-900/50 dark:active:bg-violet-900/30 dark:border-violet-800/40 text-violet-700 font-bold shadow-sm h-9 px-4 focus-visible:ring-0 focus-visible:ring-offset-0"
+                >
+                  <Download className="mr-1 h-3.5 w-3.5" /> Export Batch
+                </Button>
+              )}
               <Button onClick={handleCreateClick} size="sm" className="rounded-2xl bg-blue-50 hover:bg-blue-100 active:bg-blue-50 border border-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 dark:active:bg-blue-900/30 dark:border-blue-800/40 text-blue-700 font-bold shadow-sm h-9 px-4 focus-visible:ring-0 focus-visible:ring-offset-0">
                 <Plus className="mr-1 h-3.5 w-3.5" /> Tambah Ujian
               </Button>
@@ -613,14 +1161,14 @@ const ExamsPage = () => {
               data={exams.filter(e => activeTab === "arsip" ? e.status === "archive" : e.status !== "archive")}
               columns={columns}
               searchPlaceholder="Cari ujian..."
-              emptyMessage={`Belum ada bank soal ${activeTab}.`}
+              emptyMessage={`Belum ada bank soal ${ activeTab }.`}
               actions={(exam: any) => (
                 <div className="flex justify-end gap-1.5 items-center whitespace-nowrap">
                   <button 
                     className="flex items-center gap-1.5 px-2.5 py-1.5 bg-purple-50 text-purple-700 hover:bg-purple-100 rounded-lg dark:bg-purple-900/20 dark:text-purple-400 border border-purple-100 dark:border-purple-800/40 transition-all hover:shadow-sm" 
                     onClick={() => {
                       sessionStorage.setItem("activeQuestionsExamId", exam.id);
-                      navigate(`/admin/bank-soal/questions`);
+                      navigate("/admin/bank-soal/questions");
                     }}
                     title="Kelola Soal"
                   >
@@ -721,7 +1269,7 @@ const ExamsPage = () => {
             </FormField>
 
             {role === "admin" && (
-              <FormField id="teacherId" label={`${terminology.teacher} Pengampu`} error={undefined}>
+              <FormField id="teacherId" label={`${ terminology.teacher } Pengampu`} error={undefined}>
                 <select 
                   value={formValues.teacherId} 
                   onChange={(e) => setFormValues({ ...formValues, teacherId: e.target.value })} 
@@ -806,7 +1354,7 @@ const ExamsPage = () => {
                   <div className="space-y-1 ml-9">
                     {t.exams.map((e, eIdx) => (
                       <div key={eIdx} className="flex items-center gap-2 text-xs">
-                        <span className={`w-1.5 h-1.5 rounded-full ${e.count > 0 ? "bg-emerald-500" : "bg-amber-400"}`}></span>
+                        <span className={`w-1.5 h-1.5 rounded-full ${ e.count > 0 ? "bg-emerald-500" : "bg-amber-400" }`}></span>
                         <span className="text-slate-600 dark:text-slate-400 truncate flex-1">{e.title}</span>
                         <span className="text-slate-400 dark:text-slate-500 text-[10px] font-bold">{e.count}</span>
                       </div>
@@ -842,10 +1390,10 @@ const ExamsPage = () => {
             <Button
               onClick={handleCopyReport}
               className={`w-full h-11 rounded-xl font-bold text-sm transition-all ${
-                reportCopied 
-                  ? "bg-emerald-600 hover:bg-emerald-600 text-white" 
-                  : "bg-emerald-50 hover:bg-emerald-100 active:bg-emerald-50 border border-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-400 dark:hover:bg-emerald-900/50 dark:active:bg-emerald-900/30 dark:border-emerald-800/40 text-emerald-700"
-              }`}
+  reportCopied
+    ? "bg-emerald-600 hover:bg-emerald-600 text-white"
+    : "bg-emerald-50 hover:bg-emerald-100 active:bg-emerald-50 border border-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-400 dark:hover:bg-emerald-900/50 dark:active:bg-emerald-900/30 dark:border-emerald-800/40 text-emerald-700"
+}`}
             >
               {reportCopied ? (
                 <><Copy className="mr-2 h-4 w-4" /> Tersalin! Tinggal Paste ke WA</>
@@ -853,6 +1401,28 @@ const ExamsPage = () => {
                 <><Copy className="mr-2 h-4 w-4" /> Salin Laporan untuk WhatsApp</>
               )}
             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Batch Export Progress Dialog */}
+      <Dialog open={batchExportProgress.isOpen} onOpenChange={() => {}}>
+        <DialogContent className="max-w-sm bg-card" hideClose>
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold text-slate-800 dark:text-white flex items-center gap-2">
+              <Loader2 className="h-4 w-4 text-violet-500 animate-spin" />
+              Export Batch Arsip
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-1">
+            <Progress
+              value={batchExportProgress.total > 0 ? Math.round((batchExportProgress.current / batchExportProgress.total) * 100) : 0}
+              className="h-2"
+            />
+            <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+              <span className="truncate max-w-[220px]">{batchExportProgress.message}</span>
+              <span className="font-bold ml-2 shrink-0">{batchExportProgress.current}/{batchExportProgress.total}</span>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

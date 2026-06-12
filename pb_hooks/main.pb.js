@@ -5,50 +5,48 @@
 
 // 🕒 1. PEMBERSIHAN STATUS OFFLINE (Setiap 2 Menit)
 cronAdd("cleanupOfflineStudents", "*/2 * * * *", () => {
-    const expiredTime = new Date(Date.now() - 3 * 60000).toISOString();
+    const expiredTime = new Date(Date.now() - 5 * 60000).toISOString();
     try {
-        const records = $app.findRecordsByFilter("attempts", `status = "ongoing" && lastHeartbeat < "${expiredTime}"`);
-        records.forEach(r => {
-            r.set("isOnline", false);
-            $app.save(r);
-        });
+        $app.db().newQuery("UPDATE attempts SET isOnline = 0 WHERE status = 'ongoing' AND lastHeartbeat < {:expiredTime}")
+            .bind({ expiredTime: expiredTime })
+            .execute();
     } catch (e) { }
 });
 
 // 🕒 2. AUTO-FINISH & AUTO-SCORE (Setiap 1 Menit)
 cronAdd("autoFinishAndScore", "* * * * *", () => {
     try {
-        const now = new Date();
-        const ongoing = $app.findRecordsByFilter("attempts", 'status = "ongoing" || status = "LOCKED"');
-        if (ongoing.length === 0) return;
+        const expired = [];
+        $app.db().newQuery(`
+            SELECT a.id, a.examRoomId FROM attempts a
+            JOIN exam_rooms r ON a.examRoomId = r.id
+            WHERE (a.status = 'ongoing' OR a.status = 'LOCKED')
+              AND r.isActive = 1
+              AND datetime(COALESCE(NULLIF(a.startedAt, ''), a.created), '+' || COALESCE(r.duration, 60) || ' minutes') < datetime('now')
+        `).all(expired);
+        
+        if (expired.length === 0) return;
 
-        // Caching untuk menghindari query database berulang dalam satu perulangan cron
         const roomsCache = {};
         const questionsCache = {};
 
-        ongoing.forEach(att => {
-            const roomId = att.get("examRoomId");
-            
-            // Dapatkan room dari cache atau database
-            let room = roomsCache[roomId];
-            if (room === undefined) {
-                try {
-                    room = $app.findRecordById("exam_rooms", roomId);
-                    roomsCache[roomId] = room;
-                } catch (e) {
-                    roomsCache[roomId] = null;
-                }
-            }
-            if (!room || room.get("isActive") === false) return;
-
-            const start = new Date(att.get("startedAt") || att.get("created"));
-            const duration = (room.get("duration") || 60) * 60000;
-            const expiredAt = new Date(start.getTime() + duration);
-
-            if (expiredAt < now) {
-                const examId = room.get("examId");
+        expired.forEach(row => {
+            try {
+                const att = $app.findRecordById("attempts", row.id);
+                const roomId = row.examRoomId;
                 
-                // Dapatkan questions dari cache atau database
+                let room = roomsCache[roomId];
+                if (room === undefined) {
+                    try {
+                        room = $app.findRecordById("exam_rooms", roomId);
+                        roomsCache[roomId] = room;
+                    } catch (e) {
+                        roomsCache[roomId] = null;
+                    }
+                }
+                if (!room) return;
+
+                const examId = room.get("examId");
                 let questions = questionsCache[examId];
                 if (questions === undefined) {
                     try {
@@ -89,10 +87,10 @@ cronAdd("autoFinishAndScore", "* * * * *", () => {
                 att.set("score", score);
                 att.set("correct", correctCount);
                 att.set("total", questions.length);
-                att.set("submittedAt", now.toISOString());
+                att.set("submittedAt", new Date().toISOString());
                 att.set("isOnline", false);
                 $app.save(att);
-            }
+            } catch (err) { }
         });
     } catch (e) { }
 });
@@ -111,15 +109,12 @@ cronAdd("rotateUniversalToken", "*/5 * * * *", () => {
     } catch (e) { }
 });
 
-// 🕒 4. AUTO-ARCHIVE RUANGAN (Jam 03:00 Pagi)
 cronAdd("autoArchive", "0 3 * * *", () => {
     try {
         const yesterday = new Date(Date.now() - 24 * 60 * 60000).toISOString();
-        const oldRooms = $app.findRecordsByFilter("exam_rooms", `status != "archive" && end_time < "${yesterday}"`);
-        oldRooms.forEach(room => {
-            room.set("status", "archive");
-            $app.save(room);
-        });
+        $app.db().newQuery("UPDATE exam_rooms SET status = 'archive' WHERE status != 'archive' AND end_time < {:yesterday}")
+            .bind({ yesterday: yesterday })
+            .execute();
     } catch (e) { }
 });
 

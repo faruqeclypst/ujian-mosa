@@ -745,20 +745,27 @@ const ExamRoomsPage = () => {
 
   const [isExporting, setIsExporting] = useState(false);
   const handleExportZip = async () => {
+    const isArchive = activeTab === "arsip";
     if (filteredRooms.length === 0) {
-      showAlert("Info", "Tidak ada ruang ujian aktif untuk diexport.", "info");
+      showAlert("Info", `Tidak ada ruang ujian ${isArchive ? "arsip" : "aktif"} untuk diexport.`, "info");
       return;
     }
     setIsExporting(true);
     try {
+      const dateStr = new Date().toISOString().split('T')[0];
+      const customFilename = isArchive 
+        ? `Rekap_Semua_Ruang_Arsip_${dateStr}.zip`
+        : `Rekap_Semua_Ruang_Aktif_${dateStr}.zip`;
+
       await exportActiveRoomsToZip({
         rooms: filteredRooms,
         students,
         examClasses,
         pb,
-        terminology
+        terminology,
+        filename: customFilename
       });
-      addToast({ title: "Ekspor Berhasil", description: "File ZIP berisi rekap ujian berhasil diunduh.", type: "success" });
+      addToast({ title: "Ekspor Berhasil", description: `File ZIP berisi rekap ujian ${isArchive ? "arsip" : "aktif"} berhasil diunduh.`, type: "success" });
     } catch (e) {
       console.error(e);
       showAlert("Gagal", "Gagal mengekspor data ke ZIP.", "danger");
@@ -805,7 +812,7 @@ const ExamRoomsPage = () => {
                   <Plus className="mr-1 h-3.5 w-3.5" /> Buka Ruang
                 </Button>
               )}
-              {activeTab === "aktif" && filteredRooms.length > 0 && (
+              {filteredRooms.length > 0 && (
                 <Button
                   onClick={handleExportZip}
                   disabled={isExporting}
@@ -813,7 +820,7 @@ const ExamRoomsPage = () => {
                   className="rounded-2xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-400 dark:hover:bg-emerald-900/50 dark:border-emerald-800/40 text-emerald-700 font-bold shadow-sm h-9 px-4 transition-all"
                 >
                   <FileSpreadsheet className="mr-1.5 h-4 w-4" />
-                  {isExporting ? "Mengekspor..." : "Export Semua Aktif (ZIP)"}
+                  {isExporting ? "Mengekspor..." : activeTab === "aktif" ? "Export Semua Aktif (ZIP)" : "Export Semua Arsip (ZIP)"}
                 </Button>
               )}
             </>

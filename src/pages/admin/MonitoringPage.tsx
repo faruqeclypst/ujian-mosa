@@ -23,7 +23,7 @@ import {
   Clock,
   ShieldAlert
 } from "lucide-react";
-import { Sparkles, RotateCcw, Copy, Check, Pencil, Trophy } from "lucide-react";
+import { Sparkles, RotateCcw, Copy, Check, Pencil, Trophy, ClipboardPaste, Zap } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import * as XLSX from "xlsx-js-style";
 import { Button } from "../../components/ui/button";
@@ -609,7 +609,7 @@ const MonitoringPage = () => {
             // Re-fetch loaded attempts to update local state if anything changed
             pb.collection('attempts').getFullList({ filter: `examRoomId = "${id}"` }).then(res => {
               setAttempts(res);
-            }).catch(() => {});
+            }).catch(() => { });
           });
         }
       }
@@ -869,15 +869,15 @@ const MonitoringPage = () => {
       }
 
       if (!pb) return;
-      
+
       const essGradedVal = Object.keys(newOverrides).filter(k => {
         const q = monitorQuestions.find((x: any) => x.id === k);
         return q && (q.type === "isian_singkat" || q.type === "uraian");
       }).length;
 
       // Simpan overrides juga di dalam field answers sebagai backup (key: __overrides__)
-      const updatedAnswers = { 
-        ...(att.answers || {}), 
+      const updatedAnswers = {
+        ...(att.answers || {}),
         __overrides__: newOverrides,
         __meta: {
           ...((att.answers || {}).__meta || {}),
@@ -983,6 +983,222 @@ const MonitoringPage = () => {
     currentAnswer: string;
     qIdx: number;
   } | null>(null);
+
+  // ⚡ Quick Grade (paste tabel dari Excel/Sheets)
+  const [quickGradeOpen, setQuickGradeOpen] = useState(false);
+  const [quickGradeText, setQuickGradeText] = useState("");
+  const [quickGradeProgress, setQuickGradeProgress] = useState<{ total: number; done: number; errors: string[] } | null>(null);
+  const [quickGradeRunning, setQuickGradeRunning] = useState(false);
+
+  const handleQuickGrade = async () => {
+    if (!pb || !quickGradeText.trim()) return;
+    const essayQs = monitorQuestions.filter((q: any) => q.type === "isian_singkat" || q.type === "uraian");
+    if (essayQs.length === 0) { showAlert("Info", "Tidak ada soal essay di ruang ini.", "warning"); return; }
+
+    // ── Smart parser: auto-detect format ──────────────────────────────────────
+    // Supported formats:
+    //   A) Tab-separated (Excel/Sheets copy) — with or without header
+    //   B) Plain space-separated lines: "16 NAMA LENGKAP Benar Salah Benar"
+    //      (no header needed; "Benar/Salah" keywords used as pivot)
+
+    const GRADE_KEYWORDS = new Set(["benar", "salah", "b", "s", "true", "false", "1", "0", "ya", "tidak", "✓", "✗", "-"]);
+
+    // Detect if a word is a grade value
+    const isGradeWord = (w: string) => GRADE_KEYWORDS.has(w.toLowerCase());
+
+    // Parse a single plain-text line → { name, grades[] }
+    // Strategy: find first token that is a grade keyword; everything before = no+name
+    const parsePlainLine = (line: string): { name: string; grades: string[] } | null => {
+      const tokens = line.trim().split(/\s+/);
+      let gradeStart = tokens.findIndex(t => isGradeWord(t));
+      if (gradeStart === -1) return null;
+      // strip leading number (nomor urut)
+      let nameParts = tokens.slice(0, gradeStart);
+      if (nameParts.length > 0 && /^\d+$/.test(nameParts[0])) nameParts = nameParts.slice(1);
+      const name = nameParts.join(" ").trim();
+      const grades = tokens.slice(gradeStart);
+      return name ? { name, grades } : null;
+    };
+
+    const rawLines = quickGradeText.trim().split(/\r?\n/).filter(l => l.trim());
+
+    // Determine mode: tab-separated or plain text
+    const hasTabSep = rawLines.some(l => l.includes("\t"));
+
+    type ParsedRow = { name: string; grades: string[] };
+    let parsedRows: ParsedRow[] = [];
+
+    if (hasTabSep) {
+      // ── Mode A: Tab-separated (Excel/Google Sheets) ──────────────────────────
+      const splitTab = (line: string) => line.split("\t").map(c => c.trim());
+      const rows = rawLines.map(splitTab);
+
+      // Detect header row: first row that contains "nama" or no grade keywords
+      const firstRowLower = rows[0].map(c => c.toLowerCase());
+      const isHeaderRow = firstRowLower.some(c => c === "nama" || c.includes("nama")) ||
+        !firstRowLower.some(c => isGradeWord(c));
+
+      let namaIdx = firstRowLower.findIndex(h => h === "nama" || h.includes("nama"));
+      if (namaIdx === -1) namaIdx = 1;
+
+      const dataRows = (isHeaderRow ? rows.slice(1) : rows).filter(r => r.length > namaIdx && r[namaIdx]?.trim());
+      if (dataRows.length === 0) { showAlert("Error", "Tidak ada baris data. Pastikan format kolom benar.", "danger"); return; }
+
+      const qColCount = rows[0].length - namaIdx - 1;
+      parsedRows = dataRows.map(row => {
+        const name = row[namaIdx] || "";
+        const grades = row.slice(namaIdx + 1, namaIdx + 1 + Math.max(qColCount, essayQs.length));
+        return { name: name.trim(), grades };
+      }).filter(r => r.name);
+
+    } else {
+      // ── Mode B: Plain space-separated "No Nama Benar Salah..." ───────────────
+      // Try to detect if first line is a header (contains "nama", "no", "q1" etc. but no grade values)
+      const firstLineLower = rawLines[0].toLowerCase();
+      const firstLineParsed = parsePlainLine(rawLines[0]);
+      const isHeader = (firstLineLower.includes("nama") || firstLineLower.includes("no") || firstLineLower.startsWith("no\t")) && !firstLineParsed;
+      const dataLines = isHeader ? rawLines.slice(1) : rawLines;
+
+      for (const line of dataLines) {
+        const p = parsePlainLine(line);
+        if (p) parsedRows.push(p);
+      }
+
+      if (parsedRows.length === 0) {
+        showAlert("Error", "Tidak dapat mem-parse baris data. Pastikan ada kata 'Benar' atau 'Salah' di setiap baris, atau gunakan format tab-separated dari Excel.", "danger");
+        return;
+      }
+    }
+
+    if (parsedRows.length === 0) { showAlert("Error", "Tidak ada baris data yang valid.", "danger"); return; }
+
+    // Helper: normalize name for comparison
+    const normName = (s: string) => s.toLowerCase()
+      .replace(/[^a-z0-9\s]/g, '') // remove special chars
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    // Helper: count matching words between two names
+    const wordMatchScore = (a: string, b: string): number => {
+      const wa = normName(a).split(' ').filter(Boolean);
+      const wb = normName(b).split(' ').filter(Boolean);
+      const matched = wa.filter(w => wb.includes(w)).length;
+      return matched / Math.max(wa.length, wb.length);
+    };
+
+    // Helper: simple Levenshtein distance
+    const levenshtein = (a: string, b: string): number => {
+      const m = a.length, n = b.length;
+      const dp: number[][] = Array.from({ length: m + 1 }, (_, i) => Array.from({ length: n + 1 }, (_, j) => (i === 0 ? j : j === 0 ? i : 0)));
+      for (let i = 1; i <= m; i++) for (let j = 1; j <= n; j++) dp[i][j] = a[i - 1] === b[j - 1] ? dp[i - 1][j - 1] : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+      return dp[m][n];
+    };
+
+    // Robust name matching: exact → contains → word overlap → levenshtein
+    const findStudent = (pastedName: string) => {
+      const pn = normName(pastedName);
+      // 1. Exact normalized match
+      let found = students.find(s => normName(s.name) === pn);
+      if (found) return found;
+      // 2. Contains match (one side)
+      found = students.find(s => { const sn = normName(s.name); return sn.includes(pn) || pn.includes(sn); });
+      if (found) return found;
+      // 3. Word overlap >= 60%
+      const candidates = students.map(s => ({ s, score: wordMatchScore(s.name, pastedName) })).filter(x => x.score >= 0.6).sort((a, b) => b.score - a.score);
+      if (candidates.length > 0) return candidates[0].s;
+      // 4. Levenshtein fallback (max distance 4 for long names)
+      const lev = students.map(s => ({ s, d: levenshtein(normName(s.name), pn) })).sort((a, b) => a.d - b.d);
+      const maxLen = Math.max(pn.length, 3);
+      const maxAllowed = maxLen > 15 ? 4 : maxLen > 8 ? 3 : 2;
+      if (lev[0] && lev[0].d <= maxAllowed) return lev[0].s;
+      return null;
+    };
+
+    setQuickGradeRunning(true);
+    const errors: string[] = [];
+    let done = 0;
+    setQuickGradeProgress({ total: parsedRows.length, done: 0, errors: [] });
+
+    for (const row of parsedRows) {
+      const pastedName = row.name?.trim();
+      if (!pastedName) { errors.push(`Baris kosong dilewati.`); done++; setQuickGradeProgress({ total: parsedRows.length, done, errors: [...errors] }); continue; }
+
+      // Robust name matching
+      const matchedStudent = findStudent(pastedName);
+
+      if (!matchedStudent) { errors.push(`Tidak ditemukan: "${pastedName}"`); done++; setQuickGradeProgress({ total: parsedRows.length, done, errors: [...errors] }); continue; }
+
+      // Build overrides for this student from the parsed grades
+      const att = attempts.filter(a => a.studentId === matchedStudent.id || (a as any).student_id === matchedStudent.id)
+        .sort((a, b) => new Date(b.created).getTime() - new Date(a.created).getTime())[0];
+
+      if (!att) { errors.push(`${matchedStudent.name}: belum ada attempt.`); done++; setQuickGradeProgress({ total: parsedRows.length, done, errors: [...errors] }); continue; }
+
+      let currentOverrides: Record<string, boolean> = {};
+      try {
+        const fromField = typeof att.overrides === 'string' ? JSON.parse(att.overrides) : (att.overrides || {});
+        const fromAnswers = (att.answers as any)?.__overrides__ || {};
+        currentOverrides = { ...fromField, ...fromAnswers };
+      } catch { currentOverrides = {}; }
+
+      const newOverrides = { ...currentOverrides };
+      row.grades.forEach((cellVal, qArrIdx) => {
+        if (qArrIdx >= essayQs.length) return;
+        const cv = cellVal.trim().toLowerCase();
+        const q = essayQs[qArrIdx];
+        if (["benar", "b", "true", "1", "ya", "✓"].includes(cv)) {
+          newOverrides[q.id] = true;
+        } else if (["salah", "s", "false", "0", "tidak", "✗"].includes(cv)) {
+          newOverrides[q.id] = false;
+        }
+        // if empty / unrecognized, leave existing override
+      });
+
+      // Recalculate score
+      const sisAnswers = att.answers || {};
+      let objectiveCorrect = 0, objectiveTotal = 0, essayCorrect = 0, essayTotal = 0;
+      monitorQuestions.forEach((q: any) => {
+        const type = q.type || "pilihan_ganda";
+        const isEssay = type === "isian_singkat" || type === "uraian";
+        let ic = false;
+        if (newOverrides[q.id] !== undefined) { ic = newOverrides[q.id]; }
+        else {
+          const ansId = sisAnswers[q.id];
+          if (ansId) {
+            if (type === "pilihan_ganda" || type === "benar_salah") { const ck = Object.keys(q.choices || {}).find((k: string) => k.toLowerCase() === String(ansId).toLowerCase()); ic = ck ? q.choices[ck].isCorrect === true : false; }
+            else if (type === "pilihan_ganda_kompleks") { const cks = Object.keys(q.choices || {}).filter((k: string) => q.choices[k].isCorrect).map((k: string) => k.toLowerCase()); const sk = Array.isArray(ansId) ? ansId.map((k: any) => String(k).toLowerCase()) : []; ic = sk.length === cks.length && sk.every((k: string) => cks.includes(k)); }
+            else if (type === "isian_singkat") ic = isFuzzyMatch(ansId, q.answerKey);
+            else if (type === "urutkan" || type === "drag_drop") { const co = (q.items || []).map((it: any) => it.id); ic = Array.isArray(ansId) && ansId.length === co.length && ansId.every((v: any, i: number) => v === co[i]); }
+            else if (type === "menjodohkan") { const pairs = q.pairs || []; ic = pairs.length > 0 && pairs.every((p: any) => ansId[p.id] === p.right); }
+          }
+        }
+        if (isEssay) { essayTotal++; if (ic) essayCorrect++; } else { objectiveTotal++; if (ic) objectiveCorrect++; }
+      });
+
+      const objScore = objectiveTotal > 0 ? (objectiveCorrect / objectiveTotal) * 100 : 0;
+      const essScore = essayTotal > 0 ? (essayCorrect / essayTotal) * 100 : 0;
+      const finalScore = essayTotal === 0 ? Math.round(objScore) : Math.round(objScore * 0.6 + essScore * 0.4);
+      const essGradedVal = Object.keys(newOverrides).filter(k => { const q = monitorQuestions.find((x: any) => x.id === k); return q && (q.type === "isian_singkat" || q.type === "uraian"); }).length;
+
+      const updatedAnswers = {
+        ...(att.answers || {}),
+        __overrides__: newOverrides,
+        __meta: { ...((att.answers || {}).__meta || {}), objectiveScore: Math.round(objScore), objectiveCorrect: Math.floor(objectiveCorrect), objectiveTotal, essayTotal, essayCorrect, essayScore: Math.round(essScore), essayGraded: essGradedVal }
+      };
+
+      try {
+        await pb.collection('attempts').update(att.id, { overrides: newOverrides, answers: updatedAnswers, correct: Math.floor(objectiveCorrect + essayCorrect), objectiveCorrect: Math.floor(objectiveCorrect), objectiveTotal, objectiveScore: Math.round(objScore), essayCorrect, essayTotal, essayScore: Math.round(essScore), essayGraded: essGradedVal, score: finalScore });
+        setAttempts(prev => prev.map(a => a.id === att.id ? { ...a, overrides: newOverrides, answers: updatedAnswers, score: finalScore } : a));
+      } catch (e) { errors.push(`${matchedStudent.name}: gagal disimpan.`); }
+
+      done++;
+      setQuickGradeProgress({ total: parsedRows.length, done, errors: [...errors] });
+    }
+
+    setQuickGradeRunning(false);
+    if (errors.length === 0) { showAlert("Selesai", `Quick Grade berhasil diterapkan ke ${done} siswa!`, "success"); }
+    else { showAlert("Selesai", `${done - errors.length} berhasil, ${errors.length} gagal:\n${errors.join("\n")}`, "warning"); }
+  };
 
   const handleEditAnswer = async (newAnswer: string) => {
     if (!editAnswerDialog || !pb) return;
@@ -1432,6 +1648,253 @@ const MonitoringPage = () => {
     XLSX.writeFile(workbook, `Rekap_${monitorRoom.room_name || "Monitoring"}_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
+  const handleExportEssayExcel = () => {
+    if (!monitorRoom) return;
+
+    const essayQuestions = monitorQuestions.filter((q: any) => q.type === "isian_singkat" || q.type === "uraian");
+    if (essayQuestions.length === 0) {
+      showAlert("Informasi", "Tidak ada soal essay (isian singkat atau uraian) di ruang ujian ini.", "warning");
+      return;
+    }
+
+    const workbook = XLSX.utils.book_new();
+
+    const formatAnswerFull = (studentAns: any) => {
+      if (!studentAns) return "-";
+      return String(studentAns).replace(/<[^>]*>/g, '').trim();
+    };
+
+    const typeLabel = (type: string) => {
+      return type === "isian_singkat" ? "Isian" : "Uraian";
+    };
+
+    const STYLES = {
+      header: {
+        fill: { fgColor: { rgb: "0F766E" } }, // Teal 700
+        font: { color: { rgb: "FFFFFF" }, bold: true, sz: 11 },
+        alignment: { horizontal: "center", vertical: "center", wrapText: true },
+        border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } }
+      },
+      questionHeader: {
+        fill: { fgColor: { rgb: "F0FDFA" } }, // Teal 50 bg
+        font: { color: { rgb: "0F766E" }, bold: true, sz: 10 },
+        alignment: { horizontal: "left", vertical: "center", wrapText: true },
+        border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } }
+      },
+      titleHeader: {
+        font: { bold: true, sz: 14, color: { rgb: "0F766E" } },
+        alignment: { horizontal: "left", vertical: "center" }
+      },
+      cell: {
+        alignment: { vertical: "center", wrapText: true },
+        border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } }
+      },
+      cellCenter: {
+        alignment: { horizontal: "center", vertical: "center" },
+        border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } }
+      },
+      correct: {
+        fill: { patternType: "solid", fgColor: { rgb: "DCFCE7" } },
+        font: { color: { rgb: "16A34A" }, bold: true },
+        alignment: { horizontal: "center", vertical: "center" },
+        border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } }
+      },
+      wrong: {
+        fill: { patternType: "solid", fgColor: { rgb: "FEE2E2" } },
+        font: { color: { rgb: "DC2626" }, bold: true },
+        alignment: { horizontal: "center", vertical: "center" },
+        border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } }
+      },
+      neutral: {
+        fill: { patternType: "solid", fgColor: { rgb: "FEF9C3" } }, // Yellowish for ungraded
+        font: { color: { rgb: "854D0E" }, bold: true },
+        alignment: { horizontal: "center", vertical: "center" },
+        border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } }
+      },
+      nilaiEssay: {
+        fill: { patternType: "solid", fgColor: { rgb: "E0F2FE" } }, // Sky 100
+        font: { color: { rgb: "0369A1" }, bold: true, sz: 11 }, // Sky 700
+        alignment: { horizontal: "center", vertical: "center" },
+        border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } }
+      },
+      nilaiEssayHeader: {
+        fill: { fgColor: { rgb: "0284C7" } }, // Sky 600
+        font: { color: { rgb: "FFFFFF" }, bold: true, sz: 10 },
+        alignment: { horizontal: "center", vertical: "center", wrapText: true },
+        border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } }
+      }
+    };
+
+    const COL_WIDTHS = [
+      { wch: 5 },   // No
+      { wch: 18 },  // NISN
+      { wch: 30 },  // Nama
+      { wch: 12 },  // Kelas
+      { wch: 15 },  // Nilai Essay (100%)
+      { wch: 15 },  // Nilai Essay (40%)
+    ];
+    essayQuestions.forEach(() => {
+      COL_WIDTHS.push({ wch: 50 }); // Jawaban
+      COL_WIDTHS.push({ wch: 15 }); // Status
+    });
+
+    const filteredStudents = students
+      .map(s => ({
+        ...s,
+        className: examClasses.find(c => c.id === s.classId)?.name || "N/A"
+      }))
+      .filter(s => {
+        if (monitorRoom?.allClasses) {
+          if (monitorClassFilter !== "all" && s.className !== monitorClassFilter) return false;
+          return true;
+        }
+        const allowedIds = Array.isArray(monitorRoom?.classId) ? monitorRoom?.classId : String(monitorRoom?.classId || "").split(",");
+        if (!allowedIds.includes(s.classId)) return false;
+        if (monitorClassFilter !== "all" && s.className !== monitorClassFilter) return false;
+        return true;
+      })
+      .sort((a, b) => a.name.localeCompare(b.name));
+
+    const classesArray = Array.from(new Set(filteredStudents.map(s => s.className))).sort();
+
+    const buildEssaySheet = (groupStudents: any[], sheetName: string) => {
+      const titleRow = [
+        { v: `REKAP JAWABAN ESSAY - ${monitorRoom.room_name || "MONITORING"}`, s: STYLES.titleHeader }
+      ];
+
+      const emptyRow: any[] = [];
+
+      const questionTextRow: any[] = [
+        { v: "PERTANYAAN SOAL", s: STYLES.header },
+        { v: "", s: STYLES.header },
+        { v: "", s: STYLES.header },
+        { v: "", s: STYLES.header },
+        { v: "", s: STYLES.header }, // Nilai Essay (100%) column span placeholder
+        { v: "", s: STYLES.header }  // Nilai Essay (40%) column span placeholder
+      ];
+
+      essayQuestions.forEach((q, i) => {
+        const qTextClean = stripHtmlTags(q.text || "");
+        questionTextRow.push({ v: `Q${i + 1} [${typeLabel(q.type)}]: ${qTextClean}`, s: STYLES.questionHeader });
+        questionTextRow.push({ v: "", s: STYLES.questionHeader });
+      });
+
+      const headerRow = [
+        { v: "No", s: STYLES.header },
+        { v: terminology.id || "NISN", s: STYLES.header },
+        { v: "Nama Peserta", s: STYLES.header },
+        { v: terminology.class || "Kelas", s: STYLES.header },
+        { v: `Nilai Essay (100%)`, s: STYLES.nilaiEssayHeader },
+        { v: `Nilai Essay (40%)`, s: STYLES.nilaiEssayHeader }
+      ];
+
+      essayQuestions.forEach((q, i) => {
+        headerRow.push({ v: `Jawaban Q${i + 1}`, s: STYLES.header });
+        headerRow.push({ v: `Status Q${i + 1}`, s: STYLES.header });
+      });
+
+      const rows: any[][] = [
+        titleRow,
+        emptyRow,
+        questionTextRow,
+        headerRow
+      ];
+
+      const merges: any[] = [
+        { s: { r: 0, c: 0 }, e: { r: 0, c: 5 + essayQuestions.length * 2 } }, // Title spans all cols incl. Nilai 100% & 40%
+        { s: { r: 2, c: 0 }, e: { r: 2, c: 5 } }  // "PERTANYAAN SOAL" spans No+NISN+Nama+Kelas+Nilai100+Nilai40
+      ];
+
+      essayQuestions.forEach((_, i) => {
+        merges.push({
+          s: { r: 2, c: 6 + i * 2 },
+          e: { r: 2, c: 6 + i * 2 + 1 }
+        });
+      });
+
+      groupStudents.forEach((std, idx) => {
+        const atts = attempts.filter(a => a.studentId === std.id || a.student_id === std.id);
+        const att = atts.sort((ax, bx) => new Date(bx.created).getTime() - new Date(ax.created).getTime())[0];
+        const answers = att?.answers || {};
+        const rawOverrides = typeof att?.overrides === 'string' ? JSON.parse(att.overrides) : (att?.overrides || {});
+        const answersOverrides = (answers as any)?.__overrides__ || {};
+        const overrides: Record<string, boolean> = { ...answersOverrides, ...rawOverrides };
+
+        // Calculate essay score for this student
+        const essayCorrectCount = essayQuestions.filter(q => checkAns(q, answers[q.id], overrides)).length;
+        const essayTotal = essayQuestions.length;
+        const essayScoreRaw = att ? Math.round((essayCorrectCount / essayTotal) * 100) : null;
+        // Weighted contribution = essayScore * 40%
+        const essayWeighted = essayScoreRaw !== null ? Math.round(essayScoreRaw * 0.4) : null;
+
+        const rowNum = idx + 5;
+
+        const row = [
+          { v: idx + 1, s: STYLES.cellCenter },
+          { v: std.nisn, s: STYLES.cellCenter },
+          { v: std.name, s: STYLES.cell },
+          { v: std.className, s: STYLES.cellCenter },
+          {
+            v: essayScoreRaw !== null ? essayScoreRaw : "—",
+            s: STYLES.nilaiEssay
+          },
+          {
+            f: essayScoreRaw !== null ? `ROUND(E${rowNum}*0.4,0)` : undefined,
+            v: essayScoreRaw !== null ? essayWeighted : "—",
+            s: STYLES.nilaiEssay
+          }
+        ];
+
+        essayQuestions.forEach(q => {
+          const ans = answers[q.id];
+          const isOverridden = overrides[q.id] !== undefined;
+          const isCorrect = checkAns(q, ans, overrides);
+          const fullAnsText = formatAnswerFull(ans);
+
+          row.push({ v: fullAnsText, s: STYLES.cell });
+
+          let statusVal = "Belum Dinilai";
+          let cellStyle = STYLES.neutral;
+
+          if (isOverridden) {
+            statusVal = isCorrect ? "Benar" : "Salah";
+            cellStyle = isCorrect ? STYLES.correct : STYLES.wrong;
+          } else if (ans) {
+            if (q.type === "isian_singkat") {
+              statusVal = isCorrect ? "Benar" : "Salah";
+              cellStyle = isCorrect ? STYLES.correct : STYLES.wrong;
+            } else {
+              statusVal = "Belum Dinilai";
+              cellStyle = STYLES.neutral;
+            }
+          } else {
+            statusVal = "Tidak Dijawab";
+            cellStyle = STYLES.wrong;
+          }
+
+          row.push({ v: statusVal, s: cellStyle });
+        });
+
+        rows.push(row);
+      });
+
+      const ws = XLSX.utils.aoa_to_sheet(rows);
+      ws["!cols"] = COL_WIDTHS;
+      ws["!merges"] = merges;
+      XLSX.utils.book_append_sheet(workbook, ws, sheetName.substring(0, 31));
+    };
+
+    if (classesArray.length > 1) {
+      buildEssaySheet(filteredStudents, "SEMUA KELAS ESSAY");
+    }
+
+    classesArray.forEach(cls => {
+      buildEssaySheet(filteredStudents.filter(s => s.className === cls), cls);
+    });
+
+    XLSX.writeFile(workbook, `Rekap_Essay_${monitorRoom.room_name || "Monitoring"}_${new Date().toISOString().split('T')[0]}.xlsx`);
+  };
+
   const handleForceSubmitAll = () => {
     setConfirmDialog({
       isOpen: true,
@@ -1666,7 +2129,7 @@ const MonitoringPage = () => {
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {/* SIDEBAR - Enhanced & Integrated */}
         <div className="lg:col-span-1 space-y-6">
-          <div className="bg-card p-5 rounded-3xl border border-slate-200/60 dark:border-slate-800 shadow-sm space-y-6 h-fit sticky top-24">
+          <div className="bg-card p-5 rounded-3xl border border-slate-200/60 dark:border-slate-800 shadow-sm space-y-6 h-fit sticky top-6">
             <div>
               <h3 className="text-[10px] font-bold text-slate-400 dark:text-slate-500 flex items-center gap-2 mb-4 uppercase tracking-widest pl-1 border-l-2 border-blue-500 ml-1">
                 Panel Filter & Aksi
@@ -1723,28 +2186,107 @@ const MonitoringPage = () => {
                 </div>
               </div>
 
-              <div className="pt-2 flex flex-col gap-2.5">
-                <Button onClick={() => { sessionStorage.setItem("activeGradingRoomId", roomId || ""); navigate("/admin/penilaian"); }} variant="secondary" className="w-full rounded-xl bg-indigo-50 hover:bg-indigo-100 border border-indigo-100 dark:bg-indigo-900/20 dark:text-indigo-400 dark:hover:bg-indigo-900/40 dark:border-indigo-800/40 text-indigo-700 font-semibold shadow-sm transition-all h-10">
-                  <BookOpen className="mr-2 h-4 w-4" /> Detail Penilaian
-                </Button>
-                <Button onClick={() => navigate("/livescore-view")} variant="secondary" className="w-full rounded-xl bg-indigo-50 hover:bg-indigo-100 border border-indigo-100 dark:bg-indigo-900/20 dark:text-indigo-400 dark:hover:bg-indigo-900/40 dark:border-indigo-800/40 text-indigo-700 font-semibold shadow-sm transition-all h-10">
-                  <Trophy className="mr-2 h-4 w-4 text-amber-500" /> Papan Live Score
-                </Button>
-                <Button onClick={handleExportExcel} variant="secondary" className="w-full rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 dark:hover:bg-emerald-900/40 dark:border-emerald-800/40 text-emerald-700 font-semibold shadow-sm transition-all h-10">
-                  <FileSpreadsheet className="mr-2 h-4 w-4" /> Export Excel
-                </Button>
-                <Button onClick={handleCopyBelumUjian} variant="secondary" className={`w-full rounded-xl border font-semibold shadow-sm transition-all h-10 ${waCopied ? "bg-green-100 border-green-300 text-green-700 dark:bg-green-900/30 dark:border-green-700 dark:text-green-400" : "bg-amber-50 hover:bg-amber-100 border-amber-100 dark:bg-amber-900/20 dark:text-amber-400 dark:hover:bg-amber-900/40 dark:border-amber-800/40 text-amber-700"}`}>
-                  {waCopied ? <><Check className="mr-2 h-4 w-4" /> Tersalin!</> : <><Copy className="mr-2 h-4 w-4" /> Belum Ujian</>}
-                </Button>
+              <div className="pt-4 border-t border-slate-100 dark:border-slate-800/60 space-y-4">
+                {/* 📊 Kelompok: Navigasi & Live */}
+                <div className="space-y-1.5">
+                  <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest pl-1">Link & Tampilan</span>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => { sessionStorage.setItem("activeGradingRoomId", roomId || ""); navigate("/admin/penilaian"); }}
+                      className="w-full rounded-xl bg-indigo-50 hover:bg-indigo-100 border border-indigo-100 dark:bg-indigo-900/20 dark:text-indigo-400 dark:hover:bg-indigo-900/40 dark:border-indigo-800/40 text-indigo-700 font-bold text-[10px] py-2 px-1 shadow-sm transition-all flex items-center justify-center gap-1 whitespace-nowrap tracking-tight"
+                    >
+                      <BookOpen className="h-3.5 w-3.5 shrink-0 text-indigo-500" /> Penilaian
+                    </button>
+                    <button
+                      onClick={() => navigate("/livescore-view")}
+                      className="w-full rounded-xl bg-indigo-50 hover:bg-indigo-100 border border-indigo-100 dark:bg-indigo-900/20 dark:text-indigo-400 dark:hover:bg-indigo-900/40 dark:border-indigo-800/40 text-indigo-700 font-bold text-[10px] py-2 px-1 shadow-sm transition-all flex items-center justify-center gap-1 whitespace-nowrap tracking-tight"
+                    >
+                      <Trophy className="h-3.5 w-3.5 text-amber-500 shrink-0" /> Live Score
+                    </button>
+                  </div>
+                </div>
+
+                {/* 📥 Kelompok: Export Laporan */}
+                <div className="space-y-1.5">
+                  <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest pl-1">Unduh Laporan</span>
+                  {monitorQuestions.some((q: any) => q.type === "isian_singkat" || q.type === "uraian") ? (
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        onClick={handleExportExcel}
+                        className="w-full rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 dark:hover:bg-emerald-900/40 dark:border-emerald-800/40 text-emerald-700 font-bold text-[10px] py-2 px-1 shadow-sm transition-all flex items-center justify-center gap-1 whitespace-nowrap tracking-tight"
+                      >
+                        <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-600 shrink-0" /> Excel
+                      </button>
+                      <button
+                        onClick={handleExportEssayExcel}
+                        className="w-full rounded-xl bg-teal-50 hover:bg-teal-100 border border-teal-100 dark:bg-teal-900/20 dark:text-teal-400 dark:hover:bg-teal-900/40 dark:border-teal-800/40 text-teal-700 font-bold text-[10px] py-2 px-1 shadow-sm transition-all flex items-center justify-center gap-1 whitespace-nowrap tracking-tight"
+                      >
+                        <FileSpreadsheet className="h-3.5 w-3.5 text-teal-600 shrink-0" /> Essay
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={handleExportExcel}
+                      className="w-full rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 dark:hover:bg-emerald-900/40 dark:border-emerald-800/40 text-emerald-700 font-bold text-[10px] py-2 px-1.5 shadow-sm transition-all flex items-center justify-center gap-1 whitespace-nowrap tracking-tight"
+                    >
+                      <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-600 shrink-0" /> Export Excel
+                    </button>
+                  )}
+                </div>
+
+                {/* 📝 Kelompok: Grading & Data */}
+                <div className="space-y-1.5">
+                  <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest pl-1">Penilaian & Siswa</span>
+                  {(role === "admin" || (role === "teacher" && teacherFullAccess)) && monitorQuestions.some((q: any) => q.type === "isian_singkat" || q.type === "uraian") ? (
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        onClick={() => { setQuickGradeText(""); setQuickGradeProgress(null); setQuickGradeOpen(true); }}
+                        className="w-full rounded-xl bg-violet-50 hover:bg-violet-100 border border-violet-100 dark:bg-violet-900/20 dark:text-violet-400 dark:hover:bg-violet-900/40 dark:border-violet-800/40 text-violet-700 font-bold text-[10px] py-2 px-1 shadow-sm transition-all flex items-center justify-center gap-1 whitespace-nowrap tracking-tight"
+                      >
+                        <Zap className="h-3.5 w-3.5 text-violet-500 shrink-0" /> Quick Grade
+                      </button>
+                      <button
+                        onClick={handleCopyBelumUjian}
+                        className={`w-full rounded-xl border font-bold text-[10px] py-2 px-1 shadow-sm transition-all flex items-center justify-center gap-1 whitespace-nowrap tracking-tight ${waCopied
+                            ? "bg-green-100 border-green-300 text-green-700 dark:bg-green-900/30 dark:border-green-700 dark:text-green-400"
+                            : "bg-amber-50 hover:bg-amber-100 border-amber-100 dark:bg-amber-900/20 dark:text-amber-400 dark:hover:bg-amber-900/40 dark:border-amber-800/40 text-amber-700"
+                          }`}
+                      >
+                        {waCopied ? <><Check className="h-3.5 w-3.5 shrink-0" /> Tersalin</> : <><Copy className="h-3.5 w-3.5 shrink-0" /> Belum Ujian</>}
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={handleCopyBelumUjian}
+                      className={`w-full rounded-xl border font-bold text-[10px] py-2 px-2 shadow-sm transition-all flex items-center justify-center gap-1.5 whitespace-nowrap tracking-tight ${waCopied
+                          ? "bg-green-100 border-green-300 text-green-700 dark:bg-green-900/30 dark:border-green-700 dark:text-green-400"
+                          : "bg-amber-50 hover:bg-amber-100 border-amber-100 dark:bg-amber-900/20 dark:text-amber-400 dark:hover:bg-amber-900/40 dark:border-amber-800/40 text-amber-700"
+                        }`}
+                    >
+                      {waCopied ? <><Check className="h-3.5 w-3.5 shrink-0" /> Tersalin!</> : <><Copy className="h-3.5 w-3.5 shrink-0" /> Salin Siswa Belum Ujian</>}
+                    </button>
+                  )}
+                </div>
+
+                {/* ⚠ Kelompok: Tindakan Massal (Admin/Full Teacher Only) */}
                 {(role === "admin" || (role === "teacher" && teacherFullAccess)) && (
-                  <>
-                    <Button onClick={handleForceSubmitAll} variant="secondary" className="w-full rounded-xl bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-100 dark:bg-rose-950/40 dark:text-rose-400 dark:border dark:border-rose-800/30 shadow-sm font-semibold h-10 transition-all">
-                      <Users className="mr-2 h-4 w-4" /> Selesaikan Semua
-                    </Button>
-                    <Button onClick={handleResetAllSessions} variant="secondary" className="w-full rounded-xl bg-orange-50 text-orange-700 hover:bg-orange-100 border border-orange-100 dark:bg-orange-950/40 dark:text-orange-400 dark:border dark:border-orange-800/30 shadow-sm font-semibold h-10 transition-all">
-                      <Users className="mr-2 h-4 w-4" /> Reset Semua Sesi
-                    </Button>
-                  </>
+                  <div className="space-y-1.5">
+                    <span className="text-[10px] font-black text-rose-500/80 dark:text-rose-400/80 uppercase tracking-widest pl-1">Zona Bahaya (Aksi Massal)</span>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        onClick={handleForceSubmitAll}
+                        className="w-full rounded-xl bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-100 dark:bg-rose-950/40 dark:text-rose-400 dark:border-rose-800/30 font-bold text-[10px] py-2.5 px-1 shadow-sm transition-all flex items-center justify-center gap-1 whitespace-nowrap tracking-tight"
+                      >
+                        <Users className="h-3.5 w-3.5 text-rose-500 shrink-0" /> Selesai Semua
+                      </button>
+                      <button
+                        onClick={handleResetAllSessions}
+                        className="w-full rounded-xl bg-orange-50 text-orange-700 hover:bg-orange-100 border border-orange-100 dark:bg-orange-950/40 dark:text-orange-400 dark:border-orange-850/30 font-bold text-[10px] py-2.5 px-1 shadow-sm transition-all flex items-center justify-center gap-1 whitespace-nowrap tracking-tight"
+                      >
+                        <RotateCcw className="h-3.5 w-3.5 text-orange-500 shrink-0" /> Reset Sesi
+                      </button>
+                    </div>
+                  </div>
                 )}
               </div>
             </div>
@@ -2131,41 +2673,47 @@ const MonitoringPage = () => {
                                             })()}
                                           </span>
                                         </div>
-                                        <div className={`mt-auto p-2 rounded-lg flex items-center justify-between ${correct ? "bg-emerald-50 text-emerald-700" : ans ? "bg-rose-50 text-rose-700" : "bg-slate-50 text-slate-500"}`}>
-                                          <span className="text-[10px] font-bold truncate max-w-[60%]">Jawab: {ans ? (typeof ans === 'object' ? JSON.stringify(ans).substring(0, 30) : stripHtmlTags(String(ans)).substring(0, 30)) : "-"}</span>
-                                          <div className="flex gap-1">
-                                            {(role === "admin" || (role === "teacher" && teacherFullAccess)) && (
-                                              <>
-                                                {(q.type === "isian_singkat" || q.type === "uraian") && (
-                                                  <button onClick={() => handleAIGrade(student.id, q.id)} disabled={aiGradingId === `${student.id}_${q.id}`} className="p-1 hover:bg-indigo-50 rounded text-indigo-500" title="Periksa dengan AI">
-                                                    <Sparkles className={`h-3 w-3 ${aiGradingId === `${student.id}_${q.id}` ? "animate-spin" : ""}`} />
-                                                  </button>
-                                                )}
-                                                {/* Edit jawaban — hanya pilihan ganda */}
-                                                {(q.type === "pilihan_ganda" || q.type === "benar_salah" || !q.type) && (
-                                                  <button
-                                                    onClick={() => setEditAnswerDialog({
-                                                      open: true,
-                                                      studentId: student.id,
-                                                      studentName: student.name,
-                                                      question: q,
-                                                      currentAnswer: ans || "",
-                                                      qIdx,
-                                                    })}
-                                                    className="p-1 rounded hover:bg-amber-50 text-amber-500"
-                                                    title="Edit jawaban siswa"
-                                                  >
-                                                    <Pencil className="h-3 w-3" />
-                                                  </button>
-                                                )}
-                                                <button onClick={() => handleManualGrade(student.id, q.id, true)} className={`p-1 rounded ${overrides[q.id] === true ? "bg-emerald-200 text-emerald-700" : "hover:bg-white text-emerald-500"}`} title="Tandai Benar"><CheckCircle2 className="h-3 w-3" /></button>
-                                                <button onClick={() => handleManualGrade(student.id, q.id, false)} className={`p-1 rounded ${overrides[q.id] === false ? "bg-rose-200 text-rose-700" : "hover:bg-white text-rose-500"}`} title="Tandai Salah"><X className="h-3 w-3" /></button>
-                                                {overrides[q.id] !== undefined && (
-                                                  <button onClick={() => handleClearOverride(student.id, q.id)} className="p-1 rounded hover:bg-amber-50 text-amber-500" title="Netralkan (hapus override)"><RotateCcw className="h-3 w-3" /></button>
-                                                )}
-                                              </>
-                                            )}
-                                            <span className="text-[9px] font-black">{correct ? "✓" : "✗"}</span>
+                                        <div className={`mt-auto p-2.5 rounded-lg flex flex-col gap-2 ${correct ? "bg-emerald-50 text-emerald-700 border border-emerald-100/50" : ans ? "bg-rose-50 text-rose-700 border border-rose-100/50" : "bg-slate-50 text-slate-500 border border-slate-100/50"}`}>
+                                          <div className="text-[10px] font-bold break-words whitespace-pre-wrap leading-relaxed max-h-32 overflow-y-auto pr-1">
+                                            <span className="text-[9px] font-black uppercase tracking-wider opacity-60">Jawab:</span>
+                                            <div className="mt-0.5">{ans ? (typeof ans === 'object' ? JSON.stringify(ans) : stripHtmlTags(String(ans))) : "-"}</div>
+                                          </div>
+                                          <div className="flex items-center justify-between pt-1.5 border-t border-slate-100 dark:border-slate-800/40">
+                                            <span className="text-[9px] font-black uppercase tracking-widest">{correct ? "Benar" : ans ? "Salah" : "Kosong"}</span>
+                                            <div className="flex gap-1 items-center">
+                                              {(role === "admin" || (role === "teacher" && teacherFullAccess)) && (
+                                                <>
+                                                  {(q.type === "isian_singkat" || q.type === "uraian") && (
+                                                    <button onClick={() => handleAIGrade(student.id, q.id)} disabled={aiGradingId === `${student.id}_${q.id}`} className="p-1 hover:bg-indigo-50 dark:hover:bg-slate-700 rounded text-indigo-500" title="Periksa dengan AI">
+                                                      <Sparkles className={`h-3 w-3 ${aiGradingId === `${student.id}_${q.id}` ? "animate-spin" : ""}`} />
+                                                    </button>
+                                                  )}
+                                                  {/* Edit jawaban — hanya pilihan ganda */}
+                                                  {(q.type === "pilihan_ganda" || q.type === "benar_salah" || !q.type) && (
+                                                    <button
+                                                      onClick={() => setEditAnswerDialog({
+                                                        open: true,
+                                                        studentId: student.id,
+                                                        studentName: student.name,
+                                                        question: q,
+                                                        currentAnswer: ans || "",
+                                                        qIdx,
+                                                      })}
+                                                      className="p-1 rounded hover:bg-amber-50 dark:hover:bg-slate-700 text-amber-500"
+                                                      title="Edit jawaban siswa"
+                                                    >
+                                                      <Pencil className="h-3 w-3" />
+                                                    </button>
+                                                  )}
+                                                  <button onClick={() => handleManualGrade(student.id, q.id, true)} className={`p-1 rounded ${overrides[q.id] === true ? "bg-emerald-200 text-emerald-700" : "hover:bg-white dark:hover:bg-slate-700 text-emerald-500"}`} title="Tandai Benar"><CheckCircle2 className="h-3 w-3" /></button>
+                                                  <button onClick={() => handleManualGrade(student.id, q.id, false)} className={`p-1 rounded ${overrides[q.id] === false ? "bg-rose-200 text-rose-700" : "hover:bg-white dark:hover:bg-slate-700 text-rose-500"}`} title="Tandai Salah"><X className="h-3 w-3" /></button>
+                                                  {overrides[q.id] !== undefined && (
+                                                    <button onClick={() => handleClearOverride(student.id, q.id)} className="p-1 rounded hover:bg-amber-50 dark:hover:bg-slate-700 text-amber-500" title="Netralkan (hapus override)"><RotateCcw className="h-3 w-3" /></button>
+                                                  )}
+                                                </>
+                                              )}
+                                              <span className="text-[10px] font-black ml-1">{correct ? "✓" : "✗"}</span>
+                                            </div>
                                           </div>
                                         </div>
                                       </div>
@@ -2336,6 +2884,180 @@ const MonitoringPage = () => {
         requireWord={confirmDialog.requireWord}
       />
 
+      {/* ⚡ Dialog Quick Grade */}
+      <Dialog open={quickGradeOpen} onOpenChange={(open) => { if (!open) { setQuickGradeOpen(false); setQuickGradeProgress(null); } }}>
+        <DialogContent className="max-w-2xl bg-white dark:bg-slate-950 rounded-2xl border-none shadow-2xl p-0 overflow-hidden flex flex-col max-h-[90vh]">
+          <DialogHeader className="px-6 pt-5 pb-3 border-b border-slate-100 dark:border-slate-800 shrink-0">
+            <DialogTitle className="text-base font-black text-slate-800 dark:text-white flex items-center gap-2">
+              <Zap className="h-5 w-5 text-violet-500" /> Quick Grade — Paste Tabel dari Excel/Sheets
+            </DialogTitle>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
+              Copy tabel dari Excel/Google Sheets lalu paste di bawah ini. Kolom setelah <strong>Nama</strong> akan dipetakan ke soal essay (Q1, Q2...) secara berurutan.
+              Isi kolom: <span className="bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400 px-1 rounded font-bold">Benar</span> atau <span className="bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-400 px-1 rounded font-bold">Salah</span> (juga bisa: B, S, 1, 0, ✓, ✗).
+            </p>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+            {/* Contoh format */}
+            <div className="bg-slate-50 dark:bg-slate-900 rounded-xl p-3 border border-slate-200 dark:border-slate-800">
+              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Contoh Format (copy dari spreadsheet)</p>
+              <pre className="text-[10px] text-slate-600 dark:text-slate-300 font-mono leading-relaxed overflow-x-auto">{`No\tNama\tQ1\tQ2\tQ3\tQ4\tQ5
+11\tDAFFA AL HAYYUN\tBenar\tBenar\tSalah\tSalah\tBenar
+12\tDARA NADIA ASSYIFA\tBenar\tBenar\tSalah\tBenar\tBenar`}</pre>
+            </div>
+
+            {/* Soal essay yang terdeteksi */}
+            {monitorQuestions.some((q: any) => q.type === "isian_singkat" || q.type === "uraian") && (
+              <div className="bg-violet-50 dark:bg-violet-950/20 rounded-xl p-3 border border-violet-100 dark:border-violet-800/30">
+                <p className="text-[10px] font-black uppercase tracking-widest text-violet-500 mb-2">Urutan Soal Essay ({monitorQuestions.filter((q: any) => q.type === "isian_singkat" || q.type === "uraian").length} soal)</p>
+                <div className="flex flex-wrap gap-2">
+                  {monitorQuestions.filter((q: any) => q.type === "isian_singkat" || q.type === "uraian").map((q: any, i: number) => (
+                    <span key={q.id} className="text-[10px] px-2 py-1 bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300 rounded-lg font-bold">
+                      Q{i + 1}: #{monitorQuestions.indexOf(q) + 1} ({q.type === "isian_singkat" ? "Isian" : "Uraian"})
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Textarea paste */}
+            <div>
+              <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5 block">Paste Tabel Disini:</label>
+              <textarea
+                className="w-full h-44 text-xs font-mono bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3 resize-none focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 text-slate-700 dark:text-slate-300 placeholder-slate-300 dark:placeholder-slate-600"
+                placeholder={"Paste tabel dari Excel atau Google Sheets di sini...\n(Ctrl+V / Cmd+V)\n\nTips: di Excel/Sheets, select semua sel termasuk header lalu Ctrl+C"}
+                value={quickGradeText}
+                onChange={e => setQuickGradeText(e.target.value)}
+                disabled={quickGradeRunning}
+              />
+            </div>
+
+            {/* Live preview of parsed data */}
+            {quickGradeText.trim() && !quickGradeRunning && (() => {
+              const GKWS = new Set(["benar", "salah", "b", "s", "true", "false", "1", "0", "ya", "tidak", "✓", "✗", "-"]);
+              const isGW = (w: string) => GKWS.has(w.toLowerCase());
+              const pLines = quickGradeText.trim().split(/\r?\n/).filter(l => l.trim());
+              const hasTab = pLines.some(l => l.includes("\t"));
+
+              type PR = { name: string; grades: string[] };
+              let previewParsed: PR[] = [];
+
+              if (hasTab) {
+                const rows2 = pLines.map(l => l.split("\t").map(c => c.trim()));
+                const frLow = rows2[0].map(c => c.toLowerCase());
+                const isHdr = frLow.some(c => c === "nama" || c.includes("nama")) || !frLow.some(c => isGW(c));
+                let nIdx2 = frLow.findIndex(h => h === "nama" || h.includes("nama"));
+                if (nIdx2 === -1) nIdx2 = 1;
+                const dRows2 = (isHdr ? rows2.slice(1) : rows2).filter(r => r.length > nIdx2 && r[nIdx2]?.trim());
+                previewParsed = dRows2.map(r => ({ name: r[nIdx2] || "", grades: r.slice(nIdx2 + 1) })).filter(r => r.name.trim());
+              } else {
+                const parsePL = (line: string): PR | null => {
+                  const toks = line.trim().split(/\s+/);
+                  let gs = toks.findIndex(t => isGW(t));
+                  if (gs === -1) return null;
+                  let np = toks.slice(0, gs);
+                  if (np.length > 0 && /^\d+$/.test(np[0])) np = np.slice(1);
+                  const nm = np.join(" ").trim();
+                  return nm ? { name: nm, grades: toks.slice(gs) } : null;
+                };
+                const frLow2 = pLines[0].toLowerCase();
+                const isHdr2 = (frLow2.includes("nama") || frLow2.includes("no")) && !parsePL(pLines[0]);
+                (isHdr2 ? pLines.slice(1) : pLines).forEach(l => { const p = parsePL(l); if (p) previewParsed.push(p); });
+              }
+
+              if (previewParsed.length === 0) return null;
+              const normN2 = (s: string) => s.toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim();
+              const essayQCount = monitorQuestions.filter((q: any) => q.type === "isian_singkat" || q.type === "uraian").length;
+              return (
+                <div className="bg-violet-50/50 dark:bg-violet-950/10 rounded-xl border border-violet-100 dark:border-violet-800/30 overflow-hidden">
+                  <div className="px-3 py-2 border-b border-violet-100 dark:border-violet-800/30 flex items-center justify-between">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-violet-500">Preview ({previewParsed.length} baris terdeteksi)</span>
+                    <span className="text-[10px] text-slate-400">{hasTab ? "Format: Tab (Excel)" : "Format: Teks (Benar/Salah)"} | {essayQCount} soal essay</span>
+                  </div>
+                  <div className="max-h-80 overflow-y-auto divide-y divide-violet-50 dark:divide-violet-900/20">
+                    {previewParsed.map((row, i) => {
+                      const pn2 = normN2(row.name);
+                      const match = students.find(s => normN2(s.name) === pn2) ||
+                        students.find(s => { const sn = normN2(s.name); return sn.includes(pn2) || pn2.includes(sn); }) ||
+                        students.map(s => ({ s, sc: normN2(s.name).split(' ').filter(w => pn2.split(' ').includes(w)).length / Math.max(normN2(s.name).split(' ').length, pn2.split(' ').length) })).sort((a, b) => b.sc - a.sc).find(x => x.sc >= 0.6)?.s;
+                      const grades2 = row.grades.slice(0, essayQCount);
+                      return (
+                        <div key={i} className="px-3 py-1.5 flex items-center gap-3">
+                          <div className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 ${match ? "bg-emerald-100 dark:bg-emerald-900/40" : "bg-rose-100 dark:bg-rose-900/40"}`}>
+                            <span className="text-[9px]">{match ? "✓" : "✗"}</span>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <span className={`text-[11px] font-semibold truncate block ${match ? "text-slate-700 dark:text-slate-200" : "text-rose-600 dark:text-rose-400"}`}>{row.name || "(kosong)"}</span>
+                            {match && <span className="text-[9px] text-slate-400">→ {match.name}</span>}
+                          </div>
+                          <div className="flex gap-1 shrink-0">
+                            {grades2.map((g, gi) => {
+                              const gn = g.toLowerCase();
+                              const isBenar = ["benar", "b", "1", "ya", "true", "✓"].includes(gn);
+                              const isSalah = ["salah", "s", "0", "tidak", "false", "✗"].includes(gn);
+                              return <span key={gi} className={`text-[9px] px-1.5 py-0.5 rounded font-bold ${isBenar ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400" : isSalah ? "bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-400" : "bg-slate-100 text-slate-400"}`}>{g || "—"}</span>;
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Progress */}
+            {quickGradeProgress && (
+              <div className="bg-slate-50 dark:bg-slate-900 rounded-xl p-4 border border-slate-200 dark:border-slate-800 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-600 dark:text-slate-300">Progress</span>
+                  <span className="text-xs font-black text-violet-600 dark:text-violet-400">{quickGradeProgress.done}/{quickGradeProgress.total}</span>
+                </div>
+                <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2 overflow-hidden">
+                  <div
+                    className="h-2 rounded-full transition-all duration-300"
+                    style={{
+                      width: `${quickGradeProgress.total > 0 ? (quickGradeProgress.done / quickGradeProgress.total) * 100 : 0}%`,
+                      background: quickGradeProgress.errors.length > 0 ? '#f59e0b' : '#8b5cf6'
+                    }}
+                  />
+                </div>
+                {quickGradeProgress.errors.length > 0 && (
+                  <div className="space-y-1 max-h-24 overflow-y-auto">
+                    {quickGradeProgress.errors.map((err, i) => (
+                      <p key={i} className="text-[10px] text-rose-600 dark:text-rose-400 font-medium">⚠ {err}</p>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className="shrink-0 px-6 py-4 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-2 bg-white dark:bg-slate-950">
+            <Button
+              variant="ghost"
+              className="rounded-xl text-sm"
+              onClick={() => { setQuickGradeOpen(false); setQuickGradeProgress(null); }}
+              disabled={quickGradeRunning}
+            >
+              Tutup
+            </Button>
+            <Button
+              className="rounded-xl text-sm bg-violet-600 hover:bg-violet-700 text-white font-semibold disabled:opacity-50 gap-2"
+              onClick={handleQuickGrade}
+              disabled={quickGradeRunning || !quickGradeText.trim()}
+            >
+              {quickGradeRunning ? (
+                <><RefreshCw className="h-4 w-4 animate-spin" /> Memproses...</>
+              ) : (
+                <><Zap className="h-4 w-4" /> Terapkan Grading</>
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* ✏️ Dialog Edit Jawaban Siswa */}
       <Dialog open={!!editAnswerDialog?.open} onOpenChange={(open) => { if (!open) setEditAnswerDialog(null); }}>
         <DialogContent className="max-w-lg bg-white dark:bg-slate-950 rounded-2xl border-none shadow-2xl p-0 overflow-hidden flex flex-col max-h-[90vh]">
@@ -2384,13 +3106,13 @@ const MonitoringPage = () => {
                             key={key}
                             onClick={() => setEditAnswerDialog(prev => prev ? { ...prev, currentAnswer: key } : prev)}
                             className={`w-full flex items-start gap-3 p-3 rounded-xl border text-left transition-all ${isSelected
-                                ? "border-amber-400 bg-amber-50 dark:bg-amber-900/20"
-                                : "border-slate-200 dark:border-slate-700 hover:border-slate-300 bg-white dark:bg-slate-900"
+                              ? "border-amber-400 bg-amber-50 dark:bg-amber-900/20"
+                              : "border-slate-200 dark:border-slate-700 hover:border-slate-300 bg-white dark:bg-slate-900"
                               }`}
                           >
                             <span className={`shrink-0 w-7 h-7 rounded-lg flex items-center justify-center text-xs font-black border-2 ${isSelected
-                                ? "bg-amber-500 border-amber-500 text-white"
-                                : "border-slate-300 dark:border-slate-600 text-slate-500"
+                              ? "bg-amber-500 border-amber-500 text-white"
+                              : "border-slate-300 dark:border-slate-600 text-slate-500"
                               }`}>
                               {key.toUpperCase()}
                             </span>
