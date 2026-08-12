@@ -223,11 +223,7 @@ export const fetchWaygroundQuiz = async (urlOrId: string): Promise<ExternalQuizM
 
   // Candidate Proxy URLs (1st priority: VPS Caddy /api-quiz/ reverse proxy to wayground.com)
   const candidateUrls = [
-    `/api-quiz/${quizId}`,
-    `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(waygroundApi)}`,
-    `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(quizizzApi)}`,
-    `https://api.allorigins.win/get?url=${encodeURIComponent(waygroundApi)}`,
-    `https://corsproxy.io/?${encodeURIComponent(waygroundApi)}`
+    `/api-quiz/${quizId}`
   ];
 
   if (urlOrId.startsWith("http") && (urlOrId.includes("api") || urlOrId.includes("json"))) {
