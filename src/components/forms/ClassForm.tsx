@@ -5,7 +5,7 @@ import * as z from "zod";
 
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
-import FormField from "../forms/FormField";
+import FormField from "./FormField";
 
 const classSchema = z.object({
   name: z.string().min(1, "Nama kelas wajib diisi"),
@@ -20,7 +20,7 @@ interface ClassFormProps {
   onCancel?: () => void;
 }
 
-const ClassForm = ({ defaultValues, onSubmit, submitLabel = "Simpan", onCancel }: ClassFormProps) => {
+export const ClassForm = ({ defaultValues, onSubmit, submitLabel = "Simpan", onCancel }: ClassFormProps) => {
   const {
     register,
     handleSubmit,

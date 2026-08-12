@@ -4,12 +4,12 @@ import { ArrowLeft, Sparkles, CheckCircle2, X, RefreshCw, FileText } from "lucid
 import { Button } from "../../components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../components/ui/table";
 import { Skeleton } from "../../components/ui/skeleton";
-import { MathText } from "../../components/MathText";
+import { MathText } from "../../components/ui/MathText";
 import { useTenant } from "../../context/TenantContext";
 import { useExamData } from "../../context/ExamDataContext";
 import { useToast } from "../../components/ui/toast";
 import { gradeEssayWithAI } from "../../lib/ai";
-import { ConfirmationDialog } from "../../components/ui/confirmation-dialog";
+import { ConfirmationDialog } from "../../components/dialogs/ConfirmationDialog";
 
 // Strip HTML tags for clean text display
 const stripHtml = (html: string): string => {

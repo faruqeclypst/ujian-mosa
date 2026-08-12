@@ -294,7 +294,7 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
       const diff = nextUpdate - now;
 
       if (diff <= 0) {
-        if (timeLeft !== "00:00") setTimeLeft("00:00");
+        setTimeLeft(prev => prev === "00:00" ? prev : "00:00");
         
         // 🔒 No longer rotating from the frontend admin to avoid conflicts.
         // Rotation is now handled by the server (pb_hooks/main.pb.js).
@@ -313,11 +313,12 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
       } else {
         const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
         const s = Math.floor((diff % (1000 * 60)) / 1000);
-        setTimeLeft(`${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`);
+        const formatted = `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+        setTimeLeft(prev => prev === formatted ? prev : formatted);
       }
     }, 1000);
     return () => clearInterval(timer);
-  }, [tokenUpdatedAt, role, timeLeft]);
+  }, [tokenUpdatedAt, role, serverOffset, pb]);
 
   // --- Teacher Actions ---
   const createTeacher = async (payload: TeacherPayload) => {

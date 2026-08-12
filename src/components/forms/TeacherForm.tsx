@@ -6,8 +6,7 @@ import * as z from "zod";
 import { useExamData } from "../../context/ExamDataContext";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
-import FormField from "../forms/FormField";
-
+import FormField from "./FormField";
 import { useTenant } from "../../context/TenantContext";
 
 export interface TeacherSubmitPayload {
@@ -24,7 +23,7 @@ interface TeacherFormProps {
   onCancel?: () => void;
 }
 
-const TeacherForm = ({ defaultValues, onSubmit, submitLabel = "Simpan", onCancel }: TeacherFormProps) => {
+export const TeacherForm = ({ defaultValues, onSubmit, submitLabel = "Simpan", onCancel }: TeacherFormProps) => {
   const { subjects } = useExamData();
   const { terminology } = useTenant();
 
@@ -163,5 +162,3 @@ const TeacherForm = ({ defaultValues, onSubmit, submitLabel = "Simpan", onCancel
 };
 
 export default TeacherForm;
-
-

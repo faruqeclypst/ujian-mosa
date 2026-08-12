@@ -5,7 +5,7 @@ import * as z from "zod";
 
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
-import FormField from "../forms/FormField";
+import FormField from "./FormField";
 import { useTenant } from "../../context/TenantContext";
 
 const createSubjectSchema = (subjectTerm: string) => z.object({
@@ -23,7 +23,7 @@ interface SubjectFormProps {
   onCancel?: () => void;
 }
 
-const SubjectForm = ({ defaultValues, onSubmit, submitLabel = "Simpan", onCancel }: SubjectFormProps) => {
+export const SubjectForm = ({ defaultValues, onSubmit, submitLabel = "Simpan", onCancel }: SubjectFormProps) => {
   const { terminology } = useTenant();
   const subjectSchema = createSubjectSchema(terminology.subject);
 

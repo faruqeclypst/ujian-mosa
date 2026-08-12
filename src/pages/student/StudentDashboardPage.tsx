@@ -18,7 +18,7 @@ import { Card, CardHeader, CardContent } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
 import { cn } from "../../lib/utils";
 import { syncPendingData } from "../../lib/syncManager";
-import TokenDialog from "../../components/student/TokenDialog";
+import TokenDialog from "../../components/dialogs/TokenDialog";
 
 // ── Isolated banner: typing name + rotating message ──
 // memo + own state = tidak ikut re-render parent
@@ -134,7 +134,7 @@ const StudentDashboardPage = () => {
   const [hasPendingSync, setHasPendingSync] = useState(false);
   const [isSyncingData, setIsSyncingData] = useState(false);
   const [isFirstLoadState, setIsFirstLoadState] = useState(true);
-  
+
   // Change Password Modal
   const [isChangePassOpen, setIsChangePassOpen] = useState(false);
   const [newPass, setNewPass] = useState("");
@@ -194,7 +194,7 @@ const StudentDashboardPage = () => {
     try {
       // Only show full loading on initial mount
       if (loading && !isSilent) setLoading(true);
-      
+
       // Fetch settings (Skip if already have school info)
       if (!schoolLogo || schoolName === "CBT System") {
         const settingsRecords = await pb.collection("settings").getFullList({ limit: 1, requestKey: "dashboard_settings" });
@@ -209,11 +209,12 @@ const StudentDashboardPage = () => {
       // 1. Fetch Rooms and Attempts in Parallel (Faster)
       const [roomsRecords, attemptsRecords] = await Promise.all([
         pb.collection("exam_rooms").getFullList({
+          filter: 'status != "archive"',
           expand: "examId,examId.subjectId,examId.teacherId",
           sort: "-created",
           requestKey: "dashboard_rooms"
         }),
-        pb.collection("attempts").getFullList({ 
+        pb.collection("attempts").getFullList({
           filter: `studentId = "${student.id}"`,
           requestKey: "dashboard_attempts"
         })
@@ -253,9 +254,9 @@ const StudentDashboardPage = () => {
               const local = JSON.parse(localRaw);
               // Only trust localStorage if the attempt IDs match (same attempt, not a reset)
               if (local.status === "finished" &&
-                  myStatus[rId]?.status !== "finished" &&
-                  local.id === myStatus[rId]?.id) {
-                  myStatus[rId] = {
+                myStatus[rId]?.status !== "finished" &&
+                local.id === myStatus[rId]?.id) {
+                myStatus[rId] = {
                   ...myStatus[rId],
                   status: "finished",
                   submittedAt: local.submittedAt,
@@ -267,7 +268,7 @@ const StudentDashboardPage = () => {
                 };
               }
             }
-          } catch {}
+          } catch { }
         });
       }
 
@@ -313,9 +314,9 @@ const StudentDashboardPage = () => {
         navigate(`/cbt`, { replace: true });
         return;
       }
-    } catch (err) { 
-      console.error("Dashboard fetch error:", err); 
-    } finally { 
+    } catch (err) {
+      console.error("Dashboard fetch error:", err);
+    } finally {
       setLoading(false);
       // Tunggu sebentar agar animasi pertama selesai baru matikan state first load
       setTimeout(() => setIsFirstLoadState(false), 1000);
@@ -327,13 +328,19 @@ const StudentDashboardPage = () => {
     fetchData();
     if (!pb) return;
 
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    const triggerDebouncedFetch = () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        fetchData(true);
+      }, 1000);
+    };
+
     // Subscribe to room changes (Global)
     const unsubR = pb.collection("exam_rooms").subscribe("*", (e) => {
-      console.log("Room Change Detected, checking relevance...");
-      
       if (e.action === "update" || e.action === "create" || e.action === "delete") {
         if (e.action === "delete") {
-          fetchData(true);
+          triggerDebouncedFetch();
           return;
         }
 
@@ -341,13 +348,13 @@ const StudentDashboardPage = () => {
 
         // If a room is disabled or archived, we should refetch to update UI (hide or archive)
         if (room.isActive === false || room.status === "archive") {
-          fetchData(true);
+          triggerDebouncedFetch();
           return;
         }
 
         // If the room is for all classes, it is relevant
         if (room.allClasses) {
-          fetchData(true);
+          triggerDebouncedFetch();
           return;
         }
 
@@ -355,15 +362,16 @@ const StudentDashboardPage = () => {
         const clsData = room.classId || (room as any).classIds || "";
         const allowedClasses = Array.isArray(clsData) ? clsData : String(clsData).split(",").map(id => id.trim());
         if (allowedClasses.includes(student.classId)) {
-          fetchData(true);
+          triggerDebouncedFetch();
         }
       }
     });
 
     return () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
       unsubR.then(u => u()).catch(() => { });
     };
-  }, [student?.id, student?.classId]);
+  }, [student?.id, pb]);
 
   useEffect(() => {
     if (student?.id && pb && navigator.onLine) {
@@ -498,16 +506,16 @@ const StudentDashboardPage = () => {
                 </p>
               </div>
             </div>
-            
+
             {/* Mobile Feature Link */}
             <div
-               onClick={() => navigate("/minat-bakat")}
-               className="lg:hidden p-5 bg-gradient-to-br from-indigo-600 to-indigo-800 rounded-[2.5rem] text-white overflow-hidden relative group shadow-xl active:scale-95 transition-transform text-left"
+              onClick={() => navigate("/minat-bakat")}
+              className="lg:hidden p-5 bg-gradient-to-br from-indigo-600 to-indigo-800 rounded-[2.5rem] text-white overflow-hidden relative group shadow-xl active:scale-95 transition-transform text-left"
             >
               <div className="absolute top-0 right-0 p-4 opacity-10"><Sparkles className="h-10 w-10 rotate-12" /></div>
               <div className="flex items-center gap-2 mb-1">
-                 <Sparkles className="h-3 w-3 text-yellow-300" />
-                 <p className="text-[8px] font-black text-indigo-100 uppercase tracking-widest">{hasInterests ? "Teranalisis" : "Self Discovery"}</p>
+                <Sparkles className="h-3 w-3 text-yellow-300" />
+                <p className="text-[8px] font-black text-indigo-100 uppercase tracking-widest">{hasInterests ? "Teranalisis" : "Self Discovery"}</p>
               </div>
               <p className="text-sm font-black leading-tight">{hasInterests ? "Lihat Hasil Minat" : "Cek Minat & Bakat"}</p>
               <p className="text-[9px] font-medium text-indigo-100/70 mt-1">{hasInterests ? "Tinjau kembali potensi karirmu." : "Temukan potensi terbaikmu di sini."}</p>
@@ -515,40 +523,40 @@ const StudentDashboardPage = () => {
 
             <div className="space-y-6 text-left">
               <AnimatePresence>
-        {hasPendingSync && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            className="overflow-hidden"
-          >
-            <div className="bg-amber-500/10 border-b border-amber-500/20 px-4 sm:px-8 py-3 flex flex-col sm:flex-row items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-amber-500/20 rounded-xl flex items-center justify-center shrink-0">
-                  <AlertCircle className="w-5 h-5 text-amber-500 animate-pulse" />
-                </div>
-                <div className="flex flex-col text-left">
-                  <span className="text-xs font-black text-amber-600 uppercase tracking-widest">Sinkronisasi Diperlukan</span>
-                  <p className="text-[11px] font-bold text-amber-700/70">Waduh! Ada jawaban ujianmu yang belum terkirim ke server karena internet mati tadi.</p>
-                </div>
-              </div>
-              <Button
-                onClick={handleManualSync}
-                disabled={isSyncingData}
-                size="sm"
-                className="bg-amber-500 hover:bg-amber-600 text-white rounded-xl h-9 px-4 font-black uppercase tracking-widest text-[10px] shadow-sm w-full sm:w-auto"
-              >
-                {isSyncingData ? (
-                   <>
-                    <Sparkles className="w-3 h-3 mr-2 animate-spin" />
-                    Mengirim...
-                   </>
-                ) : "Kirim Jawaban Sekarang"}
-              </Button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+                {hasPendingSync && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="bg-amber-500/10 border-b border-amber-500/20 px-4 sm:px-8 py-3 flex flex-col sm:flex-row items-center justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-amber-500/20 rounded-xl flex items-center justify-center shrink-0">
+                          <AlertCircle className="w-5 h-5 text-amber-500 animate-pulse" />
+                        </div>
+                        <div className="flex flex-col text-left">
+                          <span className="text-xs font-black text-amber-600 uppercase tracking-widest">Sinkronisasi Diperlukan</span>
+                          <p className="text-[11px] font-bold text-amber-700/70">Waduh! Ada jawaban ujianmu yang belum terkirim ke server karena internet mati tadi.</p>
+                        </div>
+                      </div>
+                      <Button
+                        onClick={handleManualSync}
+                        disabled={isSyncingData}
+                        size="sm"
+                        className="bg-amber-500 hover:bg-amber-600 text-white rounded-xl h-9 px-4 font-black uppercase tracking-widest text-[10px] shadow-sm w-full sm:w-auto"
+                      >
+                        {isSyncingData ? (
+                          <>
+                            <Sparkles className="w-3 h-3 mr-2 animate-spin" />
+                            Mengirim...
+                          </>
+                        ) : "Kirim Jawaban Sekarang"}
+                      </Button>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 px-1">
                 <div className="flex items-center gap-3">
@@ -612,11 +620,11 @@ const StudentDashboardPage = () => {
                         const isLocked = attempt && attempt.status === "LOCKED";
 
                         return (
-                          <motion.div 
-                            initial={isFirstLoadState ? { opacity: 0, scale: 0.95 } : false} 
-                            animate={{ opacity: 1, scale: 1 }} 
-                            transition={{ delay: isFirstLoadState ? idx * 0.05 : 0 }} 
-                            key={room.id} 
+                          <motion.div
+                            initial={isFirstLoadState ? { opacity: 0, scale: 0.95 } : false}
+                            animate={{ opacity: 1, scale: 1 }}
+                            transition={{ delay: isFirstLoadState ? idx * 0.05 : 0 }}
+                            key={room.id}
                             className="group relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[2.5rem] shadow-sm hover:shadow-2xl hover:border-emerald-200 dark:hover:border-emerald-800/50 transition-all overflow-hidden flex flex-col h-full text-left"
                           >
                             <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-50 dark:bg-emerald-950/20 rounded-full -mr-16 -mt-16 transition-transform group-hover:scale-150 duration-700" />
@@ -688,7 +696,7 @@ const StudentDashboardPage = () => {
                                     </div>
                                   </div>
                                 </div>
-                                                <div className="mt-auto pt-4 border-t border-slate-50 dark:border-slate-800/50">
+                                <div className="mt-auto pt-4 border-t border-slate-50 dark:border-slate-800/50">
                                   {isFinished ? (
                                     <div className="flex flex-col gap-4">
                                       {room.show_result !== false ? (() => {
@@ -701,44 +709,44 @@ const StudentDashboardPage = () => {
                                         // Gunakan attempt?.score terlebih dahulu jika ada, untuk menghindari fallback ke default '0' di kolom objectiveScore
                                         const displayScore = attempt?.score ?? attempt?.objectiveScore ?? meta?.objectiveScore ?? 0;
                                         return (
-                                        <>
-                                        <div className="flex items-center justify-between">
-                                          <div className="flex gap-2">
-                                            <div className="flex flex-col items-center bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-100 dark:border-emerald-800/50 py-2 px-3 rounded-xl min-w-[50px]">
-                                              <span className="text-[8px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest leading-none mb-1">Benar</span>
-                                              <span className="text-sm font-black text-emerald-700 dark:text-emerald-300">{objectiveCorrect}</span>
+                                          <>
+                                            <div className="flex items-center justify-between">
+                                              <div className="flex gap-2">
+                                                <div className="flex flex-col items-center bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-100 dark:border-emerald-800/50 py-2 px-3 rounded-xl min-w-[50px]">
+                                                  <span className="text-[8px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest leading-none mb-1">Benar</span>
+                                                  <span className="text-sm font-black text-emerald-700 dark:text-emerald-300">{objectiveCorrect}</span>
+                                                </div>
+                                                <div className="flex flex-col items-center bg-rose-50 dark:bg-rose-950/30 border border-rose-100 dark:border-rose-800/50 py-2 px-3 rounded-xl min-w-[50px]">
+                                                  <span className="text-[8px] font-black text-rose-600 dark:text-rose-400 uppercase tracking-widest leading-none mb-1">Salah</span>
+                                                  <span className="text-sm font-black text-rose-700 dark:text-rose-300">{Math.max(0, objectiveTotal - objectiveCorrect)}</span>
+                                                </div>
+                                              </div>
+                                              <div className="flex flex-col items-end">
+                                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
+                                                  Nilai Objektif
+                                                </span>
+                                                <div className="flex items-baseline gap-1">
+                                                  <span className="text-3xl font-black text-slate-900 dark:text-white tabular-nums tracking-tighter">
+                                                    {Number(displayScore).toFixed(1)}
+                                                  </span>
+                                                  <span className="text-[10px] font-bold text-slate-400">/ 100</span>
+                                                </div>
+                                              </div>
                                             </div>
-                                            <div className="flex flex-col items-center bg-rose-50 dark:bg-rose-950/30 border border-rose-100 dark:border-rose-800/50 py-2 px-3 rounded-xl min-w-[50px]">
-                                              <span className="text-[8px] font-black text-rose-600 dark:text-rose-400 uppercase tracking-widest leading-none mb-1">Salah</span>
-                                              <span className="text-sm font-black text-rose-700 dark:text-rose-300">{Math.max(0, objectiveTotal - objectiveCorrect)}</span>
-                                            </div>
-                                          </div>
-                                          <div className="flex flex-col items-end">
-                                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
-                                              Nilai Objektif
-                                            </span>
-                                            <div className="flex items-baseline gap-1">
-                                              <span className="text-3xl font-black text-slate-900 dark:text-white tabular-nums tracking-tighter">
-                                                {Number(displayScore).toFixed(1)}
-                                              </span>
-                                              <span className="text-[10px] font-bold text-slate-400">/ 100</span>
-                                            </div>
-                                          </div>
-                                        </div>
 
-                                        {/* Keterangan jika ada essay — nilai essay tidak ditampilkan ke siswa */}
-                                        {essayTotal > 0 && (
-                                          <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/40 rounded-xl">
-                                            <span className="text-amber-500 text-base">📝</span>
-                                            <p className="text-[10px] font-black text-amber-700 dark:text-amber-400 uppercase tracking-wide leading-none">
-                                              {essayTotal} soal essay/isian dinilai oleh guru
-                                            </p>
-                                          </div>
-                                        )}
-                                        </>
+                                            {/* Keterangan jika ada essay — nilai essay tidak ditampilkan ke siswa */}
+                                            {essayTotal > 0 && (
+                                              <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/40 rounded-xl">
+                                                <span className="text-amber-500 text-base">📝</span>
+                                                <p className="text-[10px] font-black text-amber-700 dark:text-amber-400 uppercase tracking-wide leading-none">
+                                                  {essayTotal} soal essay/isian dinilai oleh guru
+                                                </p>
+                                              </div>
+                                            )}
+                                          </>
                                         );
                                       })() : null}
-                                      
+
                                       <div className="-mx-6 -mb-6 mt-2 px-6 py-3 bg-emerald-500 text-white flex items-center justify-between shadow-inner">
                                         <span className="text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
                                           <ClipboardCheck className="w-3.5 h-3.5" />
@@ -754,10 +762,10 @@ const StudentDashboardPage = () => {
                                       <span className="text-[10px] font-black text-rose-600 uppercase tracking-[0.2em]">Akun Terkunci</span>
                                     </div>
                                   ) : room.timeStatus === "ongoing" ? (
-                                    <Button 
-                                      onClick={() => setSelectedRoom(room)} 
+                                    <Button
+                                      onClick={() => setSelectedRoom(room)}
                                       className="w-full h-12 bg-emerald-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] shadow-lg shadow-emerald-200 dark:shadow-none transition-all active:scale-95 group-hover:bg-emerald-700"
-                                    > 
+                                    >
                                       {attempt ? "Lanjutkan Ujian" : "Mulai Pengerjaan"}
                                     </Button>
                                   ) : (
@@ -819,16 +827,16 @@ const StudentDashboardPage = () => {
                   </div>
                 </div>
                 <div className="pt-6 border-t border-slate-50 dark:border-slate-800/60">
-                   <motion.div 
-                     whileHover={{ scale: 1.02 }}
-                     whileTap={{ scale: 0.98 }}
-                     onClick={() => navigate("/minat-bakat")}
-                     className="p-5 bg-gradient-to-br from-indigo-500 to-indigo-700 dark:from-indigo-800 dark:to-indigo-950 rounded-[2rem] text-white overflow-hidden relative group cursor-pointer shadow-xl shadow-indigo-500/10 mb-4"
-                   >
+                  <motion.div
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => navigate("/minat-bakat")}
+                    className="p-5 bg-gradient-to-br from-indigo-500 to-indigo-700 dark:from-indigo-800 dark:to-indigo-950 rounded-[2rem] text-white overflow-hidden relative group cursor-pointer shadow-xl shadow-indigo-500/10 mb-4"
+                  >
                     <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-125 transition-transform"><Sparkles className="h-12 w-12" /></div>
                     <div className="flex items-center gap-2 mb-1">
-                       <Sparkles className="h-3 w-3 text-yellow-300" />
-                       <p className="text-[9px] font-black text-indigo-100/60 uppercase tracking-widest">{hasInterests ? "Teranalisis" : "Self Discovery"}</p>
+                      <Sparkles className="h-3 w-3 text-yellow-300" />
+                      <p className="text-[9px] font-black text-indigo-100/60 uppercase tracking-widest">{hasInterests ? "Teranalisis" : "Self Discovery"}</p>
                     </div>
                     <p className="text-sm font-black leading-tight mb-1">{hasInterests ? "Lihat Hasil Minat & Bakat" : "Tes Minat & Bakat"}</p>
                     <p className="text-[10px] font-medium text-indigo-100/70 leading-relaxed">{hasInterests ? "Analisis potensimu sudah siap untuk dipelajari kembali." : "Temukan jurusan dan karier impianmu melalui survey kepribadian."}</p>
@@ -866,13 +874,13 @@ const StudentDashboardPage = () => {
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest ml-1">Password Baru</label>
                 <div className="relative">
-                  <Input 
+                  <Input
                     type="password"
-                    value={newPass} 
-                    onChange={(e) => setNewPass(e.target.value)} 
-                    placeholder="Minimal 6 karakter" 
-                    className="h-14 bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 rounded-2xl px-5 font-bold" 
-                    disabled={isChangingPass} 
+                    value={newPass}
+                    onChange={(e) => setNewPass(e.target.value)}
+                    placeholder="Minimal 6 karakter"
+                    className="h-14 bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 rounded-2xl px-5 font-bold"
+                    disabled={isChangingPass}
                   />
                   <KeyRound className="absolute right-5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-300" />
                 </div>
@@ -880,13 +888,13 @@ const StudentDashboardPage = () => {
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest ml-1">Konfirmasi Password Baru</label>
                 <div className="relative">
-                  <Input 
+                  <Input
                     type="password"
-                    value={confirmPass} 
-                    onChange={(e) => setConfirmPass(e.target.value)} 
-                    placeholder="Ulangi password baru" 
-                    className="h-14 bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 rounded-2xl px-5 font-bold" 
-                    disabled={isChangingPass} 
+                    value={confirmPass}
+                    onChange={(e) => setConfirmPass(e.target.value)}
+                    placeholder="Ulangi password baru"
+                    className="h-14 bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 rounded-2xl px-5 font-bold"
+                    disabled={isChangingPass}
                   />
                   <Lock className="absolute right-5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-300" />
                 </div>
@@ -899,20 +907,20 @@ const StudentDashboardPage = () => {
               )}
             </div>
             <DialogFooter className="flex-col sm:flex-row gap-3">
-              <Button 
-                variant="ghost" 
-                onClick={() => setIsChangePassOpen(false)} 
+              <Button
+                variant="ghost"
+                onClick={() => setIsChangePassOpen(false)}
                 className="h-14 rounded-2xl font-black text-[10px] uppercase tracking-widest text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
                 disabled={isChangingPass}
               >
                 Batal
               </Button>
-              <Button 
+              <Button
                 onClick={async () => {
                   setPassError("");
                   if (newPass.length < 6) return setPassError("Password minimal 6 karakter!");
                   if (newPass !== confirmPass) return setPassError("Konfirmasi password tidak cocok!");
-                  
+
                   setIsChangingPass(true);
                   try {
                     await changePassword(newPass);

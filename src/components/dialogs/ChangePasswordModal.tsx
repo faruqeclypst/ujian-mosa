@@ -46,7 +46,7 @@ interface ProfileSettingsModalProps {
   defaultTab?: "profile" | "password";
 }
 
-const ChangePasswordModal = ({ isOpen, onClose, defaultTab = "profile" }: ProfileSettingsModalProps) => {
+export const ChangePasswordModal = ({ isOpen, onClose, defaultTab = "profile" }: ProfileSettingsModalProps) => {
   const { user } = useAuth();
   const { pb } = useTenant();
   const { addToast } = useToast();

@@ -33,19 +33,16 @@ import { useTenant } from "../context/TenantContext";
 import { useExamData } from "../context/ExamDataContext";
 import { Button } from "../components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "../components/ui/dialog";
-import { Progress } from "../components/ui/progress";
-import { DeleteConfirmationDialog } from "../components/ui/delete-confirmation-dialog";
-import StudentForm, { StudentFormValues } from "../components/exam/StudentForm";
-import StudentTable from "../components/tables/StudentTable";
-import { ImportButton } from "../components/ui/import-button";
-import { ExportButton } from "../components/ui/export-button";
-import { ConfirmationDialog } from "../components/ui/confirmation-dialog";
+import { ConfirmationDialog } from "../components/dialogs/ConfirmationDialog";
 import { downloadStudentImportTemplate, exportStudentToExcel, exportStudentLoginsToExcel, parseStudentImportExcel, exportAllStudentScores } from "../lib/studentExcel";
-import FormField from "../components/forms/FormField";
-import { Select } from "../components/ui/select";
 import type { StudentData } from "../types/exam";
-import StudentInterestDialog from "../components/exam/StudentInterestDialog";
-import StudentScoresDialog from "../components/exam/StudentScoresDialog";
+import { StudentForm, StudentFormValues } from "../components/forms/StudentForm";
+import { StudentTable } from "../components/tables/StudentTable";
+import StudentInterestDialog from "../components/dialogs/StudentInterestDialog";
+import StudentScoresDialog from "../components/dialogs/StudentScoresDialog";
+import BatchClassMoveDialog from "../components/dialogs/BatchClassMoveDialog";
+import ResetStudentPasswordDialog from "../components/dialogs/ResetStudentPasswordDialog";
+import BatchProgressDialog from "../components/dialogs/BatchProgressDialog";
 
 const StudentsPage = () => {
   const { role } = useAuth();
@@ -74,8 +71,6 @@ const StudentsPage = () => {
   const [filterClassId, setFilterClassId] = useState<string>("ALL");
 
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
-  const [resetScope, setResetScope] = useState<"selected" | "class" | "all">("class");
-  const [resetSelectedClassId, setResetSelectedClassId] = useState<string>("");
 
   const [alertDialog, setAlertDialog] = useState<{
     isOpen: boolean;
@@ -311,14 +306,6 @@ const StudentsPage = () => {
 
   const handleExecuteResetModal = () => {
     setIsResetModalOpen(false);
-
-    if (resetScope === "selected") {
-      handleBatchResetPassword();
-    } else if (resetScope === "class") {
-      handleResetClassPassword(resetSelectedClassId);
-    } else if (resetScope === "all") {
-      handleResetAllStudentsPassword();
-    }
   };
 
   const handleConfirmDelete = async () => {
@@ -741,7 +728,6 @@ const StudentsPage = () => {
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       onClick={() => {
-                        setResetScope(selectedIds.length > 0 ? "selected" : "class");
                         setIsResetModalOpen(true);
                       }}
                       className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 focus:bg-slate-50 dark:focus:bg-slate-900 transition-colors group"
@@ -908,13 +894,14 @@ const StudentsPage = () => {
         />
       )}
 
-      <DeleteConfirmationDialog
+      <ConfirmationDialog
         isOpen={deleteDialogOpen}
         onClose={() => setDeleteDialogOpen(false)}
         onConfirm={handleConfirmDelete}
+        type="danger"
         title={`Hapus ${terminology.student}`}
-        description={`Apakah Anda yakin ingin menghapus data ${terminology.student.toLowerCase()} ini? Riwayat ujian ${terminology.student.toLowerCase()} ini juga mungkin tidak akan terbaca dengan benar.`}
-        itemName={`${terminology.student} ${studentToDelete?.name || ""}`}
+        description={`Apakah Anda yakin ingin menghapus data ${terminology.student.toLowerCase()} "${studentToDelete?.name || ""}"? Riwayat ujian ${terminology.student.toLowerCase()} ini juga mungkin tidak akan terbaca dengan benar.`}
+        confirmLabel="Hapus"
         isLoading={isDeleting}
       />
 
@@ -932,197 +919,34 @@ const StudentsPage = () => {
         showCancel={alertDialog.showCancel}
       />
 
-      {/* Dialog Pindah Kelas Massal */}
-      <Dialog open={isBatchOpen} onOpenChange={setIsBatchOpen}>
-        <DialogContent className="max-w-md bg-card">
-          <DialogHeader>
-            <DialogTitle className="text-base font-bold text-slate-800 dark:text-white flex items-center gap-2">
-              <ArrowLeftRight className="h-5 w-5 text-orange-500" />
-              Pindah {terminology.class} ({selectedIds.length} {terminology.student})
-            </DialogTitle>
-            <DialogDescription className="text-xs">
-              Pilih {terminology.class.toLowerCase()} baru untuk {terminology.student.toLowerCase()}-{terminology.student.toLowerCase()} yang terpilih.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Pilih {terminology.class} Tujuan:</label>
-              <select
-                value={targetClassId}
-                onChange={(e) => setTargetClassId(e.target.value)}
-                className="w-full h-10 rounded-xl border border-slate-200 bg-slate-50/50 px-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-orange-500/20 transition-all cursor-pointer dark:bg-slate-900/50 dark:border-slate-800"
-              >
-                <option value="">-- Pilih {terminology.class} --</option>
-                {sortedClasses.map(cls => (
-                  <option key={cls.id} value={cls.id}>{cls.name}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-          <div className="flex justify-end gap-2 pt-2">
-            <Button variant="outline" onClick={() => setIsBatchOpen(false)} className="rounded-xl border-slate-200 dark:border-slate-800">Batal</Button>
-            <Button
-              disabled={!targetClassId}
-              onClick={handleBatchUpdateClass}
-              className="bg-orange-600 hover:bg-orange-700 text-white rounded-xl shadow-lg shadow-orange-500/20"
-            >
-              Proses Pindah {terminology.class}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <BatchClassMoveDialog
+        isOpen={isBatchOpen}
+        onOpenChange={setIsBatchOpen}
+        selectedCount={selectedIds.length}
+        classes={sortedClasses}
+        targetClassId={targetClassId}
+        onTargetClassChange={setTargetClassId}
+        onSubmit={handleBatchUpdateClass}
+      />
 
-      {/* Dialog Reset Password Massal */}
-      <Dialog open={isResetModalOpen} onOpenChange={setIsResetModalOpen}>
-        <DialogContent className="max-w-md bg-card">
-          <DialogHeader>
-            <DialogTitle className="text-base font-bold text-slate-800 dark:text-white flex items-center gap-2">
-              <KeyRound className="h-5 w-5 text-amber-500" />
-              Reset Password {terminology.student}
-            </DialogTitle>
-            <DialogDescription className="text-xs">
-              Kembalikan password {terminology.student.toLowerCase()} ke nilai default <strong className="font-mono bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-amber-600 dark:text-amber-400">12345678</strong>.
-            </DialogDescription>
-          </DialogHeader>
+      <ResetStudentPasswordDialog
+        isOpen={isResetModalOpen}
+        onOpenChange={setIsResetModalOpen}
+        selectedCount={selectedIds.length}
+        classes={sortedClasses}
+        students={students}
+        onConfirmReset={(scope, selectedClassId) => {
+          if (scope === "selected") {
+            handleBatchResetPassword();
+          } else if (scope === "class" && selectedClassId) {
+            handleResetClassPassword(selectedClassId);
+          } else if (scope === "all") {
+            handleResetAllStudentsPassword();
+          }
+        }}
+      />
 
-          <div className="space-y-4 py-3">
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Cakupan Reset:</label>
-              <div className="grid grid-cols-3 gap-2">
-                <button
-                  type="button"
-                  disabled={selectedIds.length === 0}
-                  onClick={() => setResetScope("selected")}
-                  className={cn(
-                    "flex flex-col items-center justify-center p-3 rounded-xl border text-xs font-bold transition-all text-center gap-1",
-                    resetScope === "selected" 
-                      ? "border-amber-500 bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-600 shadow-sm"
-                      : "border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-900 text-slate-600 dark:text-slate-400",
-                    selectedIds.length === 0 && "opacity-40 cursor-not-allowed"
-                  )}
-                >
-                  <span>Terpilih</span>
-                  <span className="text-[10px] font-normal opacity-80">({selectedIds.length})</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setResetScope("class")}
-                  className={cn(
-                    "flex flex-col items-center justify-center p-3 rounded-xl border text-xs font-bold transition-all text-center gap-1",
-                    resetScope === "class" 
-                      ? "border-amber-500 bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-600 shadow-sm"
-                      : "border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-900 text-slate-600 dark:text-slate-400"
-                  )}
-                >
-                  <span>Per {terminology.class}</span>
-                  <span className="text-[10px] font-normal opacity-80">Pilih kelas</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setResetScope("all")}
-                  className={cn(
-                    "flex flex-col items-center justify-center p-3 rounded-xl border text-xs font-bold transition-all text-center gap-1",
-                    resetScope === "all" 
-                      ? "border-rose-500 bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-600 shadow-sm"
-                      : "border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-900 text-slate-600 dark:text-slate-400"
-                  )}
-                >
-                  <span>Semua Akun</span>
-                  <span className="text-[10px] font-normal opacity-80">Seluruh siswa</span>
-                </button>
-              </div>
-            </div>
-
-            {resetScope === "selected" && (
-              <div className="p-3 bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200/50 dark:border-amber-800/30 rounded-xl text-xs text-amber-800 dark:text-amber-300">
-                Akan mereset password <strong className="font-bold">{selectedIds.length} {terminology.student.toLowerCase()}</strong> yang dicentang di tabel.
-              </div>
-            )}
-
-            {resetScope === "class" && (
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Pilih {terminology.class}:</label>
-                <select
-                  value={resetSelectedClassId}
-                  onChange={(e) => setResetSelectedClassId(e.target.value)}
-                  className="w-full h-10 rounded-xl border border-slate-200 bg-slate-50/50 px-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-amber-500/20 transition-all cursor-pointer dark:bg-slate-900/50 dark:border-slate-800"
-                >
-                  <option value="">-- Pilih {terminology.class} --</option>
-                  {sortedClasses.map(cls => {
-                    const count = students.filter(s => s.classId === cls.id).length;
-                    return (
-                      <option key={cls.id} value={cls.id}>
-                        {cls.name} ({count} {terminology.student})
-                      </option>
-                    );
-                  })}
-                </select>
-              </div>
-            )}
-
-            {resetScope === "all" && (
-              <div className="p-3.5 bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800/40 rounded-xl space-y-1">
-                <p className="text-xs font-bold text-rose-700 dark:text-rose-300 flex items-center gap-1.5">
-                  ⚠️ PERHATIAN
-                </p>
-                <p className="text-xs text-rose-600 dark:text-rose-400 leading-relaxed">
-                  Anda akan mereset password SELURUH <strong className="font-extrabold">{students.filter(s => s.classId !== "ALUMNI").length} {terminology.student.toLowerCase()}</strong> aktif menjadi <strong>12345678</strong>. {terminology.student} harus mengganti password kembali setelah login.
-                </p>
-              </div>
-            )}
-          </div>
-
-          <div className="flex justify-end gap-2 pt-2">
-            <Button variant="outline" onClick={() => setIsResetModalOpen(false)} className="rounded-xl border-slate-200 dark:border-slate-800">
-              Batal
-            </Button>
-            <Button
-              disabled={resetScope === "class" && !resetSelectedClassId}
-              onClick={handleExecuteResetModal}
-              className="bg-amber-600 hover:bg-amber-700 text-white rounded-xl shadow-lg shadow-amber-500/20"
-            >
-              Proses Reset Password
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Batch Progress Dialog */}
-      <Dialog open={batchProgress.isOpen} onOpenChange={() => { }}>
-        <DialogContent className="max-w-md bg-card border-none shadow-2xl p-0 overflow-hidden rounded-3xl" hideClose>
-          <div className="bg-blue-600 p-6 text-white flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="bg-white/20 p-2 rounded-xl">
-                <Loader2 className="h-5 w-5 animate-spin" />
-              </div>
-              <div>
-                <DialogTitle className="text-lg font-bold text-white">{batchProgress.title}</DialogTitle>
-                <DialogDescription className="text-blue-100 text-xs">Mohon tunggu hingga proses selesai.</DialogDescription>
-              </div>
-            </div>
-            <div className="text-right">
-              <span className="text-2xl font-black text-white/40">{Math.round((batchProgress.current / batchProgress.total) * 100) || 0}%</span>
-            </div>
-          </div>
-          <div className="p-8 space-y-6">
-            <div className="space-y-2">
-              <div className="flex justify-between items-end mb-1">
-                <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">{batchProgress.message}</span>
-                <span className="text-xs font-medium text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">
-                  {batchProgress.current} / {batchProgress.total}
-                </span>
-              </div>
-              <Progress value={(batchProgress.current / batchProgress.total) * 100} className="h-3 bg-slate-100 dark:bg-slate-800" />
-            </div>
-
-            <p className="text-[10px] text-center text-slate-400 font-medium italic">
-              * Jangan menutup atau merefresh halaman ini selama proses berlangsung.
-            </p>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <BatchProgressDialog progress={batchProgress} />
 
       <StudentInterestDialog
         isOpen={interestDialogOpen}

@@ -5,9 +5,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ".
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { useExamData } from "../context/ExamDataContext";
 import { Button } from "../components/ui/button";
-import { DeleteConfirmationDialog } from "../components/ui/delete-confirmation-dialog";
-import { ConfirmationDialog } from "../components/ui/confirmation-dialog";
-import StudentTable from "../components/tables/StudentTable";
+import { ConfirmationDialog } from "../components/dialogs/ConfirmationDialog";
+import { StudentTable } from "../components/tables/StudentTable";
 import { ExportButton } from "../components/ui/export-button";
 import { exportStudentToExcel } from "../lib/studentExcel";
 import { ArrowLeftRight, Check, X, RotateCw, Trash, Users } from "lucide-react";
@@ -270,13 +269,14 @@ const AlumniPage = () => {
         />
       )}
 
-      <DeleteConfirmationDialog 
+      <ConfirmationDialog 
         isOpen={deleteDialogOpen} 
         onClose={() => setDeleteDialogOpen(false)} 
         onConfirm={handleConfirmDelete} 
+        type="danger"
         title="Hapus Alumni" 
-        description="Apakah Anda yakin ingin menghapus data alumni ini?" 
-        itemName={studentToDelete?.name || ""} 
+        description={`Apakah Anda yakin ingin menghapus data alumni "${studentToDelete?.name || ""}"?`} 
+        confirmLabel="Hapus" 
         isLoading={isDeleting} 
       />
 

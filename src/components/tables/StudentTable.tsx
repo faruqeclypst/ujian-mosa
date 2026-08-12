@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { DataTable } from "../ui/data-table";
-import { Button } from "../ui/button";
 import type { StudentData, ClassData } from "../../types/exam";
 import { useAuth } from "../../context/AuthContext";
 import { useTenant } from "../../context/TenantContext";
@@ -24,7 +23,7 @@ interface StudentTableProps {
   customActions?: (student: StudentData) => React.ReactNode;
 }
 
-const StudentTable = ({ 
+export const StudentTable = ({ 
   students, 
   classes,
   selectedIds, 
@@ -61,7 +60,6 @@ const StudentTable = ({
       const end = Math.max(lastSelectedIndex, index);
       const idsInRange = students.slice(start, end + 1).map(s => s.id);
       
-      // Merge with existing selections
       newSelectedIds = Array.from(new Set([...newSelectedIds, ...idsInRange]));
     } else {
       if (checked) {
@@ -255,4 +253,3 @@ const StudentTable = ({
 };
 
 export default StudentTable;
-

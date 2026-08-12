@@ -25,15 +25,14 @@ import { useExamData } from "../context/ExamDataContext";
 import { useTenant } from "../context/TenantContext";
 import { Button } from "../components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "../components/ui/dialog";
-import { Progress } from "../components/ui/progress";
-import { DeleteConfirmationDialog } from "../components/ui/delete-confirmation-dialog";
-import ClassForm, { ClassFormValues } from "../components/exam/ClassForm";
-import ClassTable from "../components/tables/ClassTable";
+import { ClassForm, ClassFormValues } from "../components/forms/ClassForm";
+import { ClassTable } from "../components/tables/ClassTable";
 import { ImportButton } from "../components/ui/import-button";
 import { ExportButton } from "../components/ui/export-button";
-import { ConfirmationDialog } from "../components/ui/confirmation-dialog";
+import { ConfirmationDialog } from "../components/dialogs/ConfirmationDialog";
 import { downloadClassImportTemplate, exportClassToExcel, parseClassImportExcel } from "../lib/classExcel";
 import type { ClassData } from "../types/exam";
+import BatchProgressDialog from "../components/dialogs/BatchProgressDialog";
 
 const ClassesPage = () => {
   const { classes, students, loading, createClass, updateClass, deleteClass, resetStudentPasswordBatch } = useExamData();
@@ -433,13 +432,14 @@ const ClassesPage = () => {
         />
       )}
 
-      <DeleteConfirmationDialog
+      <ConfirmationDialog
         isOpen={deleteDialogOpen}
         onClose={() => setDeleteDialogOpen(false)}
         onConfirm={handleConfirmDelete}
+        type="danger"
         title={`Hapus ${terminology.class}`}
-        description={`Apakah Anda yakin ingin menghapus data ${terminology.class.toLowerCase()} ini?`}
-        itemName={`${terminology.class} ${classToDelete?.name || ""}`}
+        description={`Apakah Anda yakin ingin menghapus data ${terminology.class.toLowerCase()} "${classToDelete?.name || ""}"?`}
+        confirmLabel="Hapus"
         isLoading={isDeleting}
       />
 
@@ -457,40 +457,7 @@ const ClassesPage = () => {
         showCancel={alertDialog.showCancel}
       />
 
-      {/* Batch Progress Dialog */}
-      <Dialog open={batchProgress.isOpen} onOpenChange={() => {}}>
-        <DialogContent className="max-w-md bg-card border-none shadow-2xl p-0 overflow-hidden rounded-3xl" hideClose>
-          <div className="bg-indigo-600 p-6 text-white flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="bg-white/20 p-2 rounded-xl">
-                 <Loader2 className="h-5 w-5 animate-spin" />
-              </div>
-              <div>
-                <DialogTitle className="text-lg font-bold text-white">{batchProgress.title}</DialogTitle>
-                <DialogDescription className="text-indigo-100 text-xs text-left">Mohon tunggu hingga proses selesai.</DialogDescription>
-              </div>
-            </div>
-            <div className="text-right">
-               <span className="text-2xl font-black text-white/40">{Math.round((batchProgress.current / batchProgress.total) * 100) || 0}%</span>
-            </div>
-          </div>
-          <div className="p-8 space-y-6">
-            <div className="space-y-2">
-               <div className="flex justify-between items-end mb-1">
-                 <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">{batchProgress.message}</span>
-                 <span className="text-xs font-medium text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">
-                   {batchProgress.current} / {batchProgress.total}
-                 </span>
-               </div>
-               <Progress value={(batchProgress.current / batchProgress.total) * 100} className="h-3 bg-slate-100 dark:bg-slate-800" />
-            </div>
-            
-            <p className="text-[10px] text-center text-slate-400 font-medium italic">
-              * Jangan menutup atau merefresh halaman ini selama proses berlangsung.
-            </p>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <BatchProgressDialog progress={batchProgress} colorClass="bg-indigo-600" />
     </div>
   );
 };

@@ -14,7 +14,7 @@ interface SubjectTableProps {
   onDelete: (subject: SubjectData) => void;
 }
 
-const SubjectTable = ({ 
+export const SubjectTable = ({ 
   subjects, 
   selectedIds, 
   onSelectChange, 

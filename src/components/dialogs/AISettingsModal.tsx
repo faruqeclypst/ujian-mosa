@@ -33,7 +33,7 @@ interface AISettingsModalProps {
   onClose: () => void;
 }
 
-const AISettingsModal = ({ isOpen, onClose }: AISettingsModalProps) => {
+export const AISettingsModal = ({ isOpen, onClose }: AISettingsModalProps) => {
   const { user, refreshUser } = useAuth();
   const { pb } = useTenant();
   const { addToast } = useToast();
@@ -63,7 +63,6 @@ const AISettingsModal = ({ isOpen, onClose }: AISettingsModalProps) => {
 
       try {
         if (user.role === 'admin') {
-          // 🏛️ Admin: Ambil dari Global Settings
           const records = await pb.collection("settings").getFullList({ limit: 1 });
           const config = records[0];
           if (config) {
@@ -75,7 +74,6 @@ const AISettingsModal = ({ isOpen, onClose }: AISettingsModalProps) => {
             });
           }
         } else {
-          // 👨‍🏫 Guru: Ambil dari Profil Pribadi
           reset({
             ai_api_key: (user as any)?.ai_api_key || "",
             ai_provider: (user as any)?.ai_provider || "groq",
@@ -98,7 +96,6 @@ const AISettingsModal = ({ isOpen, onClose }: AISettingsModalProps) => {
     setFormError(null);
     try {
       if (user.role === 'admin') {
-        // 🏛️ Admin: Update Global Settings
         const records = await pb.collection("settings").getFullList({ limit: 1 });
         const config = records[0];
 
@@ -129,7 +126,6 @@ const AISettingsModal = ({ isOpen, onClose }: AISettingsModalProps) => {
           type: "success",
         });
       } else {
-        // 👨‍🏫 Guru: Update Profil Pribadi
         await pb.collection("users").update(user.id, {
           ai_api_key: values.ai_api_key,
           ai_provider: values.ai_provider,

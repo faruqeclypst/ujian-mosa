@@ -34,8 +34,8 @@ import { cn } from "../../lib/utils";
 import { useTenant } from "../../context/TenantContext";
 import { useExamData } from "../../context/ExamDataContext";
 import { useAuth } from "../../context/AuthContext";
-import { ConfirmationDialog } from "../../components/ui/confirmation-dialog";
-import { MathText } from "../../components/MathText";
+import { ConfirmationDialog } from "../../components/dialogs/ConfirmationDialog";
+import { MathText } from "../../components/ui/MathText";
 import { gradeEssayWithAI } from "../../lib/ai";
 
 export interface ExamRoomData {
@@ -2248,8 +2248,8 @@ const MonitoringPage = () => {
                       <button
                         onClick={handleCopyBelumUjian}
                         className={`w-full rounded-xl border font-bold text-[10px] py-2 px-1 shadow-sm transition-all flex items-center justify-center gap-1 whitespace-nowrap tracking-tight ${waCopied
-                            ? "bg-green-100 border-green-300 text-green-700 dark:bg-green-900/30 dark:border-green-700 dark:text-green-400"
-                            : "bg-amber-50 hover:bg-amber-100 border-amber-100 dark:bg-amber-900/20 dark:text-amber-400 dark:hover:bg-amber-900/40 dark:border-amber-800/40 text-amber-700"
+                          ? "bg-green-100 border-green-300 text-green-700 dark:bg-green-900/30 dark:border-green-700 dark:text-green-400"
+                          : "bg-amber-50 hover:bg-amber-100 border-amber-100 dark:bg-amber-900/20 dark:text-amber-400 dark:hover:bg-amber-900/40 dark:border-amber-800/40 text-amber-700"
                           }`}
                       >
                         {waCopied ? <><Check className="h-3.5 w-3.5 shrink-0" /> Tersalin</> : <><Copy className="h-3.5 w-3.5 shrink-0" /> Belum Ujian</>}
@@ -2259,8 +2259,8 @@ const MonitoringPage = () => {
                     <button
                       onClick={handleCopyBelumUjian}
                       className={`w-full rounded-xl border font-bold text-[10px] py-2 px-2 shadow-sm transition-all flex items-center justify-center gap-1.5 whitespace-nowrap tracking-tight ${waCopied
-                          ? "bg-green-100 border-green-300 text-green-700 dark:bg-green-900/30 dark:border-green-700 dark:text-green-400"
-                          : "bg-amber-50 hover:bg-amber-100 border-amber-100 dark:bg-amber-900/20 dark:text-amber-400 dark:hover:bg-amber-900/40 dark:border-amber-800/40 text-amber-700"
+                        ? "bg-green-100 border-green-300 text-green-700 dark:bg-green-900/30 dark:border-green-700 dark:text-green-400"
+                        : "bg-amber-50 hover:bg-amber-100 border-amber-100 dark:bg-amber-900/20 dark:text-amber-400 dark:hover:bg-amber-900/40 dark:border-amber-800/40 text-amber-700"
                         }`}
                     >
                       {waCopied ? <><Check className="h-3.5 w-3.5 shrink-0" /> Tersalin!</> : <><Copy className="h-3.5 w-3.5 shrink-0" /> Salin Siswa Belum Ujian</>}

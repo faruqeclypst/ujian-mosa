@@ -12,8 +12,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { cn } from "../../lib/utils";
-import ChangePasswordModal from "../auth/ChangePasswordModal";
-import AISettingsModal from "../auth/AISettingsModal";
+import ChangePasswordModal from "../dialogs/ChangePasswordModal";
+import AISettingsModal from "../dialogs/AISettingsModal";
 
 const TopNavigation = () => {
   const { user, role, signOut, usernameFromEmail } = useAuth();

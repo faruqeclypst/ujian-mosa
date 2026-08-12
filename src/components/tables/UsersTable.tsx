@@ -17,7 +17,7 @@ interface UsersTableProps {
   onDelete: (id: string, name: string) => void;
 }
 
-const UsersTable = ({ users, onDelete }: UsersTableProps) => {
+export const UsersTable = ({ users, onDelete }: UsersTableProps) => {
   const columns = [
     {
       key: "displayName",

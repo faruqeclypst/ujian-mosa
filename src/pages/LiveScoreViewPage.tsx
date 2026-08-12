@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useTenant } from "../context/TenantContext";
 import { useExamData } from "../context/ExamDataContext";
-import PinGate from "../components/PinGate";
+import PinGate from "../components/ui/PinGate";
 import {
   Trophy,
   RefreshCw,
@@ -270,7 +270,7 @@ const LiveScoreViewPage = () => {
     } finally {
       setIsRefreshing(false);
     }
-  }, [pb, rooms]);
+  }, [pb]);
 
   // Handle room switch
   useEffect(() => {

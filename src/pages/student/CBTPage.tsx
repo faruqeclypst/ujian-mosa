@@ -4,7 +4,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { App } from "@capacitor/app";
 
 const CheatAlert = registerPlugin<any>("CheatAlert");
-import { MathText } from "../../components/MathText";
+import { MathText } from "../../components/ui/MathText";
 import { SmartImage } from "../../components/ui/smart-image";
 import { useStudentAuth } from "../../context/StudentAuthContext";
 import { useTenant } from "../../context/TenantContext";
@@ -370,13 +370,13 @@ const CBTPage = () => {
   useEffect(() => {
     let wakeLock: any = null;
     let videoEl: HTMLVideoElement | null = null;
-    
+
     const requestWakeLock = async () => {
       // 1. Try modern WakeLock API
       if ('wakeLock' in navigator) {
         try {
           wakeLock = await (navigator as any).wakeLock.request('screen');
-        } catch (err: any) {}
+        } catch (err: any) { }
       }
 
       // 2. Video Hack Fallback (Works on many mobile browsers)
@@ -394,8 +394,8 @@ const CBTPage = () => {
         videoEl.src = 'data:video/mp4;base64,AAAAHGZ0eXBtcDQyAAAAAG1wNDJpc29tYXZjMQAAAZptb292AAAAbG12aGQAAAAA36Yl/N+mJf8AAAPoAAAAUAAEAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIAAABidHJhazAAAAZcdGtoZAAAAAPfpiX836Yl/AAAAAEAAAAAAAAAUAAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgAAAGBtZGlhAAAAIG1kaGQAAAAA36Yl/N+mJf8AAAPoAAAAUABVWEHAAAAAAAtWhuZGxyAAAAAAAAAAB2aWRlAAAAAAAAAAAAAAAAVmlkZW9IYW5kbGVyAAAAAVxtaW5mAAAAEHZtbmhkAAAAAQAAAAAAACRkaW5mAAAAHGRyZWYAAAAAAAAAAQAAAAx1cmwgAAAAAQAAAURzdGJsAAAAL3N0c2QAAAAAAAAAAQAAAB9hdmMxAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAAAAgACAAAAAkAAABidm9jYwAAAABhdmNDAVQAKv/hABhnVEAq/4C0YIu6u6uX9AAAAAMAAQAAAwAeDBlYm6u7u7urq7u7ur6AAAQAIAAAIAAAAEhzdHRzAAAAAAAAAAEAAAABAAAfQAAAADRzdHNjAAAAAAAAAAEAAAABAAAAAQAAAAEAAAAcc3RzegAAAAAAAAAAAAAAAQAAABAAAAAUc3RjbwAAAAAAAAABAAAAUAAAAGJ1ZHRhAAAAWm1ldGEAAAAAAAAAIWhkbHIAAAAAAAAAAG1kaXIAAAAAAAAAAAAAAAAAAAAAAAAALWlsc3QAAAAjqXRvbwAAABtkYXRhAAAAAQAAAABMYXZmNTkuMjcuMTAw';
         document.body.appendChild(videoEl);
       }
-      
-      videoEl.play().catch(() => {});
+
+      videoEl.play().catch(() => { });
     };
 
     if (!loading && !isExamOver) {
@@ -412,7 +412,7 @@ const CBTPage = () => {
 
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
-      if (wakeLock) wakeLock.release().catch(() => {});
+      if (wakeLock) wakeLock.release().catch(() => { });
       if (videoEl) {
         videoEl.pause();
         videoEl.parentNode?.removeChild(videoEl);
@@ -466,7 +466,7 @@ const CBTPage = () => {
   const safeUpdateAttempt = async (attId: string, data: any) => {
     setIsSyncing(true);
     setSyncError(false);
-    
+
     // Backup locally
     if (student && roomId) {
       if (data.answers) {
@@ -522,7 +522,7 @@ const CBTPage = () => {
     setAnswers(p => {
       const u = { ...p, [questionId]: value };
       answersRef.current = u;
-      
+
       // 1. SIMPAN KE HP INSTAN (0 DETIK)
       if (student && roomId) {
         localStorage.setItem(`offline_answers_${student.id}_${roomId}`, JSON.stringify(u));
@@ -640,7 +640,7 @@ const CBTPage = () => {
         }
 
         const mappedType = tM[q.field || q.type] || "pilihan_ganda";
-        
+
         // For choice-based types, options IS the choices object {a:{...}, b:{...}}
         // For menjodohkan, options = {pairs: [...]}
         // For urutkan/drag_drop, options = {items: [...]}
@@ -679,13 +679,13 @@ const CBTPage = () => {
             setIsLocked(true);
             sessionStorage.removeItem("activeCBTRoomId");
           }
-          
+
           let mergedAnswers = att.answers || {};
           if (localAnswers) {
             try {
               const parsedLocal = JSON.parse(localAnswers);
               mergedAnswers = { ...mergedAnswers, ...parsedLocal };
-            } catch (e) {}
+            } catch (e) { }
           }
           setAnswers(mergedAnswers);
           answersRef.current = mergedAnswers;
@@ -707,7 +707,7 @@ const CBTPage = () => {
               sessionStorage.removeItem(`currentIndex_${pr}`);
               sessionStorage.removeItem(`confirmed_${pr}`);
               localStorage.removeItem(`offline_answers_${student.id}_${roomId}`);
-              
+
               att = await pb.collection("attempts").create({
                 examRoomId: roomId,
                 studentId: student.id,
@@ -732,7 +732,7 @@ const CBTPage = () => {
           throw err;
         }
       }
-      
+
       if (att) {
         localStorage.setItem(`local_attempt_${student.id}_${roomId}`, JSON.stringify(att));
       }
@@ -764,23 +764,23 @@ const CBTPage = () => {
       let sO = sessionStorage.getItem(`order_${pr}`);
       let order: string[] = [];
       const curIds = loaded.map(q => q.id);
-      if (sO) { 
-        try { 
-          order = JSON.parse(sO).filter((id: string) => curIds.includes(id)); 
+      if (sO) {
+        try {
+          order = JSON.parse(sO).filter((id: string) => curIds.includes(id));
           // Deduplicate dari sessionStorage yang mungkin korup
           order = Array.from(new Set(order));
-          const n = curIds.filter(id => !order.includes(id)); 
-          if (n.length > 0) order = [...order, ...clusterShuffle(n)]; 
-          
+          const n = curIds.filter(id => !order.includes(id));
+          if (n.length > 0) order = [...order, ...clusterShuffle(n)];
+
           // Always ensure essay questions are at the end (fix old orders)
           const objOrder = order.filter(id => { const q = loaded.find(x => x.id === id); const t = q?.type || "pilihan_ganda"; return t !== "isian_singkat" && t !== "uraian"; });
           const essOrder = order.filter(id => { const q = loaded.find(x => x.id === id); const t = q?.type || "pilihan_ganda"; return t === "isian_singkat" || t === "uraian"; });
           order = [...objOrder, ...essOrder];
           // Final dedup
           order = Array.from(new Set(order));
-          
-          sessionStorage.setItem(`order_${pr}`, JSON.stringify(order)); 
-        } catch (e) { } 
+
+          sessionStorage.setItem(`order_${pr}`, JSON.stringify(order));
+        } catch (e) { }
       }
       if (order.length === 0) {
         const pg = curIds.filter(id => { const q = loaded.find(x => x.id === id); return !q?.type || q.type.startsWith("pilihan_ganda"); });
@@ -892,7 +892,7 @@ const CBTPage = () => {
       if (d <= 0) { clearInterval(timer); setTimeLeft(0); setIsExamOver(true); }
       else setTimeLeft(d);
     }, 1000);
-    const heartbeat = setInterval(async () => { 
+    const heartbeat = setInterval(async () => {
       if (attempt?.id && pb) {
         // Skip jika ada write sukses (seperti simpan jawaban) dalam 90 detik terakhir
         if (Date.now() - lastWriteTimeRef.current < 90000) {
@@ -921,7 +921,7 @@ const CBTPage = () => {
             setIsSessionExpiredModalOpen(true);
           }
         }
-      } 
+      }
     }, 90000); // Heartbeat setiap 90 detik
     return () => { clearInterval(timer); clearInterval(heartbeat); };
   }, [loading, isExamOver, roomData, attempt]);
@@ -930,7 +930,7 @@ const CBTPage = () => {
     if (!attempt?.id || isLocked || isExamOver) return;
     const triggerPenalty = async () => {
       if (isCheatWarningOpen || isLocked || isExamOver) return;
-      
+
       // Clear timers and state immediately to prevent race conditions
       if (cheatTimerRef.current) clearTimeout(cheatTimerRef.current);
       cheatTimerRef.current = null;
@@ -1089,7 +1089,7 @@ const CBTPage = () => {
       let objectiveTotal = 0;
       let essayTotal = 0;
       const ovr = attempt.overrides || {};
-      
+
       questions.forEach((q: any) => {
         const t = q.type || "pilihan_ganda";
         if (t === "isian_singkat" || t === "uraian") { essayTotal++; return; }
@@ -1179,7 +1179,7 @@ const CBTPage = () => {
           setIsSessionExpiredModalOpen(true);
           return;
         }
-        
+
         // Gagal karena jaringan/koneksi lambat -> tampilkan info error, jangan navigate agar bisa kumpulkan kembali
         setIsSubmitting(false);
         isSubmittingRef.current = false;
@@ -1328,7 +1328,7 @@ const CBTPage = () => {
   );
 
   const currentQuestion = questions[currentQuestionIndex];
-  
+
   const isQuestionAnswered = (qId: string) => {
     const ans = answers[qId];
     if (ans === undefined || ans === null) return false;
@@ -1477,36 +1477,36 @@ const CBTPage = () => {
       {/* Per-Room Exambro Enforcement */}
       {roomData?.is_exambro && !isExamBrowser && !loading && !isLocked && (
         <div className="fixed inset-0 z-[60] bg-slate-950 flex flex-col items-center justify-center p-6 text-center animate-in zoom-in-95 duration-500">
-           <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-red-600 via-orange-500 to-red-600 animate-gradient-x"></div>
-           <div className="w-24 h-24 bg-red-100/10 rounded-[35%] flex items-center justify-center mb-8 border border-red-500/30 shadow-2xl shadow-red-500/20">
-             <ShieldAlert className="w-12 h-12 text-red-500 animate-bounce" />
-           </div>
-           <h2 className="text-3xl font-black text-white mb-4 uppercase tracking-tighter">Akses Ruangan Terkunci</h2>
-           <p className="text-slate-400 text-sm font-bold max-w-sm mb-10 leading-relaxed">
-             Ruangan <span className="text-white">"{roomData?.room_name}"</span> membutuhkan aplikasi <span className="text-red-500">EXAMBRO</span> resmi untuk dapat diakses.
-           </p>
-           
-           <div className="bg-white/5 border border-white/10 rounded-3xl p-6 mb-10 w-full max-w-sm text-left">
-             <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3">Info Perangkat:</p>
-             <div className="text-[10px] text-slate-300 font-mono break-all opacity-60 leading-normal">
-               {navigator.userAgent}
-             </div>
-           </div>
+          <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-red-600 via-orange-500 to-red-600 animate-gradient-x"></div>
+          <div className="w-24 h-24 bg-red-100/10 rounded-[35%] flex items-center justify-center mb-8 border border-red-500/30 shadow-2xl shadow-red-500/20">
+            <ShieldAlert className="w-12 h-12 text-red-500 animate-bounce" />
+          </div>
+          <h2 className="text-3xl font-black text-white mb-4 uppercase tracking-tighter">Akses Ruangan Terkunci</h2>
+          <p className="text-slate-400 text-sm font-bold max-w-sm mb-10 leading-relaxed">
+            Ruangan <span className="text-white">"{roomData?.room_name}"</span> membutuhkan aplikasi <span className="text-red-500">EXAMBRO</span> resmi untuk dapat diakses.
+          </p>
 
-           <div className="flex flex-col gap-4 w-full max-w-xs">
-             <Button
-               onClick={() => window.location.reload()}
-               className="bg-white hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-900 dark:text-white h-14 rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl"
-             >
-               Muat Ulang Halaman
-             </Button>
-             <button
-                onClick={() => navigate("/")}
-                className="text-slate-500 hover:text-white text-[11px] font-bold uppercase tracking-widest transition-colors"
-             >
-                Kembali ke Dashboard
-             </button>
-           </div>
+          <div className="bg-white/5 border border-white/10 rounded-3xl p-6 mb-10 w-full max-w-sm text-left">
+            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3">Info Perangkat:</p>
+            <div className="text-[10px] text-slate-300 font-mono break-all opacity-60 leading-normal">
+              {navigator.userAgent}
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-4 w-full max-w-xs">
+            <Button
+              onClick={() => window.location.reload()}
+              className="bg-white hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-900 dark:text-white h-14 rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl"
+            >
+              Muat Ulang Halaman
+            </Button>
+            <button
+              onClick={() => navigate("/")}
+              className="text-slate-500 hover:text-white text-[11px] font-bold uppercase tracking-widest transition-colors"
+            >
+              Kembali ke Dashboard
+            </button>
+          </div>
         </div>
       )}
       <header className="sticky top-0 z-50 bg-white/90 dark:bg-slate-900/90 backdrop-blur-3xl border-b border-slate-100 dark:border-slate-800 h-16 sm:h-20 px-4 sm:px-8 flex items-center justify-between shadow-sm">
@@ -1622,7 +1622,7 @@ const CBTPage = () => {
       </header>
 
       <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
-        <div 
+        <div
           className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 space-y-4 sm:space-y-6 text-slate-800"
           onClick={(e) => {
             const target = e.target as HTMLElement;
@@ -1636,7 +1636,7 @@ const CBTPage = () => {
           onContextMenu={(e) => {
             e.preventDefault();
           }}
-          style={{ 
+          style={{
             fontSize: `${fontSize === 1 ? 'inherit' : `${fontSize * 100}%`}`,
             WebkitUserSelect: 'none',
             userSelect: 'none'
@@ -1656,7 +1656,7 @@ const CBTPage = () => {
           )}
 
           {!loading && questions.length > 0 && isExamOver && (
-             <div className="flex flex-col items-center justify-center h-full space-y-6 animate-in fade-in zoom-in duration-500">
+            <div className="flex flex-col items-center justify-center h-full space-y-6 animate-in fade-in zoom-in duration-500">
               <div className="w-24 h-24 bg-rose-50 dark:bg-rose-950/20 rounded-[35%] flex items-center justify-center border border-rose-100 dark:border-rose-900/30 shadow-inner">
                 <Clock className="w-12 h-12 text-rose-500 animate-pulse" />
               </div>
@@ -1720,9 +1720,9 @@ const CBTPage = () => {
                         <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-[0.2em] text-emerald-500 dark:text-emerald-400">Bacaan</span>
                       </div>
 
-                      <MathText 
+                      <MathText
                         content={f.groupText || f.text}
-                        className={`leading-relaxed text-slate-800 dark:text-slate-200 font-serif ql-editor !p-0 selection:bg-blue-100 dark:selection:bg-blue-900/40`} 
+                        className={`leading-relaxed text-slate-800 dark:text-slate-200 font-serif ql-editor !p-0 selection:bg-blue-100 dark:selection:bg-blue-900/40`}
                       />
 
                       <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex justify-end opacity-50 dark:opacity-100">
@@ -1734,9 +1734,9 @@ const CBTPage = () => {
 
                 <div className="h-3 sm:h-4" />
 
-                <MathText 
+                <MathText
                   content={currentQuestion.text}
-                  className={`ql-editor !p-0 font-serif text-slate-800 dark:text-slate-200 leading-relaxed break-words [&_strong]:text-blue-600 dark:[&_strong]:text-blue-400 [&_p]:mb-3 [&_ol]:list-decimal [&_ul]:list-disc [&_ol]:pl-6 [&_ul]:pl-6 selection:bg-indigo-100 dark:selection:bg-indigo-900/40`} 
+                  className={`ql-editor !p-0 font-serif text-slate-800 dark:text-slate-200 leading-relaxed break-words [&_strong]:text-blue-600 dark:[&_strong]:text-blue-400 [&_p]:mb-3 [&_ol]:list-decimal [&_ul]:list-disc [&_ol]:pl-6 [&_ul]:pl-6 selection:bg-indigo-100 dark:selection:bg-indigo-900/40`}
                 />
 
                 {(currentQuestion.type === "pilihan_ganda_kompleks" || currentQuestion.type === "menjodohkan" || currentQuestion.type === "urutkan") && (
@@ -1805,7 +1805,7 @@ const CBTPage = () => {
                               style={{ fontSize: `${15 * fontSize}px` }}
                             >{p.left}</div>
                             <div className="flex items-center opacity-20"><ArrowRight className="w-4 h-4" /></div>
-                            <div 
+                            <div
                               onDragOver={(e) => { e.preventDefault(); setDragOverSlot(p.id); }}
                               onDragLeave={() => setDragOverSlot(null)}
                               onDrop={(e) => {
@@ -1817,11 +1817,10 @@ const CBTPage = () => {
                                 }
                               }}
                               onClick={() => { if (v) { const n = { ...sA }; delete n[p.id]; handleAnswerSelect(currentQuestion.id, n); } }}
-                              className={`flex-1 p-1 rounded-xl border-2 border-dashed flex items-center justify-center min-h-[50px] transition-all ${
-                                dragOverSlot === p.id && !v ? "bg-emerald-100/50 dark:bg-emerald-900/30 border-emerald-500 scale-[1.02]" :
-                                v ? "bg-emerald-50/20 dark:bg-emerald-950/20 border-emerald-400/50 cursor-pointer" : 
-                                "bg-slate-50/30 dark:bg-slate-900/30 border-slate-200 dark:border-slate-800"
-                              }`}
+                              className={`flex-1 p-1 rounded-xl border-2 border-dashed flex items-center justify-center min-h-[50px] transition-all ${dragOverSlot === p.id && !v ? "bg-emerald-100/50 dark:bg-emerald-900/30 border-emerald-500 scale-[1.02]" :
+                                  v ? "bg-emerald-50/20 dark:bg-emerald-950/20 border-emerald-400/50 cursor-pointer" :
+                                    "bg-slate-50/30 dark:bg-slate-900/30 border-slate-200 dark:border-slate-800"
+                                }`}
                             >
                               {v ? <div className="w-full h-full flex items-center justify-center bg-emerald-600 text-white rounded-lg p-2 font-serif shadow-sm" style={{ fontSize: `${14 * fontSize}px` }}>{v}</div> : <span className="text-[10px] font-bold text-slate-300 dark:text-slate-600 uppercase">Drop Disini</span>}
                             </div>
@@ -1831,13 +1830,13 @@ const CBTPage = () => {
                     </div>
                     <div className="lg:w-1/3 p-4 bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800 rounded-2xl flex flex-wrap gap-2 content-start min-h-[100px]">
                       {(matchingOptions[currentQuestion.id] || []).filter(o => !Object.values(answers[currentQuestion.id] || {}).includes(o)).map(o => (
-                        <div 
-                          key={o} 
+                        <div
+                          key={o}
                           draggable
                           onDragStart={() => setDraggingOption(o)}
                           onDragEnd={() => { setDraggingOption(null); setDragOverSlot(null); }}
                           onClick={() => { const p = (currentQuestion.pairs || []).find(x => !(answers[currentQuestion.id] || {})[x.id]); if (p) handleAnswerSelect(currentQuestion.id, { ...(answers[currentQuestion.id] || {}), [p.id]: o }); }}
-                          className={`px-3 py-2 bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-xl font-serif text-emerald-600 dark:text-emerald-400 shadow-sm hover:shadow-md hover:border-emerald-300 transition-all cursor-grab active:cursor-grabbing select-none ${draggingOption === o ? "opacity-50 scale-95" : ""}`} 
+                          className={`px-3 py-2 bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-xl font-serif text-emerald-600 dark:text-emerald-400 shadow-sm hover:shadow-md hover:border-emerald-300 transition-all cursor-grab active:cursor-grabbing select-none ${draggingOption === o ? "opacity-50 scale-95" : ""}`}
                           style={{ fontSize: `${14 * fontSize}px` }}
                         >{o}</div>
                       ))}
@@ -1868,11 +1867,11 @@ const CBTPage = () => {
                   const hasBeenTouched = !!savedOrder; // Siswa sudah pernah geser
                   if (!displayOrder || displayOrder.length === 0) return null;
                   return (
-                  <Reorder.Group axis="y" values={displayOrder} onReorder={(o: string[]) => handleAnswerSelect(currentQuestion.id, o)} className="space-y-2">
-                    {displayOrder.map((id: string, i: number) => {
-                      const it = currentQuestion.items?.find(x => x.id === id); return <Reorder.Item key={id} value={id} className={`flex items-center gap-4 sm:gap-6 p-4 sm:p-5 border rounded-2xl shadow-sm cursor-grab active:cursor-grabbing group relative overflow-hidden transition-colors ${hasBeenTouched ? "bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/40" : "bg-white dark:bg-slate-800 border-slate-100 dark:border-slate-700"}`}><div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center font-black text-xs sm:text-sm ${hasBeenTouched ? "bg-emerald-600 text-white" : "bg-slate-50 dark:bg-slate-800/80 text-slate-500 dark:text-slate-400"}`}>{String.fromCharCode(65 + i)}</div><div className="flex-1 font-serif text-slate-800 dark:text-slate-200" style={{ fontSize: `${15 * fontSize}px` }}>{it?.text || ""}</div><div className={`p-2 rounded-lg ${hasBeenTouched ? "bg-emerald-100 dark:bg-emerald-900/30" : "bg-slate-50 dark:bg-slate-900"}`}><GripVertical className={`w-4 h-4 sm:w-5 sm:h-5 ${hasBeenTouched ? "text-emerald-400" : "text-slate-300"}`} /></div></Reorder.Item>;
-                    })}
-                  </Reorder.Group>
+                    <Reorder.Group axis="y" values={displayOrder} onReorder={(o: string[]) => handleAnswerSelect(currentQuestion.id, o)} className="space-y-2">
+                      {displayOrder.map((id: string, i: number) => {
+                        const it = currentQuestion.items?.find(x => x.id === id); return <Reorder.Item key={id} value={id} className={`flex items-center gap-4 sm:gap-6 p-4 sm:p-5 border rounded-2xl shadow-sm cursor-grab active:cursor-grabbing group relative overflow-hidden transition-colors ${hasBeenTouched ? "bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/40" : "bg-white dark:bg-slate-800 border-slate-100 dark:border-slate-700"}`}><div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center font-black text-xs sm:text-sm ${hasBeenTouched ? "bg-emerald-600 text-white" : "bg-slate-50 dark:bg-slate-800/80 text-slate-500 dark:text-slate-400"}`}>{String.fromCharCode(65 + i)}</div><div className="flex-1 font-serif text-slate-800 dark:text-slate-200" style={{ fontSize: `${15 * fontSize}px` }}>{it?.text || ""}</div><div className={`p-2 rounded-lg ${hasBeenTouched ? "bg-emerald-100 dark:bg-emerald-900/30" : "bg-slate-50 dark:bg-slate-900"}`}><GripVertical className={`w-4 h-4 sm:w-5 sm:h-5 ${hasBeenTouched ? "text-emerald-400" : "text-slate-300"}`} /></div></Reorder.Item>;
+                      })}
+                    </Reorder.Group>
                   );
                 })()}
               </CardContent>
@@ -1898,7 +1897,7 @@ const CBTPage = () => {
                   const isEssay = t === "isian_singkat" || t === "uraian";
                   const showSeparator = isEssay && !separatorShown;
                   if (isEssay) separatorShown = true;
-                  
+
                   // Hide essay questions entirely if objectives not done
                   if (isEssay && !allObjectiveAnswered) {
                     if (showSeparator) {
@@ -1914,7 +1913,7 @@ const CBTPage = () => {
                     }
                     return null; // Hide essay buttons
                   }
-                  
+
                   return (
                     <React.Fragment key={q.id}>
                       {showSeparator && (
@@ -1924,8 +1923,8 @@ const CBTPage = () => {
                           <div className="flex-1 h-px bg-amber-200 dark:bg-amber-800/40"></div>
                         </div>
                       )}
-                      <button 
-                        onClick={() => handleNavClick(i)} 
+                      <button
+                        onClick={() => handleNavClick(i)}
                         className={`aspect-square rounded-xl flex items-center justify-center font-black text-xl border-2 transition-all active:scale-[0.85] outline-none focus:outline-none ${i === currentQuestionIndex
                           ? "bg-emerald-700 border-emerald-700 text-white shadow-lg shadow-emerald-700/30"
                           : flaggedQuestions[q.id]
@@ -1991,7 +1990,7 @@ const CBTPage = () => {
                   if (typeof ans === 'object') return Object.keys(ans).length > 0;
                   return true;
                 };
-                
+
                 // Hide essay if objectives not done
                 if (isEssay && !allObjectiveAnswered) {
                   if (showSeparator) {
@@ -2034,7 +2033,7 @@ const CBTPage = () => {
         </DialogContent>
       </Dialog>
       <Dialog open={isResetModalOpen} onOpenChange={() => { }}><DialogContent className="max-w-md rounded-2xl p-6 text-center pointer-events-auto bg-white dark:bg-slate-950 border-none shadow-2xl"><AlertCircle className="w-12 h-12 text-red-600 mx-auto mb-2 animate-bounce" /><DialogTitle className="text-lg font-bold dark:text-white">Sesi Ujian Di-Reset</DialogTitle><p className="text-slate-500 dark:text-slate-400 text-sm mt-1">Sesi Anda telah di-reset oleh Pengawas. Silakan login kembali.</p><Button onClick={() => logoutStudent()} className="w-full bg-red-600 hover:bg-red-700 text-white rounded-xl h-11 mt-4"><LogOut className="w-4 h-4 mr-2" /> Keluar & Login Ulang</Button></DialogContent></Dialog>
-      
+
       <Dialog open={isSessionExpiredModalOpen} onOpenChange={() => { }}>
         <DialogContent className="max-w-md rounded-2xl p-6 text-center pointer-events-auto bg-white dark:bg-slate-950 border-none shadow-2xl">
           <AlertCircle className="w-12 h-12 text-amber-500 mx-auto mb-2 animate-bounce" />
@@ -2047,28 +2046,28 @@ const CBTPage = () => {
           </Button>
         </DialogContent>
       </Dialog>
-      
+
       <Dialog open={isErrorModalOpen} onOpenChange={setIsErrorModalOpen}>
         <DialogContent className="max-w-md rounded-2xl p-6 text-center pointer-events-auto bg-white dark:bg-slate-950 border-none shadow-2xl">
           <AlertCircle className="w-12 h-12 text-red-600 mx-auto mb-2 animate-pulse" />
           <DialogTitle className="text-lg font-bold dark:text-white">Gagal Mengumpulkan Ujian</DialogTitle>
           <p className="text-slate-500 dark:text-slate-400 text-sm mt-2">{errorMessage}</p>
           <div className="mt-6 flex flex-col gap-2">
-            <Button 
+            <Button
               onClick={() => {
                 setIsErrorModalOpen(false);
                 handleSubmitExam();
-              }} 
+              }}
               className="w-full bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl h-11 font-bold"
             >
               Coba Kumpulkan Lagi
             </Button>
-            <Button 
+            <Button
               variant="outline"
               onClick={() => {
                 setIsErrorModalOpen(false);
                 logoutStudent();
-              }} 
+              }}
               className="w-full border-red-200 hover:bg-red-50 text-red-600 dark:border-red-900/30 dark:hover:bg-red-950/30 rounded-xl h-11 font-bold"
             >
               Keluar Ujian / Logout
@@ -2076,12 +2075,12 @@ const CBTPage = () => {
           </div>
         </DialogContent>
       </Dialog>
-      
+
       {/* Custom Preview Image Overlay - Full Screen with Zoom */}
       {previewImage && (
         <ImageZoomOverlay src={previewImage} onClose={() => setPreviewImage(null)} />
       )}
-      
+
       <Dialog open={isSubmitModalOpen} onOpenChange={setIsSubmitModalOpen}>
         <DialogContent className="max-w-md rounded-2xl p-6 pointer-events-auto text-center bg-white dark:bg-slate-950 border-none shadow-2xl">
           {(() => {
@@ -2102,8 +2101,8 @@ const CBTPage = () => {
                     Ada {unansweredCount} soal belum dijawab. Yakin?
                   </p>
                   <div className="mt-6">
-                    <Button 
-                      onClick={() => setIsSubmitModalOpen(false)} 
+                    <Button
+                      onClick={() => setIsSubmitModalOpen(false)}
                       className="w-full bg-amber-600 hover:bg-amber-700 text-white rounded-xl"
                     >
                       Kembali Mengerjakan
@@ -2123,7 +2122,7 @@ const CBTPage = () => {
                   <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/40 rounded-xl p-3 mt-3 max-h-[120px] overflow-y-auto">
                     <div className="flex flex-wrap gap-2 justify-center">
                       {flaggedQuestionNumbers.map((num) => (
-                        <span 
+                        <span
                           key={num}
                           className="inline-flex items-center justify-center w-8 h-8 bg-amber-500 text-white font-bold text-sm rounded-lg"
                         >
@@ -2136,19 +2135,19 @@ const CBTPage = () => {
                     Ingin cek ulang atau tetap kumpulkan?
                   </p>
                   <div className="mt-4 flex gap-2">
-                    <Button 
-                      variant="outline" 
-                      onClick={() => setIsSubmitModalOpen(false)} 
+                    <Button
+                      variant="outline"
+                      onClick={() => setIsSubmitModalOpen(false)}
                       className="flex-1 rounded-xl dark:border-slate-800 dark:text-slate-300"
                     >
                       Cek Ulang
                     </Button>
-                    <Button 
+                    <Button
                       disabled={isSyncing}
-                      onClick={() => { 
-                        setIsSubmitModalOpen(false); 
-                        handleSubmitExam(); 
-                      }} 
+                      onClick={() => {
+                        setIsSubmitModalOpen(false);
+                        handleSubmitExam();
+                      }}
                       className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl"
                     >
                       {isSyncing ? "Menyimpan..." : "Tetap Kumpulkan"}
@@ -2166,19 +2165,19 @@ const CBTPage = () => {
                     Yakin ingin mengakhiri sekarang?
                   </p>
                   <div className="mt-6 flex gap-2">
-                    <Button 
-                      variant="outline" 
-                      onClick={() => setIsSubmitModalOpen(false)} 
+                    <Button
+                      variant="outline"
+                      onClick={() => setIsSubmitModalOpen(false)}
                       className="flex-1 rounded-xl dark:border-slate-800 dark:text-slate-300"
                     >
                       Batal
                     </Button>
-                    <Button 
+                    <Button
                       disabled={isSyncing}
-                      onClick={() => { 
-                        setIsSubmitModalOpen(false); 
-                        handleSubmitExam(); 
-                      }} 
+                      onClick={() => {
+                        setIsSubmitModalOpen(false);
+                        handleSubmitExam();
+                      }}
                       className="flex-1 bg-green-600 hover:bg-green-700 text-white rounded-xl"
                     >
                       {isSyncing ? "Menyimpan..." : "Kumpulkan"}
@@ -2199,16 +2198,16 @@ const CBTPage = () => {
           <DialogTitle className="text-2xl font-black text-slate-800 dark:text-white uppercase tracking-tighter mb-4">Ujian Selesai!</DialogTitle>
           <div className="bg-slate-50 dark:bg-slate-900/50 p-6 rounded-3xl border border-slate-100 dark:border-slate-800 mb-6">
             <p className="text-slate-600 dark:text-slate-400 text-sm font-bold leading-relaxed">
-              Sesi ujian Anda telah diselesaikan oleh <span className="text-emerald-600">Admin/Pengawas</span>. 
+              Sesi ujian Anda telah diselesaikan oleh <span className="text-emerald-600">Admin/Pengawas</span>.
               <br /><br />
               Semua jawaban Anda telah tersimpan dengan aman ke sistem.
             </p>
           </div>
-          <Button 
+          <Button
             onClick={() => {
               setIsAdminFinishedModalOpen(false);
               handleSubmitExam();
-            }} 
+            }}
             className="w-full bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl h-14 font-black uppercase tracking-widest text-xs shadow-lg shadow-emerald-500/20 active:scale-95 transition-all"
           >
             Selesai & Lihat Hasil
@@ -2233,7 +2232,7 @@ const CBTPage = () => {
               </span>
             </div>
           </div>
-          <Button onClick={() => { 
+          <Button onClick={() => {
             setIsCheatWarningOpen(false);
             try { CheatAlert.stopAlarm(); } catch (err) { }
           }} className="w-full bg-emerald-600 text-white font-black uppercase tracking-widest h-12 rounded-2xl mt-6">SAYA MENGERTI</Button>

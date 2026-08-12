@@ -2,14 +2,13 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, Plus, Edit, Trash, Check, Copy, Image, ChevronDown, FileText, Download, Eye, FolderOpen, Sparkles, Wand2, RefreshCw, BookOpen, Loader2, FileSpreadsheet, Search, X, Bookmark, Forward, CheckCircle2, Menu, Maximize2, HelpCircle, FileJson, GripVertical, ChevronLeft, ChevronRight } from "lucide-react";
 import { Reorder } from "framer-motion";
-import { MathText } from "../../components/MathText";
+import { MathText } from "../../components/ui/MathText";
 import { SmartImage } from "../../components/ui/smart-image";
 import { generateQuestionsAI, generateSingleQuestionAI, getTopicSuggestionsAI, parseQuestionsAI, generateFromMaterialAI, generateObjectivesAI, AI_MODELS } from "../../lib/ai";
 import { Button } from "../../components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "../../components/ui/dialog";
-import { Progress } from "../../components/ui/progress";
-import { DeleteConfirmationDialog } from "../../components/ui/delete-confirmation-dialog";
-import { ConfirmationDialog } from "../../components/ui/confirmation-dialog";
+import { ConfirmationDialog } from "../../components/dialogs/ConfirmationDialog";
+import BatchProgressDialog from "../../components/dialogs/BatchProgressDialog";
 import { Input } from "../../components/ui/input";
 import { Separator } from "../../components/ui/separator";
 import FormField from "../../components/forms/FormField";
@@ -2896,11 +2895,6 @@ const QuestionsPage = () => {
           current: currentProcessed,
           message: `Menghapus soal (${currentProcessed}/${allQ.length})`
         }));
-      }
-
-      if (pb.authStore.isValid) {
-        let rt: ReturnType<typeof setTimeout> | null = null;
-        await pb.collection('questions').subscribe("*", () => { if (rt) clearTimeout(rt); rt = setTimeout(() => loadQuestions(), 800); });
       }
 
       loadQuestions();
@@ -6098,23 +6092,25 @@ Aturan:
         </DialogContent>
       </Dialog>
 
-      <DeleteConfirmationDialog
+      <ConfirmationDialog
         isOpen={deleteDialogOpen}
         onClose={() => setDeleteDialogOpen(false)}
         onConfirm={handleConfirmDelete}
+        type="danger"
         title="Hapus Soal"
         description="Apakah Anda yakin ingin menghapus soal ini?"
-        itemName="Satu item soal ujian"
+        confirmLabel="Hapus"
         isLoading={isDeleting}
       />
 
-      <DeleteConfirmationDialog
+      <ConfirmationDialog
         isOpen={deleteAllDialogOpen}
         onClose={() => setDeleteAllDialogOpen(false)}
         onConfirm={handleConfirmDeleteAll}
+        type="danger"
         title="Hapus Semua Soal"
-        description="Apakah Anda yakin ingin menghapus seluruh soal dalam ujian ini? Tindakan ini tidak dapat dibatalkan."
-        itemName={`Total ${questions.length} soal ujian`}
+        description={`Apakah Anda yakin ingin menghapus seluruh ${questions.length} soal dalam ujian ini? Tindakan ini tidak dapat dibatalkan.`}
+        confirmLabel="Hapus Semua"
         isLoading={isDeleting}
       />
 
@@ -6748,14 +6744,15 @@ Aturan:
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      <DeleteConfirmationDialog
+      <ConfirmationDialog
         isOpen={bulkDeleteDialogOpen}
         onClose={() => setBulkDeleteDialogOpen(false)}
         onConfirm={handleConfirmBulkDelete}
+        type="danger"
         title="Hapus Soal Terpilih"
         description={`Apakah Anda yakin ingin menghapus ${selectedIds.length} soal yang dipilih? Tindakan ini tidak dapat dibatalkan.`}
+        confirmLabel="Hapus"
         isLoading={isBulkDeleting}
-        itemName={`${selectedIds.length} soal`}
       />
 
       <ConfirmationDialog
@@ -6772,40 +6769,7 @@ Aturan:
         showCancel={confirmModal.showCancel}
       />
 
-      {/* Batch Progress Dialog */}
-      <Dialog open={batchProgress.isOpen} onOpenChange={() => {}}>
-        <DialogContent className="max-w-md bg-card border-none shadow-2xl p-0 overflow-hidden rounded-3xl" hideClose>
-          <div className="bg-indigo-600 p-6 text-white flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="bg-white/20 p-2 rounded-xl">
-                 <Loader2 className="h-5 w-5 animate-spin" />
-              </div>
-              <div>
-                <DialogTitle className="text-lg font-bold text-white">{batchProgress.title}</DialogTitle>
-                <DialogDescription className="text-indigo-100 text-xs">Mohon tunggu hingga proses selesai.</DialogDescription>
-              </div>
-            </div>
-            <div className="text-right">
-               <span className="text-2xl font-black text-white/40">{Math.round((batchProgress.current / batchProgress.total) * 100) || 0}%</span>
-            </div>
-          </div>
-          <div className="p-8 space-y-6">
-            <div className="space-y-2">
-               <div className="flex justify-between items-end mb-1">
-                 <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">{batchProgress.message}</span>
-                 <span className="text-xs font-medium text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">
-                   {batchProgress.current} / {batchProgress.total}
-                 </span>
-               </div>
-               <Progress value={(batchProgress.current / batchProgress.total) * 100} className="h-3 bg-slate-100 dark:bg-slate-800" />
-            </div>
-            
-            <p className="text-[10px] text-center text-slate-400 font-medium italic">
-              * Jangan menutup atau merefresh halaman ini selama proses berlangsung.
-            </p>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <BatchProgressDialog progress={batchProgress} colorClass="bg-indigo-600" />
       {/* MODAL PUSAT BANTUAN PENULISAN STEM */}
       <Dialog open={isMathGuideOpen} onOpenChange={setIsMathGuideOpen}>
         <DialogContent className="max-w-3xl rounded-[1.5rem] overflow-hidden p-0 border-none shadow-2xl bg-white dark:bg-slate-950">

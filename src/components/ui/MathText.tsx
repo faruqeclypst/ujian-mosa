@@ -5,7 +5,7 @@ import "katex/dist/contrib/mhchem";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus, ghcolors } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { Terminal, Check, Copy } from "lucide-react";
-import { useTheme } from "../context/ThemeContext";
+import { useTheme } from "../../context/ThemeContext";
   
 interface MathTextProps {
   content: string;

@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { useTenant } from "../context/TenantContext";
-import PinGate from "../components/PinGate";
+import PinGate from "../components/ui/PinGate";
 
 const TOKEN_VIEW_PIN = (() => {
   const now = new Date();

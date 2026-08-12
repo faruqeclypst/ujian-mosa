@@ -3,7 +3,6 @@ import { Plus, Trash, Edit, Users, Archive, RotateCw, BookOpen, ClipboardList, L
 import { useNavigate } from "react-router-dom";
 import { Button } from "../../components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../../components/ui/dialog";
-import { DeleteConfirmationDialog } from "../../components/ui/delete-confirmation-dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
 import { Input } from "../../components/ui/input";
 import FormField from "../../components/forms/FormField";
@@ -11,7 +10,7 @@ import { useExamData } from "../../context/ExamDataContext";
 import { useAuth } from "../../context/AuthContext";
 import { getExamTypeColorClass } from "./ExamsPage";
 import { useTenant } from "../../context/TenantContext";
-import { ConfirmationDialog } from "../../components/ui/confirmation-dialog";
+import { ConfirmationDialog } from "../../components/dialogs/ConfirmationDialog";
 import { useToast } from "../../components/ui/toast";
 import { cn } from "../../lib/utils";
 import { exportActiveRoomsToZip } from "../../lib/roomExcelExport";
@@ -1211,13 +1210,14 @@ const ExamRoomsPage = () => {
         </DialogContent>
       </Dialog>
 
-      <DeleteConfirmationDialog
+      <ConfirmationDialog
         isOpen={deleteDialogOpen}
         onClose={() => setDeleteDialogOpen(false)}
         onConfirm={handleConfirmDelete}
+        type="danger"
         title="Hapus Ruang Ujian"
         description={`Apakah Anda yakin ingin menghapus ruang ujian ini? Data pengerjaan ${terminology.student} akan hilang.`}
-        itemName="Ruang ujian ini"
+        confirmLabel="Hapus"
         isLoading={isDeleting}
       />
 

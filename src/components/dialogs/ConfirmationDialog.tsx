@@ -1,7 +1,7 @@
 import * as React from "react";
 import { AlertCircle, AlertTriangle, AlertOctagon, HelpCircle } from "lucide-react";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "./dialog";
-import { Button } from "./button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../ui/dialog";
+import { Button } from "../ui/button";
 
 export interface ConfirmationDialogProps {
   isOpen: boolean;
@@ -49,13 +49,6 @@ export const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
     warning: "bg-amber-100 dark:bg-amber-900/20",
     info: "bg-blue-100 dark:bg-blue-900/20",
     success: "bg-green-100 dark:bg-green-900/20",
-  };
-
-  const btnVariants = {
-    danger: "secondary" as const,
-    warning: "secondary" as const,
-    info: "secondary" as const,
-    success: "secondary" as const,
   };
 
   const btnClasses = {
@@ -129,7 +122,7 @@ export const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
         </DialogFooter>
       </DialogContent>
     </Dialog>
-
   );
 };
 
+export default ConfirmationDialog;

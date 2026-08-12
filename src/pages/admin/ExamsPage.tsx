@@ -4,7 +4,6 @@ import JSZip from "jszip";
 import { Button } from "../../components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../../components/ui/dialog";
 import { Progress } from "../../components/ui/progress";
-import { DeleteConfirmationDialog } from "../../components/ui/delete-confirmation-dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
 import { Input } from "../../components/ui/input";
 import FormField from "../../components/forms/FormField";
@@ -12,7 +11,7 @@ import { useAuth } from "../../context/AuthContext";
 import { useTenant } from "../../context/TenantContext";
 import { useNavigate } from "react-router-dom";
 import { useExamData } from "../../context/ExamDataContext";
-import { ConfirmationDialog } from "../../components/ui/confirmation-dialog";
+import { ConfirmationDialog } from "../../components/dialogs/ConfirmationDialog";
 import { DataTable } from "../../components/ui/data-table";
 import { Skeleton } from "../../components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../components/ui/table";
@@ -253,9 +252,10 @@ const ExamsPage = () => {
 
   useEffect(() => {
     fetchQuestionCounts();
-    pb?.collection('questions').subscribe("*", fetchQuestionCounts);
+    if (!pb) return;
+    const unsub = pb.collection('questions').subscribe("*", fetchQuestionCounts);
     return () => {
-      pb?.collection('questions').unsubscribe("*");
+      unsub.then(u => u()).catch(() => {});
     };
   }, [pb, fetchQuestionCounts]);
 
@@ -404,11 +404,11 @@ const ExamsPage = () => {
     };
 
     fetchActiveRooms();
-    // Subscribe ke perubahan ruang ujian
-    pb?.collection('exam_rooms').subscribe("*", fetchActiveRooms);
+    if (!pb) return;
+    const unsub = pb.collection('exam_rooms').subscribe("*", fetchActiveRooms);
 
     return () => {
-      pb?.collection('exam_rooms').unsubscribe("*");
+      unsub.then(u => u()).catch(() => {});
     };
   }, [pb]);
 
@@ -461,10 +461,11 @@ const ExamsPage = () => {
     };
 
     fetchExams();
-    pb?.collection('exams').subscribe("*", fetchExams);
+    if (!pb) return;
+    const unsub = pb.collection('exams').subscribe("*", fetchExams);
 
     return () => {
-      pb?.collection('exams').unsubscribe("*");
+      unsub.then(u => u()).catch(() => {});
     };
   }, [subjects, teachers, role, user, pb]);
 
@@ -1287,13 +1288,14 @@ const ExamsPage = () => {
         </DialogContent>
       </Dialog>
 
-      <DeleteConfirmationDialog
+      <ConfirmationDialog
         isOpen={deleteDialogOpen}
         onClose={() => setDeleteDialogOpen(false)}
         onConfirm={handleConfirmDelete}
-        title="Hapus Data"
-        description="Apakah Anda yakin ingin menghapus data ini? Seluruh soal di dalamnya juga akan hilang."
-        itemName={examToDelete?.title || ""}
+        type="danger"
+        title="Hapus Data Bank Soal"
+        description={`Apakah Anda yakin ingin menghapus "${examToDelete?.title || ""}"? Seluruh soal di dalamnya juga akan hilang.`}
+        confirmLabel="Hapus"
         isLoading={isDeleting}
       />
 

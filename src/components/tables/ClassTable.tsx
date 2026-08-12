@@ -14,7 +14,7 @@ interface ClassTableProps {
   onResetPassword?: (cls: ClassData) => void;
 }
 
-const ClassTable = ({ 
+export const ClassTable = ({ 
   classes, 
   selectedIds, 
   onSelectChange, 
@@ -141,5 +141,3 @@ const ClassTable = ({
 };
 
 export default ClassTable;
-
-

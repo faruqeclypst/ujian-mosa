@@ -17,7 +17,7 @@ interface TeacherTableProps {
   onResetPassword: (teacherId: string) => void;
 }
 
-const TeacherTable = ({ 
+export const TeacherTable = ({ 
   teachers, 
   selectedIds, 
   onSelectChange, 
@@ -133,7 +133,6 @@ const TeacherTable = ({
         </div>
       )
     },
-
   ];
 
   const renderActions = (teacher: Teacher) => (
@@ -181,5 +180,3 @@ const TeacherTable = ({
 };
 
 export default TeacherTable;
-
-

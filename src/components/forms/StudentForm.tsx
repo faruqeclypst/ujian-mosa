@@ -5,10 +5,9 @@ import * as z from "zod";
 
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
-import FormField from "../forms/FormField";
+import FormField from "./FormField";
 import { Select } from "../ui/select";
 import type { ClassData } from "../../types/exam";
-
 import { useTenant } from "../../context/TenantContext";
 
 export type StudentFormValues = {
@@ -26,7 +25,7 @@ interface StudentFormProps {
   onCancel?: () => void;
 }
 
-const StudentForm = ({ 
+export const StudentForm = ({ 
   classes, 
   defaultValues, 
   onSubmit, 
@@ -41,14 +40,13 @@ const StudentForm = ({
     gender: z.enum(["L", "P"], { required_error: "Gender wajib dipilih" }),
     classId: z.string().min(1, `${terminology.class} wajib dipilih`),
   }), [terminology]);
+
   const {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
     reset,
-    setValue,
     control,
-    watch
   } = useForm<StudentFormValues>({
     resolver: zodResolver(studentSchema),
     defaultValues: {
@@ -60,9 +58,6 @@ const StudentForm = ({
     },
   });
 
-  const classIdValue = watch("classId");
-
-  // Initialize/Reset form only when the student ID changes to prevent resetting while editing
   useEffect(() => {
     if (defaultValues) {
       reset({
@@ -74,7 +69,7 @@ const StudentForm = ({
     } else {
       reset({ nisn: "", name: "", gender: "L", classId: "" });
     }
-  }, [defaultValues?.nisn, reset]); // Use nisn as a proxy for student identity change
+  }, [defaultValues?.nisn, reset]);
 
   const submitHandler = async (values: StudentFormValues) => {
     await onSubmit(values);
@@ -128,7 +123,6 @@ const StudentForm = ({
         />
       </FormField>
 
-
       <FormField id="classId" label={terminology.class} error={errors.classId}>
         <Select 
           id="classId"
@@ -173,4 +167,3 @@ const StudentForm = ({
 };
 
 export default StudentForm;
-

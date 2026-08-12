@@ -5,7 +5,7 @@ import { useExamData } from "../../context/ExamDataContext";
 import { Loader2, BookOpen, Trophy, Clock, ChevronRight, ArrowLeft, CheckCircle2, XCircle } from "lucide-react";
 import { Badge } from "../ui/badge";
 import { cn } from "../../lib/utils";
-import { MathText } from "../MathText";
+import { MathText } from "../ui/MathText";
 
 interface StudentScoresDialogProps {
   isOpen: boolean;
