@@ -91,7 +91,7 @@ const Logo = () => {
             EXAM AA
           </span>
           <span className="text-[9px] px-1.5 py-0.5 bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 font-black rounded-md border border-blue-100/50 dark:border-blue-500/20 shrink-0">
-            v3.1
+            v3.2
           </span>
         </div>
         <div className="min-w-0 pr-1">

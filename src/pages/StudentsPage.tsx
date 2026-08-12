@@ -314,6 +314,9 @@ const StudentsPage = () => {
     try {
       await deleteStudent(studentToDelete.id);
     } catch (error) {
+      console.error("Gagal menghapus siswa:", error);
+    } finally {
+      setIsDeleting(false);
       setDeleteDialogOpen(false);
       setStudentToDelete(null);
     }
@@ -513,7 +516,7 @@ const StudentsPage = () => {
           const chunkSize = 10;
           for (let i = 0; i < selectedIds.length; i += chunkSize) {
             const chunk = selectedIds.slice(i, i + chunkSize);
-            await Promise.all(chunk.map(id => deleteStudent(id)));
+            await deleteStudentsBatch(chunk);
 
             const currentProcessed = Math.min(i + chunkSize, selectedIds.length);
             setBatchProgress(prev => ({
