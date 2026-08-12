@@ -166,8 +166,28 @@ export const parseWaygroundQuizData = (rawData: any, fallbackId: string = ""): E
   };
 };
 
+const promiseAny = <T>(promises: Promise<T>[]): Promise<T> => {
+  return new Promise((resolve, reject) => {
+    let rejectedCount = 0;
+    const errors: any[] = [];
+    if (promises.length === 0) return reject(new Error("No promises provided"));
+
+    promises.forEach((p, i) => {
+      Promise.resolve(p)
+        .then(resolve)
+        .catch(err => {
+          errors[i] = err;
+          rejectedCount++;
+          if (rejectedCount === promises.length) {
+            reject(new Error("All promises failed"));
+          }
+        });
+    });
+  });
+};
+
 /**
- * Fetch and parse questions from Wayground / External Quiz REST API using CORS Proxy
+ * Fetch and parse questions from Wayground / External Quiz REST API using parallel CORS proxies
  */
 export const fetchWaygroundQuiz = async (urlOrId: string): Promise<ExternalQuizMeta> => {
   const quizId = extractQuizIdFromUrl(urlOrId);
@@ -175,8 +195,8 @@ export const fetchWaygroundQuiz = async (urlOrId: string): Promise<ExternalQuizM
     throw new Error("ID atau Link Kuis tidak valid.");
   }
 
-  // Base API endpoints to try for quizId
-  const directEndpoints = [
+  // Construct target URLs for Quizizz / Wayground REST API
+  const targets = [
     `https://quizizz.com/api/main/quiz/${quizId}`,
     `https://wayground.com/api/v1/quizzes/${quizId}`,
     `https://wayground.com/api/quiz/${quizId}`,
@@ -184,46 +204,46 @@ export const fetchWaygroundQuiz = async (urlOrId: string): Promise<ExternalQuizM
     urlOrId.startsWith("http") ? urlOrId : ""
   ].filter(Boolean);
 
-  let rawData: any = null;
-  let lastError: Error | null = null;
+  // Generate list of direct and proxied URLs
+  const candidateUrls: string[] = [];
+  targets.forEach(targetUrl => {
+    candidateUrls.push(targetUrl);
+    candidateUrls.push(`https://corsproxy.io/?${encodeURIComponent(targetUrl)}`);
+    candidateUrls.push(`https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`);
+  });
 
-  for (const directUrl of directEndpoints) {
-    // List of fetch attempts: direct + CORS proxies
-    const fetchVariants = [
-      directUrl,
-      `https://api.allorigins.win/raw?url=${encodeURIComponent(directUrl)}`,
-      `https://corsproxy.io/?${encodeURIComponent(directUrl)}`,
-      `https://thingproxy.freeboard.io/fetch/${encodeURIComponent(directUrl)}`
-    ];
+  const fetchSingle = async (url: string): Promise<any> => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3500);
 
-    for (const url of fetchVariants) {
-      try {
-        const res = await fetch(url, {
-          method: "GET",
-          headers: { "Accept": "application/json" }
-        });
+    try {
+      const res = await fetch(url, {
+        method: "GET",
+        headers: { "Accept": "application/json" },
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
 
-        if (res.ok) {
-          const text = await res.text();
-          try {
-            rawData = JSON.parse(text);
-            if (rawData && (rawData.data || rawData.quiz || rawData.info || rawData.questions)) {
-              break;
-            }
-          } catch (e) {
-            // Not valid JSON
-          }
-        }
-      } catch (err: any) {
-        lastError = err;
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const text = await res.text();
+      const json = JSON.parse(text);
+      if (json && (json.data || json.quiz || json.info || json.questions)) {
+        return json;
       }
+      throw new Error("Payload JSON tidak berisi soal.");
+    } catch (e: any) {
+      clearTimeout(timeoutId);
+      throw e;
     }
+  };
 
-    if (rawData) break;
-  }
-
-  if (!rawData) {
-    throw lastError || new Error(`Gagal mengambil data kuis. Browser memblokir koneksi CORS. Gunakan opsi Paste JSON.`);
+  // Run candidate fetches in parallel, resolve immediately on first success!
+  let rawData: any = null;
+  try {
+    rawData = await promiseAny(candidateUrls.map(url => fetchSingle(url)));
+  } catch (err) {
+    // All candidates failed or timed out
+    throw new Error("Gagal mengambil kuis secara otomatis. Silakan gunakan opsi Paste JSON.");
   }
 
   return parseWaygroundQuizData(rawData, quizId);

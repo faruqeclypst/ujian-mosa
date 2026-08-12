@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import { useExamData } from "../../context/ExamDataContext";
 import { useTenant } from "../../context/TenantContext";
-import { fetchWaygroundQuiz, ParsedExternalQuestion } from "../../lib/waygroundApi";
+import { fetchWaygroundQuiz, parseWaygroundQuizData, ParsedExternalQuestion } from "../../lib/waygroundApi";
 import type { QuestionData, QuestionType } from "../../pages/admin/QuestionsPage";
 
 interface QuestionRepositoryDialogProps {
@@ -56,6 +56,8 @@ export const QuestionRepositoryDialog: React.FC<QuestionRepositoryDialogProps> =
   const [waygroundMeta, setWaygroundMeta] = useState<{ title: string; subject?: string } | null>(null);
   const [waygroundQuestions, setWaygroundQuestions] = useState<ParsedExternalQuestion[]>([]);
   const [waygroundError, setWaygroundError] = useState("");
+  const [isJsonInputMode, setIsJsonInputMode] = useState(false);
+  const [rawJsonText, setRawJsonText] = useState("");
 
   // Shared state
   const [searchQuery, setSearchQuery] = useState("");
@@ -127,6 +129,21 @@ export const QuestionRepositoryDialog: React.FC<QuestionRepositoryDialogProps> =
       setWaygroundError(err?.message || "Gagal mengambil kuis dari Wayground API.");
     } finally {
       setLoadingWayground(false);
+    }
+  };
+
+  const handleParseJsonInput = () => {
+    if (!rawJsonText.trim()) return;
+    setWaygroundError("");
+    setSelectedQuestionIds(new Set());
+    try {
+      const parsed = JSON.parse(rawJsonText);
+      const meta = parseWaygroundQuizData(parsed);
+      setWaygroundMeta({ title: meta.title, subject: meta.subject });
+      setWaygroundQuestions(meta.questions);
+      setIsJsonInputMode(false);
+    } catch (e: any) {
+      setWaygroundError(e?.message || "Format JSON tidak valid.");
     }
   };
 
@@ -346,9 +363,37 @@ export const QuestionRepositoryDialog: React.FC<QuestionRepositoryDialogProps> =
                   disabled={loadingWayground || !waygroundUrl.trim()}
                   className="h-10 px-4 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs"
                 >
-                  {loadingWayground ? <Loader2 className="h-4 w-4 animate-spin" /> : "Ambil Soal"}
+                  {loadingWayground ? <Loader2 className="h-4 w-4 animate-spin" /> : "Ambil Soal (Auto)"}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsJsonInputMode(!isJsonInputMode)}
+                  className="h-10 px-3 rounded-xl border-purple-200 text-purple-700 dark:text-purple-300 font-semibold text-xs"
+                >
+                  {isJsonInputMode ? "Tutup Textarea" : "Paste JSON"}
                 </Button>
               </div>
+
+              {isJsonInputMode && (
+                <div className="p-3 bg-purple-50/50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-900 rounded-xl space-y-2">
+                  <textarea
+                    rows={4}
+                    value={rawJsonText}
+                    onChange={(e) => setRawJsonText(e.target.value)}
+                    placeholder="Paste teks JSON respons kuis Wayground di sini..."
+                    className="w-full p-2.5 text-xs font-mono rounded-lg border border-purple-200 dark:border-purple-900 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100"
+                  />
+                  <Button
+                    type="button"
+                    onClick={handleParseJsonInput}
+                    disabled={!rawJsonText.trim()}
+                    className="h-8 px-3 rounded-lg bg-purple-700 hover:bg-purple-800 text-white font-bold text-xs"
+                  >
+                    Parse Data JSON Instan
+                  </Button>
+                </div>
+              )}
 
               {waygroundError && (
                 <div className="space-y-2">
