@@ -1177,13 +1177,15 @@ const ExamsPage = () => {
                     <BookOpen className="h-3.5 w-3.5" />
                   </button>
 
-                  <button 
-                    className="p-1.5 bg-teal-50 text-teal-600 hover:bg-teal-100 rounded-lg dark:bg-teal-900/10 dark:text-teal-400 border border-teal-100 dark:border-teal-800/40 transition-all hover:shadow-sm" 
-                    onClick={() => handleDuplicateExam(exam)}
-                    title="Duplikat Bank Soal"
-                  >
-                    <Copy className="h-4 w-4" />
-                  </button>
+                  {role === "admin" && (
+                    <button 
+                      className="p-1.5 bg-teal-50 text-teal-600 hover:bg-teal-100 rounded-lg dark:bg-teal-900/10 dark:text-teal-400 border border-teal-100 dark:border-teal-800/40 transition-all hover:shadow-sm" 
+                      onClick={() => handleDuplicateExam(exam)}
+                      title="Duplikat Bank Soal (Khusus Admin)"
+                    >
+                      <Copy className="h-4 w-4" />
+                    </button>
+                  )}
                   
                   {isOwner(exam) && (
                     <>

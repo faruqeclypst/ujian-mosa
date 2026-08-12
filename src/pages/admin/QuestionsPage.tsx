@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Plus, Edit, Trash, Check, Copy, Image, ChevronDown, FileText, Download, Eye, FolderOpen, Sparkles, Wand2, RefreshCw, BookOpen, Loader2, FileSpreadsheet, Search, X, Bookmark, Forward, CheckCircle2, Menu, Maximize2, HelpCircle, FileJson, GripVertical, ChevronLeft, ChevronRight, Database, Globe } from "lucide-react";
+import { ArrowLeft, Plus, Edit, Trash, Check, Copy, Image, ChevronDown, FileText, Download, Eye, FolderOpen, Sparkles, Wand2, RefreshCw, BookOpen, Loader2, FileSpreadsheet, Search, X, Bookmark, Forward, CheckCircle2, Menu, Maximize2, HelpCircle, FileJson, GripVertical, ChevronLeft, ChevronRight, Database } from "lucide-react";
 import { Reorder } from "framer-motion";
 import { MathText } from "../../components/ui/MathText";
 import { SmartImage } from "../../components/ui/smart-image";
@@ -9,7 +9,7 @@ import { Button } from "../../components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "../../components/ui/dialog";
 import { ConfirmationDialog } from "../../components/dialogs/ConfirmationDialog";
 import BatchProgressDialog from "../../components/dialogs/BatchProgressDialog";
-import QuestionRepositoryDialog, { QuestionImportItem } from "../../components/dialogs/QuestionRepositoryDialog";
+import QuestionRepositoryDialog from "../../components/dialogs/QuestionRepositoryDialog";
 import { Input } from "../../components/ui/input";
 import { Separator } from "../../components/ui/separator";
 import FormField from "../../components/forms/FormField";
@@ -434,19 +434,70 @@ const QuestionsPage = () => {
 
 
   const [exam, setExam] = useState<any>(null);
-  const [allExams, setAllExams] = useState<any[]>([]);
   const [questions, setQuestions] = useState<QuestionData[]>([]);
-
-  useEffect(() => {
-    if (!pb) return;
-    pb.collection("exams").getFullList({ sort: "-created" }).then(res => setAllExams(res)).catch(() => {});
-  }, [pb]);
   const [loading, setLoading] = useState(true);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(null);
   const [isImporting, setIsImporting] = useState(false);
   const [importProgress, setImportProgress] = useState(0);
+  const [isRepoDialogOpen, setIsRepoDialogOpen] = useState(false);
+
+  const handleBatchImportQuestions = async (questionsToImport: Partial<QuestionData>[]) => {
+    const targetId = examId || (exam && exam.id);
+    if (!targetId || !pb || questionsToImport.length === 0) return;
+    
+    setIsImporting(true);
+    try {
+      setBatchProgress({
+        isOpen: true,
+        total: questionsToImport.length,
+        current: 0,
+        message: "Menyiapkan penyimpan soal...",
+        title: "Impor Butir Soal"
+      });
+
+      const chunkSize = 10;
+      for (let i = 0; i < questionsToImport.length; i += chunkSize) {
+        const chunk = questionsToImport.slice(i, i + chunkSize);
+        await Promise.all(
+          chunk.map((q, index) => {
+            const payload = {
+              examId: targetId,
+              examid: targetId,
+              type: q.type || "pilihan_ganda",
+              text: q.text || "",
+              imageUrl: q.imageUrl || "",
+              groupText: q.groupText || "",
+              choices: q.choices || {},
+              options: q.choices || {},
+              pairs: q.pairs || [],
+              answerKey: q.answerKey || "",
+              correctAnswer: q.answerKey || "",
+              order: (questions.length || 0) + i + index + 1
+            };
+            return pb.collection("questions").create(payload);
+          })
+        );
+
+        const currentProcessed = Math.min(i + chunkSize, questionsToImport.length);
+        setBatchProgress(prev => ({
+          ...prev,
+          current: currentProcessed,
+          message: `Menyimpan soal (${currentProcessed}/${questionsToImport.length})`
+        }));
+      }
+
+      await loadQuestions();
+      showAlert("Berhasil", `${questionsToImport.length} butir soal berhasil diimpor!`, "success");
+    } catch (err) {
+      console.error("Batch import error:", err);
+      showAlert("Gagal", "Gagal menyimpan beberapa butir soal.", "danger");
+    } finally {
+      setIsImporting(false);
+      setBatchProgress(prev => ({ ...prev, isOpen: false }));
+    }
+  };
 
   const [batchProgress, setBatchProgress] = useState<{
     isOpen: boolean;
@@ -531,7 +582,6 @@ const QuestionsPage = () => {
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [isRepoDialogOpen, setIsRepoDialogOpen] = useState(false);
 
   const [isGalleryOpen, setIsGalleryOpen] = useState(false);
   const [galleryGroups, setGalleryGroups] = useState<{ title: string; images: string[] }[]>([]);
@@ -3392,68 +3442,6 @@ const QuestionsPage = () => {
     }
   };
 
-  const handleImportRepositoryQuestions = async (importedItems: QuestionImportItem[]) => {
-    if (!pb || !examId || importedItems.length === 0) return;
-    setIsImporting(true);
-    setBatchProgress({
-      isOpen: true,
-      total: importedItems.length,
-      current: 0,
-      message: "Menyiapkan impor butir soal...",
-      title: "Impor Butir Soal"
-    });
-
-    try {
-      const existing = await pb.collection('questions').getFullList({ filter: `examId = "${examId}"`, fields: 'order' });
-      let maxExistingOrder = existing.reduce((max, q) => Math.max(max, q.order || 0), 0);
-
-      let importedCount = 0;
-      const chunkSize = 5;
-      for (let i = 0; i < importedItems.length; i += chunkSize) {
-        const chunk = importedItems.slice(i, i + chunkSize);
-        await Promise.all(
-          chunk.map(async (item, idx) => {
-            maxExistingOrder++;
-            const payload = {
-              examId,
-              examid: examId,
-              text: item.text,
-              type: item.type || "pilihan_ganda",
-              choices: item.choices || {},
-              answerKey: item.answerKey || "A",
-              explanation: item.explanation || "",
-              score: item.score || 1,
-              imageUrl: item.imageUrl || "",
-              order: maxExistingOrder
-            };
-            try {
-              await pb.collection("questions").create(payload);
-              importedCount++;
-            } catch (err) {
-              console.error("Gagal buat soal impor:", err);
-            }
-          })
-        );
-
-        const currentProcessed = Math.min(i + chunkSize, importedItems.length);
-        setBatchProgress(prev => ({
-          ...prev,
-          current: currentProcessed,
-          message: `Mengimpor butir soal (${currentProcessed}/${importedItems.length})`
-        }));
-      }
-
-      await loadQuestions();
-      showAlert("Impor Berhasil", `Berhasil mengimpor ${importedCount} butir soal ke dalam paket ini.`, "success");
-    } catch (err: any) {
-      console.error("Gagal mengimpor butir soal:", err);
-      showAlert("Gagal Impor", err?.message || "Terjadi kesalahan saat mengimpor butir soal.", "danger");
-    } finally {
-      setIsImporting(false);
-      setBatchProgress(prev => ({ ...prev, isOpen: false }));
-    }
-  };
-
   const handleImportJson = async (file: File) => {
     if (!pb) return;
     setIsImporting(true);
@@ -4716,14 +4704,15 @@ Aturan:
                         </Button>
                       )}
 
-                      {role === "admin" && (
+                      {role === "admin" && isOwner && (
                         <Button
+                          type="button"
                           onClick={() => setIsRepoDialogOpen(true)}
-                          variant="secondary"
                           size="sm"
-                          className="rounded-2xl bg-purple-50 hover:bg-purple-100 border border-purple-100 dark:bg-purple-900/30 dark:text-purple-400 dark:hover:bg-purple-900/50 dark:border-purple-800/40 text-purple-700 font-bold shadow-sm transition-all h-9 px-4 text-xs"
+                          className="rounded-2xl bg-amber-50 hover:bg-amber-100 border border-amber-100 dark:bg-amber-900/30 dark:text-amber-400 dark:hover:bg-amber-900/50 dark:border-amber-800/40 text-amber-700 font-bold shadow-sm transition-all h-9 px-4 text-xs"
                         >
-                          <Database className="mr-1.5 h-3.5 w-3.5" /> Ambil dari Bank / Quizizz
+                          <Database className="mr-1.5 h-3.5 w-3.5" />
+                          Bank / Wayground
                         </Button>
                       )}
 
@@ -4755,6 +4744,21 @@ Aturan:
                               <span className="text-[10px] text-slate-400 mt-1">Input manual satu per satu</span>
                             </div>
                           </DropdownMenuItem>
+
+                          {role === "admin" && (
+                            <DropdownMenuItem 
+                              onClick={() => setIsRepoDialogOpen(true)}
+                              className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 focus:bg-slate-50 dark:focus:bg-slate-900 transition-colors group"
+                            >
+                              <div className="h-10 w-10 shrink-0 rounded-lg bg-amber-50 dark:bg-amber-900/30 text-amber-600 flex items-center justify-center group-hover:scale-110 transition-transform shadow-sm">
+                                <Database className="h-5 w-5" />
+                              </div>
+                              <div className="flex flex-col min-w-0 text-left">
+                                <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">Ambil dari Bank / Wayground</span>
+                                <span className="text-[10px] text-slate-400 mt-1">Impor soal lama atau Wayground API</span>
+                              </div>
+                            </DropdownMenuItem>
+                          )}
 
 
 
@@ -7032,16 +7036,13 @@ Aturan:
         if (file) handleImportJson(file);
         e.target.value = "";
       }} />
-
-      {role === "admin" && (
-        <QuestionRepositoryDialog
-          isOpen={isRepoDialogOpen}
-          onOpenChange={setIsRepoDialogOpen}
-          exams={allExams}
-          pb={pb}
-          onImportQuestions={handleImportRepositoryQuestions}
-        />
-      )}
+      <QuestionRepositoryDialog
+        isOpen={isRepoDialogOpen}
+        onOpenChange={setIsRepoDialogOpen}
+        targetExamId={examId || (exam && exam.id) || ""}
+        targetExamTitle={exam?.title || ""}
+        onImportQuestions={handleBatchImportQuestions}
+      />
     </div>
   </div>
 );

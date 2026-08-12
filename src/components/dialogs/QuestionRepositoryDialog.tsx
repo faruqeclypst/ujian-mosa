@@ -1,456 +1,502 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "../ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "../ui/dialog";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
-import { Search, Database, Globe, Check, Loader2, BookOpen, Layers, CheckSquare, Square, ExternalLink } from "lucide-react";
-import { MathText } from "../ui/MathText";
 import { Badge } from "../ui/badge";
-import { fetchQuizizzQuiz, QuizizzQuizDetails, ExternalQuestionItem } from "../../lib/quizizzApi";
+import { Skeleton } from "../ui/skeleton";
+import { MathText } from "../ui/MathText";
+import { 
+  Search, 
+  Database, 
+  Globe, 
+  Check, 
+  Loader2, 
+  BookOpen, 
+  CheckSquare, 
+  Square, 
+  HelpCircle,
+  ExternalLink,
+  Sparkles
+} from "lucide-react";
+import { useExamData } from "../../context/ExamDataContext";
 import { useTenant } from "../../context/TenantContext";
-
-export interface QuestionImportItem {
-  text: string;
-  type: string;
-  choices?: Record<string, string>;
-  answerKey?: string;
-  explanation?: string;
-  score?: number;
-  imageUrl?: string;
-  source?: string;
-}
+import { fetchWaygroundQuiz, ParsedExternalQuestion } from "../../lib/waygroundApi";
+import type { QuestionData, QuestionType } from "../../pages/admin/QuestionsPage";
 
 interface QuestionRepositoryDialogProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
-  exams: any[];
-  pb: any;
-  onImportQuestions: (questions: QuestionImportItem[]) => Promise<void>;
+  targetExamId: string;
+  targetExamTitle?: string;
+  onImportQuestions: (questionsToImport: Partial<QuestionData>[]) => Promise<void>;
 }
 
 export const QuestionRepositoryDialog: React.FC<QuestionRepositoryDialogProps> = ({
   isOpen,
   onOpenChange,
-  exams,
-  pb,
+  targetExamId,
+  targetExamTitle,
   onImportQuestions
 }) => {
-  const { terminology } = useTenant();
-  const [activeTab, setActiveTab] = useState<"internal" | "quizizz">("internal");
+  const { pb } = useTenant();
+  const { subjects } = useExamData();
 
-  // Tab 1: Internal States
-  const [selectedExamId, setSelectedExamId] = useState<string>("");
-  const [internalQuestions, setInternalQuestions] = useState<any[]>([]);
-  const [loadingInternal, setLoadingInternal] = useState(false);
+  const [activeTab, setActiveTab] = useState<"internal" | "wayground">("internal");
+  
+  // State Tab Internal
+  const [examsList, setExamsList] = useState<any[]>([]);
+  const [selectedSourceExamId, setSelectedSourceExamId] = useState<string>("");
+  const [internalQuestions, setInternalQuestions] = useState<QuestionData[]>([]);
+  const [loadingInternalExams, setLoadingInternalExams] = useState(false);
+  const [loadingInternalQuestions, setLoadingInternalQuestions] = useState(false);
 
-  // Tab 2: Quizizz States
-  const [quizizzUrl, setQuizizzUrl] = useState("");
-  const [loadingQuizizz, setLoadingQuizizz] = useState(false);
-  const [quizizzDetails, setQuizizzDetails] = useState<QuizizzQuizDetails | null>(null);
-  const [quizizzError, setQuizizzError] = useState("");
+  // State Tab Wayground
+  const [waygroundUrl, setWaygroundUrl] = useState("");
+  const [loadingWayground, setLoadingWayground] = useState(false);
+  const [waygroundMeta, setWaygroundMeta] = useState<{ title: string; subject?: string } | null>(null);
+  const [waygroundQuestions, setWaygroundQuestions] = useState<ParsedExternalQuestion[]>([]);
+  const [waygroundError, setWaygroundError] = useState("");
 
-  // Shared Filters & Selection
+  // Shared state
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [isImporting, setIsImporting] = useState(false);
+  const [selectedTypeFilter, setSelectedTypeFilter] = useState<string>("all");
+  const [selectedQuestionIds, setSelectedQuestionIds] = useState<Set<string>>(new Set());
+  const [isSubmittingImport, setIsSubmittingImport] = useState(false);
 
-  // Reset state on open
+  // Fetch daftar Bank Soal Internal saat modal dibuka
   useEffect(() => {
-    if (isOpen) {
-      setSelectedIds(new Set());
-      setSearchQuery("");
-      setQuizizzError("");
-      if (exams.length > 0 && !selectedExamId) {
-        setSelectedExamId(exams[0].id);
-      }
-    }
-  }, [isOpen, exams]);
-
-  // Load internal questions when selectedExamId changes
-  useEffect(() => {
-    if (!isOpen || activeTab !== "internal" || !selectedExamId || !pb) return;
-
-    const fetchInternal = async () => {
-      setLoadingInternal(true);
+    if (!isOpen || !pb) return;
+    
+    const fetchInternalExams = async () => {
+      setLoadingInternalExams(true);
       try {
-        const records = await pb.collection("questions").getFullList({
-          filter: `examId = "${selectedExamId}"`,
-          sort: "+created"
+        const records = await pb.collection("exams").getFullList({
+          filter: `id != "${targetExamId}" && status != "archive"`,
+          sort: "-created"
         });
-        setInternalQuestions(records);
-      } catch (err) {
-        console.error("Error fetching internal questions:", err);
+        setExamsList(records);
+        if (records.length > 0) {
+          setSelectedSourceExamId(records[0].id);
+        }
+      } catch (e) {
+        console.error("Gagal load daftar exam:", e);
       } finally {
-        setLoadingInternal(false);
+        setLoadingInternalExams(false);
       }
     };
 
-    fetchInternal();
-  }, [isOpen, activeTab, selectedExamId, pb]);
+    fetchInternalExams();
+  }, [isOpen, pb, targetExamId]);
 
-  // Fetch Quizizz Quiz
-  const handleFetchQuizizz = async () => {
-    if (!quizizzUrl.trim()) return;
-    setLoadingQuizizz(true);
-    setQuizizzError("");
-    setQuizizzDetails(null);
-    setSelectedIds(new Set());
+  // Fetch butir soal dari Paket Internal terpilih
+  useEffect(() => {
+    if (!isOpen || !pb || !selectedSourceExamId) return;
+
+    const fetchQuestionsOfExam = async () => {
+      setLoadingInternalQuestions(true);
+      setSelectedQuestionIds(new Set());
+      try {
+        const records = await pb.collection("questions").getFullList({
+          filter: `examId = "${selectedSourceExamId}"`,
+          sort: "created"
+        });
+        setInternalQuestions(records as any);
+      } catch (e) {
+        console.error("Gagal load questions internal:", e);
+      } finally {
+        setLoadingInternalQuestions(false);
+      }
+    };
+
+    fetchQuestionsOfExam();
+  }, [isOpen, pb, selectedSourceExamId]);
+
+  // Fetch dari Wayground REST API
+  const handleFetchWayground = async () => {
+    if (!waygroundUrl.trim()) return;
+    setLoadingWayground(true);
+    setWaygroundError("");
+    setSelectedQuestionIds(new Set());
 
     try {
-      const data = await fetchQuizizzQuiz(quizizzUrl);
-      setQuizizzDetails(data);
+      const meta = await fetchWaygroundQuiz(waygroundUrl);
+      setWaygroundMeta({ title: meta.title, subject: meta.subject });
+      setWaygroundQuestions(meta.questions);
     } catch (err: any) {
-      setQuizizzError(err?.message || "Gagal mengambil kuis dari Quizizz.");
+      console.error(err);
+      setWaygroundError(err?.message || "Gagal mengambil kuis dari Wayground API.");
     } finally {
-      setLoadingQuizizz(false);
+      setLoadingWayground(false);
     }
   };
 
-  // Determine current active question items for rendering
-  const activeQuestions = useMemo(() => {
-    if (activeTab === "internal") {
-      return internalQuestions.map(q => ({
-        rawId: q.id,
-        text: q.text,
-        type: q.type || "pilihan_ganda",
-        choices: q.choices || q.options || {},
-        answerKey: q.answerKey || q.correctAnswer || "A",
-        score: q.score || 1,
-        source: `Internal: ${exams.find(e => e.id === selectedExamId)?.title || "Bank Soal"}`
-      }));
-    } else {
-      if (!quizizzDetails) return [];
-      return quizizzDetails.questions.map(q => ({
-        rawId: q.id,
-        text: q.text,
-        type: q.type,
-        choices: q.choices,
-        answerKey: q.answerKey,
-        score: q.score || 1,
-        source: `Quizizz: ${quizizzDetails.title}`
-      }));
-    }
-  }, [activeTab, internalQuestions, selectedExamId, exams, quizizzDetails]);
-
-  // Filtered by search query
-  const filteredQuestions = useMemo(() => {
+  // Filtered List tergantung Tab
+  const activeQuestionsList = useMemo(() => {
+    const sourceList = activeTab === "internal" ? internalQuestions : waygroundQuestions;
     const q = searchQuery.trim().toLowerCase();
-    if (!q) return activeQuestions;
-    return activeQuestions.filter(item =>
-      String(item.text || "").toLowerCase().includes(q) ||
-      Object.values(item.choices || {}).some(v => String(v || "").toLowerCase().includes(q))
-    );
-  }, [activeQuestions, searchQuery]);
 
-  // Checkbox handlers
-  const toggleSelect = (id: string) => {
-    const next = new Set(selectedIds);
-    if (next.has(id)) next.delete(id);
-    else next.add(id);
-    setSelectedIds(next);
+    return sourceList.filter((item: any) => {
+      // Type Filter
+      if (selectedTypeFilter !== "all") {
+        const itemType = item.type || "pilihan_ganda";
+        if (itemType !== selectedTypeFilter) return false;
+      }
+
+      // Text Search
+      if (!q) return true;
+      const textToSearch = `${item.text || ""} ${item.groupText || ""}`.toLowerCase();
+      return textToSearch.includes(q);
+    });
+  }, [activeTab, internalQuestions, waygroundQuestions, searchQuery, selectedTypeFilter]);
+
+  // Toggle selection
+  const toggleQuestionSelect = (id: string) => {
+    setSelectedQuestionIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   };
 
   const toggleSelectAll = () => {
-    if (selectedIds.size === filteredQuestions.length) {
-      setSelectedIds(new Set());
+    if (selectedQuestionIds.size === activeQuestionsList.length && activeQuestionsList.length > 0) {
+      setSelectedQuestionIds(new Set());
     } else {
-      setSelectedIds(new Set(filteredQuestions.map(q => q.rawId)));
+      setSelectedQuestionIds(new Set(activeQuestionsList.map((q: any) => q.id)));
     }
   };
 
-  // Import handler
+  // Submit Import
   const handleExecuteImport = async () => {
-    if (selectedIds.size === 0) return;
-    setIsImporting(true);
+    if (selectedQuestionIds.size === 0) return;
+    setIsSubmittingImport(true);
 
     try {
-      const itemsToImport: QuestionImportItem[] = activeQuestions
-        .filter(q => selectedIds.has(q.rawId))
-        .map(q => ({
-          text: q.text,
-          type: q.type,
-          choices: q.choices,
-          answerKey: q.answerKey,
-          score: q.score || 1,
-          source: q.source
-        }));
+      const sourceList = activeTab === "internal" ? internalQuestions : waygroundQuestions;
+      const selectedItems = sourceList.filter((q: any) => selectedQuestionIds.has(q.id));
 
-      await onImportQuestions(itemsToImport);
+      const questionsToImport: Partial<QuestionData>[] = selectedItems.map((q: any) => ({
+        type: q.type || "pilihan_ganda",
+        text: q.text || "",
+        imageUrl: q.imageUrl || undefined,
+        groupText: q.groupText || undefined,
+        choices: q.choices || undefined,
+        pairs: q.pairs || undefined,
+        answerKey: q.answerKey || undefined,
+        items: q.items || undefined,
+      }));
+
+      await onImportQuestions(questionsToImport);
       onOpenChange(false);
-    } catch (err) {
-      console.error("Import error:", err);
+    } catch (e) {
+      console.error(e);
     } finally {
-      setIsImporting(false);
+      setIsSubmittingImport(false);
     }
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col p-0 overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800">
+      <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col p-0 gap-0 rounded-2xl overflow-hidden">
         {/* Header */}
         <DialogHeader className="p-5 pb-4 border-b border-slate-200/60 dark:border-slate-800/60 bg-slate-50/50 dark:bg-slate-900/50">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
-              <div className="p-2 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400">
+              <div className="p-2 rounded-xl bg-blue-100/80 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400">
                 <Database className="h-5 w-5" />
               </div>
               <div>
-                <DialogTitle className="text-lg font-bold text-slate-800 dark:text-white">
-                  Ambil & Impor Butir Soal
+                <DialogTitle className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                  Repository & Impor Butir Soal
+                  <Badge variant="outline" className="bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400 border-amber-200 text-[10px]">
+                    Khusus Admin
+                  </Badge>
                 </DialogTitle>
-
                 <DialogDescription className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                  Pilih butir soal dari Bank Soal internal sekolah atau ambil kuis publik dari Quizizz.
+                  Pilih butir soal dari Bank Soal sekolah atau impor otomatis dari Wayground REST API.
                 </DialogDescription>
               </div>
             </div>
 
             {/* Tab Selector */}
-            <div className="flex bg-slate-200/70 dark:bg-slate-800/70 p-1 rounded-xl text-xs font-semibold">
+            <div className="flex bg-slate-200/70 dark:bg-slate-800 p-1 rounded-xl text-xs font-bold">
               <button
                 type="button"
-                onClick={() => { setActiveTab("internal"); setSelectedIds(new Set()); }}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all ${
-                  activeTab === "internal"
-                    ? "bg-white dark:bg-slate-700 text-slate-800 dark:text-white shadow-sm"
+                onClick={() => { setActiveTab("internal"); setSelectedQuestionIds(new Set()); }}
+                className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
+                  activeTab === "internal" 
+                    ? "bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm" 
                     : "text-slate-600 dark:text-slate-400 hover:text-slate-900"
                 }`}
               >
-                <Layers className="h-3.5 w-3.5" />
-                Bank Sekolah
+                <Database className="h-3.5 w-3.5" />
+                Bank Internal
               </button>
               <button
                 type="button"
-                onClick={() => { setActiveTab("quizizz"); setSelectedIds(new Set()); }}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all ${
-                  activeTab === "quizizz"
-                    ? "bg-purple-600 text-white shadow-sm"
-                    : "text-purple-600 dark:text-purple-400 hover:text-purple-800"
+                onClick={() => { setActiveTab("wayground"); setSelectedQuestionIds(new Set()); }}
+                className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
+                  activeTab === "wayground" 
+                    ? "bg-white dark:bg-slate-700 text-purple-600 dark:text-purple-400 shadow-sm" 
+                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900"
                 }`}
               >
                 <Globe className="h-3.5 w-3.5" />
-                Impor Quizizz
+                Wayground API
               </button>
             </div>
           </div>
         </DialogHeader>
 
-        {/* Content Body */}
+        {/* Body Container */}
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
-          {/* TAB 1: INTERNAL BANK SOAL */}
+          {/* TAB 1: BANK INTERNAL */}
           {activeTab === "internal" && (
             <div className="space-y-4">
               <div className="flex flex-col sm:flex-row gap-3">
-                <div className="flex-1">
-                  <label className="text-xs font-bold text-slate-600 dark:text-slate-400 mb-1 block">
+                {/* Select Bank Soal Sumber */}
+                <div className="flex-1 min-w-[240px]">
+                  <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 block mb-1">
                     Pilih Bank Soal Sumber:
                   </label>
-                  <select
-                    value={selectedExamId}
-                    onChange={(e) => setSelectedExamId(e.target.value)}
-                    className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 dark:text-slate-200"
-                  >
-                    {exams.map((ex) => (
-                      <option key={ex.id} value={ex.id}>
-                        {ex.title} ({ex.subjectName || "Mapel"})
-                      </option>
-                    ))}
-                  </select>
+                  {loadingInternalExams ? (
+                    <Skeleton className="h-9 w-full rounded-xl" />
+                  ) : (
+                    <select
+                      value={selectedSourceExamId}
+                      onChange={(e) => setSelectedSourceExamId(e.target.value)}
+                      className="w-full h-9 px-3 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 font-medium focus:ring-2 focus:ring-blue-500"
+                    >
+                      {examsList.length === 0 ? (
+                        <option value="">(Tidak ada Bank Soal lain)</option>
+                      ) : (
+                        examsList.map((exam) => {
+                          const subjName = subjects.find((s: any) => s.id === (exam.subjectId || exam.subjectid))?.name || "";
+                          return (
+                            <option key={exam.id} value={exam.id}>
+                              {exam.title} {subjName ? `(${subjName})` : ""}
+                            </option>
+                          );
+                        })
+                      )}
+                    </select>
+                  )}
                 </div>
-                <div className="flex-1">
-                  <label className="text-xs font-bold text-slate-600 dark:text-slate-400 mb-1 block">
-                    Cari Teks Soal:
+
+                {/* Search */}
+                <div className="flex-1 min-w-[200px]">
+                  <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 block mb-1">
+                    Cari Kata Kunci Soal:
                   </label>
                   <div className="relative">
-                    <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400" />
+                    <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
                     <Input
-                      placeholder="Cari kata dalam soal..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-9 text-xs rounded-xl h-9"
+                      placeholder="Cari teks soal..."
+                      className="pl-9 h-9 text-xs rounded-xl"
                     />
                   </div>
+                </div>
+
+                {/* Filter Tipe Soal */}
+                <div className="w-full sm:w-44">
+                  <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 block mb-1">
+                    Tipe Soal:
+                  </label>
+                  <select
+                    value={selectedTypeFilter}
+                    onChange={(e) => setSelectedTypeFilter(e.target.value)}
+                    className="w-full h-9 px-3 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 font-medium focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="all">Semua Tipe</option>
+                    <option value="pilihan_ganda">Pilihan Ganda</option>
+                    <option value="pilihan_ganda_kompleks">PG Kompleks</option>
+                    <option value="isian_singkat">Isian Singkat</option>
+                    <option value="uraian">Uraian</option>
+                    <option value="menjodohkan">Menjodohkan</option>
+                    <option value="urutkan">Urutkan</option>
+                  </select>
                 </div>
               </div>
             </div>
           )}
 
-          {/* TAB 2: QUIZIZZ REST API */}
-          {activeTab === "quizizz" && (
-            <div className="space-y-3 bg-purple-50/50 dark:bg-purple-950/20 p-4 rounded-xl border border-purple-100 dark:border-purple-900/30">
-              <label className="text-xs font-bold text-purple-900 dark:text-purple-300 block">
-                Link atau ID Kuis Quizizz:
-              </label>
+          {/* TAB 2: WAYGROUND REST API */}
+          {activeTab === "wayground" && (
+            <div className="space-y-3">
+              <div className="p-3.5 rounded-xl bg-purple-50 dark:bg-purple-950/30 border border-purple-100 dark:border-purple-900/40 text-xs text-purple-800 dark:text-purple-300 flex items-start gap-2.5">
+                <Sparkles className="h-4 w-4 text-purple-600 shrink-0 mt-0.5" />
+                <div>
+                  <strong>Impor REST API Wayground:</strong> Tempelkan Link Kuis Wayground (contoh: <code>https://wayground.com/...</code>) atau ID Kuis untuk mengambil soal beserta pilihan jawaban & kunci secara instan.
+                </div>
+              </div>
+
               <div className="flex gap-2">
                 <Input
-                  placeholder="Paste link Quizizz (misal: https://quizizz.com/admin/quiz/613eabc...)"
-                  value={quizizzUrl}
-                  onChange={(e) => setQuizizzUrl(e.target.value)}
-                  className="text-xs rounded-xl bg-white dark:bg-slate-900 border-purple-200 dark:border-purple-800 h-10"
+                  value={waygroundUrl}
+                  onChange={(e) => setWaygroundUrl(e.target.value)}
+                  placeholder="Tempel Link / ID Kuis Wayground di sini..."
+                  className="h-10 text-xs rounded-xl flex-1 border-purple-200 dark:border-purple-900 focus:ring-purple-500"
                 />
                 <Button
-                  onClick={handleFetchQuizizz}
-                  disabled={loadingQuizizz || !quizizzUrl.trim()}
-                  className="bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold px-4 shrink-0 h-10"
+                  type="button"
+                  onClick={handleFetchWayground}
+                  disabled={loadingWayground || !waygroundUrl.trim()}
+                  className="h-10 px-4 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs"
                 >
-                  {loadingQuizizz ? (
-                    <>
-                      <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> Ambil Data...
-                    </>
-                  ) : (
-                    <>
-                      <Globe className="mr-1.5 h-4 w-4" /> Ambil Soal Quizizz
-                    </>
-                  )}
+                  {loadingWayground ? <Loader2 className="h-4 w-4 animate-spin" /> : "Ambil Soal"}
                 </Button>
               </div>
 
-              {quizizzError && (
-                <div className="text-xs text-rose-600 font-semibold bg-rose-50 dark:bg-rose-950/30 p-2.5 rounded-lg border border-rose-200 dark:border-rose-900/40">
-                  ⚠️ {quizizzError}
-                </div>
+              {waygroundError && (
+                <p className="text-xs font-semibold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/40 p-2.5 rounded-xl border border-rose-200 dark:border-rose-900">
+                  ⚠️ {waygroundError}
+                </p>
               )}
 
-              {quizizzDetails && (
-                <div className="flex items-center justify-between text-xs text-purple-800 dark:text-purple-300 font-bold bg-white dark:bg-slate-900 p-2.5 rounded-lg border border-purple-200 dark:border-purple-800">
-                  <span className="flex items-center gap-2">
-                    <BookOpen className="h-4 w-4 text-purple-600" />
-                    Kuis Ditemukan: {quizizzDetails.title}
+              {waygroundMeta && (
+                <div className="flex items-center justify-between text-xs bg-slate-100 dark:bg-slate-800/60 p-2.5 rounded-xl">
+                  <span className="font-bold text-slate-800 dark:text-slate-100">
+                    Kuis: {waygroundMeta.title}
                   </span>
-                  <Badge variant="outline" className="border-purple-300 text-purple-700 dark:text-purple-300">
-                    {quizizzDetails.questions.length} Soal
+                  <Badge variant="outline" className="text-[10px]">
+                    {waygroundQuestions.length} Butir Soal Terdeteksi
                   </Badge>
                 </div>
               )}
             </div>
           )}
 
-          {/* QUESTIONS LIST WITH PREVIEW & MULTI-SELECT */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between border-b border-slate-200/60 dark:border-slate-800/60 pb-2">
-              <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={toggleSelectAll}
-                  disabled={filteredQuestions.length === 0}
-                  className="h-7 text-xs rounded-lg px-2.5 font-bold"
-                >
-                  {selectedIds.size === filteredQuestions.length && filteredQuestions.length > 0 ? (
-                    <>
-                      <CheckSquare className="mr-1.5 h-3.5 w-3.5 text-blue-600" /> Batal Pilih Semua
-                    </>
-                  ) : (
-                    <>
-                      <Square className="mr-1.5 h-3.5 w-3.5 text-slate-400" /> Pilih Semua ({filteredQuestions.length})
-                    </>
-                  )}
-                </Button>
-              </div>
+          {/* LIST PRATINJAU SOAL */}
+          <div className="border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden bg-white dark:bg-slate-900">
+            <div className="p-3 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+              <button
+                type="button"
+                onClick={toggleSelectAll}
+                disabled={activeQuestionsList.length === 0}
+                className="flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-300 hover:text-blue-600"
+              >
+                {selectedQuestionIds.size === activeQuestionsList.length && activeQuestionsList.length > 0 ? (
+                  <CheckSquare className="h-4 w-4 text-blue-600" />
+                ) : (
+                  <Square className="h-4 w-4 text-slate-400" />
+                )}
+                Pilih Semua ({selectedQuestionIds.size}/{activeQuestionsList.length} terpilih)
+              </button>
 
-              <span className="text-xs font-bold text-blue-600 dark:text-blue-400">
-                {selectedIds.size} Soal Terpilih
+              <span className="text-[11px] text-slate-500 font-medium">
+                Menampilkan {activeQuestionsList.length} soal
               </span>
             </div>
 
-            {/* List Render */}
-            {loadingInternal || loadingQuizizz ? (
-              <div className="py-12 text-center text-xs text-slate-500 flex flex-col items-center gap-2">
-                <Loader2 className="h-6 w-6 animate-spin text-blue-500" />
-                Memuat daftar soal...
-              </div>
-            ) : filteredQuestions.length === 0 ? (
-              <div className="py-10 text-center text-xs text-slate-400 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl">
-                {activeTab === "quizizz" && !quizizzDetails
-                  ? "Masukkan URL Kuis Quizizz lalu klik 'Ambil Soal Quizizz'."
-                  : "Tidak ada butir soal ditemukan."}
-              </div>
-            ) : (
-              <div className="space-y-2.5 max-h-[380px] overflow-y-auto pr-1">
-                {filteredQuestions.map((q, index) => {
-                  const isSelected = selectedIds.has(q.rawId);
+            <div className="max-h-[380px] overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800 p-2">
+              {loadingInternalQuestions || loadingWayground ? (
+                <div className="p-6 space-y-3">
+                  <Skeleton className="h-14 w-full rounded-xl" />
+                  <Skeleton className="h-14 w-full rounded-xl" />
+                  <Skeleton className="h-14 w-full rounded-xl" />
+                </div>
+              ) : activeQuestionsList.length === 0 ? (
+                <div className="py-12 text-center text-slate-400 dark:text-slate-500 text-xs">
+                  <BookOpen className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                  Tidak ada butir soal ditemukan.
+                </div>
+              ) : (
+                activeQuestionsList.map((item: any, idx: number) => {
+                  const isSelected = selectedQuestionIds.has(item.id);
                   return (
                     <div
-                      key={q.rawId}
-                      onClick={() => toggleSelect(q.rawId)}
-                      className={`p-3.5 rounded-xl border text-xs cursor-pointer transition-all ${
-                        isSelected
-                          ? "bg-blue-50/60 dark:bg-blue-950/30 border-blue-400 dark:border-blue-700 shadow-sm"
-                          : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700"
+                      key={item.id || idx}
+                      onClick={() => toggleQuestionSelect(item.id)}
+                      className={`p-3 rounded-xl cursor-pointer transition-all flex items-start gap-3 border ${
+                        isSelected 
+                          ? "bg-blue-50/70 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800/60 shadow-sm" 
+                          : "border-transparent hover:bg-slate-50 dark:hover:bg-slate-800/40"
                       }`}
                     >
-                      <div className="flex items-start gap-3">
-                        <div className="pt-0.5 shrink-0">
-                          {isSelected ? (
-                            <CheckSquare className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                          ) : (
-                            <Square className="h-4 w-4 text-slate-300 dark:text-slate-700" />
-                          )}
+                      <div className="pt-0.5">
+                        {isSelected ? (
+                          <CheckSquare className="h-4 w-4 text-blue-600 shrink-0" />
+                        ) : (
+                          <Square className="h-4 w-4 text-slate-400 shrink-0" />
+                        )}
+                      </div>
+
+                      <div className="flex-1 min-w-0 space-y-1.5">
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className="text-[9px] uppercase font-bold py-0.5 px-1.5">
+                            No. {idx + 1}
+                          </Badge>
+                          <Badge variant="secondary" className="text-[9px] uppercase font-semibold py-0.5 px-1.5">
+                            {item.type || "pilihan_ganda"}
+                          </Badge>
                         </div>
 
-                        <div className="flex-1 min-w-0 space-y-1.5">
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="font-bold text-slate-500 text-[10px] uppercase tracking-wider">
-                              No. {index + 1} &bull; {q.type.replace("_", " ")}
-                            </span>
-                            <Badge variant="outline" className="text-[9px] py-0">
-                              Kunci: {q.answerKey}
-                            </Badge>
+                        {/* Soal Text Preview */}
+                        <div className="text-xs text-slate-800 dark:text-slate-200 font-serif leading-relaxed line-clamp-3">
+                          <MathText content={item.text} />
+                        </div>
+
+                        {/* Pilihan Preview jika PG */}
+                        {item.choices && (
+                          <div className="grid grid-cols-2 gap-1.5 pt-1">
+                            {Object.entries(item.choices).map(([key, val]: [string, any]) => (
+                              <div 
+                                key={key} 
+                                className={`text-[11px] px-2 py-1 rounded-lg border ${
+                                  val.isCorrect 
+                                    ? "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 font-bold" 
+                                    : "bg-slate-50 dark:bg-slate-800 border-slate-100 dark:border-slate-800 text-slate-600 dark:text-slate-400"
+                                }`}
+                              >
+                                <span className="font-bold mr-1">{key}.</span>
+                                <MathText content={val.text || ""} className="inline" />
+                              </div>
+                            ))}
                           </div>
-
-                          <MathText content={q.text} className="text-slate-800 dark:text-slate-200 font-medium line-clamp-3" />
-
-                          {/* Choices Preview */}
-                          {Object.keys(q.choices).length > 0 && (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 pt-1">
-                              {Object.entries(q.choices).map(([letter, text]) => {
-                                const optText = typeof text === "string" ? text : (text as any)?.text || "";
-                                return (
-                                  <div key={letter} className="text-[11px] text-slate-600 dark:text-slate-400 truncate">
-                                    <span className="font-bold">{letter}.</span> {optText}
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          )}
-                        </div>
+                        )}
                       </div>
                     </div>
                   );
-                })}
-              </div>
-            )}
+                })
+              )}
+            </div>
           </div>
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-slate-200/60 dark:border-slate-800/60 bg-slate-50/50 dark:bg-slate-900/50 flex items-center justify-between">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-            className="rounded-xl text-xs font-semibold"
-          >
-            Batal
-          </Button>
-
-          <Button
-            type="button"
-            disabled={selectedIds.size === 0 || isImporting}
-            onClick={handleExecuteImport}
-            className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold px-5 shadow-lg shadow-blue-500/20"
-          >
-            {isImporting ? (
-              <>
-                <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> Menyimpan Soal...
-              </>
-            ) : (
-              <>
-                <Check className="mr-1.5 h-4 w-4" /> Impor {selectedIds.size} Soal Terpilih
-              </>
-            )}
-          </Button>
-        </div>
+        <DialogFooter className="p-4 border-t border-slate-200/60 dark:border-slate-800/60 bg-slate-50/50 dark:bg-slate-900/50 flex items-center justify-between">
+          <div className="text-xs font-semibold text-slate-600 dark:text-slate-400">
+            {selectedQuestionIds.size} butir soal dipilih
+          </div>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              className="rounded-xl text-xs"
+            >
+              Batal
+            </Button>
+            <Button
+              type="button"
+              onClick={handleExecuteImport}
+              disabled={isSubmittingImport || selectedQuestionIds.size === 0}
+              className="rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-500/20"
+            >
+              {isSubmittingImport ? (
+                <>
+                  <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                  Mengimpor...
+                </>
+              ) : (
+                `Gunakan ${selectedQuestionIds.size} Soal Terpilih`
+              )}
+            </Button>
+          </div>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

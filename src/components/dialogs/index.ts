@@ -15,3 +15,6 @@ export * from "./AISettingsModal";
 
 export { default as ChangePasswordModal } from "./ChangePasswordModal";
 export * from "./ChangePasswordModal";
+
+export { default as QuestionRepositoryDialog } from "./QuestionRepositoryDialog";
+export * from "./QuestionRepositoryDialog";
