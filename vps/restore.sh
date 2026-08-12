@@ -91,6 +91,10 @@ log "Caddy config OK"
 # ============================================================
 progress "Restore systemd services..."
 cp "$BACKUP_DIR/systemd/"*.service /etc/systemd/system/ 2>/dev/null || true
+if [ -d "$BACKUP_DIR/systemd/caddy.service.d" ]; then
+    mkdir -p /etc/systemd/system/caddy.service.d
+    cp -a "$BACKUP_DIR/systemd/caddy.service.d/"* /etc/systemd/system/caddy.service.d/ 2>/dev/null || true
+fi
 systemctl daemon-reload
 log "$(ls /etc/systemd/system/pb-*.service 2>/dev/null | wc -l) services"
 

@@ -130,6 +130,7 @@ progress "Backup systemd services..."
 mkdir -p "$BACKUP_DIR/systemd"
 
 cp /etc/systemd/system/pb-*.service "$BACKUP_DIR/systemd/" 2>/dev/null || true
+cp -a /etc/systemd/system/caddy.service.d "$BACKUP_DIR/systemd/" 2>/dev/null || true
 
 log "$(ls "$BACKUP_DIR/systemd/" 2>/dev/null | wc -l) service files"
 
