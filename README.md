@@ -1,131 +1,190 @@
-# EXAM AA - Platform Ujian & CBT (Computer Based Test) Multi-Tenant
+# 🎓 EXAM AA — Platform Ujian & CBT (Computer Based Test) Multi-Tenant
 
-Platform modern berbasis web untuk menyelenggarakan ujian sekolah (Computer Based Test) secara real-time dan aman. Sistem ini dirancang sebagai platform SaaS multi-tenant yang memungkinkan beberapa sekolah mendaftar dan mengelola data ujian mereka sendiri secara terisolasi dengan performa tinggi.
+Platform modern berbasis web untuk menyelenggarakan ujian sekolah (Computer Based Test) secara *real-time* dan aman. Sistem ini dirancang sebagai platform **SaaS (Software as a Service) Multi-Tenant** yang memungkinkan beberapa sekolah mendaftar dan mengelola data ujian mereka sendiri secara terisolasi dengan performa tinggi.
+
+---
+
+<p align="center">
+  <img src="https://img.shields.io/badge/React-18.2.0-61DAFB?style=for-the-badge&logo=react&logoColor=white" alt="React" />
+  <img src="https://img.shields.io/badge/TypeScript-5.3.3-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript" />
+  <img src="https://img.shields.io/badge/Vite-5.0.10-646CFF?style=for-the-badge&logo=vite&logoColor=white" alt="Vite" />
+  <img src="https://img.shields.io/badge/Tailwind_CSS-3.4.1-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white" alt="Tailwind CSS" />
+  <img src="https://img.shields.io/badge/PocketBase-0.26.8-2F9E8F?style=for-the-badge&logo=pocketbase&logoColor=white" alt="PocketBase" />
+  <img src="https://img.shields.io/badge/Capacitor-8.3.0-119EFF?style=for-the-badge&logo=capacitor&logoColor=white" alt="Capacitor" />
+  <img src="https://img.shields.io/badge/Cloudflare_R2-F38020?style=for-the-badge&logo=cloudflare&logoColor=white" alt="Cloudflare" />
+  <img src="https://img.shields.io/badge/Bun-1.x-000000?style=for-the-badge&logo=bun&logoColor=white" alt="Bun" />
+</p>
 
 ---
 
 ## 🚀 Fitur Utama
 
-- 🏢 **Multi-Tenant SaaS Architecture** – Manajemen multi-sekolah dengan registrasi mandiri, integrasi subdomain sekolah, dan modul super admin pusat.
-- 📝 **Manajemen Bank Soal & Soal**
-  - **Import dari Word & Excel** – Konversi naskah soal `.docx`/`.xlsx` langsung menjadi soal ujian lengkap beserta gambar dan persamaan matematika LaTeX.
-  - **Export ke Word (Offline Image)** – Cetak naskah soal beserta kunci jawaban ke format `.doc` (Word) dengan gambar yang di-embed secara offline (MHTML format) dan formula LaTeX terkonversi.
-  - **AI-Powered Question Generator** – Integrasi AI (seperti Groq/LLM) untuk membuat soal otomatis berdasarkan topik, kesulitan, dan teks stimulus/literasi.
-- 🖥️ **CBT Exam Engine**
-  - Antarmuka ujian siswa yang responsif, minimalis, dan stabil.
-  - Dukungan penulisan rumus matematika kompleks menggunakan **KaTeX (LaTeX)**.
-  - Auto-save jawaban siswa secara berkala ke database server untuk mencegah kehilangan data akibat kendala koneksi.
-- 🔒 **Exambro Guard Security**
-  - Proteksi anti-curang dengan mendeteksi perpindahan tab browser, meminimalkan jendela, serta integrasi Exambro Guard (`VITE_DISABLE_EXAMBRO_GUARD` untuk bypass testing).
-- 📊 **Monitoring Real-Time**
-  - Dasbor pengawas/admin untuk memantau progress pengerjaan siswa, waktu mulai/selesai, sisa waktu, dan status keaktifan secara real-time.
-- 📉 **Autograding & Laporan Progress**
-  - Penilaian otomatis untuk soal pilihan ganda, kompleks, benar-salah, menjodohkan, dan urutkan.
-  - Fitur salin format teks laporan kemajuan pembuatan soal guru untuk dibagikan via WhatsApp.
-- 📲 **Capacitor Hybrid Mobile Support**
-  - Konfigurasi siap pakai untuk memaketkan aplikasi frontend ke aplikasi mobile native (Android & iOS).
+### 🏢 **SaaS Multi-Tenant Architecture**
+Manajemen multi-sekolah dengan registrasi mandiri, isolasi data lengkap pada level database, pemetaan subdomain sekolah otomatis, dan kontrol panel admin pusat untuk manajemen global.
+
+### 📝 **Manajemen Bank Soal & Integrasi AI**
+*   **Import Dokumen Praktis**: Konversi naskah soal `.docx` (Word) dan `.xlsx` (Excel) langsung menjadi soal ujian lengkap beserta media gambar dan persamaan matematika LaTeX.
+*   **Export ke Word (Offline Image)**: Ekspor naskah soal beserta kunci jawaban ke format `.doc` (Word) dengan gambar yang tersemat secara offline (format MHTML) dan formula LaTeX terkonversi.
+*   **AI-Powered Question Generator**: Integrasi kecerdasan buatan (LLM / Groq) untuk memproduksi soal ujian secara otomatis berdasarkan topik, tingkat kesulitan, serta stimulus teks literasi/numerasi.
+
+### 🖥️ **CBT Exam Engine Modern**
+*   Antarmuka ujian siswa yang responsif, minimalis, dan dirancang fokus bebas gangguan.
+*   *Rendering* persamaan matematika kompleks berkecepatan tinggi menggunakan **KaTeX (LaTeX)**.
+*   **Auto-Save & Safe State**: Sinkronisasi jawaban berkala ke server untuk menghindari kehilangan progres jika terjadi kendala jaringan/daya.
+
+### 🔒 **Exambro Guard Security**
+*   Proteksi keamanan tingkat tinggi yang mendeteksi pergantian tab browser, meminimalkan jendela, dan integrasi penuh dengan aplikasi mobile client (**Exambro Guard**).
+*   Gunakan variabel `VITE_DISABLE_EXAMBRO_GUARD=true` untuk menonaktifkan fitur pengaman saat tahap pengembangan/testing.
+
+### 📊 **Real-Time Monitoring Panel**
+*   Dasbor pengawas (*Proctor*) real-time untuk memantau status keaktifan siswa, kemajuan pengerjaan, sisa waktu, IP Address, dan deteksi pelanggaran saat ujian berlangsung.
+
+### 📉 **Autograding & Laporan Penilaian**
+*   Kalkulasi nilai otomatis untuk berbagai tipe soal: pilihan ganda tunggal, pilihan ganda kompleks, benar/salah, menjodohkan (*matching*), dan mengurutkan (*reorder*).
+*   Fitur **Salin Laporan WhatsApp** untuk memudahkan guru membagikan rekap progres bank soal ke grup chat sekolah.
+
+### 📲 **Capacitor Hybrid Mobile Support**
+*   Konfigurasi terintegrasi untuk memaketkan platform web menjadi aplikasi native Android & iOS menggunakan framework **Capacitor**.
 
 ---
 
-## 🛠️ Tech Stack
+## 🛠️ Tech Stack & Dependencies
 
-- **Frontend**: React 18, Vite, TypeScript, Tailwind CSS, Lucide React (Icons), Framer Motion (Animations), React Quill (Rich Text Editor).
-- **Backend/Database**: PocketBase (Real-time DB, Auth Store, File Storage, SaaS registry).
-- **Math Rendering**: KaTeX.
-- **Media Storage**: Cloudflare R2 dengan secure proxy menggunakan Cloudflare Worker (`VITE_R2_WORKER_URL`).
-- **File Parsing**: Mammoth (Word docx extractor), JSZip (Word MHTML packager), SheetJS/XLSX (Excel generator).
+Sistem ini didesain menggunakan ekosistem teknologi modern dengan efisiensi tinggi:
+
+| Layer | Keterangan | Teknologi Utama |
+| :--- | :--- | :--- |
+| **Frontend Core** | Antarmuka dinamis dan responsif | `React 18`, `TypeScript`, `Vite`, `React Router DOM` |
+| **Styling & UI** | Desain premium, interaktif & konsisten | `Tailwind CSS`, `Framer Motion`, `Lucide Icons`, `Shadcn UI` |
+| **Database & Auth** | Real-time backend dengan performa tinggi | `PocketBase` (Go backend, SQLite database, Real-time SDK) |
+| **Math Rendering** | Render formula matematika LaTeX instan | `KaTeX` |
+| **Media Storage** | Penyimpanan aset gambar/audio aman | `Cloudflare R2` dengan custom secure proxy worker |
+| **File Parser** | Ekstraksi dan pengemasan berkas | `Mammoth` (.docx), `JSZip` (MHTML), `SheetJS/XLSX` (.xlsx) |
+| **Mobile Integration**| Kemasan aplikasi mobile native Android/iOS | `Capacitor CLI & Plugins` (Splash Screen, App lifecycle) |
 
 ---
 
 ## 📁 Struktur Proyek
 
-```
-├── android                 # Proyek Android native (Capacitor)
-├── configs                 # Konfigurasi deploy/build tambahan
-├── pb_hooks                # Kustom hook server PocketBase
-├── pocketbase-schema       # Schema koleksi database PocketBase
-├── public                  # Aset statis public
-├── scripts                 # Utilitas build & switch environment
+```bash
+├── android                 # Proyek Native Android (Capacitor wrapper)
+├── configs                 # Konfigurasi tambahan deployment & build
+├── pb_hooks                # Custom Go/JS hooks backend PocketBase
+├── pocketbase-schema       # Skema koleksi database PocketBase (JSON)
+├── public                  # Aset statis public (logo, favicon)
+├── scripts                 # Script utilitas (e.g. switch environment)
 ├── src
-│   ├── components          # Komponen reusable (forms, UI shadcn, tables)
-│   ├── context             # Auth & Exam Data Context provider
-│   ├── lib                 # Utility parser (Word, Excel), AI & R2 storage helper
+│   ├── components          # Komponen reusable (form, modal, UI shadcn, tabel)
+│   ├── context             # Auth & CBT Exam data context state
+│   ├── lib                 # Utility parser (Word, Excel), helper AI & R2 storage
 │   ├── pages
-│   │   ├── admin           # Kelola Bank Soal, Ruang Ujian, Monitoring, Nilai
-│   │   ├── student         # Halaman CBT siswa, login & dashboard ujian
-│   │   └── superadmin      # Dashboard pusat admin SaaS
-│   ├── styles              # Konfigurasi styling Tailwind global
-│   └── App.tsx             # Routing & Layouting inti
-├── capacitor.config.ts     # Konfigurasi Capacitor Mobile app
-├── tailwind.config.ts      # Konfigurasi Tailwind CSS
-└── package.json            # Daftar dependensi & npm scripts
+│   │   ├── admin           # Panel Guru/Sekolah: Bank Soal, Monitoring, Ruang Ujian, Nilai
+│   │   ├── student         # Halaman Siswa: Login CBT, Dashboard, Lembar Ujian
+│   │   └── superadmin      # Dashboard pusat admin SaaS Multi-Tenant
+│   ├── styles              # Konfigurasi gaya CSS global & Tailwind
+│   └── App.tsx             # Routing & layout utama aplikasi
+├── capacitor.config.ts     # Konfigurasi Capacitor Mobile App
+├── tailwind.config.ts      # Konfigurasi token visual Tailwind CSS
+└── package.json            # Manifest proyek & script perintah
 ```
 
 ---
 
 ## ⚙️ Persiapan Lingkungan (Environment Variables)
 
-Buat file `.env` di root direktori proyek dengan variabel konfigurasi berikut:
+Salin berkas `.env` di root direktori proyek Anda dan sesuaikan isinya dengan parameter berikut:
 
 ```env
-# Nama Aplikasi
+# Nama Aplikasi Utama
 VITE_APP_NAME="EXAM AA"
 
 # SaaS Multi-Tenant Config
 VITE_MASTER_PB_URL=https://db.alfaruqasri.my.id   # Master PB database untuk registry sekolah
 VITE_MAIN_DOMAIN=alfaruqasri.my.id                # Domain utama platform SaaS (tanpa subdomain)
 VITE_LANDING_SUBDOMAIN=ujian                       # Subdomain halaman landing & super admin
-# VITE_DEV_SCHOOL_SLUG=modalbangsa                # Bypass halaman landing di localhost (testing)
+# VITE_DEV_SCHOOL_SLUG=modalbangsa                # Aktifkan untuk bypass landing page di localhost
 
 # Tenant Database Connection
 VITE_POCKETBASE_URL=https://db.alfaruqasri.my.id
 
-# Keamanan Exambro (Isi 'true' untuk testing/nonaktifkan pengaman)
+# Keamanan Exambro (Set 'true' hanya untuk bypass debugging)
 VITE_DISABLE_EXAMBRO_GUARD=false
 
 # Media & Storage Cloudflare R2
 VITE_R2_PUBLIC_BASE_URL=https://assets.examku.my.id
-VITE_R2_WORKER_URL=https://examku-worker.faruq-blogger.workers.dev # CF Worker untuk upload/delete aman
+VITE_R2_WORKER_URL=https://examku-worker.faruq-blogger.workers.dev # CF Worker proxy
 ```
 
 ---
 
-## 🏃‍♂️ Cara Menjalankan
+## 🏃‍♂️ Panduan Menjalankan Aplikasi
 
 ### 1. Instalasi Dependensi
-Gunakan package manager untuk memasang dependensi:
+Rekomendasi menggunakan `bun` untuk kecepatan maksimal, namun Anda juga dapat menggunakan `npm`:
 ```bash
+# Menggunakan Bun
 bun install
-# atau menggunakan npm:
+
+# Menggunakan NPM
 npm install
 ```
 
-### 2. Jalankan Mode Pengembangan (Local Dev Server)
+### 2. Mode Pengembangan (Local Dev Server)
+Jalankan server lokal untuk proses coding dan testing:
 ```bash
+# Menggunakan Bun
 bun run dev
-# atau
+
+# Menggunakan NPM
 npm run dev
 ```
-Buka browser di `http://localhost:5173`.
+Buka browser dan akses halaman di [http://localhost:5173](http://localhost:5173).
 
 ### 3. Build untuk Produksi
-Membangun paket statis aplikasi teroptimasi untuk di-deploy:
+Menghasilkan bundle statis siap pasang di server hosting/VPS:
 ```bash
+# Menggunakan Bun
 bun run build
-# atau
+
+# Menggunakan NPM
 npm run build
 ```
-Hasil build akan disimpan di direktori `dist/`.
-
-### 4. Sinkronisasi Aplikasi Mobile (Capacitor)
-Jika Anda ingin memaketkan aplikasi ke perangkat Android/iOS:
-```bash
-npx cap sync
-npx cap open android
-```
+Hasil build teroptimasi akan tersimpan dalam direktori `dist/`.
 
 ---
 
-## 📄 Lisensi
+## 📲 Panduan Build Aplikasi Mobile (Capacitor Android & iOS)
 
-Platform ini dirancang khusus untuk operasional dan manajemen internal ujian sekolah mitra. Seluruh kode sumber tunduk pada kebijakan lisensi internal pengembang.
+Aplikasi CBT ini dirancang untuk dapat dibungkus menjadi aplikasi mobile native untuk memicu deteksi Exambro Guard.
+
+### 1. Build Proyek Web
+Sebelum melakukan sinkronisasi Capacitor, pastikan bundle web terbaru telah dibuat:
+```bash
+bun run build
+```
+
+### 2. Sinkronisasi Aset & Plugin ke Folder Native
+```bash
+npx cap sync
+```
+
+### 3. Menjalankan / Membuka Android Studio
+Akses editor Android Studio untuk melakukan kompilasi file APK atau Bundle:
+```bash
+npx cap open android
+```
+
+### 🔒 Catatan Keamanan Mobile Agent
+Konfigurasi Android memiliki agen User-Agent yang dimodifikasi khusus:
+```typescript
+android: {
+  overrideUserAgent: 'MosaExambro/1.0 (Android)'
+}
+```
+*Platform Ujian akan mendeteksi User-Agent di atas. Siswa yang tidak menggunakan aplikasi native Exambro resmi dengan User-Agent tersebut akan secara otomatis diblokir dari lembar ujian untuk menghindari kecurangan.*
+
+---
+
+## 📄 Lisensi & Hak Cipta
+
+Platform ini dirancang khusus untuk operasional dan manajemen internal ujian sekolah mitra. Seluruh kode sumber tunduk pada kebijakan lisensi internal pengembang. Penggunaan tanpa izin tertulis dilarang keras.
