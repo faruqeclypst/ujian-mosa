@@ -16,13 +16,11 @@ import {
   Square, 
   HelpCircle,
   ExternalLink,
-  Sparkles,
-  FileJson,
-  Code2
+  Sparkles
 } from "lucide-react";
 import { useExamData } from "../../context/ExamDataContext";
 import { useTenant } from "../../context/TenantContext";
-import { fetchWaygroundQuiz, parseWaygroundQuizData, ParsedExternalQuestion } from "../../lib/waygroundApi";
+import { fetchWaygroundQuiz, ParsedExternalQuestion } from "../../lib/waygroundApi";
 import type { QuestionData, QuestionType } from "../../pages/admin/QuestionsPage";
 
 interface QuestionRepositoryDialogProps {
@@ -58,23 +56,6 @@ export const QuestionRepositoryDialog: React.FC<QuestionRepositoryDialogProps> =
   const [waygroundMeta, setWaygroundMeta] = useState<{ title: string; subject?: string } | null>(null);
   const [waygroundQuestions, setWaygroundQuestions] = useState<ParsedExternalQuestion[]>([]);
   const [waygroundError, setWaygroundError] = useState("");
-  const [showJsonInput, setShowJsonInput] = useState(false);
-  const [rawJsonText, setRawJsonText] = useState("");
-
-  const handleParseRawJson = () => {
-    if (!rawJsonText.trim()) return;
-    setWaygroundError("");
-    try {
-      const parsedObj = JSON.parse(rawJsonText.trim());
-      const meta = parseWaygroundQuizData(parsedObj, "manual-json");
-      setWaygroundMeta({ title: meta.title, subject: meta.subject });
-      setWaygroundQuestions(meta.questions);
-      setSelectedQuestionIds(new Set());
-      setShowJsonInput(false);
-    } catch (e: any) {
-      setWaygroundError("Format JSON tidak valid. Pastikan Anda menyalin seluruh teks respons JSON kuis.");
-    }
-  };
 
   // Shared state
   const [searchQuery, setSearchQuery] = useState("");
@@ -348,7 +329,7 @@ export const QuestionRepositoryDialog: React.FC<QuestionRepositoryDialogProps> =
               <div className="p-3.5 rounded-xl bg-purple-50 dark:bg-purple-950/30 border border-purple-100 dark:border-purple-900/40 text-xs text-purple-800 dark:text-purple-300 flex items-start gap-2.5">
                 <Sparkles className="h-4 w-4 text-purple-600 shrink-0 mt-0.5" />
                 <div>
-                  <strong>Impor REST API Wayground:</strong> Tempelkan Link Kuis Wayground (contoh: <code>https://wayground.com/...</code>) atau ID Kuis untuk mengambil soal beserta pilihan jawaban & kunci secara instan.
+                  <strong>Impor REST API Wayground:</strong> Tempelkan Link Kuis Wayground (contoh: <code>https://wayground.com/activity/admin/quiz/5daf...</code>) atau ID Kuis untuk mengambil soal secara otomatis via CORS Proxy.
                 </div>
               </div>
 
@@ -369,47 +350,12 @@ export const QuestionRepositoryDialog: React.FC<QuestionRepositoryDialogProps> =
                 </Button>
               </div>
 
-              <div className="flex items-center justify-between pt-1">
-                <button
-                  type="button"
-                  onClick={() => setShowJsonInput(!showJsonInput)}
-                  className="text-xs font-bold text-purple-600 dark:text-purple-400 hover:underline flex items-center gap-1.5"
-                >
-                  <FileJson className="h-3.5 w-3.5" />
-                  {showJsonInput ? "Sembunyikan Input JSON" : "Alternatif: Paste Respons JSON Kuis Direct"}
-                </button>
-              </div>
-
-              {showJsonInput && (
-                <div className="p-3 bg-purple-50/50 dark:bg-purple-950/20 rounded-xl border border-purple-200 dark:border-purple-900/50 space-y-2">
-                  <p className="text-[11px] text-purple-700 dark:text-purple-300">
-                    Buka link API kuis di tab browser (contoh: <code>https://quizizz.com/api/main/quiz/{`{ID_KUIS}`}</code>), salin seluruh isi teks JSON dan tempelkan di bawah ini:
-                  </p>
-                  <textarea
-                    rows={4}
-                    value={rawJsonText}
-                    onChange={(e) => setRawJsonText(e.target.value)}
-                    placeholder='{"info": {"name": "..."}, "questions": [...] }'
-                    className="w-full p-2 text-xs font-mono rounded-lg border border-purple-200 dark:border-purple-900 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100"
-                  />
-                  <div className="flex justify-end">
-                    <Button
-                      type="button"
-                      onClick={handleParseRawJson}
-                      disabled={!rawJsonText.trim()}
-                      size="sm"
-                      className="bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs rounded-lg px-4"
-                    >
-                      Parse Soal JSON
-                    </Button>
-                  </div>
-                </div>
-              )}
-
               {waygroundError && (
-                <p className="text-xs font-semibold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/40 p-2.5 rounded-xl border border-rose-200 dark:border-rose-900">
-                  ⚠️ {waygroundError}
-                </p>
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/40 p-2.5 rounded-xl border border-rose-200 dark:border-rose-900">
+                    ⚠️ {waygroundError}
+                  </p>
+                </div>
               )}
 
               {waygroundMeta && (

@@ -27,16 +27,9 @@ export const extractQuizIdFromUrl = (urlOrId: string): string => {
   const trimmed = urlOrId.trim();
   if (!trimmed) return "";
   
-  // 1. Regex match 24-hex ObjectId (e.g. 5dafef0d523e5e001aa5e62e or 5f3f373b26490a001d990c66)
-  const hexMatch = trimmed.match(/[a-f0-9]{24}/i);
-  if (hexMatch) {
-    return hexMatch[0];
-  }
-
-  // 2. Regex match UUID
-  const uuidMatch = trimmed.match(/[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}/i);
-  if (uuidMatch) {
-    return uuidMatch[0];
+  // If it's already a raw ID (24 hex characters or 6-36 alphanumerics)
+  if (/^[a-f0-9]{24}$/i.test(trimmed) || (/^[a-z0-9_-]{6,36}$/i.test(trimmed) && !trimmed.includes("/"))) {
+    return trimmed;
   }
 
   try {
@@ -44,14 +37,19 @@ export const extractQuizIdFromUrl = (urlOrId: string): string => {
     const pathSegments = urlObj.pathname.split("/").filter(Boolean);
     
     // Pattern: /admin/quiz/613eabc... or /quiz/613eabc... or /game/613eabc...
-    const quizIdx = pathSegments.findIndex(s => s === "quiz" || s === "game" || s === "quiz-room" || s === "details");
-    if (quizIdx !== -1 && pathSegments[quizIdx + 1]) {
-      return pathSegments[quizIdx + 1];
+    const quizIdx = pathSegments.findIndex(s => s === "quiz" || s === "game" || s === "quiz-room" || s === "details" || s === "activity");
+    if (quizIdx !== -1) {
+      // Find the segment after quiz or last segment that looks like an ID
+      for (let i = quizIdx + 1; i < pathSegments.length; i++) {
+        if (/^[a-f0-9]{24}$/i.test(pathSegments[i]) || /^[a-z0-9_-]{6,36}$/i.test(pathSegments[i])) {
+          return pathSegments[i];
+        }
+      }
     }
 
     // Return last segment if it looks like an ID
     const last = pathSegments[pathSegments.length - 1];
-    if (last) return last;
+    if (last && (last.length >= 6)) return last;
   } catch (e) {
     return trimmed;
   }
@@ -60,14 +58,13 @@ export const extractQuizIdFromUrl = (urlOrId: string): string => {
 };
 
 /**
- * Parse raw Wayground / Quizizz JSON payload object
+ * Parse Quiz JSON payload into ExternalQuizMeta
  */
-export const parseWaygroundQuizData = (rawData: any, fallbackId: string = "quiz"): ExternalQuizMeta => {
+export const parseWaygroundQuizData = (rawData: any, fallbackId: string = ""): ExternalQuizMeta => {
   if (!rawData) {
-    throw new Error("Data kuis tidak ditemukan atau format JSON tidak sesuai.");
+    throw new Error("Data JSON kuis kosong.");
   }
 
-  // Parse payload metadata
   const quizObj = rawData.data?.quiz || rawData.quiz || rawData.data || rawData;
   const title = quizObj.info?.name || quizObj.name || quizObj.title || `Kuis Wayground (${fallbackId.slice(0, 8)})`;
   const subject = quizObj.info?.subjects?.[0] || quizObj.subject || "Umum";
@@ -79,6 +76,10 @@ export const parseWaygroundQuizData = (rawData: any, fallbackId: string = "quiz"
     rawData.data?.questions || 
     rawData.questions || 
     [];
+
+  if (rawQuestions.length === 0) {
+    throw new Error("Tidak menemukan butir soal di dalam data kuis.");
+  }
 
   const parsedQuestions: ParsedExternalQuestion[] = rawQuestions.map((q, index) => {
     const qId = q.id || q._id || `ext_q_${index + 1}`;
@@ -166,7 +167,7 @@ export const parseWaygroundQuizData = (rawData: any, fallbackId: string = "quiz"
 };
 
 /**
- * Fetch and parse questions from Wayground / External Quiz REST API with fallback proxies
+ * Fetch and parse questions from Wayground / External Quiz REST API using CORS Proxy
  */
 export const fetchWaygroundQuiz = async (urlOrId: string): Promise<ExternalQuizMeta> => {
   const quizId = extractQuizIdFromUrl(urlOrId);
@@ -174,21 +175,8 @@ export const fetchWaygroundQuiz = async (urlOrId: string): Promise<ExternalQuizM
     throw new Error("ID atau Link Kuis tidak valid.");
   }
 
-  // If input is raw JSON string, parse directly
-  if (urlOrId.trim().startsWith("{") && urlOrId.trim().endsWith("}")) {
-    try {
-      const parsedObj = JSON.parse(urlOrId.trim());
-      return parseWaygroundQuizData(parsedObj, quizId);
-    } catch (e) {
-      // Not valid JSON string, continue to fetch
-    }
-  }
-
-  let rawData: any = null;
-  let lastError: Error | null = null;
-
-  // Candidate API targets for Wayground / Quizizz REST APIs
-  const candidateUrls = [
+  // Base API endpoints to try for quizId
+  const directEndpoints = [
     `https://quizizz.com/api/main/quiz/${quizId}`,
     `https://wayground.com/api/v1/quizzes/${quizId}`,
     `https://wayground.com/api/quiz/${quizId}`,
@@ -196,19 +184,21 @@ export const fetchWaygroundQuiz = async (urlOrId: string): Promise<ExternalQuizM
     urlOrId.startsWith("http") ? urlOrId : ""
   ].filter(Boolean);
 
-  // CORS Proxy wrappers to bypass browser Same-Origin policy
-  const corsWrappers = [
-    (url: string) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-    (url: string) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
-    (url: string) => `https://corsproxy.io/?${encodeURIComponent(url)}`,
-    (url: string) => url // direct fallback
-  ];
+  let rawData: any = null;
+  let lastError: Error | null = null;
 
-  for (const rawUrl of candidateUrls) {
-    for (const wrapFn of corsWrappers) {
-      const finalUrl = wrapFn(rawUrl);
+  for (const directUrl of directEndpoints) {
+    // List of fetch attempts: direct + CORS proxies
+    const fetchVariants = [
+      directUrl,
+      `https://api.allorigins.win/raw?url=${encodeURIComponent(directUrl)}`,
+      `https://corsproxy.io/?${encodeURIComponent(directUrl)}`,
+      `https://thingproxy.freeboard.io/fetch/${encodeURIComponent(directUrl)}`
+    ];
+
+    for (const url of fetchVariants) {
       try {
-        const res = await fetch(finalUrl, {
+        const res = await fetch(url, {
           method: "GET",
           headers: { "Accept": "application/json" }
         });
@@ -216,24 +206,24 @@ export const fetchWaygroundQuiz = async (urlOrId: string): Promise<ExternalQuizM
         if (res.ok) {
           const text = await res.text();
           try {
-            const parsed = JSON.parse(text);
-            if (parsed && (parsed.data || parsed.quiz || parsed.info || parsed.questions || parsed.structure)) {
-              rawData = parsed;
+            rawData = JSON.parse(text);
+            if (rawData && (rawData.data || rawData.quiz || rawData.info || rawData.questions)) {
               break;
             }
-          } catch (jsonErr) {
-            // Content was not valid JSON
+          } catch (e) {
+            // Not valid JSON
           }
         }
       } catch (err: any) {
         lastError = err;
       }
     }
+
     if (rawData) break;
   }
 
   if (!rawData) {
-    throw lastError || new Error(`Gagal mengambil kuis dari Wayground API. Anda juga dapat menggunakan opsi 'Paste JSON' jika server memblokir proxy.`);
+    throw lastError || new Error(`Gagal mengambil data kuis. Browser memblokir koneksi CORS. Gunakan opsi Paste JSON.`);
   }
 
   return parseWaygroundQuizData(rawData, quizId);
