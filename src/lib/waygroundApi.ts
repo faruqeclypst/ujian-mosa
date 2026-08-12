@@ -32,14 +32,19 @@ export const extractQuizIdFromUrl = (urlOrId: string): string => {
     return trimmed;
   }
 
+  // Check direct 24-character hex ID pattern anywhere in URL string
+  const hexMatch = trimmed.match(/\/quiz\/([a-f0-9]{24})\b/i) || trimmed.match(/\b([a-f0-9]{24})\b/i);
+  if (hexMatch && hexMatch[1]) {
+    return hexMatch[1];
+  }
+
   try {
     const urlObj = new URL(trimmed);
     const pathSegments = urlObj.pathname.split("/").filter(Boolean);
     
-    // Pattern: /admin/quiz/613eabc... or /quiz/613eabc... or /game/613eabc...
+    // Pattern: /admin/quiz/613eabc... or /activity/admin/quiz/613eabc...
     const quizIdx = pathSegments.findIndex(s => s === "quiz" || s === "game" || s === "quiz-room" || s === "details" || s === "activity");
     if (quizIdx !== -1) {
-      // Find the segment after quiz or last segment that looks like an ID
       for (let i = quizIdx + 1; i < pathSegments.length; i++) {
         if (/^[a-f0-9]{24}$/i.test(pathSegments[i]) || /^[a-z0-9_-]{6,36}$/i.test(pathSegments[i])) {
           return pathSegments[i];
@@ -47,7 +52,6 @@ export const extractQuizIdFromUrl = (urlOrId: string): string => {
       }
     }
 
-    // Return last segment if it looks like an ID
     const last = pathSegments[pathSegments.length - 1];
     if (last && (last.length >= 6)) return last;
   } catch (e) {
