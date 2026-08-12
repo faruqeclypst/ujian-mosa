@@ -220,11 +220,12 @@ export const fetchWaygroundQuiz = async (urlOrId: string): Promise<ExternalQuizM
 
   const targetApi = `https://quizizz.com/api/main/quiz/${quizId}`;
 
-  // Candidate CORS Proxy URLs supporting Production HTTPS domains (modalbangsa.examku.my.id)
+  // Candidate Proxy URLs (1st priority: VPS Nginx /api-quiz/ reverse proxy)
   const candidateUrls = [
+    `/api-quiz/${quizId}`,
+    `https://modalbangsa.examku.my.id/api-quiz/${quizId}`,
     `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(targetApi)}`,
     `https://api.allorigins.win/get?url=${encodeURIComponent(targetApi)}`,
-    `https://api.allorigins.win/raw?url=${encodeURIComponent(targetApi)}`,
     `https://corsproxy.io/?${encodeURIComponent(targetApi)}`
   ];
 
