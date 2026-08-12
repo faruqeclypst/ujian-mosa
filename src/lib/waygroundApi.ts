@@ -216,19 +216,21 @@ export const fetchWaygroundQuiz = async (urlOrId: string): Promise<ExternalQuizM
 
   const targetApi = `https://quizizz.com/api/main/quiz/${quizId}`;
 
-  // Candidate CORS Proxy URLs targeting the exact API endpoint (prevents 404 & direct CORS console warnings)
+  // Candidate CORS Proxy URLs supporting Production HTTPS domains (modalbangsa.examku.my.id)
   const candidateUrls = [
-    `https://corsproxy.io/?${encodeURIComponent(targetApi)}`,
-    `https://api.allorigins.win/raw?url=${encodeURIComponent(targetApi)}`
+    `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(targetApi)}`,
+    `https://api.allorigins.win/get?url=${encodeURIComponent(targetApi)}`,
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(targetApi)}`,
+    `https://corsproxy.io/?${encodeURIComponent(targetApi)}`
   ];
 
   if (urlOrId.startsWith("http") && (urlOrId.includes("api") || urlOrId.includes("json"))) {
-    candidateUrls.push(`https://corsproxy.io/?${encodeURIComponent(urlOrId)}`);
+    candidateUrls.push(`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(urlOrId)}`);
   }
 
   const fetchSingle = async (url: string): Promise<any> => {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 4000);
+    const timeoutId = setTimeout(() => controller.abort(), 6000);
 
     try {
       const res = await fetch(url, {
@@ -240,7 +242,17 @@ export const fetchWaygroundQuiz = async (urlOrId: string): Promise<ExternalQuizM
 
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const text = await res.text();
-      const json = JSON.parse(text);
+      let json = JSON.parse(text);
+
+      // Handle allorigins wrapper format if present
+      if (json && typeof json.contents === "string") {
+        try {
+          json = JSON.parse(json.contents);
+        } catch (e) {
+          // Ignore
+        }
+      }
+
       if (json && (json.data || json.quiz || json.info || json.questions)) {
         return json;
       }
@@ -257,7 +269,7 @@ export const fetchWaygroundQuiz = async (urlOrId: string): Promise<ExternalQuizM
     rawData = await promiseAny(candidateUrls.map(url => fetchSingle(url)));
   } catch (err) {
     // All candidates failed or timed out
-    throw new Error("Gagal mengambil kuis secara otomatis. Silakan gunakan opsi Paste JSON.");
+    throw new Error("Gagal mengambil kuis secara otomatis dari server VPS. Silakan gunakan opsi Paste JSON.");
   }
 
   return parseWaygroundQuizData(rawData, quizId);
