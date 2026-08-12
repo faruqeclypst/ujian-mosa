@@ -195,26 +195,21 @@ export const fetchWaygroundQuiz = async (urlOrId: string): Promise<ExternalQuizM
     throw new Error("ID atau Link Kuis tidak valid.");
   }
 
-  // Construct target URLs for Quizizz / Wayground REST API
-  const targets = [
-    `https://quizizz.com/api/main/quiz/${quizId}`,
-    `https://wayground.com/api/v1/quizzes/${quizId}`,
-    `https://wayground.com/api/quiz/${quizId}`,
-    `https://api.wayground.com/v1/quiz/${quizId}`,
-    urlOrId.startsWith("http") ? urlOrId : ""
-  ].filter(Boolean);
+  const targetApi = `https://quizizz.com/api/main/quiz/${quizId}`;
 
-  // Generate list of direct and proxied URLs
-  const candidateUrls: string[] = [];
-  targets.forEach(targetUrl => {
-    candidateUrls.push(targetUrl);
-    candidateUrls.push(`https://corsproxy.io/?${encodeURIComponent(targetUrl)}`);
-    candidateUrls.push(`https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`);
-  });
+  // Candidate CORS Proxy URLs targeting the exact API endpoint (prevents 404 & direct CORS console warnings)
+  const candidateUrls = [
+    `https://corsproxy.io/?${encodeURIComponent(targetApi)}`,
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(targetApi)}`
+  ];
+
+  if (urlOrId.startsWith("http") && (urlOrId.includes("api") || urlOrId.includes("json"))) {
+    candidateUrls.push(`https://corsproxy.io/?${encodeURIComponent(urlOrId)}`);
+  }
 
   const fetchSingle = async (url: string): Promise<any> => {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3500);
+    const timeoutId = setTimeout(() => controller.abort(), 4000);
 
     try {
       const res = await fetch(url, {
