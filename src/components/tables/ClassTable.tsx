@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { DataTable } from "../ui/data-table";
 import { Button } from "../ui/button";
 import type { ClassData } from "../../types/exam";
-import { Edit, Trash, GraduationCap } from "lucide-react";
+import { Edit, Trash, GraduationCap, KeyRound } from "lucide-react";
 
 interface ClassTableProps {
   classes: ClassData[];
@@ -11,6 +11,7 @@ interface ClassTableProps {
   onSelectChange: (ids: string[]) => void;
   onEdit: (cls: ClassData) => void;
   onDelete: (cls: ClassData) => void;
+  onResetPassword?: (cls: ClassData) => void;
 }
 
 const ClassTable = ({ 
@@ -18,7 +19,8 @@ const ClassTable = ({
   selectedIds, 
   onSelectChange, 
   onEdit, 
-  onDelete 
+  onDelete,
+  onResetPassword
 }: ClassTableProps) => {
   const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(null);
 
@@ -94,6 +96,15 @@ const ClassTable = ({
 
   const renderActions = (cls: ClassData) => (
     <div className="flex justify-end gap-2">
+      {onResetPassword && (
+        <button 
+          className="p-1.5 bg-amber-50 text-amber-600 hover:bg-amber-100 rounded-lg dark:bg-amber-900/10 dark:text-amber-400 border border-amber-100 dark:border-amber-800/40"
+          onClick={() => onResetPassword(cls)}
+          title="Reset Password Siswa Kelas Ini"
+        >
+          <KeyRound className="h-4 w-4" />
+        </button>
+      )}
       <button 
         className="p-1.5 bg-sky-50 text-sky-600 hover:bg-sky-100 rounded-lg dark:bg-sky-900/10 dark:text-sky-400 border border-sky-100 dark:border-sky-800/40"
         onClick={() => onEdit(cls)}

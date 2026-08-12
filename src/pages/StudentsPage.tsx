@@ -19,6 +19,7 @@ import {
   KeyRound,
   BarChart2
 } from "lucide-react";
+import { cn } from "../lib/utils";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -49,7 +50,7 @@ import StudentScoresDialog from "../components/exam/StudentScoresDialog";
 const StudentsPage = () => {
   const { role } = useAuth();
   const { school, terminology, pb } = useTenant();
-  const { students, classes, loading, createStudent, updateStudent, deleteStudent, resetStudentPassword } = useExamData();
+  const { students, classes, loading, createStudent, updateStudent, deleteStudent, resetStudentPassword, resetStudentPasswordBatch } = useExamData();
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [dialogMode, setDialogMode] = useState<"create" | "edit">("create");
@@ -71,6 +72,10 @@ const StudentsPage = () => {
   const [isBatchOpen, setIsBatchOpen] = useState(false);
   const [targetClassId, setTargetClassId] = useState<string>("");
   const [filterClassId, setFilterClassId] = useState<string>("ALL");
+
+  const [isResetModalOpen, setIsResetModalOpen] = useState(false);
+  const [resetScope, setResetScope] = useState<"selected" | "class" | "all">("class");
+  const [resetSelectedClassId, setResetSelectedClassId] = useState<string>("");
 
   const [alertDialog, setAlertDialog] = useState<{
     isOpen: boolean;
@@ -179,6 +184,141 @@ const StudentsPage = () => {
       true,
       "Ya, Reset"
     );
+  };
+
+  const handleBatchResetPassword = () => {
+    if (selectedIds.length === 0) return;
+    showAlert(
+      `Reset Password ${terminology.student} Terpilih`,
+      `Apakah Anda yakin ingin mereset password ${selectedIds.length} ${terminology.student.toLowerCase()} terpilih ke default (12345678)?`,
+      "warning",
+      async () => {
+        setBatchProgress({
+          isOpen: true,
+          total: selectedIds.length,
+          current: 0,
+          message: "Menyiapkan reset password...",
+          title: `Reset Password ${terminology.student} Terpilih`
+        });
+
+        try {
+          await resetStudentPasswordBatch(selectedIds, (current, total) => {
+            setBatchProgress(prev => ({
+              ...prev,
+              current,
+              message: `Mereset password ${terminology.student.toLowerCase()} (${current}/${total})`
+            }));
+          });
+          const count = selectedIds.length;
+          setSelectedIds([]);
+          showAlert("Berhasil", `Password ${count} ${terminology.student.toLowerCase()} terpilih berhasil direset menjadi 12345678.`, "success");
+        } catch (error: any) {
+          console.error("Gagal reset password massal", error);
+          showAlert("Gagal", error.message || `Gagal mereset password ${terminology.student.toLowerCase()}.`, "danger");
+        } finally {
+          setBatchProgress(prev => ({ ...prev, isOpen: false }));
+        }
+      },
+      true,
+      "Ya, Reset"
+    );
+  };
+
+  const handleResetClassPassword = (classId: string) => {
+    const targetClass = classes.find(c => c.id === classId);
+    const classStudents = students.filter(s => s.classId === classId);
+
+    if (classStudents.length === 0) {
+      return showAlert("Informasi", `Tidak ada data ${terminology.student.toLowerCase()} di ${terminology.class.toLowerCase()} ${targetClass?.name || ""}.`, "info");
+    }
+
+    showAlert(
+      `Reset Password ${terminology.class}`,
+      `Apakah Anda yakin ingin mereset password ${classStudents.length} ${terminology.student.toLowerCase()} di ${terminology.class.toLowerCase()} ${targetClass?.name || ""} menjadi default (12345678)?`,
+      "warning",
+      async () => {
+        const studentIds = classStudents.map(s => s.id);
+        setBatchProgress({
+          isOpen: true,
+          total: studentIds.length,
+          current: 0,
+          message: `Menyiapkan reset password ${targetClass?.name}...`,
+          title: `Reset Password ${terminology.class} ${targetClass?.name}`
+        });
+
+        try {
+          await resetStudentPasswordBatch(studentIds, (current, total) => {
+            setBatchProgress(prev => ({
+              ...prev,
+              current,
+              message: `Mereset password ${terminology.student.toLowerCase()} (${current}/${total})`
+            }));
+          });
+          showAlert("Berhasil", `Password ${studentIds.length} ${terminology.student.toLowerCase()} di ${terminology.class.toLowerCase()} ${targetClass?.name} berhasil direset menjadi 12345678.`, "success");
+        } catch (error: any) {
+          console.error("Gagal reset password kelas", error);
+          showAlert("Gagal", error.message || `Gagal mereset password ${terminology.student.toLowerCase()} kelas.`, "danger");
+        } finally {
+          setBatchProgress(prev => ({ ...prev, isOpen: false }));
+        }
+      },
+      true,
+      "Ya, Reset Kelas"
+    );
+  };
+
+  const handleResetAllStudentsPassword = () => {
+    const activeStudents = students.filter(s => s.classId !== "ALUMNI");
+
+    if (activeStudents.length === 0) {
+      return showAlert("Informasi", `Tidak ada ${terminology.student.toLowerCase()} aktif untuk direset.`, "info");
+    }
+
+    showAlert(
+      `Reset Password SELURUH ${terminology.student}`,
+      `⚠️ PERHATIAN! Apakah Anda YAKIN ingin mereset password SELURUH ${activeStudents.length} ${terminology.student.toLowerCase()} menjadi default (12345678)?`,
+      "danger",
+      async () => {
+        const studentIds = activeStudents.map(s => s.id);
+        setBatchProgress({
+          isOpen: true,
+          total: studentIds.length,
+          current: 0,
+          message: "Menyiapkan reset password seluruh siswa...",
+          title: `Reset Password Semua ${terminology.student}`
+        });
+
+        try {
+          await resetStudentPasswordBatch(studentIds, (current, total) => {
+            setBatchProgress(prev => ({
+              ...prev,
+              current,
+              message: `Mereset password ${terminology.student.toLowerCase()} (${current}/${total})`
+            }));
+          });
+          showAlert("Berhasil", `Password SELURUH ${studentIds.length} ${terminology.student.toLowerCase()} berhasil direset menjadi 12345678.`, "success");
+        } catch (error: any) {
+          console.error("Gagal reset password semua siswa", error);
+          showAlert("Gagal", error.message || `Gagal mereset password seluruh ${terminology.student.toLowerCase()}.`, "danger");
+        } finally {
+          setBatchProgress(prev => ({ ...prev, isOpen: false }));
+        }
+      },
+      true,
+      "Ya, Reset Semua"
+    );
+  };
+
+  const handleExecuteResetModal = () => {
+    setIsResetModalOpen(false);
+
+    if (resetScope === "selected") {
+      handleBatchResetPassword();
+    } else if (resetScope === "class") {
+      handleResetClassPassword(resetSelectedClassId);
+    } else if (resetScope === "all") {
+      handleResetAllStudentsPassword();
+    }
   };
 
   const handleConfirmDelete = async () => {
@@ -517,6 +657,19 @@ const StudentsPage = () => {
                           <span className="text-[10px] text-slate-400 mt-1">Pindahkan ke daftar alumni</span>
                         </div>
                       </DropdownMenuItem>
+
+                      <DropdownMenuItem
+                        onClick={() => setTimeout(handleBatchResetPassword, 150)}
+                        className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 focus:bg-slate-50 dark:focus:bg-slate-900 transition-colors group"
+                      >
+                        <div className="h-10 w-10 shrink-0 rounded-lg bg-amber-50 dark:bg-amber-900/30 text-amber-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                          <KeyRound className="h-5 w-5" />
+                        </div>
+                        <div className="flex flex-col min-w-0">
+                          <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">Reset Password</span>
+                          <span className="text-[10px] text-slate-400 mt-1">Reset password {selectedIds.length} {terminology.student.toLowerCase()} terpilih</span>
+                        </div>
+                      </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
 
@@ -584,6 +737,21 @@ const StudentsPage = () => {
                       <div className="flex flex-col min-w-0">
                         <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">Export Akun Login</span>
                         <span className="text-[10px] text-slate-400 mt-1">Unduh username & password {terminology.student.toLowerCase()}</span>
+                      </div>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => {
+                        setResetScope(selectedIds.length > 0 ? "selected" : "class");
+                        setIsResetModalOpen(true);
+                      }}
+                      className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 focus:bg-slate-50 dark:focus:bg-slate-900 transition-colors group"
+                    >
+                      <div className="h-10 w-10 shrink-0 rounded-lg bg-rose-50 dark:bg-rose-900/30 text-rose-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <KeyRound className="h-5 w-5" />
+                      </div>
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">Reset Password Massal</span>
+                        <span className="text-[10px] text-slate-400 mt-1">Reset password per kelas atau seluruh {terminology.student.toLowerCase()}</span>
                       </div>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator className="my-1 border-slate-100 dark:border-slate-800" />
@@ -799,6 +967,123 @@ const StudentsPage = () => {
               className="bg-orange-600 hover:bg-orange-700 text-white rounded-xl shadow-lg shadow-orange-500/20"
             >
               Proses Pindah {terminology.class}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog Reset Password Massal */}
+      <Dialog open={isResetModalOpen} onOpenChange={setIsResetModalOpen}>
+        <DialogContent className="max-w-md bg-card">
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold text-slate-800 dark:text-white flex items-center gap-2">
+              <KeyRound className="h-5 w-5 text-amber-500" />
+              Reset Password {terminology.student}
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              Kembalikan password {terminology.student.toLowerCase()} ke nilai default <strong className="font-mono bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-amber-600 dark:text-amber-400">12345678</strong>.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-3">
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Cakupan Reset:</label>
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  type="button"
+                  disabled={selectedIds.length === 0}
+                  onClick={() => setResetScope("selected")}
+                  className={cn(
+                    "flex flex-col items-center justify-center p-3 rounded-xl border text-xs font-bold transition-all text-center gap-1",
+                    resetScope === "selected" 
+                      ? "border-amber-500 bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-600 shadow-sm"
+                      : "border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-900 text-slate-600 dark:text-slate-400",
+                    selectedIds.length === 0 && "opacity-40 cursor-not-allowed"
+                  )}
+                >
+                  <span>Terpilih</span>
+                  <span className="text-[10px] font-normal opacity-80">({selectedIds.length})</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setResetScope("class")}
+                  className={cn(
+                    "flex flex-col items-center justify-center p-3 rounded-xl border text-xs font-bold transition-all text-center gap-1",
+                    resetScope === "class" 
+                      ? "border-amber-500 bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-600 shadow-sm"
+                      : "border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-900 text-slate-600 dark:text-slate-400"
+                  )}
+                >
+                  <span>Per {terminology.class}</span>
+                  <span className="text-[10px] font-normal opacity-80">Pilih kelas</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setResetScope("all")}
+                  className={cn(
+                    "flex flex-col items-center justify-center p-3 rounded-xl border text-xs font-bold transition-all text-center gap-1",
+                    resetScope === "all" 
+                      ? "border-rose-500 bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-600 shadow-sm"
+                      : "border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-900 text-slate-600 dark:text-slate-400"
+                  )}
+                >
+                  <span>Semua Akun</span>
+                  <span className="text-[10px] font-normal opacity-80">Seluruh siswa</span>
+                </button>
+              </div>
+            </div>
+
+            {resetScope === "selected" && (
+              <div className="p-3 bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200/50 dark:border-amber-800/30 rounded-xl text-xs text-amber-800 dark:text-amber-300">
+                Akan mereset password <strong className="font-bold">{selectedIds.length} {terminology.student.toLowerCase()}</strong> yang dicentang di tabel.
+              </div>
+            )}
+
+            {resetScope === "class" && (
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Pilih {terminology.class}:</label>
+                <select
+                  value={resetSelectedClassId}
+                  onChange={(e) => setResetSelectedClassId(e.target.value)}
+                  className="w-full h-10 rounded-xl border border-slate-200 bg-slate-50/50 px-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-amber-500/20 transition-all cursor-pointer dark:bg-slate-900/50 dark:border-slate-800"
+                >
+                  <option value="">-- Pilih {terminology.class} --</option>
+                  {sortedClasses.map(cls => {
+                    const count = students.filter(s => s.classId === cls.id).length;
+                    return (
+                      <option key={cls.id} value={cls.id}>
+                        {cls.name} ({count} {terminology.student})
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+            )}
+
+            {resetScope === "all" && (
+              <div className="p-3.5 bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800/40 rounded-xl space-y-1">
+                <p className="text-xs font-bold text-rose-700 dark:text-rose-300 flex items-center gap-1.5">
+                  ⚠️ PERHATIAN
+                </p>
+                <p className="text-xs text-rose-600 dark:text-rose-400 leading-relaxed">
+                  Anda akan mereset password SELURUH <strong className="font-extrabold">{students.filter(s => s.classId !== "ALUMNI").length} {terminology.student.toLowerCase()}</strong> aktif menjadi <strong>12345678</strong>. {terminology.student} harus mengganti password kembali setelah login.
+                </p>
+              </div>
+            )}
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={() => setIsResetModalOpen(false)} className="rounded-xl border-slate-200 dark:border-slate-800">
+              Batal
+            </Button>
+            <Button
+              disabled={resetScope === "class" && !resetSelectedClassId}
+              onClick={handleExecuteResetModal}
+              className="bg-amber-600 hover:bg-amber-700 text-white rounded-xl shadow-lg shadow-amber-500/20"
+            >
+              Proses Reset Password
             </Button>
           </div>
         </DialogContent>

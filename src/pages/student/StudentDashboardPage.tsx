@@ -329,14 +329,41 @@ const StudentDashboardPage = () => {
 
     // Subscribe to room changes (Global)
     const unsubR = pb.collection("exam_rooms").subscribe("*", (e) => {
-      console.log("Room Change Detected, updating UI silently...");
-      fetchData(true);
+      console.log("Room Change Detected, checking relevance...");
+      
+      if (e.action === "update" || e.action === "create" || e.action === "delete") {
+        if (e.action === "delete") {
+          fetchData(true);
+          return;
+        }
+
+        const room = e.record;
+
+        // If a room is disabled or archived, we should refetch to update UI (hide or archive)
+        if (room.isActive === false || room.status === "archive") {
+          fetchData(true);
+          return;
+        }
+
+        // If the room is for all classes, it is relevant
+        if (room.allClasses) {
+          fetchData(true);
+          return;
+        }
+
+        // If student's class matches the room classes
+        const clsData = room.classId || (room as any).classIds || "";
+        const allowedClasses = Array.isArray(clsData) ? clsData : String(clsData).split(",").map(id => id.trim());
+        if (allowedClasses.includes(student.classId)) {
+          fetchData(true);
+        }
+      }
     });
 
     return () => {
       unsubR.then(u => u()).catch(() => { });
     };
-  }, [student?.id]);
+  }, [student?.id, student?.classId]);
 
   useEffect(() => {
     if (student?.id && pb && navigator.onLine) {

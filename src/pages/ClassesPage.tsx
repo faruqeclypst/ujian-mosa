@@ -36,7 +36,7 @@ import { downloadClassImportTemplate, exportClassToExcel, parseClassImportExcel 
 import type { ClassData } from "../types/exam";
 
 const ClassesPage = () => {
-  const { classes, loading, createClass, updateClass, deleteClass } = useExamData();
+  const { classes, students, loading, createClass, updateClass, deleteClass, resetStudentPasswordBatch } = useExamData();
   const { terminology } = useTenant();
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -97,6 +97,48 @@ const ClassesPage = () => {
   const handleDeleteClick = (cls: ClassData) => {
     setClassToDelete(cls);
     setDeleteDialogOpen(true);
+  };
+
+  const handleResetClassPassword = (cls: ClassData) => {
+    const classStudents = students.filter(s => s.classId === cls.id);
+
+    if (classStudents.length === 0) {
+      return showAlert("Informasi", `Tidak ada data ${terminology.student.toLowerCase()} di ${terminology.class.toLowerCase()} ${cls.name}.`, "info");
+    }
+
+    showAlert(
+      `Reset Password ${terminology.class}`,
+      `Apakah Anda yakin ingin mereset password ${classStudents.length} ${terminology.student.toLowerCase()} di ${terminology.class.toLowerCase()} ${cls.name} menjadi default (12345678)?`,
+      "warning",
+      async () => {
+        const studentIds = classStudents.map(s => s.id);
+        setBatchProgress({
+          isOpen: true,
+          total: studentIds.length,
+          current: 0,
+          message: `Menyiapkan reset password ${cls.name}...`,
+          title: `Reset Password ${terminology.class} ${cls.name}`
+        });
+
+        try {
+          await resetStudentPasswordBatch(studentIds, (current, total) => {
+            setBatchProgress(prev => ({
+              ...prev,
+              current,
+              message: `Mereset password ${terminology.student.toLowerCase()} (${current}/${total})`
+            }));
+          });
+          showAlert("Berhasil", `Password ${studentIds.length} ${terminology.student.toLowerCase()} di ${terminology.class.toLowerCase()} ${cls.name} berhasil direset menjadi 12345678.`, "success");
+        } catch (error: any) {
+          console.error("Gagal reset password kelas", error);
+          showAlert("Gagal", error.message || `Gagal mereset password ${terminology.student.toLowerCase()} kelas.`, "danger");
+        } finally {
+          setBatchProgress(prev => ({ ...prev, isOpen: false }));
+        }
+      },
+      true,
+      "Ya, Reset Kelas"
+    );
   };
 
   const closeDialog = () => {
@@ -387,6 +429,7 @@ const ClassesPage = () => {
           onSelectChange={setSelectedIds}
           onEdit={handleEditClick} 
           onDelete={handleDeleteClick} 
+          onResetPassword={handleResetClassPassword}
         />
       )}
 

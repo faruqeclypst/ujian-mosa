@@ -39,6 +39,7 @@ interface ExamDataContextType {
   updateStudent: (id: string, payload: Partial<StudentPayload>) => Promise<void>;
   deleteStudent: (id: string) => Promise<void>;
   resetStudentPassword: (id: string) => Promise<void>;
+  resetStudentPasswordBatch: (studentIds: string[], onProgress?: (current: number, total: number) => void) => Promise<void>;
   resetUserPassword: (userId: string) => Promise<void>;
   deleteStudentsBatch: (studentIds: string[]) => Promise<void>;
   updateStudentClassBatch: (studentIds: string[], newClassId: string) => Promise<void>;
@@ -452,6 +453,25 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
       passwordConfirm: defaultPass,
       hasChangedPassword: false,
     });
+    setStudents(prev => prev.map(item => item.id === id ? { ...item, hasChangedPassword: false } : item));
+  };
+  const resetStudentPasswordBatch = async (studentIds: string[], onProgress?: (current: number, total: number) => void) => {
+    const defaultPass = "12345678";
+    const chunkSize = 10;
+    for (let i = 0; i < studentIds.length; i += chunkSize) {
+      const chunk = studentIds.slice(i, i + chunkSize);
+      await Promise.all(chunk.map(id => pb.collection("students").update(id, {
+        password: defaultPass,
+        passwordConfirm: defaultPass,
+        hasChangedPassword: false,
+      })));
+      if (onProgress) {
+        onProgress(Math.min(i + chunkSize, studentIds.length), studentIds.length);
+      }
+    }
+    setStudents(prev => prev.map(student => 
+      studentIds.includes(student.id) ? { ...student, hasChangedPassword: false } : student
+    ));
   };
   const updateStudentClassBatch = async (studentIds: string[], newClassId: string) => {
     const chunkSize = 10;
@@ -489,7 +509,7 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
         createTeacher, updateTeacher, deleteTeacher,
         createClass, updateClass, deleteClass,
         createSubject, updateSubject, deleteSubject,
-        createStudent, updateStudent, deleteStudent, resetStudentPassword, resetUserPassword, updateStudentClassBatch, deleteStudentsBatch,
+        createStudent, updateStudent, deleteStudent, resetStudentPassword, resetStudentPasswordBatch, resetUserPassword, updateStudentClassBatch, deleteStudentsBatch,
         universalToken, timeLeft, teacherFullAccess, teacherAIAccess
       }}
     >

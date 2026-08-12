@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from "react";
-import { RefreshCw, LogOut, X, MoreHorizontal, ShieldAlert } from "lucide-react";
+import { RefreshCw, LogOut, X, MoreHorizontal, ShieldAlert, Eye, EyeOff } from "lucide-react";
 import { Capacitor } from "@capacitor/core";
 import { App } from "@capacitor/app";
 
@@ -8,6 +8,7 @@ const CapacitorOverlay = () => {
   const [showMenu, setShowMenu] = useState(false);
   const [dialogType, setDialogType] = useState<"none" | "refresh" | "exit">("none");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
   // Simple drag implementation without framer-motion
   const fabRef = useRef<HTMLDivElement>(null);
@@ -112,7 +113,7 @@ const CapacitorOverlay = () => {
 
             {/* Exit Button */}
             <button
-              onClick={() => { setDialogType("exit"); setPassword(""); setShowMenu(false); }}
+              onClick={() => { setDialogType("exit"); setPassword(""); setShowPassword(false); setShowMenu(false); }}
               className="w-10 h-10 flex items-center justify-center rounded-full bg-rose-500 text-white shadow-xl border border-rose-400 active:scale-90 transition-transform"
               title="Exit"
             >
@@ -156,20 +157,32 @@ const CapacitorOverlay = () => {
             </p>
 
             {dialogType === "exit" && (
-              <div className="mb-6">
+              <div className="mb-6 relative">
                 <input
-                  type="password"
-                  placeholder="PIN PENGAWAS"
+                  type={showPassword ? "text" : "password"}
+                  inputMode="text"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  autoComplete="off"
+                  spellCheck={false}
+                  placeholder="KODE PENGAWAS"
                   autoFocus
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full py-4 px-4 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-center font-bold tracking-[0.3em] outline-none placeholder:tracking-normal placeholder:font-medium text-sm"
+                  className="w-full py-4 pl-4 pr-12 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-center font-bold tracking-[0.3em] outline-none placeholder:tracking-normal placeholder:font-medium text-sm dark:text-white"
                   onKeyDown={(e) => {
                     if (e.key === "Enter") {
                       handleExitApp();
                     }
                   }}
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 focus:outline-none"
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
               </div>
             )}
 
@@ -185,7 +198,7 @@ const CapacitorOverlay = () => {
                 Ya, Lanjutkan
               </button>
               <button
-                onClick={() => { setDialogType("none"); setPassword(""); }}
+                onClick={() => { setDialogType("none"); setPassword(""); setShowPassword(false); }}
                 className="w-full py-2 text-slate-400 font-bold text-xs"
               >
                 Batal / Kembali

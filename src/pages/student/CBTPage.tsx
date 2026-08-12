@@ -815,17 +815,29 @@ const CBTPage = () => {
       const sFlagStored = sessionStorage.getItem(`flags_${pr}`); if (sFlagStored) try { setFlaggedQuestions(JSON.parse(sFlagStored)); } catch (e) { }
       const sConfirmed = sessionStorage.getItem(`confirmed_${pr}`); if (sConfirmed === "true") setIsConfirmed(true);
     } catch (e) { console.error(e); } finally { setLoading(false); }
-  }, [student, roomId, navigate, refreshTrigger]);
+  }, [student?.id, student?.nisn, roomId, navigate, refreshTrigger]);
 
   useEffect(() => { loadExamData(); }, [loadExamData]);
 
+  // Keep latest state in refs to avoid resubscribing when they change
+  const attemptRef = useRef(attempt);
+  const roomDataRef = useRef(roomData);
+
   useEffect(() => {
-    if (!roomData?.examId || !roomId || !attempt?.id || !pb) return;
+    attemptRef.current = attempt;
+  }, [attempt]);
+
+  useEffect(() => {
+    roomDataRef.current = roomData;
+  }, [roomData]);
+
+  useEffect(() => {
+    if (!roomId || !attempt?.id || !pb) return;
     const rId = roomId;
-    const sId = student?.id || "";
+    const attId = attempt.id;
 
     // 1. Subscribe ke Room saja (Questions tidak perlu disubscribe during exam)
-    const unsubRoom = pb!.collection("exam_rooms").subscribe(rId, (e) => {
+    const unsubRoom = pb.collection("exam_rooms").subscribe(rId, (e) => {
       if (e.action === "update") {
         setRoomData((prev: any) => ({ ...prev, ...e.record }));
         const isOff = e.record.isDisabled === true || e.record.status === "archive";
@@ -834,7 +846,7 @@ const CBTPage = () => {
     });
 
     // 2. Subscribe ke Attempt
-    const unsubAttempt = pb!.collection("attempts").subscribe(attempt.id, (e) => {
+    const unsubAttempt = pb.collection("attempts").subscribe(attId, (e) => {
       if (e.action === "delete") {
         sessionStorage.removeItem("activeCBTRoomId");
         setIsSubmitModalOpen(false);
@@ -842,7 +854,7 @@ const CBTPage = () => {
         setTimeout(() => { window.location.href = "/"; }, 2500);
       }
       else if (e.action === "update") {
-        const oldS = attempt.status;
+        const oldS = attemptRef.current?.status;
         const newS = (e.record as any).status;
         setAttempt(e.record as any);
 
@@ -851,7 +863,7 @@ const CBTPage = () => {
           sessionStorage.removeItem("activeCBTRoomId");
         } else if (newS === "ongoing") {
           setIsLocked(false);
-          localStorage.removeItem(`lock_time_${attempt?.id}`);
+          localStorage.removeItem(`lock_time_${attId}`);
           if (oldS === "LOCKED") {
             sessionStorage.removeItem("activeCBTRoomId");
             window.location.href = "/";
@@ -863,10 +875,10 @@ const CBTPage = () => {
     });
 
     return () => {
-      unsubRoom.then(u => u());
-      unsubAttempt.then(u => u());
+      unsubRoom.then(u => u()).catch(() => { });
+      unsubAttempt.then(u => u()).catch(() => { });
     };
-  }, [roomData, roomId, attempt, navigate, loadExamData]);
+  }, [roomId, attempt?.id, pb, navigate]);
 
   useEffect(() => {
     if (loading || isExamOver || !roomData || !attempt) return;
@@ -943,11 +955,6 @@ const CBTPage = () => {
       if (document.visibilityState === "hidden" || e.type === "blur") {
         if (isCheatWarningOpen || isLocked) return;
 
-        // Ignore blur caused by screen rotation on mobile/tablet
-        if (e.type === "blur" && window.screen?.orientation) {
-          orientationChangeRef.current = true;
-          setTimeout(() => { orientationChangeRef.current = false; }, 1500);
-        }
         if (orientationChangeRef.current) return;
 
         // Record departure time for mobile (where JS might pause)

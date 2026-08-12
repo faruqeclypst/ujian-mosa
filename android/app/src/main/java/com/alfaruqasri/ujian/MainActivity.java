@@ -36,8 +36,11 @@ public class MainActivity extends BridgeActivity {
         ActivityManager am = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
         lastLockState = am.getLockTaskModeState();
         
-        // 2. Keamanan: Anti Screenshot & Record
+        // 2. Keamanan: Anti Screenshot & Record, dan Sembunyikan Overlay (Android 12+)
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+            getWindow().setHideOverlayWindows(true);
+        }
         
         // 3. Inisialisasi Layar Blokir (Layout)
         createBlockingLayout();
