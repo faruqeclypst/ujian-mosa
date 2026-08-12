@@ -22,7 +22,9 @@ Platform modern berbasis web untuk menyelenggarakan ujian sekolah (Computer Base
 ### 🏢 **SaaS Multi-Tenant Architecture**
 Manajemen multi-sekolah dengan registrasi mandiri, isolasi data lengkap pada level database, pemetaan subdomain sekolah otomatis, dan kontrol panel admin pusat untuk manajemen global.
 
-### 📝 **Manajemen Bank Soal & Integrasi AI**
+### 📝 **Manajemen Bank Soal, Wayground REST API & AI**
+*   **Repository & Impor Soal Wayground (Khusus Admin)**: Tarik dan impor butir soal secara otomatis dari REST API Wayground / Bank Soal internal sekolah dengan penanganan presisi untuk kunci jawaban multi-format (PG, PG Kompleks, Isian), gambar, serta formula KaTeX.
+*   **Bebas Blokir AWS WAF & CORS**: Terintegrasi dengan Caddy Reverse Proxy & Cloudflare WARP SOCKS5 lokal (Port 4001) di VPS, serta dilengkapi mode alternatif **Paste JSON** instan (0,00 detik).
 *   **Import Dokumen Praktis**: Konversi naskah soal `.docx` (Word) dan `.xlsx` (Excel) langsung menjadi soal ujian lengkap beserta media gambar dan persamaan matematika LaTeX.
 *   **Export ke Word (Offline Image)**: Ekspor naskah soal beserta kunci jawaban ke format `.doc` (Word) dengan gambar yang tersemat secara offline (format MHTML) dan formula LaTeX terkonversi.
 *   **AI-Powered Question Generator**: Integrasi kecerdasan buatan (LLM / Groq) untuk memproduksi soal ujian secara otomatis berdasarkan topik, tingkat kesulitan, serta stimulus teks literasi/numerasi.
