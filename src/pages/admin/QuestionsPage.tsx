@@ -462,6 +462,7 @@ const QuestionsPage = () => {
         const chunk = questionsToImport.slice(i, i + chunkSize);
         await Promise.all(
           chunk.map((q, index) => {
+            const correctChoiceKey = q.answerKey || Object.entries(q.choices || {}).filter(([_, v]) => (v as any).isCorrect).map(([k]) => k).join(",");
             const payload = {
               examId: targetId,
               examid: targetId,
@@ -472,8 +473,10 @@ const QuestionsPage = () => {
               choices: q.choices || {},
               options: q.choices || {},
               pairs: q.pairs || [],
-              answerKey: q.answerKey || "",
-              correctAnswer: q.answerKey || "",
+              answerKey: correctChoiceKey,
+              answer: correctChoiceKey,
+              correctAnswer: correctChoiceKey,
+              correct_answer: correctChoiceKey,
               order: (questions.length || 0) + i + index + 1
             };
             return pb.collection("questions").create(payload);

@@ -116,20 +116,33 @@ export const parseWaygroundQuizData = (rawData: any, fallbackId: string = ""): E
     const optionLetters = ["A", "B", "C", "D", "E", "F"];
 
     let correctCount = 0;
+    const correctLetters: string[] = [];
+
     if (Array.isArray(rawOptions) && rawOptions.length > 0) {
       rawOptions.forEach((opt: any, i: number) => {
         const letter = optionLetters[i] || `O${i + 1}`;
         const optText = opt.text || opt.media?.[0]?.url || (typeof opt === "string" ? opt : "");
         const optImage = opt.media?.[0]?.url || opt.image || undefined;
         
+        const ansRaw = structure.answer !== undefined ? structure.answer : q.answer;
+        const ansNum = typeof ansRaw === "number" ? ansRaw : (typeof ansRaw === "string" && !isNaN(Number(ansRaw)) && ansRaw.trim() !== "" ? Number(ansRaw) : -1);
+
         let isCorrect = Boolean(
-          opt.isCorrect || 
-          opt.correct || 
-          (structure.answer !== undefined && Number(structure.answer) === i) ||
-          (Array.isArray(structure.answer) && structure.answer.includes(i))
+          opt.isCorrect === true || 
+          opt.isCorrect === 1 || 
+          opt.isCorrect === "true" ||
+          opt.correct === true || 
+          opt.correct === 1 || 
+          opt.correct === "true" ||
+          (ansNum !== -1 && ansNum === i) ||
+          (Array.isArray(ansRaw) && (ansRaw.includes(i) || ansRaw.includes(String(i)))) ||
+          (typeof ansRaw === "string" && ansRaw.trim() !== "" && ansRaw.trim().toLowerCase() === String(optText).trim().toLowerCase())
         );
 
-        if (isCorrect) correctCount++;
+        if (isCorrect) {
+          correctCount++;
+          correctLetters.push(letter);
+        }
 
         choices[letter] = {
           text: optText,
@@ -144,8 +157,14 @@ export const parseWaygroundQuizData = (rawData: any, fallbackId: string = ""): E
       type = "pilihan_ganda_kompleks";
     }
 
-    // AnswerKey untuk isian/uraian
-    const answerKey = q.answer || structure.answer || (typeof structure.answer === "string" ? structure.answer : undefined);
+    // Determine answerKey:
+    let computedAnswerKey = "";
+    if (type === "pilihan_ganda" || type === "pilihan_ganda_kompleks") {
+      computedAnswerKey = correctLetters.join(",");
+    } else {
+      const rawAns = q.answer !== undefined ? q.answer : structure.answer;
+      computedAnswerKey = typeof rawAns === "string" ? rawAns : (rawAns !== undefined ? JSON.stringify(rawAns) : "");
+    }
 
     return {
       id: qId,
@@ -153,7 +172,7 @@ export const parseWaygroundQuizData = (rawData: any, fallbackId: string = ""): E
       text: textRaw,
       imageUrl,
       choices: Object.keys(choices).length > 0 ? choices : undefined,
-      answerKey: typeof answerKey === "string" ? answerKey : undefined,
+      answerKey: computedAnswerKey || undefined,
       sourceTitle: title
     };
   });
