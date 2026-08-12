@@ -9,6 +9,7 @@ const CapacitorOverlay = () => {
   const [dialogType, setDialogType] = useState<"none" | "refresh" | "exit">("none");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   // Simple drag implementation without framer-motion
   const fabRef = useRef<HTMLDivElement>(null);
@@ -37,6 +38,15 @@ const CapacitorOverlay = () => {
   const handleTouchEnd = useCallback(() => {
     dragState.current.isDragging = false;
   }, []);
+
+  useEffect(() => {
+    if (dialogType === "exit") {
+      const timer = setTimeout(() => {
+        inputRef.current?.focus();
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [dialogType]);
 
   useEffect(() => {
     // Only show on Android native platform
@@ -136,8 +146,8 @@ const CapacitorOverlay = () => {
       </div>
 
       {dialogType !== "none" && (
-        <div className="fixed inset-0 z-[10000] flex items-center justify-center p-6 bg-slate-950/60">
-          <div className="bg-white dark:bg-slate-900 w-full max-w-[320px] rounded-[2rem] p-6 shadow-2xl border border-white/5 animate-in fade-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center p-6 bg-slate-950/60 pointer-events-auto select-none">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-[320px] rounded-[2rem] p-6 shadow-2xl border border-white/5 animate-in fade-in zoom-in-95 duration-200 pointer-events-auto select-text">
             <div className="w-14 h-14 bg-slate-100 dark:bg-slate-800 rounded-2xl flex items-center justify-center mb-5 mx-auto">
               {dialogType === "refresh" ? (
                 <RefreshCw className="text-blue-500 w-6 h-6" />
@@ -159,6 +169,7 @@ const CapacitorOverlay = () => {
             {dialogType === "exit" && (
               <div className="mb-6 relative">
                 <input
+                  ref={inputRef}
                   type={showPassword ? "text" : "password"}
                   inputMode="text"
                   autoCapitalize="none"
@@ -169,7 +180,7 @@ const CapacitorOverlay = () => {
                   autoFocus
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full py-4 pl-4 pr-12 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-center font-bold tracking-[0.3em] outline-none placeholder:tracking-normal placeholder:font-medium text-sm dark:text-white"
+                  className="w-full py-4 pl-4 pr-12 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-center font-bold tracking-[0.3em] outline-none placeholder:tracking-normal placeholder:font-medium text-sm dark:text-white select-text pointer-events-auto"
                   onKeyDown={(e) => {
                     if (e.key === "Enter") {
                       handleExitApp();

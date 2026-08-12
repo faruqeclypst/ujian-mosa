@@ -602,10 +602,15 @@ body {
 
 /* 🔒 CBT Text Protection - block text selection on exam content but allow input */
 textarea,
+input,
 input[type="text"],
+input[type="password"],
 input[type="number"],
 input[type="search"],
+input[type="tel"],
+input[type="email"],
 [contenteditable="true"] {
   -webkit-user-select: text !important;
   user-select: text !important;
+  pointer-events: auto !important;
 }

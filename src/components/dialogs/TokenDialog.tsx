@@ -1,4 +1,4 @@
-import { useState, memo } from "react";
+import { useState, useRef, useEffect, memo } from "react";
 import { useNavigate } from "react-router-dom";
 import { KeyRound, AlertCircle } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../ui/dialog";
@@ -20,6 +20,16 @@ const TokenDialog = memo(({ selectedRoom, onClose }: TokenDialogProps) => {
   const [tokenInput, setTokenInput] = useState("");
   const [tokenError, setTokenError] = useState("");
   const [isValidating, setIsValidating] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (selectedRoom) {
+      const timer = setTimeout(() => {
+        inputRef.current?.focus();
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [selectedRoom]);
 
   const handleClose = () => {
     if (isValidating) return;
@@ -101,11 +111,13 @@ const TokenDialog = memo(({ selectedRoom, onClose }: TokenDialogProps) => {
                 Token Ujian
               </label>
               <Input
+                ref={inputRef}
+                autoFocus
                 value={tokenInput}
-                onChange={(e) => setTokenInput(e.target.value.toUpperCase())}
+                onChange={(e) => setTokenInput(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter" && tokenInput && !isValidating) handleValidateToken(); }}
                 placeholder="ISI TOKEN"
-                className="h-14 text-center text-2xl font-black bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 rounded-lg uppercase"
+                className="h-14 text-center text-2xl font-black bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 rounded-lg uppercase select-text pointer-events-auto"
                 disabled={isValidating}
                 inputMode="text"
                 autoCapitalize="characters"
