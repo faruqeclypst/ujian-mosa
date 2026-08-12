@@ -27,9 +27,16 @@ export const extractQuizIdFromUrl = (urlOrId: string): string => {
   const trimmed = urlOrId.trim();
   if (!trimmed) return "";
   
-  // If it's already a raw ID
-  if (/^[a-f0-9]{24}$/i.test(trimmed) || (/^[a-z0-9_-]{6,36}$/i.test(trimmed) && !trimmed.includes("/"))) {
-    return trimmed;
+  // 1. Regex match 24-hex ObjectId (e.g. 5dafef0d523e5e001aa5e62e)
+  const hexMatch = trimmed.match(/[a-f0-9]{24}/i);
+  if (hexMatch) {
+    return hexMatch[0];
+  }
+
+  // 2. Regex match UUID
+  const uuidMatch = trimmed.match(/[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}/i);
+  if (uuidMatch) {
+    return uuidMatch[0];
   }
 
   try {
@@ -65,35 +72,52 @@ export const fetchWaygroundQuiz = async (urlOrId: string): Promise<ExternalQuizM
   let rawData: any = null;
   let lastError: Error | null = null;
 
-  // List of candidate endpoints for Wayground / Quiz REST APIs
-  const endpoints = [
+  // Candidate API targets for Wayground / Quizizz REST APIs
+  const candidateUrls = [
+    `https://quizizz.com/api/main/quiz/${quizId}`,
     `https://wayground.com/api/v1/quizzes/${quizId}`,
     `https://wayground.com/api/quiz/${quizId}`,
     `https://api.wayground.com/v1/quiz/${quizId}`,
-    // Fallback Quizizz API pratinjau (compatible API format)
-    `https://quizizz.com/api/main/quiz/${quizId}`,
-    // Direct URL fetch if user pasted a full JSON REST API URL
     urlOrId.startsWith("http") ? urlOrId : ""
   ].filter(Boolean);
 
-  for (const endpoint of endpoints) {
-    try {
-      const res = await fetch(endpoint, {
-        method: "GET",
-        headers: { "Accept": "application/json" }
-      });
+  // CORS Proxy wrappers to bypass browser Same-Origin policy
+  const corsWrappers = [
+    (url: string) => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+    (url: string) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+    (url: string) => url // direct fallback
+  ];
 
-      if (res.ok) {
-        rawData = await res.json();
-        if (rawData) break;
+  for (const rawUrl of candidateUrls) {
+    for (const wrapFn of corsWrappers) {
+      const finalUrl = wrapFn(rawUrl);
+      try {
+        const res = await fetch(finalUrl, {
+          method: "GET",
+          headers: { "Accept": "application/json" }
+        });
+
+        if (res.ok) {
+          const text = await res.text();
+          try {
+            const parsed = JSON.parse(text);
+            if (parsed && (parsed.data || parsed.quiz || parsed.info || parsed.questions || parsed.structure)) {
+              rawData = parsed;
+              break;
+            }
+          } catch (jsonErr) {
+            // Content was not valid JSON
+          }
+        }
+      } catch (err: any) {
+        lastError = err;
       }
-    } catch (err: any) {
-      lastError = err;
     }
+    if (rawData) break;
   }
 
   if (!rawData) {
-    throw lastError || new Error(`Gagal mengambil kuis dari Wayground API. Pastikan kuis bersifat publik dan ID/Link benar.`);
+    throw lastError || new Error(`Gagal mengambil kuis dari Wayground API. Pastikan link kuis publik dan dapat diakses.`);
   }
 
   // Parse payload metadata
