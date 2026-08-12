@@ -121,7 +121,7 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
         pb.collection("students").getFullList({ sort: '-created' }),
         pb.collection("exams").getList(1, 1).then(res => res.totalItems).catch(() => 0),
         pb.collection("questions").getList(1, 1).then(res => res.totalItems).catch(() => 0),
-        pb.collection("exam_rooms").getList(1, 1).then(res => res.totalItems).catch(() => 0),
+        pb.collection("exam_rooms").getList(1, 1, { filter: 'status != "archive"' }).then(res => res.totalItems).catch(() => 0),
       ]);
 
       setTeachers(tData.map(i => ({ ...i, id: i.id } as any)));
@@ -205,8 +205,8 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
 
       unsubscribeRooms = await pb.collection("exam_rooms").subscribe("*", async (e) => {
         console.log("🔔 Realtime Room Event:", e.action);
-        if (e.action === "create" || e.action === "delete") {
-          const res = await pb.collection("exam_rooms").getList(1, 1).catch(() => ({ totalItems: 0 }));
+        if (e.action === "create" || e.action === "delete" || e.action === "update") {
+          const res = await pb.collection("exam_rooms").getList(1, 1, { filter: 'status != "archive"' }).catch(() => ({ totalItems: 0 }));
           setRoomsCount(res.totalItems);
         }
       });

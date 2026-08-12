@@ -893,9 +893,11 @@ const ExamRoomsPage = () => {
             <ClipboardList className="h-5 w-5" />
           </div>
           <div>
-            <p className="text-xs text-slate-500 dark:text-slate-400">Total Ruang</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              {activeTab === "aktif" ? "Total Ruang Aktif" : "Total Ruang Arsip"}
+            </p>
             <div className="text-lg font-bold text-slate-800 dark:text-slate-100 mt-0.5">
-              {isLoading ? <Skeleton className="h-7 w-8" /> : rooms.length}
+              {isLoading ? <Skeleton className="h-7 w-8" /> : filteredRooms.length}
             </div>
           </div>
         </div>
