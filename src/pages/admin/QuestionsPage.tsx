@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Plus, Edit, Trash, Check, Copy, Image, ChevronDown, FileText, Download, Eye, FolderOpen, Sparkles, Wand2, RefreshCw, BookOpen, Loader2, FileSpreadsheet, Search, X, Bookmark, Forward, CheckCircle2, Menu, Maximize2, HelpCircle, FileJson, GripVertical, ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowLeft, Plus, Edit, Trash, Check, Copy, Image, ChevronDown, FileText, Download, Eye, FolderOpen, Sparkles, Wand2, RefreshCw, BookOpen, Loader2, FileSpreadsheet, Search, X, Bookmark, Forward, CheckCircle2, Menu, Maximize2, HelpCircle, FileJson, GripVertical, ChevronLeft, ChevronRight, Database, Globe } from "lucide-react";
 import { Reorder } from "framer-motion";
 import { MathText } from "../../components/ui/MathText";
 import { SmartImage } from "../../components/ui/smart-image";
@@ -9,6 +9,7 @@ import { Button } from "../../components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "../../components/ui/dialog";
 import { ConfirmationDialog } from "../../components/dialogs/ConfirmationDialog";
 import BatchProgressDialog from "../../components/dialogs/BatchProgressDialog";
+import QuestionRepositoryDialog, { QuestionImportItem } from "../../components/dialogs/QuestionRepositoryDialog";
 import { Input } from "../../components/ui/input";
 import { Separator } from "../../components/ui/separator";
 import FormField from "../../components/forms/FormField";
@@ -433,7 +434,13 @@ const QuestionsPage = () => {
 
 
   const [exam, setExam] = useState<any>(null);
+  const [allExams, setAllExams] = useState<any[]>([]);
   const [questions, setQuestions] = useState<QuestionData[]>([]);
+
+  useEffect(() => {
+    if (!pb) return;
+    pb.collection("exams").getFullList({ sort: "-created" }).then(res => setAllExams(res)).catch(() => {});
+  }, [pb]);
   const [loading, setLoading] = useState(true);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -524,6 +531,7 @@ const QuestionsPage = () => {
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isRepoDialogOpen, setIsRepoDialogOpen] = useState(false);
 
   const [isGalleryOpen, setIsGalleryOpen] = useState(false);
   const [galleryGroups, setGalleryGroups] = useState<{ title: string; images: string[] }[]>([]);
@@ -3384,6 +3392,68 @@ const QuestionsPage = () => {
     }
   };
 
+  const handleImportRepositoryQuestions = async (importedItems: QuestionImportItem[]) => {
+    if (!pb || !examId || importedItems.length === 0) return;
+    setIsImporting(true);
+    setBatchProgress({
+      isOpen: true,
+      total: importedItems.length,
+      current: 0,
+      message: "Menyiapkan impor butir soal...",
+      title: "Impor Butir Soal"
+    });
+
+    try {
+      const existing = await pb.collection('questions').getFullList({ filter: `examId = "${examId}"`, fields: 'order' });
+      let maxExistingOrder = existing.reduce((max, q) => Math.max(max, q.order || 0), 0);
+
+      let importedCount = 0;
+      const chunkSize = 5;
+      for (let i = 0; i < importedItems.length; i += chunkSize) {
+        const chunk = importedItems.slice(i, i + chunkSize);
+        await Promise.all(
+          chunk.map(async (item, idx) => {
+            maxExistingOrder++;
+            const payload = {
+              examId,
+              examid: examId,
+              text: item.text,
+              type: item.type || "pilihan_ganda",
+              choices: item.choices || {},
+              answerKey: item.answerKey || "A",
+              explanation: item.explanation || "",
+              score: item.score || 1,
+              imageUrl: item.imageUrl || "",
+              order: maxExistingOrder
+            };
+            try {
+              await pb.collection("questions").create(payload);
+              importedCount++;
+            } catch (err) {
+              console.error("Gagal buat soal impor:", err);
+            }
+          })
+        );
+
+        const currentProcessed = Math.min(i + chunkSize, importedItems.length);
+        setBatchProgress(prev => ({
+          ...prev,
+          current: currentProcessed,
+          message: `Mengimpor butir soal (${currentProcessed}/${importedItems.length})`
+        }));
+      }
+
+      await loadQuestions();
+      showAlert("Impor Berhasil", `Berhasil mengimpor ${importedCount} butir soal ke dalam paket ini.`, "success");
+    } catch (err: any) {
+      console.error("Gagal mengimpor butir soal:", err);
+      showAlert("Gagal Impor", err?.message || "Terjadi kesalahan saat mengimpor butir soal.", "danger");
+    } finally {
+      setIsImporting(false);
+      setBatchProgress(prev => ({ ...prev, isOpen: false }));
+    }
+  };
+
   const handleImportJson = async (file: File) => {
     if (!pb) return;
     setIsImporting(true);
@@ -4643,6 +4713,17 @@ Aturan:
                           className="rounded-2xl bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-100 dark:bg-rose-950/40 dark:text-rose-400 dark:border dark:border-rose-800/30 shadow-sm font-bold h-9 px-4 transition-all text-xs"
                         >
                           <Trash className="mr-2 h-3.5 w-3.5" /> Hapus Semua
+                        </Button>
+                      )}
+
+                      {role === "admin" && (
+                        <Button
+                          onClick={() => setIsRepoDialogOpen(true)}
+                          variant="secondary"
+                          size="sm"
+                          className="rounded-2xl bg-purple-50 hover:bg-purple-100 border border-purple-100 dark:bg-purple-900/30 dark:text-purple-400 dark:hover:bg-purple-900/50 dark:border-purple-800/40 text-purple-700 font-bold shadow-sm transition-all h-9 px-4 text-xs"
+                        >
+                          <Database className="mr-1.5 h-3.5 w-3.5" /> Ambil dari Bank / Quizizz
                         </Button>
                       )}
 
@@ -6951,6 +7032,16 @@ Aturan:
         if (file) handleImportJson(file);
         e.target.value = "";
       }} />
+
+      {role === "admin" && (
+        <QuestionRepositoryDialog
+          isOpen={isRepoDialogOpen}
+          onOpenChange={setIsRepoDialogOpen}
+          exams={allExams}
+          pb={pb}
+          onImportQuestions={handleImportRepositoryQuestions}
+        />
+      )}
     </div>
   </div>
 );
