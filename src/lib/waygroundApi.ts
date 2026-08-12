@@ -218,15 +218,16 @@ export const fetchWaygroundQuiz = async (urlOrId: string): Promise<ExternalQuizM
     throw new Error("ID atau Link Kuis tidak valid.");
   }
 
-  const targetApi = `https://quizizz.com/api/main/quiz/${quizId}`;
+  const waygroundApi = `https://wayground.com/api/main/quiz/${quizId}`;
+  const quizizzApi = `https://quizizz.com/api/main/quiz/${quizId}`;
 
-  // Candidate Proxy URLs (1st priority: VPS Nginx /api-quiz/ reverse proxy)
+  // Candidate Proxy URLs (1st priority: VPS Caddy /api-quiz/ reverse proxy to wayground.com)
   const candidateUrls = [
     `/api-quiz/${quizId}`,
-    `https://modalbangsa.examku.my.id/api-quiz/${quizId}`,
-    `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(targetApi)}`,
-    `https://api.allorigins.win/get?url=${encodeURIComponent(targetApi)}`,
-    `https://corsproxy.io/?${encodeURIComponent(targetApi)}`
+    `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(waygroundApi)}`,
+    `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(quizizzApi)}`,
+    `https://api.allorigins.win/get?url=${encodeURIComponent(waygroundApi)}`,
+    `https://corsproxy.io/?${encodeURIComponent(waygroundApi)}`
   ];
 
   if (urlOrId.startsWith("http") && (urlOrId.includes("api") || urlOrId.includes("json"))) {
