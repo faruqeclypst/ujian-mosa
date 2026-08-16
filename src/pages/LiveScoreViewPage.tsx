@@ -150,13 +150,17 @@ const LiveScoreViewPage = () => {
   const getLiveScore = useCallback((sisAnswers: Record<string, any>, attOverrides: Record<string, boolean> = {}) => {
     if (!sisAnswers || monitorQuestions.length === 0) return 0;
     const overrides = Object.keys(attOverrides).length > 0 ? attOverrides : ((sisAnswers as any)?.__overrides__ || {});
+    const studentOrder = (sisAnswers as any)?.__order__ || (sisAnswers as any)?.__meta?.questionOrder;
+    const targetQuestions = Array.isArray(studentOrder) && studentOrder.length > 0
+      ? monitorQuestions.filter((q: any) => studentOrder.includes(q.id))
+      : monitorQuestions;
 
     let objectiveCorrect = 0;
     let objectiveTotal = 0;
     let essayCorrect = 0;
     let essayTotal = 0;
 
-    monitorQuestions.forEach((q: any) => {
+    targetQuestions.forEach((q: any) => {
       const type = q.type || "pilihan_ganda";
       const isEssay = type === "isian_singkat" || type === "uraian";
       let itemCorrect = false;

@@ -12,7 +12,7 @@
   --card-foreground: 0 0% 3.9%; /* gray-950 */
   --popover: 0 0% 100%; /* white */
   --popover-foreground: 0 0% 3.9%; /* gray-950 */
-  --primary: 160 84% 39%; /* emerald-600 */
+  --primary: 221.2 83.2% 53.3%; /* blue-600 */
   --primary-foreground: 210 40% 98%; /* white */
   --secondary: 210 40% 96%; /* gray-100 */
   --secondary-foreground: 222.2 84% 4.9%; /* gray-900 */
@@ -24,7 +24,7 @@
   --destructive-foreground: 210 40% 98%; /* white */
   --border: 214.3 31.8% 91.4%; /* gray-200 */
   --input: 214.3 31.8% 91.4%; /* gray-200 */
-  --ring: 160 84% 39%;
+  --ring: 221.2 83.2% 53.3%; /* blue-600 */
   --radius: 0.75rem;
 }
 
@@ -39,9 +39,9 @@
   --popover: 222.2 84% 4.9%;
   --popover-foreground: 210 40% 98%;
 
-  /* Keep brand emerald for both themes */
-  --primary: 158 64% 52%;
-  --primary-foreground: 210 40% 98%;
+  /* Brand blue for dark theme */
+  --primary: 217.2 91.2% 59.8%; /* blue-500 */
+  --primary-foreground: 210 40% 98%; /* white */
 
   --secondary: 217.2 32.6% 17.5%;
   --secondary-foreground: 210 40% 98%;
@@ -57,7 +57,7 @@
 
   --border: 217.2 32.6% 17.5%;
   --input: 217.2 32.6% 17.5%;
-  --ring: 158 64% 52%;
+  --ring: 217.2 91.2% 59.8%; /* blue-500 */
 }
 
 html {

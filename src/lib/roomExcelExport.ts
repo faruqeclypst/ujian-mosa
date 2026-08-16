@@ -64,13 +64,17 @@ const getLiveScore = (sisAnswers: Record<string, any>, monitorQuestions: any[], 
 
   // Fallback: read overrides from answers.__overrides__ if attOverrides is empty
   const overrides = Object.keys(attOverrides).length > 0 ? attOverrides : ((sisAnswers as any)?.__overrides__ || {});
+  const studentOrder = (sisAnswers as any)?.__order__ || (sisAnswers as any)?.__meta?.questionOrder;
+  const targetQuestions = Array.isArray(studentOrder) && studentOrder.length > 0
+    ? monitorQuestions.filter((q: any) => studentOrder.includes(q.id))
+    : monitorQuestions;
 
   let objectiveCorrect = 0;
   let objectiveTotal = 0;
   let essayCorrect = 0;
   let essayTotal = 0;
 
-  monitorQuestions.forEach((q: any) => {
+  targetQuestions.forEach((q: any) => {
     const type = q.type || "pilihan_ganda";
     const isEssay = type === "isian_singkat" || type === "uraian";
     let itemCorrect = false;
@@ -209,7 +213,20 @@ export async function exportActiveRoomsToZip({
       alignment: { horizontal: "center", vertical: "center" },
       border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } }
     },
+    unassignedDarkGray: {
+      fill: { patternType: "solid", fgColor: { rgb: "64748B" } }, // Abu-abu pekat untuk soal di luar kuota siswa
+      font: { color: { rgb: "E2E8F0" } }, // Teks tanda - abu terang
+      alignment: { horizontal: "center", vertical: "center" },
+      border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } }
+    },
+    unansweredWhite: {
+      fill: { patternType: "solid", fgColor: { rgb: "FFFFFF" } }, // Putih untuk soal dapat siswa tapi tidak dijawab
+      font: { color: { rgb: "94A3B8" } },
+      alignment: { horizontal: "center", vertical: "center" },
+      border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } }
+    },
     neutral: {
+      fill: { patternType: "solid", fgColor: { rgb: "FFFFFF" } },
       font: { color: { rgb: "64748B" } },
       alignment: { horizontal: "center", vertical: "center" },
       border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } }
@@ -384,14 +401,28 @@ export async function exportActiveRoomsToZip({
         const answersOverrides = (answers as any)?.__overrides__ || {};
         const overrides: Record<string, boolean> = { ...answersOverrides, ...rawOverrides };
 
+        const studentOrder = (answers as any)?.__order__ || (answers as any)?.__meta?.questionOrder;
+        const targetQuestions = Array.isArray(studentOrder) && studentOrder.length > 0
+          ? monitorQuestions.filter((q: any) => studentOrder.includes(q.id))
+          : (room?.max_questions && room.max_questions > 0
+              ? monitorQuestions.slice(0, room.max_questions)
+              : monitorQuestions);
+
         let objCorrect = 0, objTotal = 0, essCorrect = 0, essTotal = 0;
-        monitorQuestions.forEach((q: any) => {
+        targetQuestions.forEach((q: any) => {
           const type = q.type || "pilihan_ganda";
           const isEssay = type === "isian_singkat" || type === "uraian";
           const ic = checkAns(q, answers[q.id], overrides);
           if (isEssay) { essTotal++; if (ic) essCorrect++; }
           else { objTotal++; if (ic) objCorrect++; }
         });
+
+        if (objTotal === 0 && essTotal === 0) {
+          const maxQ = room?.max_questions && room.max_questions > 0
+            ? room.max_questions
+            : monitorQuestions.filter((q: any) => q.type !== "isian_singkat" && q.type !== "uraian").length;
+          objTotal = maxQ;
+        }
 
         const objScore = objTotal > 0 ? Math.round((objCorrect / objTotal) * 100) : 0;
         const essScore = essTotal > 0 ? Math.round((essCorrect / essTotal) * 100) : 0;
@@ -419,10 +450,7 @@ export async function exportActiveRoomsToZip({
             : `${dMins}m ${dSecs}d`;
         }
 
-        const essGraded = Object.keys(overrides).filter((k: string) => {
-          const q = monitorQuestions.find((x: any) => x.id === k);
-          return q && (q.type === "isian_singkat" || q.type === "uraian");
-        }).length;
+        const essGraded = Object.keys(overrides).filter(k => { const q = targetQuestions.find((x: any) => x.id === k); return q && (q.type === "isian_singkat" || q.type === "uraian"); }).length;
 
         const finalVal = Math.round(finalScore) || 0;
         const ri = idx + 3;
@@ -448,20 +476,35 @@ export async function exportActiveRoomsToZip({
         ];
 
         monitorQuestions.forEach((q: any) => {
+          const isQuestionAssigned = targetQuestions.some((tq: any) => tq.id === q.id);
           const ans = answers[q.id];
           const isOverridden = overrides[q.id] !== undefined;
           const isCorrect = checkAns(q, ans, overrides);
           const display = isOverridden ? `${formatAnswer(q, ans)} ✓` : formatAnswer(q, ans);
 
-          let cellStyle = STYLES.neutral;
-          if (q.type === "uraian" && !isOverridden) {
-            cellStyle = STYLES.neutral;
-          } else if (ans || isOverridden) {
-            cellStyle = isCorrect ? STYLES.correct : STYLES.wrong;
+          let cellStyle = STYLES.unansweredWhite;
+          let cellValue = "-";
+
+          if (!isQuestionAssigned) {
+            // Soal acak yang TIDAK didapat siswa → warna abu pekat
+            cellStyle = STYLES.unassignedDarkGray;
+            cellValue = "-";
+          } else if (!ans && !isOverridden) {
+            // Soal yang didapat siswa tapi TIDAK dijawab → warna putih
+            cellStyle = STYLES.unansweredWhite;
+            cellValue = "-";
+          } else {
+            // Soal yang didapat dan dijawab siswa
+            cellValue = display;
+            if (q.type === "uraian" && !isOverridden) {
+              cellStyle = STYLES.neutral;
+            } else {
+              cellStyle = isCorrect ? STYLES.correct : STYLES.wrong;
+            }
           }
 
           row.push({
-            v: display,
+            v: cellValue,
             s: cellStyle
           });
         });

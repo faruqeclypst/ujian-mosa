@@ -52,6 +52,7 @@ const StudentGradingDetailPage = () => {
   const [loading, setLoading] = useState(true);
   const [room, setRoom] = useState<any>(null);
   const [questions, setQuestions] = useState<any[]>([]);
+  const [bankQuestions, setBankQuestions] = useState<any[]>([]);
   const [attempt, setAttempt] = useState<any>(null);
   const [aiGradingId, setAiGradingId] = useState<string | null>(null);
 
@@ -83,16 +84,25 @@ const StudentGradingDetailPage = () => {
         const opts = q.options || {};
         return { ...q, type: t, choices: opts, pairs: t === "menjodohkan" ? opts.pairs : undefined, items: (t === "urutkan" || t === "drag_drop") ? opts.items : undefined, answerKey: q.correctAnswer || q.answerKey };
       });
-      setQuestions(mapped.sort((a: any, b: any) => {
+      setBankQuestions(mapped);
+
+      const attList = await pb.collection("attempts").getFullList({ filter: `examRoomId = "${roomId}" && studentId = "${studentId}"` });
+      const attRecord = attList.length > 0 ? attList[0] : null;
+      setAttempt(attRecord);
+
+      const studentOrder = attRecord?.answers?.__order__ || attRecord?.answers?.__meta?.questionOrder;
+      let finalQuestions = mapped;
+      if (Array.isArray(studentOrder) && studentOrder.length > 0) {
+        finalQuestions = studentOrder.map((id: string) => mapped.find((q: any) => q.id === id)).filter((q): q is any => !!q);
+      }
+
+      setQuestions(finalQuestions.sort((a: any, b: any) => {
         const aIsEssay = a.type === "isian_singkat" || a.type === "uraian";
         const bIsEssay = b.type === "isian_singkat" || b.type === "uraian";
         if (aIsEssay && !bIsEssay) return 1;
         if (!aIsEssay && bIsEssay) return -1;
         return 0;
       }));
-
-      const attList = await pb.collection("attempts").getFullList({ filter: `examRoomId = "${roomId}" && studentId = "${studentId}"` });
-      setAttempt(attList.length > 0 ? attList[0] : null);
     } catch (e) { console.error(e); }
     finally { setLoading(false); }
   }, [pb, roomId, studentId]);
@@ -547,7 +557,14 @@ const StudentGradingDetailPage = () => {
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <div>
-            <h1 className="text-lg font-bold text-slate-900 dark:text-white">{student?.name || "Siswa"}</h1>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-lg font-bold text-slate-900 dark:text-white">{student?.name || "Siswa"}</h1>
+              {bankQuestions.length > questions.length && (
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300 border border-purple-200 dark:border-purple-800/50 flex items-center gap-1 shadow-sm">
+                  <span>🎲</span> {questions.length} Soal Teracak (dari {bankQuestions.length} Bank Soal)
+                </span>
+              )}
+            </div>
             <p className="text-xs text-slate-500">{(student as any)?.nisn || ""} • {className} • {room?.examTitle || "Ujian"}{room?.subjectName ? ` • ${room.subjectName}` : ""}</p>
           </div>
         </div>
@@ -644,10 +661,20 @@ const StudentGradingDetailPage = () => {
                     drag_drop: "bg-orange-50 text-orange-600 border-orange-100 dark:bg-orange-950/30 dark:text-orange-400 dark:border-orange-800/30",
                   };
 
+                  const bankIdx = bankQuestions.findIndex(x => x.id === q.id);
+                  const bankNo = bankIdx !== -1 ? bankIdx + 1 : "-";
+
                   return (
                     <TableRow key={q.id} className={`group transition-colors ${correct === true ? "hover:bg-emerald-50/50 dark:hover:bg-emerald-950/10" : correct === false ? "hover:bg-rose-50/50 dark:hover:bg-rose-950/10" : "hover:bg-slate-50 dark:hover:bg-slate-800/30"} ${isEssay ? "bg-purple-50/20 dark:bg-purple-950/5" : ""}`}>
                       <TableCell className="text-center">
-                        <span className="text-[10px] font-bold text-slate-400 font-mono">{idx + 1}</span>
+                        <div className="flex flex-col items-center gap-0.5">
+                          <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 font-mono">{idx + 1}</span>
+                          {bankQuestions.length > questions.length && (
+                            <span className="px-1.5 py-0.2 rounded text-[8px] font-black bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300 border border-purple-200/60 dark:border-purple-800/40 whitespace-nowrap" title={`Soal Bank #${bankNo}`}>
+                              🎲 #{bankNo}
+                            </span>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell>
                         <div className="text-[11px] leading-snug text-slate-700 dark:text-slate-300">

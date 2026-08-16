@@ -183,7 +183,7 @@ const TokenViewPage = () => {
     if (!pb || unlocking) return;
     setUnlocking(attId);
     try {
-      await pb.collection("attempts").update(attId, { status: "ongoing", cheatCount: 0 });
+      await pb.collection("attempts").update(attId, { status: "ongoing" });
       setLockedStudents(prev => prev.filter(s => s.attId !== attId));
       setUnlockSuccess(attId);
       setTimeout(() => setUnlockSuccess(null), 2000);

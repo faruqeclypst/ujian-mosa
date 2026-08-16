@@ -520,7 +520,18 @@ const CBTPage = () => {
   const handleAnswerSelect = (questionId: string, value: any) => {
     if (isExamOver || isLocked || !attempt) return;
     setAnswers(p => {
-      const u = { ...p, [questionId]: value };
+      const curMeta = (p as any)?.__meta || {};
+      const u = {
+        ...p,
+        [questionId]: value,
+        __activeQuestionId__: questionId,
+        __meta: {
+          ...curMeta,
+          activeQuestionId: questionId,
+          activeQuestionIndex: currentQuestionIndex,
+          lastAnsweredAt: new Date().toISOString(),
+        }
+      };
       answersRef.current = u;
 
       // 1. SIMPAN KE HP INSTAN (0 DETIK)
@@ -569,6 +580,23 @@ const CBTPage = () => {
     }
     setTargetIndex(null); setCurrentQuestionIndex(index);
     sessionStorage.setItem(`currentIndex_${student?.nisn}_${roomId}`, index.toString());
+
+    if (targetQ?.id && attempt?.id) {
+      setAnswers(p => {
+        const curMeta = (p as any)?.__meta || {};
+        const u = {
+          ...p,
+          __activeQuestionId__: targetQ.id,
+          __meta: {
+            ...curMeta,
+            activeQuestionId: targetQ.id,
+            activeQuestionIndex: index,
+          }
+        };
+        answersRef.current = u;
+        return u;
+      });
+    }
   };
 
   const handleNextClick = () => {
@@ -738,71 +766,234 @@ const CBTPage = () => {
       }
       setAttempt(att);
 
+      const isRandom = rData.randomize_questions !== false;
+      const maxQ = Number(rData.max_questions) || 0;
+
       const clusterShuffle = (list: string[]): string[] => {
         const g: Record<string, string[]> = {}; const s: string[] = [];
         list.forEach(id => { const q = loaded.find(x => x.id === id); if (q?.groupId) { if (!g[q.groupId]) g[q.groupId] = []; g[q.groupId].push(id); } else s.push(id); });
         const nC: Record<string, string[]> = {}; const nI: Record<string, string[]> = {}; const nM: Record<string, string[]> = {};
         loaded.forEach((q: any) => {
-          if (q.choices) { const k = Object.keys(q.choices); for (let i = k.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1));[k[i], k[j]] = [k[j], k[i]]; } nC[q.id] = k; }
-          if (q.items && (q.type === "urutkan" || q.type === "drag_drop")) { const ids = q.items.map((it: any) => it.id); for (let i = ids.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1));[ids[i], ids[j]] = [ids[j], ids[i]]; } nI[q.id] = ids; }
-          if (q.pairs && q.type === "menjodohkan") { const rO = Array.from(new Set((q.pairs as any[]).map(p => p.right))); for (let i = rO.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1));[rO[i], rO[j]] = [rO[j], rO[i]]; } nM[q.id] = rO as string[]; }
+          if (q.choices) {
+            const k = Object.keys(q.choices);
+            if (isRandom) {
+              for (let i = k.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [k[i], k[j]] = [k[j], k[i]]; }
+            }
+            nC[q.id] = k;
+          }
+          if (q.items && (q.type === "urutkan" || q.type === "drag_drop")) {
+            const ids = q.items.map((it: any) => it.id);
+            if (isRandom) {
+              for (let i = ids.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [ids[i], ids[j]] = [ids[j], ids[i]]; }
+            }
+            nI[q.id] = ids;
+          }
+          if (q.pairs && q.type === "menjodohkan") {
+            const rO = Array.from(new Set((q.pairs as any[]).map(p => p.right)));
+            if (isRandom) {
+              for (let i = rO.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [rO[i], rO[j]] = [rO[j], rO[i]]; }
+            }
+            nM[q.id] = rO as string[];
+          }
         });
         const pr = `${student.nisn}_${roomId}`;
-        const sC = sessionStorage.getItem(`choices_${pr}`); if (sC) try { Object.assign(nC, JSON.parse(sC)); } catch (e) { }
-        const sI = sessionStorage.getItem(`items_${pr}`); if (sI) try { Object.assign(nI, JSON.parse(sI)); } catch (e) { }
-        const sM = sessionStorage.getItem(`match_${pr}`); if (sM) try { Object.assign(nM, JSON.parse(sM)); } catch (e) { }
+        let sC = sessionStorage.getItem(`choices_${pr}`);
+        let sI = sessionStorage.getItem(`items_${pr}`);
+        let sM = sessionStorage.getItem(`match_${pr}`);
+
+        if (!sC && att?.answers?.__choices__) {
+          try { sC = JSON.stringify(att.answers.__choices__); } catch (e) { }
+        }
+        if (!sI && att?.answers?.__items__) {
+          try { sI = JSON.stringify(att.answers.__items__); } catch (e) { }
+        }
+        if (!sM && att?.answers?.__match__) {
+          try { sM = JSON.stringify(att.answers.__match__); } catch (e) { }
+        }
+
+        if (sC) try { Object.assign(nC, JSON.parse(sC)); } catch (e) { }
+        if (sI) try { Object.assign(nI, JSON.parse(sI)); } catch (e) { }
+        if (sM) try { Object.assign(nM, JSON.parse(sM)); } catch (e) { }
         sessionStorage.setItem(`choices_${pr}`, JSON.stringify(nC));
         sessionStorage.setItem(`items_${pr}`, JSON.stringify(nI));
         sessionStorage.setItem(`match_${pr}`, JSON.stringify(nM));
         setChoicesOrder(nC); setItemsOrder(nI); setMatchingOptions(nM);
+
+        if (!isRandom) {
+          return list;
+        }
+
         const col: (string | string[])[] = [...s, ...Object.values(g)];
-        for (let i = col.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1));[col[i], col[j]] = [col[j], col[i]]; }
+        for (let i = col.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [col[i], col[j]] = [col[j], col[i]]; }
         return col.flat();
       };
 
       const pr = `${student.nisn}_${roomId}`;
       let sO = sessionStorage.getItem(`order_${pr}`);
+      if (!sO && att?.answers) {
+        const fromAtt = (att.answers as any).__order__ || (att.answers as any)?.__meta?.questionOrder;
+        if (Array.isArray(fromAtt) && fromAtt.length > 0) {
+          sO = JSON.stringify(fromAtt);
+        }
+      }
+
       let order: string[] = [];
       const curIds = loaded.map(q => q.id);
       if (sO) {
         try {
           order = JSON.parse(sO).filter((id: string) => curIds.includes(id));
-          // Deduplicate dari sessionStorage yang mungkin korup
           order = Array.from(new Set(order));
-          const n = curIds.filter(id => !order.includes(id));
-          if (n.length > 0) order = [...order, ...clusterShuffle(n)];
 
-          // Always ensure essay questions are at the end (fix old orders)
+          // 1. If room max_questions was lowered, trim to maxQ
+          if (maxQ > 0 && order.length > maxQ) {
+            order = order.slice(0, maxQ);
+          }
+          // 2. If room max_questions was increased, or set to 0 (all questions), add remaining questions
+          else if ((maxQ > 0 && order.length < maxQ) || (maxQ === 0 && order.length < curIds.length)) {
+            const targetTotal = maxQ > 0 ? maxQ : curIds.length;
+            const remaining = curIds.filter(id => !order.includes(id));
+            if (isRandom) {
+              for (let i = remaining.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [remaining[i], remaining[j]] = [remaining[j], remaining[i]];
+              }
+            }
+            const needed = targetTotal - order.length;
+            const toAdd = remaining.slice(0, needed);
+            order = [...order, ...toAdd];
+          }
+
+          // Ensure essay questions are at the end
           const objOrder = order.filter(id => { const q = loaded.find(x => x.id === id); const t = q?.type || "pilihan_ganda"; return t !== "isian_singkat" && t !== "uraian"; });
           const essOrder = order.filter(id => { const q = loaded.find(x => x.id === id); const t = q?.type || "pilihan_ganda"; return t === "isian_singkat" || t === "uraian"; });
-          order = [...objOrder, ...essOrder];
-          // Final dedup
-          order = Array.from(new Set(order));
+          order = Array.from(new Set([...objOrder, ...essOrder]));
 
           sessionStorage.setItem(`order_${pr}`, JSON.stringify(order));
+
+          // If attempt has outdated __order__, sync updated order to DB
+          if (att?.id && (att.answers as any)?.__order__ && (att.answers as any).__order__.length !== order.length) {
+            const curAns = att.answers || {};
+            safeUpdateAttempt(att.id, {
+              answers: {
+                ...curAns,
+                __order__: order,
+                __meta: {
+                  ...(curAns.__meta || {}),
+                  questionOrder: order,
+                  totalQuestions: order.length,
+                }
+              }
+            });
+          }
         } catch (e) { }
       }
+
       if (order.length === 0) {
-        const pg = curIds.filter(id => { const q = loaded.find(x => x.id === id); return !q?.type || q.type.startsWith("pilihan_ganda"); });
-        const es = curIds.filter(id => { const q = loaded.find(x => x.id === id); return q?.type === "isian_singkat" || q?.type === "uraian"; });
-        const it = curIds.filter(id => !pg.includes(id) && !es.includes(id));
-        // Essay/isian singkat TIDAK diacak — tetap urutan original (sesuai nomor soal di kertas)
-        order = [...clusterShuffle(pg), ...clusterShuffle(it), ...es];
-        // Deduplicate — cegah soal muncul 2x
+        let poolIds = curIds;
+        if (maxQ > 0 && maxQ < curIds.length) {
+          if (isRandom) {
+            // Group cluster sampling to keep stimulus intact
+            const groups: Record<string, string[]> = {};
+            const singles: string[] = [];
+            loaded.forEach(q => {
+              if (q.groupId) {
+                if (!groups[q.groupId]) groups[q.groupId] = [];
+                groups[q.groupId].push(q.id);
+              } else {
+                singles.push(q.id);
+              }
+            });
+            const units: string[][] = [...Object.values(groups), ...singles.map(id => [id])];
+            for (let i = units.length - 1; i > 0; i--) {
+              const j = Math.floor(Math.random() * (i + 1));
+              [units[i], units[j]] = [units[j], units[i]];
+            }
+            const selectedIds: string[] = [];
+            for (const u of units) {
+              if (selectedIds.length + u.length <= maxQ || selectedIds.length === 0) {
+                selectedIds.push(...u);
+              } else if (selectedIds.length < maxQ) {
+                const rem = maxQ - selectedIds.length;
+                selectedIds.push(...u.slice(0, rem));
+              }
+              if (selectedIds.length >= maxQ) break;
+            }
+            poolIds = selectedIds;
+          } else {
+            poolIds = curIds.slice(0, maxQ);
+          }
+        }
+
+        const pg = poolIds.filter(id => { const q = loaded.find(x => x.id === id); return !q?.type || q.type.startsWith("pilihan_ganda"); });
+        const es = poolIds.filter(id => { const q = loaded.find(x => x.id === id); return q?.type === "isian_singkat" || q?.type === "uraian"; });
+        const it = poolIds.filter(id => !pg.includes(id) && !es.includes(id));
+
+        if (isRandom) {
+          // Objective questions shuffled, essay questions at end
+          order = [...clusterShuffle(pg), ...clusterShuffle(it), ...es];
+        } else {
+          // Objective questions in original order, essay questions at end
+          order = [...pg, ...it, ...es];
+        }
         order = Array.from(new Set(order));
         sessionStorage.setItem(`order_${pr}`, JSON.stringify(order));
+
+        if (att?.id && pb) {
+          const curAns = att.answers || {};
+          const sC_saved = sessionStorage.getItem(`choices_${pr}`);
+          const sI_saved = sessionStorage.getItem(`items_${pr}`);
+          const sM_saved = sessionStorage.getItem(`match_${pr}`);
+          safeUpdateAttempt(att.id, {
+            answers: {
+              ...curAns,
+              __order__: order,
+              __choices__: sC_saved ? JSON.parse(sC_saved) : undefined,
+              __items__: sI_saved ? JSON.parse(sI_saved) : undefined,
+              __match__: sM_saved ? JSON.parse(sM_saved) : undefined,
+              __meta: {
+                ...(curAns.__meta || {}),
+                questionOrder: order,
+                totalQuestions: order.length,
+              }
+            }
+          });
+        }
       } else {
-        // Restore choices/items/matching orders from sessionStorage even when question order already exists
-        const sC = sessionStorage.getItem(`choices_${pr}`); if (sC) try { setChoicesOrder(JSON.parse(sC)); } catch (e) { }
-        const sI = sessionStorage.getItem(`items_${pr}`); if (sI) try { setItemsOrder(JSON.parse(sI)); } catch (e) { }
-        const sM = sessionStorage.getItem(`match_${pr}`); if (sM) try { setMatchingOptions(JSON.parse(sM)); } catch (e) { }
+        // Restore choices/items/matching orders from sessionStorage or database attempt (for new device / HP baru)
+        let sC = sessionStorage.getItem(`choices_${pr}`);
+        let sI = sessionStorage.getItem(`items_${pr}`);
+        let sM = sessionStorage.getItem(`match_${pr}`);
+
+        if (!sC && att?.answers?.__choices__) {
+          try { sC = JSON.stringify(att.answers.__choices__); sessionStorage.setItem(`choices_${pr}`, sC); } catch (e) { }
+        }
+        if (!sI && att?.answers?.__items__) {
+          try { sI = JSON.stringify(att.answers.__items__); sessionStorage.setItem(`items_${pr}`, sI); } catch (e) { }
+        }
+        if (!sM && att?.answers?.__match__) {
+          try { sM = JSON.stringify(att.answers.__match__); sessionStorage.setItem(`match_${pr}`, sM); } catch (e) { }
+        }
+
+        if (sC) try { setChoicesOrder(JSON.parse(sC)); } catch (e) { }
+        if (sI) try { setItemsOrder(JSON.parse(sI)); } catch (e) { }
+        if (sM) try { setMatchingOptions(JSON.parse(sM)); } catch (e) { }
       }
 
       // Deduplicate order sebelum set state — cegah soal muncul 2x di questions
       const uniqueOrder = Array.from(new Set(order));
-      setQuestions(uniqueOrder.map(id => loaded.find(x => x.id === id)).filter(x => !!x) as Question[]);
+      const finalQuestions = uniqueOrder.map(id => loaded.find(x => x.id === id)).filter(x => !!x) as Question[];
+      setQuestions(finalQuestions);
       const sIndexStored = sessionStorage.getItem(`currentIndex_${pr}`);
-      if (sIndexStored && !isIndexRestored.current) { const idx = parseInt(sIndexStored, 10); if (idx >= 0 && idx < order.length) setCurrentQuestionIndex(idx); }
+      if (sIndexStored && !isIndexRestored.current) {
+        const idx = parseInt(sIndexStored, 10);
+        if (idx >= 0 && idx < finalQuestions.length) {
+          setCurrentQuestionIndex(idx);
+        } else {
+          setCurrentQuestionIndex(Math.max(0, finalQuestions.length - 1));
+        }
+      } else {
+        setCurrentQuestionIndex(prev => prev >= finalQuestions.length ? Math.max(0, finalQuestions.length - 1) : prev);
+      }
       isIndexRestored.current = true;
 
       const stD = parseSafeDate(att.startTime || att.startedAt) || new Date();
@@ -1113,13 +1304,18 @@ const CBTPage = () => {
 
       // Gabungkan answers + status finished dalam SATU request — atomic, tidak bisa setengah-setengah
       // Simpan objectiveScore & essayTotal sebagai metadata di dalam answers (tidak perlu field baru)
+      const currentOrder = questions.map(q => q.id);
       const answersWithMeta = {
         ...answersRef.current,
+        __order__: currentOrder,
         __meta: {
+          ...((answersRef.current as any)?.__meta || {}),
           objectiveScore,
           objectiveCorrect: Math.floor(objectiveCorrect),
           objectiveTotal,
           essayTotal,
+          questionOrder: currentOrder,
+          totalQuestions,
         }
       };
 
@@ -2235,7 +2431,7 @@ const CBTPage = () => {
           <Button onClick={() => {
             setIsCheatWarningOpen(false);
             try { CheatAlert.stopAlarm(); } catch (err) { }
-          }} className="w-full bg-emerald-600 text-white font-black uppercase tracking-widest h-12 rounded-2xl mt-6">SAYA MENGERTI</Button>
+          }} className="w-full bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-black uppercase tracking-widest h-12 rounded-2xl mt-6 transition-colors shadow-lg shadow-emerald-600/20">SAYA MENGERTI</Button>
         </DialogContent>
       </Dialog>
     </div>

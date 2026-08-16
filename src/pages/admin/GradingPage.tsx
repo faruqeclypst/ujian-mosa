@@ -84,12 +84,21 @@ const GradingPage = () => {
   const hasEssay = essayQuestions.length > 0;
 
   const getScoreBreakdown = (att: any) => {
-    if (!att) return { objScore: 0, essScore: 0, finalScore: 0, objCorrect: 0, essCorrect: 0, essGraded: 0 };
+    const defaultObjTotal = room?.max_questions && room.max_questions > 0 ? room.max_questions : objectiveQuestions.length;
+    if (!att) return { objScore: 0, essScore: 0, finalScore: 0, objCorrect: 0, essCorrect: 0, essGraded: 0, objTotal: defaultObjTotal, essTotal: essayQuestions.length };
     const answers = att.answers || {};
     const overrides = att.overrides || (answers as any)?.__overrides__ || {};
+    const studentOrder = answers.__order__ || (answers as any)?.__meta?.questionOrder;
+    const targetQuestions = Array.isArray(studentOrder) && studentOrder.length > 0
+      ? questions.filter(q => studentOrder.includes(q.id))
+      : (room?.max_questions && room.max_questions > 0 ? questions.slice(0, room.max_questions) : questions);
+
+    const studentObjQuestions = targetQuestions.filter(q => q.type !== "isian_singkat" && q.type !== "uraian");
+    const studentEssQuestions = targetQuestions.filter(q => q.type === "isian_singkat" || q.type === "uraian");
+    const studentHasEssay = studentEssQuestions.length > 0;
 
     let objCorrect = 0;
-    objectiveQuestions.forEach(q => {
+    studentObjQuestions.forEach(q => {
       let ic = false;
       if (overrides[q.id] !== undefined) { ic = overrides[q.id]; }
       else {
@@ -104,16 +113,16 @@ const GradingPage = () => {
     });
 
     let essCorrect = 0, essGraded = 0;
-    essayQuestions.forEach(q => {
+    studentEssQuestions.forEach(q => {
       if (overrides[q.id] !== undefined) { essGraded++; if (overrides[q.id]) essCorrect++; }
       else if (q.type === "isian_singkat" && answers[q.id]) { essGraded++; if (isFuzzyMatch(answers[q.id], q.answerKey)) essCorrect++; }
     });
 
-    const objScore = objectiveQuestions.length > 0 ? Math.round((objCorrect / objectiveQuestions.length) * 100) : 0;
-    const essScore = essayQuestions.length > 0 ? Math.round((essCorrect / essayQuestions.length) * 100) : 0;
-    const finalScore = !hasEssay ? objScore : Math.round(objScore * 0.6 + essScore * 0.4);
+    const objScore = studentObjQuestions.length > 0 ? Math.round((objCorrect / studentObjQuestions.length) * 100) : 0;
+    const essScore = studentEssQuestions.length > 0 ? Math.round((essCorrect / studentEssQuestions.length) * 100) : 0;
+    const finalScore = !studentHasEssay ? objScore : Math.round(objScore * 0.6 + essScore * 0.4);
 
-    return { objScore, essScore, finalScore, objCorrect, essCorrect, essGraded };
+    return { objScore, essScore, finalScore, objCorrect, essCorrect, essGraded, objTotal: studentObjQuestions.length, essTotal: studentEssQuestions.length };
   };
 
   const handleExportGrading = () => {
@@ -143,7 +152,7 @@ const GradingPage = () => {
 
     filteredStudents.forEach((std, idx) => {
       const att = attempts.find(a => a.studentId === std.id || a.student_id === std.id);
-      const { objScore, essScore, finalScore, objCorrect, essCorrect } = getScoreBreakdown(att);
+      const { objScore, essScore, finalScore, objCorrect, essCorrect, objTotal, essTotal } = getScoreBreakdown(att);
       const className = examClasses.find(c => c.id === std.classId)?.name || "-";
       const formula = hasEssay ? `${objScore}×60% + ${essScore}×40% = ${finalScore}` : `${objScore} (100% objektif)`;
 
@@ -152,9 +161,9 @@ const GradingPage = () => {
         { v: (std as any).nisn || std.id, s: STYLES.cellCenter },
         { v: std.name, s: STYLES.cell },
         { v: className, s: STYLES.cellCenter },
-        { v: `${objCorrect}/${objectiveQuestions.length}`, s: STYLES.cellCenter },
+        { v: `${objCorrect}/${objTotal}`, s: STYLES.cellCenter },
         { v: objScore, s: objScore >= 75 ? STYLES.correct : (objScore >= 50 ? STYLES.cellCenter : STYLES.wrong) },
-        { v: `${essCorrect}/${essayQuestions.length}`, s: STYLES.cellCenter },
+        { v: `${essCorrect}/${essTotal}`, s: STYLES.cellCenter },
         { v: essScore, s: essScore >= 75 ? STYLES.correct : (essScore >= 50 ? STYLES.cellCenter : STYLES.wrong) },
         { v: finalScore, s: { ...STYLES.cellCenter, font: { bold: true, sz: 12 } } },
         { v: formula, s: STYLES.cellCenter },
@@ -250,7 +259,7 @@ const GradingPage = () => {
             <TableBody>
               {filteredStudents.map((std, idx) => {
                 const att = attempts.find(a => a.studentId === std.id || a.student_id === std.id);
-                const { objScore, essScore, finalScore, objCorrect, essGraded, essCorrect } = getScoreBreakdown(att);
+                const { objScore, essScore, finalScore, objCorrect, essGraded, essCorrect, objTotal, essTotal } = getScoreBreakdown(att);
                 const className = examClasses.find(c => c.id === std.classId)?.name || "-";
 
                 return (
@@ -264,16 +273,16 @@ const GradingPage = () => {
                     <TableCell className="text-center">
                       <div className="flex flex-col items-center">
                         <span className={`text-sm font-black ${objScore >= 75 ? "text-emerald-600" : objScore >= 50 ? "text-amber-600" : "text-rose-600"}`}>{objScore}</span>
-                        <span className="text-[9px] text-slate-400">{objCorrect}/{objectiveQuestions.length}</span>
+                        <span className="text-[9px] text-slate-400">{objCorrect}/{objTotal}</span>
                       </div>
                     </TableCell>
                     <TableCell className="text-center">
                       {hasEssay ? (
                         <div className="flex flex-col items-center">
-                          <span className={`text-sm font-black ${essGraded < essayQuestions.length ? "text-amber-500" : essScore >= 75 ? "text-emerald-600" : essScore >= 50 ? "text-amber-600" : "text-rose-600"}`}>
-                            {essGraded < essayQuestions.length ? `${essGraded}/${essayQuestions.length}` : essScore}
+                          <span className={`text-sm font-black ${essGraded < essTotal ? "text-amber-500" : essScore >= 75 ? "text-emerald-600" : essScore >= 50 ? "text-amber-600" : "text-rose-600"}`}>
+                            {essGraded < essTotal ? `${essGraded}/${essTotal}` : essScore}
                           </span>
-                          <span className="text-[9px] text-slate-400">{essGraded < essayQuestions.length ? "belum dinilai" : `${essCorrect}/${essayQuestions.length}`}</span>
+                          <span className="text-[9px] text-slate-400">{essGraded < essTotal ? "belum dinilai" : `${essCorrect}/${essTotal}`}</span>
                         </div>
                       ) : <span className="text-xs text-slate-300">-</span>}
                     </TableCell>

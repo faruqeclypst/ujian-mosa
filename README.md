@@ -33,16 +33,22 @@ Manajemen multi-sekolah dengan registrasi mandiri, isolasi data lengkap pada lev
 *   Antarmuka ujian siswa yang responsif, minimalis, dan dirancang fokus bebas gangguan.
 *   *Rendering* persamaan matematika kompleks berkecepatan tinggi menggunakan **KaTeX (LaTeX)**.
 *   **Auto-Save & Safe State**: Sinkronisasi jawaban berkala ke server untuk menghindari kehilangan progres jika terjadi kendala jaringan/daya.
+*   **Pengacakan & Subset Sampling Soal**: Dukungan pengambilan subset soal dinamis (misal ambil 30 soal dari 90 bank soal) dengan *cluster-based shuffle* yang menjaga keutuhan stimulus/wacana soal.
+*   **Anti-Refresh & Sesi Lintas Perangkat**: Urutan soal acak dan pilihan jawaban tersinkronisasi ke sesi dan database (`__order__`, `__choices__`, dll), menjamin kontinuitas 100% saat siswa me-refresh halaman atau berpindah perangkat/HP.
 
-### 🔒 **Exambro Guard Security**
+### 🔒 **Exambro Guard Security & Smart Unlock**
 *   Proteksi keamanan tingkat tinggi yang mendeteksi pergantian tab browser, meminimalkan jendela, dan integrasi penuh dengan aplikasi mobile client (**Exambro Guard**).
+*   **Smart Anti-Cheat Guard**: Akumulasi pelanggaran tersimpan secara persisten. Saat pengawas membuka kunci (*Unlock*), riwayat kecurangan tetap tercatat sehingga kecurangan berikutnya akan langsung mengunci layar siswa seketika.
 *   Gunakan variabel `VITE_DISABLE_EXAMBRO_GUARD=true` untuk menonaktifkan fitur pengaman saat tahap pengembangan/testing.
 
 ### 📊 **Real-Time Monitoring Panel**
 *   Dasbor pengawas (*Proctor*) real-time untuk memantau status keaktifan siswa, kemajuan pengerjaan, sisa waktu, IP Address, dan deteksi pelanggaran saat ujian berlangsung.
+*   **Indikator Soal Aktif**: Memantau nomor butir soal yang sedang dibuka dan dikerjakan siswa secara langsung (`Soal #X` & `📍 AKTIF`) dengan *zero-overhead* beban server.
+*   **Pemetaan Nomor Bank Soal**: Menampilkan nomor acak siswa berdampingan dengan nomor asli bank soal (`🎲 Bank #Y`).
 
-### 📉 **Autograding & Laporan Penilaian**
+### 📉 **Autograding & Laporan Penilaian Excel**
 *   Kalkulasi nilai otomatis untuk berbagai tipe soal: pilihan ganda tunggal, pilihan ganda kompleks, benar/salah, menjodohkan (*matching*), dan mengurutkan (*reorder*).
+*   **Ekspor Excel Presisi**: Pembagi skor otomatis menyesuaikan jumlah soal subset acak yang didapat siswa (misal 1/30 alih-alih 1/90) dengan penandaan warna sel (Abu-abu pekat untuk soal di luar paket siswa, Putih untuk belum dijawab, Hijau untuk benar, Merah untuk salah).
 *   Fitur **Salin Laporan WhatsApp** untuk memudahkan guru membagikan rekap progres bank soal ke grup chat sekolah.
 
 ### 📲 **Capacitor Hybrid Mobile Support**

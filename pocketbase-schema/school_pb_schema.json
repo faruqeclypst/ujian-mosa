@@ -87,6 +87,8 @@
       { "name": "start_time", "type": "text" },
       { "name": "end_time", "type": "text" },
       { "name": "duration", "type": "number", "required": true },
+      { "name": "max_questions", "type": "number" },
+      { "name": "randomize_questions", "type": "bool" },
       { "name": "isActive", "type": "bool" }
     ],
     "listRule": "@request.auth.id != ''"

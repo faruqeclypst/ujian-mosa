@@ -178,7 +178,6 @@ const TopNavigation = () => {
     try {
       await pb.collection('attempts').update(attId, {
         status: "ongoing",
-        cheatCount: 0,
       });
     } catch (error) {
       console.error("Gagal membuka kunci student", error);

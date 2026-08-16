@@ -49,6 +49,8 @@ export interface ExamRoomData {
   duration: number;
   cheat_limit: number;
   submit_window?: number;
+  max_questions?: number;
+  randomize_questions?: boolean;
   examTitle?: string;
   className?: string;
   room_code?: string;
@@ -256,13 +258,17 @@ const MonitoringPage = () => {
 
     // Fallback: read overrides from answers.__overrides__ if attOverrides is empty
     const overrides = Object.keys(attOverrides).length > 0 ? attOverrides : ((sisAnswers as any)?.__overrides__ || {});
+    const studentOrder = (sisAnswers as any)?.__order__ || (sisAnswers as any)?.__meta?.questionOrder;
+    const targetQuestions = Array.isArray(studentOrder) && studentOrder.length > 0
+      ? monitorQuestions.filter((q: any) => studentOrder.includes(q.id))
+      : monitorQuestions;
 
     let objectiveCorrect = 0;
     let objectiveTotal = 0;
     let essayCorrect = 0;
     let essayTotal = 0;
 
-    monitorQuestions.forEach((q: any) => {
+    targetQuestions.forEach((q: any) => {
       const type = q.type || "pilihan_ganda";
       const isEssay = type === "isian_singkat" || type === "uraian";
       let itemCorrect = false;
@@ -345,8 +351,13 @@ const MonitoringPage = () => {
         if (score > 0 && pb) {
           try {
             // Recalculate objectiveCorrect/objectiveTotal dari scratch
+            const studentOrder = (att.answers as any)?.__order__ || (att.answers as any)?.__meta?.questionOrder;
+            const targetQuestions = Array.isArray(studentOrder) && studentOrder.length > 0
+              ? monitorQuestions.filter((q: any) => studentOrder.includes(q.id))
+              : monitorQuestions;
+
             let objCorrect = 0, objTotal = 0;
-            monitorQuestions.forEach((q: any) => {
+            targetQuestions.forEach((q: any) => {
               const type = q.type || "pilihan_ganda";
               const isEssay = type === "isian_singkat" || type === "uraian";
               if (!isEssay) {
@@ -534,8 +545,13 @@ const MonitoringPage = () => {
             const answersOverrides = answers.__overrides__ || {};
             const overrides = { ...answersOverrides, ...rawOverrides };
 
+            const studentOrder = answers.__order__ || (answers as any)?.__meta?.questionOrder;
+            const targetQuestions = Array.isArray(studentOrder) && studentOrder.length > 0
+              ? monitorQuestions.filter((q: any) => studentOrder.includes(q.id))
+              : monitorQuestions;
+
             let objCorrect = 0, objTotal = 0, essCorrect = 0, essTotal = 0;
-            monitorQuestions.forEach((q: any) => {
+            targetQuestions.forEach((q: any) => {
               const type = q.type || "pilihan_ganda";
               const isEssay = type === "isian_singkat" || type === "uraian";
               const ic = checkAns(q, answers[q.id], overrides);
@@ -702,8 +718,7 @@ const MonitoringPage = () => {
     if (!pb) return;
     try {
       await pb.collection('attempts').update(attId, {
-        status: 'ongoing',
-        cheatCount: 0
+        status: 'ongoing'
       });
       showAlert("Berhasil", `${terminology.student} berhasil dibuka kuncinya.`, "success");
     } catch (e) { showAlert("Gagal", "Gagal membuka kunci.", "danger"); }
@@ -814,6 +829,10 @@ const MonitoringPage = () => {
 
       const newOverrides = { ...currentOverrides, [qId]: isForcedCorrect };
       const sisAnswers = att.answers || {};
+      const studentOrder = (sisAnswers as any)?.__order__ || (sisAnswers as any)?.__meta?.questionOrder;
+      const targetQuestions = Array.isArray(studentOrder) && studentOrder.length > 0
+        ? monitorQuestions.filter((q: any) => studentOrder.includes(q.id))
+        : monitorQuestions;
 
       // Weighted scoring: separate objective vs essay
       let objectiveCorrect = 0;
@@ -821,7 +840,7 @@ const MonitoringPage = () => {
       let essayCorrect = 0;
       let essayTotal = 0;
 
-      monitorQuestions.forEach((q: any) => {
+      targetQuestions.forEach((q: any) => {
         const type = q.type || "pilihan_ganda";
         const isEssay = type === "isian_singkat" || type === "uraian";
 
@@ -1406,7 +1425,20 @@ const MonitoringPage = () => {
         alignment: { horizontal: "center", vertical: "center" },
         border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } }
       },
+      unassignedDarkGray: {
+        fill: { patternType: "solid", fgColor: { rgb: "64748B" } }, // Abu-abu pekat untuk soal di luar kuota siswa
+        font: { color: { rgb: "E2E8F0" } }, // Teks tanda - abu terang
+        alignment: { horizontal: "center", vertical: "center" },
+        border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } }
+      },
+      unansweredWhite: {
+        fill: { patternType: "solid", fgColor: { rgb: "FFFFFF" } }, // Putih untuk soal dapat siswa tapi tidak dijawab
+        font: { color: { rgb: "94A3B8" } },
+        alignment: { horizontal: "center", vertical: "center" },
+        border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } }
+      },
       neutral: {
+        fill: { patternType: "solid", fgColor: { rgb: "FFFFFF" } },
         font: { color: { rgb: "64748B" } },
         alignment: { horizontal: "center", vertical: "center" },
         border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } }
@@ -1515,15 +1547,29 @@ const MonitoringPage = () => {
         const answersOverrides = (answers as any)?.__overrides__ || {};
         const overrides: Record<string, boolean> = { ...answersOverrides, ...rawOverrides };
 
+        const studentOrder = (answers as any)?.__order__ || (answers as any)?.__meta?.questionOrder;
+        const targetQuestions = Array.isArray(studentOrder) && studentOrder.length > 0
+          ? monitorQuestions.filter((q: any) => studentOrder.includes(q.id))
+          : (monitorRoom?.max_questions && monitorRoom.max_questions > 0
+              ? monitorQuestions.slice(0, monitorRoom.max_questions)
+              : monitorQuestions);
+
         // Calculate scores per category
         let objCorrect = 0, objTotal = 0, essCorrect = 0, essTotal = 0;
-        monitorQuestions.forEach((q: any) => {
+        targetQuestions.forEach((q: any) => {
           const type = q.type || "pilihan_ganda";
           const isEssay = type === "isian_singkat" || type === "uraian";
           const ic = checkAns(q, answers[q.id], overrides);
           if (isEssay) { essTotal++; if (ic) essCorrect++; }
           else { objTotal++; if (ic) objCorrect++; }
         });
+
+        if (objTotal === 0 && essTotal === 0) {
+          const maxQ = monitorRoom?.max_questions && monitorRoom.max_questions > 0
+            ? monitorRoom.max_questions
+            : monitorQuestions.filter((q: any) => q.type !== "isian_singkat" && q.type !== "uraian").length;
+          objTotal = maxQ;
+        }
 
         const objScore = objTotal > 0 ? Math.round((objCorrect / objTotal) * 100) : 0;
         const essScore = essTotal > 0 ? Math.round((essCorrect / essTotal) * 100) : 0;
@@ -1552,7 +1598,7 @@ const MonitoringPage = () => {
             : `${dMins}m ${dSecs}d`;
         }
 
-        const essGraded = Object.keys(overrides).filter(k => { const q = monitorQuestions.find((x: any) => x.id === k); return q && (q.type === "isian_singkat" || q.type === "uraian"); }).length;
+        const essGraded = Object.keys(overrides).filter(k => { const q = targetQuestions.find((x: any) => x.id === k); return q && (q.type === "isian_singkat" || q.type === "uraian"); }).length;
 
         const finalVal = Math.round(finalScore) || 0;
         const ri = idx + 3;
@@ -1578,20 +1624,35 @@ const MonitoringPage = () => {
         ];
 
         monitorQuestions.forEach(q => {
+          const isQuestionAssigned = targetQuestions.some((tq: any) => tq.id === q.id);
           const ans = answers[q.id];
           const isOverridden = overrides[q.id] !== undefined;
           const isCorrect = checkAns(q, ans, overrides);
           const display = isOverridden ? `${formatAnswer(q, ans)} ✓` : formatAnswer(q, ans);
 
-          let cellStyle = STYLES.neutral;
-          if (q.type === "uraian" && !isOverridden) {
-            cellStyle = STYLES.neutral;
-          } else if (ans || isOverridden) {
-            cellStyle = isCorrect ? STYLES.correct : STYLES.wrong;
+          let cellStyle = STYLES.unansweredWhite;
+          let cellValue = "-";
+
+          if (!isQuestionAssigned) {
+            // Soal acak yang TIDAK didapat siswa → warna abu pekat
+            cellStyle = STYLES.unassignedDarkGray;
+            cellValue = "-";
+          } else if (!ans && !isOverridden) {
+            // Soal yang didapat siswa tapi TIDAK dijawab → warna putih
+            cellStyle = STYLES.unansweredWhite;
+            cellValue = "-";
+          } else {
+            // Soal yang didapat dan dijawab siswa
+            cellValue = display;
+            if (q.type === "uraian" && !isOverridden) {
+              cellStyle = STYLES.neutral;
+            } else {
+              cellStyle = isCorrect ? STYLES.correct : STYLES.wrong;
+            }
           }
 
           row.push({
-            v: display,
+            v: cellValue,
             s: cellStyle
           });
         });
@@ -2447,9 +2508,14 @@ const MonitoringPage = () => {
                     const rows = currentData.map((student, localIdx) => {
                       const attempt = attempts.find(a => a.studentId === student.id || a.student_id === student.id);
                       const sisAnswers = attempt?.answers || {};
+                      const studentOrder = (sisAnswers as any)?.__order__ || (sisAnswers as any)?.__meta?.questionOrder;
+                      const targetQuestions = Array.isArray(studentOrder) && studentOrder.length > 0
+                        ? monitorQuestions.filter((q: any) => studentOrder.includes(q.id))
+                        : monitorQuestions;
+
                       const answered = Object.keys(sisAnswers).filter(k =>
-                        k !== "__overrides__" &&
-                        monitorQuestions.some((q: any) => q.id === k)
+                        k !== "__overrides__" && k !== "__order__" && k !== "__meta" && k !== "__choices__" &&
+                        targetQuestions.some((q: any) => q.id === k)
                       ).length;
                       const isExpanded = expandedstudent === student.id;
 
@@ -2482,7 +2548,7 @@ const MonitoringPage = () => {
 
                                 // Calculate objective breakdown
                                 let objCorrect = 0, objTotal = 0;
-                                monitorQuestions.forEach((q: any) => {
+                                targetQuestions.forEach((q: any) => {
                                   const type = q.type || "pilihan_ganda";
                                   const isEssay = type === "isian_singkat" || type === "uraian";
                                   if (!isEssay) {
@@ -2519,14 +2585,14 @@ const MonitoringPage = () => {
                                   const overrides = attempt.overrides || (sisAnswers as any)?.__overrides__ || {};
 
                                   let essCorrect = 0, essTotal = 0;
-                                  monitorQuestions.forEach((q: any) => {
+                                  targetQuestions.forEach((q: any) => {
                                     const type = q.type || "pilihan_ganda";
                                     if (type === "isian_singkat" || type === "uraian") {
                                       essTotal++;
                                       if (overrides[q.id]) essCorrect++;
                                     }
                                   });
-                                  const essGraded = Object.keys(overrides).filter(k => { const q = monitorQuestions.find((x: any) => x.id === k); return q && (q.type === "isian_singkat" || q.type === "uraian"); }).length;
+                                  const essGraded = Object.keys(overrides).filter(k => { const q = targetQuestions.find((x: any) => x.id === k); return q && (q.type === "isian_singkat" || q.type === "uraian"); }).length;
                                   const essScore = essTotal > 0 ? Math.round((essCorrect / essTotal) * 100) : 0;
 
                                   if (essGraded < essTotal) {
@@ -2559,12 +2625,26 @@ const MonitoringPage = () => {
                               </TableCell>
                             )}
                             <TableCell className="text-center px-1">
-                              <div className="flex items-center justify-center gap-1.5 text-[11px] font-bold">
-                                <span className="text-slate-600 font-bold">{answered}/{monitorQuestions.length}</span>
-                                <span className="text-slate-200">|</span>
-                                <span className={cn((attempt?.cheatCount || 0) > 0 ? "text-rose-600" : "text-slate-400")}>
-                                  C: {attempt?.cheatCount || 0}
-                                </span>
+                              <div className="flex flex-col items-center gap-0.5">
+                                <div className="flex items-center justify-center gap-1.5 text-[11px] font-bold">
+                                  <span className="text-slate-600 font-bold">{answered}/{targetQuestions.length}</span>
+                                  <span className="text-slate-200">|</span>
+                                  <span className={cn((attempt?.cheatCount || 0) > 0 ? "text-rose-600" : "text-slate-400")}>
+                                    C: {attempt?.cheatCount || 0}
+                                  </span>
+                                </div>
+                                {attempt?.status === "ongoing" && (() => {
+                                  const activeQId = (sisAnswers as any)?.__activeQuestionId__ || (sisAnswers as any)?.__meta?.activeQuestionId;
+                                  const activeIdx = activeQId ? targetQuestions.findIndex((q: any) => q.id === activeQId) : -1;
+                                  if (activeIdx !== -1) {
+                                    return (
+                                      <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 animate-pulse border border-blue-200 dark:border-blue-800/40">
+                                        Soal #{activeIdx + 1}
+                                      </span>
+                                    );
+                                  }
+                                  return null;
+                                })()}
                               </div>
                             </TableCell>
                             <TableCell className="text-right">
@@ -2639,15 +2719,74 @@ const MonitoringPage = () => {
                           {isExpanded && (
                             <TableRow className="bg-slate-50/50 dark:bg-slate-900/40">
                               <TableCell colSpan={7} className="p-4">
+                                {/* Header Info Paket Soal Siswa */}
+                                <div className="mb-3 flex items-center justify-between flex-wrap gap-2 px-3.5 py-2 bg-indigo-50/70 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-800/40 rounded-xl text-xs">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="h-2 w-2 rounded-full bg-indigo-500" />
+                                    <span className="font-bold text-indigo-900 dark:text-indigo-200">
+                                      Lembar Jawaban: <span className="font-black underline">{student.name}</span>
+                                    </span>
+                                    {monitorQuestions.length > targetQuestions.length ? (
+                                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300 border border-purple-200 dark:border-purple-800/50 flex items-center gap-1 shadow-sm">
+                                        <span>🎲</span> {targetQuestions.length} Soal Teracak (dari {monitorQuestions.length} Bank Soal)
+                                      </span>
+                                    ) : (
+                                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300">
+                                        Total {targetQuestions.length} Soal
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-3 text-[10px] font-semibold text-slate-500 dark:text-slate-400">
+                                    <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-blue-500 animate-pulse" /> Sedang Dikerjakan</span>
+                                    <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-emerald-500" /> Benar</span>
+                                    <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-rose-500" /> Salah / Belum</span>
+                                  </div>
+                                </div>
+
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                                  {monitorQuestions.map((q, qIdx) => {
+                                  {targetQuestions.map((q, qIdx) => {
                                     const ans = sisAnswers[q.id];
                                     const overrides = attempt?.overrides || (sisAnswers as any)?.__overrides__ || {};
                                     const correct = overrides[q.id] !== undefined ? overrides[q.id] : (ans ? (q.type === "isian_singkat" ? isFuzzyMatch(ans, q.answerKey) : q.choices?.[ans]?.isCorrect) : false);
+                                    const bankIdx = monitorQuestions.findIndex((mq: any) => mq.id === q.id);
+                                    const bankNo = bankIdx !== -1 ? bankIdx + 1 : "-";
+                                    const activeQId = (sisAnswers as any)?.__activeQuestionId__ || (sisAnswers as any)?.__meta?.activeQuestionId;
+                                    const isActive = activeQId === q.id;
+
                                     return (
-                                      <div key={q.id} className="bg-white dark:bg-slate-800 p-3 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col gap-2">
+                                      <div
+                                        key={q.id}
+                                        className={cn(
+                                          "p-3 rounded-xl border transition-all flex flex-col gap-2 relative",
+                                          isActive
+                                            ? "bg-blue-50/80 dark:bg-blue-950/40 border-blue-400 dark:border-blue-500 shadow-md ring-2 ring-blue-500/40"
+                                            : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 shadow-sm"
+                                        )}
+                                      >
+                                        <div className="flex items-center justify-between gap-1">
+                                          <div className="flex items-center gap-1.5 flex-wrap">
+                                            <span className="px-2 py-0.5 rounded text-[10px] font-black bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-200 shadow-xs">
+                                              No. {qIdx + 1}
+                                            </span>
+                                            {monitorQuestions.length !== targetQuestions.length ? (
+                                              <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300 border border-purple-200 dark:border-purple-800/50 flex items-center gap-0.5" title={`Soal ini diambil dari nomor ${bankNo} di Bank Soal`}>
+                                                <span>🎲 Bank #{bankNo}</span>
+                                              </span>
+                                            ) : (
+                                              <span className="text-[9px] font-bold text-slate-400 dark:text-slate-500">
+                                                (Bank #{bankNo})
+                                              </span>
+                                            )}
+                                          </div>
+                                          {isActive && (
+                                            <span className="px-2 py-0.5 rounded-full text-[9px] font-black bg-blue-600 text-white animate-pulse flex items-center gap-1 shadow-sm shrink-0">
+                                              <span className="h-1.5 w-1.5 rounded-full bg-white animate-ping" />
+                                              AKTIF
+                                            </span>
+                                          )}
+                                        </div>
+
                                         <div className="flex gap-2">
-                                          <span className="text-[10px] font-black text-slate-400 shrink-0">#{qIdx + 1}</span>
                                           <MathText content={q.text} className="text-[9px] font-medium leading-tight text-slate-700 dark:text-slate-300 line-clamp-3" />
                                         </div>
                                         {/* Kunci Jawaban */}

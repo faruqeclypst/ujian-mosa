@@ -33,6 +33,8 @@ export interface ExamRoomData {
   duration: number;
   cheat_limit: number;
   submit_window?: number;
+  max_questions?: number;
+  randomize_questions?: boolean;
   examTitle?: string;
   className?: string;
   room_code?: string;
@@ -57,6 +59,7 @@ const ExamRoomsPage = () => {
   const [rooms, setRooms] = useState<ExamRoomData[]>([]);
   const [exams, setExams] = useState<any[]>([]);
   const [examsLoading, setExamsLoading] = useState(true);
+  const [examQuestionCounts, setExamQuestionCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"aktif" | "arsip">("aktif");
 
@@ -78,6 +81,8 @@ const ExamRoomsPage = () => {
     duration: 90,
     cheat_limit: 2,
     submit_window: 50,
+    max_questions: 0,
+    randomize_questions: true,
     room_code: "",
     show_result: true,
     is_exambro: false,
@@ -217,13 +222,24 @@ const ExamRoomsPage = () => {
 
         return (
           <div className="flex flex-col gap-1.5">
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 flex-wrap">
               <span className={cn("inline-flex text-[9px] px-1.5 py-0 rounded font-black uppercase tracking-wider border whitespace-nowrap", statusStyle)}>
                 {statusLabel}
               </span>
               <span className={cn("text-[9px] px-1 py-0 rounded font-black uppercase tracking-widest border bg-slate-50 dark:bg-slate-900", getExamTypeColorClass(room.examType || "UMUM"))}>
                 {room.examType || "UMUM"}
               </span>
+              {room.max_questions && room.max_questions > 0 ? (
+                <span className="text-[9px] px-1.5 py-0 rounded font-black border bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/40 dark:text-indigo-400 dark:border-indigo-800/40 whitespace-nowrap">
+                  {room.max_questions} Soal {room.randomize_questions !== false ? "(Acak)" : "(Urut)"}
+                </span>
+              ) : (
+                room.randomize_questions === false && (
+                  <span className="text-[9px] px-1.5 py-0 rounded font-black border bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400 whitespace-nowrap">
+                    Soal Urut
+                  </span>
+                )
+              )}
             </div>
             <div className="flex flex-col gap-0.5 text-slate-500 dark:text-slate-400 font-bold text-[10px]">
               <div className="flex items-center gap-1.5 whitespace-nowrap">
@@ -366,6 +382,15 @@ const ExamRoomsPage = () => {
         setExamsLoading(true);
         const loaded = await pb.collection('exams').getFullList({ sort: '-created' });
         setExams(loaded);
+        try {
+          const qList = await pb.collection('questions').getFullList({ fields: 'id,examId' });
+          const counts: Record<string, number> = {};
+          qList.forEach((q: any) => {
+            const exId = q.examId || (q as any).examid;
+            if (exId) counts[exId] = (counts[exId] || 0) + 1;
+          });
+          setExamQuestionCounts(counts);
+        } catch (qErr) { }
       } catch (e) { } finally {
         setExamsLoading(false);
       }
@@ -425,6 +450,8 @@ const ExamRoomsPage = () => {
           teacherName: teacherObj?.name || "N/A",
           examTeacherId: eTeacherId,
           className: className,
+          max_questions: Number(room.max_questions) || 0,
+          randomize_questions: room.randomize_questions !== false,
           is_exambro: room.is_exambro || (room as any).isExambro || false
         } as any as ExamRoomData;
       });
@@ -501,6 +528,8 @@ const ExamRoomsPage = () => {
       duration: 90,
       cheat_limit: 2,
       submit_window: 50,
+      max_questions: 0,
+      randomize_questions: true,
       room_code: "",
       show_result: true,
       is_exambro: false,
@@ -524,6 +553,8 @@ const ExamRoomsPage = () => {
       duration: room.duration,
       cheat_limit: room.cheat_limit,
       submit_window: room.submit_window || 0,
+      max_questions: room.max_questions || 0,
+      randomize_questions: room.randomize_questions !== false,
       room_code: room.room_code || "",
       show_result: room.show_result !== false,
       is_exambro: room.is_exambro || false,
@@ -637,6 +668,8 @@ const ExamRoomsPage = () => {
         duration: Number(formValues.duration),
         cheat_limit: Number(formValues.cheat_limit),
         submit_window: Number(formValues.submit_window),
+        max_questions: Number(formValues.max_questions) || 0,
+        randomize_questions: formValues.randomize_questions !== false,
         room_code: formValues.room_code,
         show_result: formValues.show_result,
         is_exambro: formValues.is_exambro,
@@ -848,8 +881,8 @@ const ExamRoomsPage = () => {
           </div>
         </div>
 
-        <div className="group relative bg-card p-4 rounded-2xl border border-slate-200/60 dark:border-slate-800/40 shadow-sm flex items-center gap-3 backdrop-blur-sm cursor-help hover:border-emerald-300 dark:hover:border-emerald-800 transition-all">
-          <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-900/10 text-emerald-600 dark:emerald-400 group-hover:scale-110 transition-transform">
+        <div className="group relative z-10 hover:z-50 bg-card p-4 rounded-2xl border border-slate-200/60 dark:border-slate-800/40 shadow-sm flex items-center gap-3 backdrop-blur-sm cursor-help hover:border-blue-300 dark:hover:border-blue-800 transition-all">
+          <div className="p-2.5 rounded-xl bg-blue-50 dark:bg-blue-900/10 text-blue-600 dark:text-blue-400 group-hover:scale-110 transition-transform">
             <Users className="h-5 w-5" />
           </div>
           <div>
@@ -859,24 +892,24 @@ const ExamRoomsPage = () => {
             </div>
           </div>
           {/* Hover Breakdown Card */}
-          <div className="absolute top-full left-0 right-0 mt-2 z-50 invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-all scale-95 group-hover:scale-100">
-            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl p-3 min-w-[200px] max-h-60 overflow-y-auto">
-              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 border-b border-slate-100 dark:border-slate-800 pb-1 flex justify-between">
+          <div className="absolute top-full left-0 right-0 mt-2 z-50 invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-all duration-200 scale-95 group-hover:scale-100 pointer-events-none group-hover:pointer-events-auto">
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl p-3.5 min-w-[220px] max-h-60 overflow-y-auto ring-1 ring-black/5 dark:ring-white/10">
+              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 border-b border-slate-100 dark:border-slate-800 pb-1.5 flex justify-between items-center">
                 <span>Detail Ruangan Live</span>
-                <span className="text-emerald-500">{totalOngoing} Total</span>
+                <span className="text-blue-600 dark:text-blue-400 font-bold">{totalOngoing} Total</span>
               </div>
               {Object.keys(liveBreakdown).length === 0 ? (
-                <p className="text-center py-2 text-[10px] text-slate-500">Tidak ada aktifitas</p>
+                <p className="text-center py-2 text-xs text-slate-400 font-medium">Tidak ada aktifitas</p>
               ) : (
                 <div className="space-y-1.5">
                   {Object.keys(liveBreakdown).map(rid => {
                     const room = rooms.find(r => r.id === rid);
                     return (
-                      <div key={rid} className="flex justify-between items-center text-[11px]">
+                      <div key={rid} className="flex justify-between items-center text-xs py-0.5">
                         <span className="text-slate-600 dark:text-slate-300 font-medium truncate pr-2">
                           {room ? (room.room_name || room.examTitle) : "ID: " + rid}
                         </span>
-                        <span className="bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 px-1.5 py-0.5 rounded font-bold min-w-[20px] text-center">
+                        <span className="bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded-full font-bold text-[11px] min-w-[22px] text-center border border-blue-100 dark:border-blue-900/40">
                           {liveBreakdown[rid]}
                         </span>
                       </div>
@@ -1030,70 +1063,73 @@ const ExamRoomsPage = () => {
 
       {/* Dialog Create/Edit */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-card p-0 rounded-2xl border-slate-200/70 dark:border-slate-800 shadow-2xl">
+        <DialogContent className="max-w-5xl w-[95vw] max-h-[92vh] overflow-y-auto bg-card p-0 rounded-2xl border-slate-200/70 dark:border-slate-800 shadow-2xl">
 
           {/* Header dengan tombol simpan di kanan */}
-          <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100 dark:border-slate-800 sticky top-0 bg-card z-10">
+          <div className="flex items-center justify-between px-6 py-3.5 border-b border-slate-100 dark:border-slate-800 sticky top-0 bg-card z-10">
             <div>
               <h2 className="text-sm font-bold text-slate-800 dark:text-white leading-tight">
                 {dialogMode === "edit" ? "Edit Ruang Ujian" : "Buka Ruang Ujian"}
               </h2>
-              <p className="text-[11px] text-slate-400">Bank soal · jadwal · kelas · aturan</p>
+              <p className="text-[11px] text-slate-400">Bank soal · jadwal · kelas · aturan & parameter</p>
             </div>
-            <Button type="submit" form="room-form" className="h-8 px-5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs shadow-md">
+            <Button type="submit" form="room-form" className="h-8 px-6 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs shadow-md">
               {dialogMode === "edit" ? "Perbarui" : "Simpan"}
             </Button>
           </div>
 
           {isEditRestricted && (
-            <div className="mx-4 mt-3 flex items-start gap-2 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/40 text-amber-700 dark:text-amber-400 px-3 py-2 rounded-lg text-[11px]">
-              <Lock className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+            <div className="mx-6 mt-3.5 flex items-start gap-2 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/40 text-amber-700 dark:text-amber-400 px-3.5 py-2.5 rounded-xl text-xs">
+              <Lock className="h-4 w-4 shrink-0 mt-0.5 text-amber-600" />
               <span>Ujian berlangsung. Hanya <b>Nama Ruang, Kelas, Waktu, Durasi, Kumpul Dibuka</b>, dan <b>Batas Cheat</b> yang bisa diubah.</span>
             </div>
           )}
 
-          <form id="room-form" onSubmit={handleSubmit} className="px-5 pb-5 pt-3 space-y-3">
+          <form id="room-form" onSubmit={handleSubmit} className="px-6 pb-6 pt-4 space-y-4">
 
             {/* Row 1: Search + Nama Ruang */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide mb-1">Cari Bank Soal</p>
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+              <div className="md:col-span-5">
+                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Cari Bank Soal</p>
                 <div className="relative">
                   <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
-                  <Input placeholder="Nama soal / mapel / guru" value={examSearch} onChange={(e) => setExamSearch(e.target.value)} disabled={isEditRestricted} className="pl-8 h-8 text-sm" />
+                  <Input placeholder="Nama soal / mapel / guru" value={examSearch} onChange={(e) => setExamSearch(e.target.value)} disabled={isEditRestricted} className="pl-8 h-9 text-xs rounded-xl" />
                 </div>
               </div>
-              <div>
-                <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide mb-1">Nama Ruang</p>
-                <Input placeholder="Contoh: Gelombang 1 / Kelas X" value={formValues.room_name} onChange={(e) => setFormValues({ ...formValues, room_name: e.target.value })} required className="h-8 text-sm" />
+              <div className="md:col-span-7">
+                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Nama Ruang Ujian</p>
+                <Input placeholder="Contoh: Gelombang 1 / Kelas X" value={formValues.room_name} onChange={(e) => setFormValues({ ...formValues, room_name: e.target.value })} required className="h-9 text-xs rounded-xl" />
               </div>
             </div>
 
-            {/* Row 2: Bank Soal | Jadwal & Aturan */}
-            <div className="grid grid-cols-2 gap-3 items-start">
+            {/* Row 2: Bank Soal (col-5) | Jadwal & Aturan (col-7) */}
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
 
               {/* Kiri: Bank Soal */}
-              <div>
-                <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide mb-1">Bank Soal <span className="font-normal normal-case text-slate-300">({filteredExams.length})</span></p>
-                <div className={`space-y-1 max-h-[260px] overflow-y-auto ${isEditRestricted ? "opacity-60 pointer-events-none" : ""}`}>
+              <div className="md:col-span-5">
+                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Bank Soal <span className="font-normal normal-case text-slate-400">({filteredExams.length} tersedia)</span></p>
+                <div className={`space-y-1.5 max-h-[360px] overflow-y-auto pr-1 ${isEditRestricted ? "opacity-60 pointer-events-none" : ""}`}>
                   {filteredExams.length === 0 ? (
-                    <div className="rounded-lg border-2 border-dashed border-slate-200 dark:border-slate-700 py-8 text-center text-xs text-slate-400">Tidak ditemukan</div>
+                    <div className="rounded-xl border-2 border-dashed border-slate-200 dark:border-slate-700 py-12 text-center text-xs text-slate-400">Tidak ditemukan</div>
                   ) : visibleExamOptions.map((e) => {
                     const subjectName = subjects.find((m: any) => m.id === (e.subjectId || e.subjectid))?.name || "-";
                     const teacherName = masterTeachers.find((t: any) => t.id === (e.teacherId || e.teacherid))?.name || "-";
+                    const qCount = examQuestionCounts[e.id];
                     const selected = formValues.examId === e.id;
                     return (
                       <button key={e.id} type="button" onClick={() => setFormValues({ ...formValues, examId: e.id })}
-                        className={cn("w-full text-left rounded-lg border px-2.5 py-2 transition-all",
-                          selected ? "border-blue-400 bg-blue-50 dark:border-blue-700 dark:bg-blue-950/40"
-                            : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:border-blue-300 hover:bg-blue-50/40"
+                        className={cn("w-full text-left rounded-xl border px-3 py-2.5 transition-all shadow-xs",
+                          selected ? "border-blue-500 bg-blue-50/80 dark:border-blue-700 dark:bg-blue-950/50 ring-1 ring-blue-400/40"
+                            : "border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-blue-300 hover:bg-blue-50/30"
                         )}
                       >
                         <div className="flex items-center justify-between gap-2">
-                          <span className={cn("text-xs font-semibold truncate", selected ? "text-blue-700 dark:text-blue-300" : "text-slate-700 dark:text-slate-200")}>{e.title}</span>
+                          <span className={cn("text-xs font-bold truncate", selected ? "text-blue-700 dark:text-blue-300" : "text-slate-800 dark:text-slate-200")}>{e.title}</span>
                           <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 shrink-0">{e.examType || "PAS"}</span>
                         </div>
-                        <p className="text-[10px] text-slate-400 truncate">{subjectName} · {teacherName}</p>
+                        <p className="text-[10.5px] text-slate-400 truncate mt-0.5">
+                          {subjectName} · {teacherName} {qCount !== undefined ? `· ${qCount} Soal` : ""}
+                        </p>
                       </button>
                     );
                   })}
@@ -1101,12 +1137,12 @@ const ExamRoomsPage = () => {
               </div>
 
               {/* Kanan: Jadwal + Aturan */}
-              <div className="space-y-3">
+              <div className="md:col-span-7 space-y-3">
 
                 {/* Jadwal */}
                 <div>
                   <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide mb-1">Jadwal</p>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                     <div>
                       <p className="text-[10px] text-slate-400 mb-1">Waktu Mulai</p>
                       <Input type="datetime-local" value={formValues.start_time} onChange={(e) => handleStartTimeChange(e.target.value)} required className="h-8 text-xs" />
@@ -1139,33 +1175,76 @@ const ExamRoomsPage = () => {
                 {/* Aturan */}
                 <div>
                   <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide mb-1">Aturan</p>
-                  <div className="grid grid-cols-3 gap-2">
+                  
+                  {/* Baris 1: Durasi, Cheat, Kumpul */}
+                  <div className="grid grid-cols-3 gap-2.5 mb-2">
                     <div>
                       <p className="text-[10px] text-slate-400 mb-1">Durasi (mnt)</p>
-                      <Input type="number" value={formValues.duration || ""} onChange={(e) => handleDurationChange(e.target.value === "" ? 0 : parseInt(e.target.value) || 0)} required className="h-8 text-sm" />
+                      <Input type="number" value={formValues.duration || ""} onChange={(e) => handleDurationChange(e.target.value === "" ? 0 : parseInt(e.target.value) || 0)} required className="h-8 text-xs font-medium" />
                     </div>
                     <div>
                       <p className="text-[10px] text-slate-400 mb-1">Batas Cheat</p>
-                      <Input type="number" value={formValues.cheat_limit || ""} onChange={(e) => setFormValues({ ...formValues, cheat_limit: e.target.value === "" ? 0 : parseInt(e.target.value) || 0 })} required className="h-8 text-sm" />
+                      <Input type="number" value={formValues.cheat_limit || ""} onChange={(e) => setFormValues({ ...formValues, cheat_limit: e.target.value === "" ? 0 : parseInt(e.target.value) || 0 })} required className="h-8 text-xs font-medium" />
                     </div>
                     <div>
                       <p className="text-[10px] text-slate-400 mb-1">Kumpul Dibuka</p>
-                      <Input type="number" value={formValues.submit_window || ""} onChange={(e) => setFormValues({ ...formValues, submit_window: e.target.value === "" ? 0 : parseInt(e.target.value) || 0 })} className="h-8 text-sm" />
-                      <p className="text-[10px] text-slate-400 mt-1">Kosongkan = kapan saja</p>
+                      <Input type="number" placeholder="Kapan saja" value={formValues.submit_window || ""} onChange={(e) => setFormValues({ ...formValues, submit_window: e.target.value === "" ? 0 : parseInt(e.target.value) || 0 })} className="h-8 text-xs font-medium" />
+                      <p className="text-[10px] text-slate-400 mt-0.5">Kosongkan = kapan saja</p>
                     </div>
                   </div>
-                </div>
 
-                {/* Toggle */}
-                <div className="flex items-center justify-between py-2 px-3 rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700">
-                  <div>
-                    <p className="text-xs font-medium text-slate-700 dark:text-slate-200">Tampilkan Hasil Ujian</p>
-                    <p className="text-[10px] text-slate-400">{terminology.student} bisa lihat skor setelah selesai</p>
+                  {/* Baris 2: Jumlah Soal, Acak Soal & Opsi, Tampilkan Hasil */}
+                  <div className="grid grid-cols-3 gap-2.5">
+                    {/* Kolom 1: Jumlah Soal Ditampilkan */}
+                    <div>
+                      <div className="flex items-center justify-between gap-1 mb-1">
+                        <p className="text-[10px] text-slate-400">Jumlah Soal</p>
+                        {formValues.examId && examQuestionCounts[formValues.examId] !== undefined && (
+                          <span className="text-[9px] font-bold text-blue-600 dark:text-blue-400">
+                            Bank: {examQuestionCounts[formValues.examId]}
+                          </span>
+                        )}
+                      </div>
+                      <Input
+                        type="number"
+                        placeholder="0 = Semua"
+                        value={formValues.max_questions || ""}
+                        onChange={(e) => setFormValues({ ...formValues, max_questions: e.target.value === "" ? 0 : parseInt(e.target.value) || 0 })}
+                        className="h-8 text-xs font-medium"
+                      />
+                      <p className="text-[10px] text-slate-400 mt-0.5">
+                        {formValues.max_questions && formValues.max_questions > 0
+                          ? `Tampilkan ${formValues.max_questions} soal.`
+                          : "0 = Semua soal."}
+                      </p>
+                    </div>
+
+                    {/* Kolom 2: Acak Soal & Pilihan Jawaban */}
+                    <div>
+                      <p className="text-[10px] text-slate-400 mb-1">Pengacakan</p>
+                      <label className="flex items-center justify-between h-8 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer transition-colors select-none">
+                        <span className="text-xs font-medium text-slate-700 dark:text-slate-200 truncate pr-1">Acak Soal</span>
+                        <div className="relative inline-flex items-center shrink-0">
+                          <input type="checkbox" className="sr-only peer" checked={formValues.randomize_questions !== false} onChange={(e) => setFormValues({ ...formValues, randomize_questions: e.target.checked })} />
+                          <div className="w-9 h-5 bg-slate-300 dark:bg-slate-600 peer-focus:outline-none rounded-full peer peer-checked:bg-blue-600 peer-checked:after:translate-x-4 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all after:shadow-xs" />
+                        </div>
+                      </label>
+                      <p className="text-[10px] text-slate-400 mt-0.5">Acak butir & opsi A–E</p>
+                    </div>
+
+                    {/* Kolom 3: Tampilkan Hasil Ujian */}
+                    <div>
+                      <p className="text-[10px] text-slate-400 mb-1">Hasil Ujian</p>
+                      <label className="flex items-center justify-between h-8 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer transition-colors select-none">
+                        <span className="text-xs font-medium text-slate-700 dark:text-slate-200 truncate pr-1">Tampilkan</span>
+                        <div className="relative inline-flex items-center shrink-0">
+                          <input type="checkbox" className="sr-only peer" checked={formValues.show_result !== false} onChange={(e) => setFormValues({ ...formValues, show_result: e.target.checked })} />
+                          <div className="w-9 h-5 bg-slate-300 dark:bg-slate-600 peer-focus:outline-none rounded-full peer peer-checked:bg-blue-600 peer-checked:after:translate-x-4 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all after:shadow-xs" />
+                        </div>
+                      </label>
+                      <p className="text-[10px] text-slate-400 mt-0.5">Siswa melihat nilai</p>
+                    </div>
                   </div>
-                  <label className="relative inline-flex items-center cursor-pointer shrink-0 ml-3">
-                    <input type="checkbox" className="sr-only peer" checked={formValues.show_result} onChange={(e) => setFormValues({ ...formValues, show_result: e.target.checked })} />
-                    <div className="w-9 h-5 bg-slate-200 dark:bg-slate-700 rounded-full peer peer-checked:bg-blue-600 peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all after:border after:border-slate-200" />
-                  </label>
                 </div>
 
               </div>
