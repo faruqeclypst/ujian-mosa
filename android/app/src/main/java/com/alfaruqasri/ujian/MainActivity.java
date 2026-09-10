@@ -67,6 +67,97 @@ public class MainActivity extends BridgeActivity {
         }
 
         @com.getcapacitor.PluginMethod
+        public void disableLockForUpdate(com.getcapacitor.PluginCall call) {
+            isExiting = true;
+            getActivity().runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        handler.removeCallbacksAndMessages(null);
+                        alarmHandler.removeCallbacksAndMessages(null);
+                        isAlarmPlaying = false;
+                        stopRingtone();
+
+                        if (blockingLayout != null) {
+                            blockingLayout.setVisibility(android.view.View.GONE);
+                        }
+
+                        try {
+                            stopLockTask();
+                        } catch (Exception e) {}
+
+                        call.resolve();
+                    } catch (Exception e) {
+                        call.reject(e.getMessage());
+                    }
+                }
+            });
+        }
+
+        @com.getcapacitor.PluginMethod
+        public void openUrlAndExit(com.getcapacitor.PluginCall call) {
+            final String url = call.getString("url");
+            if (url == null || url.isEmpty()) {
+                call.reject("URL is empty");
+                return;
+            }
+
+            isExiting = true;
+            getActivity().runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        // 1. Matikan semua loop pengetesan agar tidak bentrok
+                        handler.removeCallbacksAndMessages(null);
+                        alarmHandler.removeCallbacksAndMessages(null);
+                        isAlarmPlaying = false;
+                        stopRingtone();
+                        
+                        if (blockingLayout != null) {
+                            blockingLayout.setVisibility(android.view.View.GONE);
+                        }
+
+                        // 2. Lepas kunci layar
+                        try {
+                            stopLockTask();
+                        } catch (Exception e) {}
+
+                        // 3. Buka browser eksternal
+                        try {
+                            android.content.Intent intent = new android.content.Intent(
+                                android.content.Intent.ACTION_VIEW, 
+                                android.net.Uri.parse(url)
+                            );
+                            intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
+                            startActivity(intent);
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        }
+
+                        // 4. Tutup aplikasi ujian setelah jeda singkat agar browser sempat muncul
+                        new android.os.Handler().postDelayed(new Runnable() {
+                            @Override
+                            public void run() {
+                                try {
+                                    if (android.os.Build.VERSION.SDK_INT >= 21) {
+                                        finishAndRemoveTask();
+                                    } else {
+                                        finish();
+                                    }
+                                    System.exit(0);
+                                } catch (Exception e) {}
+                            }
+                        }, 800);
+
+                        call.resolve();
+                    } catch (Exception e) {
+                        call.reject(e.getMessage());
+                    }
+                }
+            });
+        }
+
+        @com.getcapacitor.PluginMethod
         public void exitApp(com.getcapacitor.PluginCall call) {
             isExiting = true;
             getActivity().runOnUiThread(new Runnable() {

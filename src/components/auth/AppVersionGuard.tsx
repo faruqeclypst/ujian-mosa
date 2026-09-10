@@ -53,6 +53,17 @@ export const AppVersionGuard = ({ children }: AppVersionGuardProps) => {
           if (force && currentCode < minCode) {
             setIsOutdated(true);
             setRequiredVersion(config);
+
+            // Segera unpin layar agar siswa tidak terjebak dan bisa membuka browser
+            try {
+              // @ts-ignore
+              const cheatAlert = Capacitor.Plugins?.CheatAlert;
+              if (cheatAlert && cheatAlert.disableLockForUpdate) {
+                await cheatAlert.disableLockForUpdate();
+              }
+            } catch (e) {
+              console.warn("[AppVersionGuard] Gagal melepas lock task secara otomatis:", e);
+            }
           }
         }
       } catch (err) {
@@ -65,15 +76,39 @@ export const AppVersionGuard = ({ children }: AppVersionGuardProps) => {
     checkAppVersion();
   }, []);
 
-  const handleDownload = () => {
-    if (requiredVersion?.apk_url) {
-      window.open(requiredVersion.apk_url, "_system");
+  const handleDownload = async () => {
+    if (!requiredVersion?.apk_url) return;
+
+    try {
+      if (Capacitor.isNativePlatform()) {
+        // @ts-ignore
+        const cheatAlert = Capacitor.Plugins?.CheatAlert;
+        if (cheatAlert && cheatAlert.openUrlAndExit) {
+          await cheatAlert.openUrlAndExit({ url: requiredVersion.apk_url });
+          return;
+        }
+      }
+    } catch (e) {
+      console.warn("[AppVersionGuard] Gagal membuka URL via native plugin:", e);
     }
+
+    // Fallback standard browser
+    window.open(requiredVersion.apk_url, "_system");
   };
 
   const handleExit = async () => {
     try {
-      await App.exitApp();
+      if (Capacitor.isNativePlatform()) {
+        // @ts-ignore
+        const cheatAlert = Capacitor.Plugins?.CheatAlert;
+        if (cheatAlert && cheatAlert.exitApp) {
+          await cheatAlert.exitApp();
+          return;
+        }
+        await App.exitApp();
+      } else {
+        window.close();
+      }
     } catch (e) {
       window.close();
     }
@@ -150,8 +185,12 @@ export const AppVersionGuard = ({ children }: AppVersionGuardProps) => {
               className="w-full py-3 px-6 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white font-bold rounded-2xl flex items-center justify-center gap-2 text-xs uppercase tracking-wider transition-all active:scale-95"
             >
               <LogOut size={14} />
-              Tutup Aplikasi
+              Tutup Aplikasi & Buka Browser
             </button>
+
+            <p className="text-[11px] text-slate-400 leading-relaxed bg-slate-950/40 p-3 rounded-xl border border-slate-800/60 text-left">
+              💡 <span className="font-bold text-slate-300">Jika layar terkunci (App is pinned):</span> Klik tombol <span className="text-white font-semibold">"Tutup Aplikasi & Buka Browser"</span> di atas, atau tahan tombol <span className="text-emerald-400 font-semibold">Kembali & Recent Apps</span> di HP Anda untuk melepas sematan layar.
+            </p>
           </div>
         </div>
       </div>
