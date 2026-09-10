@@ -519,7 +519,8 @@ const CBTPage = () => {
   }, [isOnline, syncAllLocalData]);
 
   const handleAnswerSelect = (questionId: string, value: any) => {
-    if (isExamOver || isLocked || !attempt) return;
+    const currentAttempt = attemptRef.current || attempt;
+    if (isExamOver || isLocked || !currentAttempt) return;
     setAnswers(p => {
       const curMeta = (p as any)?.__meta || {};
       const u = {
@@ -544,7 +545,7 @@ const CBTPage = () => {
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
       saveTimeoutRef.current = setTimeout(() => {
         setIsSyncing(true);
-        safeUpdateAttempt(attempt.id, {
+        safeUpdateAttempt(currentAttempt.id, {
           answers: u,
           isOnline: true,
           lastHeartbeat: new Date().toISOString()
@@ -582,7 +583,7 @@ const CBTPage = () => {
     setTargetIndex(null); setCurrentQuestionIndex(index);
     sessionStorage.setItem(`currentIndex_${student?.nisn}_${roomId}`, index.toString());
 
-    if (targetQ?.id && attempt?.id) {
+    if (targetQ?.id && (attemptRef.current?.id || attempt?.id)) {
       setAnswers(p => {
         const curMeta = (p as any)?.__meta || {};
         const u = {
@@ -1033,6 +1034,13 @@ const CBTPage = () => {
         }
       }
 
+      // Simpan attempt ke React state dan localStorage agar siswa bisa memilih jawaban
+      if (att) {
+        localStorage.setItem(`local_attempt_${student.id}_${roomId}`, JSON.stringify(att));
+        setAttempt(att);
+        attemptRef.current = att;
+      }
+
       // Deduplicate order sebelum set state — cegah soal muncul 2x di questions
       const uniqueOrder = Array.from(new Set(order));
       const finalQuestions = uniqueOrder.map(id => loaded.find(x => x.id === id)).filter(x => !!x) as Question[];
@@ -1309,7 +1317,8 @@ const CBTPage = () => {
   }, []);
 
   const handleSubmitExam = useCallback(async (isAuto = false) => {
-    if (!student || !roomId || !attempt || (attempt.status !== "ongoing" && attempt.status !== "LOCKED") || isSubmitting) return;
+    const currentAttempt = attemptRef.current || attempt;
+    if (!student || !roomId || !currentAttempt || (currentAttempt.status !== "ongoing" && currentAttempt.status !== "LOCKED") || isSubmitting) return;
 
     setIsSubmitting(true);
     isSubmittingRef.current = true;
@@ -1320,7 +1329,7 @@ const CBTPage = () => {
         clearTimeout(saveTimeoutRef.current);
         saveTimeoutRef.current = null;
         try {
-          await safeUpdateAttempt(attempt.id, {
+          await safeUpdateAttempt(currentAttempt.id, {
             answers: answersRef.current,
             isOnline: true,
             lastHeartbeat: new Date().toISOString()
@@ -1333,7 +1342,7 @@ const CBTPage = () => {
       let objectiveCorrect = 0;
       let objectiveTotal = 0;
       let essayTotal = 0;
-      const ovr = attempt.overrides || {};
+      const ovr = currentAttempt.overrides || {};
 
       questions.forEach((q: any) => {
         const t = q.type || "pilihan_ganda";
@@ -1351,7 +1360,7 @@ const CBTPage = () => {
       // score yang disimpan = murni nilai objektif (100%), essay dinilai terpisah oleh guru
       const objectiveScore = objectiveTotal > 0 ? Math.round((objectiveCorrect / objectiveTotal) * 100) : 0;
       const score = objectiveScore;
-      const st = attempt.startedAt || attempt.startTime || attempt.start_time || attempt.created;
+      const st = currentAttempt.startedAt || currentAttempt.startTime || currentAttempt.start_time || currentAttempt.created;
       const startDate = parseSafeDate(st);
       const usedTime = startDate ? Math.max(0, Math.floor((Date.now() - startDate.getTime()) / 1000)) : 0;
       const submittedAt = new Date().toISOString();
@@ -1393,7 +1402,7 @@ const CBTPage = () => {
       // Simpan ke localStorage sebagai fallback SEBELUM kirim ke server
       if (student && roomId) {
         localStorage.setItem(`offline_answers_${student.id}_${roomId}`, JSON.stringify(answersRef.current));
-        const localAtt = { ...(attempt || {}), ...finalPayload, id: attempt.id };
+        const localAtt = { ...(currentAttempt || {}), ...finalPayload, id: currentAttempt.id };
         localStorage.setItem(`local_attempt_${student.id}_${roomId}`, JSON.stringify(localAtt));
       }
       // Thundering Herd mitigation
@@ -1409,7 +1418,7 @@ const CBTPage = () => {
       }
 
       try {
-        await pb!.collection("attempts").update(attempt.id, finalPayload);
+        await pb!.collection("attempts").update(currentAttempt.id, finalPayload);
         // Berhasil — hapus pending sync flag
         if (student && roomId) {
           localStorage.removeItem(`pending_sync_${student.id}_${roomId}`);
