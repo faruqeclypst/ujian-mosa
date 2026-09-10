@@ -147,7 +147,6 @@ public class MainActivity extends BridgeActivity {
                                             } else {
                                                 finish();
                                             }
-                                            System.exit(0);
                                         } catch (Exception e) {}
                                     }
                                 }, 1200);
