@@ -3,11 +3,15 @@ package com.alfaruqasri.ujian;
 import android.app.ActivityManager;
 import android.content.Context;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.View;
 import android.view.WindowManager;
 import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
+    private static final String TAG = "MainActivity";
+    public static MainActivity instance;
+
     private android.media.ToneGenerator toneGenerator;
     private int lastLockState = -1;
     private android.widget.LinearLayout blockingLayout;
@@ -16,6 +20,8 @@ public class MainActivity extends BridgeActivity {
     private boolean isAlarmPlaying = false;
     private boolean isExiting = false;
     private boolean isLockEnabled = false;
+    private Runnable fallbackEnableLockRunnable;
+
     private Runnable alarmRunnable = new Runnable() {
         @Override
         public void run() {
@@ -28,199 +34,193 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        // 1. Daftarkan Plugin SEBELUM super.onCreate agar Capacitor BridgeBuilder dapat memuatnya
+        registerPlugin(CheatAlert.class);
         super.onCreate(savedInstanceState);
+        instance = this;
         
-        // 1. Layar Penuh Otomatis
+        // 2. Layar Penuh Otomatis
         makeFullScreen();
 
-        // Ambil status awal agar tidak langsung berdering saat buka
-        ActivityManager am = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
-        lastLockState = am.getLockTaskModeState();
+        // Ambil status awal lock task
+        try {
+            ActivityManager am = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
+            lastLockState = am.getLockTaskModeState();
+        } catch (Exception e) {}
         
-        // 2. Keamanan: Anti Screenshot & Record, dan Sembunyikan Overlay (Android 12+)
+        // 3. Keamanan: Anti Screenshot & Record, dan Sembunyikan Overlay (Android 12+)
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
             getWindow().setHideOverlayWindows(true);
         }
         
-        // 3. Inisialisasi Layar Blokir (Layout)
+        // 4. Inisialisasi Layar Blokir (Layout)
         createBlockingLayout();
         
-        // CATATAN PENTING: JANGAN jalankan startRepeatingCheck() di onCreate()!
-        // Biarkan aplikasi bebas dari sematan layar saat startup agar siswa bisa mendownload update.
-        // Pengecekan kuncian layar hanya akan aktif setelah JS memanggil enableLockMode().
-
-        // 4. Register Plugin untuk JS
-        registerPlugin(CheatAlert.class);
+        // 5. Safety Fallback: Tunggu respon dari React (AppVersionGuard).
+        // Jika dalam 2.5 detik tidak ada sinyal dari JS (misal offline atau JS crash),
+        // otomatis aktifkan kuncian ujian demi keamanan.
+        fallbackEnableLockRunnable = new Runnable() {
+            @Override
+            public void run() {
+                if (!isLockEnabled && !isExiting) {
+                    Log.d(TAG, "Fallback timeout (2.5s): Mengaktifkan kuncian ujian secara otomatis");
+                    enableLockModeInternal();
+                }
+            }
+        };
+        handler.postDelayed(fallbackEnableLockRunnable, 2500);
     }
 
-    @com.getcapacitor.annotation.CapacitorPlugin(name = "CheatAlert")
-    public class CheatAlert extends com.getcapacitor.Plugin {
-        @com.getcapacitor.PluginMethod
-        public void enableLockMode(com.getcapacitor.PluginCall call) {
-            isLockEnabled = true;
-            isExiting = false;
-            getActivity().runOnUiThread(new Runnable() {
-                @Override
-                public void run() {
-                    checkLockTaskOnly();
-                    startRepeatingCheck();
-                    call.resolve();
-                }
-            });
+    public void enableLockModeInternal() {
+        if (isExiting) return;
+        isLockEnabled = true;
+        if (fallbackEnableLockRunnable != null) {
+            handler.removeCallbacks(fallbackEnableLockRunnable);
         }
-
-        @com.getcapacitor.PluginMethod
-        public void startAlarm(com.getcapacitor.PluginCall call) {
-            playRingtone();
-            call.resolve();
-        }
-
-        @com.getcapacitor.PluginMethod
-        public void stopAlarm(com.getcapacitor.PluginCall call) {
-            stopRingtone();
-            call.resolve();
-        }
-
-        @com.getcapacitor.PluginMethod
-        public void disableLockForUpdate(com.getcapacitor.PluginCall call) {
-            isExiting = true;
-            getActivity().runOnUiThread(new Runnable() {
-                @Override
-                public void run() {
-                    try {
-                        handler.removeCallbacksAndMessages(null);
-                        alarmHandler.removeCallbacksAndMessages(null);
-                        isAlarmPlaying = false;
-                        stopRingtone();
-
-                        if (blockingLayout != null) {
-                            blockingLayout.setVisibility(android.view.View.GONE);
-                        }
-
-                        try {
-                            stopLockTask();
-                        } catch (Exception e) {}
-
-                        call.resolve();
-                    } catch (Exception e) {
-                        call.reject(e.getMessage());
-                    }
-                }
-            });
-        }
-
-        @com.getcapacitor.PluginMethod
-        public void openUrlAndExit(com.getcapacitor.PluginCall call) {
-            final String url = call.getString("url");
-            if (url == null || url.isEmpty()) {
-                call.reject("URL is empty");
-                return;
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                Log.d(TAG, "enableLockModeInternal: Kuncian diaktifkan");
+                checkLockTaskOnly();
+                startRepeatingCheck();
             }
+        });
+    }
 
-            isExiting = true;
-            getActivity().runOnUiThread(new Runnable() {
-                @Override
-                public void run() {
+    public void disableLockForUpdateInternal() {
+        isExiting = true;
+        isLockEnabled = false;
+        if (fallbackEnableLockRunnable != null) {
+            handler.removeCallbacks(fallbackEnableLockRunnable);
+        }
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    Log.d(TAG, "disableLockForUpdateInternal: Melepas kuncian untuk update");
+                    handler.removeCallbacksAndMessages(null);
+                    alarmHandler.removeCallbacksAndMessages(null);
+                    isAlarmPlaying = false;
+                    stopRingtone();
+
+                    if (blockingLayout != null) {
+                        blockingLayout.setVisibility(View.GONE);
+                    }
+
                     try {
-                        // 1. Matikan semua loop pengetesan agar tidak bentrok
-                        handler.removeCallbacksAndMessages(null);
-                        alarmHandler.removeCallbacksAndMessages(null);
-                        isAlarmPlaying = false;
-                        stopRingtone();
-                        
-                        if (blockingLayout != null) {
-                            blockingLayout.setVisibility(android.view.View.GONE);
-                        }
+                        stopLockTask();
+                    } catch (Exception e) {}
+                } catch (Exception e) {}
+            }
+        });
+    }
 
-                        // 2. Lepas kunci layar
-                        try {
-                            stopLockTask();
-                        } catch (Exception e) {}
+    public void openUrlAndExitInternal(final String url) {
+        isExiting = true;
+        isLockEnabled = false;
+        if (fallbackEnableLockRunnable != null) {
+            handler.removeCallbacks(fallbackEnableLockRunnable);
+        }
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    Log.d(TAG, "openUrlAndExitInternal: Membuka browser: " + url);
+                    handler.removeCallbacksAndMessages(null);
+                    alarmHandler.removeCallbacksAndMessages(null);
+                    isAlarmPlaying = false;
+                    stopRingtone();
 
-                        // 3. Buka browser eksternal setelah jeda 350ms (agar OS selesai memproses unpin)
-                        new android.os.Handler().postDelayed(new Runnable() {
-                            @Override
-                            public void run() {
-                                try {
-                                    android.content.Intent intent = new android.content.Intent(
-                                        android.content.Intent.ACTION_VIEW, 
-                                        android.net.Uri.parse(url)
-                                    );
-                                    intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
-                                    startActivity(intent);
-                                } catch (Exception e) {
-                                    e.printStackTrace();
+                    if (blockingLayout != null) {
+                        blockingLayout.setVisibility(View.GONE);
+                    }
+
+                    try {
+                        stopLockTask();
+                    } catch (Exception e) {}
+
+                    // Jeda 350ms agar OS Android selesai memproses stopLockTask sebelum meluncurkan browser
+                    new android.os.Handler().postDelayed(new Runnable() {
+                        @Override
+                        public void run() {
+                            try {
+                                android.content.Intent intent = new android.content.Intent(
+                                    android.content.Intent.ACTION_VIEW, 
+                                    android.net.Uri.parse(url)
+                                );
+                                intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
+                                startActivity(intent);
+                            } catch (Exception e) {
+                                Log.e(TAG, "Gagal meluncurkan intent ACTION_VIEW", e);
+                            }
+
+                            // Tutup aplikasi setelah browser dipanggil
+                            new android.os.Handler().postDelayed(new Runnable() {
+                                @Override
+                                public void run() {
+                                    try {
+                                        if (android.os.Build.VERSION.SDK_INT >= 21) {
+                                            finishAndRemoveTask();
+                                        } else {
+                                            finish();
+                                        }
+                                    } catch (Exception e) {}
+
+                                    new android.os.Handler().postDelayed(new Runnable() {
+                                        @Override
+                                        public void run() {
+                                            System.exit(0);
+                                        }
+                                    }, 500);
                                 }
+                            }, 1200);
+                        }
+                    }, 350);
+                } catch (Exception e) {}
+            }
+        });
+    }
 
-                                // 4. Tutup aplikasi ujian setelah jeda agar browser sempat muncul
-                                new android.os.Handler().postDelayed(new Runnable() {
-                                    @Override
-                                    public void run() {
-                                        try {
-                                            if (android.os.Build.VERSION.SDK_INT >= 21) {
-                                                finishAndRemoveTask();
-                                            } else {
-                                                finish();
-                                            }
-                                        } catch (Exception e) {}
-                                    }
-                                }, 1200);
-                            }
-                        }, 350);
-
-                        call.resolve();
-                    } catch (Exception e) {
-                        call.reject(e.getMessage());
-                    }
-                }
-            });
+    public void exitAppInternal() {
+        isExiting = true;
+        isLockEnabled = false;
+        if (fallbackEnableLockRunnable != null) {
+            handler.removeCallbacks(fallbackEnableLockRunnable);
         }
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    Log.d(TAG, "exitAppInternal: Menutup aplikasi secara bersih");
+                    handler.removeCallbacksAndMessages(null);
+                    alarmHandler.removeCallbacksAndMessages(null);
+                    isAlarmPlaying = false;
+                    stopRingtone();
 
-        @com.getcapacitor.PluginMethod
-        public void exitApp(com.getcapacitor.PluginCall call) {
-            isExiting = true;
-            getActivity().runOnUiThread(new Runnable() {
-                @Override
-                public void run() {
+                    if (blockingLayout != null) {
+                        blockingLayout.setVisibility(View.GONE);
+                    }
+
                     try {
-                        // 1. Matikan semua loop pengetesan agar tidak bentrok
-                        handler.removeCallbacksAndMessages(null);
-                        alarmHandler.removeCallbacksAndMessages(null);
-                        isAlarmPlaying = false;
-                        stopRingtone();
-                        
-                        if (blockingLayout != null) {
-                            blockingLayout.setVisibility(android.view.View.GONE);
-                        }
+                        stopLockTask();
+                    } catch (Exception e) {}
 
-                        // 2. Lepas kunci layar
-                        try {
-                            stopLockTask();
-                        } catch (Exception e) {}
-
-                        // 3. TUTUP PAKSA
-                        if (android.os.Build.VERSION.SDK_INT >= 21) {
-                            finishAndRemoveTask();
-                        } else {
-                            finish();
-                        }
-                        
-                        // Pintu keluar cadangan (Force Kill setelah 500ms jika masih hidup)
-                        new android.os.Handler().postDelayed(new Runnable() {
-                            @Override
-                            public void run() {
-                                System.exit(0);
-                            }
-                        }, 500);
-
-                        call.resolve();
-                    } catch (Exception e) {
-                        call.reject(e.getMessage());
+                    if (android.os.Build.VERSION.SDK_INT >= 21) {
+                        finishAndRemoveTask();
+                    } else {
+                        finish();
                     }
-                }
-            });
-        }
+
+                    new android.os.Handler().postDelayed(new Runnable() {
+                        @Override
+                        public void run() {
+                            System.exit(0);
+                        }
+                    }, 500);
+                } catch (Exception e) {}
+            }
+        });
     }
 
     private void createBlockingLayout() {
@@ -255,7 +255,15 @@ public class MainActivity extends BridgeActivity {
         btn.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                startLockTask();
+                try {
+                    startLockTask();
+                    handler.postDelayed(new Runnable() {
+                        @Override
+                        public void run() {
+                            checkLockTaskOnly();
+                        }
+                    }, 400);
+                } catch (Exception e) {}
             }
         });
 
@@ -282,7 +290,7 @@ public class MainActivity extends BridgeActivity {
         handler.postDelayed(new Runnable() {
             @Override
             public void run() {
-                if (isLockEnabled) {
+                if (isLockEnabled && !isExiting) {
                     checkLockTaskOnly();
                     handler.postDelayed(this, 1000);
                 }
@@ -291,7 +299,7 @@ public class MainActivity extends BridgeActivity {
     }
 
     private void checkLockTaskOnly() {
-        if (!isLockEnabled || isFinishing() || isExiting) return; // Jangan cek jika kuncian belum diaktifkan atau sedang menutup
+        if (!isLockEnabled || isFinishing() || isExiting) return;
         try {
             ActivityManager am = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
             int lockState = am.getLockTaskModeState();
@@ -308,7 +316,6 @@ public class MainActivity extends BridgeActivity {
                 blockingLayout.setVisibility(View.GONE);
                 
                 // Hanya stopRingtone otomatis jika sebelumnya memang dipicu oleh unpinning
-                // Ini agar tidak mematikan alarm yang dipicu manual via JS (CheatAlert)
                 if (lastLockState == ActivityManager.LOCK_TASK_MODE_NONE) {
                     stopRingtone();
                 }
@@ -326,7 +333,6 @@ public class MainActivity extends BridgeActivity {
             makeFullScreen();
         } else {
             try {
-                // Jangan kirim broadcast jika sedang menutup atau membuka browser luar
                 if (!isExiting) {
                     sendBroadcast(new android.content.Intent(android.content.Intent.ACTION_CLOSE_SYSTEM_DIALOGS));
                 }
@@ -334,13 +340,13 @@ public class MainActivity extends BridgeActivity {
         }
     }
 
-    private void playRingtone() {
+    public void playRingtone() {
         if (isAlarmPlaying) return; 
         isAlarmPlaying = true;
         alarmHandler.post(alarmRunnable);
     }
 
-    private void stopRingtone() {
+    public void stopRingtone() {
         isAlarmPlaying = false;
         alarmHandler.removeCallbacks(alarmRunnable);
         try {
@@ -356,7 +362,6 @@ public class MainActivity extends BridgeActivity {
 
     private void playTone() {
         try {
-            // Booster Volume Alarm
             android.media.AudioManager am = (android.media.AudioManager) getSystemService(Context.AUDIO_SERVICE);
             if (am != null) {
                 int max = am.getStreamMaxVolume(android.media.AudioManager.STREAM_ALARM);
@@ -366,10 +371,8 @@ public class MainActivity extends BridgeActivity {
             if (toneGenerator == null) {
                 toneGenerator = new android.media.ToneGenerator(android.media.AudioManager.STREAM_ALARM, 100);
             }
-            // TONE_SUP_ERROR menghasilkan suara "tit-tit-tit" yang khas error/alarm
             toneGenerator.startTone(android.media.ToneGenerator.TONE_SUP_ERROR, 400);
 
-            // Vibrasi darurat
             android.os.Vibrator v = (android.os.Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
             if (v != null && v.hasVibrator()) {
                 if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
@@ -396,16 +399,14 @@ public class MainActivity extends BridgeActivity {
         );
     }
 
-    // 4. Blokir Tombol Back
     @Override
     public void onBackPressed() {
         // Biarkan kosong
     }
 
-    // 5. Pastikan Unpin sebelum keluar (Cegah Crash)
     @Override
     public void finish() {
-        isExiting = true; // Tandai sedang keluar agar pengecekan berhenti
+        isExiting = true;
         try {
             handler.removeCallbacksAndMessages(null);
             alarmHandler.removeCallbacksAndMessages(null);
@@ -430,6 +431,7 @@ public class MainActivity extends BridgeActivity {
     public void onDestroy() {
         try {
             handler.removeCallbacksAndMessages(null);
+            alarmHandler.removeCallbacksAndMessages(null);
         } catch (Exception e) {}
         super.onDestroy();
     }
