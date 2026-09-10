@@ -122,32 +122,37 @@ public class MainActivity extends BridgeActivity {
                             stopLockTask();
                         } catch (Exception e) {}
 
-                        // 3. Buka browser eksternal
-                        try {
-                            android.content.Intent intent = new android.content.Intent(
-                                android.content.Intent.ACTION_VIEW, 
-                                android.net.Uri.parse(url)
-                            );
-                            intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
-                            startActivity(intent);
-                        } catch (Exception e) {
-                            e.printStackTrace();
-                        }
-
-                        // 4. Tutup aplikasi ujian setelah jeda singkat agar browser sempat muncul
+                        // 3. Buka browser eksternal setelah jeda 350ms (agar OS selesai memproses unpin)
                         new android.os.Handler().postDelayed(new Runnable() {
                             @Override
                             public void run() {
                                 try {
-                                    if (android.os.Build.VERSION.SDK_INT >= 21) {
-                                        finishAndRemoveTask();
-                                    } else {
-                                        finish();
+                                    android.content.Intent intent = new android.content.Intent(
+                                        android.content.Intent.ACTION_VIEW, 
+                                        android.net.Uri.parse(url)
+                                    );
+                                    intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
+                                    startActivity(intent);
+                                } catch (Exception e) {
+                                    e.printStackTrace();
+                                }
+
+                                // 4. Tutup aplikasi ujian setelah jeda agar browser sempat muncul
+                                new android.os.Handler().postDelayed(new Runnable() {
+                                    @Override
+                                    public void run() {
+                                        try {
+                                            if (android.os.Build.VERSION.SDK_INT >= 21) {
+                                                finishAndRemoveTask();
+                                            } else {
+                                                finish();
+                                            }
+                                            System.exit(0);
+                                        } catch (Exception e) {}
                                     }
-                                    System.exit(0);
-                                } catch (Exception e) {}
+                                }, 1200);
                             }
-                        }, 800);
+                        }, 350);
 
                         call.resolve();
                     } catch (Exception e) {
@@ -301,8 +306,10 @@ public class MainActivity extends BridgeActivity {
             makeFullScreen();
         } else {
             try {
-                // Jangan kirim broadcast jika sedang menutup
-                sendBroadcast(new android.content.Intent(android.content.Intent.ACTION_CLOSE_SYSTEM_DIALOGS));
+                // Jangan kirim broadcast jika sedang menutup atau membuka browser luar
+                if (!isExiting) {
+                    sendBroadcast(new android.content.Intent(android.content.Intent.ACTION_CLOSE_SYSTEM_DIALOGS));
+                }
             } catch (Exception e) {}
         }
     }

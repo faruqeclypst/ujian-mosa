@@ -1,8 +1,10 @@
 import { useEffect, useState, ReactNode } from "react";
-import { Capacitor } from "@capacitor/core";
+import { Capacitor, registerPlugin } from "@capacitor/core";
 import { App } from "@capacitor/app";
 import { masterPb } from "../../lib/pocketbase";
 import { Download, LogOut, ShieldAlert } from "lucide-react";
+
+const CheatAlert = registerPlugin<any>("CheatAlert");
 
 interface AppVersionGuardProps {
   children: ReactNode;
@@ -56,11 +58,7 @@ export const AppVersionGuard = ({ children }: AppVersionGuardProps) => {
 
             // Segera unpin layar agar siswa tidak terjebak dan bisa membuka browser
             try {
-              // @ts-ignore
-              const cheatAlert = Capacitor.Plugins?.CheatAlert;
-              if (cheatAlert && cheatAlert.disableLockForUpdate) {
-                await cheatAlert.disableLockForUpdate();
-              }
+              await CheatAlert.disableLockForUpdate();
             } catch (e) {
               console.warn("[AppVersionGuard] Gagal melepas lock task secara otomatis:", e);
             }
@@ -81,12 +79,8 @@ export const AppVersionGuard = ({ children }: AppVersionGuardProps) => {
 
     try {
       if (Capacitor.isNativePlatform()) {
-        // @ts-ignore
-        const cheatAlert = Capacitor.Plugins?.CheatAlert;
-        if (cheatAlert && cheatAlert.openUrlAndExit) {
-          await cheatAlert.openUrlAndExit({ url: requiredVersion.apk_url });
-          return;
-        }
+        await CheatAlert.openUrlAndExit({ url: requiredVersion.apk_url });
+        return;
       }
     } catch (e) {
       console.warn("[AppVersionGuard] Gagal membuka URL via native plugin:", e);
@@ -99,12 +93,10 @@ export const AppVersionGuard = ({ children }: AppVersionGuardProps) => {
   const handleExit = async () => {
     try {
       if (Capacitor.isNativePlatform()) {
-        // @ts-ignore
-        const cheatAlert = Capacitor.Plugins?.CheatAlert;
-        if (cheatAlert && cheatAlert.exitApp) {
-          await cheatAlert.exitApp();
+        try {
+          await CheatAlert.exitApp();
           return;
-        }
+        } catch (e) {}
         await App.exitApp();
       } else {
         window.close();
