@@ -198,7 +198,7 @@ const SelectSchoolPage = () => {
           CBT by Alfaruq Asri
         </p>
         <p className="text-[9px] font-bold text-slate-300 tracking-widest mt-1">
-          v2.5.0
+          v2.0.0
         </p>
       </div>
     </div>
