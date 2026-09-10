@@ -1998,7 +1998,7 @@ const CBTPage = () => {
 
                 <MathText
                   content={currentQuestion.text}
-                  className={`ql-editor !p-0 font-serif text-slate-800 dark:text-slate-200 leading-relaxed break-words [&_strong]:text-emerald-700 dark:[&_strong]:text-emerald-400 [&_p]:mb-3 [&_ol]:list-decimal [&_ul]:list-disc [&_ol]:pl-6 [&_ul]:pl-6 selection:bg-emerald-100 dark:selection:bg-emerald-900/40`}
+                  className={`ql-editor !p-0 font-serif text-slate-800 dark:text-slate-200 leading-relaxed break-words [&_strong]:text-slate-900 dark:[&_strong]:text-white [&_b]:text-slate-900 dark:[&_b]:text-white [&_p]:mb-3 [&_ol]:list-decimal [&_ul]:list-disc [&_ol]:pl-6 [&_ul]:pl-6 selection:bg-emerald-100 dark:selection:bg-emerald-900/40`}
                 />
 
                 {(currentQuestion.type === "pilihan_ganda_kompleks" || currentQuestion.type === "menjodohkan" || currentQuestion.type === "urutkan") && (
