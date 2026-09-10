@@ -16,6 +16,7 @@ import { TenantProvider, useTenant } from "./context/TenantContext";
 import { StudentAuthProvider, useStudentAuth } from "./context/StudentAuthContext";
 import { AuthProvider } from "./context/AuthContext";
 import ExambroGuard from "./components/auth/ExambroGuard";
+import AppVersionGuard from "./components/auth/AppVersionGuard";
 import StudentLoginPage from "./pages/student/StudentLoginPage";
 
 const StudentDashboardPage = lazy(() => import("./pages/student/StudentDashboardPage"));
@@ -259,8 +260,10 @@ const App = () => {
         <SidebarProvider>
           <TenantProvider>
             <AuthProvider>
-              <AppRouter />
-              <CapacitorOverlay />
+              <AppVersionGuard>
+                <AppRouter />
+                <CapacitorOverlay />
+              </AppVersionGuard>
             </AuthProvider>
           </TenantProvider>
         </SidebarProvider>

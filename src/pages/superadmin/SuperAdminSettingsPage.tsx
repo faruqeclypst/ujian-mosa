@@ -1,11 +1,11 @@
 import { useState, useEffect } from "react";
-import { UserCircle, KeyRound, Save, CheckCircle, AlertCircle, Shield } from "lucide-react";
+import { UserCircle, KeyRound, Save, CheckCircle, AlertCircle, Shield, Smartphone } from "lucide-react";
 import SuperAdminLayout from "../../components/layout/SuperAdminLayout";
 import { masterPb } from "../../lib/pocketbase";
 import { useNavigate } from "react-router-dom";
 import { cn } from "../../lib/utils";
 
-type Section = "profile" | "password";
+type Section = "profile" | "password" | "apk";
 
 const SuperAdminSettingsPage = () => {
   const navigate = useNavigate();
@@ -22,6 +22,16 @@ const SuperAdminSettingsPage = () => {
     newPasswordConfirm: "",
   });
 
+  const [apkRecordId, setApkRecordId] = useState<string | null>(null);
+  const [apkData, setApkData] = useState({
+    app_name: "EXAM AA",
+    min_version_code: 1,
+    min_version_name: "1.0.0",
+    apk_url: "",
+    update_notes: "",
+    is_force_update: false,
+  });
+
   useEffect(() => {
     const admin = masterPb.authStore.model;
     if (!admin) {
@@ -33,6 +43,27 @@ const SuperAdminSettingsPage = () => {
       name: admin.name || "",
       email: admin.email || "",
     }));
+
+    const fetchApkSettings = async () => {
+      try {
+        const records = await masterPb.collection("app_settings").getFullList({ limit: 1 });
+        if (records.length > 0) {
+          const rec = records[0];
+          setApkRecordId(rec.id);
+          setApkData({
+            app_name: rec.app_name || "EXAM AA",
+            min_version_code: rec.min_version_code ?? 1,
+            min_version_name: rec.min_version_name || "1.0.0",
+            apk_url: rec.apk_url || "",
+            update_notes: rec.update_notes || "",
+            is_force_update: rec.is_force_update ?? false,
+          });
+        }
+      } catch (e) {
+        console.warn("Gagal memuat setelan APK dari Master PB:", e);
+      }
+    };
+    fetchApkSettings();
   }, [navigate]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -101,9 +132,29 @@ const SuperAdminSettingsPage = () => {
     }
   };
 
+  const handleSaveApk = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    clearMessages();
+    try {
+      if (apkRecordId) {
+        await masterPb.collection("app_settings").update(apkRecordId, apkData);
+      } else {
+        const created = await masterPb.collection("app_settings").create(apkData);
+        setApkRecordId(created.id);
+      }
+      setSuccess("Konfigurasi versi APK siswa berhasil disimpan ke Master PB!");
+    } catch (err: any) {
+      setError(err.message || "Gagal menyimpan konfigurasi APK ke Master PB.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const sideNavItems: { key: Section; label: string; icon: typeof UserCircle }[] = [
     { key: "profile", label: "Profil Pribadi", icon: UserCircle },
     { key: "password", label: "Ganti Kata Sandi", icon: KeyRound },
+    { key: "apk", label: "Versi APK Siswa", icon: Smartphone },
   ];
 
   const adminName = masterPb.authStore.model?.name || masterPb.authStore.model?.email || "Super Admin";
@@ -249,6 +300,126 @@ const SuperAdminSettingsPage = () => {
                     className="h-9 px-5 bg-slate-800 hover:bg-slate-900 text-white text-sm font-semibold rounded-xl flex items-center gap-2 shadow-sm transition-all disabled:opacity-50 active:scale-95"
                   >
                     {loading ? "Memproses..." : <><KeyRound size={14} /> Ubah Sandi</>}
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
+
+          {/* APK Version Section */}
+          {activeSection === "apk" && (
+            <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+              <div className="px-5 py-4 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">Manajemen Versi APK EXAM AA</h3>
+                  <p className="text-xs text-slate-400 mt-0.5">Kontrol versi minimum APK Android siswa yang diizinkan mengakses ujian.</p>
+                </div>
+                <span className={cn(
+                  "px-3 py-1 rounded-full text-xs font-bold border",
+                  apkData.is_force_update
+                    ? "bg-rose-50 border-rose-200 text-rose-700"
+                    : "bg-emerald-50 border-emerald-200 text-emerald-700"
+                )}>
+                  {apkData.is_force_update ? "Pembaruan Wajib Aktif" : "Pembaruan Opsional"}
+                </span>
+              </div>
+              <form onSubmit={handleSaveApk} className="p-5 space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">Nama Aplikasi</label>
+                    <input
+                      type="text"
+                      value={apkData.app_name}
+                      onChange={(e) => setApkData(p => ({ ...p, app_name: e.target.value }))}
+                      placeholder="EXAM AA"
+                      className="w-full h-10 border border-slate-200 rounded-xl px-3.5 text-sm text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 shadow-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                      Versi Minimal Label (VersionName)
+                    </label>
+                    <input
+                      type="text"
+                      value={apkData.min_version_name}
+                      onChange={(e) => setApkData(p => ({ ...p, min_version_name: e.target.value }))}
+                      placeholder="Contoh: 2.0.0"
+                      className="w-full h-10 border border-slate-200 rounded-xl px-3.5 text-sm text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 shadow-sm"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                      Kode Versi Minimal (VersionCode / Build Number)
+                    </label>
+                    <input
+                      type="number"
+                      required
+                      min={1}
+                      value={apkData.min_version_code}
+                      onChange={(e) => setApkData(p => ({ ...p, min_version_code: parseInt(e.target.value, 10) || 1 }))}
+                      placeholder="1"
+                      className="w-full h-10 border border-slate-200 rounded-xl px-3.5 text-sm text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 shadow-sm"
+                    />
+                    <p className="text-[11px] text-slate-400 mt-1">
+                      Angka integer di build.gradle Android. HP siswa dengan build lebih rendah akan dikunci.
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                      Tautan Unduh APK Baru (Download URL)
+                    </label>
+                    <input
+                      type="url"
+                      value={apkData.apk_url}
+                      onChange={(e) => setApkData(p => ({ ...p, apk_url: e.target.value }))}
+                      placeholder="https://.../EXAM_AA_v2.apk"
+                      className="w-full h-10 border border-slate-200 rounded-xl px-3.5 text-sm text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 shadow-sm"
+                    />
+                    <p className="text-[11px] text-slate-400 mt-1">
+                      Link direct download (Cloudflare R2, Google Drive, atau server web Anda).
+                    </p>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">Catatan Pembaruan (Changelog)</label>
+                  <textarea
+                    rows={3}
+                    value={apkData.update_notes}
+                    onChange={(e) => setApkData(p => ({ ...p, update_notes: e.target.value }))}
+                    placeholder="Contoh: Pembaruan wajib fitur ujian online terbaru dan perbaikan sistem keamanan anti-cheat."
+                    className="w-full border border-slate-200 rounded-xl p-3.5 text-sm text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 shadow-sm resize-none"
+                  />
+                </div>
+
+                <div className="p-4 bg-slate-50 border border-slate-200/80 rounded-xl flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-bold text-slate-900">Aktifkan Force Update (Wajib Perbarui)</p>
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      Jika aktif, siswa dengan versi lama tidak dapat membuka login atau ujian sama sekali.
+                    </p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={apkData.is_force_update}
+                      onChange={(e) => setApkData(p => ({ ...p, is_force_update: e.target.checked }))}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                  </label>
+                </div>
+
+                <div className="flex justify-end pt-2">
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="h-9 px-5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl flex items-center gap-2 shadow-sm transition-all disabled:opacity-50 active:scale-95"
+                  >
+                    {loading ? "Menyimpan..." : <><Save size={14} /> Simpan Setelan APK</>}
                   </button>
                 </div>
               </form>

@@ -48,5 +48,22 @@
     "createRule": "",
     "updateRule": "@request.auth.collectionName = 'super_admins'",
     "deleteRule": "@request.auth.collectionName = 'super_admins'"
+  },
+  {
+    "name": "app_settings",
+    "type": "base",
+    "fields": [
+      { "id": "app_name", "name": "app_name", "type": "text", "required": false, "presentable": true },
+      { "id": "min_version_code", "name": "min_version_code", "type": "number", "required": false },
+      { "id": "min_version_name", "name": "min_version_name", "type": "text", "required": false },
+      { "id": "apk_url", "name": "apk_url", "type": "url", "required": false },
+      { "id": "update_notes", "name": "update_notes", "type": "text", "required": false },
+      { "id": "is_force_update", "name": "is_force_update", "type": "bool", "required": false }
+    ],
+    "listRule": "",
+    "viewRule": "",
+    "createRule": "@request.auth.collectionName = 'super_admins'",
+    "updateRule": "@request.auth.collectionName = 'super_admins'",
+    "deleteRule": "@request.auth.collectionName = 'super_admins'"
   }
 ]
