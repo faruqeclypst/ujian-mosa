@@ -28,6 +28,7 @@ declare global {
 
 const ExambroGuard = ({ children }: ExambroGuardProps) => {
   const [isExambro, setIsExambro] = useState<boolean | null>(null);
+  const [blockedReason, setBlockedReason] = useState<string | null>(null);
   const { pb } = useTenant();
 
   useEffect(() => {
@@ -49,6 +50,13 @@ const ExambroGuard = ({ children }: ExambroGuardProps) => {
         }
 
         const ua = navigator.userAgent.toLowerCase();
+
+        // 0. Tolak secara spesifik APK purba bulan lalu (MosaExambro/1.0)
+        if (ua.includes("mosaexambro/1.0")) {
+          setBlockedReason("Aplikasi EXAM AA Anda (versi 1.0) sudah tidak didukung. Silakan unduh dan pasang aplikasi APK versi terbaru (v2.0) untuk dapat mengakses ujian.");
+          setIsExambro(false);
+          return;
+        }
 
         // 1. Check User Agent
         const isValidUA = ALLOWED_USER_AGENTS.some((agent) => ua.includes(agent.toLowerCase()));
@@ -86,13 +94,21 @@ const ExambroGuard = ({ children }: ExambroGuardProps) => {
             </svg>
           </div>
 
-          <h2 className="text-2xl font-bold text-slate-900 mb-3 tracking-tight">Akses Dibatasi</h2>
+          <h2 className="text-2xl font-bold text-slate-900 mb-3 tracking-tight">
+            {blockedReason ? "Versi Aplikasi Usang" : "Akses Dibatasi"}
+          </h2>
           <div className="space-y-4 mb-8">
             <p className="text-slate-500 text-sm leading-relaxed">
-              Halaman ini hanya dapat diakses melalui aplikasi <span className="font-bold text-blue-600">Safe Exam Browser</span> atau <span className="font-bold text-blue-600">Exambro</span> resmi untuk menjaga integritas ujian.
+              {blockedReason || (
+                <>
+                  Halaman ini hanya dapat diakses melalui aplikasi <span className="font-bold text-blue-600">Safe Exam Browser</span> atau <span className="font-bold text-blue-600">Exambro</span> resmi untuk menjaga integritas ujian.
+                </>
+              )}
             </p>
             <div className="p-3 bg-blue-50/50 rounded-xl border border-blue-100 text-[11px] text-blue-700 font-medium">
-              Pastikan Anda membuka link ini dari dalam aplikasi ujian yang telah ditentukan.
+              {blockedReason
+                ? "Hubungi pengawas atau operator sekolah untuk mengunduh file APK versi terbaru (v2.0)."
+                : "Pastikan Anda membuka link ini dari dalam aplikasi ujian yang telah ditentukan."}
             </div>
           </div>
 

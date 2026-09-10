@@ -10,7 +10,7 @@ const config: CapacitorConfig = {
     cleartext: true
   },
   android: {
-    overrideUserAgent: 'MosaExambro/1.0 (Android)'
+    overrideUserAgent: 'MosaExambro/2.0 (Android)'
   },
   plugins: {
     SplashScreen: {
