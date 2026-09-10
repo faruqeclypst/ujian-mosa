@@ -23,7 +23,7 @@ import {
   Clock,
   ShieldAlert
 } from "lucide-react";
-import { Sparkles, RotateCcw, Copy, Check, Pencil, Trophy, ClipboardPaste, Zap } from "lucide-react";
+import { Sparkles, RotateCcw, Copy, Check, Pencil, Trophy, ClipboardPaste, Zap, BarChart2 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import * as XLSX from "xlsx-js-style";
 import { Button } from "../../components/ui/button";
@@ -35,6 +35,7 @@ import { useTenant } from "../../context/TenantContext";
 import { useExamData } from "../../context/ExamDataContext";
 import { useAuth } from "../../context/AuthContext";
 import { ConfirmationDialog } from "../../components/dialogs/ConfirmationDialog";
+import { ItemAnalysisDialog } from "../../components/dialogs/ItemAnalysisDialog";
 import { MathText } from "../../components/ui/MathText";
 import { gradeEssayWithAI } from "../../lib/ai";
 
@@ -251,6 +252,7 @@ const MonitoringPage = () => {
   const [isMonitorRefreshing, setIsMonitorRefreshing] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState("");
+  const [isItemAnalysisOpen, setIsItemAnalysisOpen] = useState(false);
 
   // 📝 Real-time Live Score Calculator (Weighted: objective + essay)
   const getLiveScore = (sisAnswers: Record<string, any>, attOverrides: Record<string, boolean> = {}) => {
@@ -2250,7 +2252,7 @@ const MonitoringPage = () => {
               <div className="pt-4 border-t border-slate-100 dark:border-slate-800/60 space-y-4">
                 {/* 📊 Kelompok: Navigasi & Live */}
                 <div className="space-y-1.5">
-                  <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest pl-1">Link & Tampilan</span>
+                  <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest pl-1">Link & Analisis</span>
                   <div className="grid grid-cols-2 gap-2">
                     <button
                       onClick={() => { sessionStorage.setItem("activeGradingRoomId", roomId || ""); navigate("/admin/penilaian"); }}
@@ -2263,6 +2265,12 @@ const MonitoringPage = () => {
                       className="w-full rounded-xl bg-indigo-50 hover:bg-indigo-100 border border-indigo-100 dark:bg-indigo-900/20 dark:text-indigo-400 dark:hover:bg-indigo-900/40 dark:border-indigo-800/40 text-indigo-700 font-bold text-[10px] py-2 px-1 shadow-sm transition-all flex items-center justify-center gap-1 whitespace-nowrap tracking-tight"
                     >
                       <Trophy className="h-3.5 w-3.5 text-amber-500 shrink-0" /> Live Score
+                    </button>
+                    <button
+                      onClick={() => setIsItemAnalysisOpen(true)}
+                      className="w-full col-span-2 rounded-xl bg-blue-50 hover:bg-blue-100 border border-blue-100 dark:bg-blue-900/20 dark:text-blue-400 dark:hover:bg-blue-900/40 dark:border-blue-800/40 text-blue-700 font-bold text-[10px] py-2 px-2 shadow-sm transition-all flex items-center justify-center gap-1.5 whitespace-nowrap tracking-tight"
+                    >
+                      <BarChart2 className="h-3.5 w-3.5 text-blue-600 shrink-0" /> Analisis Butir Soal (Item Analysis)
                     </button>
                   </div>
                 </div>
@@ -3308,6 +3316,17 @@ const MonitoringPage = () => {
           {previewImage && <img src={previewImage} className="w-full rounded-xl" />}
         </DialogContent>
       </Dialog>
+
+      {isItemAnalysisOpen && (
+        <ItemAnalysisDialog
+          isOpen={isItemAnalysisOpen}
+          onClose={() => setIsItemAnalysisOpen(false)}
+          roomId={roomId || undefined}
+          examId={monitorRoom?.examId}
+          roomName={monitorRoom?.room_name}
+          examTitle={monitorRoom?.examTitle}
+        />
+      )}
     </div>
   );
 };

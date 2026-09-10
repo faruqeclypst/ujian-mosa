@@ -18,3 +18,7 @@ export * from "./ChangePasswordModal";
 
 export { default as QuestionRepositoryDialog } from "./QuestionRepositoryDialog";
 export * from "./QuestionRepositoryDialog";
+
+export { default as ItemAnalysisDialog } from "./ItemAnalysisDialog";
+export * from "./ItemAnalysisDialog";
+

@@ -14,9 +14,9 @@ import {
   BookOpen, 
   CheckSquare, 
   Square, 
-  HelpCircle,
-  ExternalLink,
-  Sparkles
+  FileText,
+  Sparkles,
+  Layers
 } from "lucide-react";
 import { useExamData } from "../../context/ExamDataContext";
 import { useTenant } from "../../context/TenantContext";
@@ -90,7 +90,7 @@ export const QuestionRepositoryDialog: React.FC<QuestionRepositoryDialogProps> =
     fetchInternalExams();
   }, [isOpen, pb, targetExamId]);
 
-  // Fetch butir soal dari Paket Internal terpilih
+  // Fetch & Normalisasi butir soal dari Bank Soal Internal terpilih
   useEffect(() => {
     if (!isOpen || !pb || !selectedSourceExamId) return;
 
@@ -100,9 +100,97 @@ export const QuestionRepositoryDialog: React.FC<QuestionRepositoryDialogProps> =
       try {
         const records = await pb.collection("questions").getFullList({
           filter: `examId = "${selectedSourceExamId}"`,
-          sort: "created"
+          sort: "order,created"
         });
-        setInternalQuestions(records as any);
+
+        const typeMapReverse: Record<string, QuestionType> = {
+          multiple_choice: "pilihan_ganda",
+          complex_choice: "pilihan_ganda_kompleks",
+          matching: "menjodohkan",
+          true_false: "benar_salah",
+          short_answer: "isian_singkat",
+          essay: "uraian",
+          sequence: "urutkan",
+          drag_drop: "drag_drop"
+        };
+
+        // Kumpulkan map stimulus wacana literasi (groupId -> groupText)
+        const groupTextMap: Record<string, string> = {};
+        records.forEach((q: any) => {
+          const gId = q.groupId || q.group_id;
+          const gTxt = q.groupText || q.group_text;
+          if (gId && gTxt && !groupTextMap[gId]) {
+            groupTextMap[gId] = gTxt;
+          }
+        });
+
+        const normalized: QuestionData[] = records.map((q: any) => {
+          const rawType = q.field || q.type || "pilihan_ganda";
+          const mappedType: QuestionType = (typeMapReverse[rawType] || rawType) as QuestionType;
+          const options = q.options || q.choices || {};
+          const gId = q.groupId || q.group_id || "";
+          const gTxt = q.groupText || q.group_text || (gId ? groupTextMap[gId] || "" : "");
+          const ansKey = q.correctAnswer || q.answerKey || q.correct_answer || q.answer || "";
+
+          let choicesObj: Record<string, { text: string; imageUrl?: string; isCorrect?: boolean }> | undefined = undefined;
+          if (mappedType === "pilihan_ganda" || mappedType === "pilihan_ganda_kompleks" || mappedType === "benar_salah") {
+            if (options && typeof options === "object" && !Array.isArray(options)) {
+              const currentChoices: Record<string, { text: string; imageUrl?: string; isCorrect?: boolean }> = { ...options };
+              // Pastikan status isCorrect sinkron dengan answerKey / correctAnswer
+              if (ansKey) {
+                const correctKeys = ansKey.toLowerCase().split(/[,|; ]+/).map((s: string) => s.trim());
+                Object.keys(currentChoices).forEach((k) => {
+                  if (currentChoices[k]) {
+                    const isCorr = currentChoices[k].isCorrect !== undefined
+                      ? Boolean(currentChoices[k].isCorrect)
+                      : correctKeys.includes(k.toLowerCase());
+                    currentChoices[k] = { ...currentChoices[k], isCorrect: isCorr };
+                  }
+                });
+              }
+              choicesObj = currentChoices;
+            }
+          }
+
+          return {
+            id: q.id,
+            examId: q.examId || q.examid || selectedSourceExamId,
+            type: mappedType,
+            text: q.text || "",
+            imageUrl: q.imageUrl || q.image_url || undefined,
+            groupId: gId || undefined,
+            groupText: gTxt || undefined,
+            choices: choicesObj,
+            pairs: mappedType === "menjodohkan" ? (options.pairs || q.pairs) : undefined,
+            items: (mappedType === "urutkan" || mappedType === "drag_drop") ? (options.items || q.items) : undefined,
+            answerKey: ansKey || undefined,
+            order: q.order
+          };
+        });
+
+        // Pertahankan urutan soal berdasarkan paket literasi
+        const grouped: QuestionData[] = [];
+        const seen = new Set<string>();
+        normalized.forEach((q) => {
+          if (seen.has(q.id)) return;
+          if (q.groupId) {
+            if (!seen.has("group_" + q.groupId)) {
+              seen.add("group_" + q.groupId);
+              const groupQuestions = normalized.filter((gq) => gq.groupId === q.groupId);
+              groupQuestions.forEach((gq) => {
+                if (!seen.has(gq.id)) {
+                  seen.add(gq.id);
+                  grouped.push(gq);
+                }
+              });
+            }
+          } else {
+            seen.add(q.id);
+            grouped.push(q);
+          }
+        });
+
+        setInternalQuestions(grouped);
       } catch (e) {
         console.error("Gagal load questions internal:", e);
       } finally {
@@ -159,19 +247,38 @@ export const QuestionRepositoryDialog: React.FC<QuestionRepositoryDialogProps> =
         if (itemType !== selectedTypeFilter) return false;
       }
 
-      // Text Search
+      // Text Search (Mencari di teks soal, teks wacana literasi, dan ID/nama paket)
       if (!q) return true;
-      const textToSearch = `${item.text || ""} ${item.groupText || ""}`.toLowerCase();
+      const textToSearch = `${item.text || ""} ${item.groupText || ""} ${item.groupId || ""}`.toLowerCase();
       return textToSearch.includes(q);
     });
   }, [activeTab, internalQuestions, waygroundQuestions, searchQuery, selectedTypeFilter]);
 
-  // Toggle selection
+  // Toggle selection satu butir soal
   const toggleQuestionSelect = (id: string) => {
     setSelectedQuestionIds(prev => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
+      return next;
+    });
+  };
+
+  // Toggle semua butir soal di paket literasi yang sama
+  const toggleGroupSelect = (groupId: string) => {
+    if (!groupId) return;
+    const groupItems = activeQuestionsList.filter((q: any) => q.groupId === groupId);
+    const allSelected = groupItems.every((q: any) => selectedQuestionIds.has(q.id));
+
+    setSelectedQuestionIds(prev => {
+      const next = new Set(prev);
+      groupItems.forEach((q: any) => {
+        if (allSelected) {
+          next.delete(q.id);
+        } else {
+          next.add(q.id);
+        }
+      });
       return next;
     });
   };
@@ -197,6 +304,7 @@ export const QuestionRepositoryDialog: React.FC<QuestionRepositoryDialogProps> =
         type: q.type || "pilihan_ganda",
         text: q.text || "",
         imageUrl: q.imageUrl || undefined,
+        groupId: q.groupId || undefined,
         groupText: q.groupText || undefined,
         choices: q.choices || undefined,
         pairs: q.pairs || undefined,
@@ -207,10 +315,21 @@ export const QuestionRepositoryDialog: React.FC<QuestionRepositoryDialogProps> =
       await onImportQuestions(questionsToImport);
       onOpenChange(false);
     } catch (e) {
-      console.error(e);
+      console.error("Gagal eksekusi impor soal:", e);
     } finally {
       setIsSubmittingImport(false);
     }
+  };
+
+  const typeLabels: Record<string, string> = {
+    pilihan_ganda: "Pilihan Ganda",
+    pilihan_ganda_kompleks: "PG Kompleks",
+    menjodohkan: "Menjodohkan",
+    benar_salah: "Benar/Salah",
+    isian_singkat: "Isian Singkat",
+    uraian: "Uraian",
+    urutkan: "Urutkan",
+    drag_drop: "Drag & Drop"
   };
 
   return (
@@ -304,14 +423,14 @@ export const QuestionRepositoryDialog: React.FC<QuestionRepositoryDialogProps> =
                 {/* Search */}
                 <div className="flex-1 min-w-[200px]">
                   <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 block mb-1">
-                    Cari Kata Kunci Soal:
+                    Cari Kata Kunci Soal / Wacana:
                   </label>
                   <div className="relative">
                     <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
                     <Input
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      placeholder="Cari teks soal..."
+                      placeholder="Cari teks soal atau wacana..."
                       className="pl-9 h-9 text-xs rounded-xl"
                     />
                   </div>
@@ -334,6 +453,8 @@ export const QuestionRepositoryDialog: React.FC<QuestionRepositoryDialogProps> =
                     <option value="uraian">Uraian</option>
                     <option value="menjodohkan">Menjodohkan</option>
                     <option value="urutkan">Urutkan</option>
+                    <option value="drag_drop">Drag & Drop</option>
+                    <option value="benar_salah">Benar / Salah</option>
                   </select>
                 </div>
               </div>
@@ -438,7 +559,7 @@ export const QuestionRepositoryDialog: React.FC<QuestionRepositoryDialogProps> =
               </span>
             </div>
 
-            <div className="max-h-[380px] overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800 p-2">
+            <div className="max-h-[420px] overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800 p-2">
               {loadingInternalQuestions || loadingWayground ? (
                 <div className="p-6 space-y-3">
                   <Skeleton className="h-14 w-full rounded-xl" />
@@ -453,6 +574,10 @@ export const QuestionRepositoryDialog: React.FC<QuestionRepositoryDialogProps> =
               ) : (
                 activeQuestionsList.map((item: any, idx: number) => {
                   const isSelected = selectedQuestionIds.has(item.id);
+                  const isGrouped = Boolean(item.groupId);
+                  const groupQuestions = isGrouped ? activeQuestionsList.filter((q: any) => q.groupId === item.groupId) : [];
+                  const isFirstInGroup = isGrouped && groupQuestions[0]?.id === item.id;
+
                   return (
                     <div
                       key={item.id || idx}
@@ -471,37 +596,116 @@ export const QuestionRepositoryDialog: React.FC<QuestionRepositoryDialogProps> =
                         )}
                       </div>
 
-                      <div className="flex-1 min-w-0 space-y-1.5">
-                        <div className="flex items-center gap-2">
+                      <div className="flex-1 min-w-0 space-y-2">
+                        {/* Header Badges */}
+                        <div className="flex items-center gap-2 flex-wrap">
                           <Badge variant="outline" className="text-[9px] uppercase font-bold py-0.5 px-1.5">
                             No. {idx + 1}
                           </Badge>
                           <Badge variant="secondary" className="text-[9px] uppercase font-semibold py-0.5 px-1.5">
-                            {item.type || "pilihan_ganda"}
+                            {typeLabels[item.type || "pilihan_ganda"] || item.type || "Pilihan Ganda"}
                           </Badge>
+
+                          {/* Paket Literasi Badge & Quick Group Selector */}
+                          {item.groupId && (
+                            <div className="flex items-center gap-1.5">
+                              <Badge className="bg-amber-500 hover:bg-amber-600 text-white text-[9px] font-bold py-0.5 px-2 flex items-center gap-1">
+                                <FileText className="h-2.5 w-2.5" />
+                                Literasi: {item.groupId}
+                              </Badge>
+                              {groupQuestions.length > 1 && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleGroupSelect(item.groupId);
+                                  }}
+                                  className="text-[10px] font-semibold text-amber-700 dark:text-amber-400 hover:underline bg-amber-50 dark:bg-amber-950/40 px-1.5 py-0.5 rounded border border-amber-200 dark:border-amber-800/40 flex items-center gap-1"
+                                >
+                                  <Layers className="h-2.5 w-2.5" />
+                                  Pilih 1 Paket ({groupQuestions.length} soal)
+                                </button>
+                              )}
+                            </div>
+                          )}
                         </div>
 
-                        {/* Soal Text Preview */}
+                        {/* Stimulus Wacana Bacaan Preview (jika ada groupText) */}
+                        {item.groupText && (
+                          <div className="p-2.5 rounded-lg bg-amber-50/70 dark:bg-amber-950/20 border border-amber-200/70 dark:border-amber-900/40 text-xs text-amber-900 dark:text-amber-200 space-y-1">
+                            <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400">
+                              <FileText className="h-3 w-3" />
+                              Teks Stimulus / Wacana Bacaan:
+                            </div>
+                            <div className="max-h-24 overflow-y-auto font-serif leading-relaxed line-clamp-3 text-[11px]">
+                              <MathText content={item.groupText} />
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Question Text */}
                         <div className="text-xs text-slate-800 dark:text-slate-200 font-serif leading-relaxed line-clamp-3">
                           <MathText content={item.text} />
                         </div>
 
-                        {/* Pilihan Preview jika PG */}
-                        {item.choices && (
-                          <div className="grid grid-cols-2 gap-1.5 pt-1">
+                        {/* Image Preview if any */}
+                        {item.imageUrl && (
+                          <div className="pt-1">
+                            <img 
+                              src={item.imageUrl} 
+                              alt="soal" 
+                              className="max-h-24 rounded-lg border border-slate-200 dark:border-slate-800 object-contain bg-white dark:bg-slate-900" 
+                            />
+                          </div>
+                        )}
+
+                        {/* Pilihan Preview jika PG / PG Kompleks / Benar Salah */}
+                        {item.choices && Object.keys(item.choices).length > 0 && (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 pt-1">
                             {Object.entries(item.choices).map(([key, val]: [string, any]) => (
                               <div 
                                 key={key} 
-                                className={`text-[11px] px-2 py-1 rounded-lg border ${
+                                className={`text-[11px] px-2.5 py-1 rounded-lg border flex items-start gap-1.5 ${
                                   val.isCorrect 
-                                    ? "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 font-bold" 
-                                    : "bg-slate-50 dark:bg-slate-800 border-slate-100 dark:border-slate-800 text-slate-600 dark:text-slate-400"
+                                    ? "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-700 text-emerald-800 dark:text-emerald-300 font-bold" 
+                                    : "bg-slate-50 dark:bg-slate-800/70 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400"
                                 }`}
                               >
-                                <span className="font-bold mr-1">{key}.</span>
-                                <MathText content={val.text || ""} className="inline" />
+                                <span className="font-black shrink-0">{key.toUpperCase()}.</span>
+                                <div className="flex-1 min-w-0">
+                                  <MathText content={val.text || ""} className="inline" />
+                                  {val.imageUrl && (
+                                    <img src={val.imageUrl} alt="" className="max-h-12 mt-1 rounded border border-slate-200" />
+                                  )}
+                                </div>
+                                {val.isCorrect && (
+                                  <Check className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5 stroke-[3px]" />
+                                )}
                               </div>
                             ))}
+                          </div>
+                        )}
+
+                        {/* Menjodohkan Pairs Preview */}
+                        {item.type === "menjodohkan" && item.pairs && item.pairs.length > 0 && (
+                          <div className="space-y-1 pt-1">
+                            <div className="text-[10px] font-bold text-slate-500 uppercase">{item.pairs.length} Pasangan:</div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
+                              {item.pairs.map((p: any, pIdx: number) => (
+                                <div key={p.id || pIdx} className="text-[11px] p-1.5 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 flex items-center justify-between">
+                                  <span className="font-semibold">{p.left}</span>
+                                  <span className="text-blue-500 font-bold mx-2">➔</span>
+                                  <span>{p.right}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Isian / Uraian Answer Key Preview */}
+                        {(item.type === "isian_singkat" || item.type === "uraian") && item.answerKey && (
+                          <div className="text-[11px] px-2 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300">
+                            <span className="font-bold mr-1">Kunci Jawaban:</span> {item.answerKey}
                           </div>
                         )}
                       </div>

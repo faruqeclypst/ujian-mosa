@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { Plus, Trash, Edit, Users, Archive, RotateCw, BookOpen, ClipboardList, Lock, Clock, ChevronDown, ChevronRight, Power, PowerOff, Search, ShieldAlert, FileSpreadsheet } from "lucide-react";
+import { Plus, Trash, Edit, Users, Archive, RotateCw, BookOpen, ClipboardList, Lock, Clock, ChevronDown, ChevronRight, Power, PowerOff, Search, ShieldAlert, FileSpreadsheet, BarChart2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "../../components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../../components/ui/dialog";
@@ -11,6 +11,7 @@ import { useAuth } from "../../context/AuthContext";
 import { getExamTypeColorClass } from "./ExamsPage";
 import { useTenant } from "../../context/TenantContext";
 import { ConfirmationDialog } from "../../components/dialogs/ConfirmationDialog";
+import { ItemAnalysisDialog } from "../../components/dialogs/ItemAnalysisDialog";
 import { useToast } from "../../components/ui/toast";
 import { cn } from "../../lib/utils";
 import { exportActiveRoomsToZip } from "../../lib/roomExcelExport";
@@ -66,6 +67,7 @@ const ExamRoomsPage = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [dialogMode, setDialogMode] = useState<"create" | "edit">("create");
   const [selectedRoom, setSelectedRoom] = useState<ExamRoomData | null>(null);
+  const [analysisRoom, setAnalysisRoom] = useState<ExamRoomData | null>(null);
 
   const [examSearch, setExamSearch] = useState("");
   const [lastSelectedClassIndex, setLastSelectedClassIndex] = useState<number | null>(null);
@@ -1001,6 +1003,14 @@ const ExamRoomsPage = () => {
                     <Search className="h-4 w-4" />
                   </button>
 
+                  <button
+                    className="p-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg dark:bg-blue-900/10 dark:text-blue-400 border border-blue-100 dark:border-blue-800/40 transition-colors"
+                    onClick={() => setAnalysisRoom(room)}
+                    title="Analisis Butir Soal & Daya Pembeda"
+                  >
+                    <BarChart2 className="h-4 w-4" />
+                  </button>
+
                   {isOwner(room) && (
                     <button
                       className="p-1.5 bg-sky-50 text-sky-600 hover:bg-sky-100 rounded-lg dark:bg-sky-900/10 dark:text-sky-400 border border-sky-100 dark:border-sky-800/40 transition-colors"
@@ -1338,6 +1348,17 @@ const ExamRoomsPage = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {analysisRoom && (
+        <ItemAnalysisDialog
+          isOpen={!!analysisRoom}
+          onClose={() => setAnalysisRoom(null)}
+          roomId={analysisRoom.id}
+          examId={analysisRoom.examId}
+          roomName={analysisRoom.room_name}
+          examTitle={analysisRoom.examTitle}
+        />
+      )}
     </div>
   );
 };

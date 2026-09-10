@@ -457,26 +457,61 @@ const QuestionsPage = () => {
         title: "Impor Butir Soal"
       });
 
+      const typeMap: Record<string, string> = {
+        pilihan_ganda: "multiple_choice",
+        pilihan_ganda_kompleks: "complex_choice",
+        menjodohkan: "matching",
+        benar_salah: "true_false",
+        isian_singkat: "short_answer",
+        uraian: "essay",
+        urutkan: "sequence",
+        drag_drop: "drag_drop"
+      };
+
       const chunkSize = 10;
       for (let i = 0; i < questionsToImport.length; i += chunkSize) {
         const chunk = questionsToImport.slice(i, i + chunkSize);
         await Promise.all(
           chunk.map((q, index) => {
-            const correctChoiceKey = q.answerKey || Object.entries(q.choices || {}).filter(([_, v]) => (v as any).isCorrect).map(([k]) => k).join(",");
+            const qType = q.type || "pilihan_ganda";
+            const fieldType = typeMap[qType] || "multiple_choice";
+
+            let optionsToSave: any = {};
+            let correctAnswer = q.answerKey || "";
+
+            if (qType === "pilihan_ganda" || qType === "pilihan_ganda_kompleks" || qType === "benar_salah") {
+              optionsToSave = q.choices || {};
+              if (!correctAnswer && q.choices) {
+                correctAnswer = Object.entries(q.choices)
+                  .filter(([_, v]) => (v as any)?.isCorrect)
+                  .map(([k]) => k)
+                  .join(",");
+              }
+            } else if (qType === "menjodohkan") {
+              optionsToSave = { pairs: q.pairs || [] };
+            } else if (qType === "urutkan" || qType === "drag_drop") {
+              optionsToSave = { items: q.items || [] };
+            }
+
             const payload = {
               examId: targetId,
               examid: targetId,
-              type: q.type || "pilihan_ganda",
+              type: qType,
+              field: fieldType,
               text: q.text || "",
               imageUrl: q.imageUrl || "",
+              groupId: q.groupId || "",
+              group_id: q.groupId || "",
               groupText: q.groupText || "",
-              choices: q.choices || {},
-              options: q.choices || {},
+              group_text: q.groupText || "",
+              options: optionsToSave,
+              choices: optionsToSave,
               pairs: q.pairs || [],
-              answerKey: correctChoiceKey,
-              answer: correctChoiceKey,
-              correctAnswer: correctChoiceKey,
-              correct_answer: correctChoiceKey,
+              items: q.items || [],
+              answerKey: correctAnswer,
+              answer: correctAnswer,
+              correctAnswer: correctAnswer,
+              correct_answer: correctAnswer,
               order: (questions.length || 0) + i + index + 1
             };
             return pb.collection("questions").create(payload);

@@ -4,7 +4,8 @@ import {
   GraduationCap, Award, AlertCircle, Download, Monitor, Key, Home, Globe, Database,
   Cpu, MessageCircle, ChevronRight, Menu, X, FileSpreadsheet, FileText, Sparkles,
   Bot, CheckCircle2, Zap, FileJson, Lightbulb, FileBox, HelpCircle, Eye, RefreshCw,
-  Search, ShieldCheck, PieChart, Info, Terminal, Laptop, FileCheck, Layers
+  Search, ShieldCheck, PieChart, Info, Terminal, Laptop, FileCheck, Layers,
+  BarChart2, Target, TrendingUp, Percent
 } from "lucide-react";
 import { useTenant } from "../../context/TenantContext";
 import { Badge } from "../../components/ui/badge";
@@ -119,7 +120,7 @@ const GuidePage = () => {
     { id: "ai-magic", label: "Teknologi AI & Import", icon: Bot, keywords: "magic ai json extraction generator llm import" },
     { id: "ruang-ujian", label: "Siklus Ruang Ujian", icon: ClipboardList, keywords: "sesi token durasi waktu" },
     { id: "monitoring", label: "Anti-Cheat & Pengawasan", icon: Monitor, keywords: "lock gembok pelanggaran monitor" },
-    { id: "nilai", label: "Laporan & Analisis", icon: PieChart, keywords: "rekap excel nilai statistik" },
+    { id: "nilai", label: "Laporan & Analisis Butir Soal", icon: PieChart, keywords: "rekap excel nilai statistik analisis butir soal daya pembeda tingkat kesukaran pengecoh kurikulum merdeka deep learning kemendikdasmen psikometri" },
     { id: "pengaturan", label: "Konfigurasi & Backup", icon: Settings, keywords: "logo branding exambro reset format" },
     { id: "pengembang", label: "Tim Pengembang", icon: User, keywords: "alfaruq asri developer wa" }
   ];
@@ -699,21 +700,120 @@ const GuidePage = () => {
             </DocSection>
 
             {/* 8. Laporan & Analisis */}
-            <DocSection id="nilai" title="Laporan & Analisis" icon={PieChart}>
-              <div className="space-y-8">
-                <p>Data nilai diolah secara otomatis oleh sistem sesaat setelah siswa mengklik tombol Selesai.</p>
+            <DocSection id="nilai" title="Laporan & Sistem Analisis Butir Soal" icon={PieChart}>
+              <div className="space-y-10">
+                <p className="text-base font-medium">
+                  EXAM AA dilengkapi dengan modul analitik asesmen tingkat lanjut yang mengintegrasikan <strong>Teori Tes Klasik (Classical Test Theory / CTT)</strong> dengan paradigma <strong>Kurikulum Merdeka &amp; Pembelajaran Mendalam (Deep Learning: Mindful, Meaningful, &amp; Joyful Learning)</strong> dari <strong>Kemendikdasmen RI</strong>.
+                </p>
 
-                <SubSection title="Ekspor ke Excel" icon={FileSpreadsheet}>
-                   <p>Semua hasil ujian per ruang dapat diunduh dalam format <Kbd>.xlsx</Kbd> lengkap dengan:</p>
-                   <ul className="text-xs sm:text-sm list-disc pl-5 space-y-2 mt-2 text-slate-600 dark:text-slate-400">
-                      <li>Skor total dan nilai skala 100.</li>
-                      <li>Waktu pengerjaan (start & finish).</li>
-                      <li>Rincian jawaban siswa di setiap nomor soal (untuk keperluan analitik butir soal).</li>
-                   </ul>
+                {/* SubSection 1: Metode & Formula */}
+                <SubSection title="Metode &amp; Formula Perhitungan Psikometri" icon={BarChart2}>
+                   <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
+                     Sistem secara otomatis menghitung 3 metrik psikometri utama sesaat setelah siswa menyelesaikan ujian:
+                   </p>
+
+                   <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mt-4">
+                      {/* Kartu 1: Tingkat Kesukaran */}
+                      <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-3">
+                         <div className="flex items-center justify-between">
+                            <span className="text-xs font-black text-blue-600 dark:text-blue-400 uppercase tracking-wider flex items-center gap-1.5">
+                               <Percent size={16} /> 1. Tingkat Kesukaran (P)
+                            </span>
+                            <Badge variant="outline" className="text-[9px] font-bold">P = B / N</Badge>
+                         </div>
+                         <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+                            Mengukur proporsi seluruh peserta yang berhasil menjawab butir soal dengan benar (<code className="font-mono text-[10px] bg-slate-100 dark:bg-slate-800 px-1 py-0.5 rounded">B</code> = jumlah siswa benar, <code className="font-mono text-[10px] bg-slate-100 dark:bg-slate-800 px-1 py-0.5 rounded">N</code> = total peserta ujian).
+                         </p>
+                         <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 text-[10px] space-y-1 font-medium text-slate-600 dark:text-slate-300">
+                            <div>• <strong>P &gt; 0.70</strong> : Mudah (Asesmen Awal / Matrikulasi)</div>
+                            <div>• <strong>0.30 ≤ P ≤ 0.70</strong> : Sedang (Ideal / Sumatif CP)</div>
+                            <div>• <strong>P &lt; 0.30</strong> : Sukar (Tantangan / Penalaran Lanjut)</div>
+                         </div>
+                      </div>
+
+                      {/* Kartu 2: Daya Pembeda */}
+                      <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-3">
+                         <div className="flex items-center justify-between">
+                            <span className="text-xs font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-wider flex items-center gap-1.5">
+                               <TrendingUp size={16} /> 2. Daya Pembeda (D)
+                            </span>
+                            <Badge variant="outline" className="text-[9px] font-bold">Metode 27% Kelley</Badge>
+                         </div>
+                         <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+                            Mengukur kemampuan soal dalam membedakan siswa kelompok atas (27% ranking tertinggi, <code className="font-mono text-[10px] bg-slate-100 dark:bg-slate-800 px-1 py-0.5 rounded">Bₐ</code>) dan kelompok bawah (27% ranking terendah, <code className="font-mono text-[10px] bg-slate-100 dark:bg-slate-800 px-1 py-0.5 rounded">Bᵦ</code>): <br />
+                            <code className="font-mono text-[10px] font-bold text-indigo-600 dark:text-indigo-400">D = (Bₐ - Bᵦ) / n</code>
+                         </p>
+                         <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 text-[10px] space-y-1 font-medium text-slate-600 dark:text-slate-300">
+                            <div>• <strong>D ≥ 0.40</strong> : Sangat Baik (Sangat Membedakan)</div>
+                            <div>• <strong>0.30 ≤ D &lt; 0.40</strong> : Baik (Layak Bank Soal)</div>
+                            <div>• <strong>0.20 ≤ D &lt; 0.30</strong> : Cukup (Revisi Redaksi/Opsi)</div>
+                            <div>• <strong>D &lt; 0.20</strong> : Rendah (Kurang Membedakan)</div>
+                            <div>• <strong>D &lt; 0</strong> : Negatif (Deteksi Anomali Kunci)</div>
+                         </div>
+                      </div>
+
+                      {/* Kartu 3: Efektivitas Pengecoh */}
+                      <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-3">
+                         <div className="flex items-center justify-between">
+                            <span className="text-xs font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+                               <Target size={16} /> 3. Analisis Pengecoh
+                            </span>
+                            <Badge variant="outline" className="text-[9px] font-bold">Distractor Analysis</Badge>
+                         </div>
+                         <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+                            Menganalisis sebaran pemilih pada tiap pilihan opsi salah (A, B, C, D, E). Opsi pengecoh yang baik dipilih minimal 5% peserta dan lebih banyak dipilih oleh kelompok bawah.
+                         </p>
+                         <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 text-[10px] space-y-1 font-medium text-slate-600 dark:text-slate-300">
+                            <div>• <strong>🟢 Berfungsi Baik</strong> : Dipilih ≥ 5% &amp; Kel. Bawah &gt; Atas</div>
+                            <div>• <strong>⚠️ Tidak Efektif / Mati</strong> : Dipilih &lt; 5% / 0% siswa</div>
+                            <div>• <strong>🚩 Menyesatkan</strong> : Dipilih lebih banyak oleh Kel. Atas</div>
+                         </div>
+                      </div>
+                   </div>
                 </SubSection>
 
-                <SubSection title="Analitik Butir Soal" icon={Layers}>
-                   <p>Sistem menyediakan data statistik per soal untuk membantu guru mengevaluasi tingkat kesulitan soal. Anda dapat melihat soal mana yang paling banyak salah dijawab oleh siswa sebagai bahan evaluasi pembelajaran di kelas.</p>
+                {/* SubSection 2: Paradigma Kurikulum Merdeka & Deep Learning */}
+                <SubSection title="Penerapan dalam Paradigma Kurikulum Merdeka &amp; Kemendikdasmen" icon={Sparkles}>
+                   <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
+                     Dalam paradigma <strong>Pembelajaran Mendalam (Deep Learning)</strong> Kemendikdasmen, hasil analitik butir soal tidak digunakan untuk memberi vonis kaku pada siswa atau butir soal, melainkan diposisikan sesuai fungsi asesmennya:
+                   </p>
+
+                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-3">
+                      <div className="p-4 rounded-2xl bg-blue-50/50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/40 space-y-2">
+                         <h6 className="text-xs font-black uppercase text-blue-700 dark:text-blue-300 flex items-center gap-2">
+                            <BookOpen size={16} /> Asesmen Awal &amp; Matrikulasi Fondasional
+                         </h6>
+                         <p className="text-xs text-blue-900/80 dark:text-blue-300/80 leading-relaxed">
+                            Pada tes diagnostik awal (seperti tes literasi dan numerasi dasar), soal sengaja dirancang berdaya kesukaran mudah (<code className="font-mono text-[10px]">P &gt; 0.80</code>). Rendahnya daya pembeda (<code className="font-mono text-[10px]">D ≈ 0.10</code>) adalah <strong>hal yang wajar dan diharapkan</strong> karena membuktikan bahwa kompetensi prasyarat telah dikuasai tuntas oleh mayoritas siswa (<em>Mastery Learning</em>).
+                         </p>
+                      </div>
+
+                      <div className="p-4 rounded-2xl bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-900/40 space-y-2">
+                         <h6 className="text-xs font-black uppercase text-indigo-700 dark:text-indigo-300 flex items-center gap-2">
+                            <Layers size={16} /> Asesmen Sumatif &amp; Pembelajaran Mendalam
+                         </h6>
+                         <p className="text-xs text-indigo-900/80 dark:text-indigo-300/80 leading-relaxed">
+                            Pada penilaian capaian pembelajaran akhir, digunakan soal berbasis stimulus wacana konteks nyata. Di sinilah daya pembeda tinggi (<code className="font-mono text-[10px]">D ≥ 0.30</code>) menjadi tolok ukur utama untuk membedakan siswa yang memiliki pemahaman konsep mendalam (<em>Deep Understanding</em>) dengan yang sekadar mengingat hafalan (<em>Surface Learning</em>).
+                         </p>
+                      </div>
+                   </div>
+
+                   <AlertBox type="success" title="Refleksi Diferensiasi Pembelajaran (Teaching at the Right Level)">
+                      Hasil analisis butir soal memberikan rekomendasi otomatis kepada guru mengenai opsi pengecoh mana yang perlu diperbaiki, serta memetakan materi apa yang masih menjadi miskonsepsi umum di kalangan siswa.
+                   </AlertBox>
+                </SubSection>
+
+                {/* SubSection 3: Laporan & Ekspor Excel */}
+                <SubSection title="Ekspor Laporan Multi-Sheet Excel Berformat" icon={FileSpreadsheet}>
+                   <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
+                      Sistem menyediakan fitur unduhan laporan evaluasi lengkap berbasis spreadsheet <Kbd>.xlsx</Kbd> berstandar kurikulum dengan gaya format profesional (<em>xlsx-js-style</em>), yang mencakup:
+                   </p>
+                   <ul className="text-xs sm:text-sm list-disc pl-5 space-y-2 mt-2 text-slate-600 dark:text-slate-400">
+                      <li><strong>Lembar Ringkasan Ujian:</strong> Rata-rata tingkat kesukaran (P), rata-rata daya pembeda (D), serta persentase butir soal layak pakai.</li>
+                      <li><strong>Lembar Analisis Butir Soal Lengkap:</strong> Tabel per nomor soal berisi indeks P, D, kategori kelayakan, jumlah benar kelompok atas/bawah, dan rekomendasi ahli evaluasi.</li>
+                      <li><strong>Lembar Distribusi Pengecoh:</strong> Matriks rincian pemilihan opsi A, B, C, D, E per butir soal untuk kelompok atas vs kelompok bawah.</li>
+                      <li><strong>Lembar Rekapitulasi Nilai Siswa:</strong> Nilai skala 100, waktu pengerjaan, dan log respons jawaban.</li>
+                   </ul>
                 </SubSection>
               </div>
             </DocSection>

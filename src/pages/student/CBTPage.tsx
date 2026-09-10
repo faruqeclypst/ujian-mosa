@@ -355,6 +355,7 @@ const CBTPage = () => {
   const [isAdminFinishedModalOpen, setIsAdminFinishedModalOpen] = useState(false);
   const [isErrorModalOpen, setIsErrorModalOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [loadingMessage, setLoadingMessage] = useState("Menyiapkan lembar ujian...");
 
   const saveTimeoutRef = useRef<any>(null);
   const cheatTimerRef = useRef<any>(null);
@@ -693,206 +694,81 @@ const CBTPage = () => {
         return { id: q.id, type: mappedType, text: q.text, imageUrl: qImg, groupId: q.groupId, groupText: q.groupText, choices, pairs, items, answerKey: q.answerKey || q.correctAnswer };
       });
 
+      const pr = `${student.nisn}_${roomId}`;
       const localAnswers = localStorage.getItem(`offline_answers_${student.id}_${roomId}`);
       const localAttData = localStorage.getItem(`local_attempt_${student.id}_${roomId}`);
 
-      let att: any = null;
-      try {
-        const existingAttempts = await pb.collection("attempts").getFullList({ filter: `studentId = "${student.id}" && examRoomId = "${roomId}"`, sort: "-created" });
-        if (existingAttempts.length > 0) {
-          att = existingAttempts[0];
-          const status = att.status || (att as any).status;
-          if (status === "finished") { navigate("/cbt/" + roomId + "/result"); return; }
-          if (status === "LOCKED") {
-            setIsLocked(true);
-            sessionStorage.removeItem("activeCBTRoomId");
-          }
-
-          let mergedAnswers = att.answers || {};
-          if (localAnswers) {
-            try {
-              const parsedLocal = JSON.parse(localAnswers);
-              mergedAnswers = { ...mergedAnswers, ...parsedLocal };
-            } catch (e) { }
-          }
-          setAnswers(mergedAnswers);
-          answersRef.current = mergedAnswers;
-          safeUpdateAttempt(att.id, { answers: mergedAnswers, isOnline: true, lastHeartbeat: new Date().toISOString() });
-        } else {
-          if (isCreatingRef.current) return;
-          isCreatingRef.current = true;
-          try {
-            const secondCheck = await pb.collection("attempts").getFullList({ filter: `studentId = "${student.id}" && examRoomId = "${roomId}"` });
-            if (secondCheck.length > 0) { att = secondCheck[0]; }
-            else {
-              // Clear old session data for fresh start
-              const pr = `${student.nisn}_${roomId}`;
-              sessionStorage.removeItem(`flags_${pr}`);
-              sessionStorage.removeItem(`order_${pr}`);
-              sessionStorage.removeItem(`choices_${pr}`);
-              sessionStorage.removeItem(`items_${pr}`);
-              sessionStorage.removeItem(`match_${pr}`);
-              sessionStorage.removeItem(`currentIndex_${pr}`);
-              sessionStorage.removeItem(`confirmed_${pr}`);
-              localStorage.removeItem(`offline_answers_${student.id}_${roomId}`);
-
-              att = await pb.collection("attempts").create({
-                examRoomId: roomId,
-                studentId: student.id,
-                status: "ongoing",
-                cheatCount: 0,
-                answers: {},
-                startedAt: new Date().toISOString(),
-                isOnline: true,
-                lastHeartbeat: new Date().toISOString()
-              });
-            }
-          } finally { isCreatingRef.current = false; }
-        }
-      } catch (err) {
-        if (!isOnline && localAttData) {
-          try {
-            att = JSON.parse(localAttData);
-            setAnswers(att.answers || {});
-            answersRef.current = att.answers || {};
-          } catch (e) { throw err; }
-        } else {
-          throw err;
-        }
-      }
-
-      if (att) {
-        localStorage.setItem(`local_attempt_${student.id}_${roomId}`, JSON.stringify(att));
-      }
-      setAttempt(att);
-
       const isRandom = rData.randomize_questions !== false;
       const maxQ = Number(rData.max_questions) || 0;
+      const curIds = loaded.map(q => q.id);
 
-      const clusterShuffle = (list: string[]): string[] => {
-        const g: Record<string, string[]> = {}; const s: string[] = [];
-        list.forEach(id => { const q = loaded.find(x => x.id === id); if (q?.groupId) { if (!g[q.groupId]) g[q.groupId] = []; g[q.groupId].push(id); } else s.push(id); });
-        const nC: Record<string, string[]> = {}; const nI: Record<string, string[]> = {}; const nM: Record<string, string[]> = {};
+      // Helper pembuat acakan opsi & pasangan soal
+      const generateChoicesAndItemOrders = () => {
+        const nC: Record<string, string[]> = {};
+        const nI: Record<string, string[]> = {};
+        const nM: Record<string, string[]> = {};
+
         loaded.forEach((q: any) => {
           if (q.choices) {
             const k = Object.keys(q.choices);
             if (isRandom) {
-              for (let i = k.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [k[i], k[j]] = [k[j], k[i]]; }
+              for (let i = k.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [k[i], k[j]] = [k[j], k[i]];
+              }
             }
             nC[q.id] = k;
           }
           if (q.items && (q.type === "urutkan" || q.type === "drag_drop")) {
             const ids = q.items.map((it: any) => it.id);
             if (isRandom) {
-              for (let i = ids.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [ids[i], ids[j]] = [ids[j], ids[i]]; }
+              for (let i = ids.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [ids[i], ids[j]] = [ids[j], ids[i]];
+              }
             }
             nI[q.id] = ids;
           }
           if (q.pairs && q.type === "menjodohkan") {
             const rO = Array.from(new Set((q.pairs as any[]).map(p => p.right)));
             if (isRandom) {
-              for (let i = rO.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [rO[i], rO[j]] = [rO[j], rO[i]]; }
+              for (let i = rO.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [rO[i], rO[j]] = [rO[j], rO[i]];
+              }
             }
             nM[q.id] = rO as string[];
           }
         });
-        const pr = `${student.nisn}_${roomId}`;
-        let sC = sessionStorage.getItem(`choices_${pr}`);
-        let sI = sessionStorage.getItem(`items_${pr}`);
-        let sM = sessionStorage.getItem(`match_${pr}`);
+        return { nC, nI, nM };
+      };
 
-        if (!sC && att?.answers?.__choices__) {
-          try { sC = JSON.stringify(att.answers.__choices__); } catch (e) { }
-        }
-        if (!sI && att?.answers?.__items__) {
-          try { sI = JSON.stringify(att.answers.__items__); } catch (e) { }
-        }
-        if (!sM && att?.answers?.__match__) {
-          try { sM = JSON.stringify(att.answers.__match__); } catch (e) { }
-        }
-
-        if (sC) try { Object.assign(nC, JSON.parse(sC)); } catch (e) { }
-        if (sI) try { Object.assign(nI, JSON.parse(sI)); } catch (e) { }
-        if (sM) try { Object.assign(nM, JSON.parse(sM)); } catch (e) { }
-        sessionStorage.setItem(`choices_${pr}`, JSON.stringify(nC));
-        sessionStorage.setItem(`items_${pr}`, JSON.stringify(nI));
-        sessionStorage.setItem(`match_${pr}`, JSON.stringify(nM));
-        setChoicesOrder(nC); setItemsOrder(nI); setMatchingOptions(nM);
-
-        if (!isRandom) {
-          return list;
-        }
-
+      // Helper pengacak cluster kelompok wacana
+      const clusterShuffle = (list: string[]): string[] => {
+        const g: Record<string, string[]> = {};
+        const s: string[] = [];
+        list.forEach(id => {
+          const q = loaded.find(x => x.id === id);
+          if (q?.groupId) {
+            if (!g[q.groupId]) g[q.groupId] = [];
+            g[q.groupId].push(id);
+          } else {
+            s.push(id);
+          }
+        });
         const col: (string | string[])[] = [...s, ...Object.values(g)];
-        for (let i = col.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [col[i], col[j]] = [col[j], col[i]]; }
+        for (let i = col.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [col[i], col[j]] = [col[j], col[i]];
+        }
         return col.flat();
       };
 
-      const pr = `${student.nisn}_${roomId}`;
-      let sO = sessionStorage.getItem(`order_${pr}`);
-      if (!sO && att?.answers) {
-        const fromAtt = (att.answers as any).__order__ || (att.answers as any)?.__meta?.questionOrder;
-        if (Array.isArray(fromAtt) && fromAtt.length > 0) {
-          sO = JSON.stringify(fromAtt);
-        }
-      }
-
-      let order: string[] = [];
-      const curIds = loaded.map(q => q.id);
-      if (sO) {
-        try {
-          order = JSON.parse(sO).filter((id: string) => curIds.includes(id));
-          order = Array.from(new Set(order));
-
-          // 1. If room max_questions was lowered, trim to maxQ
-          if (maxQ > 0 && order.length > maxQ) {
-            order = order.slice(0, maxQ);
-          }
-          // 2. If room max_questions was increased, or set to 0 (all questions), add remaining questions
-          else if ((maxQ > 0 && order.length < maxQ) || (maxQ === 0 && order.length < curIds.length)) {
-            const targetTotal = maxQ > 0 ? maxQ : curIds.length;
-            const remaining = curIds.filter(id => !order.includes(id));
-            if (isRandom) {
-              for (let i = remaining.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [remaining[i], remaining[j]] = [remaining[j], remaining[i]];
-              }
-            }
-            const needed = targetTotal - order.length;
-            const toAdd = remaining.slice(0, needed);
-            order = [...order, ...toAdd];
-          }
-
-          // Ensure essay questions are at the end
-          const objOrder = order.filter(id => { const q = loaded.find(x => x.id === id); const t = q?.type || "pilihan_ganda"; return t !== "isian_singkat" && t !== "uraian"; });
-          const essOrder = order.filter(id => { const q = loaded.find(x => x.id === id); const t = q?.type || "pilihan_ganda"; return t === "isian_singkat" || t === "uraian"; });
-          order = Array.from(new Set([...objOrder, ...essOrder]));
-
-          sessionStorage.setItem(`order_${pr}`, JSON.stringify(order));
-
-          // If attempt has outdated __order__, sync updated order to DB
-          if (att?.id && (att.answers as any)?.__order__ && (att.answers as any).__order__.length !== order.length) {
-            const curAns = att.answers || {};
-            safeUpdateAttempt(att.id, {
-              answers: {
-                ...curAns,
-                __order__: order,
-                __meta: {
-                  ...(curAns.__meta || {}),
-                  questionOrder: order,
-                  totalQuestions: order.length,
-                }
-              }
-            });
-          }
-        } catch (e) { }
-      }
-
-      if (order.length === 0) {
+      // Helper penentu urutan soal
+      const generateQuestionOrder = (): string[] => {
         let poolIds = curIds;
         if (maxQ > 0 && maxQ < curIds.length) {
           if (isRandom) {
-            // Group cluster sampling to keep stimulus intact
             const groups: Record<string, string[]> = {};
             const singles: string[] = [];
             loaded.forEach(q => {
@@ -928,55 +804,233 @@ const CBTPage = () => {
         const es = poolIds.filter(id => { const q = loaded.find(x => x.id === id); return q?.type === "isian_singkat" || q?.type === "uraian"; });
         const it = poolIds.filter(id => !pg.includes(id) && !es.includes(id));
 
+        let ord: string[] = [];
         if (isRandom) {
-          // Objective questions shuffled, essay questions at end
-          order = [...clusterShuffle(pg), ...clusterShuffle(it), ...es];
+          ord = [...clusterShuffle(pg), ...clusterShuffle(it), ...es];
         } else {
-          // Objective questions in original order, essay questions at end
-          order = [...pg, ...it, ...es];
+          ord = [...pg, ...it, ...es];
         }
-        order = Array.from(new Set(order));
-        sessionStorage.setItem(`order_${pr}`, JSON.stringify(order));
+        return Array.from(new Set(ord));
+      };
 
-        if (att?.id && pb) {
-          const curAns = att.answers || {};
-          const sC_saved = sessionStorage.getItem(`choices_${pr}`);
-          const sI_saved = sessionStorage.getItem(`items_${pr}`);
-          const sM_saved = sessionStorage.getItem(`match_${pr}`);
-          safeUpdateAttempt(att.id, {
-            answers: {
-              ...curAns,
+      let att: any = null;
+      let order: string[] = [];
+
+      // Resilience Retry Helper dengan Exponential Backoff & Jitter
+      // Mencegah error 'database is locked' / 500 saat antrean transaksi SQLite padat
+      const retryWithBackoff = async <T,>(fn: () => Promise<T>, maxRetries = 3, baseDelay = 600): Promise<T> => {
+        let attemptNum = 0;
+        while (true) {
+          try {
+            return await fn();
+          } catch (err: any) {
+            attemptNum++;
+            if (attemptNum > maxRetries) throw err;
+            const jitterMs = Math.floor(Math.random() * 400);
+            const delay = Math.min(baseDelay * Math.pow(1.5, attemptNum) + jitterMs, 6000);
+            console.warn(`[CBT Start] SQLite busy/timeout, retry ke-${attemptNum} dalam ${delay}ms...`, err?.message || err);
+            await new Promise(r => setTimeout(r, delay));
+          }
+        }
+      };
+
+      try {
+        const existingAttempts = await retryWithBackoff(() =>
+          pb.collection("attempts").getFullList({
+            filter: `studentId = "${student.id}" && examRoomId = "${roomId}"`,
+            sort: "-created"
+          })
+        );
+
+        if (existingAttempts.length > 0) {
+          // ==============================================
+          // KASUS 1: SISWA MELANJUTKAN UJIAN (RESUME/RELOAD)
+          // ==============================================
+          att = existingAttempts[0];
+          const status = att.status || (att as any).status;
+          if (status === "finished") { navigate("/cbt/" + roomId + "/result"); return; }
+          if (status === "LOCKED") {
+            setIsLocked(true);
+            sessionStorage.removeItem("activeCBTRoomId");
+          }
+
+          let mergedAnswers = att.answers || {};
+          let hasNewLocalAnswers = false;
+
+          if (localAnswers) {
+            try {
+              const parsedLocal = JSON.parse(localAnswers);
+              for (const [k, v] of Object.entries(parsedLocal)) {
+                if (k.startsWith("__")) continue;
+                if (JSON.stringify(v) !== JSON.stringify(mergedAnswers[k])) {
+                  hasNewLocalAnswers = true;
+                  break;
+                }
+              }
+              mergedAnswers = { ...mergedAnswers, ...parsedLocal };
+            } catch (e) { }
+          }
+          setAnswers(mergedAnswers);
+          answersRef.current = mergedAnswers;
+
+          // HANYA update ke server jika benar-benar ada perbedaan jawaban lokal yang belum tersinkron
+          // Mengeliminasi penumpukan write jika siswa sekadar refresh halaman
+          if (hasNewLocalAnswers) {
+            safeUpdateAttempt(att.id, { answers: mergedAnswers, isOnline: true, lastHeartbeat: new Date().toISOString() });
+          }
+
+          // Restore urutan soal dari att.answers atau sessionStorage
+          let sO = sessionStorage.getItem(`order_${pr}`);
+          if (!sO && att?.answers) {
+            const fromAtt = (att.answers as any).__order__ || (att.answers as any)?.__meta?.questionOrder;
+            if (Array.isArray(fromAtt) && fromAtt.length > 0) {
+              sO = JSON.stringify(fromAtt);
+            }
+          }
+
+          if (sO) {
+            try {
+              order = JSON.parse(sO).filter((id: string) => curIds.includes(id));
+              order = Array.from(new Set(order));
+              if (maxQ > 0 && order.length > maxQ) {
+                order = order.slice(0, maxQ);
+              } else if ((maxQ > 0 && order.length < maxQ) || (maxQ === 0 && order.length < curIds.length)) {
+                const targetTotal = maxQ > 0 ? maxQ : curIds.length;
+                const remaining = curIds.filter(id => !order.includes(id));
+                if (isRandom) {
+                  for (let i = remaining.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [remaining[i], remaining[j]] = [remaining[j], remaining[i]];
+                  }
+                }
+                const needed = targetTotal - order.length;
+                order = [...order, ...remaining.slice(0, needed)];
+              }
+              const objOrder = order.filter(id => { const q = loaded.find(x => x.id === id); const t = q?.type || "pilihan_ganda"; return t !== "isian_singkat" && t !== "uraian"; });
+              const essOrder = order.filter(id => { const q = loaded.find(x => x.id === id); const t = q?.type || "pilihan_ganda"; return t === "isian_singkat" || t === "uraian"; });
+              order = Array.from(new Set([...objOrder, ...essOrder]));
+              sessionStorage.setItem(`order_${pr}`, JSON.stringify(order));
+            } catch (e) { }
+          }
+
+          if (order.length === 0) {
+            order = generateQuestionOrder();
+            sessionStorage.setItem(`order_${pr}`, JSON.stringify(order));
+          }
+
+          // Restore acakan opsi pilihan
+          let sC = sessionStorage.getItem(`choices_${pr}`);
+          let sI = sessionStorage.getItem(`items_${pr}`);
+          let sM = sessionStorage.getItem(`match_${pr}`);
+
+          if (!sC && att?.answers?.__choices__) {
+            try { sC = JSON.stringify(att.answers.__choices__); sessionStorage.setItem(`choices_${pr}`, sC); } catch (e) { }
+          }
+          if (!sI && att?.answers?.__items__) {
+            try { sI = JSON.stringify(att.answers.__items__); sessionStorage.setItem(`items_${pr}`, sI); } catch (e) { }
+          }
+          if (!sM && att?.answers?.__match__) {
+            try { sM = JSON.stringify(att.answers.__match__); sessionStorage.setItem(`match_${pr}`, sM); } catch (e) { }
+          }
+
+          const nCRestored: Record<string, string[]> = {};
+          const nIRestored: Record<string, string[]> = {};
+          const nMRestored: Record<string, string[]> = {};
+          if (sC) try { Object.assign(nCRestored, JSON.parse(sC)); } catch (e) { }
+          if (sI) try { Object.assign(nIRestored, JSON.parse(sI)); } catch (e) { }
+          if (sM) try { Object.assign(nMRestored, JSON.parse(sM)); } catch (e) { }
+
+          setChoicesOrder(nCRestored);
+          setItemsOrder(nIRestored);
+          setMatchingOptions(nMRestored);
+
+        } else {
+          // ==============================================
+          // KASUS 2: SISWA PERTAMA KALI MULAI UJIAN (07:30)
+          // ==============================================
+          if (isCreatingRef.current) return;
+          isCreatingRef.current = true;
+
+          try {
+            // Bersihkan sisa sesi lama
+            sessionStorage.removeItem(`flags_${pr}`);
+            sessionStorage.removeItem(`order_${pr}`);
+            sessionStorage.removeItem(`choices_${pr}`);
+            sessionStorage.removeItem(`items_${pr}`);
+            sessionStorage.removeItem(`match_${pr}`);
+            sessionStorage.removeItem(`currentIndex_${pr}`);
+            sessionStorage.removeItem(`confirmed_${pr}`);
+            localStorage.removeItem(`offline_answers_${student.id}_${roomId}`);
+
+            // 1. Hitung acakan opsi dan urutan soal SEBELUM create attempt
+            setLoadingMessage("Mempersiapkan lembar soal...");
+            const { nC, nI, nM } = generateChoicesAndItemOrders();
+            order = generateQuestionOrder();
+
+            sessionStorage.setItem(`choices_${pr}`, JSON.stringify(nC));
+            sessionStorage.setItem(`items_${pr}`, JSON.stringify(nI));
+            sessionStorage.setItem(`match_${pr}`, JSON.stringify(nM));
+            sessionStorage.setItem(`order_${pr}`, JSON.stringify(order));
+
+            setChoicesOrder(nC);
+            setItemsOrder(nI);
+            setMatchingOptions(nM);
+
+            const initialAnswers = {
               __order__: order,
-              __choices__: sC_saved ? JSON.parse(sC_saved) : undefined,
-              __items__: sI_saved ? JSON.parse(sI_saved) : undefined,
-              __match__: sM_saved ? JSON.parse(sM_saved) : undefined,
+              __choices__: nC,
+              __items__: nI,
+              __match__: nM,
               __meta: {
-                ...(curAns.__meta || {}),
                 questionOrder: order,
                 totalQuestions: order.length,
+                startedAt: new Date().toISOString(),
               }
-            }
-          });
-        }
-      } else {
-        // Restore choices/items/matching orders from sessionStorage or database attempt (for new device / HP baru)
-        let sC = sessionStorage.getItem(`choices_${pr}`);
-        let sI = sessionStorage.getItem(`items_${pr}`);
-        let sM = sessionStorage.getItem(`match_${pr}`);
+            };
 
-        if (!sC && att?.answers?.__choices__) {
-          try { sC = JSON.stringify(att.answers.__choices__); sessionStorage.setItem(`choices_${pr}`, sC); } catch (e) { }
-        }
-        if (!sI && att?.answers?.__items__) {
-          try { sI = JSON.stringify(att.answers.__items__); sessionStorage.setItem(`items_${pr}`, sI); } catch (e) { }
-        }
-        if (!sM && att?.answers?.__match__) {
-          try { sM = JSON.stringify(att.answers.__match__); sessionStorage.setItem(`match_${pr}`, sM); } catch (e) { }
-        }
+            setAnswers(initialAnswers);
+            answersRef.current = initialAnswers;
 
-        if (sC) try { setChoicesOrder(JSON.parse(sC)); } catch (e) { }
-        if (sI) try { setItemsOrder(JSON.parse(sI)); } catch (e) { }
-        if (sM) try { setMatchingOptions(JSON.parse(sM)); } catch (e) { }
+            // 2. STAGGERED JITTER DELAY (Mitigasi Thundering Herd)
+            // Sebarkan pembuatan record attempt acak antara 200ms s.d 3800ms
+            // agar 600 siswa tidak menembak SQLite pada milidetik yang sama
+            setLoadingMessage("Menghubungkan ke ruang ujian...");
+            const startJitter = Math.floor(Math.random() * 3600) + 200;
+            await new Promise(r => setTimeout(r, startJitter));
+
+            // 3. ATOMIC SINGLE-WRITE dengan Auto-Retry
+            att = await retryWithBackoff(async () => {
+              // Cek ulang untuk mencegah duplikasi jika double-click/multi-tab
+              const secondCheck = await pb.collection("attempts").getFullList({
+                filter: `studentId = "${student.id}" && examRoomId = "${roomId}"`
+              });
+              if (secondCheck.length > 0) return secondCheck[0];
+
+              return await pb.collection("attempts").create({
+                examRoomId: roomId,
+                studentId: student.id,
+                status: "ongoing",
+                cheatCount: 0,
+                answers: initialAnswers,
+                startedAt: new Date().toISOString(),
+                isOnline: true,
+                lastHeartbeat: new Date().toISOString()
+              });
+            });
+          } finally {
+            isCreatingRef.current = false;
+          }
+        }
+      } catch (err) {
+        if (!isOnline && localAttData) {
+          try {
+            att = JSON.parse(localAttData);
+            setAnswers(att.answers || {});
+            answersRef.current = att.answers || {};
+          } catch (e) { throw err; }
+        } else {
+          throw err;
+        }
       }
 
       // Deduplicate order sebelum set state — cegah soal muncul 2x di questions
@@ -1430,7 +1484,10 @@ const CBTPage = () => {
       <div className="h-screen h-[100dvh] bg-slate-50 dark:bg-slate-950 flex flex-col overflow-hidden">
         <header className="sticky top-0 z-50 bg-white/90 dark:bg-slate-900/90 backdrop-blur-3xl border-b border-slate-100 dark:border-slate-800 h-16 sm:h-20 px-4 sm:px-8 flex items-center justify-between shadow-sm">
           <Skeleton className="h-10 w-24 sm:w-32 rounded-2xl" />
-          <Skeleton className="hidden sm:block h-10 w-40 rounded-2xl" />
+          <div className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/50 text-emerald-700 dark:text-emerald-300 text-xs font-bold tracking-wide animate-pulse">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+            {loadingMessage}
+          </div>
           <div className="flex items-center gap-3">
             <div className="flex flex-col items-end gap-1">
               <Skeleton className="h-3 w-20" />

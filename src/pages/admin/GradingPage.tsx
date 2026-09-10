@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, BookOpen, FileSpreadsheet, RefreshCw, Search } from "lucide-react";
+import { ArrowLeft, BookOpen, FileSpreadsheet, RefreshCw, Search, BarChart2 } from "lucide-react";
 import * as XLSX from "xlsx-js-style";
 import { Button } from "../../components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../components/ui/table";
@@ -8,6 +8,7 @@ import { Skeleton } from "../../components/ui/skeleton";
 import { useTenant } from "../../context/TenantContext";
 import { useExamData } from "../../context/ExamDataContext";
 import { useToast } from "../../components/ui/toast";
+import { ItemAnalysisDialog } from "../../components/dialogs/ItemAnalysisDialog";
 
 const isFuzzyMatch = (studentAns: any, correctKey: string) => {
   if (typeof studentAns !== "string" || !correctKey) return false;
@@ -43,6 +44,7 @@ const GradingPage = () => {
   const [questions, setQuestions] = useState<any[]>([]);
   const [attempts, setAttempts] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [isAnalysisOpen, setIsAnalysisOpen] = useState(false);
 
   useEffect(() => {
     if (!roomId) { navigate("/admin/ruang-ujian", { replace: true }); return; }
@@ -209,11 +211,14 @@ const GradingPage = () => {
             <p className="text-xs text-slate-500">{room?.examTitle || "Ujian"} • {room?.room_name || ""}</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <Button variant="outline" size="sm" onClick={loadData} className="rounded-xl text-xs">
             <RefreshCw className="w-3.5 h-3.5 mr-1.5" /> Refresh
           </Button>
-          <Button size="sm" onClick={handleExportGrading} className="rounded-xl text-xs bg-emerald-600 hover:bg-emerald-700 text-white">
+          <Button size="sm" onClick={() => setIsAnalysisOpen(true)} className="rounded-xl text-xs bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-xs">
+            <BarChart2 className="w-3.5 h-3.5 mr-1.5" /> Analisis Butir Soal
+          </Button>
+          <Button size="sm" onClick={handleExportGrading} className="rounded-xl text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-xs">
             <FileSpreadsheet className="w-3.5 h-3.5 mr-1.5" /> Export Excel
           </Button>
         </div>
@@ -296,6 +301,17 @@ const GradingPage = () => {
           </Table>
         </div>
       </div>
+
+      {isAnalysisOpen && (
+        <ItemAnalysisDialog
+          isOpen={isAnalysisOpen}
+          onClose={() => setIsAnalysisOpen(false)}
+          roomId={roomId || undefined}
+          examId={room?.examId}
+          roomName={room?.room_name}
+          examTitle={room?.examTitle}
+        />
+      )}
     </div>
   );
 };
