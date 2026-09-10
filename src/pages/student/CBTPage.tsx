@@ -1776,7 +1776,7 @@ const CBTPage = () => {
           <div className="flex items-center gap-2 sm:gap-3 bg-slate-100 dark:bg-slate-800 px-3 sm:px-4 py-1.5 sm:py-2 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
             {/* Mobile: sync icon replaces clock when syncing */}
             {isSyncing ? (
-              <Cloud className="h-4 w-4 sm:h-5 sm:w-5 text-blue-500 animate-pulse sm:hidden" />
+              <Cloud className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-500 animate-pulse sm:hidden" />
             ) : !isOnline ? (
               <WifiOff className="h-4 w-4 sm:h-5 sm:w-5 text-rose-500 sm:hidden" />
             ) : (
@@ -1797,8 +1797,8 @@ const CBTPage = () => {
               </div>
             ) : isSyncing ? (
               <div className="flex items-center gap-1.5">
-                <RefreshCcw className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-500 animate-spin shrink-0" />
-                <span className="hidden sm:inline text-[9px] font-black text-blue-600 uppercase tracking-widest">Syncing</span>
+                <RefreshCcw className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-500 animate-spin shrink-0" />
+                <span className="hidden sm:inline text-[9px] font-black text-emerald-600 uppercase tracking-widest">Syncing</span>
               </div>
             ) : syncError || localStorage.getItem(`pending_sync_${student?.id}_${roomId}`) ? (
               <div className="flex items-center gap-1.5 animate-pulse">
@@ -1998,13 +1998,13 @@ const CBTPage = () => {
 
                 <MathText
                   content={currentQuestion.text}
-                  className={`ql-editor !p-0 font-serif text-slate-800 dark:text-slate-200 leading-relaxed break-words [&_strong]:text-blue-600 dark:[&_strong]:text-blue-400 [&_p]:mb-3 [&_ol]:list-decimal [&_ul]:list-disc [&_ol]:pl-6 [&_ul]:pl-6 selection:bg-indigo-100 dark:selection:bg-indigo-900/40`}
+                  className={`ql-editor !p-0 font-serif text-slate-800 dark:text-slate-200 leading-relaxed break-words [&_strong]:text-emerald-700 dark:[&_strong]:text-emerald-400 [&_p]:mb-3 [&_ol]:list-decimal [&_ul]:list-disc [&_ol]:pl-6 [&_ul]:pl-6 selection:bg-emerald-100 dark:selection:bg-emerald-900/40`}
                 />
 
                 {(currentQuestion.type === "pilihan_ganda_kompleks" || currentQuestion.type === "menjodohkan" || currentQuestion.type === "urutkan") && (
-                  <div className="flex items-center gap-2 mb-6 px-4 py-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/50 rounded-xl">
-                    <HelpCircle className="w-4 h-4 text-blue-500" />
-                    <span className="text-[10px] sm:text-[11px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest">
+                  <div className="flex items-center gap-2 mb-6 px-4 py-2 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-100 dark:border-emerald-900/50 rounded-xl">
+                    <HelpCircle className="w-4 h-4 text-emerald-500" />
+                    <span className="text-[10px] sm:text-[11px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">
                       {currentQuestion.type === "pilihan_ganda_kompleks" ? "Pilih semua jawaban yang benar" :
                         currentQuestion.type === "menjodohkan" ? "Pasangkan pernyataan di bawah ini" :
                           "Urutkan pernyataan dengan benar"}
@@ -2210,17 +2210,71 @@ const CBTPage = () => {
           {/* Footer Tombol (Fixed at Bottom) */}
           <div className="p-5 pt-6 border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900">
             <div className="grid grid-cols-2 gap-3">
-              <Button variant="outline" disabled={currentQuestionIndex === 0} onClick={() => setCurrentQuestionIndex(prev => prev - 1)} className="h-16 rounded-2xl font-black uppercase tracking-widest text-[12px] border-2 border-emerald-50 dark:border-emerald-900/30 text-emerald-600 dark:text-emerald-400 bg-white dark:bg-slate-900 hover:bg-emerald-50 dark:hover:bg-emerald-950 transition-colors">Back</Button>
-              <Button onClick={() => currentQuestionIndex === questions.length - 1 ? setIsSubmitModalOpen(true) : handleNextClick()} className={`h-16 text-white font-black uppercase tracking-widest text-[12px] rounded-2xl transition-transform active:scale-95 shadow-lg ${currentQuestionIndex === questions.length - 1 ? "bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/20" : "bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/20"}`}>{currentQuestionIndex === questions.length - 1 ? "Submit" : "Next"}</Button>
+              <Button
+                variant="outline"
+                disabled={currentQuestionIndex === 0}
+                onClick={() => setCurrentQuestionIndex(prev => prev - 1)}
+                className="h-16 rounded-2xl font-black uppercase tracking-widest text-[12px] border-2 border-emerald-500/40 text-emerald-700 dark:text-emerald-400 bg-emerald-50/50 dark:bg-emerald-950/30 hover:bg-emerald-100/70 dark:hover:bg-emerald-900/50 disabled:opacity-30 disabled:border-slate-200 dark:disabled:border-slate-800 disabled:text-slate-400 disabled:bg-slate-50 dark:disabled:bg-slate-900 transition-all active:scale-95 flex items-center justify-center gap-2"
+              >
+                <ChevronLeft className="w-4 h-4" />
+                Back
+              </Button>
+              <Button
+                onClick={() => currentQuestionIndex === questions.length - 1 ? setIsSubmitModalOpen(true) : handleNextClick()}
+                className="h-16 text-white font-black uppercase tracking-widest text-[12px] rounded-2xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 shadow-lg shadow-emerald-600/25 transition-all flex items-center justify-center gap-2"
+              >
+                {currentQuestionIndex === questions.length - 1 ? (
+                  <>
+                    End
+                    <CheckCircle2 className="w-4 h-4" />
+                  </>
+                ) : (
+                  <>
+                    Next
+                    <ChevronRight className="w-4 h-4" />
+                  </>
+                )}
+              </Button>
             </div>
           </div>
         </aside>
       </div>
 
       <div className="sticky bottom-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl border-t border-slate-100 dark:border-slate-800 p-4 sm:p-6 lg:hidden flex justify-between items-center z-40">
-        <Button variant="outline" size="sm" disabled={currentQuestionIndex === 0} onClick={() => setCurrentQuestionIndex(p => p - 1)} className="rounded-2xl h-14 px-8 font-black uppercase text-[12px] tracking-[0.2em] border-2 border-emerald-50 dark:border-emerald-900/40 bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 active:scale-90 transition-all">Back</Button>
-        <Button variant="ghost" className="font-black text-emerald-800 dark:text-emerald-100 uppercase tracking-[0.3em] text-[16px]" onClick={() => setIsNavModalOpen(true)}>{currentQuestionIndex + 1} / {questions.length}</Button>
-        <Button onClick={() => currentQuestionIndex === questions.length - 1 ? setIsSubmitModalOpen(true) : handleNextClick()} size="sm" className="rounded-2xl h-14 px-8 text-white font-black uppercase text-[12px] tracking-[0.2em] bg-emerald-600 dark:bg-emerald-500 active:scale-90 transition-all shadow-lg shadow-emerald-600/20">{currentQuestionIndex === questions.length - 1 ? "End" : "Next"}</Button>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={currentQuestionIndex === 0}
+          onClick={() => setCurrentQuestionIndex(p => p - 1)}
+          className="rounded-2xl h-14 px-6 font-black uppercase text-[12px] tracking-[0.2em] border-2 border-emerald-500/40 bg-emerald-50/50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100/70 dark:hover:bg-emerald-900/50 disabled:opacity-30 disabled:border-slate-200 dark:disabled:border-slate-800 disabled:text-slate-400 disabled:bg-slate-50 dark:disabled:bg-slate-900 active:scale-90 transition-all flex items-center gap-1.5"
+        >
+          <ChevronLeft className="w-4 h-4" />
+          Back
+        </Button>
+        <Button
+          variant="ghost"
+          className="font-black text-emerald-800 dark:text-emerald-100 uppercase tracking-[0.3em] text-[16px]"
+          onClick={() => setIsNavModalOpen(true)}
+        >
+          {currentQuestionIndex + 1} / {questions.length}
+        </Button>
+        <Button
+          onClick={() => currentQuestionIndex === questions.length - 1 ? setIsSubmitModalOpen(true) : handleNextClick()}
+          size="sm"
+          className="rounded-2xl h-14 px-6 text-white font-black uppercase text-[12px] tracking-[0.2em] bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500 active:scale-90 transition-all shadow-lg shadow-emerald-600/25 flex items-center gap-1.5"
+        >
+          {currentQuestionIndex === questions.length - 1 ? (
+            <>
+              End
+              <CheckCircle2 className="w-4 h-4" />
+            </>
+          ) : (
+            <>
+              Next
+              <ChevronRight className="w-4 h-4" />
+            </>
+          )}
+        </Button>
       </div>
 
       <Dialog open={isNavModalOpen} onOpenChange={setIsNavModalOpen}>
