@@ -15,6 +15,7 @@ public class MainActivity extends BridgeActivity {
     private android.os.Handler alarmHandler = new android.os.Handler();
     private boolean isAlarmPlaying = false;
     private boolean isExiting = false;
+    private boolean isLockEnabled = false;
     private Runnable alarmRunnable = new Runnable() {
         @Override
         public void run() {
@@ -45,15 +46,30 @@ public class MainActivity extends BridgeActivity {
         // 3. Inisialisasi Layar Blokir (Layout)
         createBlockingLayout();
         
-        // 4. Mulai Pengecekan Status Saja
-        startRepeatingCheck();
+        // CATATAN PENTING: JANGAN jalankan startRepeatingCheck() di onCreate()!
+        // Biarkan aplikasi bebas dari sematan layar saat startup agar siswa bisa mendownload update.
+        // Pengecekan kuncian layar hanya akan aktif setelah JS memanggil enableLockMode().
 
-        // 5. Register Plugin untuk JS
+        // 4. Register Plugin untuk JS
         registerPlugin(CheatAlert.class);
     }
 
     @com.getcapacitor.annotation.CapacitorPlugin(name = "CheatAlert")
     public class CheatAlert extends com.getcapacitor.Plugin {
+        @com.getcapacitor.PluginMethod
+        public void enableLockMode(com.getcapacitor.PluginCall call) {
+            isLockEnabled = true;
+            isExiting = false;
+            getActivity().runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    checkLockTaskOnly();
+                    startRepeatingCheck();
+                    call.resolve();
+                }
+            });
+        }
+
         @com.getcapacitor.PluginMethod
         public void startAlarm(com.getcapacitor.PluginCall call) {
             playRingtone();
@@ -256,21 +272,26 @@ public class MainActivity extends BridgeActivity {
     public void onResume() {
         super.onResume();
         makeFullScreen();
-        checkLockTaskOnly();
+        if (isLockEnabled) {
+            checkLockTaskOnly();
+        }
     }
 
     private void startRepeatingCheck() {
+        handler.removeCallbacksAndMessages(null);
         handler.postDelayed(new Runnable() {
             @Override
             public void run() {
-                checkLockTaskOnly();
-                handler.postDelayed(this, 1000);
+                if (isLockEnabled) {
+                    checkLockTaskOnly();
+                    handler.postDelayed(this, 1000);
+                }
             }
         }, 1000);
     }
 
     private void checkLockTaskOnly() {
-        if (isFinishing() || isExiting) return; // Jangan cek jika sedang menutup
+        if (!isLockEnabled || isFinishing() || isExiting) return; // Jangan cek jika kuncian belum diaktifkan atau sedang menutup
         try {
             ActivityManager am = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
             int lockState = am.getLockTaskModeState();
