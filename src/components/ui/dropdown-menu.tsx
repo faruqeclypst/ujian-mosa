@@ -40,7 +40,7 @@ const DropdownMenu: React.FC<DropdownMenuProps> = ({ children }) => {
   
   return (
     <DropdownMenuContext.Provider value={{ open, setOpen }}>
-      <div className="relative" data-dropdown-menu>
+      <div className={cn("relative", open ? "z-50" : "z-auto")} data-dropdown-menu>
         {children}
       </div>
     </DropdownMenuContext.Provider>
@@ -53,15 +53,21 @@ interface DropdownMenuTriggerProps {
 }
 
 const DropdownMenuTrigger: React.FC<DropdownMenuTriggerProps> = ({ children, asChild }) => {
-  const { setOpen } = useDropdownMenu();
+  const { open, setOpen } = useDropdownMenu();
   
-  const handleClick = () => {
-    setOpen(true);
+  const handleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setOpen(!open);
   };
   
   if (asChild && React.isValidElement(children)) {
     return React.cloneElement(children, {
-      onClick: handleClick,
+      onClick: (e: React.MouseEvent) => {
+        handleClick(e);
+        if (typeof (children.props as any).onClick === 'function') {
+          (children.props as any).onClick(e);
+        }
+      },
       ...children.props
     });
   }
@@ -93,7 +99,7 @@ const DropdownMenuContent: React.FC<DropdownMenuContentProps> = ({
   return (
     <div
       className={cn(
-        "absolute mt-2 z-[70] min-w-[8rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md",
+        "absolute mt-2 z-[9999] min-w-[8rem] rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 p-1 text-popover-foreground shadow-2xl",
         "animate-in fade-in-0 zoom-in-95",
         alignmentClasses[align],
         className

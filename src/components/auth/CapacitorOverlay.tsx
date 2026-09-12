@@ -43,7 +43,7 @@ const CapacitorOverlay = () => {
     if (dialogType === "exit") {
       const timer = setTimeout(() => {
         inputRef.current?.focus();
-      }, 100);
+      }, 150);
       return () => clearTimeout(timer);
     }
   }, [dialogType]);
@@ -146,8 +146,12 @@ const CapacitorOverlay = () => {
       </div>
 
       {dialogType !== "none" && (
-        <div className="fixed inset-0 z-[10000] flex items-center justify-center p-6 bg-slate-950/60 pointer-events-auto select-none">
-          <div className="bg-white dark:bg-slate-900 w-full max-w-[320px] rounded-[2rem] p-6 shadow-2xl border border-white/5 animate-in fade-in zoom-in-95 duration-200 pointer-events-auto select-text">
+        <div
+          onTouchStart={(e) => e.stopPropagation()}
+          onTouchMove={(e) => e.stopPropagation()}
+          className="fixed inset-0 z-[10000] flex items-center justify-center p-6 bg-slate-950/60 pointer-events-auto touch-auto"
+        >
+          <div className="bg-white dark:bg-slate-900 w-full max-w-[320px] rounded-[2rem] p-6 shadow-2xl border border-white/5 animate-in fade-in zoom-in-95 duration-150 pointer-events-auto">
             <div className="w-14 h-14 bg-slate-100 dark:bg-slate-800 rounded-2xl flex items-center justify-center mb-5 mx-auto">
               {dialogType === "refresh" ? (
                 <RefreshCw className="text-blue-500 w-6 h-6" />
@@ -170,17 +174,17 @@ const CapacitorOverlay = () => {
               <div className="mb-6 relative">
                 <input
                   ref={inputRef}
-                  type={showPassword ? "text" : "password"}
+                  type={showPassword ? "password" : "text"}
                   inputMode="text"
                   autoCapitalize="none"
                   autoCorrect="off"
                   autoComplete="off"
                   spellCheck={false}
-                  placeholder="KODE PENGAWAS"
-                  autoFocus
+                  placeholder="Ketik 'quit'"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full py-4 pl-4 pr-12 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-center font-bold tracking-[0.3em] outline-none placeholder:tracking-normal placeholder:font-medium text-sm dark:text-white select-text pointer-events-auto"
+                  onClick={(e) => e.currentTarget.focus()}
+                  className="w-full py-4 pl-4 pr-12 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-center font-bold outline-none placeholder:font-normal text-base dark:text-white pointer-events-auto transition-none"
                   onKeyDown={(e) => {
                     if (e.key === "Enter") {
                       handleExitApp();
@@ -190,9 +194,9 @@ const CapacitorOverlay = () => {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 focus:outline-none"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 focus:outline-none p-1"
                 >
-                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  {showPassword ? <Eye size={18} /> : <EyeOff size={18} />}
                 </button>
               </div>
             )}

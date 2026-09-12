@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { Plus, Trash, Edit, Users, Archive, RotateCw, BookOpen, ClipboardList, Lock, Clock, ChevronDown, ChevronRight, Power, PowerOff, Search, ShieldAlert, FileSpreadsheet, BarChart2 } from "lucide-react";
+import { Plus, Trash, Edit, Users, Archive, RotateCw, BookOpen, ClipboardList, Lock, Clock, ChevronDown, ChevronRight, Power, PowerOff, Search, ShieldAlert, FileSpreadsheet, BarChart2, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "../../components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../../components/ui/dialog";
@@ -12,12 +12,21 @@ import { getExamTypeColorClass } from "./ExamsPage";
 import { useTenant } from "../../context/TenantContext";
 import { ConfirmationDialog } from "../../components/dialogs/ConfirmationDialog";
 import { ItemAnalysisDialog } from "../../components/dialogs/ItemAnalysisDialog";
+import { BatchProgressDialog, type BatchProgressState } from "../../components/dialogs/BatchProgressDialog";
 import { useToast } from "../../components/ui/toast";
 import { cn } from "../../lib/utils";
 import { exportActiveRoomsToZip } from "../../lib/roomExcelExport";
 
 import { DataTable } from "../../components/ui/data-table";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../components/ui/table";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "../../components/ui/dropdown-menu";
 
 import { Skeleton } from "../../components/ui/skeleton";
 import { Avatar, AvatarFallback } from "../../components/ui/avatar";
@@ -71,6 +80,22 @@ const ExamRoomsPage = () => {
 
   const [examSearch, setExamSearch] = useState("");
   const [lastSelectedClassIndex, setLastSelectedClassIndex] = useState<number | null>(null);
+
+  // Batch Selection State
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(null);
+  const [batchProgress, setBatchProgress] = useState<BatchProgressState>({
+    isOpen: false,
+    current: 0,
+    total: 0,
+    message: "",
+    title: ""
+  });
+
+  useEffect(() => {
+    setSelectedIds([]);
+    setLastSelectedIndex(null);
+  }, [activeTab]);
 
   const [formValues, setFormValues] = useState({
     room_name: "",
@@ -156,8 +181,82 @@ const ExamRoomsPage = () => {
 
   const canCreate = role === "admin" || (role === "teacher" && teacherFullAccess);
 
+  const filteredRooms = useMemo(() => {
+    return rooms.filter(r => {
+      const isCorrectTab = activeTab === "arsip" ? r.status === "archive" : r.status !== "archive";
+      if (!isCorrectTab) return false;
+
+      // Jika Guru, hanya tampilkan yang miliknya
+      if (role === "teacher") {
+        return r.examTeacherId === teacherId;
+      }
+
+      // Admin tampilkan semua
+      return true;
+    });
+  }, [rooms, activeTab, role, teacherId]);
+
+  const selectableRooms = useMemo(() => {
+    return filteredRooms.filter(r => isOwner(r));
+  }, [filteredRooms, isOwner]);
+
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedIds(selectableRooms.map(r => r.id));
+    } else {
+      setSelectedIds([]);
+    }
+  };
+
+  const handleSelectOne = (id: string, checked: boolean, index: number, event: any) => {
+    let newSelectedIds = [...selectedIds];
+
+    if (checked && event.nativeEvent.shiftKey && lastSelectedIndex !== null) {
+      const start = Math.min(lastSelectedIndex, index);
+      const end = Math.max(lastSelectedIndex, index);
+      const idsInRange = filteredRooms.slice(start, end + 1).filter(r => isOwner(r)).map(r => r.id);
+      newSelectedIds = Array.from(new Set([...newSelectedIds, ...idsInRange]));
+    } else {
+      if (checked) {
+        if (!newSelectedIds.includes(id)) {
+          newSelectedIds.push(id);
+        }
+      } else {
+        newSelectedIds = newSelectedIds.filter((item) => item !== id);
+      }
+    }
+
+    setSelectedIds(newSelectedIds);
+    setLastSelectedIndex(index);
+  };
+
   // Columns definition (matching ExamsPage style)
   const columns = useMemo(() => [
+    {
+      key: "selection",
+      label: (
+        <input
+          type="checkbox"
+          checked={selectableRooms.length > 0 && selectableRooms.every(r => selectedIds.includes(r.id))}
+          onChange={(e) => handleSelectAll(e.target.checked)}
+          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-4 w-4 cursor-pointer align-middle"
+          title="Pilih Semua"
+        />
+      ),
+      render: (_: any, room: ExamRoomData, index?: number) => {
+        const canSelect = isOwner(room);
+        if (!canSelect) return <div className="w-4 h-4 mx-auto" />;
+        return (
+          <input
+            type="checkbox"
+            checked={selectedIds.includes(room.id)}
+            onChange={(e) => handleSelectOne(room.id, e.target.checked, index ?? 0, e)}
+            className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-4 w-4 cursor-pointer align-middle"
+          />
+        );
+      },
+      className: "w-[40px] text-center",
+    },
     {
       key: "index",
       label: "No",
@@ -313,7 +412,7 @@ const ExamRoomsPage = () => {
         );
       }
     }
-  ], [masterTeachers, liveBreakdown, rooms]);
+  ], [masterTeachers, liveBreakdown, rooms, selectableRooms, selectedIds, terminology, isOwner, lastSelectedIndex, filteredRooms]);
 
   // Sync Live Monitoring Progres
   useEffect(() => {
@@ -643,6 +742,167 @@ const ExamRoomsPage = () => {
     finally { setIsDeleting(false); setDeleteDialogOpen(false); }
   };
 
+  const handleBatchToggleStatus = (enable: boolean) => {
+    if (selectedIds.length === 0) return;
+    const actionLabel = enable ? "Aktifkan" : "Nonaktifkan";
+    const confirmTitle = `${actionLabel} Ruang Ujian Massal`;
+    const confirmDesc = enable
+      ? `Aktifkan ${selectedIds.length} ruang ujian terpilih agar ${terminology.student.toLowerCase()} bisa mulai mengerjakan?`
+      : `Nonaktifkan ${selectedIds.length} ruang ujian terpilih? ${terminology.student} tidak akan bisa masuk atau lanjut mengerjakan.`;
+    
+    setConfirmDialog({
+      isOpen: true,
+      title: confirmTitle,
+      description: confirmDesc,
+      type: enable ? "info" : "warning",
+      confirmLabel: actionLabel,
+      onConfirm: async () => {
+        if (!pb) return;
+        setBatchProgress({
+          isOpen: true,
+          total: selectedIds.length,
+          current: 0,
+          message: `${actionLabel} ruang ujian...`,
+          title: `${actionLabel} Ruang Ujian Massal`
+        });
+        try {
+          for (let i = 0; i < selectedIds.length; i++) {
+            await pb.collection('exam_rooms').update(selectedIds[i], {
+              isActive: enable,
+              isDisabled: !enable
+            });
+            setBatchProgress(prev => ({
+              ...prev,
+              current: i + 1,
+              message: `Memproses (${i + 1}/${selectedIds.length})`
+            }));
+          }
+          showAlert("Berhasil", `${selectedIds.length} ruang ujian berhasil ${enable ? "diaktifkan" : "dinonaktifkan"}.`, "success");
+          setSelectedIds([]);
+        } catch (e: any) {
+          showAlert("Gagal", e.message || `Gagal mengubah status ruang ujian massal.`, "danger");
+        } finally {
+          setBatchProgress(prev => ({ ...prev, isOpen: false }));
+        }
+      }
+    });
+  };
+
+  const handleBatchArchive = () => {
+    if (selectedIds.length === 0) return;
+    setConfirmDialog({
+      isOpen: true,
+      title: "Arsipkan Ruangan Massal",
+      description: `Apakah Anda yakin ingin mengarsipkan ${selectedIds.length} ruang ujian terpilih?`,
+      type: "warning",
+      confirmLabel: "Arsipkan",
+      onConfirm: async () => {
+        if (!pb) return;
+        setBatchProgress({
+          isOpen: true,
+          total: selectedIds.length,
+          current: 0,
+          message: "Mengarsipkan ruang ujian...",
+          title: "Arsipkan Ruang Ujian Massal"
+        });
+        try {
+          for (let i = 0; i < selectedIds.length; i++) {
+            await pb.collection('exam_rooms').update(selectedIds[i], { status: "archive" });
+            setBatchProgress(prev => ({
+              ...prev,
+              current: i + 1,
+              message: `Mengarsipkan (${i + 1}/${selectedIds.length})`
+            }));
+          }
+          showAlert("Berhasil", `${selectedIds.length} ruang ujian berhasil diarsipkan.`, "success");
+          setSelectedIds([]);
+        } catch (e: any) {
+          showAlert("Gagal", e.message || "Gagal mengarsipkan massal.", "danger");
+        } finally {
+          setBatchProgress(prev => ({ ...prev, isOpen: false }));
+        }
+      }
+    });
+  };
+
+  const handleBatchRestore = () => {
+    if (selectedIds.length === 0) return;
+    setConfirmDialog({
+      isOpen: true,
+      title: "Pulihkan Ruangan Massal",
+      description: `Apakah Anda yakin ingin memulihkan ${selectedIds.length} ruang ujian terpilih?`,
+      type: "info",
+      confirmLabel: "Pulihkan",
+      onConfirm: async () => {
+        if (!pb) return;
+        setBatchProgress({
+          isOpen: true,
+          total: selectedIds.length,
+          current: 0,
+          message: "Memulihkan ruang ujian...",
+          title: "Pulihkan Ruang Ujian Massal"
+        });
+        try {
+          for (let i = 0; i < selectedIds.length; i++) {
+            await pb.collection('exam_rooms').update(selectedIds[i], { status: null });
+            setBatchProgress(prev => ({
+              ...prev,
+              current: i + 1,
+              message: `Memulihkan (${i + 1}/${selectedIds.length})`
+            }));
+          }
+          showAlert("Berhasil", `${selectedIds.length} ruang ujian berhasil dipulihkan.`, "success");
+          setSelectedIds([]);
+        } catch (e: any) {
+          showAlert("Gagal", e.message || "Gagal memulihkan massal.", "danger");
+        } finally {
+          setBatchProgress(prev => ({ ...prev, isOpen: false }));
+        }
+      }
+    });
+  };
+
+  const handleBatchDelete = () => {
+    if (selectedIds.length === 0) return;
+    setConfirmDialog({
+      isOpen: true,
+      title: "Hapus Ruangan Massal",
+      description: `Hapus PERMANEN ${selectedIds.length} ruang ujian terpilih? Tindakan ini TIDAK DAPAT dikembalikan!`,
+      type: "danger",
+      confirmLabel: "Hapus",
+      onConfirm: async () => {
+        if (!pb) return;
+        setBatchProgress({
+          isOpen: true,
+          total: selectedIds.length,
+          current: 0,
+          message: "Menghapus ruang ujian...",
+          title: "Hapus Ruang Ujian Massal"
+        });
+        try {
+          for (let i = 0; i < selectedIds.length; i++) {
+            try {
+              await pb.collection('exam_rooms').delete(selectedIds[i]);
+            } catch (err) {
+              console.error(`Gagal menghapus ruang ujian ${selectedIds[i]}:`, err);
+            }
+            setBatchProgress(prev => ({
+              ...prev,
+              current: i + 1,
+              message: `Menghapus (${i + 1}/${selectedIds.length})`
+            }));
+          }
+          showAlert("Berhasil", `${selectedIds.length} ruang ujian berhasil dihapus permanen.`, "success");
+          setSelectedIds([]);
+        } catch (e: any) {
+          showAlert("Gagal", e.message || "Gagal menghapus massal.", "danger");
+        } finally {
+          setBatchProgress(prev => ({ ...prev, isOpen: false }));
+        }
+      }
+    });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -762,44 +1022,32 @@ const ExamRoomsPage = () => {
     setFormValues({ ...formValues, classId: current.join(",") });
   };
 
-  const filteredRooms = useMemo(() => {
-    return rooms.filter(r => {
-      const isCorrectTab = activeTab === "arsip" ? r.status === "archive" : r.status !== "archive";
-      if (!isCorrectTab) return false;
-
-      // Jika Guru, hanya tampilkan yang miliknya
-      if (role === "teacher") {
-        return r.examTeacherId === teacherId;
-      }
-
-      // Admin tampilkan semua
-      return true;
-    });
-  }, [rooms, activeTab, role, teacherId]);
-
   const [isExporting, setIsExporting] = useState(false);
-  const handleExportZip = async () => {
+  const handleExportZip = async (customRooms?: ExamRoomData[]) => {
     const isArchive = activeTab === "arsip";
-    if (filteredRooms.length === 0) {
+    const targetRooms = customRooms || filteredRooms;
+    if (targetRooms.length === 0) {
       showAlert("Info", `Tidak ada ruang ujian ${isArchive ? "arsip" : "aktif"} untuk diexport.`, "info");
       return;
     }
     setIsExporting(true);
     try {
       const dateStr = new Date().toISOString().split('T')[0];
-      const customFilename = isArchive 
-        ? `Rekap_Semua_Ruang_Arsip_${dateStr}.zip`
-        : `Rekap_Semua_Ruang_Aktif_${dateStr}.zip`;
+      const customFilename = customRooms
+        ? `Rekap_${customRooms.length}_Ruang_Terpilih_${dateStr}.zip`
+        : isArchive 
+          ? `Rekap_Semua_Ruang_Arsip_${dateStr}.zip`
+          : `Rekap_Semua_Ruang_Aktif_${dateStr}.zip`;
 
       await exportActiveRoomsToZip({
-        rooms: filteredRooms,
+        rooms: targetRooms,
         students,
         examClasses,
         pb,
         terminology,
         filename: customFilename
       });
-      addToast({ title: "Ekspor Berhasil", description: `File ZIP berisi rekap ujian ${isArchive ? "arsip" : "aktif"} berhasil diunduh.`, type: "success" });
+      addToast({ title: "Ekspor Berhasil", description: `File ZIP berisi rekap ujian berhasil diunduh.`, type: "success" });
     } catch (e) {
       console.error(e);
       showAlert("Gagal", "Gagal mengekspor data ke ZIP.", "danger");
@@ -811,7 +1059,7 @@ const ExamRoomsPage = () => {
   return (
     <div className="space-y-6">
       {/* Header Bar */}
-      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between bg-card p-4 rounded-2xl border border-slate-200/60 dark:border-slate-800/40 shadow-sm backdrop-blur-sm">
+      <div className="relative z-30 flex flex-col gap-3 md:flex-row md:items-center md:justify-between bg-card p-4 rounded-2xl border border-slate-200/60 dark:border-slate-800/40 shadow-sm backdrop-blur-sm">
         <div>
           <h2 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
             <ClipboardList className="h-5 w-5 text-blue-500" />
@@ -841,6 +1089,102 @@ const ExamRoomsPage = () => {
                   Arsip
                 </button>
               </div>
+              {selectedIds.length > 0 && (
+                <div className="flex items-center gap-1.5 animate-in fade-in zoom-in duration-200">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="default"
+                        size="sm"
+                        className="rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-sm transition-all h-9 px-3.5 text-xs flex items-center gap-1.5"
+                      >
+                        <span>{selectedIds.length} - Aksi Masal</span>
+                        <ChevronDown className="h-3.5 w-3.5 opacity-70" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-56 p-1.5 rounded-2xl shadow-xl border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 z-[100]">
+                      <DropdownMenuLabel className="text-[10px] font-bold uppercase tracking-wider text-slate-400 px-2.5 py-1">
+                        Aksi ({selectedIds.length} Ruang Ujian)
+                      </DropdownMenuLabel>
+                      
+                      {activeTab === "aktif" ? (
+                        <>
+                          <DropdownMenuItem
+                            onClick={() => handleBatchToggleStatus(true)}
+                            className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl cursor-pointer text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
+                          >
+                            <Power className="h-4 w-4" />
+                            <span>Aktifkan Ruangan</span>
+                          </DropdownMenuItem>
+
+                          <DropdownMenuItem
+                            onClick={() => handleBatchToggleStatus(false)}
+                            className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl cursor-pointer text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40"
+                          >
+                            <PowerOff className="h-4 w-4" />
+                            <span>Nonaktifkan Ruangan</span>
+                          </DropdownMenuItem>
+
+                          <DropdownMenuSeparator className="my-1 border-slate-100 dark:border-slate-800" />
+
+                          <DropdownMenuItem
+                            onClick={() => {
+                              const chosen = rooms.filter(r => selectedIds.includes(r.id));
+                              handleExportZip(chosen);
+                            }}
+                            className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl cursor-pointer text-xs font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40"
+                          >
+                            <FileSpreadsheet className="h-4 w-4" />
+                            <span>Export Rekap Excel (ZIP)</span>
+                          </DropdownMenuItem>
+
+                          <DropdownMenuSeparator className="my-1 border-slate-100 dark:border-slate-800" />
+
+                          <DropdownMenuItem
+                            onClick={handleBatchArchive}
+                            className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl cursor-pointer text-xs font-semibold text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/40"
+                          >
+                            <Archive className="h-4 w-4" />
+                            <span>Arsipkan Ruangan</span>
+                          </DropdownMenuItem>
+                        </>
+                      ) : (
+                        <>
+                          <DropdownMenuItem
+                            onClick={handleBatchRestore}
+                            className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl cursor-pointer text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/40"
+                          >
+                            <RotateCw className="h-4 w-4" />
+                            <span>Pulihkan Ruangan</span>
+                          </DropdownMenuItem>
+
+                          <DropdownMenuItem
+                            onClick={() => {
+                              const chosen = rooms.filter(r => selectedIds.includes(r.id));
+                              handleExportZip(chosen);
+                            }}
+                            className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl cursor-pointer text-xs font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40"
+                          >
+                            <FileSpreadsheet className="h-4 w-4" />
+                            <span>Export Rekap Excel (ZIP)</span>
+                          </DropdownMenuItem>
+
+                          <DropdownMenuSeparator className="my-1 border-slate-100 dark:border-slate-800" />
+
+                          <DropdownMenuItem
+                            onClick={handleBatchDelete}
+                            className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl cursor-pointer text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40"
+                          >
+                            <Trash className="h-4 w-4" />
+                            <span>Hapus Permanen</span>
+                          </DropdownMenuItem>
+                        </>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              )}
+
               {canCreate && (
                 <Button onClick={handleCreateClick} size="sm" className="rounded-2xl bg-blue-50 hover:bg-blue-100 border border-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 dark:border-blue-800/40 text-blue-700 font-bold shadow-sm h-9 px-4">
                   <Plus className="mr-1 h-3.5 w-3.5" /> Buka Ruang
@@ -848,7 +1192,7 @@ const ExamRoomsPage = () => {
               )}
               {filteredRooms.length > 0 && (
                 <Button
-                  onClick={handleExportZip}
+                  onClick={() => handleExportZip()}
                   disabled={isExporting}
                   size="sm"
                   className="rounded-2xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-400 dark:hover:bg-emerald-900/50 dark:border-emerald-800/40 text-emerald-700 font-bold shadow-sm h-9 px-4 transition-all"
@@ -1359,6 +1703,9 @@ const ExamRoomsPage = () => {
           examTitle={analysisRoom.examTitle}
         />
       )}
+
+      {/* Batch Operation Progress Dialog */}
+      <BatchProgressDialog progress={batchProgress} colorClass="bg-indigo-600" />
     </div>
   );
 };

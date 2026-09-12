@@ -2794,6 +2794,13 @@ const QuestionsPage = () => {
       doc.querySelectorAll("img").forEach(img => addUrl(img.getAttribute("src") || ""));
     }
 
+    // Sertakan juga gambar dari stimulus/wacana literasi (groupText)
+    const gText = q.groupText || (q as any).group_text;
+    if (gText && gText.includes("<img")) {
+      const doc = new DOMParser().parseFromString(gText, "text/html");
+      doc.querySelectorAll("img").forEach(img => addUrl(img.getAttribute("src") || ""));
+    }
+
     if (q.choices) {
       Object.values(q.choices).forEach((c) => {
         if (c.imageUrl) addUrl(c.imageUrl);
@@ -2953,22 +2960,44 @@ const QuestionsPage = () => {
       setBatchProgress(prev => ({ ...prev, message: `Menghapus ${uniqueUrls.length} gambar dari storage...` }));
       if (uniqueUrls.length > 0 && pb) {
         try {
-          // Semua soal di exam ini dihapus, jadi IDs dari exam ini bisa diabaikan semua
-          // Cukup cek apakah URL masih dipakai di exam LAIN
-          const examIds = new Set(allQ.map(q => q.id));
+          // Semua soal di exam ini dihapus, jadi cukup cek apakah URL masih dipakai di exam LAIN
           await Promise.allSettled(uniqueUrls.map(async url => {
             try {
-              const escapedUrl = url.replace(/'/g, "\\'");
-              const refByImageUrl = await pb.collection("questions").getList(1, 1, {
-                filter: `imageUrl = "${escapedUrl}" && ${Array.from(examIds).map(id => `id != "${id}"`).join(" && ")}`,
-              }).catch(() => ({ totalItems: 0 }));
-              if (refByImageUrl.totalItems > 0) return;
-              const refByText = await pb.collection("questions").getList(1, 1, {
-                filter: `(text ~ "${escapedUrl}" || options ~ "${escapedUrl}") && ${Array.from(examIds).map(id => `id != "${id}"`).join(" && ")}`,
-              }).catch(() => ({ totalItems: 0 }));
-              if (refByText.totalItems > 0) return;
-              const key = new URL(url).pathname.replace(/^\//, "");
-              if (key) await deleteImageFromStorage(key);
+              const escapedUrl = url.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+              const examFilter = `examId != "${examId}"`;
+
+              let isUsedElsewhere = false;
+              try {
+                const refByImageUrl = await pb.collection("questions").getList(1, 1, {
+                  filter: `imageUrl = "${escapedUrl}" && ${examFilter}`,
+                });
+                if (refByImageUrl.totalItems > 0) isUsedElsewhere = true;
+              } catch {
+                isUsedElsewhere = true; // fail-safe: jika gagal query, jangan hapus
+              }
+
+              if (!isUsedElsewhere) {
+                try {
+                  const refByText = await pb.collection("questions").getList(1, 1, {
+                    filter: `(text ~ "${escapedUrl}" || options ~ "${escapedUrl}" || groupText ~ "${escapedUrl}" || group_text ~ "${escapedUrl}") && ${examFilter}`,
+                  });
+                  if (refByText.totalItems > 0) isUsedElsewhere = true;
+                } catch {
+                  try {
+                    const fallbackRef = await pb.collection("questions").getList(1, 1, {
+                      filter: `(text ~ "${escapedUrl}" || options ~ "${escapedUrl}") && ${examFilter}`,
+                    });
+                    if (fallbackRef.totalItems > 0) isUsedElsewhere = true;
+                  } catch {
+                    isUsedElsewhere = true; // fail-safe
+                  }
+                }
+              }
+
+              if (!isUsedElsewhere) {
+                const key = new URL(url).pathname.replace(/^\//, "");
+                if (key) await deleteImageFromStorage(key);
+              }
             } catch {}
           }));
         } catch (storageError) {
@@ -3050,21 +3079,51 @@ const QuestionsPage = () => {
       setBatchProgress(prev => ({ ...prev, message: "Membersihkan gambar di storage..." }));
       if (uniqueUrls.length > 0 && pb) {
         try {
-          const selectedIds2 = new Set(selectedQuestions.map(q => q.id));
+          const selectedIdSet = new Set(selectedQuestions.map(q => q.id));
           await Promise.allSettled(uniqueUrls.map(async url => {
             try {
-              const escapedUrl = url.replace(/'/g, "\\'");
-              const idExcludes = Array.from(selectedIds2).map(id => `id != "${id}"`).join(" && ");
-              const refByImageUrl = await pb.collection("questions").getList(1, 1, {
-                filter: `imageUrl = "${escapedUrl}" && ${idExcludes}`,
-              }).catch(() => ({ totalItems: 0 }));
-              if (refByImageUrl.totalItems > 0) return;
-              const refByText = await pb.collection("questions").getList(1, 1, {
-                filter: `(text ~ "${escapedUrl}" || options ~ "${escapedUrl}") && ${idExcludes}`,
-              }).catch(() => ({ totalItems: 0 }));
-              if (refByText.totalItems > 0) return;
-              const key = new URL(url).pathname.replace(/^\//, "");
-              if (key) await deleteImageFromStorage(key);
+              const escapedUrl = url.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+              let isUsedElsewhere = false;
+
+              // 1. Cek di imageUrl
+              try {
+                const checkImg = await pb.collection("questions").getList(1, 20, {
+                  filter: `imageUrl = "${escapedUrl}"`,
+                });
+                if (checkImg.items.some(item => !selectedIdSet.has(item.id)) || checkImg.totalItems > checkImg.items.length) {
+                  isUsedElsewhere = true;
+                }
+              } catch {
+                isUsedElsewhere = true; // fail-safe: jika gagal query, jangan hapus
+              }
+
+              // 2. Cek di text, options, groupText
+              if (!isUsedElsewhere) {
+                try {
+                  const checkContent = await pb.collection("questions").getList(1, 20, {
+                    filter: `text ~ "${escapedUrl}" || options ~ "${escapedUrl}" || groupText ~ "${escapedUrl}" || group_text ~ "${escapedUrl}"`,
+                  });
+                  if (checkContent.items.some(item => !selectedIdSet.has(item.id)) || checkContent.totalItems > checkContent.items.length) {
+                    isUsedElsewhere = true;
+                  }
+                } catch {
+                  try {
+                    const fallbackContent = await pb.collection("questions").getList(1, 20, {
+                      filter: `text ~ "${escapedUrl}" || options ~ "${escapedUrl}"`,
+                    });
+                    if (fallbackContent.items.some(item => !selectedIdSet.has(item.id)) || fallbackContent.totalItems > fallbackContent.items.length) {
+                      isUsedElsewhere = true;
+                    }
+                  } catch {
+                    isUsedElsewhere = true; // fail-safe
+                  }
+                }
+              }
+
+              if (!isUsedElsewhere) {
+                const key = new URL(url).pathname.replace(/^\//, "");
+                if (key) await deleteImageFromStorage(key);
+              }
             } catch {}
           }));
         } catch (storageError) {

@@ -102,23 +102,41 @@ export async function safeDeleteImage(
   if (!url || url.startsWith("data:") || !workerUrl) return;
   try {
     // Cari soal lain yang masih pakai URL ini
-    const escapedUrl = url.replace(/'/g, "\\'");
+    const escapedUrl = url.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
     const idFilter = excludeQuestionId ? ` && id != "${excludeQuestionId}"` : "";
-    // Cek di imageUrl field
-    const refByImageUrl = await pb.collection("questions").getList(1, 1, {
-      filter: `imageUrl = "${escapedUrl}"${idFilter}`,
-    }).catch(() => ({ totalItems: 0 }));
 
-    if (refByImageUrl.totalItems > 0) return; // masih dipakai, tidak dihapus
+    // 1. Cek di imageUrl field
+    try {
+      const refByImageUrl = await pb.collection("questions").getList(1, 1, {
+        filter: `imageUrl = "${escapedUrl}"${idFilter}`,
+      });
+      if (refByImageUrl.totalItems > 0) return; // masih dipakai di soal lain
+    } catch (e) {
+      // Fail-safe: jika query gagal/error, JANGAN hapus file demi keamanan
+      console.warn("safeDeleteImage: cek imageUrl gagal, lewati penghapusan", e);
+      return;
+    }
 
-    // Cek di text (Quill HTML) dan options
-    const refByText = await pb.collection("questions").getList(1, 1, {
-      filter: `(text ~ "${escapedUrl}" || options ~ "${escapedUrl}")${idFilter}`,
-    }).catch(() => ({ totalItems: 0 }));
+    // 2. Cek di text (Quill HTML), options (Pilihan), dan groupText (Stimulus Literasi)
+    try {
+      const refByContent = await pb.collection("questions").getList(1, 1, {
+        filter: `(text ~ "${escapedUrl}" || options ~ "${escapedUrl}" || groupText ~ "${escapedUrl}" || group_text ~ "${escapedUrl}")${idFilter}`,
+      });
+      if (refByContent.totalItems > 0) return; // masih dipakai
+    } catch (e) {
+      // Fallback jika field groupText tidak ada di skema PB
+      try {
+        const refByFallback = await pb.collection("questions").getList(1, 1, {
+          filter: `(text ~ "${escapedUrl}" || options ~ "${escapedUrl}")${idFilter}`,
+        });
+        if (refByFallback.totalItems > 0) return;
+      } catch (errFallback) {
+        console.warn("safeDeleteImage: cek konten gagal, lewati penghapusan", errFallback);
+        return;
+      }
+    }
 
-    if (refByText.totalItems > 0) return; // masih dipakai
-
-    // Aman dihapus
+    // Aman dihapus jika benar-benar tidak ada referensi lain
     const key = new URL(url).pathname.replace(/^\//, "");
     if (key) deleteImageFromStorage(key); // fire & forget
   } catch (e) {

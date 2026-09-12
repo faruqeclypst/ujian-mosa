@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Plus, BookOpen, Trash, Edit, Archive, RotateCw, Copy, ClipboardList, Download, Loader2 } from "lucide-react";
+import { Plus, BookOpen, Trash, Edit, Archive, RotateCw, Copy, ClipboardList, Download, Loader2, X, ChevronDown } from "lucide-react";
 import JSZip from "jszip";
 import { Button } from "../../components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../../components/ui/dialog";
@@ -12,6 +12,15 @@ import { useTenant } from "../../context/TenantContext";
 import { useNavigate } from "react-router-dom";
 import { useExamData } from "../../context/ExamDataContext";
 import { ConfirmationDialog } from "../../components/dialogs/ConfirmationDialog";
+import { BatchProgressDialog, type BatchProgressState } from "../../components/dialogs/BatchProgressDialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "../../components/ui/dropdown-menu";
 import { DataTable } from "../../components/ui/data-table";
 import { Skeleton } from "../../components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../components/ui/table";
@@ -228,6 +237,22 @@ const ExamsPage = () => {
     message: "",
   });
 
+  // Batch Selection State
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(null);
+  const [batchProgress, setBatchProgress] = useState<BatchProgressState>({
+    isOpen: false,
+    current: 0,
+    total: 0,
+    message: "",
+    title: ""
+  });
+
+  useEffect(() => {
+    setSelectedIds([]);
+    setLastSelectedIndex(null);
+  }, [activeTab]);
+
   const fetchQuestionCounts = useCallback(async () => {
     if (!pb) return;
     try {
@@ -259,7 +284,79 @@ const ExamsPage = () => {
     };
   }, [pb, fetchQuestionCounts]);
 
+  const isOwner = useCallback((exam: any) => {
+    if (role === "admin") return true;
+    if (teacherFullAccess) return true;
+    if (!teacherId) return false;
+    // Dukung format lama (user?.id) dan baru (teacherId) serta case sensitivity
+    const examTeacherId = exam.teacherId || exam.teacherid;
+    return examTeacherId === teacherId || examTeacherId === user?.id;
+  }, [role, teacherId, user, teacherFullAccess]);
+
+  const filteredExams = useMemo(() => {
+    return exams.filter(e => activeTab === "arsip" ? e.status === "archive" : e.status !== "archive");
+  }, [exams, activeTab]);
+
+  const selectableExams = useMemo(() => {
+    return filteredExams.filter(e => isOwner(e));
+  }, [filteredExams, isOwner]);
+
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedIds(selectableExams.map(e => e.id));
+    } else {
+      setSelectedIds([]);
+    }
+  };
+
+  const handleSelectOne = (id: string, checked: boolean, index: number, event: any) => {
+    let newSelectedIds = [...selectedIds];
+
+    if (checked && event.nativeEvent.shiftKey && lastSelectedIndex !== null) {
+      const start = Math.min(lastSelectedIndex, index);
+      const end = Math.max(lastSelectedIndex, index);
+      const idsInRange = filteredExams.slice(start, end + 1).filter(e => isOwner(e)).map(e => e.id);
+      newSelectedIds = Array.from(new Set([...newSelectedIds, ...idsInRange]));
+    } else {
+      if (checked) {
+        if (!newSelectedIds.includes(id)) {
+          newSelectedIds.push(id);
+        }
+      } else {
+        newSelectedIds = newSelectedIds.filter((item) => item !== id);
+      }
+    }
+
+    setSelectedIds(newSelectedIds);
+    setLastSelectedIndex(index);
+  };
+
   const columns = useMemo(() => [
+    {
+      key: "selection",
+      label: (
+        <input
+          type="checkbox"
+          checked={selectableExams.length > 0 && selectableExams.every(e => selectedIds.includes(e.id))}
+          onChange={(e) => handleSelectAll(e.target.checked)}
+          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-4 w-4 cursor-pointer align-middle"
+          title="Pilih Semua"
+        />
+      ),
+      render: (_: any, item: any, index?: number) => {
+        const canSelect = isOwner(item);
+        if (!canSelect) return <div className="w-4 h-4 mx-auto" />;
+        return (
+          <input
+            type="checkbox"
+            checked={selectedIds.includes(item.id)}
+            onChange={(e) => handleSelectOne(item.id, e.target.checked, index ?? 0, e)}
+            className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-4 w-4 cursor-pointer align-middle"
+          />
+        );
+      },
+      className: "w-[40px] text-center",
+    },
     {
       key: "index",
       label: "No",
@@ -311,7 +408,7 @@ const ExamsPage = () => {
         );
       }
     }
-  ], [teachers]);
+  ], [teachers, selectableExams, selectedIds, terminology, isOwner, lastSelectedIndex, filteredExams]);
 
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean;
@@ -329,8 +426,6 @@ const ExamsPage = () => {
     onConfirm: () => { }
   });
 
-
-
   const showAlert = (title: string, description: string, type: "success" | "danger" | "warning" | "info" = "info", onConfirm?: () => void) => {
     if (!onConfirm && (type === "success" || type === "info")) {
       addToast({ type, title, description });
@@ -339,14 +434,126 @@ const ExamsPage = () => {
     setConfirmDialog({ isOpen: true, title, description, type, confirmLabel: "OK", onConfirm: onConfirm || (() => { }) });
   };
 
-  const isOwner = useCallback((exam: any) => {
-    if (role === "admin") return true;
-    if (teacherFullAccess) return true;
-    if (!teacherId) return false;
-    // Dukung format lama (user?.id) dan baru (teacherId) serta case sensitivity
-    const examTeacherId = exam.teacherId || exam.teacherid;
-    return examTeacherId === teacherId || examTeacherId === user?.id;
-  }, [role, teacherId, user, teacherFullAccess]);
+  const handleBatchArchive = () => {
+    if (selectedIds.length === 0) return;
+    const blockedExams = selectedIds.filter(id => activeExamIds.includes(id));
+    const validExams = selectedIds.filter(id => !activeExamIds.includes(id));
+    if (validExams.length === 0) {
+      showAlert("Peringatan", "Semua Bank Soal yang dipilih sedang diujikan di Ruang Ujian aktif dan tidak dapat diarsipkan.", "warning");
+      return;
+    }
+    const msg = blockedExams.length > 0
+      ? `${validExams.length} bank soal akan diarsipkan (${blockedExams.length} bank soal dilewati karena sedang diujikan aktif). Lanjutkan?`
+      : `Apakah Anda yakin ingin mengarsipkan ${validExams.length} bank soal terpilih?`;
+    
+    showAlert("Arsipkan Massal", msg, "warning", async () => {
+      if (!pb) return;
+      setBatchProgress({
+        isOpen: true,
+        total: validExams.length,
+        current: 0,
+        message: "Mengarsipkan bank soal...",
+        title: "Arsipkan Bank Soal Massal"
+      });
+      try {
+        for (let i = 0; i < validExams.length; i++) {
+          await pb.collection('exams').update(validExams[i], { status: "archive" });
+          setBatchProgress(prev => ({
+            ...prev,
+            current: i + 1,
+            message: `Mengarsipkan (${i + 1}/${validExams.length})`
+          }));
+        }
+        showAlert("Berhasil", `${validExams.length} bank soal berhasil diarsipkan.`, "success");
+        setSelectedIds([]);
+      } catch (e: any) {
+        showAlert("Gagal", e.message || "Gagal mengarsipkan bank soal secara massal.", "danger");
+      } finally {
+        setBatchProgress(prev => ({ ...prev, isOpen: false }));
+      }
+    });
+  };
+
+  const handleBatchRestore = () => {
+    if (selectedIds.length === 0) return;
+    showAlert("Pulihkan Massal", `Apakah Anda yakin ingin memulihkan ${selectedIds.length} bank soal terpilih?`, "info", async () => {
+      if (!pb) return;
+      setBatchProgress({
+        isOpen: true,
+        total: selectedIds.length,
+        current: 0,
+        message: "Memulihkan bank soal...",
+        title: "Pulihkan Bank Soal Massal"
+      });
+      try {
+        for (let i = 0; i < selectedIds.length; i++) {
+          await pb.collection('exams').update(selectedIds[i], { status: null });
+          setBatchProgress(prev => ({
+            ...prev,
+            current: i + 1,
+            message: `Memulihkan (${i + 1}/${selectedIds.length})`
+          }));
+        }
+        showAlert("Berhasil", `${selectedIds.length} bank soal berhasil dipulihkan.`, "success");
+        setSelectedIds([]);
+      } catch (e: any) {
+        showAlert("Gagal", e.message || "Gagal memulihkan bank soal secara massal.", "danger");
+      } finally {
+        setBatchProgress(prev => ({ ...prev, isOpen: false }));
+      }
+    });
+  };
+
+  const handleBatchDelete = () => {
+    if (selectedIds.length === 0) return;
+    const blockedExams = selectedIds.filter(id => activeExamIds.includes(id));
+    const validExams = selectedIds.filter(id => !activeExamIds.includes(id));
+    if (validExams.length === 0) {
+      showAlert("Peringatan", "Semua Bank Soal yang dipilih sedang digunakan di Ruang Ujian aktif dan tidak dapat dihapus.", "warning");
+      return;
+    }
+    const msg = blockedExams.length > 0
+      ? `Hapus PERMANEN ${validExams.length} bank soal beserta seluruh soal di dalamnya? (${blockedExams.length} dilewati karena sedang aktif). Tindakan ini TIDAK DAPAT dikembalikan!`
+      : `Hapus PERMANEN ${validExams.length} bank soal beserta seluruh soal di dalamnya? Tindakan ini TIDAK DAPAT dikembalikan!`;
+    
+    showAlert("Hapus Massal", msg, "danger", async () => {
+      if (!pb) return;
+      setBatchProgress({
+        isOpen: true,
+        total: validExams.length,
+        current: 0,
+        message: "Menghapus bank soal...",
+        title: "Hapus Bank Soal Massal"
+      });
+      try {
+        for (let i = 0; i < validExams.length; i++) {
+          const examId = validExams[i];
+          try {
+            const questions = await pb.collection('questions').getFullList({
+              filter: `examId = "${examId}"`
+            });
+            for (const q of questions) {
+              await pb.collection('questions').delete(q.id);
+            }
+            await pb.collection('exams').delete(examId);
+          } catch (err) {
+            console.error(`Gagal menghapus exam ${examId}:`, err);
+          }
+          setBatchProgress(prev => ({
+            ...prev,
+            current: i + 1,
+            message: `Menghapus (${i + 1}/${validExams.length})`
+          }));
+        }
+        showAlert("Berhasil", `${validExams.length} bank soal berhasil dihapus permanen.`, "success");
+        setSelectedIds([]);
+      } catch (e: any) {
+        showAlert("Gagal", e.message || "Gagal menghapus massal.", "danger");
+      } finally {
+        setBatchProgress(prev => ({ ...prev, isOpen: false }));
+      }
+    });
+  };
 
   const handleArchiveExam = (exam: any) => {
     if (activeExamIds.includes(exam.id)) {
@@ -677,9 +884,9 @@ const ExamsPage = () => {
     setTimeout(() => setReportCopied(false), 2500);
   };
 
-  const handleBatchExport = async () => {
+  const handleBatchExport = async (customExams?: ExamData[]) => {
     if (!pb) return;
-    const targetExams = exams.filter(e => activeTab === "arsip" ? e.status === "archive" : e.status !== "archive");
+    const targetExams = customExams || exams.filter(e => activeTab === "arsip" ? e.status === "archive" : e.status !== "archive");
     if (targetExams.length === 0) {
       addToast({ type: "warning", title: "Kosong", description: "Tidak ada bank soal untuk diexport." });
       return;
@@ -1030,7 +1237,7 @@ const ExamsPage = () => {
         zip.file(`${safeName}.doc`, "\ufeff" + wordMhtml);
       }
 
-      const label = activeTab === "arsip" ? "ARSIP" : "AKTIF";
+      const label = customExams ? `${customExams.length}_TERPILIH` : (activeTab === "arsip" ? "ARSIP" : "AKTIF");
       const dateStr = new Date().toLocaleDateString("id-ID", { day: "2-digit", month: "2-digit", year: "numeric" }).replace(/\//g, "-");
       const zipBlob = await zip.generateAsync({ type: "blob" });
       const url = URL.createObjectURL(zipBlob);
@@ -1057,7 +1264,7 @@ const ExamsPage = () => {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between bg-card p-4 rounded-2xl border border-slate-200/60 dark:border-slate-800/40 shadow-sm backdrop-blur-sm">
+      <div className="relative z-30 flex flex-col gap-3 md:flex-row md:items-center md:justify-between bg-card p-4 rounded-2xl border border-slate-200/60 dark:border-slate-800/40 shadow-sm backdrop-blur-sm">
         <div>
           <h2 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
             <BookOpen className="h-5 w-5 text-indigo-500" />
@@ -1087,9 +1294,89 @@ const ExamsPage = () => {
                   Arsip
                 </button>
               </div>
+              {selectedIds.length > 0 && (
+                <div className="flex items-center gap-1.5 animate-in fade-in zoom-in duration-200">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="default"
+                        size="sm"
+                        className="rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold shadow-sm transition-all h-9 px-3.5 text-xs flex items-center gap-1.5"
+                      >
+                        <span>{selectedIds.length} - Aksi Masal</span>
+                        <ChevronDown className="h-3.5 w-3.5 opacity-70" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-56 p-1.5 rounded-2xl shadow-xl border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 z-[100]">
+                      <DropdownMenuLabel className="text-[10px] font-bold uppercase tracking-wider text-slate-400 px-2.5 py-1">
+                        Aksi ({selectedIds.length} Bank Soal)
+                      </DropdownMenuLabel>
+                      
+                      {activeTab === "aktif" ? (
+                        <>
+                          {role === "admin" && (
+                            <DropdownMenuItem
+                              onClick={() => {
+                                const chosen = exams.filter(e => selectedIds.includes(e.id));
+                                handleBatchExport(chosen);
+                              }}
+                              className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl cursor-pointer text-xs font-semibold text-violet-600 dark:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-950/40"
+                            >
+                              <Download className="h-4 w-4" />
+                              <span>Export Terpilih (Word ZIP)</span>
+                            </DropdownMenuItem>
+                          )}
+
+                          <DropdownMenuItem
+                            onClick={handleBatchArchive}
+                            className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl cursor-pointer text-xs font-semibold text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/40"
+                          >
+                            <Archive className="h-4 w-4" />
+                            <span>Arsipkan Bank Soal</span>
+                          </DropdownMenuItem>
+                        </>
+                      ) : (
+                        <>
+                          <DropdownMenuItem
+                            onClick={handleBatchRestore}
+                            className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl cursor-pointer text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/40"
+                          >
+                            <RotateCw className="h-4 w-4" />
+                            <span>Pulihkan Bank Soal</span>
+                          </DropdownMenuItem>
+
+                          {role === "admin" && (
+                            <DropdownMenuItem
+                              onClick={() => {
+                                const chosen = exams.filter(e => selectedIds.includes(e.id));
+                                handleBatchExport(chosen);
+                              }}
+                              className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl cursor-pointer text-xs font-semibold text-violet-600 dark:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-950/40"
+                            >
+                              <Download className="h-4 w-4" />
+                              <span>Export Terpilih (Word ZIP)</span>
+                            </DropdownMenuItem>
+                          )}
+
+                          <DropdownMenuSeparator className="my-1 border-slate-100 dark:border-slate-800" />
+
+                          <DropdownMenuItem
+                            onClick={handleBatchDelete}
+                            className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl cursor-pointer text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40"
+                          >
+                            <Trash className="h-4 w-4" />
+                            <span>Hapus Permanen</span>
+                          </DropdownMenuItem>
+                        </>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              )}
+
               {role === "admin" && (
                 <Button
-                  onClick={handleBatchExport}
+                  onClick={() => handleBatchExport()}
                   size="sm"
                   className="rounded-2xl bg-violet-50 hover:bg-violet-100 active:bg-violet-50 border border-violet-100 dark:bg-violet-900/30 dark:text-violet-400 dark:hover:bg-violet-900/50 dark:active:bg-violet-900/30 dark:border-violet-800/40 text-violet-700 font-bold shadow-sm h-9 px-4 focus-visible:ring-0 focus-visible:ring-offset-0"
                 >
@@ -1159,7 +1446,7 @@ const ExamsPage = () => {
           </CardHeader>
           <CardContent>
             <DataTable
-              data={exams.filter(e => activeTab === "arsip" ? e.status === "archive" : e.status !== "archive")}
+              data={filteredExams}
               columns={columns}
               searchPlaceholder="Cari ujian..."
               emptyMessage={`Belum ada bank soal ${ activeTab }.`}
@@ -1430,6 +1717,9 @@ const ExamsPage = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Batch Operation Progress Dialog */}
+      <BatchProgressDialog progress={batchProgress} colorClass="bg-indigo-600" />
     </div>
   );
 };

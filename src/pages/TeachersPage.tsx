@@ -11,7 +11,8 @@ import {
   Download, 
   ChevronDown,
   FileText,
-  Upload
+  Upload,
+  KeyRound
 } from "lucide-react";
 import { 
   DropdownMenu, 
@@ -346,6 +347,102 @@ const TeachersPage = () => {
     );
   };
 
+  const handleBatchResetPassword = async () => {
+    if (selectedIds.length === 0) return;
+    const targetTeachers = teachers.filter(t => selectedIds.includes(t.id));
+    if (targetTeachers.length === 0) return;
+
+    showAlert(
+      `Reset Password ${terminology.teacher} Massal`,
+      `Apakah Anda yakin ingin mereset password ${targetTeachers.length} ${terminology.teacher.toLowerCase()} terpilih menjadi default "12345678"?`,
+      "warning",
+      async () => {
+        if (!pb) return;
+        setBatchProgress({
+          isOpen: true,
+          total: targetTeachers.length,
+          current: 0,
+          message: "Menyiapkan reset password...",
+          title: `Reset Password ${terminology.teacher} Massal`
+        });
+
+        const defaultPass = "12345678";
+        let successCount = 0;
+        let failCount = 0;
+
+        try {
+          let userList: any[] = [];
+          try {
+            userList = await pb.collection("users").getFullList({ filter: 'role = "teacher"' });
+          } catch (e) {
+            console.warn("Could not batch-fetch users:", e);
+          }
+          const userMap = new Map(userList.map(u => [u.teacherId, u]));
+
+          const chunkSize = 5;
+          for (let i = 0; i < targetTeachers.length; i += chunkSize) {
+            const chunk = targetTeachers.slice(i, i + chunkSize);
+            await Promise.all(chunk.map(async (teacher) => {
+              try {
+                const userRec = userMap.get(teacher.id);
+                if (userRec) {
+                  await resetUserPassword(userRec.id);
+                } else {
+                  let fallbackUser = null;
+                  try {
+                    fallbackUser = await pb.collection("users").getFirstListItem(`teacherId="${teacher.id}"`);
+                  } catch (err: any) {
+                    if (err.status !== 404) throw err;
+                  }
+
+                  if (fallbackUser) {
+                    await resetUserPassword(fallbackUser.id);
+                  } else {
+                    const username = teacher.username || teacher.code || teacher.name.toLowerCase().replace(/\s+/g, "_") + "_" + Math.floor(Math.random() * 1000);
+                    await pb.collection("users").create({
+                      username: username,
+                      password: defaultPass,
+                      passwordConfirm: defaultPass,
+                      name: teacher.name,
+                      role: "teacher",
+                      teacherId: teacher.id,
+                      hasChangedPassword: false,
+                    });
+                  }
+                }
+                successCount++;
+              } catch (err) {
+                console.error(`Gagal reset password ${teacher.name}:`, err);
+                failCount++;
+              }
+            }));
+
+            const processed = Math.min(i + chunkSize, targetTeachers.length);
+            setBatchProgress(prev => ({
+              ...prev,
+              current: processed,
+              message: `Mereset password ${terminology.teacher.toLowerCase()} (${processed}/${targetTeachers.length})`
+            }));
+          }
+
+          if (failCount === 0) {
+            showAlert("Berhasil", `Password ${successCount} ${terminology.teacher.toLowerCase()} berhasil direset menjadi 12345678.`, "success");
+          } else {
+            showAlert("Selesai dengan Catatan", `${successCount} akun berhasil direset, ${failCount} gagal diproses.`, "warning");
+          }
+          setSelectedIds([]);
+        } catch (error: any) {
+          console.error("Gagal reset password massal guru", error);
+          showAlert("Gagal", error.message || `Gagal mereset password ${terminology.teacher.toLowerCase()} massal.`, "danger");
+        } finally {
+          setBatchProgress(prev => ({ ...prev, isOpen: false }));
+        }
+      },
+      true,
+      "Ya, Reset Password"
+    );
+  };
+
   const defaultValues = useMemo(() => 
     selectedTeacher
       ? {
@@ -389,16 +486,44 @@ const TeachersPage = () => {
           ) : (
             <>
               {selectedIds.length > 0 && (
-            <Button 
-              variant="default" 
-              size="sm"
-              className="bg-rose-600 hover:bg-rose-700 dark:bg-rose-950/40 dark:text-rose-400 dark:border dark:border-rose-800/40 text-white rounded-xl font-bold shadow-lg shadow-rose-500/20 animate-in fade-in zoom-in duration-200 transition-all active:scale-95"
-              onClick={handleBatchDelete}
-            >
-              <Trash className="mr-1 h-3.5 w-3.5" />
-              Hapus ({selectedIds.length})
-            </Button>
-          )}
+                <div className="flex items-center gap-1.5 animate-in fade-in zoom-in duration-200">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="default"
+                        size="sm"
+                        className="rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold shadow-sm transition-all h-9 px-3.5 text-xs flex items-center gap-1.5"
+                      >
+                        <span>{selectedIds.length} - Aksi Masal</span>
+                        <ChevronDown className="h-3.5 w-3.5 opacity-70" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-60 p-1.5 rounded-2xl shadow-xl border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 z-[100]">
+                      <DropdownMenuLabel className="text-[10px] font-bold uppercase tracking-wider text-slate-400 px-2.5 py-1">
+                        Aksi ({selectedIds.length} {terminology.teacher})
+                      </DropdownMenuLabel>
+                      
+                      <DropdownMenuItem
+                        onClick={handleBatchResetPassword}
+                        className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl cursor-pointer text-xs font-semibold text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/40"
+                      >
+                        <KeyRound className="h-4 w-4" />
+                        <span>Reset Password (12345678)</span>
+                      </DropdownMenuItem>
+
+                      <DropdownMenuSeparator className="my-1 border-slate-100 dark:border-slate-800" />
+
+                      <DropdownMenuItem
+                        onClick={handleBatchDelete}
+                        className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl cursor-pointer text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40"
+                      >
+                        <Trash className="h-4 w-4" />
+                        <span>Hapus Data {terminology.teacher}</span>
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              )}
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

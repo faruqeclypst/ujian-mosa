@@ -1,8 +1,7 @@
-import { useState, useRef, useEffect, memo } from "react";
+import { useState, useRef, useEffect, memo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { KeyRound, AlertCircle } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../ui/dialog";
-import { Input } from "../ui/input";
 import { Button } from "../ui/button";
 import { useTenant } from "../../context/TenantContext";
 import { useStudentAuth } from "../../context/StudentAuthContext";
@@ -21,15 +20,24 @@ const TokenDialog = memo(({ selectedRoom, onClose }: TokenDialogProps) => {
   const [tokenError, setTokenError] = useState("");
   const [isValidating, setIsValidating] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const prevRoomIdRef = useRef<string | null>(null);
 
+  // Fokus hanya satu kali saat modal pertama kali dibuka untuk room tertentu
   useEffect(() => {
-    if (selectedRoom) {
-      const timer = setTimeout(() => {
-        inputRef.current?.focus();
-      }, 150);
-      return () => clearTimeout(timer);
+    if (selectedRoom?.id) {
+      if (selectedRoom.id !== prevRoomIdRef.current) {
+        prevRoomIdRef.current = selectedRoom.id;
+        setTokenInput("");
+        setTokenError("");
+        const timer = setTimeout(() => {
+          inputRef.current?.focus();
+        }, 50);
+        return () => clearTimeout(timer);
+      }
+    } else {
+      prevRoomIdRef.current = null;
     }
-  }, [selectedRoom]);
+  }, [selectedRoom?.id]);
 
   const handleClose = () => {
     if (isValidating) return;
@@ -38,15 +46,34 @@ const TokenDialog = memo(({ selectedRoom, onClose }: TokenDialogProps) => {
     onClose();
   };
 
+  // Typing handler yang ultra-responsif (0ms lag, langsung uppercase di JS agar keyboard HP tidak glitch)
+  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value.toUpperCase().replace(/\s/g, "");
+    setTokenInput(val);
+    setTokenError("");
+  }, []);
+
   const handleValidateToken = async () => {
     if (!selectedRoom || !student || !pb) return;
+    const input = tokenInput.trim().toUpperCase();
+    if (!input) return;
+
     setTokenError("");
     setIsValidating(true);
+
     try {
-      // Fetch room & settings secara paralel — hemat 1 round trip
+      // 1. FAST-PATH: Jika token langsung cocok dengan data room yang sudah di-load di memori
+      const localRoomToken = (selectedRoom.token || "").toString().trim().toUpperCase();
+      if (localRoomToken && input === localRoomToken) {
+        sessionStorage.setItem("activeCBTRoomId", selectedRoom.id);
+        document.documentElement.requestFullscreen?.().catch(() => {});
+        navigate("/cbt");
+        return;
+      }
+
+      // 2. SLOW-PATH: Jika belum cocok (misal proctor baru saja generate token baru atau pakai universal token)
       const [freshRoom, settingsRecords] = await Promise.all([
         pb.collection("exam_rooms").getOne(selectedRoom.id, { requestKey: null }).catch(async () => {
-          // Fallback ke getList jika getOne tidak diizinkan oleh API rules
           const list = await pb.collection("exam_rooms").getFullList({
             filter: `id = "${selectedRoom.id}"`,
             limit: 1,
@@ -70,18 +97,14 @@ const TokenDialog = memo(({ selectedRoom, onClose }: TokenDialogProps) => {
         settingsRecords?.globalToken ||
         ""
       ).toString().trim().toUpperCase();
-      const roomToken = (freshRoom.token || "").toString().trim().toUpperCase();
-      const input = tokenInput.trim().toUpperCase();
+      const freshRoomToken = (freshRoom.token || "").toString().trim().toUpperCase();
 
-      if (input !== globalToken && input !== roomToken) {
+      if (input !== globalToken && input !== freshRoomToken) {
         throw new Error("Token yang Anda masukkan belum tepat. Silakan cek kembali.");
       }
 
       sessionStorage.setItem("activeCBTRoomId", selectedRoom.id);
-
-      // Fullscreen tidak perlu di-await — tidak memblokir navigasi
       document.documentElement.requestFullscreen?.().catch(() => {});
-
       navigate("/cbt");
     } catch (err: any) {
       setTokenError(err.message || "Terjadi kesalahan saat verifikasi.");
@@ -110,20 +133,26 @@ const TokenDialog = memo(({ selectedRoom, onClose }: TokenDialogProps) => {
               <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 block">
                 Token Ujian
               </label>
-              <Input
+              <input
                 ref={inputRef}
-                autoFocus
+                type="text"
                 value={tokenInput}
-                onChange={(e) => setTokenInput(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter" && tokenInput && !isValidating) handleValidateToken(); }}
+                onChange={handleInputChange}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && tokenInput && !isValidating) {
+                    e.preventDefault();
+                    handleValidateToken();
+                  }
+                }}
                 placeholder="ISI TOKEN"
-                className="h-14 text-center text-2xl font-black bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 rounded-lg uppercase select-text pointer-events-auto"
+                className="h-14 w-full text-center text-2xl font-black bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg uppercase tracking-wider text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-none disabled:opacity-50 select-text pointer-events-auto"
                 disabled={isValidating}
                 inputMode="text"
                 autoCapitalize="characters"
                 autoCorrect="off"
-                autoComplete="off"
+                autoComplete="one-time-code"
                 spellCheck={false}
+                maxLength={20}
               />
               {tokenError && (
                 <p className="text-rose-500 text-[9px] font-bold mt-2 flex items-center gap-1 uppercase text-left">

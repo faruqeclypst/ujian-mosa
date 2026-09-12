@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, memo, useRef } from "react";
+import { useEffect, useState, useCallback, useMemo, memo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useStudentAuth } from "../../context/StudentAuthContext";
 import { Button } from "../../components/ui/button";
@@ -144,6 +144,8 @@ const StudentDashboardPage = () => {
   const { changePassword } = useStudentAuth();
 
   const isSyncingRef = useRef(false);
+  const selectedRoomRef = useRef<any>(null);
+  selectedRoomRef.current = selectedRoom;
 
   const handleManualSync = async () => {
     if (!student || isSyncingRef.current || !navigator.onLine || !pb) return;
@@ -168,6 +170,9 @@ const StudentDashboardPage = () => {
     if (!student) return;
 
     const checkAndSync = () => {
+      // Jangan jalankan sync saat siswa sedang membuka dialog token agar mengetik tidak delay/terganggu
+      if (selectedRoomRef.current) return;
+
       const pending = Object.keys(localStorage).filter(k => k.startsWith(`pending_sync_${student.id}_`));
       const hasPending = pending.length > 0;
       setHasPendingSync(hasPending);
@@ -330,9 +335,13 @@ const StudentDashboardPage = () => {
 
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
     const triggerDebouncedFetch = () => {
+      // Jika modal token sedang terbuka, tahan refetch background agar siswa mengetik lancar
+      if (selectedRoomRef.current) return;
       if (debounceTimer) clearTimeout(debounceTimer);
       debounceTimer = setTimeout(() => {
-        fetchData(true);
+        if (!selectedRoomRef.current) {
+          fetchData(true);
+        }
       }, 1000);
     };
 
@@ -395,10 +404,10 @@ const StudentDashboardPage = () => {
     return finished || expired;
   }).length;
 
-  const bannerMessages = [
+  const bannerMessages = useMemo(() => [
     { text: "Anda memiliki", highlight: `${totalActive} agenda ujian aktif`, suffix: "hari ini." },
     { text: "Tercatat sebanyak", highlight: `${totalFinished} agenda ujian`, suffix: "telah selesai." }
-  ];
+  ], [totalActive, totalFinished]);
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 font-sans pb-20 sm:pb-0">
