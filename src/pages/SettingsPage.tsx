@@ -31,8 +31,18 @@ import {
   Monitor,
   HelpCircle,
   LayoutTemplate,
-  Zap
+  Zap,
+  Globe,
+  Copy,
+  Check,
+  ExternalLink,
+  ShieldCheck,
+  Info,
+  ChevronDown,
+  ChevronUp,
+  Server
 } from "lucide-react";
+import { getSchoolDomain, getSchoolUrl } from "../utils/domainHelper";
 
 const COLLECTIONS = [
   "users",
@@ -83,6 +93,40 @@ const SettingsPage = () => {
   const [importProgress, setImportProgress] = useState(0);
   const [importStatus, setImportStatus] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // 🌐 Custom Domain & DNS Copy States
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [showDnsGuide, setShowDnsGuide] = useState(false);
+  const SERVER_IP = "64.235.41.108";
+
+  const getDnsHostName = (domain?: string): string => {
+    if (!domain) return "@";
+    const clean = domain.trim().toLowerCase();
+    const parts = clean.split(".");
+    const twoLevelTlds = [".sch.id", ".ac.id", ".go.id", ".my.id", ".co.id", ".or.id", ".ponpes.id"];
+    const hasTwoLevelTld = twoLevelTlds.some(tld => clean.endsWith(tld));
+    
+    if (hasTwoLevelTld) {
+      if (parts.length > 3) {
+        return parts.slice(0, parts.length - 3).join(".");
+      }
+      return "@";
+    }
+    
+    if (parts.length > 2) {
+      return parts.slice(0, parts.length - 2).join(".");
+    }
+    return "@";
+  };
+
+  const handleCopy = (text: string, key: string) => {
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(text);
+    }
+    setCopiedKey(key);
+    addToast({ title: "Tersalin!", description: `${text} berhasil disalin ke clipboard.`, type: "success" });
+    setTimeout(() => setCopiedKey(null), 2000);
+  };
 
   // 📝 Question Types Management
   const [allowedTypes, setAllowedTypes] = useState<Record<string, boolean>>({
@@ -1069,8 +1113,208 @@ const SettingsPage = () => {
           </Card>
         </div>
 
-        {/* ── Right Column: Danger Zone & Theme ── */}
+        {/* ── Right Column: Domain, Danger Zone & Theme ── */}
         <div className="space-y-6">
+          {/* ── Domain & Akses Sistem Card ── */}
+          <Card className="rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900 overflow-hidden">
+            <CardHeader className="p-5 pb-3 border-b border-slate-100 dark:border-slate-800 flex flex-row items-center justify-between">
+              <CardTitle className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 flex items-center gap-2">
+                <Globe size={14} className="text-blue-600 dark:text-blue-400" /> Domain & Akses Sistem
+              </CardTitle>
+              {school?.custom_domain ? (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/60">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  Custom Domain Aktif
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400">
+                  Subdomain Default
+                </span>
+              )}
+            </CardHeader>
+            <CardContent className="p-5 space-y-4">
+              {/* Alamat Domain */}
+              <div className="space-y-3">
+                {school?.custom_domain ? (
+                  <>
+                    <div>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
+                        Domain Resmi Sekolah (Utama)
+                      </span>
+                      <div className="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700">
+                        <span className="font-mono text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate">
+                          https://{school.custom_domain}
+                        </span>
+                        <a
+                          href={`https://${school.custom_domain}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-2.5 py-1 text-xs font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg hover:shadow-sm transition-all flex items-center gap-1 shrink-0"
+                        >
+                          Buka <ExternalLink size={12} />
+                        </a>
+                      </div>
+                    </div>
+
+                    <div>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
+                        Domain Cadangan (Bawaan Sistem)
+                      </span>
+                      <div className="flex items-center justify-between gap-2 p-2 rounded-lg bg-slate-50/50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 text-slate-600 dark:text-slate-400 text-xs">
+                        <span className="font-mono truncate">{getSchoolDomain(school?.slug || "")}</span>
+                        <a
+                          href={getSchoolUrl(school?.slug || "")}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="hover:text-blue-600 text-[11px] font-medium transition-colors shrink-0 flex items-center gap-1"
+                        >
+                          Buka <ExternalLink size={10} />
+                        </a>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
+                      Alamat Akses Ujian
+                    </span>
+                    <div className="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700">
+                      <span className="font-mono text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate">
+                        {getSchoolDomain(school?.slug || "")}
+                      </span>
+                      <a
+                        href={getSchoolUrl(school?.slug || "")}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-2.5 py-1 text-xs font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg hover:shadow-sm transition-all flex items-center gap-1 shrink-0"
+                      >
+                        Buka <ExternalLink size={12} />
+                      </a>
+                    </div>
+                    
+                    <div className="mt-3 p-3 rounded-xl bg-blue-50/70 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900/50 space-y-2">
+                      <div className="flex items-start gap-2">
+                        <Info size={14} className="text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
+                        <div className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
+                          Ingin memakai domain sekolah sendiri (cth: <code className="text-blue-600 dark:text-blue-400 font-mono font-semibold">cbt.sekolah.sch.id</code>)? Minta Administrator Pusat mengaktifkannya.
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowDnsGuide(!showDnsGuide)}
+                        className="text-[11px] font-bold text-blue-600 hover:text-blue-700 dark:text-blue-400 flex items-center gap-1 pt-1"
+                      >
+                        {showDnsGuide ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                        {showDnsGuide ? "Tutup Petunjuk DNS" : "Lihat Petunjuk DNS untuk Admin IT Domain"}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* ── Petunjuk DNS (Muncul jika custom_domain telah diset ATAU tombol buka panduan diklik) ── */}
+              {(school?.custom_domain || showDnsGuide) && (
+                <div className="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-3">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800 dark:text-slate-200">
+                    <ShieldCheck size={14} className="text-emerald-500" />
+                    Panduan Konfigurasi DNS di Domain Anda
+                  </div>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                    Pengelola domain sekolah wajib mengarahkan DNS record di panel penyedia domain (seperti Cloudflare, Niagahoster, Rumahweb, cPanel, dll) ke server CBT:
+                  </p>
+
+                  <div className="space-y-2">
+                    {/* Opsi 1: A Record */}
+                    <div className="p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-800/50 space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-black uppercase text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/50 border border-blue-200/50 px-1.5 py-0.5 rounded">
+                          Opsi 1 (A Record - Disarankan)
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleCopy(SERVER_IP, "a-record")}
+                          className="text-[10px] font-bold text-slate-600 dark:text-slate-300 hover:text-blue-600 flex items-center gap-1 py-0.5 px-2 rounded bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 shadow-xs transition-all active:scale-95"
+                        >
+                          {copiedKey === "a-record" ? (
+                            <><Check size={11} className="text-emerald-500" /> Tersalin!</>
+                          ) : (
+                            <><Copy size={11} /> Salin IP</>
+                          )}
+                        </button>
+                      </div>
+                      <div className="grid grid-cols-3 gap-1 text-[11px] font-mono">
+                        <div>
+                          <span className="text-[9px] font-sans font-bold text-slate-400 uppercase block">Type</span>
+                          <span className="font-bold text-slate-800 dark:text-slate-200">A</span>
+                        </div>
+                        <div>
+                          <span className="text-[9px] font-sans font-bold text-slate-400 uppercase block">Host / Name</span>
+                          <span className="text-slate-800 dark:text-slate-200 truncate block">
+                            {school?.custom_domain ? getDnsHostName(school.custom_domain) : "cbt (atau @)"}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-[9px] font-sans font-bold text-slate-400 uppercase block">Value / IP Target</span>
+                          <span className="font-bold text-blue-600 dark:text-blue-400">{SERVER_IP}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Opsi 2: CNAME Record */}
+                    <div className="p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-800/50 space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-black uppercase text-slate-600 dark:text-slate-400 bg-slate-200/60 dark:bg-slate-700 px-1.5 py-0.5 rounded">
+                          Opsi 2 (CNAME Record)
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleCopy(`${school?.slug}.examku.my.id`, "cname")}
+                          className="text-[10px] font-bold text-slate-600 dark:text-slate-300 hover:text-blue-600 flex items-center gap-1 py-0.5 px-2 rounded bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 shadow-xs transition-all active:scale-95"
+                        >
+                          {copiedKey === "cname" ? (
+                            <><Check size={11} className="text-emerald-500" /> Tersalin!</>
+                          ) : (
+                            <><Copy size={11} /> Salin Target</>
+                          )}
+                        </button>
+                      </div>
+                      <div className="grid grid-cols-3 gap-1 text-[11px] font-mono">
+                        <div>
+                          <span className="text-[9px] font-sans font-bold text-slate-400 uppercase block">Type</span>
+                          <span className="font-bold text-slate-800 dark:text-slate-200">CNAME</span>
+                        </div>
+                        <div>
+                          <span className="text-[9px] font-sans font-bold text-slate-400 uppercase block">Host / Name</span>
+                          <span className="text-slate-800 dark:text-slate-200 truncate block">
+                            {school?.custom_domain ? getDnsHostName(school.custom_domain) : "cbt"}
+                          </span>
+                        </div>
+                        <div className="truncate">
+                          <span className="text-[9px] font-sans font-bold text-slate-400 uppercase block">Target CNAME</span>
+                          <span className="text-blue-600 dark:text-blue-400 truncate block text-[10px]">
+                            {school?.slug}.examku.my.id
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Catatan Penting */}
+                  <div className="p-2.5 rounded-xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200/60 dark:border-amber-900/40 text-[10px] text-amber-900 dark:text-amber-300 space-y-1">
+                    <p className="font-semibold flex items-center gap-1">
+                      <AlertTriangle size={12} className="text-amber-600 shrink-0" /> Catatan Penting:
+                    </p>
+                    <ul className="list-disc pl-4 space-y-0.5 text-amber-800/90 dark:text-amber-300/90">
+                      <li>Sertifikat SSL (HTTPS) otomatis terbit oleh server kami saat domain pertama kali diakses.</li>
+                      <li>Jika memakai <strong>Cloudflare</strong>, pastikan proxy dimatikan (atur ke <em>DNS Only</em> / awan abu-abu).</li>
+                      <li>Perubahan DNS membutuhkan waktu propagasi antara 5 hingga 30 menit.</li>
+                    </ul>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
           <Card className="rounded-2xl border border-slate-200 dark:border-indigo-500/20 shadow-sm bg-gradient-to-br from-indigo-600 to-blue-700 dark:from-indigo-950/80 dark:to-slate-900 text-white overflow-hidden relative">
             <div className="absolute top-0 right-0 p-4 opacity-10 dark:opacity-5">
               <Database size={80} />

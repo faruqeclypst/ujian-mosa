@@ -287,18 +287,18 @@ const ClassesPage = () => {
           </h2>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Kelola daftar {terminology.class.toLowerCase()} untuk pengelompokan {terminology.student.toLowerCase()}.</p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-stretch sm:items-center gap-2 w-full sm:w-auto">
           {loading ? (
              <>
-               <Skeleton className="h-9 w-28 rounded-2xl" />
-               <Skeleton className="h-9 w-28 rounded-2xl" />
+               <Skeleton className="h-9 w-28 rounded-xl" />
+               <Skeleton className="h-9 w-28 rounded-xl" />
              </>
           ) : (
             <>
               {selectedIds.length > 0 && (
             <Button 
               variant="default" 
-              size="sm"
+              size="sm" 
               className="bg-rose-600 hover:bg-rose-700 dark:bg-rose-950/40 dark:text-rose-400 dark:border dark:border-rose-800/40 text-white rounded-xl font-bold shadow-lg shadow-rose-500/20 animate-in fade-in zoom-in duration-200 transition-all active:scale-95"
               onClick={handleBatchDelete}
             >
@@ -309,7 +309,7 @@ const ClassesPage = () => {
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="secondary" size="sm" className="rounded-2xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 dark:hover:bg-emerald-900/40 dark:border-emerald-800/40 text-emerald-700 font-bold shadow-sm transition-all h-9 px-4">
+              <Button variant="softSuccess" size="sm" className="rounded-xl font-bold shadow-sm transition-all h-9 px-3.5">
                 <FileSpreadsheet className="mr-1.5 h-3.5 w-3.5" />
                 Opsi Data
                 <ChevronDown className="ml-1.5 h-3 w-3 opacity-50" />
@@ -364,8 +364,8 @@ const ClassesPage = () => {
 
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
-              <Button onClick={() => { setSelectedClass(null); setIsDialogOpen(true); }} size="sm" className="rounded-2xl bg-blue-50 hover:bg-blue-100 active:bg-blue-50 border border-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 dark:active:bg-blue-900/30 dark:border-blue-800/40 text-blue-700 font-bold shadow-sm h-9 px-4 focus-visible:ring-0 focus-visible:ring-offset-0">
-                <Plus className="mr-1 h-3.5 w-3.5" />
+              <Button onClick={() => { setSelectedClass(null); setIsDialogOpen(true); }} size="sm" className="rounded-2xl bg-blue-50 hover:bg-blue-100 active:bg-blue-50 border border-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 dark:active:bg-blue-900/30 dark:border-blue-800/40 text-blue-700 font-bold shadow-sm h-9 px-4">
+                <Plus className="mr-1.5 h-3.5 w-3.5" />
                 Tambah {terminology.class}
               </Button>
             </DialogTrigger>

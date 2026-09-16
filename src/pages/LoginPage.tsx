@@ -95,7 +95,7 @@ const LoginPage = () => {
   };
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-gradient-to-br from-blue-50 via-blue-100 to-blue-200 dark:from-gray-900 dark:via-blue-900/20 dark:to-blue-800/20">
+    <div className="relative flex min-h-[100dvh] flex-col items-center justify-center overflow-y-auto px-4 py-8 bg-gradient-to-br from-blue-50 via-blue-100 to-blue-200 dark:from-gray-900 dark:via-blue-900/20 dark:to-blue-800/20">
       {/* Floating Change School Button (Android Only) */}
       {Capacitor.getPlatform() === 'android' && (
         <div className="absolute top-6 left-6 z-50">
@@ -125,7 +125,7 @@ const LoginPage = () => {
         </button>
       </div>
       {/* Animated Background Elements */}
-      <div className="absolute inset-0 overflow-hidden">
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <motion.div
           animate={{
             scale: [1, 1.2, 1],
@@ -177,7 +177,7 @@ const LoginPage = () => {
             repeat: Infinity,
             delay: i * 0.5,
           }}
-          className="absolute h-2 w-2 rounded-full bg-blue-500/40"
+          className="absolute h-2 w-2 rounded-full bg-blue-500/40 pointer-events-none"
           style={{
             left: `${20 + i * 15}%`,
             top: `${30 + i * 10}%`,
@@ -186,21 +186,21 @@ const LoginPage = () => {
       ))}
 
       <motion.div
-        initial={{ opacity: 0, y: 30, scale: 0.9 }}
+        initial={{ opacity: 0, y: 20, scale: 0.95 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{
-          duration: 0.6,
+          duration: 0.5,
           type: "spring",
           stiffness: 100,
           damping: 15
         }}
-        className="relative z-10 w-full max-w-md p-6"
+        className="relative z-10 w-full max-w-md my-auto"
       >
-        <Card className="relative overflow-hidden rounded-3xl border-0 bg-white/80 shadow-2xl backdrop-blur-xl dark:bg-gray-900/80">
+        <Card className="relative overflow-hidden rounded-2xl sm:rounded-3xl border-0 bg-white/85 shadow-2xl backdrop-blur-xl dark:bg-gray-900/85">
           {/* Card Header Decoration */}
           <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-blue-500 via-blue-600 to-blue-700" />
 
-          <CardHeader className="relative space-y-4 pb-8 pt-8 text-center">
+          <CardHeader className="relative space-y-2 sm:space-y-4 pb-4 sm:pb-8 pt-6 sm:pt-8 text-center">
             <motion.div
               initial={{ scale: 0, rotate: -180 }}
               animate={{ scale: 1, rotate: 0 }}
@@ -210,16 +210,16 @@ const LoginPage = () => {
                 stiffness: 200,
                 damping: 15
               }}
-              className="mx-auto flex items-center justify-center gap-4 py-2"
+              className="mx-auto flex items-center justify-center gap-4 py-1"
             >
               {logoLoading ? (
-                <div className="flex items-center justify-center h-24 w-24 bg-slate-100 dark:bg-slate-800 rounded-2xl animate-pulse">
-                  <div className="h-8 w-8 rounded-full border-2 border-blue-500 border-t-transparent animate-spin" />
+                <div className="flex items-center justify-center h-16 w-16 sm:h-24 sm:w-24 bg-slate-100 dark:bg-slate-800 rounded-2xl animate-pulse">
+                  <div className="h-6 w-6 sm:h-8 sm:w-8 rounded-full border-2 border-blue-500 border-t-transparent animate-spin" />
                 </div>
               ) : (
                 <div className="flex items-center justify-center">
                   {schoolLogo && !logoError ? (
-                    <div className="h-24 w-24 md:h-32 md:w-32 flex items-center justify-center p-1">
+                    <div className="h-16 w-16 sm:h-24 sm:w-24 md:h-32 md:w-32 flex items-center justify-center p-1">
                       <img
                         src={schoolLogo}
                         alt="Logo Sekolah"
@@ -228,7 +228,7 @@ const LoginPage = () => {
                       />
                     </div>
                   ) : (
-                    <div className="h-20 w-20 md:h-24 md:w-24 flex items-center justify-center p-1">
+                    <div className="h-14 w-14 sm:h-20 sm:w-20 md:h-24 md:w-24 flex items-center justify-center p-1">
                       <img
                         src="/logo-default.png"
                         alt="Logo Default"
@@ -241,23 +241,23 @@ const LoginPage = () => {
             </motion.div>
 
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0, y: 15 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3 }}
             >
-              <CardTitle className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent dark:from-white dark:to-gray-300">
+              <CardTitle className="text-xl sm:text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent dark:from-white dark:to-gray-300">
                 Selamat Datang Kembali
               </CardTitle>
-              <CardDescription className="mt-2 text-gray-600 dark:text-gray-400">
+              <CardDescription className="mt-1 sm:mt-2 text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                 Masuk ke dashboard dengan akun admin Anda
               </CardDescription>
             </motion.div>
           </CardHeader>
 
-          <CardContent className="space-y-6 px-8 pb-8">
+          <CardContent className="space-y-4 sm:space-y-6 px-5 sm:px-8 pb-6 sm:pb-8">
             <motion.form
               onSubmit={handleSubmit(onSubmit)}
-              className="space-y-5"
+              className="space-y-3.5 sm:space-y-5"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.4 }}

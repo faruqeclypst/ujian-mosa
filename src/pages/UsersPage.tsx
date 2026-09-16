@@ -279,8 +279,8 @@ const UsersPage = () => {
           <Badge variant="outline" className="bg-white/50 dark:bg-slate-900/50 text-[10px] font-bold px-3 py-1.5 border-slate-200 dark:border-slate-800 rounded-xl">
             {users.length} Total Akun
           </Badge>
-          <Button onClick={handleCreateAdmin} size="sm" className="rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold shadow-md shadow-indigo-500/20 h-10 px-5">
-            <Plus className="mr-2 h-4 w-4" /> Admin Baru
+          <Button onClick={handleCreateAdmin} size="sm" className="rounded-2xl bg-blue-50 hover:bg-blue-100 active:bg-blue-50 border border-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 dark:active:bg-blue-900/30 dark:border-blue-800/40 text-blue-700 font-bold shadow-sm h-9 px-4">
+            <Plus className="mr-1.5 h-3.5 w-3.5" /> Admin Baru
           </Button>
         </div>
       </div>

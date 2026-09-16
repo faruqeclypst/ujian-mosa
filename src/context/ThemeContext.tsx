@@ -1,4 +1,29 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { Capacitor, registerPlugin } from '@capacitor/core';
+
+const CheatAlert = registerPlugin<any>('CheatAlert');
+
+const syncNativeTheme = (currentTheme: 'light' | 'dark') => {
+  const themeColor = currentTheme === 'dark' ? '#0f172a' : '#ffffff';
+
+  // 1. Update HTML meta theme-color
+  try {
+    let metaTheme = document.querySelector('meta[name="theme-color"]');
+    if (!metaTheme) {
+      metaTheme = document.createElement('meta');
+      metaTheme.setAttribute('name', 'theme-color');
+      document.head.appendChild(metaTheme);
+    }
+    metaTheme.setAttribute('content', themeColor);
+  } catch (_) {}
+
+  // 2. Synchronize Android native status bar & notch cutout background
+  if (Capacitor.isNativePlatform()) {
+    try {
+      CheatAlert.setStatusBarTheme({ theme: currentTheme, color: themeColor });
+    } catch (_) {}
+  }
+};
 
 type Theme = 'light' | 'dark' | 'system';
 
@@ -24,7 +49,7 @@ interface ThemeProviderProps {
   defaultTheme?: Theme;
 }
 
-export function ThemeProvider({ children, defaultTheme = 'system' }: ThemeProviderProps) {
+export function ThemeProvider({ children, defaultTheme = 'light' }: ThemeProviderProps) {
   const [theme, setTheme] = useState<Theme>(() => {
     if (typeof window !== 'undefined') {
       return (localStorage.getItem('theme') as Theme) || defaultTheme;
@@ -52,6 +77,7 @@ export function ThemeProvider({ children, defaultTheme = 'system' }: ThemeProvid
     }
 
     setActualTheme(newActualTheme);
+    syncNativeTheme(newActualTheme);
 
     // Store in localStorage
     localStorage.setItem('theme', theme);
@@ -70,6 +96,7 @@ export function ThemeProvider({ children, defaultTheme = 'system' }: ThemeProvid
       const newTheme = e.matches ? 'dark' : 'light';
       root.classList.add(newTheme);
       setActualTheme(newTheme);
+      syncNativeTheme(newTheme);
     };
 
     mediaQuery.addEventListener('change', handleChange);

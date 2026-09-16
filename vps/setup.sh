@@ -118,10 +118,15 @@ const triggerProvisioning = (e) => {
         port = nextPort;
     }
 
+    const customDomain = (e.record.get("custom_domain") || "").trim();
+
     if (isActive) {
-        console.log("[Provisioning] Orchestrating:", slug, "on port:", port);
+        console.log("[Provisioning] Orchestrating:", slug, "on port:", port, "customDomain:", customDomain);
         try { 
-            $os.cmd("bash", "-c", "/usr/local/bin/add-school.sh " + slug + " " + port).run(); 
+            const cmd = customDomain 
+                ? "/usr/local/bin/add-school.sh " + slug + " " + port + " " + customDomain
+                : "/usr/local/bin/add-school.sh " + slug + " " + port;
+            $os.cmd("bash", "-c", cmd).run(); 
         } catch (err) { console.log("[Provisioning] Error:", err); }
     }
     return e.next();
@@ -147,9 +152,18 @@ cat > /usr/local/bin/add-school.sh << 'EOF'
 #!/bin/bash
 SLUG=$1
 PORT=$2
-DOMAIN="${SLUG}.alfaruqasri.my.id"
+CUSTOM_DOMAIN=$3
 
 if [ -z "$SLUG" ] || [ -z "$PORT" ]; then exit 1; fi
+
+# Clean custom domain (remove protocols, trailing slashes, whitespace)
+CUSTOM_DOMAIN=$(echo "$CUSTOM_DOMAIN" | sed -e 's|^[^/]*//||' -e 's|/.*$||' | tr -d '[:space:]')
+
+if [ -n "$CUSTOM_DOMAIN" ]; then
+    DOMAINS="${SLUG}.examku.my.id, ${CUSTOM_DOMAIN}"
+else
+    DOMAINS="${SLUG}.examku.my.id"
+fi
 
 TEMPLATE_DIR="/opt/pocketbase/schools/template"
 TARGET_DIR="/opt/pocketbase/schools/$SLUG"
@@ -185,7 +199,7 @@ systemctl restart "pb-${SLUG}.service"
 
 # Caddy Config
 cat > /etc/caddy/conf.d/${SLUG}.caddy << CADDYEOF
-$DOMAIN {
+$DOMAINS {
     root * /opt/frontend/ujian/dist
     file_server
     handle /api/* {

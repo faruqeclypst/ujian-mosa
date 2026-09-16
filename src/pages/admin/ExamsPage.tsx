@@ -434,10 +434,22 @@ const ExamsPage = () => {
     setConfirmDialog({ isOpen: true, title, description, type, confirmLabel: "OK", onConfirm: onConfirm || (() => { }) });
   };
 
-  const handleBatchArchive = () => {
+  const handleBatchArchive = async () => {
     if (selectedIds.length === 0) return;
-    const blockedExams = selectedIds.filter(id => activeExamIds.includes(id));
-    const validExams = selectedIds.filter(id => !activeExamIds.includes(id));
+    if (!pb) return;
+
+    let currentActiveExamIds = activeExamIds;
+    try {
+      const allRooms = await pb.collection('exam_rooms').getFullList({ requestKey: null });
+      const activeRooms = allRooms.filter(r => r.status !== "archive" && r.isActive !== false && !r.isDisabled);
+      currentActiveExamIds = activeRooms.map(r => r.examId).filter(Boolean);
+      setActiveExamIds(currentActiveExamIds);
+    } catch (err) {
+      console.warn("Gagal refresh ruang ujian:", err);
+    }
+
+    const blockedExams = selectedIds.filter(id => currentActiveExamIds.includes(id));
+    const validExams = selectedIds.filter(id => !currentActiveExamIds.includes(id));
     if (validExams.length === 0) {
       showAlert("Peringatan", "Semua Bank Soal yang dipilih sedang diujikan di Ruang Ujian aktif dan tidak dapat diarsipkan.", "warning");
       return;
@@ -504,10 +516,22 @@ const ExamsPage = () => {
     });
   };
 
-  const handleBatchDelete = () => {
+  const handleBatchDelete = async () => {
     if (selectedIds.length === 0) return;
-    const blockedExams = selectedIds.filter(id => activeExamIds.includes(id));
-    const validExams = selectedIds.filter(id => !activeExamIds.includes(id));
+    if (!pb) return;
+
+    let currentActiveExamIds = activeExamIds;
+    try {
+      const allRooms = await pb.collection('exam_rooms').getFullList({ requestKey: null });
+      const activeRooms = allRooms.filter(r => r.status !== "archive" && r.isActive !== false && !r.isDisabled);
+      currentActiveExamIds = activeRooms.map(r => r.examId).filter(Boolean);
+      setActiveExamIds(currentActiveExamIds);
+    } catch (err) {
+      console.warn("Gagal refresh ruang ujian:", err);
+    }
+
+    const blockedExams = selectedIds.filter(id => currentActiveExamIds.includes(id));
+    const validExams = selectedIds.filter(id => !currentActiveExamIds.includes(id));
     if (validExams.length === 0) {
       showAlert("Peringatan", "Semua Bank Soal yang dipilih sedang digunakan di Ruang Ujian aktif dan tidak dapat dihapus.", "warning");
       return;
@@ -555,8 +579,21 @@ const ExamsPage = () => {
     });
   };
 
-  const handleArchiveExam = (exam: any) => {
-    if (activeExamIds.includes(exam.id)) {
+  const handleArchiveExam = async (exam: any) => {
+    if (!pb) return;
+
+    let isCurrentlyActive = activeExamIds.includes(exam.id);
+    try {
+      const rooms = await pb.collection('exam_rooms').getFullList({
+        filter: `examId = "${exam.id}"`,
+        requestKey: null
+      });
+      isCurrentlyActive = rooms.some(r => r.status !== "archive" && r.isActive !== false && !r.isDisabled);
+    } catch (err) {
+      console.warn("Gagal cek ruang ujian aktif:", err);
+    }
+
+    if (isCurrentlyActive) {
       showAlert("Peringatan", "Batal mengarsipkan karena Bank Soal ini sedang diujikan di Ruang Ujian aktif.", "warning");
       return;
     }
@@ -602,9 +639,10 @@ const ExamsPage = () => {
       if (!pb) return;
       try {
         const rooms = await pb.collection('exam_rooms').getFullList({
-          filter: 'isActive = true'
+          requestKey: null
         });
-        setActiveExamIds(rooms.map(r => r.examId));
+        const activeRooms = rooms.filter(r => r.status !== "archive" && r.isActive !== false && !r.isDisabled);
+        setActiveExamIds(activeRooms.map(r => r.examId).filter(Boolean));
       } catch (e) {
         console.error("Gagal load data ruang ujian:", e);
       }
@@ -737,8 +775,21 @@ const ExamsPage = () => {
     setIsDialogOpen(true);
   };
 
-  const handleDeleteClick = (exam: ExamData) => {
-    if (activeExamIds.includes(exam.id)) {
+  const handleDeleteClick = async (exam: ExamData) => {
+    if (!pb) return;
+
+    let isCurrentlyActive = activeExamIds.includes(exam.id);
+    try {
+      const rooms = await pb.collection('exam_rooms').getFullList({
+        filter: `examId = "${exam.id}"`,
+        requestKey: null
+      });
+      isCurrentlyActive = rooms.some(r => r.status !== "archive" && r.isActive !== false && !r.isDisabled);
+    } catch (err) {
+      console.warn("Gagal cek ruang ujian aktif:", err);
+    }
+
+    if (isCurrentlyActive) {
       showAlert("Peringatan", "Batal menghapus karena Bank Soal ini sedang digunakan di Ruang Ujian aktif.", "warning");
       return;
     }
@@ -1053,8 +1104,8 @@ const ExamsPage = () => {
         const qGroupId = q.groupId || q.group_id || "";
         const qGroupText = q.groupText || q.group_text || "";
         if (qGroupId && qGroupId !== currentGroupId && qGroupText) {
-          const cleanWacana = cleanForWord(processHtmlInlineImages(processLatex(qGroupText), getAbsoluteUrl, imageMapping));
-          html += `<div class="wacana"><b>STIMULUS / BACAAN:</b><br/>${cleanWacana}</div>`;
+          const cleanLiterasi = cleanForWord(processHtmlInlineImages(processLatex(qGroupText), getAbsoluteUrl, imageMapping));
+          html += `<div class="wacana"><b>STIMULUS / LITERASI:</b><br/>${cleanLiterasi}</div>`;
           currentGroupId = qGroupId;
         }
 
@@ -1272,24 +1323,24 @@ const ExamsPage = () => {
           </h2>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Kelola master ujian dan rincian soal Bank Soal.</p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-stretch sm:items-center gap-2 w-full sm:w-auto">
           {isLoading ? (
             <>
               <Skeleton className="h-9 w-24 rounded-xl" />
-              <Skeleton className="h-9 w-32 rounded-2xl" />
+              <Skeleton className="h-9 w-32 rounded-xl" />
             </>
           ) : (
             <>
               <div className="flex bg-slate-100 dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-800/80 p-1 rounded-xl text-xs font-semibold">
                 <button 
                   onClick={() => setActiveTab("aktif")} 
-                  className={`px-3 py-1.5 rounded-lg transition-all ${ activeTab === "aktif" ? "bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 shadow-sm" : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200" }`}
+                  className={`min-h-[40px] sm:min-h-0 px-3.5 py-1.5 rounded-lg transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 ${ activeTab === "aktif" ? "bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 shadow-sm" : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200" }`}
                 >
                   Aktif
                 </button>
                 <button 
                   onClick={() => setActiveTab("arsip")} 
-                  className={`px-3 py-1.5 rounded-lg transition-all ${ activeTab === "arsip" ? "bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 shadow-sm" : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200" }`}
+                  className={`min-h-[40px] sm:min-h-0 px-3.5 py-1.5 rounded-lg transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 ${ activeTab === "arsip" ? "bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 shadow-sm" : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200" }`}
                 >
                   Arsip
                 </button>
@@ -1378,17 +1429,17 @@ const ExamsPage = () => {
                 <Button
                   onClick={() => handleBatchExport()}
                   size="sm"
-                  className="rounded-2xl bg-violet-50 hover:bg-violet-100 active:bg-violet-50 border border-violet-100 dark:bg-violet-900/30 dark:text-violet-400 dark:hover:bg-violet-900/50 dark:active:bg-violet-900/30 dark:border-violet-800/40 text-violet-700 font-bold shadow-sm h-9 px-4 focus-visible:ring-0 focus-visible:ring-offset-0"
+                  className="rounded-xl bg-violet-50 hover:bg-violet-100 active:bg-violet-50 border border-violet-200/80 dark:bg-violet-950/40 dark:text-violet-300 dark:hover:bg-violet-900/50 dark:border-violet-800/50 text-violet-700 font-bold shadow-sm h-9 px-3.5"
                 >
-                  <Download className="mr-1 h-3.5 w-3.5" /> Export Batch
+                  <Download className="mr-1.5 h-3.5 w-3.5" /> Export Batch
                 </Button>
               )}
-              <Button onClick={handleCreateClick} size="sm" className="rounded-2xl bg-blue-50 hover:bg-blue-100 active:bg-blue-50 border border-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 dark:active:bg-blue-900/30 dark:border-blue-800/40 text-blue-700 font-bold shadow-sm h-9 px-4 focus-visible:ring-0 focus-visible:ring-offset-0">
-                <Plus className="mr-1 h-3.5 w-3.5" /> Tambah Ujian
+              <Button onClick={handleCreateClick} size="sm" className="rounded-2xl bg-blue-50 hover:bg-blue-100 active:bg-blue-50 border border-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 dark:active:bg-blue-900/30 dark:border-blue-800/40 text-blue-700 font-bold shadow-sm h-9 px-4">
+                <Plus className="mr-1.5 h-3.5 w-3.5" /> Tambah Ujian
               </Button>
               {role === "admin" && (
-                <Button onClick={() => setIsReportOpen(true)} size="sm" className="rounded-2xl bg-emerald-50 hover:bg-emerald-100 active:bg-emerald-50 border border-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-400 dark:hover:bg-emerald-900/50 dark:active:bg-emerald-900/30 dark:border-emerald-800/40 text-emerald-700 font-bold shadow-sm h-9 px-4 focus-visible:ring-0 focus-visible:ring-offset-0">
-                  <ClipboardList className="mr-1 h-3.5 w-3.5" /> Laporan
+                <Button onClick={() => setIsReportOpen(true)} size="sm" variant="softSuccess" className="rounded-xl font-bold shadow-sm h-9 px-3.5">
+                  <ClipboardList className="mr-1.5 h-3.5 w-3.5" /> Laporan
                 </Button>
               )}
             </>
@@ -1572,7 +1623,7 @@ const ExamsPage = () => {
               </FormField>
             )}
 
-            <Button type="submit" className="w-full bg-blue-50 hover:bg-blue-100 border border-blue-100 dark:bg-blue-900/40 dark:text-blue-400 dark:hover:bg-blue-900/60 dark:border-blue-800/20 text-blue-700 font-semibold">{dialogMode === "edit" ? "Perbarui" : "Simpan"}</Button>
+            <Button type="submit" className="w-full h-11 rounded-xl font-bold shadow-md">{dialogMode === "edit" ? "Perbarui" : "Simpan"}</Button>
           </form>
         </DialogContent>
       </Dialog>

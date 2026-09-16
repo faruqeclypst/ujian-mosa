@@ -163,38 +163,54 @@ const LiveScoreViewPage = () => {
     targetQuestions.forEach((q: any) => {
       const type = q.type || "pilihan_ganda";
       const isEssay = type === "isian_singkat" || type === "uraian";
-      let itemCorrect = false;
+      let itemScore = 0;
 
       if (overrides[q.id] !== undefined) {
-        itemCorrect = overrides[q.id];
+        itemScore = overrides[q.id] === true ? 1 : (typeof overrides[q.id] === "number" ? overrides[q.id] : 0);
       } else {
         const ansId = sisAnswers[q.id];
         if (ansId !== undefined && ansId !== null) {
-          if (type === "pilihan_ganda" || type === "benar_salah") {
+          if (type === "pilihan_ganda") {
             const ck = Object.keys(q.choices || {}).find(k => k.toLowerCase() === String(ansId).toLowerCase());
-            itemCorrect = ck ? q.choices[ck].isCorrect === true : false;
+            itemScore = ck ? (q.choices[ck].isCorrect === true ? 1 : 0) : 0;
+          } else if (type === "benar_salah") {
+            const sts = q.statements || q.choices?.statements || [];
+            if (sts.length > 0) {
+              let stCorrect = 0;
+              sts.forEach((st: any) => {
+                const expected = (st.answer || "benar").toLowerCase();
+                const given = (ansId?.[st.id] || "").toLowerCase();
+                if (given === expected) stCorrect++;
+              });
+              itemScore = sts.length > 0 ? stCorrect / sts.length : 0;
+            } else {
+              const ck = Object.keys(q.choices || {}).find(k => k.toLowerCase() === String(ansId).toLowerCase());
+              itemScore = ck ? (q.choices[ck].isCorrect === true ? 1 : 0) : 0;
+            }
           } else if (type === "pilihan_ganda_kompleks") {
             const correctKeys = Object.keys(q.choices || {}).filter(k => q.choices[k].isCorrect).map(k => k.toLowerCase());
             const studentKeys = Array.isArray(ansId) ? ansId.map(k => String(k).toLowerCase()) : [];
-            itemCorrect = studentKeys.length === correctKeys.length && studentKeys.every(k => correctKeys.includes(k));
+            const correctChosen = studentKeys.filter(k => correctKeys.includes(k));
+            const wrongChosen = studentKeys.filter(k => !correctKeys.includes(k));
+            itemScore = correctKeys.length > 0 ? Math.max(0, correctChosen.length - wrongChosen.length) / correctKeys.length : 0;
           } else if (type === "isian_singkat") {
-            itemCorrect = isFuzzyMatch(ansId, q.answerKey);
+            itemScore = isFuzzyMatch(ansId, q.answerKey) ? 1 : 0;
           } else if (type === "urutkan" || type === "drag_drop") {
             const co = (q.items || []).map((it: any) => it.id);
-            itemCorrect = Array.isArray(ansId) && ansId.length === co.length && ansId.every((v, i) => v === co[i]);
+            itemScore = Array.isArray(ansId) && ansId.length === co.length && ansId.every((v, i) => v === co[i]) ? 1 : 0;
           } else if (type === "menjodohkan") {
             const pairs = q.pairs || [];
-            itemCorrect = pairs.length > 0 && pairs.every((p: any) => ansId[p.id] === p.right);
+            itemScore = pairs.length > 0 && pairs.every((p: any) => ansId[p.id] === p.right) ? 1 : 0;
           }
         }
       }
 
       if (isEssay) {
         essayTotal++;
-        if (itemCorrect) essayCorrect++;
+        essayCorrect += itemScore;
       } else {
         objectiveTotal++;
-        if (itemCorrect) objectiveCorrect++;
+        objectiveCorrect += itemScore;
       }
     });
 
@@ -234,11 +250,13 @@ const LiveScoreViewPage = () => {
           const typeMapReverse: Record<string, string> = {
             multiple_choice: "pilihan_ganda",
             complex_multiple_choice: "pilihan_ganda_kompleks",
+            complex_choice: "pilihan_ganda_kompleks",
             matching: "menjodohkan",
             true_false: "benar_salah",
             short_answer: "isian_singkat",
             essay: "uraian",
             ordering: "urutkan",
+            sequence: "urutkan",
             drag_drop: "drag_drop",
             pilihan_ganda: "pilihan_ganda",
             pilihan_ganda_kompleks: "pilihan_ganda_kompleks",
@@ -249,11 +267,15 @@ const LiveScoreViewPage = () => {
             benar_salah: "benar_salah"
           };
           const mappedType = typeMapReverse[rawType] || rawType;
-          const options = q.options || {};
+          let options = q.options || {};
+          if (typeof options === "string") {
+            try { options = JSON.parse(options); } catch (e) { options = {}; }
+          }
           return {
             ...q,
             type: mappedType,
             choices: options,
+            statements: (mappedType === "benar_salah" && Array.isArray(options.statements)) ? options.statements : undefined,
             pairs: mappedType === "menjodohkan" ? options.pairs : undefined,
             items: (mappedType === "urutkan" || mappedType === "drag_drop") ? options.items : undefined,
             answerKey: q.correctAnswer || q.answerKey

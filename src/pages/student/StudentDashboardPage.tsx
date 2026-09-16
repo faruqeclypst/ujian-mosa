@@ -18,7 +18,7 @@ import { Card, CardHeader, CardContent } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
 import { cn } from "../../lib/utils";
 import { syncPendingData } from "../../lib/syncManager";
-import TokenDialog from "../../components/dialogs/TokenDialog";
+import ExamConfirmationPage from "./ExamConfirmationPage";
 
 // ── Isolated banner: typing name + rotating message ──
 // memo + own state = tidak ikut re-render parent
@@ -126,6 +126,7 @@ const StudentDashboardPage = () => {
   const [schoolLogo, setSchoolLogo] = useState("");
 
   const [selectedRoom, setSelectedRoom] = useState<any>(null);
+  const [universalToken, setUniversalToken] = useState("");
   const handleCloseTokenDialog = useCallback(() => setSelectedRoom(null), []);
 
   const [activeRooms, setActiveRooms] = useState<any[]>([]);
@@ -200,12 +201,14 @@ const StudentDashboardPage = () => {
       // Only show full loading on initial mount
       if (loading && !isSilent) setLoading(true);
 
-      // Fetch settings (Skip if already have school info)
-      if (!schoolLogo || schoolName === "CBT System") {
+      // Fetch settings (Skip if already have school info & universal token)
+      if (!schoolLogo || schoolName === "CBT System" || !universalToken) {
         const settingsRecords = await pb.collection("settings").getFullList({ limit: 1, requestKey: "dashboard_settings" });
         if (settingsRecords.length > 0) {
           setSchoolName(settingsRecords[0].name || "CBT System");
           setSchoolLogo(settingsRecords[0].logoUrl || settingsRecords[0].logo || "");
+          const uTok = (settingsRecords[0].universal_token || settingsRecords[0].global_token || settingsRecords[0].globalToken || "").toString();
+          if (uTok) setUniversalToken(uTok);
         }
       }
 
@@ -409,9 +412,20 @@ const StudentDashboardPage = () => {
     { text: "Tercatat sebanyak", highlight: `${totalFinished} agenda ujian`, suffix: "telah selesai." }
   ], [totalActive, totalFinished]);
 
+  if (selectedRoom) {
+    return (
+      <ExamConfirmationPage
+        room={selectedRoom}
+        student={student}
+        universalToken={universalToken}
+        onBack={handleCloseTokenDialog}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 font-sans pb-20 sm:pb-0">
-      <header className="sticky top-0 z-50 bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 h-16 sm:h-20 px-3 sm:px-10 flex items-center justify-between shadow-sm">
+      <header className="sticky top-0 z-50 bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 min-h-[4rem] sm:min-h-[5rem] h-auto pt-[env(safe-area-inset-top,0px)] px-3 sm:px-10 flex items-center justify-between shadow-sm">
         <div className="flex items-center gap-2 sm:gap-3">
           <div className="p-1 sm:p-2 bg-emerald-50 dark:bg-emerald-950/40 rounded-xl sm:rounded-2xl border border-emerald-100/50 dark:border-emerald-800/50 shadow-sm shrink-0">
             {schoolLogo ? (
@@ -573,8 +587,16 @@ const StudentDashboardPage = () => {
                   <h3 className="text-sm sm:text-base font-black text-emerald-900 dark:text-slate-300 uppercase tracking-[0.3em]">Agenda Ujian</h3>
                 </div>
 
-                <div className="flex p-1 bg-slate-100 dark:bg-slate-800 rounded-xl w-fit">
-                  <button onClick={() => setActiveTab("active")} className={cn("px-4 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all", activeTab === "active" ? "bg-white dark:bg-slate-900 text-emerald-600 shadow-sm" : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-300")}>
+                <div className="flex p-1 bg-slate-100 dark:bg-slate-800 rounded-xl w-full sm:w-fit">
+                  <button 
+                    onClick={() => setActiveTab("active")} 
+                    className={cn(
+                      "flex-1 sm:flex-none min-h-[40px] px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-lg transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500", 
+                      activeTab === "active" 
+                        ? "bg-white dark:bg-slate-900 text-emerald-700 dark:text-emerald-400 shadow-sm font-black" 
+                        : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
+                    )}
+                  >
                     Aktif ({activeRooms.filter(r => {
                       const att = userAttempts[r.id];
                       const finished = att && (att.status === "finished" || att.status === "submitted" || att.status === "graded");
@@ -582,7 +604,15 @@ const StudentDashboardPage = () => {
                       return !finished && !expired;
                     }).length})
                   </button>
-                  <button onClick={() => setActiveTab("history")} className={cn("px-4 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all", activeTab === "history" ? "bg-white dark:bg-slate-900 text-emerald-600 shadow-sm" : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-300")}>
+                  <button 
+                    onClick={() => setActiveTab("history")} 
+                    className={cn(
+                      "flex-1 sm:flex-none min-h-[40px] px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-lg transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500", 
+                      activeTab === "history" 
+                        ? "bg-white dark:bg-slate-900 text-emerald-700 dark:text-emerald-400 shadow-sm font-black" 
+                        : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
+                    )}
+                  >
                     Selesai ({activeRooms.filter(r => {
                       const att = userAttempts[r.id];
                       const finished = att && (att.status === "finished" || att.status === "submitted" || att.status === "graded");
@@ -862,11 +892,6 @@ const StudentDashboardPage = () => {
           </div>
         </div>
       </main>
-
-      <TokenDialog
-        selectedRoom={selectedRoom}
-        onClose={handleCloseTokenDialog}
-      />
 
       {/* Manual Change Password Dialog */}
       <Dialog open={isChangePassOpen} onOpenChange={(open) => { if (!isChangingPass) setIsChangePassOpen(open); setPassError(""); setNewPass(""); setConfirmPass(""); }}>

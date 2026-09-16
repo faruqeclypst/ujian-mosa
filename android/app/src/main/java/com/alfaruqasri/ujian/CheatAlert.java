@@ -1,6 +1,9 @@
 package com.alfaruqasri.ujian;
 
 import android.util.Log;
+import android.content.Context;
+import android.os.PowerManager;
+import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
@@ -20,6 +23,24 @@ public class CheatAlert extends Plugin {
             return (MainActivity) getActivity();
         }
         return null;
+    }
+
+    @PluginMethod
+    public void getScreenState(PluginCall call) {
+        JSObject ret = new JSObject();
+        boolean isInteractive = true;
+        try {
+            PowerManager pm = (PowerManager) getContext().getSystemService(Context.POWER_SERVICE);
+            if (pm != null) {
+                isInteractive = pm.isInteractive();
+            }
+        } catch (Exception e) {}
+
+        long now = System.currentTimeMillis();
+        boolean wasScreenOffRecently = (MainActivity.isScreenOff || (now - MainActivity.lastScreenOffTime < 15000));
+        ret.put("isScreenOn", isInteractive);
+        ret.put("wasScreenOffRecently", wasScreenOffRecently);
+        call.resolve(ret);
     }
 
     @PluginMethod
@@ -83,6 +104,18 @@ public class CheatAlert extends Plugin {
         MainActivity act = getMainActivity();
         if (act != null) {
             act.exitAppInternal();
+        }
+        call.resolve();
+    }
+
+    @PluginMethod
+    public void setStatusBarTheme(PluginCall call) {
+        final String theme = call.getString("theme", "light");
+        final String color = call.getString("color", null);
+        Log.d(TAG, "setStatusBarTheme called from JS: theme=" + theme + ", color=" + color);
+        MainActivity act = getMainActivity();
+        if (act != null) {
+            act.setThemeModeInternal(theme, color);
         }
         call.resolve();
     }

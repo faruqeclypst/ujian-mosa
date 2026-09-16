@@ -179,33 +179,286 @@ const isFuzzyMatch = (studentAns: any, correctKey: string) => {
   return dist <= maxAllowed;
 };
 
-// Helper for answer comparison (all types)
-const checkAns = (q: any, studentAns: any, overrides?: Record<string, boolean>) => {
-  if (overrides && overrides[q.id] !== undefined) return overrides[q.id];
-  if (!studentAns) return false;
+// Helper to get target questions for a student attempt
+const getTargetQuestions = (
+  allQuestions: any[],
+  answers: Record<string, any>,
+  maxQuestions?: number
+) => {
+  if (!allQuestions || allQuestions.length === 0) return [];
+  const studentOrder = (answers as any)?.__order__ || (answers as any)?.__meta?.questionOrder;
+  const isRandomSubset = Number(maxQuestions) > 0 && Number(maxQuestions) < allQuestions.length;
+
+  if (Array.isArray(studentOrder) && studentOrder.length > 0) {
+    const answeredQIds = Object.keys(answers || {}).filter(k => !k.startsWith("__"));
+    const allStudentQIds = Array.from(new Set([...studentOrder, ...answeredQIds]));
+
+    if (isRandomSubset) {
+      const filtered = allQuestions.filter((q: any) => allStudentQIds.includes(q.id));
+      return filtered.sort((a: any, b: any) => {
+        const idxA = studentOrder.indexOf(a.id);
+        const idxB = studentOrder.indexOf(b.id);
+        if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+        if (idxA !== -1) return -1;
+        if (idxB !== -1) return 1;
+        return 0;
+      });
+    } else {
+      return [...allQuestions].sort((a: any, b: any) => {
+        const idxA = studentOrder.indexOf(a.id);
+        const idxB = studentOrder.indexOf(b.id);
+        if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+        if (idxA !== -1) return -1;
+        if (idxB !== -1) return 1;
+        return (a.order || 0) - (b.order || 0);
+      });
+    }
+  }
+
+  return allQuestions;
+};
+
+// Helper to compute question score (supports proportional scoring for complex multiple choice and true/false matrix)
+const computeQuestionScore = (q: any, ans: any, overrides?: Record<string, boolean>): number => {
+  if (overrides && overrides[q.id] !== undefined) {
+    return overrides[q.id] ? 1 : 0;
+  }
+  if (ans === undefined || ans === null) return 0;
   const type = q.type || q.field || "pilihan_ganda";
 
-  if (type === "pilihan_ganda" || type === "benar_salah") {
-    const ck = Object.keys(q.choices || {}).find(k => k.toLowerCase() === String(studentAns).toLowerCase());
-    return ck ? q.choices[ck].isCorrect === true : false;
+  if (type === "pilihan_ganda" || type === "multiple_choice") {
+    const ck = Object.keys(q.choices || {}).find(k => k.toLowerCase() === String(ans).toLowerCase());
+    return ck && q.choices[ck]?.isCorrect === true ? 1 : 0;
   }
-  if (type === "pilihan_ganda_kompleks") {
-    const correctKeys = Object.keys(q.choices || {}).filter(k => q.choices[k].isCorrect).map(k => k.toLowerCase());
-    const studentKeys = Array.isArray(studentAns) ? studentAns.map((k: any) => String(k).toLowerCase()) : [];
-    return studentKeys.length === correctKeys.length && studentKeys.every((k: string) => correctKeys.includes(k));
+
+  if (type === "benar_salah" || type === "true_false") {
+    const sts = q.statements || (q.choices && q.choices.statements);
+    if (Array.isArray(sts) && sts.length > 0) {
+      if (typeof ans !== "object" || ans === null || Array.isArray(ans)) return 0;
+      let stCorrect = 0;
+      sts.forEach((st: any, idx: number) => {
+        const expected = (st.answer || "benar").toLowerCase();
+        const userRaw = ans[st.id] !== undefined
+          ? ans[st.id]
+          : (ans[String(idx + 1)] !== undefined
+              ? ans[String(idx + 1)]
+              : (ans[String(idx)] !== undefined ? ans[String(idx)] : ""));
+        const given = String(userRaw || "").toLowerCase();
+        if (given === expected) stCorrect++;
+      });
+      return sts.length > 0 ? stCorrect / sts.length : 0;
+    } else {
+      const ck = Object.keys(q.choices || {}).find(k => k.toLowerCase() === String(ans).toLowerCase());
+      return ck && q.choices[ck]?.isCorrect === true ? 1 : 0;
+    }
   }
-  if (type === "isian_singkat") {
-    return isFuzzyMatch(studentAns, q.answerKey);
+
+  if (type === "pilihan_ganda_kompleks" || type === "complex_choice" || type === "complex_multiple_choice") {
+    const correctKeys = Object.keys(q.choices || {}).filter(k => q.choices[k]?.isCorrect).map(k => k.toLowerCase());
+    const studentKeys = Array.isArray(ans)
+      ? ans.map((k: any) => String(k).toLowerCase().trim())
+      : typeof ans === "string" && ans.trim().length > 0
+        ? ans.split(",").map((k: any) => k.toLowerCase().trim())
+        : [];
+    if (studentKeys.length === 0 || correctKeys.length === 0) return 0;
+    const correctChosen = studentKeys.filter(k => correctKeys.includes(k));
+    const wrongChosen = studentKeys.filter(k => !correctKeys.includes(k));
+    return Math.max(0, correctChosen.length - wrongChosen.length) / correctKeys.length;
   }
-  if (type === "urutkan" || type === "drag_drop") {
+
+  if (type === "isian_singkat" || type === "short_answer") {
+    return isFuzzyMatch(ans, q.answerKey) ? 1 : 0;
+  }
+
+  if (type === "urutkan" || type === "drag_drop" || type === "ordering" || type === "sequence") {
     const co = (q.items || []).map((it: any) => it.id);
-    return Array.isArray(studentAns) && studentAns.length === co.length && studentAns.every((v: any, i: number) => v === co[i]);
+    return Array.isArray(ans) && ans.length === co.length && ans.every((v: any, i: number) => v === co[i]) ? 1 : 0;
   }
-  if (type === "menjodohkan") {
+
+  if (type === "menjodohkan" || type === "matching") {
     const pairs = q.pairs || [];
-    return pairs.length > 0 && pairs.every((p: any) => studentAns[p.id] === p.right);
+    if (pairs.length > 0 && typeof ans === "object" && ans !== null) {
+      const correctCount = pairs.filter((p: any) => ans[p.id] === p.right).length;
+      return correctCount / pairs.length;
+    }
+    return 0;
   }
-  return false;
+
+  return 0;
+};
+
+// Helper for boolean full-credit check
+const checkAns = (q: any, studentAns: any, overrides?: Record<string, boolean>): boolean => {
+  return computeQuestionScore(q, studentAns, overrides) >= 1;
+};
+
+export interface QuestionDetailInfo {
+  score: number;
+  status: "correct" | "partial" | "wrong" | "empty";
+  badgeLabel: string;
+  breakdown?: any;
+}
+
+const getQuestionDetailInfo = (q: any, ans: any, overrides?: Record<string, boolean>): QuestionDetailInfo => {
+  if (overrides && overrides[q.id] !== undefined) {
+    const isOverride = overrides[q.id];
+    return {
+      score: isOverride ? 1 : 0,
+      status: isOverride ? "correct" : "wrong",
+      badgeLabel: isOverride ? "Benar (Manual)" : "Salah (Manual)"
+    };
+  }
+
+  if (ans === undefined || ans === null) {
+    return { score: 0, status: "empty", badgeLabel: "Kosong" };
+  }
+
+  const type = q.type || q.field || "pilihan_ganda";
+
+  if (type === "pilihan_ganda" || type === "multiple_choice") {
+    const ck = Object.keys(q.choices || {}).find(k => k.toLowerCase() === String(ans).toLowerCase());
+    const isCorrect = ck ? q.choices[ck]?.isCorrect === true : false;
+    return {
+      score: isCorrect ? 1 : 0,
+      status: isCorrect ? "correct" : "wrong",
+      badgeLabel: isCorrect ? "Benar" : "Salah"
+    };
+  }
+
+  if (type === "benar_salah" || type === "true_false") {
+    const sts = q.statements || (q.choices && q.choices.statements);
+    if (Array.isArray(sts) && sts.length > 0) {
+      if (typeof ans !== "object" || ans === null || Array.isArray(ans)) {
+        return { score: 0, status: "empty", badgeLabel: "Kosong" };
+      }
+      let matchCount = 0;
+      const breakdown = sts.map((st: any, idx: number) => {
+        const expected = (st.answer || "benar").toLowerCase();
+        const userRaw = ans[st.id] !== undefined
+          ? ans[st.id]
+          : (ans[String(idx + 1)] !== undefined
+              ? ans[String(idx + 1)]
+              : (ans[String(idx)] !== undefined ? ans[String(idx)] : ""));
+        const userVal = String(userRaw || "").toLowerCase();
+        const isMatch = userVal === expected;
+        if (isMatch) matchCount++;
+        return {
+          id: st.id || String(idx + 1),
+          num: idx + 1,
+          text: st.text,
+          userVal: userRaw ? (String(userRaw).toLowerCase() === "salah" ? "Salah" : "Benar") : "-",
+          expected: expected === "salah" ? "Salah" : "Benar",
+          isMatch
+        };
+      });
+
+      const score = sts.length > 0 ? matchCount / sts.length : 0;
+      const status = matchCount === sts.length ? "correct" : (matchCount > 0 ? "partial" : "wrong");
+      const badgeLabel = matchCount === sts.length 
+        ? "Benar" 
+        : (matchCount > 0 ? `Sebagian (${matchCount}/${sts.length} Benar)` : `Salah (0/${sts.length})`);
+
+      return {
+        score,
+        status,
+        badgeLabel,
+        breakdown: { type: "benar_salah", items: breakdown }
+      };
+    } else {
+      const ck = Object.keys(q.choices || {}).find(k => k.toLowerCase() === String(ans).toLowerCase());
+      const isCorrect = ck ? q.choices[ck]?.isCorrect === true : false;
+      return {
+        score: isCorrect ? 1 : 0,
+        status: isCorrect ? "correct" : "wrong",
+        badgeLabel: isCorrect ? "Benar" : "Salah"
+      };
+    }
+  }
+
+  if (type === "pilihan_ganda_kompleks" || type === "complex_choice" || type === "complex_multiple_choice") {
+    const correctKeys = Object.keys(q.choices || {}).filter(k => q.choices[k]?.isCorrect).map(k => k.toLowerCase());
+    const studentKeys = Array.isArray(ans)
+      ? ans.map((k: any) => String(k).toLowerCase().trim())
+      : typeof ans === "string" && ans.trim().length > 0
+        ? ans.split(",").map((k: any) => k.toLowerCase().trim())
+        : [];
+    if (studentKeys.length === 0) {
+      return { score: 0, status: "empty", badgeLabel: "Kosong" };
+    }
+
+    const correctChosen = studentKeys.filter(k => correctKeys.includes(k));
+    const wrongChosen = studentKeys.filter(k => !correctKeys.includes(k));
+    const missingKeys = correctKeys.filter(k => !studentKeys.includes(k)).map(k => k.toUpperCase());
+    const isFull = studentKeys.length === correctKeys.length && wrongChosen.length === 0 && correctKeys.every(k => studentKeys.includes(k));
+
+    const breakdownItems = studentKeys.map(k => ({
+      key: k.toUpperCase(),
+      isCorrect: correctKeys.includes(k)
+    }));
+
+    const score = correctKeys.length > 0 ? Math.max(0, correctChosen.length - wrongChosen.length) / correctKeys.length : 0;
+    const status = isFull ? "correct" : (correctChosen.length > 0 ? "partial" : "wrong");
+    const badgeLabel = isFull 
+      ? "Benar" 
+      : (correctChosen.length > 0 ? `Sebagian (${correctChosen.length}/${correctKeys.length} Benar)` : "Salah");
+
+    return {
+      score,
+      status,
+      badgeLabel,
+      breakdown: { type: "pilihan_ganda_kompleks", items: breakdownItems, missingKeys }
+    };
+  }
+
+  if (type === "isian_singkat" || type === "short_answer") {
+    const isCorrect = isFuzzyMatch(ans, q.answerKey);
+    return {
+      score: isCorrect ? 1 : 0,
+      status: isCorrect ? "correct" : "wrong",
+      badgeLabel: isCorrect ? "Benar" : "Salah"
+    };
+  }
+
+  if (type === "urutkan" || type === "drag_drop" || type === "ordering" || type === "sequence") {
+    const co = (q.items || []).map((it: any) => it.id);
+    const isCorrect = Array.isArray(ans) && ans.length === co.length && ans.every((v: any, i: number) => v === co[i]);
+    return {
+      score: isCorrect ? 1 : 0,
+      status: isCorrect ? "correct" : "wrong",
+      badgeLabel: isCorrect ? "Benar" : "Salah"
+    };
+  }
+
+  if (type === "menjodohkan" || type === "matching") {
+    const pairs = q.pairs || [];
+    if (pairs.length > 0 && typeof ans === "object" && ans !== null) {
+      let matchCount = 0;
+      const breakdownItems = pairs.map((p: any) => {
+        const isMatch = ans[p.id] === p.right;
+        if (isMatch) matchCount++;
+        return {
+          left: p.left,
+          right: p.right,
+          userVal: ans[p.id],
+          isMatch
+        };
+      });
+      const score = matchCount / pairs.length;
+      const status = matchCount === pairs.length ? "correct" : (matchCount > 0 ? "partial" : "wrong");
+      const badgeLabel = matchCount === pairs.length 
+        ? "Benar" 
+        : (matchCount > 0 ? `Sebagian (${matchCount}/${pairs.length} Benar)` : "Salah");
+
+      return {
+        score,
+        status,
+        badgeLabel,
+        breakdown: { type: "menjodohkan", items: breakdownItems }
+      };
+    }
+  }
+
+  return { score: 0, status: "empty", badgeLabel: "Kosong" };
 };
 
 const MonitoringPage = () => {
@@ -260,10 +513,7 @@ const MonitoringPage = () => {
 
     // Fallback: read overrides from answers.__overrides__ if attOverrides is empty
     const overrides = Object.keys(attOverrides).length > 0 ? attOverrides : ((sisAnswers as any)?.__overrides__ || {});
-    const studentOrder = (sisAnswers as any)?.__order__ || (sisAnswers as any)?.__meta?.questionOrder;
-    const targetQuestions = Array.isArray(studentOrder) && studentOrder.length > 0
-      ? monitorQuestions.filter((q: any) => studentOrder.includes(q.id))
-      : monitorQuestions;
+    const targetQuestions = getTargetQuestions(monitorQuestions, sisAnswers, monitorRoom?.max_questions);
 
     let objectiveCorrect = 0;
     let objectiveTotal = 0;
@@ -273,38 +523,14 @@ const MonitoringPage = () => {
     targetQuestions.forEach((q: any) => {
       const type = q.type || "pilihan_ganda";
       const isEssay = type === "isian_singkat" || type === "uraian";
-      let itemCorrect = false;
-
-      if (overrides[q.id] !== undefined) {
-        itemCorrect = overrides[q.id];
-      } else {
-        const ansId = sisAnswers[q.id];
-        if (ansId !== undefined && ansId !== null) {
-          if (type === "pilihan_ganda" || type === "benar_salah") {
-            const ck = Object.keys(q.choices || {}).find(k => k.toLowerCase() === String(ansId).toLowerCase());
-            itemCorrect = ck ? q.choices[ck].isCorrect === true : false;
-          } else if (type === "pilihan_ganda_kompleks") {
-            const correctKeys = Object.keys(q.choices || {}).filter(k => q.choices[k].isCorrect).map(k => k.toLowerCase());
-            const studentKeys = Array.isArray(ansId) ? ansId.map(k => String(k).toLowerCase()) : [];
-            itemCorrect = studentKeys.length === correctKeys.length && studentKeys.every(k => correctKeys.includes(k));
-          } else if (type === "isian_singkat") {
-            itemCorrect = isFuzzyMatch(ansId, q.answerKey);
-          } else if (type === "urutkan" || type === "drag_drop") {
-            const co = (q.items || []).map((it: any) => it.id);
-            itemCorrect = Array.isArray(ansId) && ansId.length === co.length && ansId.every((v, i) => v === co[i]);
-          } else if (type === "menjodohkan") {
-            const pairs = q.pairs || [];
-            itemCorrect = pairs.length > 0 && pairs.every((p: any) => ansId[p.id] === p.right);
-          }
-        }
-      }
+      const itemScore = computeQuestionScore(q, sisAnswers[q.id], overrides);
 
       if (isEssay) {
         essayTotal++;
-        if (itemCorrect) essayCorrect++;
+        essayCorrect += itemScore;
       } else {
         objectiveTotal++;
-        if (itemCorrect) objectiveCorrect++;
+        objectiveCorrect += itemScore;
       }
     });
 
@@ -352,34 +578,24 @@ const MonitoringPage = () => {
         const score = getLiveScore(att.answers, att.overrides || {});
         if (score > 0 && pb) {
           try {
-            // Recalculate objectiveCorrect/objectiveTotal dari scratch
-            const studentOrder = (att.answers as any)?.__order__ || (att.answers as any)?.__meta?.questionOrder;
-            const targetQuestions = Array.isArray(studentOrder) && studentOrder.length > 0
-              ? monitorQuestions.filter((q: any) => studentOrder.includes(q.id))
-              : monitorQuestions;
+            const targetQuestions = getTargetQuestions(monitorQuestions, att.answers || {}, monitorRoom?.max_questions);
 
             let objCorrect = 0, objTotal = 0;
             targetQuestions.forEach((q: any) => {
-              const type = q.type || "pilihan_ganda";
+              const type = q.type || q.field || "pilihan_ganda";
               const isEssay = type === "isian_singkat" || type === "uraian";
               if (!isEssay) {
                 objTotal++;
-                const a = (att.answers || {})[q.id];
-                let ic = (att.overrides || {})[q.id];
-                if (ic === undefined && a) {
-                  if (type === "pilihan_ganda" || type === "benar_salah") { const ck = Object.keys(q.choices || {}).find((k: string) => k.toLowerCase() === String(a).toLowerCase()); ic = ck ? q.choices[ck].isCorrect === true : false; }
-                  else if (type === "pilihan_ganda_kompleks") { const ck = Object.keys(q.choices || {}).filter((k: string) => q.choices[k].isCorrect).map((k: string) => k.toLowerCase()); const sk = Array.isArray(a) ? a.map((k: any) => String(k).toLowerCase()) : []; ic = sk.length === ck.length && sk.every((k: string) => ck.includes(k)); }
-                  else if (type === "menjodohkan") { const pairs = q.pairs || []; ic = pairs.length > 0 && pairs.every((p: any) => a[p.id] === p.right); }
-                  else if (type === "urutkan" || type === "drag_drop") { const co = (q.items || []).map((it: any) => it.id); ic = Array.isArray(a) && a.length === co.length && a.every((v: any, i: number) => v === co[i]); }
-                }
-                if (ic) objCorrect++;
+                const s = computeQuestionScore(q, (att.answers || {})[q.id], att.overrides || {});
+                objCorrect += s;
               }
             });
             objCorrect = Math.min(objCorrect, objTotal);
+            const savedObjCorrect = Number.isInteger(objCorrect) ? objCorrect : (Math.round(objCorrect * 10) / 10);
             await pb.collection('attempts').update(att.id, {
               score,
               objectiveScore: objTotal > 0 ? Math.round((objCorrect / objTotal) * 100) : 0,
-              objectiveCorrect: objCorrect,
+              objectiveCorrect: savedObjCorrect,
               objectiveTotal: objTotal,
             });
             console.log(`Self-healed score for ${att.id}: ${score}, obj: ${objCorrect}/${objTotal}`);
@@ -485,11 +701,13 @@ const MonitoringPage = () => {
           const typeMapReverse: Record<string, string> = {
             multiple_choice: "pilihan_ganda",
             complex_multiple_choice: "pilihan_ganda_kompleks",
+            complex_choice: "pilihan_ganda_kompleks",
             matching: "menjodohkan",
             true_false: "benar_salah",
             short_answer: "isian_singkat",
             essay: "uraian",
             ordering: "urutkan",
+            sequence: "urutkan",
             drag_drop: "drag_drop",
             pilihan_ganda: "pilihan_ganda",
             pilihan_ganda_kompleks: "pilihan_ganda_kompleks",
@@ -500,13 +718,19 @@ const MonitoringPage = () => {
             benar_salah: "benar_salah"
           };
           const mappedType = typeMapReverse[rawType] || rawType;
-          const options = q.options || {};
+          let rawOptions = q.options || {};
+          if (typeof rawOptions === "string") {
+            try { rawOptions = JSON.parse(rawOptions); } catch (e) { rawOptions = {}; }
+          }
           return {
             ...q,
             type: mappedType,
-            choices: options,
-            pairs: mappedType === "menjodohkan" ? options.pairs : undefined,
-            items: (mappedType === "urutkan" || mappedType === "drag_drop") ? options.items : undefined,
+            choices: rawOptions,
+            statements: (mappedType === "benar_salah" && Array.isArray(rawOptions.statements))
+              ? rawOptions.statements
+              : (Array.isArray(rawOptions) ? rawOptions : (q.statements || undefined)),
+            pairs: mappedType === "menjodohkan" ? rawOptions.pairs : undefined,
+            items: (mappedType === "urutkan" || mappedType === "drag_drop") ? rawOptions.items : undefined,
             answerKey: q.correctAnswer || q.answerKey
           };
         });
@@ -547,10 +771,7 @@ const MonitoringPage = () => {
             const answersOverrides = answers.__overrides__ || {};
             const overrides = { ...answersOverrides, ...rawOverrides };
 
-            const studentOrder = answers.__order__ || (answers as any)?.__meta?.questionOrder;
-            const targetQuestions = Array.isArray(studentOrder) && studentOrder.length > 0
-              ? monitorQuestions.filter((q: any) => studentOrder.includes(q.id))
-              : monitorQuestions;
+            const targetQuestions = getTargetQuestions(monitorQuestions, answers, monitorRoom?.max_questions);
 
             let objCorrect = 0, objTotal = 0, essCorrect = 0, essTotal = 0;
             targetQuestions.forEach((q: any) => {
@@ -831,10 +1052,7 @@ const MonitoringPage = () => {
 
       const newOverrides = { ...currentOverrides, [qId]: isForcedCorrect };
       const sisAnswers = att.answers || {};
-      const studentOrder = (sisAnswers as any)?.__order__ || (sisAnswers as any)?.__meta?.questionOrder;
-      const targetQuestions = Array.isArray(studentOrder) && studentOrder.length > 0
-        ? monitorQuestions.filter((q: any) => studentOrder.includes(q.id))
-        : monitorQuestions;
+      const targetQuestions = getTargetQuestions(monitorQuestions, sisAnswers, monitorRoom?.max_questions);
 
       // Weighted scoring: separate objective vs essay
       let objectiveCorrect = 0;
@@ -845,30 +1063,7 @@ const MonitoringPage = () => {
       targetQuestions.forEach((q: any) => {
         const type = q.type || "pilihan_ganda";
         const isEssay = type === "isian_singkat" || type === "uraian";
-
-        let itemCorrect = false;
-        if (newOverrides[q.id] !== undefined) {
-          itemCorrect = newOverrides[q.id];
-        } else {
-          const ansId = sisAnswers[q.id];
-          if (ansId) {
-            if (type === "pilihan_ganda" || type === "benar_salah") {
-              const ck = Object.keys(q.choices || {}).find(k => k.toLowerCase() === String(ansId).toLowerCase());
-              itemCorrect = ck ? q.choices[ck].isCorrect === true : false;
-            } else if (type === "pilihan_ganda_kompleks") {
-              const correctKeys = Object.keys(q.choices || {}).filter(k => q.choices[k].isCorrect).map(k => k.toLowerCase());
-              const studentKeys = Array.isArray(ansId) ? ansId.map(k => String(k).toLowerCase()) : [];
-              itemCorrect = studentKeys.length === correctKeys.length && studentKeys.every(k => correctKeys.includes(k));
-            } else if (type === "isian_singkat") itemCorrect = isFuzzyMatch(ansId, q.answerKey);
-            else if (type === "urutkan" || type === "drag_drop") {
-              const co = (q.items || []).map((it: any) => it.id);
-              itemCorrect = Array.isArray(ansId) && ansId.length === co.length && ansId.every((v, i) => v === co[i]);
-            } else if (type === "menjodohkan") {
-              const pairs = q.pairs || [];
-              itemCorrect = pairs.length > 0 && pairs.every((p: any) => ansId[p.id] === p.right);
-            }
-          }
-        }
+        const itemCorrect = checkAns(q, sisAnswers[q.id], newOverrides);
 
         if (isEssay) {
           essayTotal++;
@@ -950,23 +1145,13 @@ const MonitoringPage = () => {
 
       // Recalculate score without the override
       const sisAnswers = att.answers || {};
+      const targetQuestions = getTargetQuestions(monitorQuestions, sisAnswers, monitorRoom?.max_questions);
       let objCorrect = 0, objTotal = 0, essCorrect = 0, essTotal = 0;
-      monitorQuestions.forEach((q: any) => {
+
+      targetQuestions.forEach((q: any) => {
         const type = q.type || "pilihan_ganda";
         const isEssay = type === "isian_singkat" || type === "uraian";
-        let itemCorrect = false;
-        if (newOverrides[q.id] !== undefined) {
-          itemCorrect = newOverrides[q.id];
-        } else {
-          const ansId = sisAnswers[q.id];
-          if (ansId) {
-            if (type === "pilihan_ganda" || type === "benar_salah") { const ck = Object.keys(q.choices || {}).find(k => k.toLowerCase() === String(ansId).toLowerCase()); itemCorrect = ck ? q.choices[ck].isCorrect === true : false; }
-            else if (type === "pilihan_ganda_kompleks") { const ck = Object.keys(q.choices || {}).filter(k => q.choices[k].isCorrect).map(k => k.toLowerCase()); const sk = Array.isArray(ansId) ? ansId.map((k: any) => String(k).toLowerCase()) : []; itemCorrect = sk.length === ck.length && sk.every((k: string) => ck.includes(k)); }
-            else if (type === "isian_singkat") itemCorrect = isFuzzyMatch(ansId, q.answerKey);
-            else if (type === "urutkan" || type === "drag_drop") { const co = (q.items || []).map((it: any) => it.id); itemCorrect = Array.isArray(ansId) && ansId.length === co.length && ansId.every((v: any, i: number) => v === co[i]); }
-            else if (type === "menjodohkan") { const pairs = q.pairs || []; itemCorrect = pairs.length > 0 && pairs.every((p: any) => ansId[p.id] === p.right); }
-          }
-        }
+        const itemCorrect = checkAns(q, sisAnswers[q.id], newOverrides);
         if (isEssay) { essTotal++; if (itemCorrect) essCorrect++; }
         else { objTotal++; if (itemCorrect) objCorrect++; }
       });
@@ -1177,22 +1362,12 @@ const MonitoringPage = () => {
 
       // Recalculate score
       const sisAnswers = att.answers || {};
+      const targetQuestions = getTargetQuestions(monitorQuestions, sisAnswers, monitorRoom?.max_questions);
       let objectiveCorrect = 0, objectiveTotal = 0, essayCorrect = 0, essayTotal = 0;
-      monitorQuestions.forEach((q: any) => {
+      targetQuestions.forEach((q: any) => {
         const type = q.type || "pilihan_ganda";
         const isEssay = type === "isian_singkat" || type === "uraian";
-        let ic = false;
-        if (newOverrides[q.id] !== undefined) { ic = newOverrides[q.id]; }
-        else {
-          const ansId = sisAnswers[q.id];
-          if (ansId) {
-            if (type === "pilihan_ganda" || type === "benar_salah") { const ck = Object.keys(q.choices || {}).find((k: string) => k.toLowerCase() === String(ansId).toLowerCase()); ic = ck ? q.choices[ck].isCorrect === true : false; }
-            else if (type === "pilihan_ganda_kompleks") { const cks = Object.keys(q.choices || {}).filter((k: string) => q.choices[k].isCorrect).map((k: string) => k.toLowerCase()); const sk = Array.isArray(ansId) ? ansId.map((k: any) => String(k).toLowerCase()) : []; ic = sk.length === cks.length && sk.every((k: string) => cks.includes(k)); }
-            else if (type === "isian_singkat") ic = isFuzzyMatch(ansId, q.answerKey);
-            else if (type === "urutkan" || type === "drag_drop") { const co = (q.items || []).map((it: any) => it.id); ic = Array.isArray(ansId) && ansId.length === co.length && ansId.every((v: any, i: number) => v === co[i]); }
-            else if (type === "menjodohkan") { const pairs = q.pairs || []; ic = pairs.length > 0 && pairs.every((p: any) => ansId[p.id] === p.right); }
-          }
-        }
+        const ic = checkAns(q, sisAnswers[q.id], newOverrides);
         if (isEssay) { essayTotal++; if (ic) essayCorrect++; } else { objectiveTotal++; if (ic) objectiveCorrect++; }
       });
 
@@ -1359,25 +1534,56 @@ const MonitoringPage = () => {
 
     // Helper: format answer for display in Excel
     const formatAnswer = (q: any, studentAns: any) => {
-      if (!studentAns) return "-";
-      const type = q.type || "pilihan_ganda";
+      if (studentAns === undefined || studentAns === null) return "-";
+      const type = q.type || q.field || "pilihan_ganda";
 
-      if (type === "pilihan_ganda" || type === "benar_salah") {
+      if (type === "pilihan_ganda" || type === "multiple_choice") {
         return String(studentAns).toUpperCase();
       }
-      if (type === "pilihan_ganda_kompleks") {
+      if (type === "benar_salah" || type === "true_false") {
+        const sts = q.statements || (q.choices && q.choices.statements);
+        if (Array.isArray(sts) && sts.length > 0 && typeof studentAns === "object" && studentAns !== null) {
+          return sts.map((st: any, idx: number) => {
+            const val = studentAns[st.id] !== undefined
+              ? studentAns[st.id]
+              : (studentAns[String(idx + 1)] !== undefined
+                  ? studentAns[String(idx + 1)]
+                  : (studentAns[String(idx)] !== undefined ? studentAns[String(idx)] : "-"));
+            const displayVal = val ? (String(val).toLowerCase() === "salah" ? "SALAH" : String(val).toLowerCase() === "benar" ? "BENAR" : String(val).toUpperCase()) : "-";
+            return `${idx + 1}:${displayVal}`;
+          }).join(", ");
+        }
+        if (typeof studentAns === "object" && !Array.isArray(studentAns) && studentAns !== null) {
+          return Object.entries(studentAns).map(([k, v], idx) => {
+            const num = /^\d+$/.test(k) && Number(k) < 100 ? k : `${idx + 1}`;
+            return `${num}:${String(v).toUpperCase()}`;
+          }).join(", ");
+        }
+        return String(studentAns).toUpperCase();
+      }
+      if (type === "pilihan_ganda_kompleks" || type === "complex_choice" || type === "complex_multiple_choice") {
         return Array.isArray(studentAns) ? studentAns.map((k: any) => String(k).toUpperCase()).join(",") : String(studentAns).toUpperCase();
       }
-      if (type === "isian_singkat" || type === "uraian") {
+      if (type === "isian_singkat" || type === "uraian" || type === "short_answer") {
         const text = String(studentAns).replace(/<[^>]*>/g, '').trim();
         return text.length > 100 ? text.substring(0, 100) + "..." : text;
       }
-      if (type === "urutkan" || type === "drag_drop") {
+      if (type === "urutkan" || type === "drag_drop" || type === "ordering") {
         return Array.isArray(studentAns) ? studentAns.join(" → ") : String(studentAns);
       }
-      if (type === "menjodohkan") {
-        if (typeof studentAns === "object" && !Array.isArray(studentAns)) {
-          return Object.entries(studentAns).map(([k, v]) => `${k}=${v}`).join(", ");
+      if (type === "menjodohkan" || type === "matching") {
+        const pairs = q.pairs || [];
+        if (pairs.length > 0 && typeof studentAns === "object" && !Array.isArray(studentAns) && studentAns !== null) {
+          return pairs.map((p: any, idx: number) => {
+            const userVal = studentAns[p.id] !== undefined ? studentAns[p.id] : (studentAns[String(idx + 1)] || "-");
+            return `${idx + 1}:${userVal}`;
+          }).join(", ");
+        }
+        if (typeof studentAns === "object" && !Array.isArray(studentAns) && studentAns !== null) {
+          return Object.entries(studentAns).map(([k, v], idx) => {
+            const num = /^\d+$/.test(k) && Number(k) < 100 ? k : `${idx + 1}`;
+            return `${num}=${v}`;
+          }).join(", ");
         }
         return String(studentAns);
       }
@@ -1424,6 +1630,12 @@ const MonitoringPage = () => {
       wrong: {
         fill: { patternType: "solid", fgColor: { rgb: "FEE2E2" } },
         font: { color: { rgb: "DC2626" }, bold: true },
+        alignment: { horizontal: "center", vertical: "center" },
+        border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } }
+      },
+      partial: {
+        fill: { patternType: "solid", fgColor: { rgb: "FEF3C7" } }, // Amber 100
+        font: { color: { rgb: "B45309" }, bold: true }, // Amber 700
         alignment: { horizontal: "center", vertical: "center" },
         border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } }
       },
@@ -1549,22 +1761,19 @@ const MonitoringPage = () => {
         const answersOverrides = (answers as any)?.__overrides__ || {};
         const overrides: Record<string, boolean> = { ...answersOverrides, ...rawOverrides };
 
-        const studentOrder = (answers as any)?.__order__ || (answers as any)?.__meta?.questionOrder;
-        const targetQuestions = Array.isArray(studentOrder) && studentOrder.length > 0
-          ? monitorQuestions.filter((q: any) => studentOrder.includes(q.id))
-          : (monitorRoom?.max_questions && monitorRoom.max_questions > 0
-              ? monitorQuestions.slice(0, monitorRoom.max_questions)
-              : monitorQuestions);
+        const targetQuestions = getTargetQuestions(monitorQuestions, answers, monitorRoom?.max_questions);
 
         // Calculate scores per category
         let objCorrect = 0, objTotal = 0, essCorrect = 0, essTotal = 0;
         targetQuestions.forEach((q: any) => {
-          const type = q.type || "pilihan_ganda";
+          const type = q.type || q.field || "pilihan_ganda";
           const isEssay = type === "isian_singkat" || type === "uraian";
-          const ic = checkAns(q, answers[q.id], overrides);
-          if (isEssay) { essTotal++; if (ic) essCorrect++; }
-          else { objTotal++; if (ic) objCorrect++; }
+          const s = computeQuestionScore(q, answers[q.id], overrides);
+          if (isEssay) { essTotal++; essCorrect += s; }
+          else { objTotal++; objCorrect += s; }
         });
+        objCorrect = Math.min(objCorrect, objTotal);
+        const displayObjCorrect = Number.isInteger(objCorrect) ? objCorrect : (Math.round(objCorrect * 10) / 10);
 
         if (objTotal === 0 && essTotal === 0) {
           const maxQ = monitorRoom?.max_questions && monitorRoom.max_questions > 0
@@ -1613,7 +1822,7 @@ const MonitoringPage = () => {
           { v: loginTime ? new Date(loginTime).toLocaleString("id-ID", { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' }) : "-", s: STYLES.cellCenter },
           { v: durationStr, s: STYLES.cellCenter },
           { v: att?.submitTime ? new Date(att.submitTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : (att?.submittedAt ? new Date(att.submittedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : (att?.status === "finished" ? "Selesai" : (att ? "Proses" : "-"))), s: STYLES.cellCenter },
-          { t: "s", v: `${objCorrect}/${objTotal}`, z: "@", s: STYLES.cellCenter },
+          { t: "s", v: `${displayObjCorrect}/${objTotal}`, z: "@", s: STYLES.cellCenter },
           { t: "n", v: Number(objScore), s: getFinalScoreStyle(objScore) },
           { t: "n", v: Math.round(objScore * 0.6), f: `ROUND(I${ri}*0.6,0)`, s: STYLES.cellCenter },
           essTotal > 0 ? (
@@ -1629,7 +1838,6 @@ const MonitoringPage = () => {
           const isQuestionAssigned = targetQuestions.some((tq: any) => tq.id === q.id);
           const ans = answers[q.id];
           const isOverridden = overrides[q.id] !== undefined;
-          const isCorrect = checkAns(q, ans, overrides);
           const display = isOverridden ? `${formatAnswer(q, ans)} ✓` : formatAnswer(q, ans);
 
           let cellStyle = STYLES.unansweredWhite;
@@ -1649,7 +1857,8 @@ const MonitoringPage = () => {
             if (q.type === "uraian" && !isOverridden) {
               cellStyle = STYLES.neutral;
             } else {
-              cellStyle = isCorrect ? STYLES.correct : STYLES.wrong;
+              const qScore = computeQuestionScore(q, ans, overrides);
+              cellStyle = qScore >= 1 ? STYLES.correct : (qScore > 0 ? STYLES.partial : STYLES.wrong);
             }
           }
 
@@ -2516,10 +2725,7 @@ const MonitoringPage = () => {
                     const rows = currentData.map((student, localIdx) => {
                       const attempt = attempts.find(a => a.studentId === student.id || a.student_id === student.id);
                       const sisAnswers = attempt?.answers || {};
-                      const studentOrder = (sisAnswers as any)?.__order__ || (sisAnswers as any)?.__meta?.questionOrder;
-                      const targetQuestions = Array.isArray(studentOrder) && studentOrder.length > 0
-                        ? monitorQuestions.filter((q: any) => studentOrder.includes(q.id))
-                        : monitorQuestions;
+                      const targetQuestions = getTargetQuestions(monitorQuestions, sisAnswers, monitorRoom?.max_questions);
 
                       const answered = Object.keys(sisAnswers).filter(k =>
                         k !== "__overrides__" && k !== "__order__" && k !== "__meta" && k !== "__choices__" &&
@@ -2561,27 +2767,18 @@ const MonitoringPage = () => {
                                   const isEssay = type === "isian_singkat" || type === "uraian";
                                   if (!isEssay) {
                                     objTotal++;
-                                    let ic = false;
-                                    if (overrides[q.id] !== undefined) ic = overrides[q.id];
-                                    else {
-                                      const a = sisAnswers[q.id];
-                                      if (a) {
-                                        if (type === "pilihan_ganda" || type === "benar_salah") { const ck = Object.keys(q.choices || {}).find(k => k.toLowerCase() === String(a).toLowerCase()); ic = ck ? q.choices[ck].isCorrect === true : false; }
-                                        else if (type === "pilihan_ganda_kompleks") { const ck = Object.keys(q.choices || {}).filter(k => q.choices[k].isCorrect).map(k => k.toLowerCase()); const sk = Array.isArray(a) ? a.map(k => String(k).toLowerCase()) : []; ic = sk.length === ck.length && sk.every(k => ck.includes(k)); }
-                                        else if (type === "menjodohkan") { const pairs = q.pairs || []; ic = pairs.length > 0 && pairs.every((p: any) => a[p.id] === p.right); }
-                                        else if (type === "urutkan" || type === "drag_drop") { const co = (q.items || []).map((it: any) => it.id); ic = Array.isArray(a) && a.length === co.length && a.every((v: any, i: number) => v === co[i]); }
-                                      }
-                                    }
-                                    if (ic) objCorrect++;
+                                    const s = computeQuestionScore(q, sisAnswers[q.id], overrides);
+                                    objCorrect += s;
                                   }
                                 });
                                 objCorrect = Math.min(objCorrect, objTotal); // safety cap
                                 const objScore = objTotal > 0 ? Math.round((objCorrect / objTotal) * 100) : 0;
+                                const displayCorrect = Number.isInteger(objCorrect) ? objCorrect : (Math.round(objCorrect * 10) / 10);
 
                                 return (
                                   <div className="flex flex-col items-center">
                                     <span className="text-blue-600 dark:text-blue-400 font-black text-sm">{objScore}</span>
-                                    <span className="text-[9px] text-slate-400">{objCorrect}/{objTotal}</span>
+                                    <span className="text-[9px] text-slate-400">{displayCorrect}/{objTotal}</span>
                                   </div>
                                 );
                               })()}
@@ -2734,7 +2931,7 @@ const MonitoringPage = () => {
                                     <span className="font-bold text-indigo-900 dark:text-indigo-200">
                                       Lembar Jawaban: <span className="font-black underline">{student.name}</span>
                                     </span>
-                                    {monitorQuestions.length > targetQuestions.length ? (
+                                    {Number(monitorRoom?.max_questions) > 0 && Number(monitorRoom?.max_questions) < monitorQuestions.length ? (
                                       <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300 border border-purple-200 dark:border-purple-800/50 flex items-center gap-1 shadow-sm">
                                         <span>🎲</span> {targetQuestions.length} Soal Teracak (dari {monitorQuestions.length} Bank Soal)
                                       </span>
@@ -2744,33 +2941,50 @@ const MonitoringPage = () => {
                                       </span>
                                     )}
                                   </div>
-                                  <div className="flex items-center gap-3 text-[10px] font-semibold text-slate-500 dark:text-slate-400">
+                                  <div className="flex items-center gap-3 text-[10px] font-semibold text-slate-500 dark:text-slate-400 flex-wrap">
                                     <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-blue-500 animate-pulse" /> Sedang Dikerjakan</span>
-                                    <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-emerald-500" /> Benar</span>
-                                    <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-rose-500" /> Salah / Belum</span>
+                                    <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-emerald-500" /> Benar (100%)</span>
+                                    <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-amber-500" /> Sebagian Benar</span>
+                                    <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-rose-500" /> Salah</span>
+                                    <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-slate-400" /> Kosong</span>
                                   </div>
                                 </div>
 
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                <div
+                                  className="grid gap-3.5"
+                                  style={{
+                                    gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 300px), 1fr))"
+                                  }}
+                                >
                                   {targetQuestions.map((q, qIdx) => {
                                     const ans = sisAnswers[q.id];
                                     const overrides = attempt?.overrides || (sisAnswers as any)?.__overrides__ || {};
-                                    const correct = overrides[q.id] !== undefined ? overrides[q.id] : (ans ? (q.type === "isian_singkat" ? isFuzzyMatch(ans, q.answerKey) : q.choices?.[ans]?.isCorrect) : false);
+                                    const detail = getQuestionDetailInfo(q, ans, overrides);
+                                    const { status, score: qScore, badgeLabel, breakdown } = detail;
                                     const bankIdx = monitorQuestions.findIndex((mq: any) => mq.id === q.id);
                                     const bankNo = bankIdx !== -1 ? bankIdx + 1 : "-";
                                     const activeQId = (sisAnswers as any)?.__activeQuestionId__ || (sisAnswers as any)?.__meta?.activeQuestionId;
                                     const isActive = activeQId === q.id;
 
+                                    const cardBorder = isActive
+                                      ? "border-blue-400 dark:border-blue-500 shadow-md ring-2 ring-blue-500/40 bg-blue-50/40 dark:bg-blue-950/30"
+                                      : status === "correct"
+                                        ? "border-emerald-200 dark:border-emerald-800/40 bg-white dark:bg-slate-800 shadow-xs"
+                                        : status === "partial"
+                                          ? "border-amber-300 dark:border-amber-700/60 bg-white dark:bg-slate-800 shadow-xs ring-1 ring-amber-400/20"
+                                          : status === "wrong"
+                                            ? "border-rose-200 dark:border-rose-800/40 bg-white dark:bg-slate-800 shadow-xs"
+                                            : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-xs";
+
                                     return (
                                       <div
                                         key={q.id}
                                         className={cn(
-                                          "p-3 rounded-xl border transition-all flex flex-col gap-2 relative",
-                                          isActive
-                                            ? "bg-blue-50/80 dark:bg-blue-950/40 border-blue-400 dark:border-blue-500 shadow-md ring-2 ring-blue-500/40"
-                                            : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 shadow-sm"
+                                          "p-3.5 rounded-xl border transition-all flex flex-col gap-2.5 relative min-w-0",
+                                          cardBorder
                                         )}
                                       >
+                                        {/* Header */}
                                         <div className="flex items-center justify-between gap-1">
                                           <div className="flex items-center gap-1.5 flex-wrap">
                                             <span className="px-2 py-0.5 rounded text-[10px] font-black bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-200 shadow-xs">
@@ -2794,40 +3008,225 @@ const MonitoringPage = () => {
                                           )}
                                         </div>
 
+                                        {/* Text Soal */}
                                         <div className="flex gap-2">
-                                          <MathText content={q.text} className="text-[9px] font-medium leading-tight text-slate-700 dark:text-slate-300 line-clamp-3" />
+                                          <MathText content={q.text} className="text-[10px] font-medium leading-relaxed text-slate-700 dark:text-slate-300 line-clamp-3" />
                                         </div>
+
                                         {/* Kunci Jawaban */}
-                                        <div className="px-2 py-1.5 rounded-lg bg-blue-50/50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-800/30">
-                                          <span className="text-[9px] font-black text-blue-500 uppercase tracking-widest">Kunci: </span>
-                                          <span className="text-[10px] font-bold text-blue-700 dark:text-blue-300">
+                                        <div className="px-2.5 py-1.5 rounded-lg bg-blue-50/60 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900/40">
+                                          <span className="text-[9px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest mr-1">KUNCI:</span>
+                                          <span className="text-[10px] font-bold text-blue-800 dark:text-blue-200">
                                             {(() => {
-                                              const t = q.type || "pilihan_ganda";
-                                              if (t === "pilihan_ganda" || t === "benar_salah") {
+                                              const t = q.type || q.field || "pilihan_ganda";
+                                              if (t === "pilihan_ganda" || t === "multiple_choice") {
                                                 const ck = Object.keys(q.choices || {}).find(k => q.choices[k]?.isCorrect);
                                                 if (!ck) return stripHtmlTags(q.answerKey || "-");
                                                 const choiceText = q.choices[ck]?.text || "";
-                                                return <span className="inline-flex items-baseline gap-0.5"><span>{ck.toUpperCase()}.</span> <MathText content={choiceText} className="inline text-[10px] [&_p]:inline [&_p]:m-0 [&_img]:hidden" /></span>;
+                                                return <span className="inline-flex items-baseline gap-1"><span>{ck.toUpperCase()}.</span> <MathText content={choiceText} className="inline text-[10px] [&_p]:inline [&_p]:m-0 [&_img]:hidden" /></span>;
                                               }
-                                              if (t === "pilihan_ganda_kompleks") {
+                                              if (t === "benar_salah" || t === "true_false") {
+                                                const sts = q.statements || (q.choices && q.choices.statements);
+                                                if (Array.isArray(sts) && sts.length > 0) {
+                                                  return sts.map((s: any, idx: number) => `P${idx + 1}: ${s.answer === "salah" ? "Salah" : "Benar"}`).join(", ");
+                                                }
+                                                const ck = Object.keys(q.choices || {}).find(k => q.choices[k]?.isCorrect);
+                                                if (!ck) return stripHtmlTags(q.answerKey || "-");
+                                                const choiceText = q.choices[ck]?.text || "";
+                                                return <span className="inline-flex items-baseline gap-1"><span>{ck.toUpperCase()}.</span> <MathText content={choiceText} className="inline text-[10px] [&_p]:inline [&_p]:m-0 [&_img]:hidden" /></span>;
+                                              }
+                                              if (t === "pilihan_ganda_kompleks" || t === "complex_choice" || t === "complex_multiple_choice") {
                                                 const cks = Object.keys(q.choices || {}).filter(k => q.choices[k]?.isCorrect);
-                                                return cks.map(k => k.toUpperCase()).join(", ") || "-";
+                                                return cks.map(k => k.toUpperCase()).join(", ") || stripHtmlTags(q.answerKey || "-");
                                               }
-                                              if (t === "isian_singkat" || t === "uraian") return <MathText content={q.answerKey || "-"} className="inline text-[10px] [&_p]:inline [&_p]:m-0 [&_img]:hidden" />;
-                                              if (t === "menjodohkan") return `${(q.pairs || []).length} pasangan`;
+                                              if (t === "isian_singkat" || t === "uraian" || t === "short_answer") return <MathText content={q.answerKey || "-"} className="inline text-[10px] [&_p]:inline [&_p]:m-0 [&_img]:hidden" />;
+                                              if (t === "menjodohkan" || t === "matching") return `${(q.pairs || []).length} pasangan`;
                                               if (t === "urutkan" || t === "drag_drop") return (q.items || []).map((it: any) => stripHtmlTags(it.text || "").substring(0, 10)).join(" → ");
                                               return stripHtmlTags(q.answerKey || "-");
                                             })()}
                                           </span>
                                         </div>
-                                        <div className={`mt-auto p-2.5 rounded-lg flex flex-col gap-2 ${correct ? "bg-emerald-50 text-emerald-700 border border-emerald-100/50" : ans ? "bg-rose-50 text-rose-700 border border-rose-100/50" : "bg-slate-50 text-slate-500 border border-slate-100/50"}`}>
-                                          <div className="text-[10px] font-bold break-words whitespace-pre-wrap leading-relaxed max-h-32 overflow-y-auto pr-1">
-                                            <span className="text-[9px] font-black uppercase tracking-wider opacity-60">Jawab:</span>
-                                            <div className="mt-0.5">{ans ? (typeof ans === 'object' ? JSON.stringify(ans) : stripHtmlTags(String(ans))) : "-"}</div>
+
+                                        {/* Jawaban Siswa & Detail Breakdown */}
+                                        <div
+                                          className={cn(
+                                            "mt-auto p-2.5 rounded-lg flex flex-col gap-2 border transition-all",
+                                            status === "correct"
+                                              ? "bg-emerald-50/70 dark:bg-emerald-950/25 border-emerald-200 dark:border-emerald-800/40 text-emerald-900 dark:text-emerald-200"
+                                              : status === "partial"
+                                                ? "bg-amber-50/80 dark:bg-amber-950/30 border-amber-300 dark:border-amber-700/60 text-amber-950 dark:text-amber-200 shadow-xs"
+                                                : status === "wrong"
+                                                  ? "bg-rose-50/70 dark:bg-rose-950/25 border-rose-200 dark:border-rose-800/40 text-rose-900 dark:text-rose-200"
+                                                  : "bg-slate-50 dark:bg-slate-900/30 border-slate-200 dark:border-slate-800/40 text-slate-600 dark:text-slate-400"
+                                          )}
+                                        >
+                                          <div>
+                                            <div className="flex items-center justify-between gap-1.5 mb-1.5 flex-wrap">
+                                              <span className="text-[9px] font-black uppercase tracking-wider opacity-70 shrink-0">Jawaban Siswa:</span>
+                                              <span
+                                                className={cn(
+                                                  "px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider inline-flex items-center gap-1 shrink-0",
+                                                  status === "correct" && "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300",
+                                                  status === "partial" && "bg-amber-200 text-amber-950 dark:bg-amber-900/80 dark:text-amber-200 font-black ring-1 ring-amber-400/40",
+                                                  status === "wrong" && "bg-rose-100 text-rose-800 dark:bg-rose-900/60 dark:text-rose-300",
+                                                  status === "empty" && "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400"
+                                                )}
+                                              >
+                                                {status === "correct" && <Check className="h-3 w-3 stroke-[2.5]" />}
+                                                {status === "partial" && <span>½</span>}
+                                                {status === "wrong" && <X className="h-3 w-3 stroke-[2.5]" />}
+                                                {badgeLabel}
+                                              </span>
+                                            </div>
+
+                                            {/* Detail Content */}
+                                            {(() => {
+                                              if (status === "empty") {
+                                                return <div className="text-[10px] text-slate-400 italic py-1 font-semibold">(Belum ada jawaban)</div>;
+                                              }
+
+                                              // 1. Benar / Salah detailed breakdown
+                                              if (breakdown?.type === "benar_salah" && Array.isArray(breakdown.items)) {
+                                                return (
+                                                  <div className="flex flex-col gap-1 mt-1">
+                                                    {breakdown.items.map((it: any) => (
+                                                      <div
+                                                        key={it.id}
+                                                        className={cn(
+                                                          "flex items-center justify-between px-2 py-1 rounded text-[10px] border font-medium",
+                                                          it.isMatch
+                                                            ? "bg-emerald-100/70 dark:bg-emerald-950/40 border-emerald-300/80 dark:border-emerald-800/60 text-emerald-900 dark:text-emerald-200"
+                                                            : "bg-rose-100/70 dark:bg-rose-950/40 border-rose-300/80 dark:border-rose-800/60 text-rose-900 dark:text-rose-200"
+                                                        )}
+                                                      >
+                                                        <div className="flex items-center gap-1.5 min-w-0">
+                                                          <span className="font-black text-slate-600 dark:text-slate-400 shrink-0">P{it.num}:</span>
+                                                          <span className="font-bold truncate">{it.userVal}</span>
+                                                        </div>
+                                                        <div className="flex items-center gap-1 shrink-0 text-[9px] font-black">
+                                                          {it.isMatch ? (
+                                                            <span className="text-emerald-700 dark:text-emerald-300 flex items-center gap-0.5">
+                                                              <Check className="h-3 w-3 stroke-[3]" /> Benar
+                                                            </span>
+                                                          ) : (
+                                                            <span className="text-rose-700 dark:text-rose-300 flex items-center gap-0.5">
+                                                              <X className="h-3 w-3 stroke-[3]" /> Salah
+                                                              <span className="text-[8.5px] font-semibold opacity-80">(Kunci: {it.expected})</span>
+                                                            </span>
+                                                          )}
+                                                        </div>
+                                                      </div>
+                                                    ))}
+                                                  </div>
+                                                );
+                                              }
+
+                                              // 2. Pilihan Ganda Kompleks detailed breakdown
+                                              if (breakdown?.type === "pilihan_ganda_kompleks" && Array.isArray(breakdown.items)) {
+                                                return (
+                                                  <div className="flex flex-col gap-1.5 mt-1">
+                                                    <div className="flex items-center gap-1 flex-wrap">
+                                                      <span className="text-[9px] font-bold text-slate-500 dark:text-slate-400 mr-0.5">Pilihan Siswa:</span>
+                                                      {breakdown.items.length > 0 ? (
+                                                        breakdown.items.map((it: any) => (
+                                                          <span
+                                                            key={it.key}
+                                                            className={cn(
+                                                              "px-2 py-0.5 rounded text-[10px] font-black inline-flex items-center gap-1 border shadow-xs",
+                                                              it.isCorrect
+                                                                ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-200 border-emerald-300 dark:border-emerald-700"
+                                                                : "bg-rose-100 text-rose-800 dark:bg-rose-950/70 dark:text-rose-200 border-rose-300 dark:border-rose-700"
+                                                            )}
+                                                          >
+                                                            {it.key}
+                                                            {it.isCorrect ? <Check className="h-3 w-3 stroke-[3]" /> : <X className="h-3 w-3 stroke-[3]" />}
+                                                          </span>
+                                                        ))
+                                                      ) : (
+                                                        <span className="text-[10px] text-slate-400 italic">(Kosong)</span>
+                                                      )}
+                                                    </div>
+                                                    {breakdown.missingKeys && breakdown.missingKeys.length > 0 && (
+                                                      <div className="flex items-center gap-1 flex-wrap text-[9px] font-semibold text-amber-800 dark:text-amber-300">
+                                                        <span className="opacity-80">Belum dipilih:</span>
+                                                        {breakdown.missingKeys.map((mk: string) => (
+                                                          <span
+                                                            key={mk}
+                                                            className="px-1.5 py-0.2 rounded bg-amber-100/90 text-amber-900 dark:bg-amber-950/60 dark:text-amber-200 border border-dashed border-amber-400 dark:border-amber-700 font-black"
+                                                          >
+                                                            {mk}
+                                                          </span>
+                                                        ))}
+                                                      </div>
+                                                    )}
+                                                  </div>
+                                                );
+                                              }
+
+                                              // 3. Menjodohkan detailed breakdown
+                                              if (breakdown?.type === "menjodohkan" && Array.isArray(breakdown.items)) {
+                                                return (
+                                                  <div className="flex flex-col gap-1 mt-1">
+                                                    {breakdown.items.map((it: any, pIdx: number) => (
+                                                      <div
+                                                        key={pIdx}
+                                                        className={cn(
+                                                          "flex items-center justify-between px-2 py-1 rounded text-[9px] border font-medium",
+                                                          it.isMatch
+                                                            ? "bg-emerald-100/70 border-emerald-300 text-emerald-900 dark:text-emerald-200"
+                                                            : "bg-rose-100/70 border-rose-300 text-rose-900 dark:text-rose-200"
+                                                        )}
+                                                      >
+                                                        <span className="truncate max-w-[120px] font-bold">{it.left}</span>
+                                                        <span className="flex items-center gap-1 font-bold">
+                                                          <span>{it.userVal || "-"}</span>
+                                                          {it.isMatch ? <Check className="h-3 w-3 text-emerald-600 stroke-[2.5]" /> : <X className="h-3 w-3 text-rose-600 stroke-[2.5]" />}
+                                                        </span>
+                                                      </div>
+                                                    ))}
+                                                  </div>
+                                                );
+                                              }
+
+                                              // 4. Default / standard single choice / essay
+                                              return (
+                                                <div className="mt-0.5 font-mono font-bold text-[10px] break-words whitespace-pre-wrap leading-relaxed max-h-32 overflow-y-auto pr-1">
+                                                  {(() => {
+                                                    if (typeof ans === "object") {
+                                                      return Object.entries(ans).map(([k, v]) => `${k}: ${v}`).join(", ");
+                                                    }
+                                                    const strAns = String(ans).trim();
+                                                    if (q.choices && q.choices[strAns.toLowerCase()]) {
+                                                      return (
+                                                        <span className="inline-flex items-baseline gap-1">
+                                                          <span>{strAns.toUpperCase()}.</span>
+                                                          <MathText content={q.choices[strAns.toLowerCase()].text || ""} className="inline text-[10px] [&_p]:inline [&_p]:m-0 [&_img]:hidden" />
+                                                        </span>
+                                                      );
+                                                    }
+                                                    return stripHtmlTags(strAns).toUpperCase();
+                                                  })()}
+                                                </div>
+                                              );
+                                            })()}
                                           </div>
-                                          <div className="flex items-center justify-between pt-1.5 border-t border-slate-100 dark:border-slate-800/40">
-                                            <span className="text-[9px] font-black uppercase tracking-widest">{correct ? "Benar" : ans ? "Salah" : "Kosong"}</span>
-                                            <div className="flex gap-1 items-center">
+
+                                          {/* Bottom Action / Score Bar */}
+                                          <div className="flex items-center justify-between pt-1.5 border-t border-slate-200/70 dark:border-slate-800/60 gap-1.5 flex-wrap">
+                                            <div className="flex items-center gap-1 text-[9px] font-black shrink-0">
+                                              <span className="opacity-60 uppercase tracking-widest">Skor:</span>
+                                              <span className={cn(
+                                                "font-black",
+                                                status === "correct" && "text-emerald-700 dark:text-emerald-300",
+                                                status === "partial" && "text-amber-800 dark:text-amber-300",
+                                                status === "wrong" && "text-rose-700 dark:text-rose-300",
+                                                status === "empty" && "text-slate-400"
+                                              )}>
+                                                {Number.isInteger(qScore) ? qScore : (Math.round(qScore * 100) / 100)} / 1
+                                              </span>
+                                            </div>
+
+                                            <div className="flex gap-1 items-center shrink-0">
                                               {(role === "admin" || (role === "teacher" && teacherFullAccess)) && (
                                                 <>
                                                   {(q.type === "isian_singkat" || q.type === "uraian") && (
@@ -2835,7 +3234,6 @@ const MonitoringPage = () => {
                                                       <Sparkles className={`h-3 w-3 ${aiGradingId === `${student.id}_${q.id}` ? "animate-spin" : ""}`} />
                                                     </button>
                                                   )}
-                                                  {/* Edit jawaban — hanya pilihan ganda */}
                                                   {(q.type === "pilihan_ganda" || q.type === "benar_salah" || !q.type) && (
                                                     <button
                                                       onClick={() => setEditAnswerDialog({
@@ -2852,14 +3250,22 @@ const MonitoringPage = () => {
                                                       <Pencil className="h-3 w-3" />
                                                     </button>
                                                   )}
-                                                  <button onClick={() => handleManualGrade(student.id, q.id, true)} className={`p-1 rounded ${overrides[q.id] === true ? "bg-emerald-200 text-emerald-700" : "hover:bg-white dark:hover:bg-slate-700 text-emerald-500"}`} title="Tandai Benar"><CheckCircle2 className="h-3 w-3" /></button>
-                                                  <button onClick={() => handleManualGrade(student.id, q.id, false)} className={`p-1 rounded ${overrides[q.id] === false ? "bg-rose-200 text-rose-700" : "hover:bg-white dark:hover:bg-slate-700 text-rose-500"}`} title="Tandai Salah"><X className="h-3 w-3" /></button>
+                                                  <button onClick={() => handleManualGrade(student.id, q.id, true)} className={`min-h-[36px] min-w-[36px] p-1.5 rounded-lg flex items-center justify-center transition-all active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 ${overrides[q.id] === true ? "bg-emerald-200 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300" : "hover:bg-slate-100 dark:hover:bg-slate-700 text-emerald-600 dark:text-emerald-400"}`} title="Tandai Benar"><CheckCircle2 className="h-4 w-4" /></button>
+                                                  <button onClick={() => handleManualGrade(student.id, q.id, false)} className={`min-h-[36px] min-w-[36px] p-1.5 rounded-lg flex items-center justify-center transition-all active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 ${overrides[q.id] === false ? "bg-rose-200 dark:bg-rose-950/60 text-rose-800 dark:text-rose-300" : "hover:bg-slate-100 dark:hover:bg-slate-700 text-rose-600 dark:text-rose-400"}`} title="Tandai Salah"><X className="h-4 w-4" /></button>
                                                   {overrides[q.id] !== undefined && (
-                                                    <button onClick={() => handleClearOverride(student.id, q.id)} className="p-1 rounded hover:bg-amber-50 dark:hover:bg-slate-700 text-amber-500" title="Netralkan (hapus override)"><RotateCcw className="h-3 w-3" /></button>
+                                                    <button onClick={() => handleClearOverride(student.id, q.id)} className="min-h-[36px] min-w-[36px] p-1.5 rounded-lg flex items-center justify-center transition-all active:scale-95 hover:bg-amber-50 dark:hover:bg-slate-700 text-amber-600 dark:text-amber-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500" title="Netralkan (hapus override)"><RotateCcw className="h-4 w-4" /></button>
                                                   )}
                                                 </>
                                               )}
-                                              <span className="text-[10px] font-black ml-1">{correct ? "✓" : "✗"}</span>
+                                              <span className={cn(
+                                                "text-[10px] font-black ml-1 px-1 py-0.2 rounded",
+                                                status === "correct" && "text-emerald-700 dark:text-emerald-300",
+                                                status === "partial" && "text-amber-700 dark:text-amber-300 font-black",
+                                                status === "wrong" && "text-rose-700 dark:text-rose-300",
+                                                status === "empty" && "text-slate-400"
+                                              )}>
+                                                {status === "correct" ? "✓" : status === "partial" ? "½" : status === "wrong" ? "✗" : "-"}
+                                              </span>
                                             </div>
                                           </div>
                                         </div>

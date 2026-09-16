@@ -54,6 +54,7 @@ export interface SchoolRecord {
   plan?: string;
   student_quota?: number;
   contact_email?: string;
+  custom_domain?: string;
 }
 
 interface TenantContextValue {
@@ -71,38 +72,55 @@ interface TenantContextValue {
 const TenantContext = createContext<TenantContextValue | undefined>(undefined);
 
 // ============================================================
-// Slug Resolver — mudah diganti ke subdomain nanti
+// Slug & Custom Domain Resolver
 // ============================================================
-function resolveSlugFromUrl(): { slug: string | null; isLanding: boolean } {
-  const hostname = window.location.hostname;
-  const mainDomain = import.meta.env.VITE_MAIN_DOMAIN || 'alfaruqasri.my.id';
-  const landingSubdomain = import.meta.env.VITE_LANDING_SUBDOMAIN || 'ujian';
+function resolveSlugFromUrl(): { slug: string | null; customDomain: string | null; isLanding: boolean } {
+  const hostname = window.location.hostname.toLowerCase();
+  const mainDomain = (import.meta.env.VITE_MAIN_DOMAIN || 'examku.my.id').toLowerCase();
+  const landingSubdomain = (import.meta.env.VITE_LANDING_SUBDOMAIN || 'ujian').toLowerCase();
 
   // DEV OVERRIDE: jika VITE_DEV_SCHOOL_SLUG diisi, paksa mode sekolah di localhost
   const devSlug = import.meta.env.VITE_DEV_SCHOOL_SLUG;
   if (devSlug && (hostname === 'localhost' || hostname === '127.0.0.1')) {
-    return { slug: devSlug, isLanding: false };
+    return { slug: devSlug, customDomain: null, isLanding: false };
   }
 
-  // Dev mode: localhost / 127.0.0.1 → tampilkan landing
+  // Dev mode: localhost / 127.0.0.1 / root domain → tampilkan landing
   if (
     hostname === 'localhost' ||
     hostname === '127.0.0.1' ||
-    hostname === mainDomain
+    hostname === mainDomain ||
+    hostname === `www.${mainDomain}`
   ) {
-    return { slug: null, isLanding: true };
+    return { slug: null, customDomain: null, isLanding: true };
   }
 
-  // Cek apakah ini subdomain dari main domain
+  // Cek apakah ini subdomain dari main domain (misal: modalbangsa.examku.my.id)
   if (hostname.endsWith(`.${mainDomain}`)) {
     const subdomain = hostname.slice(0, hostname.length - mainDomain.length - 1);
-    if (subdomain === landingSubdomain) {
-      return { slug: null, isLanding: true };
+    if (subdomain === landingSubdomain || subdomain === 'www') {
+      return { slug: null, customDomain: null, isLanding: true };
     }
-    return { slug: subdomain, isLanding: false };
+    return { slug: subdomain, customDomain: null, isLanding: false };
   }
 
-  return { slug: null, isLanding: true };
+  // Support domain sekunder/legacy (alfaruqasri.my.id)
+  const legacyDomain = 'alfaruqasri.my.id';
+  if (hostname === legacyDomain || hostname === `www.${legacyDomain}`) {
+    return { slug: null, customDomain: null, isLanding: true };
+  }
+
+  const legacySubdomain = hostname.endsWith(`.${legacyDomain}`)
+    ? hostname.slice(0, hostname.length - legacyDomain.length - 1)
+    : null;
+
+  if (legacySubdomain && (legacySubdomain === landingSubdomain || legacySubdomain === 'www')) {
+    return { slug: null, customDomain: null, isLanding: true };
+  }
+
+  // Jika bukan subdomain bawaan dan bukan landing:
+  // Berarti ini adalah Custom Domain milik tenant (misal: cbt.sman1modalbangsa.sch.id atau exam.alfaruqasri.my.id)
+  return { slug: legacySubdomain, customDomain: hostname, isLanding: false };
 }
 
 
@@ -119,7 +137,7 @@ export const TenantProvider = ({ children }: { children: ReactNode }) => {
     return typeof window !== 'undefined' ? localStorage.getItem('selected_school_slug') : null;
   });
 
-  const { slug: urlSlug, isLanding: isUrlLanding } = useMemo(() => resolveSlugFromUrl(), []);
+  const { slug: urlSlug, customDomain, isLanding: isUrlLanding } = useMemo(() => resolveSlugFromUrl(), []);
 
   // Effective slug: URL slug takes priority on web, manual slug for native/override
   const slug = urlSlug || manualSlug;
@@ -135,7 +153,7 @@ export const TenantProvider = ({ children }: { children: ReactNode }) => {
   };
 
   useEffect(() => {
-    if (isLanding || !slug) {
+    if (isLanding || (!slug && !customDomain)) {
       setLoading(false);
       return;
     }
@@ -180,9 +198,21 @@ export const TenantProvider = ({ children }: { children: ReactNode }) => {
       }
 
       try {
+        const currentHostname = typeof window !== 'undefined' ? window.location.hostname.toLowerCase() : '';
+        let filter = '';
+        if (customDomain && slug) {
+          filter = `custom_domain = "${customDomain}" || slug = "${slug}"`;
+        } else if (customDomain) {
+          filter = `custom_domain = "${customDomain}" || slug = "${customDomain}"`;
+        } else if (slug) {
+          filter = `custom_domain = "${currentHostname}" || slug = "${slug}"`;
+        } else if (currentHostname) {
+          filter = `custom_domain = "${currentHostname}"`;
+        }
+
         const record = await masterPb
           .collection('schools')
-          .getFirstListItem<SchoolRecord>(`slug = "${slug}"`);
+          .getFirstListItem<SchoolRecord>(filter);
 
         if (!record.is_active) {
           setInactive(true);
@@ -200,7 +230,7 @@ export const TenantProvider = ({ children }: { children: ReactNode }) => {
     };
 
     resolveSchool();
-  }, [slug, isLanding]);
+  }, [slug, customDomain, isLanding]);
 
 
   const value = useMemo<TenantContextValue>(

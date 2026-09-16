@@ -64,7 +64,8 @@ const GradingPage = () => {
       const mapped = qList.map(q => {
         const t = typeMap[q.field || q.type] || q.field || q.type || "pilihan_ganda";
         const opts = q.options || {};
-        return { ...q, type: t, choices: opts, pairs: t === "menjodohkan" ? opts.pairs : undefined, items: (t === "urutkan" || t === "drag_drop") ? opts.items : undefined, answerKey: q.correctAnswer || q.answerKey };
+        const statements = t === "benar_salah" ? (opts.statements || []) : undefined;
+        return { ...q, type: t, choices: opts, pairs: t === "menjodohkan" ? opts.pairs : undefined, items: (t === "urutkan" || t === "drag_drop") ? opts.items : undefined, statements, answerKey: q.correctAnswer || q.answerKey };
       });
       setQuestions(mapped.sort((a: any, b: any) => {
         const aIsEssay = a.type === "isian_singkat" || a.type === "uraian";
@@ -101,17 +102,43 @@ const GradingPage = () => {
 
     let objCorrect = 0;
     studentObjQuestions.forEach(q => {
-      let ic = false;
-      if (overrides[q.id] !== undefined) { ic = overrides[q.id]; }
+      let qScore = 0;
+      if (overrides[q.id] !== undefined) { 
+        qScore = overrides[q.id] === true ? 1 : (typeof overrides[q.id] === 'number' ? overrides[q.id] : 0); 
+      }
       else {
         const a = answers[q.id]; if (!a) return;
         const t = q.type;
-        if (t === "pilihan_ganda" || t === "benar_salah") { const ck = Object.keys(q.choices||{}).find(k=>k.toLowerCase()===String(a).toLowerCase()); ic = ck ? q.choices[ck].isCorrect===true : false; }
-        else if (t === "pilihan_ganda_kompleks") { const ck = Object.keys(q.choices||{}).filter(k=>q.choices[k].isCorrect).map(k=>k.toLowerCase()); const sk = Array.isArray(a)?a.map((k:any)=>String(k).toLowerCase()):[]; ic = sk.length===ck.length && sk.every((k:any)=>ck.includes(k)); }
-        else if (t === "menjodohkan") { const pairs = q.pairs||[]; ic = pairs.length>0 && pairs.every((p:any)=>a[p.id]===p.right); }
-        else if (t === "urutkan" || t === "drag_drop") { const co = (q.items||[]).map((it:any)=>it.id); ic = Array.isArray(a) && a.length===co.length && a.every((v:any,i:number)=>v===co[i]); }
+        if (t === "pilihan_ganda") { 
+          const ck = Object.keys(q.choices||{}).find(k=>k.toLowerCase()===String(a).toLowerCase()); 
+          qScore = ck ? (q.choices[ck].isCorrect===true ? 1 : 0) : 0; 
+        }
+        else if (t === "benar_salah") {
+          const sts = q.statements || q.choices?.statements || [];
+          if (sts.length > 0) {
+            let stCorrect = 0;
+            sts.forEach((st: any) => {
+              const expected = (st.answer || "benar").toLowerCase();
+              const given = (a?.[st.id] || "").toLowerCase();
+              if (given === expected) stCorrect++;
+            });
+            qScore = stCorrect / sts.length;
+          } else {
+            const ck = Object.keys(q.choices||{}).find(k=>k.toLowerCase()===String(a).toLowerCase()); 
+            qScore = ck ? (q.choices[ck].isCorrect===true ? 1 : 0) : 0; 
+          }
+        }
+        else if (t === "pilihan_ganda_kompleks") { 
+          const ck = Object.keys(q.choices||{}).filter(k=>q.choices[k].isCorrect).map(k=>k.toLowerCase()); 
+          const sk = Array.isArray(a)?a.map((k:any)=>String(k).toLowerCase()):[]; 
+          const correctChosen = sk.filter(k => ck.includes(k));
+          const wrongChosen = sk.filter(k => !ck.includes(k));
+          qScore = ck.length > 0 ? Math.max(0, correctChosen.length - wrongChosen.length) / ck.length : 0;
+        }
+        else if (t === "menjodohkan") { const pairs = q.pairs||[]; qScore = pairs.length>0 && pairs.every((p:any)=>a[p.id]===p.right) ? 1 : 0; }
+        else if (t === "urutkan" || t === "drag_drop") { const co = (q.items||[]).map((it:any)=>it.id); qScore = Array.isArray(a) && a.length===co.length && a.every((v:any,i:number)=>v===co[i]) ? 1 : 0; }
       }
-      if (ic) objCorrect++;
+      objCorrect += qScore;
     });
 
     let essCorrect = 0, essGraded = 0;

@@ -211,11 +211,13 @@ const StudentScoresDialog = ({ isOpen, onClose, studentId, studentName }: Studen
       const typeMapReverse: Record<string, string> = {
         multiple_choice: "pilihan_ganda",
         complex_multiple_choice: "pilihan_ganda_kompleks",
+        complex_choice: "pilihan_ganda_kompleks",
         matching: "menjodohkan",
         true_false: "benar_salah",
         short_answer: "isian_singkat",
         essay: "uraian",
         ordering: "urutkan",
+        sequence: "urutkan",
         drag_drop: "drag_drop",
         pilihan_ganda: "pilihan_ganda",
         pilihan_ganda_kompleks: "pilihan_ganda_kompleks",
@@ -229,13 +231,19 @@ const StudentScoresDialog = ({ isOpen, onClose, studentId, studentName }: Studen
       const mappedQuestions = rawQuestions.map((q: any) => {
         const rawType = q.field || q.type || "pilihan_ganda";
         const mappedType = typeMapReverse[rawType] || rawType;
-        const options = q.options || {};
+        let rawOptions = q.options || {};
+        if (typeof rawOptions === "string") {
+          try { rawOptions = JSON.parse(rawOptions); } catch (e) { rawOptions = {}; }
+        }
         return {
           ...q,
           type: mappedType,
-          choices: mappedType === "menjodohkan" ? undefined : options,
-          pairs: mappedType === "menjodohkan" ? options.pairs : undefined,
-          items: (mappedType === "urutkan" || mappedType === "drag_drop") ? options.items : undefined,
+          choices: mappedType === "menjodohkan" ? undefined : rawOptions,
+          statements: (mappedType === "benar_salah" && Array.isArray(rawOptions.statements))
+            ? rawOptions.statements
+            : (Array.isArray(rawOptions) ? rawOptions : (q.statements || undefined)),
+          pairs: mappedType === "menjodohkan" ? rawOptions.pairs : undefined,
+          items: (mappedType === "urutkan" || mappedType === "drag_drop") ? rawOptions.items : undefined,
           answerKey: q.correctAnswer || q.answerKey
         };
       });
@@ -273,30 +281,44 @@ const StudentScoresDialog = ({ isOpen, onClose, studentId, studentName }: Studen
     return dist <= maxAllowed;
   };
 
-  const checkAnswer = (q: QuestionData, ans: any, overrides: Record<string, boolean>) => {
+  const checkAnswer = (q: any, ans: any, overrides: Record<string, boolean>) => {
     if (overrides[q.id] !== undefined) return overrides[q.id];
-    if (!ans) return false;
+    if (ans === undefined || ans === null) return false;
 
     const type = q.type || "pilihan_ganda";
-    if (type === "pilihan_ganda" || type === "benar_salah") {
+    if (type === "pilihan_ganda" || type === "multiple_choice") {
       const ck = Object.keys(q.choices || {}).find(k => k.toLowerCase() === String(ans).toLowerCase());
-      return ck ? q.choices![ck].isCorrect === true : false;
+      return ck ? q.choices![ck]?.isCorrect === true : false;
     }
-    if (type === "pilihan_ganda_kompleks") {
-      const correctKeys = Object.keys(q.choices || {}).filter(k => q.choices![k].isCorrect).map(k => k.toLowerCase());
+    if (type === "benar_salah" || type === "true_false") {
+      const sts = q.statements || (q.choices && q.choices.statements);
+      if (Array.isArray(sts) && sts.length > 0) {
+        if (typeof ans !== "object" || ans === null || Array.isArray(ans)) return false;
+        return sts.every((st: any) => {
+          const expected = (st.answer || "benar").toLowerCase();
+          const given = (ans[st.id] || "").toLowerCase();
+          return given === expected;
+        });
+      } else {
+        const ck = Object.keys(q.choices || {}).find(k => k.toLowerCase() === String(ans).toLowerCase());
+        return ck ? q.choices![ck]?.isCorrect === true : false;
+      }
+    }
+    if (type === "pilihan_ganda_kompleks" || type === "complex_choice" || type === "complex_multiple_choice") {
+      const correctKeys = Object.keys(q.choices || {}).filter(k => q.choices![k]?.isCorrect).map(k => k.toLowerCase());
       const studentKeys = Array.isArray(ans) ? ans.map((k: string) => String(k).toLowerCase()) : [];
-      return studentKeys.length === correctKeys.length && studentKeys.every((k: string) => correctKeys.includes(k));
+      return correctKeys.length > 0 && studentKeys.length === correctKeys.length && studentKeys.every((k: string) => correctKeys.includes(k));
     }
-    if (type === "isian_singkat") {
+    if (type === "isian_singkat" || type === "short_answer") {
       return isFuzzyMatch(ans, q.answerKey || "");
     }
-    if (type === "urutkan" || type === "drag_drop") {
-      const co = (q.items || []).map((it) => it.id);
+    if (type === "urutkan" || type === "drag_drop" || type === "ordering" || type === "sequence") {
+      const co = (q.items || []).map((it: any) => it.id);
       return Array.isArray(ans) && ans.length === co.length && ans.every((v: string, i: number) => v === co[i]);
     }
-    if (type === "menjodohkan") {
+    if (type === "menjodohkan" || type === "matching") {
       const pairs = q.pairs || [];
-      return pairs.length > 0 && pairs.every((p) => ans[p.id] === p.right);
+      return pairs.length > 0 && typeof ans === "object" && ans !== null && pairs.every((p: any) => ans[p.id] === p.right);
     }
     return false;
   };

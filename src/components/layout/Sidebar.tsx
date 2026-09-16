@@ -249,10 +249,11 @@ const Sidebar = () => {
             if (hasChildren) {
               return (
                 <div key={item.label} className="space-y-1">
-                  <div
+                  <button
+                    type="button"
                     onClick={() => toggleSubmenu(item.label)}
                     className={cn(
-                      "group relative flex items-center gap-3.5 rounded-xl px-3 py-3 mx-1 text-sm font-semibold transition-all duration-200 cursor-pointer text-slate-600 dark:text-slate-400 hover:bg-slate-100/80 dark:hover:bg-slate-800/80 hover:text-slate-900 dark:hover:text-slate-200"
+                      "w-full text-left group relative flex items-center gap-3.5 rounded-xl px-3 py-3 mx-1 text-sm font-semibold transition-all duration-200 cursor-pointer text-slate-600 dark:text-slate-400 hover:bg-slate-100/80 dark:hover:bg-slate-800/80 hover:text-slate-900 dark:hover:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
                     )}
                   >
                     <item.icon className="h-[18px] w-[18px] transition-transform text-slate-400 dark:text-slate-500 group-hover:text-slate-600 dark:group-hover:text-slate-400" />
@@ -260,7 +261,7 @@ const Sidebar = () => {
                       <span className="truncate">{item.label}</span>
                       <ChevronDown className={cn("h-4 w-4 transition-transform text-slate-400", isMenuExpanded && "rotate-180")} />
                     </div>
-                  </div>
+                  </button>
 
                   {isMenuExpanded && (
                     <div className="space-y-1 py-1 animate-in slide-in-from-top-1 duration-200 relative before:absolute before:left-[21px] before:top-0 before:bottom-0 before:w-px before:bg-slate-200 dark:before:bg-slate-800">
@@ -356,10 +357,10 @@ const Sidebar = () => {
             <Button
               variant="ghost"
               size="icon"
-              className="h-9 w-9 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl transition-all duration-200 group"
+              className="min-h-[44px] min-w-[44px] h-11 w-11 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl transition-all duration-200 group focus-visible:ring-2 focus-visible:ring-blue-600"
               onClick={closeMobile}
             >
-              <X className="h-4 w-4 group-hover:scale-110 transition-transform" />
+              <X className="h-5 w-5 group-hover:scale-110 transition-transform" />
               <span className="sr-only">Close menu</span>
             </Button>
 
@@ -382,10 +383,11 @@ const Sidebar = () => {
               if (hasChildren) {
                 return (
                   <div key={item.label} className="space-y-1">
-                    <div
+                    <button
+                      type="button"
                       onClick={() => toggleSubmenu(item.label)}
                       className={cn(
-                        "group relative flex items-center gap-3.5 rounded-xl px-3 py-3 mx-1 text-sm font-semibold transition-all duration-200 cursor-pointer text-slate-600 dark:text-slate-400 hover:bg-slate-100/80 dark:hover:bg-slate-800/80 hover:text-slate-900 dark:hover:text-slate-200"
+                        "w-full text-left group relative flex items-center gap-3.5 rounded-xl px-3 py-3 mx-1 text-sm font-semibold transition-all duration-200 cursor-pointer text-slate-600 dark:text-slate-400 hover:bg-slate-100/80 dark:hover:bg-slate-800/80 hover:text-slate-900 dark:hover:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
                       )}
                     >
                       <item.icon className="h-[18px] w-[18px] transition-transform text-slate-400 dark:text-slate-500" />
@@ -393,7 +395,7 @@ const Sidebar = () => {
                         <span className="truncate">{item.label}</span>
                         <ChevronDown className={cn("h-4 w-4 transition-transform text-slate-400", isMenuExpanded && "rotate-180")} />
                       </div>
-                    </div>
+                    </button>
 
                     {isMenuExpanded && (
                       <div className="space-y-1 py-1 relative before:absolute before:left-[21px] before:top-0 before:bottom-0 before:w-px before:bg-slate-200 dark:before:bg-slate-800 animate-in slide-in-from-top-1">

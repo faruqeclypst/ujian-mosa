@@ -5,15 +5,15 @@ import { Input } from "../ui/input";
 import { Badge } from "../ui/badge";
 import { Skeleton } from "../ui/skeleton";
 import { MathText } from "../ui/MathText";
-import { 
-  Search, 
-  Database, 
-  Globe, 
-  Check, 
-  Loader2, 
-  BookOpen, 
-  CheckSquare, 
-  Square, 
+import {
+  Search,
+  Database,
+  Globe,
+  Check,
+  Loader2,
+  BookOpen,
+  CheckSquare,
+  Square,
   FileText,
   Sparkles,
   Layers
@@ -42,7 +42,7 @@ export const QuestionRepositoryDialog: React.FC<QuestionRepositoryDialogProps> =
   const { subjects } = useExamData();
 
   const [activeTab, setActiveTab] = useState<"internal" | "wayground">("internal");
-  
+
   // State Tab Internal
   const [examsList, setExamsList] = useState<any[]>([]);
   const [selectedSourceExamId, setSelectedSourceExamId] = useState<string>("");
@@ -68,7 +68,7 @@ export const QuestionRepositoryDialog: React.FC<QuestionRepositoryDialogProps> =
   // Fetch daftar Bank Soal Internal saat modal dibuka
   useEffect(() => {
     if (!isOpen || !pb) return;
-    
+
     const fetchInternalExams = async () => {
       setLoadingInternalExams(true);
       try {
@@ -114,7 +114,7 @@ export const QuestionRepositoryDialog: React.FC<QuestionRepositoryDialogProps> =
           drag_drop: "drag_drop"
         };
 
-        // Kumpulkan map stimulus wacana literasi (groupId -> groupText)
+        // Kumpulkan map stimulus literasi literasi (groupId -> groupText)
         const groupTextMap: Record<string, string> = {};
         records.forEach((q: any) => {
           const gId = q.groupId || q.group_id;
@@ -163,6 +163,8 @@ export const QuestionRepositoryDialog: React.FC<QuestionRepositoryDialogProps> =
             choices: choicesObj,
             pairs: mappedType === "menjodohkan" ? (options.pairs || q.pairs) : undefined,
             items: (mappedType === "urutkan" || mappedType === "drag_drop") ? (options.items || q.items) : undefined,
+            statements: mappedType === "benar_salah" ? (options.statements || q.statements) : undefined,
+            options: options,
             answerKey: ansKey || undefined,
             order: q.order
           };
@@ -247,7 +249,7 @@ export const QuestionRepositoryDialog: React.FC<QuestionRepositoryDialogProps> =
         if (itemType !== selectedTypeFilter) return false;
       }
 
-      // Text Search (Mencari di teks soal, teks wacana literasi, dan ID/nama paket)
+      // Text Search (Mencari di teks soal, teks literasi, dan ID/nama paket)
       if (!q) return true;
       const textToSearch = `${item.text || ""} ${item.groupText || ""} ${item.groupId || ""}`.toLowerCase();
       return textToSearch.includes(q);
@@ -308,6 +310,8 @@ export const QuestionRepositoryDialog: React.FC<QuestionRepositoryDialogProps> =
         groupText: q.groupText || undefined,
         choices: q.choices || undefined,
         pairs: q.pairs || undefined,
+        statements: q.statements || undefined,
+        options: q.options || undefined,
         answerKey: q.answerKey || undefined,
         items: q.items || undefined,
       }));
@@ -360,11 +364,10 @@ export const QuestionRepositoryDialog: React.FC<QuestionRepositoryDialogProps> =
               <button
                 type="button"
                 onClick={() => { setActiveTab("internal"); setSelectedQuestionIds(new Set()); }}
-                className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
-                  activeTab === "internal" 
-                    ? "bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm" 
-                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900"
-                }`}
+                className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${activeTab === "internal"
+                  ? "bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm"
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900"
+                  }`}
               >
                 <Database className="h-3.5 w-3.5" />
                 Bank Internal
@@ -372,11 +375,10 @@ export const QuestionRepositoryDialog: React.FC<QuestionRepositoryDialogProps> =
               <button
                 type="button"
                 onClick={() => { setActiveTab("wayground"); setSelectedQuestionIds(new Set()); }}
-                className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
-                  activeTab === "wayground" 
-                    ? "bg-white dark:bg-slate-700 text-purple-600 dark:text-purple-400 shadow-sm" 
-                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900"
-                }`}
+                className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${activeTab === "wayground"
+                  ? "bg-white dark:bg-slate-700 text-purple-600 dark:text-purple-400 shadow-sm"
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900"
+                  }`}
               >
                 <Globe className="h-3.5 w-3.5" />
                 Wayground API
@@ -423,14 +425,14 @@ export const QuestionRepositoryDialog: React.FC<QuestionRepositoryDialogProps> =
                 {/* Search */}
                 <div className="flex-1 min-w-[200px]">
                   <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 block mb-1">
-                    Cari Kata Kunci Soal / Wacana:
+                    Cari Kata Kunci Soal / Literasi:
                   </label>
                   <div className="relative">
                     <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
                     <Input
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      placeholder="Cari teks soal atau wacana..."
+                      placeholder="Cari teks soal atau literasi..."
                       className="pl-9 h-9 text-xs rounded-xl"
                     />
                   </div>
@@ -582,11 +584,10 @@ export const QuestionRepositoryDialog: React.FC<QuestionRepositoryDialogProps> =
                     <div
                       key={item.id || idx}
                       onClick={() => toggleQuestionSelect(item.id)}
-                      className={`p-3 rounded-xl cursor-pointer transition-all flex items-start gap-3 border ${
-                        isSelected 
-                          ? "bg-blue-50/70 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800/60 shadow-sm" 
-                          : "border-transparent hover:bg-slate-50 dark:hover:bg-slate-800/40"
-                      }`}
+                      className={`p-3 rounded-xl cursor-pointer transition-all flex items-start gap-3 border ${isSelected
+                        ? "bg-blue-50/70 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800/60 shadow-sm"
+                        : "border-transparent hover:bg-slate-50 dark:hover:bg-slate-800/40"
+                        }`}
                     >
                       <div className="pt-0.5">
                         {isSelected ? (
@@ -630,12 +631,12 @@ export const QuestionRepositoryDialog: React.FC<QuestionRepositoryDialogProps> =
                           )}
                         </div>
 
-                        {/* Stimulus Wacana Bacaan Preview (jika ada groupText) */}
+                        {/* Stimulus Literasi Bacaan Preview (jika ada groupText) */}
                         {item.groupText && (
                           <div className="p-2.5 rounded-lg bg-amber-50/70 dark:bg-amber-950/20 border border-amber-200/70 dark:border-amber-900/40 text-xs text-amber-900 dark:text-amber-200 space-y-1">
                             <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400">
                               <FileText className="h-3 w-3" />
-                              Teks Stimulus / Wacana Bacaan:
+                              Teks Stimulus / Literasi Bacaan:
                             </div>
                             <div className="max-h-24 overflow-y-auto font-serif leading-relaxed line-clamp-3 text-[11px]">
                               <MathText content={item.groupText} />
@@ -651,25 +652,24 @@ export const QuestionRepositoryDialog: React.FC<QuestionRepositoryDialogProps> =
                         {/* Image Preview if any */}
                         {item.imageUrl && (
                           <div className="pt-1">
-                            <img 
-                              src={item.imageUrl} 
-                              alt="soal" 
-                              className="max-h-24 rounded-lg border border-slate-200 dark:border-slate-800 object-contain bg-white dark:bg-slate-900" 
+                            <img
+                              src={item.imageUrl}
+                              alt="soal"
+                              className="max-h-24 rounded-lg border border-slate-200 dark:border-slate-800 object-contain bg-white dark:bg-slate-900"
                             />
                           </div>
                         )}
 
-                        {/* Pilihan Preview jika PG / PG Kompleks / Benar Salah */}
+                        {/* Pilihan Preview jika PG / PG Kompleks / Benar Salah format lama */}
                         {item.choices && Object.keys(item.choices).length > 0 && (
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 pt-1">
                             {Object.entries(item.choices).map(([key, val]: [string, any]) => (
-                              <div 
-                                key={key} 
-                                className={`text-[11px] px-2.5 py-1 rounded-lg border flex items-start gap-1.5 ${
-                                  val.isCorrect 
-                                    ? "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-700 text-emerald-800 dark:text-emerald-300 font-bold" 
-                                    : "bg-slate-50 dark:bg-slate-800/70 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400"
-                                }`}
+                              <div
+                                key={key}
+                                className={`text-[11px] px-2.5 py-1 rounded-lg border flex items-start gap-1.5 ${val.isCorrect
+                                  ? "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-700 text-emerald-800 dark:text-emerald-300 font-bold"
+                                  : "bg-slate-50 dark:bg-slate-800/70 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400"
+                                  }`}
                               >
                                 <span className="font-black shrink-0">{key.toUpperCase()}.</span>
                                 <div className="flex-1 min-w-0">
@@ -683,6 +683,29 @@ export const QuestionRepositoryDialog: React.FC<QuestionRepositoryDialogProps> =
                                 )}
                               </div>
                             ))}
+                          </div>
+                        )}
+
+                        {/* Matriks Pernyataan jika Benar / Salah */}
+                        {item.type === "benar_salah" && item.statements && item.statements.length > 0 && (
+                          <div className="space-y-1.5 pt-1">
+                            <div className="text-[10px] font-bold text-cyan-600 dark:text-cyan-400 uppercase tracking-wider">{item.statements.length} Pernyataan:</div>
+                            <div className="divide-y divide-slate-100 dark:divide-slate-800 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden bg-slate-50/50 dark:bg-slate-800/30">
+                              {item.statements.map((st: any, sIdx: number) => {
+                                const isBenar = (st.answer || "benar").toLowerCase() === "benar";
+                                return (
+                                  <div key={st.id || sIdx} className="text-[11px] p-2 flex items-center justify-between gap-2">
+                                    <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                                      <span className="font-bold text-slate-400">{sIdx + 1}.</span>
+                                      <MathText content={st.text} className="inline truncate" />
+                                    </div>
+                                    <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase shrink-0 ${isBenar ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300" : "bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300"}`}>
+                                      {st.answer || "benar"}
+                                    </span>
+                                  </div>
+                                );
+                              })}
+                            </div>
                           </div>
                         )}
 

@@ -26,7 +26,7 @@ export const getTokenUsage = (apiKeyHint?: string): AITokenUsage => {
       const currentHash = apiKeyHint ? hashKey(apiKeyHint) : data.keyHash || "";
       if (data.date === today && data.keyHash === currentHash) return data;
     }
-  } catch {}
+  } catch { }
   return { date: new Date().toISOString().split("T")[0], used: 0, limit: 100000, lastUpdated: Date.now(), keyHash: "" };
 };
 
@@ -74,28 +74,28 @@ export interface AIGeneratedQuestion {
 // ═══════════════════════════════════════════════════════════════════════════════
 const robustJSONParse = (text: string): any => {
   if (!text || !text.trim()) throw new Error("AI memberikan respon kosong.");
-  
+
   let clean = text.trim();
   clean = clean.replace(/^```(?:json)?\s*\n?/i, "").replace(/\n?```\s*$/i, "").trim();
-  
+
   const firstBrace = clean.indexOf('{');
   const firstBracket = clean.indexOf('[');
   if (firstBrace === -1 && firstBracket === -1) throw new Error("AI memberikan format data yang tidak bisa dibaca sistem.");
-  
+
   let startIdx = firstBrace === -1 ? firstBracket : firstBracket === -1 ? firstBrace : Math.min(firstBrace, firstBracket);
   const isArray = clean[startIdx] === '[';
   const lastClose = isArray ? clean.lastIndexOf(']') : clean.lastIndexOf('}');
   clean = (lastClose !== -1 && lastClose > startIdx) ? clean.substring(startIdx, lastClose + 1) : clean.substring(startIdx);
 
   // Fast path
-  try { return JSON.parse(clean); } catch {}
+  try { return JSON.parse(clean); } catch { }
   // jsonrepair
-  try { return JSON.parse(jsonrepair(clean)); } catch {}
+  try { return JSON.parse(jsonrepair(clean)); } catch { }
   // Cleanup + repair
   try {
     const cleaned = clean.replace(/\r\n/g, "\\n").replace(/\r/g, "\\n").replace(/(?<!\\)\n/g, "\\n").replace(/(?<!\\)\t/g, "\\t").replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "");
     return JSON.parse(jsonrepair(cleaned));
-  } catch {}
+  } catch { }
   // Truncated recovery
   try {
     const lastComplete = clean.lastIndexOf('"answerKey"');
@@ -107,10 +107,10 @@ const robustJSONParse = (text: string): any => {
         return JSON.parse(jsonrepair(truncated));
       }
     }
-  } catch {}
+  } catch { }
   // Last resort
-  try { return JSON.parse(jsonrepair(clean.replace(/[\n\r\t]/g, " "))); } catch {}
-  
+  try { return JSON.parse(jsonrepair(clean.replace(/[\n\r\t]/g, " "))); } catch { }
+
   console.error("All JSON repair failed. Raw (500 chars):", clean.substring(0, 500));
   throw new Error("AI memberikan format data yang tidak bisa dibaca sistem.");
 };
@@ -144,7 +144,7 @@ export const AI_MODELS = [
   { id: "ministral-3:14b", name: "Ministral 3 14B", speed: "Efficient", status: "production", provider: "ollama" },
   { id: "gemini-3-flash-preview", name: "Gemini 3 Flash (Preview)", speed: "Hyper Speed", status: "preview", provider: "ollama" },
   { id: "gemma3:4b", name: "Gemma 3 4B (Small)", speed: "Eco-Friendly", status: "production", provider: "ollama" },
-  
+
   // --- GOOGLE AI STUDIO (Gemini) ---
   { id: "gemini-2.0-pro-exp-02-05", name: "Gemini 2.0 Pro (Experimental)", speed: "Ultimate Brain", status: "preview", provider: "google" },
   { id: "gemini-2.0-flash", name: "Gemini 2.0 Flash (Next-Gen)", speed: "Hyper Fast", status: "production", provider: "google" },
@@ -152,7 +152,7 @@ export const AI_MODELS = [
   { id: "gemini-1.5-pro", name: "Gemini 1.5 Pro (Powerful)", speed: "Balanced", status: "production", provider: "google" },
   { id: "gemini-1.5-flash", name: "Gemini 1.5 Flash (Fast)", speed: "Instant", status: "production", provider: "google" },
   { id: "gemini-1.5-flash-8b", name: "Gemini 1.5 Flash 8B", speed: "Hyper Fast", status: "production", provider: "google" },
-  
+
   // --- CLOUDFLARE WORKERS AI ---
   { id: "@cf/moonshotai/kimi-k2.5", name: "Kimi K2.5 (256k ctx)", speed: "Powerful", status: "production", provider: "cloudflare" },
   { id: "@cf/zai-org/glm-4.7-flash", name: "GLM-4.7 Flash", speed: "Fast", status: "production", provider: "cloudflare" },
@@ -185,7 +185,7 @@ export const AI_MODELS = [
   { id: "@cf/meta/meta-llama-3-8b-instruct", name: "Meta Llama 3 8B", speed: "Fast", status: "production", provider: "cloudflare" },
   { id: "@hf/nousresearch/hermes-2-pro-mistral-7b", name: "Hermes 2 Pro Mistral 7B", speed: "Fast", status: "production", provider: "cloudflare" },
   { id: "@cf/defog/sqlcoder-7b-2", name: "SQLCoder 7B (SQL)", speed: "Fast", status: "production", provider: "cloudflare" },
-  
+
   // --- OPENROUTER ---
   { id: "meta-llama/llama-4-scout-17b-16e-instruct", name: "Llama 4 Scout 17B (Next-Gen)", speed: "Instant", status: "preview", provider: "openrouter" },
   { id: "qwen/qwen3-32b", name: "Qwen 3 32B (Latest)", speed: "Powerful", status: "preview", provider: "openrouter" },
@@ -201,11 +201,11 @@ export const AI_MODELS = [
   // --- GROQ EXPERIMENTAL ---
   { id: "groq/compound", name: "Groq Compound (Research)", speed: "Fast", status: "preview", provider: "groq", dailyLimit: "~8k token/hari ⚠️" },
   { id: "groq/compound-mini", name: "Groq Compound Mini", speed: "Hyper Fast", status: "preview", provider: "groq", dailyLimit: "~8k token/hari ⚠️" },
-  
+
   // --- TOGETHER AI ---
   { id: "meta-llama/Llama-3-70b-chat-hf", name: "Llama 3 70B", speed: "Fast", status: "production", provider: "together" },
   { id: "meta-llama/Llama-3-8b-chat-hf", name: "Llama 3 8B", speed: "Instant", status: "production", provider: "together" },
-  
+
   // --- GITHUB MODELS ---
   { id: "gpt-4o", name: "GPT-4o (GitHub)", speed: "Ultimate", status: "production", provider: "github" },
   { id: "gpt-4o-mini", name: "GPT-4o mini (Fast)", speed: "Fast", status: "production", provider: "github" },
@@ -215,7 +215,7 @@ export const AI_MODELS = [
   { id: "phi-3-medium-128k-instruct", name: "Phi-3 Medium", speed: "Balanced", status: "production", provider: "github" },
   { id: "phi-3-mini-128k-instruct", name: "Phi-3 Mini", speed: "Fast", status: "production", provider: "github" },
   { id: "phi-3-small-128k-instruct", name: "Phi-3 Small", speed: "Fast", status: "production", provider: "github" },
-  
+
   // --- HUGGING FACE ---
   { id: "meta-llama/Meta-Llama-3-8B-Instruct", name: "Llama 3 8B Instruct", speed: "Fast", status: "production", provider: "huggingface" },
 
@@ -246,14 +246,14 @@ const loadPuterSDK = (): Promise<void> => {
   });
 };
 
-const callPuterAI = async (model: string, messages: Array<{role: string; content: string}>, maxTokens?: number): Promise<string> => {
+const callPuterAI = async (model: string, messages: Array<{ role: string; content: string }>, maxTokens?: number): Promise<string> => {
   await loadPuterSDK();
   const puter = (window as any).puter;
   if (!puter?.ai?.chat) throw new Error("Puter.js SDK tidak tersedia. Pastikan popup tidak diblokir.");
   try {
     const isSignedIn = await puter.auth.isSignedIn();
     if (!isSignedIn) await puter.auth.signIn();
-  } catch {}
+  } catch { }
 
   const response = await puter.ai.chat(
     messages.map(m => ({ role: m.role, content: m.content })),
@@ -297,7 +297,7 @@ const getAIConfig = async (pb: PocketBase): Promise<AIConfig> => {
 
   let rawModel = AI_MODELS[0].id;
   let rawProvider = "groq";
-  
+
   if (userRole === "admin") {
     rawModel = config?.ai_model || AI_MODELS[0].id;
     rawProvider = config?.ai_provider || "groq";
@@ -318,7 +318,7 @@ const getAIConfig = async (pb: PocketBase): Promise<AIConfig> => {
 
   const isCustom = rawProvider === "custom";
   const actualModelDef = AI_MODELS.find((m) => m.id === rawModel && m.provider === rawProvider) || AI_MODELS.find((m) => m.id === rawModel);
-  
+
   const finalModel = isCustom ? rawModel : (actualModelDef ? actualModelDef.id : AI_MODELS[0].id);
   const finalProvider = isCustom ? "custom" : (rawProvider === "puter" ? "puter" : (actualModelDef ? actualModelDef.provider : "groq"));
 
@@ -451,9 +451,9 @@ const fetchAI = async (opts: AIFetchOptions): Promise<string> => {
 
   const data = await response.json();
   if (data?.usage?.total_tokens) trackTokenUsage(data.usage.total_tokens, undefined, apiKey);
-  
+
   // Extract content (supports OpenAI, Ollama, and various custom formats)
-  const content = 
+  const content =
     data?.choices?.[0]?.message?.content ||
     data?.message?.content ||
     data?.choices?.[0]?.text ||
@@ -464,12 +464,12 @@ const fetchAI = async (opts: AIFetchOptions): Promise<string> => {
     data?.content ||
     data?.text ||
     "";
-  
+
   if (!content) {
     console.error("[AI] Empty content from response. Full data:", JSON.stringify(data).substring(0, 500));
     throw new Error(`AI tidak memberikan respon teks yang valid. (model: ${model})`);
   }
-  
+
   return content;
 };
 
@@ -498,23 +498,23 @@ const detectSubjectContext = (subject: string, topic: string = ""): SubjectConte
 
 const buildFormatRules = (ctx: SubjectContext): string => {
   const rules: string[] = [];
-  
+
   if (ctx.isExact || ctx.isChemistry) {
     rules.push("ATURAN RUMUS & SIMBOL MATEMATIKA/FISIKA:\n" +
-"- Gunakan LaTeX HANYA untuk rumus matematika, persamaan, dan simbol ilmiah.\n" +
-"- Inline: $...$. Display/block: $$...$$\n" +
-"- JANGAN gunakan LaTeX untuk angka biasa tanpa konteks rumus (contoh: \"5 siswa\", \"tahun 2024\", \"nomor 3\" tetap teks biasa).\n" +
-"- GUNAKAN LaTeX untuk: rumus ($v = v_0 + at$), angka+satuan fisika ($10\\\\text{ m/s}^2$), simbol ($\\\\rho$, $\\\\Omega$).\n" +
-"- NOTASI STANDAR:\n" +
-"  * Logaritma: ${}^a\\\\log b$\n" +
-"  * Pecahan: $\\\\frac{a}{b}$\n" +
-"  * Perkalian: $\\\\times$\n" +
-"  * Pangkat: $10^{22}$\n" +
-"  * Koma desimal: $9{,}8$\n" +
-"  * Derajat: $90^\\\\circ$\n" +
-"- Di dalam JSON string, backslash ditulis ganda: \"$\\\\\\\\frac{1}{2}$\"");
+      "- Gunakan LaTeX HANYA untuk rumus matematika, persamaan, dan simbol ilmiah.\n" +
+      "- Inline: $...$. Display/block: $$...$$\n" +
+      "- JANGAN gunakan LaTeX untuk angka biasa tanpa konteks rumus (contoh: \"5 siswa\", \"tahun 2024\", \"nomor 3\" tetap teks biasa).\n" +
+      "- GUNAKAN LaTeX untuk: rumus ($v = v_0 + at$), angka+satuan fisika ($10\\\\text{ m/s}^2$), simbol ($\\\\rho$, $\\\\Omega$).\n" +
+      "- NOTASI STANDAR:\n" +
+      "  * Logaritma: ${}^a\\\\log b$\n" +
+      "  * Pecahan: $\\\\frac{a}{b}$\n" +
+      "  * Perkalian: $\\\\times$\n" +
+      "  * Pangkat: $10^{22}$\n" +
+      "  * Koma desimal: $9{,}8$\n" +
+      "  * Derajat: $90^\\\\circ$\n" +
+      "- Di dalam JSON string, backslash ditulis ganda: \"$\\\\\\\\frac{1}{2}$\"");
   }
-  
+
   if (ctx.isChemistry) {
     rules.push(`ATURAN WAJIB KIMIA:
 - Semua rumus kimia WAJIB menggunakan $\\\\ce{...}$ (mhchem package).
@@ -525,7 +525,7 @@ const buildFormatRules = (ctx: SubjectContext): string => {
 - DILARANG menulis reaksi kimia sebagai teks biasa. Contoh SALAH: "2H2 + O2 → 2H2O". Contoh BENAR: "$\\\\ce{2H2 + O2 -> 2H2O}$"
 - Di JSON: "$\\\\\\\\ce{H2SO4}$"`);
   }
-  
+
   if (ctx.isProgramming) {
     rules.push(`KODE PROGRAM: Gunakan <pre class="ql-syntax" data-language="BAHASA">...</pre> HANYA untuk potongan kode/sintaks program yang sebenarnya. JANGAN gunakan code block untuk teks narasi, penjelasan, atau stimulus bacaan — tulis sebagai teks biasa/HTML.`);
   }
@@ -534,7 +534,7 @@ const buildFormatRules = (ctx: SubjectContext): string => {
   } else if (ctx.isReligious) {
     rules.push(`Jika relevan, sertakan ayat Arab ber-harakat dalam <p dir="rtl" style="text-align:right;font-size:1.3em;line-height:2;margin:12px 0;">AYAT</p>. Pisahkan dari teks Latin.`);
   }
-  
+
   return rules.length > 0 ? rules.join("\n\n") : "PENTING: Tulis soal dalam teks biasa (plain text/HTML). JANGAN gunakan simbol $ atau LaTeX kecuali mapel Matematika/Fisika/Kimia.";
 };
 
@@ -560,13 +560,13 @@ CONTOH OUTPUT BENAR (Eksakta):
 // Strip unwanted LaTeX $ from text when subject is NOT math/physics/chemistry
 const stripUnwantedLatex = (text: string, isExactSubject: boolean): string => {
   if (!text || isExactSubject) return text;
-  
+
   // If the text contains $ signs but subject is not exact, try to clean them
   if (!text.includes('$')) return text;
-  
+
   // Remove simple $number$ patterns (e.g. "$5$" → "5", "$1945$" → "1945")
   let cleaned = text.replace(/\$(\d[\d.,]*)\$/g, '$1');
-  
+
   // Remove $simple text$ that doesn't look like real math (no backslash, no ^, no _, no {})
   cleaned = cleaned.replace(/\$([^$\\^_{}]+)\$/g, (match, inner) => {
     // If it's just plain text/numbers without math operators, strip the $
@@ -575,7 +575,7 @@ const stripUnwantedLatex = (text: string, isExactSubject: boolean): string => {
     }
     return match; // Keep it if it looks like actual math
   });
-  
+
   return cleaned;
 };
 
@@ -610,7 +610,7 @@ const validateQuestions = (questions: any[], isExactSubject: boolean = false, re
     // Must have text
     if (!q.text?.trim() && !q.question?.trim()) return false;
     const qType = q.type || requestedType || "pilihan_ganda";
-    
+
     // For multiple choice: must have at least 2 choices
     if ((qType === "pilihan_ganda" || qType === "pilihan_ganda_kompleks" || qType === "benar_salah") && q.choices && typeof q.choices === "object") {
       const keys = Object.keys(q.choices);
@@ -625,7 +625,7 @@ const validateQuestions = (questions: any[], isExactSubject: boolean = false, re
       const uniqueTexts = new Set(texts);
       if (uniqueTexts.size < texts.length * 0.7) return false;
     }
-    
+
     // For menjodohkan: should have pairs (but allow empty for manual editing)
     if (qType === "menjodohkan") {
       // Try to extract pairs from choices if pairs is missing (AI sometimes returns wrong format)
@@ -662,7 +662,7 @@ const validateQuestions = (questions: any[], isExactSubject: boolean = false, re
         q.pairs = [];
       }
     }
-    
+
     // For urutkan/drag_drop: should have items (but allow empty for manual editing)
     if (qType === "urutkan" || qType === "drag_drop") {
       if (q.items && Array.isArray(q.items)) {
@@ -685,10 +685,10 @@ const validateQuestions = (questions: any[], isExactSubject: boolean = false, re
         q.items = [];
       }
     }
-    
+
     // For isian_singkat: must have answerKey
     if (qType === "isian_singkat" && !q.answerKey?.trim() && !q.answer_key?.trim() && !q.answer?.trim()) return false;
-    
+
     return true;
   }).map(q => ({
     text: stripUnwantedLatex(unescapeLatex(q.text || q.question || ""), isExactSubject),
@@ -724,7 +724,7 @@ const validateQuestions = (questions: any[], isExactSubject: boolean = false, re
 // ═══════════════════════════════════════════════════════════════════════════════
 const buildTaxonomyInstruction = (taxonomy: string): string => {
   const levels = taxonomy.split(",").map(s => s.trim()).filter(Boolean);
-  
+
   const taxonomyMap: Record<string, string> = {
     C1: "C1 (Mengingat/Remember): mengingat fakta, definisi, istilah",
     C2: "C2 (Memahami/Understand): menjelaskan, menafsirkan, merangkum",
@@ -764,9 +764,9 @@ const buildTaxonomyInstruction = (taxonomy: string): string => {
 // ═══════════════════════════════════════════════════════════════════════════════
 export const generateQuestionsAI = async (
   pb: PocketBase,
-  topic: string, 
-  count: number = 5, 
-  level: string = "Umum", 
+  topic: string,
+  count: number = 5,
+  level: string = "Umum",
   subject: string = "",
   type: string = "pilihan_ganda",
   isLiteracy: boolean = false,
@@ -790,9 +790,9 @@ export const generateQuestionsAI = async (
       if (err.message?.includes("AI_RATE_LIMIT")) throw err;
       // Don't retry if aborted
       if (err.name === "AbortError") throw err;
-      
+
       console.warn(`[AI] Attempt ${attempt}/${MAX_RETRIES} failed: ${err.message}. ${attempt < MAX_RETRIES ? "Retrying..." : "Giving up."}`);
-      
+
       if (attempt < MAX_RETRIES) {
         // Wait before retry (exponential backoff: 1s, 2s)
         await new Promise(r => setTimeout(r, attempt * 1000));
@@ -805,9 +805,9 @@ export const generateQuestionsAI = async (
 
 const _generateQuestionsAIInternal = async (
   pb: PocketBase,
-  topic: string, 
-  count: number = 5, 
-  level: string = "Umum", 
+  topic: string,
+  count: number = 5,
+  level: string = "Umum",
   subject: string = "",
   type: string = "pilihan_ganda",
   isLiteracy: boolean = false,
@@ -821,7 +821,7 @@ const _generateQuestionsAIInternal = async (
   try {
     const ctx = detectSubjectContext(subject, topic);
     const formatRules = buildFormatRules(ctx);
-    
+
     console.log(`🚀 [AI ENGINE] Generating ${count} questions | Literacy: ${isLiteracy} | Subject: ${subject}`);
 
     const typeDesc: Record<string, string> = {
@@ -841,18 +841,18 @@ const _generateQuestionsAIInternal = async (
       const batchSize = Math.ceil(count / 2);
       const batches = [batchSize, count - batchSize];
       console.log(`⚡ [PARALLEL] Splitting ${count} into batches: ${batches.join(', ')}`);
-      
+
       const results = await Promise.allSettled(
-        batches.map(batchCount => 
+        batches.map(batchCount =>
           generateQuestionsAI(pb, topic, batchCount, level, subject, type, false, passageLength, difficulty, focus, taxonomy, materialReference, objectives)
         )
       );
-      
+
       const allQuestions: AIGeneratedQuestion[] = [];
       for (const result of results) {
         if (result.status === "fulfilled") allQuestions.push(...result.value);
       }
-      
+
       if (allQuestions.length === 0) throw new Error("Semua batch gagal menghasilkan soal.");
       return allQuestions;
     }
@@ -866,7 +866,7 @@ const _generateQuestionsAIInternal = async (
       };
 
       const fewShotLit = getFewShotExample(ctx);
-      
+
       // Build type-specific output format for literacy mode
       const getLiteracyTypeFormat = (questionType: string): string => {
         switch (questionType) {
@@ -892,11 +892,11 @@ const _generateQuestionsAIInternal = async (
       };
 
       const litTypeFormat = getLiteracyTypeFormat(type);
-      const litTypeInstructions = (type === "pilihan_ganda" || type === "pilihan_ganda_kompleks") 
-        ? "Opsi A-E ringkas & logis. Kunci jawaban acak." 
-        : (type === "menjodohkan" ? "Buat 4-6 pasangan yang logis berdasarkan stimulus." 
-          : (type === "urutkan" || type === "drag_drop") ? "Buat 4-6 item yang harus disusun berdasarkan stimulus." 
-          : "");
+      const litTypeInstructions = (type === "pilihan_ganda" || type === "pilihan_ganda_kompleks")
+        ? "Opsi A-E ringkas & logis. Kunci jawaban acak."
+        : (type === "menjodohkan" ? "Buat 4-6 pasangan yang logis berdasarkan stimulus."
+          : (type === "urutkan" || type === "drag_drop") ? "Buat 4-6 item yang harus disusun berdasarkan stimulus."
+            : "");
 
       const taxonomyInstruction = buildTaxonomyInstruction(taxonomy);
       const objectivesSection = objectives.length > 0 ? `\nTUJUAN PEMBELAJARAN (soal WAJIB mengukur pencapaian tujuan ini):\n${objectives.map((o, i) => `${i + 1}. ${o}`).join("\n")}\n` : "";
@@ -904,8 +904,8 @@ const _generateQuestionsAIInternal = async (
       // Jika ada materi referensi, stimulus WAJIB berdasarkan materi tersebut
       const hasMaterial = materialReference && materialReference.trim().length > 10;
       const stimulusInstruction = hasMaterial
-        ? `1. Buat stimulus/wacana berdasarkan MATERI REFERENSI yang diberikan, sepanjang ${lengthMap[passageLength] || lengthMap.sedang}. Olah materi menjadi artikel/studi kasus menarik yang memuat fakta & informasi dari materi. WAJIB menyinggung isi materi referensi. Format HTML: <h2 style="text-align:center;color:#1e3a8a;margin-bottom:32px;font-weight:900;">[JUDUL]</h2> lalu <p style="text-indent:30px;margin-bottom:24px;line-height:1.8;text-align:justify;">paragraf</p>.`
-        : `1. Buat stimulus/wacana bertema "${topic}" sepanjang ${lengthMap[passageLength] || lengthMap.sedang}. Sajikan sebagai artikel/studi kasus menarik (bukan definisi). Format HTML: <h2 style="text-align:center;color:#1e3a8a;margin-bottom:32px;font-weight:900;">[JUDUL]</h2> lalu <p style="text-indent:30px;margin-bottom:24px;line-height:1.8;text-align:justify;">paragraf</p>.`;
+        ? `1. Buat stimulus/literasi berdasarkan MATERI REFERENSI yang diberikan, sepanjang ${lengthMap[passageLength] || lengthMap.sedang}. Olah materi menjadi artikel/studi kasus menarik yang memuat fakta & informasi dari materi. WAJIB menyinggung isi materi referensi. Format HTML: <h2 style="text-align:center;color:#1e3a8a;margin-bottom:32px;font-weight:900;">[JUDUL]</h2> lalu <p style="text-indent:30px;margin-bottom:24px;line-height:1.8;text-align:justify;">paragraf</p>.`
+        : `1. Buat stimulus/literasi bertema "${topic}" sepanjang ${lengthMap[passageLength] || lengthMap.sedang}. Sajikan sebagai artikel/studi kasus menarik (bukan definisi). Format HTML: <h2 style="text-align:center;color:#1e3a8a;margin-bottom:32px;font-weight:900;">[JUDUL]</h2> lalu <p style="text-indent:30px;margin-bottom:24px;line-height:1.8;text-align:justify;">paragraf</p>.`;
 
       const systemPrompt = `Anda adalah Spesialis Evaluasi Pendidikan. Buat stimulus literasi + ${count} soal ${typeLabel} dalam SATU respons.
 Jenjang: ${level}, Mapel: ${subject}, Kesulitan: ${difficulty}.
@@ -941,18 +941,18 @@ Hanya JSON. Pastikan stimulus SELESAI SEMPURNA (tidak terpotong).`;
       const groupText = parsed.groupText || parsed.stimulus || parsed.wacana || "";
       const groupId = `LIT-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substr(2, 4).toUpperCase()}`;
       let questionsRaw = parsed.questions || parsed.data || parsed.soal || (Array.isArray(parsed) ? parsed : []);
-      
+
       if (questionsRaw.length === 0 && parsed.text) questionsRaw = [parsed];
-      
+
       const validated = validateQuestions(questionsRaw, ctx.isExact || ctx.isChemistry, type);
       if (validated.length === 0) throw new Error("AI tidak menghasilkan soal yang valid.");
-      
+
       return validated.map(q => ({ ...q, groupId, groupText }));
     }
 
     // ═══ STANDARD (Non-Literacy) Generation ═══
     const fewShot = getFewShotExample(ctx);
-    
+
     // Build type-specific output format instructions
     const getTypeOutputFormat = (questionType: string): string => {
       switch (questionType) {
@@ -985,11 +985,11 @@ CATATAN: items berisi 4-6 item yang harus disusun/dikelompokkan. Urutan dalam ar
     };
 
     const typeOutputFormat = getTypeOutputFormat(type);
-    
+
     const taxonomyInstruction = buildTaxonomyInstruction(taxonomy);
     const hasMaterial = materialReference && materialReference.trim().length > 10;
     const objectivesSection = objectives.length > 0 ? `\nTUJUAN PEMBELAJARAN (soal WAJIB mengukur pencapaian tujuan ini):\n${objectives.map((o, i) => `${i + 1}. ${o}`).join("\n")}\n` : "";
-    
+
     const systemPrompt = `Buat ${count} soal ${typeLabel}, ${level} - ${subject}, kesulitan ${difficulty}.
 ${taxonomyInstruction}
 ${objectivesSection}${hasMaterial ? "PENTING: Soal WAJIB berdasarkan & menyinggung isi MATERI REFERENSI yang diberikan. Gunakan fakta, konsep, dan informasi dari materi sebagai konteks soal.\n" : ""}Variasi panjang stem.${type === "pilihan_ganda" || type === "pilihan_ganda_kompleks" ? " Opsi A-E ringkas & logis. Kunci jawaban acak." : ""}
@@ -1000,7 +1000,7 @@ Hanya JSON.`;
     const materialSection = hasMaterial ? `MATERI REFERENSI (soal WAJIB berdasarkan isi materi ini):\n${materialReference}\n\n` : "";
     const topicLower = topic.toLowerCase();
     const isTopicInstruction = topic.length > 50 || topic.includes(',') || topicLower.includes('buat') || topicLower.includes('berikan') || topicLower.includes('pakai');
-    
+
     const userPrompt = isTopicInstruction
       ? `${materialSection}INSTRUKSI PENGGUNA: ${topic}\nBuat ${count} soal ${typeLabel}, ${level} - ${subject}. Soal harus menyinggung isi materi.`
       : `${materialSection}Topik: "${topic}". Buat ${count} soal ${typeLabel}, ${level} - ${subject}.${hasMaterial ? " Soal WAJIB berdasarkan & menyinggung isi materi referensi di atas." : " Variasi panjang stem & tipe pertanyaan."}`;
@@ -1041,14 +1041,14 @@ export const generateSingleQuestionAI = async (
   subject: string = "",
   difficulty: string = "sedang",
   focus: string = "akm",
-  existingWacana: string = ""
+  existingLiterasi: string = ""
 ): Promise<AIGeneratedQuestion> => {
   const MAX_RETRIES = 3;
   let lastError: any = null;
 
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
-      return await _generateSingleQuestionInternal(pb, topic, type, level, subject, difficulty, focus, existingWacana);
+      return await _generateSingleQuestionInternal(pb, topic, type, level, subject, difficulty, focus, existingLiterasi);
     } catch (err: any) {
       lastError = err;
       if (err.message?.includes("AI_RATE_LIMIT")) throw err;
@@ -1067,7 +1067,7 @@ const _generateSingleQuestionInternal = async (
   subject: string = "",
   difficulty: string = "sedang",
   focus: string = "akm",
-  existingWacana: string = ""
+  existingLiterasi: string = ""
 ): Promise<AIGeneratedQuestion> => {
   try {
     const ctx = detectSubjectContext(subject, topic);
@@ -1116,8 +1116,8 @@ ${formatRules ? `FORMAT: ${formatRules}` : ""}${type === "pilihan_ganda" || type
 ${typeFormat}
 Hanya JSON.`;
 
-    const userPrompt = existingWacana 
-      ? `STIMULUS LITERASI:\n${existingWacana}\n\nBuat 1 soal ${typeLabel} baru dari stimulus di atas. Jangan tanya definisi. Variasi bentuk pertanyaan.`
+    const userPrompt = existingLiterasi
+      ? `STIMULUS LITERASI:\n${existingLiterasi}\n\nBuat 1 soal ${typeLabel} baru dari stimulus di atas. Jangan tanya definisi. Variasi bentuk pertanyaan.`
       : `Topik: "${topic}". Buat 1 soal ${typeLabel}. Variasi bentuk pertanyaan.`;
 
     const maxTokens = ctx.isReligious ? 900 : (type === "menjodohkan" || type === "urutkan" || type === "drag_drop" || type === "uraian") ? 800 : 600;
@@ -1152,7 +1152,7 @@ Hanya JSON.`;
       items: result.items,
       answerKey: result.answerKey || result.answer_key || result.correctAnswer || "",
       groupId: "",
-      groupText: existingWacana
+      groupText: existingLiterasi
     };
   } catch (err: any) {
     console.error("AI Single Gen Error:", err);
@@ -1189,7 +1189,7 @@ Output JSON: {"topics":["...","..."]}`;
 
     const parsed = robustJSONParse(content);
     const rawTopics = parsed.topics || parsed.data || (Array.isArray(parsed) ? parsed : []);
-    
+
     return rawTopics.map((t: any) => {
       if (typeof t === "string") return t;
       if (typeof t === "object" && t !== null) {
@@ -1220,10 +1220,10 @@ export const generateObjectivesAI = async (
       C1: "Mengingat", C2: "Memahami", C3: "Menerapkan",
       C4: "Menganalisis", C5: "Mengevaluasi", C6: "Mencipta"
     };
-    
+
     const sorted = [...taxonomy].sort();
     const selectedLevels = sorted.map(c => `${c} (${taxonomyMap[c] || c})`).join(", ");
-    
+
     // Detect fase from level
     const levelLower = level.toLowerCase();
     let fase = "";
@@ -1239,7 +1239,7 @@ export const generateObjectivesAI = async (
     }
     const faseInfo = fase ? ` (${fase} Kurikulum Merdeka)` : "";
 
-    const materialContext = materialReference && materialReference.trim().length > 20 
+    const materialContext = materialReference && materialReference.trim().length > 20
       ? `\nBahan Materi (gunakan sebagai konteks):\n${materialReference.substring(0, 1500)}\n` : "";
 
     const systemPrompt = `Anda adalah ahli kurikulum pendidikan Indonesia. Buat tujuan pembelajaran (indikator soal) yang spesifik dan terukur.
@@ -1272,7 +1272,7 @@ Buat tujuan pembelajaran/indikator soal untuk SETIAP level taksonomi di atas.`;
 
     const parsed = robustJSONParse(content);
     const raw = parsed.objectives || parsed.tujuan || parsed.data || (Array.isArray(parsed) ? parsed : []);
-    
+
     return raw.map((t: any) => typeof t === "string" ? t : (t.text || t.objective || t.tujuan || String(t)))
       .filter((s: string) => s.length > 5)
       .slice(0, 6);
@@ -1365,7 +1365,7 @@ export const testAIConnection = async (pb: PocketBase, apiKey: string, modelId: 
         await loadPuterSDK();
         const puter = (window as any).puter;
         if (!puter?.ai?.chat) return { success: false, message: "Puter.js SDK tidak tersedia." };
-        try { const isSignedIn = await puter.auth.isSignedIn(); if (!isSignedIn) await puter.auth.signIn(); } catch {}
+        try { const isSignedIn = await puter.auth.isSignedIn(); if (!isSignedIn) await puter.auth.signIn(); } catch { }
         await puter.ai.chat("Say hi", { model: modelId, max_tokens: 10 });
         return { success: true, message: `Koneksi Puter Berhasil! (Model: ${modelId})` };
       } catch (e: any) {
@@ -1375,7 +1375,7 @@ export const testAIConnection = async (pb: PocketBase, apiKey: string, modelId: 
 
     if (!apiKey) throw new Error("API Key Kosong");
     const useProxy = finalProvider !== "groq";
-    
+
     const resolveBaseUrl = (p: string, url: string) => {
       switch (p) {
         case "google": return "https://generativelanguage.googleapis.com/v1beta/openai";
@@ -1417,13 +1417,13 @@ export const testAIConnection = async (pb: PocketBase, apiKey: string, modelId: 
     }
 
     if (response.ok) return { success: true, message: "Koneksi Berhasil!" };
-    
+
     let errorMessage = "Gagal menghubungi AI";
     try {
       const err = await response.json();
       errorMessage = err.error?.message || err.error || err.message || JSON.stringify(err);
     } catch { errorMessage = `Server Error: ${response.status} ${response.statusText}`; }
-    
+
     return { success: false, message: errorMessage };
   } catch (error: any) {
     return { success: false, message: error.message || "Gagal menghubungi server AI." };
@@ -1500,7 +1500,7 @@ KETENTUAN:
 1. AKURASI: Soal WAJIB berdasarkan fakta dalam materi.
 2. HOTS & VARIASI: Wajib variasi pola (analisis, evaluasi, kreasi, skenario kasus). DILARANG pola seragam.
 ${type === "pilihan_ganda" || type === "pilihan_ganda_kompleks" ? "3. OPSI: 5 pilihan (A-E) variatif, logis, diawali huruf kapital." : "3. Pastikan format sesuai tipe soal."}
-4. LITERASI: Jika diminta, masukkan wacana ke "groupText" (BUKAN "text"). Berikan "groupId" sama untuk soal satu wacana.
+4. LITERASI: Jika diminta, masukkan stimulus literasi ke "groupText" (BUKAN "text"). Berikan "groupId" sama untuk soal satu paket literasi.
 ${formatRules ? `\n${formatRules}` : ""}${fewShot ? `\n${fewShot}` : ""}
 
 ${materialTypeFormat}
@@ -1527,7 +1527,7 @@ Hanya JSON murni.`;
           });
         })
       );
-      
+
       const allQuestions: AIGeneratedQuestion[] = [];
       for (const result of results) {
         if (result.status === "fulfilled") allQuestions.push(...result.value);
@@ -1546,7 +1546,7 @@ Hanya JSON murni.`;
     if (questionsRaw.length === 0 && parsed.text && (parsed.choices || parsed.answerKey)) {
       questionsRaw = [parsed];
     }
-    
+
     const validated = validateQuestions(questionsRaw, ctx.isExact || ctx.isChemistry, type);
     if (validated.length === 0) throw new Error("Format soal tidak valid.");
     return validated;

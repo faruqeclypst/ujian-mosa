@@ -602,11 +602,11 @@ const StudentsPage = () => {
           </h2>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Kelola daftar {terminology.student} aktif dan penempatan {terminology.class.toLowerCase()}.</p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-stretch sm:items-center gap-2 w-full sm:w-auto">
           {loading ? (
             <>
-              <Skeleton className="h-9 w-28 rounded-2xl" />
-              <Skeleton className="h-9 w-28 rounded-2xl" />
+              <Skeleton className="h-9 w-28 rounded-xl" />
+              <Skeleton className="h-9 w-28 rounded-xl" />
             </>
           ) : (
             <>
@@ -614,7 +614,7 @@ const StudentsPage = () => {
                 <div className="flex items-center gap-1.5 animate-in fade-in zoom-in duration-200">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="default" size="sm" className="bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-400 dark:border dark:border-indigo-800/40 text-white h-8 text-xs rounded-xl shadow-lg shadow-indigo-500/20 active:scale-95 transition-all">
+                      <Button variant="default" size="sm" className="bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-400 dark:border dark:border-indigo-800/40 text-white h-9 text-xs rounded-xl shadow-lg shadow-indigo-500/20 active:scale-95 transition-all">
                         <Users2 className="mr-1.5 h-3.5 w-3.5" />
                         Aksi ({selectedIds.length})
                         <ChevronDown className="ml-1.5 h-3 w-3 opacity-50" />
@@ -666,7 +666,7 @@ const StudentsPage = () => {
                   <Button
                     variant="default"
                     size="sm"
-                    className="bg-rose-600 hover:bg-rose-700 dark:bg-rose-950/40 dark:text-rose-400 dark:border dark:border-rose-800/40 text-white h-8 text-xs rounded-xl shadow-lg shadow-rose-500/20 active:scale-95 transition-all"
+                    className="bg-rose-600 hover:bg-rose-700 dark:bg-rose-950/40 dark:text-rose-400 dark:border dark:border-rose-800/40 text-white h-9 text-xs rounded-xl shadow-lg shadow-rose-500/20 active:scale-95 transition-all font-bold"
                     onClick={handleBatchDelete}
                   >
                     <Trash2 className="mr-1 h-3.5 w-3.5" />
@@ -678,7 +678,7 @@ const StudentsPage = () => {
               {role === "admin" && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="secondary" size="sm" className="rounded-2xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 dark:hover:bg-emerald-900/40 dark:border-emerald-800/40 text-emerald-700 font-bold shadow-sm transition-all h-9 px-4">
+                    <Button variant="softSuccess" size="sm" className="rounded-xl font-bold shadow-sm transition-all h-9 px-3.5">
                       <FileSpreadsheet className="mr-1.5 h-3.5 w-3.5" />
                       Opsi Data
                       <ChevronDown className="ml-1.5 h-3 w-3 opacity-50" />
@@ -686,8 +686,8 @@ const StudentsPage = () => {
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-56 p-2 rounded-2xl shadow-2xl border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 z-[100]">
                     <DropdownMenuLabel className="text-[10px] font-bold uppercase tracking-widest text-slate-400 px-3 py-2 text-left">Kelola {terminology.student}</DropdownMenuLabel>
-                    <div
-                      className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors group"
+                    <DropdownMenuItem
+                      className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 focus:bg-slate-50 dark:focus:bg-slate-900 transition-colors group"
                       onClick={() => {
                         const input = document.getElementById("student-import-input") as HTMLInputElement;
                         if (input) {
@@ -704,7 +704,7 @@ const StudentsPage = () => {
                         </span>
                         <span className="text-[10px] text-slate-400 mt-1">Unggah file data {terminology.student.toLowerCase()} aktif</span>
                       </div>
-                    </div>
+                    </DropdownMenuItem>
                     <DropdownMenuItem
                       onClick={() => handleExportStudents()}
                       className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 focus:bg-slate-50 dark:focus:bg-slate-900 transition-colors group"
@@ -780,7 +780,7 @@ const StudentsPage = () => {
                   onClick={handleExportAllScores}
                   disabled={isExportingScores}
                   size="sm"
-                  className="rounded-2xl bg-indigo-50 hover:bg-indigo-100 active:bg-indigo-50 border border-indigo-100 dark:bg-indigo-900/30 dark:text-indigo-400 dark:hover:bg-indigo-900/50 dark:active:bg-indigo-900/30 dark:border-indigo-800/40 text-indigo-700 font-bold shadow-sm h-9 px-4 focus-visible:ring-0 focus-visible:ring-offset-0"
+                  className="rounded-xl bg-indigo-50 hover:bg-indigo-100 active:bg-indigo-50 border border-indigo-200/80 dark:bg-indigo-950/40 dark:text-indigo-300 dark:hover:bg-indigo-900/50 dark:border-indigo-800/50 text-indigo-700 font-bold shadow-sm h-9 px-3.5"
                 >
                   {isExportingScores ? (
                     <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
@@ -794,8 +794,8 @@ const StudentsPage = () => {
               {role === "admin" && (
                 <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                   <DialogTrigger asChild>
-                    <Button onClick={handleCreateClick} size="sm" className="rounded-2xl bg-blue-50 hover:bg-blue-100 active:bg-blue-50 border border-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 dark:active:bg-blue-900/30 dark:border-blue-800/40 text-blue-700 font-bold shadow-sm h-9 px-4 focus-visible:ring-0 focus-visible:ring-offset-0">
-                      <Plus className="mr-1 h-3.5 w-3.5" />
+                    <Button onClick={handleCreateClick} size="sm" className="rounded-2xl bg-blue-50 hover:bg-blue-100 active:bg-blue-50 border border-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 dark:active:bg-blue-900/30 dark:border-blue-800/40 text-blue-700 font-bold shadow-sm h-9 px-4">
+                      <Plus className="mr-1.5 h-3.5 w-3.5" />
                       Tambah {terminology.student}
                     </Button>
                   </DialogTrigger>

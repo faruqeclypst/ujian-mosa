@@ -21,7 +21,8 @@
       { "id": "school_email", "name": "contact_email", "type": "email", "required": false },
       { "id": "school_active", "name": "is_active", "type": "bool", "required": false },
       { "id": "school_plan", "name": "plan", "type": "select", "required": true, "values": ["free", "basic", "pro"] },
-      { "id": "school_quota", "name": "student_quota", "type": "number", "required": false }
+      { "id": "school_quota", "name": "student_quota", "type": "number", "required": false },
+      { "id": "school_custom_domain", "name": "custom_domain", "type": "text", "required": false }
     ],
     "listRule": "@request.auth.collectionName = 'super_admins'",
     "viewRule": "@request.auth.collectionName = 'super_admins'",

@@ -1,17 +1,17 @@
 import { useEffect, useState, useRef, useCallback } from "react";
-import { RefreshCw, LogOut, X, MoreHorizontal, ShieldAlert, Eye, EyeOff } from "lucide-react";
-import { Capacitor } from "@capacitor/core";
+import { RefreshCw, LogOut, X, MoreHorizontal, ShieldAlert } from "lucide-react";
+import { Capacitor, registerPlugin } from "@capacitor/core";
 import { App } from "@capacitor/app";
+
+const CheatAlert = registerPlugin<any>("CheatAlert");
 
 const CapacitorOverlay = () => {
   const [isCapacitor, setIsCapacitor] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [dialogType, setDialogType] = useState<"none" | "refresh" | "exit">("none");
-  const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [isExitingApp, setIsExitingApp] = useState(false);
 
-  // Simple drag implementation without framer-motion
+  // Simple drag implementation
   const fabRef = useRef<HTMLDivElement>(null);
   const dragState = useRef({ isDragging: false, startX: 0, startY: 0, offsetX: 0, offsetY: 0 });
   const [position, setPosition] = useState({ x: 0, y: 0 });
@@ -40,68 +40,75 @@ const CapacitorOverlay = () => {
   }, []);
 
   useEffect(() => {
-    if (dialogType === "exit") {
-      const timer = setTimeout(() => {
-        inputRef.current?.focus();
-      }, 150);
-      return () => clearTimeout(timer);
-    }
-  }, [dialogType]);
-
-  useEffect(() => {
     // Only show on Android native platform
-    if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android') {
+    if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === "android") {
       setIsCapacitor(true);
+      try {
+        CheatAlert.stopAlarm();
+      } catch (e) {}
     }
 
-    // Listen for hardware back button — block completely to prevent session exit
-    const backListener = App.addListener('backButton', () => {
-      // Do nothing — back button is disabled during exam sessions.
-      // Exit is only available via the floating menu button with password.
-    });
+    // Block back button
+    const backListener = App.addListener("backButton", () => {});
 
     return () => {
-      backListener.then(l => l.remove());
+      backListener.then((l) => l.remove());
     };
   }, []);
 
-  const isExcludedRoute = window.location.pathname.startsWith('/admin') ||
-    window.location.pathname.startsWith('/superadmin');
+  const isExcludedRoute =
+    window.location.pathname.startsWith("/admin") ||
+    window.location.pathname.startsWith("/superadmin");
 
   if (!isCapacitor || isExcludedRoute) return null;
 
-  const handleRefresh = () => {
+  const handleRefresh = async () => {
+    try {
+      if (Capacitor.isNativePlatform()) {
+        try {
+          await CheatAlert.stopAlarm();
+        } catch (e) {}
+      }
+    } catch (e) {}
     window.location.reload();
   };
 
   const handleExitApp = async () => {
-    const cleanPass = password.trim().toLowerCase();
-    if (cleanPass === "quit") {
+    setIsExitingApp(true);
+    try {
+      // Hapus sesi student saat exit aplikasi agar saat dibuka kembali wajib login ulang
       try {
-        if (Capacitor.isNativePlatform()) {
-          // @ts-ignore
-          const cheatAlert = Capacitor.Plugins.CheatAlert;
-          if (cheatAlert && (cheatAlert as any).exitApp) {
-            await (cheatAlert as any).exitApp();
-          }
-          await App.exitApp();
-        } else {
-          setDialogType("none");
-          window.close();
+        sessionStorage.removeItem("student_session_active");
+        sessionStorage.removeItem("student_session_id");
+        localStorage.removeItem("student_session_id");
+      } catch (_) {}
+
+      if (Capacitor.isNativePlatform()) {
+        try {
+          await CheatAlert.stopAlarm();
+          await CheatAlert.exitApp();
+          return;
+        } catch (e) {
+          console.warn("CheatAlert.exitApp error:", e);
         }
-      } catch (e) {
-        console.error("Exit system failed, forcing fallback:", e);
-        App.exitApp();
+        await App.exitApp();
+      } else {
+        setDialogType("none");
+        window.close();
       }
-    } else {
-      alert("Password Salah!");
-      setPassword("");
+    } catch (e) {
+      console.error("Exit system failed:", e);
+      try {
+        await App.exitApp();
+      } catch (_) {}
+    } finally {
+      setIsExitingApp(false);
     }
   };
 
   return (
     <>
-      {/* Draggable Menu Toggle — lightweight, no framer-motion */}
+      {/* Draggable Menu Toggle */}
       <div
         ref={fabRef}
         onTouchStart={handleTouchStart}
@@ -114,7 +121,10 @@ const CapacitorOverlay = () => {
           <div className="flex flex-col gap-2.5 mb-1 animate-in fade-in slide-in-from-bottom-2 duration-150">
             {/* Refresh Button */}
             <button
-              onClick={() => { handleRefresh(); setShowMenu(false); }}
+              onClick={() => {
+                handleRefresh();
+                setShowMenu(false);
+              }}
               className="w-10 h-10 flex items-center justify-center rounded-full bg-emerald-500 text-white shadow-xl border border-emerald-400 active:scale-90 transition-transform"
               title="Refresh"
             >
@@ -123,7 +133,10 @@ const CapacitorOverlay = () => {
 
             {/* Exit Button */}
             <button
-              onClick={() => { setDialogType("exit"); setPassword(""); setShowPassword(false); setShowMenu(false); }}
+              onClick={() => {
+                setDialogType("exit");
+                setShowMenu(false);
+              }}
               className="w-10 h-10 flex items-center justify-center rounded-full bg-rose-500 text-white shadow-xl border border-rose-400 active:scale-90 transition-transform"
               title="Exit"
             >
@@ -151,8 +164,8 @@ const CapacitorOverlay = () => {
           onTouchMove={(e) => e.stopPropagation()}
           className="fixed inset-0 z-[10000] flex items-center justify-center p-6 bg-slate-950/60 pointer-events-auto touch-auto"
         >
-          <div className="bg-white dark:bg-slate-900 w-full max-w-[320px] rounded-[2rem] p-6 shadow-2xl border border-white/5 animate-in fade-in zoom-in-95 duration-150 pointer-events-auto">
-            <div className="w-14 h-14 bg-slate-100 dark:bg-slate-800 rounded-2xl flex items-center justify-center mb-5 mx-auto">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-[320px] rounded-2xl p-6 shadow-2xl border border-slate-200 dark:border-slate-800 pointer-events-auto">
+            <div className="w-14 h-14 bg-slate-100 dark:bg-slate-800 rounded-2xl flex items-center justify-center mb-4 mx-auto">
               {dialogType === "refresh" ? (
                 <RefreshCw className="text-blue-500 w-6 h-6" />
               ) : (
@@ -160,63 +173,34 @@ const CapacitorOverlay = () => {
               )}
             </div>
 
-            <h3 className="text-lg font-bold text-center mb-2 dark:text-white">
-              {dialogType === "refresh" ? "Muat Ulang?" : "Keluar Sesi?"}
+            <h3 className="text-lg font-bold text-center mb-1.5 text-slate-900 dark:text-white">
+              {dialogType === "refresh" ? "Muat Ulang Halaman?" : "Keluar Dari Aplikasi?"}
             </h3>
 
-            <p className="text-center text-slate-500 dark:text-slate-400 text-xs mb-6 leading-relaxed">
+            <p className="text-center text-slate-500 dark:text-slate-400 text-xs mb-5 leading-relaxed">
               {dialogType === "refresh"
                 ? "Seluruh progres jawaban yang belum tersimpan mungkin akan hilang."
-                : "Hanya pengawas yang diizinkan untuk menutup aplikasi ujian ini."}
+                : "Apakah Anda yakin ingin keluar dari aplikasi ujian?"}
             </p>
 
-            {dialogType === "exit" && (
-              <div className="mb-6 relative">
-                <input
-                  ref={inputRef}
-                  type={showPassword ? "password" : "text"}
-                  inputMode="text"
-                  autoCapitalize="none"
-                  autoCorrect="off"
-                  autoComplete="off"
-                  spellCheck={false}
-                  placeholder="Ketik 'quit'"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  onClick={(e) => e.currentTarget.focus()}
-                  className="w-full py-4 pl-4 pr-12 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-center font-bold outline-none placeholder:font-normal text-base dark:text-white pointer-events-auto transition-none"
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      handleExitApp();
-                    }
-                  }}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 focus:outline-none p-1"
-                >
-                  {showPassword ? <Eye size={18} /> : <EyeOff size={18} />}
-                </button>
-              </div>
-            )}
-
-            <div className="flex flex-col gap-3">
+            <div className="grid grid-cols-2 gap-3">
               <button
-                onClick={dialogType === "refresh" ? handleRefresh : handleExitApp}
-                className={`w-full py-3.5 rounded-xl font-bold text-white text-sm shadow-lg active:scale-95 transition-transform ${
-                  dialogType === "refresh"
-                    ? "bg-blue-600 shadow-blue-500/20"
-                    : "bg-rose-600 shadow-rose-500/20"
-                }`}
+                type="button"
+                disabled={isExitingApp}
+                onClick={() => setDialogType("none")}
+                className="w-full py-3 rounded-xl font-bold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-sm active:scale-95 transition-all disabled:opacity-50"
               >
-                Ya, Lanjutkan
+                Tidak
               </button>
               <button
-                onClick={() => { setDialogType("none"); setPassword(""); setShowPassword(false); }}
-                className="w-full py-2 text-slate-400 font-bold text-xs"
+                type="button"
+                disabled={isExitingApp}
+                onClick={dialogType === "refresh" ? handleRefresh : handleExitApp}
+                className={`w-full py-3 rounded-xl font-bold text-white text-sm shadow-md active:scale-95 transition-all disabled:opacity-50 ${
+                  dialogType === "refresh" ? "bg-blue-600 hover:bg-blue-700" : "bg-rose-600 hover:bg-rose-700"
+                }`}
               >
-                Batal / Kembali
+                {isExitingApp ? "Keluar..." : "Ya"}
               </button>
             </div>
           </div>

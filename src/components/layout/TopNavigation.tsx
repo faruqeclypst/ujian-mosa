@@ -191,7 +191,7 @@ const TopNavigation = () => {
       <Button
         variant="ghost"
         size="icon"
-        className="lg:hidden shrink-0 touch-manipulation hover:bg-accent"
+        className="lg:hidden shrink-0 touch-manipulation hover:bg-accent min-h-[44px] min-w-[44px]"
         onClick={() => setMobileOpen(true)}
       >
         <Menu className="h-5 w-5" />
@@ -226,7 +226,7 @@ const TopNavigation = () => {
             variant="ghost"
             size="icon"
             className={cn(
-              "relative h-9 w-9 sm:h-10 sm:w-10 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors",
+              "relative min-h-[44px] min-w-[44px] h-10 w-10 sm:h-10 sm:w-10 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors",
               isNotifOpen && "bg-slate-100 dark:bg-slate-800"
             )}
             onClick={() => setIsNotifOpen(!isNotifOpen)}
@@ -334,7 +334,7 @@ const TopNavigation = () => {
         <div className="relative" ref={dropdownRef}>
           <Button
             variant="ghost"
-            className="relative h-9 w-9 sm:h-10 sm:w-10 rounded-full p-0 hover:bg-transparent touch-manipulation"
+            className="relative min-h-[44px] min-w-[44px] h-10 w-10 sm:h-10 sm:w-10 rounded-full p-0 hover:bg-transparent touch-manipulation"
             onClick={() => setIsDropdownOpen(!isDropdownOpen)}
           >
             <Avatar className="h-9 w-9 sm:h-10 sm:w-10">
@@ -389,42 +389,45 @@ const TopNavigation = () => {
 
               {/* Tampilan (Theme Segmented Control) */}
               <div className="px-4 py-3">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-2.5">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-2.5">
                   Tampilan
                 </p>
                 <div className="flex items-center bg-slate-100 dark:bg-slate-900/80 rounded-lg p-1 border border-slate-200/50 dark:border-slate-800/80">
                   <button
                     onClick={() => setTheme("light")}
+                    aria-label="Mode Terang"
                     className={cn(
-                      "flex-1 flex justify-center items-center py-1.5 rounded-md transition-all",
+                      "flex-1 flex justify-center items-center min-h-[36px] py-1.5 rounded-md transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600",
                       theme === "light" 
                         ? "bg-white text-blue-600 shadow-sm border border-slate-200 dark:border-transparent dark:bg-slate-800 dark:text-white" 
                         : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
                     )}
                   >
-                    <Sun className="h-3.5 w-3.5" />
+                    <Sun className="h-4 w-4" />
                   </button>
                   <button
                     onClick={() => setTheme("system")}
+                    aria-label="Mode Sistem"
                     className={cn(
-                      "flex-1 flex justify-center items-center py-1.5 rounded-md transition-all",
+                      "flex-1 flex justify-center items-center min-h-[36px] py-1.5 rounded-md transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600",
                       theme === "system" 
                         ? "bg-white text-blue-600 shadow-sm border border-slate-200 dark:border-transparent dark:bg-slate-800 dark:text-white" 
                         : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
                     )}
                   >
-                    <Monitor className="h-3.5 w-3.5" />
+                    <Monitor className="h-4 w-4" />
                   </button>
                   <button
                     onClick={() => setTheme("dark")}
+                    aria-label="Mode Gelap"
                     className={cn(
-                      "flex-1 flex justify-center items-center py-1.5 rounded-md transition-all",
+                      "flex-1 flex justify-center items-center min-h-[36px] py-1.5 rounded-md transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600",
                       theme === "dark" 
                         ? "bg-white text-blue-600 shadow-sm border border-slate-200 dark:border-transparent dark:bg-slate-800 dark:text-white" 
                         : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
                     )}
                   >
-                    <Moon className="h-3.5 w-3.5" />
+                    <Moon className="h-4 w-4" />
                   </button>
                 </div>
               </div>

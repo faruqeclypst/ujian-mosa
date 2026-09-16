@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef } from "react";
-import { registerPlugin } from "@capacitor/core";
+import { Capacitor, registerPlugin } from "@capacitor/core";
 import { useParams, useNavigate } from "react-router-dom";
 import { App } from "@capacitor/app";
 
@@ -69,6 +69,7 @@ interface Question {
   pairs?: Array<{ id: string; left: string; right: string }>;
   answerKey?: string;
   items?: Array<{ id: string; text: string; imageUrl?: string }>;
+  statements?: Array<{ id: string; text: string; answer?: "benar" | "salah" }>;
 }
 
 interface ExamAttempt {
@@ -366,6 +367,12 @@ const CBTPage = () => {
   const isSubmittingRef = useRef(false);
   const lastWriteTimeRef = useRef<number>(0);
   const answersRef = useRef<Record<string, any>>({});
+  const isNavigatingOrReloadingRef = useRef<boolean>(false);
+
+  // Stop alarm on CBT mount just in case
+  useEffect(() => {
+    try { CheatAlert.stopAlarm(); } catch (err) { }
+  }, []);
 
   // 🛡️ Enhanced Screen Wake Lock (WakeLock API + Video Hack)
   useEffect(() => {
@@ -674,14 +681,22 @@ const CBTPage = () => {
         // For choice-based types, options IS the choices object {a:{...}, b:{...}}
         // For menjodohkan, options = {pairs: [...]}
         // For urutkan/drag_drop, options = {items: [...]}
+        // For benar_salah, options = {statements: [...]}
         let choices: any = {};
         let pairs: any = undefined;
         let items: any = undefined;
+        let statements: any = undefined;
 
         if (mappedType === "menjodohkan") {
           pairs = rawOptions.pairs || [];
         } else if (mappedType === "urutkan" || mappedType === "drag_drop") {
           items = rawOptions.items || [];
+        } else if (mappedType === "benar_salah") {
+          statements = rawOptions.statements || [];
+          // Fallback jika format legacy (hanya punya pilihan a dan b)
+          if ((!statements || statements.length === 0) && (rawOptions.a || rawOptions.b)) {
+            choices = { ...rawOptions };
+          }
         } else {
           // Choice-based types: options = {a: {text, isCorrect, imageUrl}, b: {...}, ...}
           choices = { ...rawOptions };
@@ -692,7 +707,7 @@ const CBTPage = () => {
           });
         }
 
-        return { id: q.id, type: mappedType, text: q.text, imageUrl: qImg, groupId: q.groupId, groupText: q.groupText, choices, pairs, items, answerKey: q.answerKey || q.correctAnswer };
+        return { id: q.id, type: mappedType, text: q.text, imageUrl: qImg, groupId: q.groupId, groupText: q.groupText, choices, pairs, items, statements, answerKey: q.answerKey || q.correctAnswer };
       });
 
       const pr = `${student.nisn}_${roomId}`;
@@ -744,7 +759,7 @@ const CBTPage = () => {
         return { nC, nI, nM };
       };
 
-      // Helper pengacak cluster kelompok wacana
+      // Helper pengacak cluster kelompok literasi
       const clusterShuffle = (list: string[]): string[] => {
         const g: Record<string, string[]> = {};
         const s: string[] = [];
@@ -917,6 +932,23 @@ const CBTPage = () => {
           if (order.length === 0) {
             order = generateQuestionOrder();
             sessionStorage.setItem(`order_${pr}`, JSON.stringify(order));
+          }
+
+          // Sinkronkan __order__ ke server jika ada soal baru yang ditambahkan guru ke bank soal
+          const dbOrder = (att?.answers as any)?.__order__ || (att?.answers as any)?.__meta?.questionOrder;
+          if (Array.isArray(order) && order.length > 0 && (!Array.isArray(dbOrder) || order.length !== dbOrder.length)) {
+            const updatedAnswers = {
+              ...mergedAnswers,
+              __order__: order,
+              __meta: {
+                ...((mergedAnswers as any)?.__meta || {}),
+                questionOrder: order,
+                totalQuestions: order.length,
+              }
+            };
+            answersRef.current = updatedAnswers;
+            setAnswers(updatedAnswers);
+            safeUpdateAttempt(att.id, { answers: updatedAnswers, isOnline: true, lastHeartbeat: new Date().toISOString() });
           }
 
           // Restore acakan opsi pilihan
@@ -1182,7 +1214,7 @@ const CBTPage = () => {
   useEffect(() => {
     if (!attempt?.id || isLocked || isExamOver) return;
     const triggerPenalty = async () => {
-      if (isCheatWarningOpen || isLocked || isExamOver) return;
+      if (isCheatWarningOpen || isLocked || isExamOver || isNavigatingOrReloadingRef.current) return;
 
       // Clear timers and state immediately to prevent race conditions
       if (cheatTimerRef.current) clearTimeout(cheatTimerRef.current);
@@ -1192,6 +1224,9 @@ const CBTPage = () => {
       const currentCheat = attempt?.cheatCount || 0;
       const newCount = currentCheat + 1;
       const limit = roomData?.cheat_limit || 3;
+
+      // Alarm HANYA berbunyi saat penalti benar-benar dieksekusi (setelah lewat jeda 5 detik)
+      try { CheatAlert.startAlarm(); } catch (err) { }
 
       try {
         const res = await safeUpdateAttempt(attempt!.id, {
@@ -1203,12 +1238,22 @@ const CBTPage = () => {
       } catch (e) { }
     };
 
+    const handleCheatDetection = async (e: Event) => {
+      if (isNavigatingOrReloadingRef.current) return;
 
-    const handleCheatDetection = (e: Event) => {
       if (document.visibilityState === "hidden" || e.type === "blur") {
         if (isCheatWarningOpen || isLocked) return;
-
         if (orientationChangeRef.current) return;
+
+        // Cek apakah event terjadi karena layar HP mati (bukan pindah aplikasi)
+        if (Capacitor.isNativePlatform()) {
+          try {
+            const screen = await (CheatAlert as any).getScreenState();
+            if (screen?.isScreenOn === false || screen?.wasScreenOffRecently) {
+              return;
+            }
+          } catch (_) {}
+        }
 
         // Record departure time for mobile (where JS might pause)
         if (!lastLeftTimeRef.current) {
@@ -1216,23 +1261,43 @@ const CBTPage = () => {
         }
 
         if (!cheatTimerRef.current) {
-          cheatTimerRef.current = setTimeout(triggerPenalty, 5000);
-          try { CheatAlert.startAlarm(); } catch (err) { }
+          cheatTimerRef.current = setTimeout(async () => {
+            // Sebelum eksekusi penalti, pastikan bukan karena layar sedang mati
+            if (Capacitor.isNativePlatform()) {
+              try {
+                const screen = await (CheatAlert as any).getScreenState();
+                if (screen?.isScreenOn === false || screen?.wasScreenOffRecently) {
+                  return;
+                }
+              } catch (_) {}
+            }
+            triggerPenalty();
+          }, 5000);
         }
       } else {
         // Returned to app
-        if (lastLeftTimeRef.current) {
-          const elapsed = Date.now() - lastLeftTimeRef.current;
-          // If they were gone for more than 5 seconds while JS was paused
-          if (elapsed >= 5000) {
-            triggerPenalty();
-          }
-          lastLeftTimeRef.current = null;
+        let wasScreenOff = false;
+        if (Capacitor.isNativePlatform()) {
+          try {
+            const screen = await (CheatAlert as any).getScreenState();
+            if (screen?.wasScreenOffRecently || screen?.isScreenOn === false) {
+              wasScreenOff = true;
+            }
+          } catch (_) {}
         }
 
         if (cheatTimerRef.current) {
           clearTimeout(cheatTimerRef.current);
           cheatTimerRef.current = null;
+        }
+
+        if (lastLeftTimeRef.current) {
+          const elapsed = Date.now() - lastLeftTimeRef.current;
+          // Hanya beri penalti jika siswa benar-benar meninggalkan aplikasi (bukan karena layar mati)
+          if (elapsed >= 5000 && !wasScreenOff) {
+            triggerPenalty();
+          }
+          lastLeftTimeRef.current = null;
         }
 
         try { CheatAlert.stopAlarm(); } catch (err) { }
@@ -1253,34 +1318,78 @@ const CBTPage = () => {
     };
 
     // 3. Native Capacitor App State Listener (More reliable for Android/iOS)
-    const unsubApp = App.addListener('appStateChange', ({ isActive }) => {
+    const unsubApp = App.addListener('appStateChange', async ({ isActive }) => {
+      if (isNavigatingOrReloadingRef.current) return;
+
       if (!isActive) {
         if (isCheatWarningOpen || isLocked) return;
+
+        if (Capacitor.isNativePlatform()) {
+          try {
+            const screen = await (CheatAlert as any).getScreenState();
+            if (screen?.isScreenOn === false || screen?.wasScreenOffRecently) {
+              return;
+            }
+          } catch (_) {}
+        }
 
         // App went to background
         if (!lastLeftTimeRef.current) {
           lastLeftTimeRef.current = Date.now();
         }
         if (!cheatTimerRef.current) {
-          cheatTimerRef.current = setTimeout(triggerPenalty, 5000);
-          try { CheatAlert.startAlarm(); } catch (err) { }
+          cheatTimerRef.current = setTimeout(async () => {
+            if (Capacitor.isNativePlatform()) {
+              try {
+                const screen = await (CheatAlert as any).getScreenState();
+                if (screen?.isScreenOn === false || screen?.wasScreenOffRecently) {
+                  return;
+                }
+              } catch (_) {}
+            }
+            triggerPenalty();
+          }, 5000);
         }
       } else {
         // App returned to foreground
-        if (lastLeftTimeRef.current) {
-          const elapsed = Date.now() - lastLeftTimeRef.current;
-          if (elapsed >= 5000) {
-            triggerPenalty();
-          }
-          lastLeftTimeRef.current = null;
+        let wasScreenOff = false;
+        if (Capacitor.isNativePlatform()) {
+          try {
+            const screen = await (CheatAlert as any).getScreenState();
+            if (screen?.wasScreenOffRecently || screen?.isScreenOn === false) {
+              wasScreenOff = true;
+            }
+          } catch (_) {}
         }
+
         if (cheatTimerRef.current) {
           clearTimeout(cheatTimerRef.current);
           cheatTimerRef.current = null;
         }
+
+        if (lastLeftTimeRef.current) {
+          const elapsed = Date.now() - lastLeftTimeRef.current;
+          if (elapsed >= 5000 && !wasScreenOff) {
+            triggerPenalty();
+          }
+          lastLeftTimeRef.current = null;
+        }
+
         try { CheatAlert.stopAlarm(); } catch (err) { }
       }
     });
+
+    const handleBeforeUnload = () => {
+      isNavigatingOrReloadingRef.current = true;
+      try { CheatAlert.stopAlarm(); } catch (err) { }
+      if (cheatTimerRef.current) {
+        clearTimeout(cheatTimerRef.current);
+        cheatTimerRef.current = null;
+      }
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    window.addEventListener("pagehide", handleBeforeUnload);
 
     const graceTimer = setTimeout(() => {
       document.addEventListener("visibilitychange", handleCheatDetection);
@@ -1294,6 +1403,9 @@ const CBTPage = () => {
 
     return () => {
       clearTimeout(graceTimer);
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      window.removeEventListener("pagehide", handleBeforeUnload);
+      try { CheatAlert.stopAlarm(); } catch (err) { }
       unsubApp.then(h => h.remove());
       document.removeEventListener("visibilitychange", handleCheatDetection);
       window.removeEventListener("blur", handleCheatDetection);
@@ -1350,8 +1462,31 @@ const CBTPage = () => {
         objectiveTotal++;
         if (ovr[q.id] !== undefined) { if (ovr[q.id] === true) objectiveCorrect++; return; }
         const sa = answersRef.current[q.id]; if (!sa) return;
-        if (t === "pilihan_ganda" || t === "benar_salah") { if (q.choices?.[sa]?.isCorrect === true) objectiveCorrect++; }
-        else if (t === "pilihan_ganda_kompleks") { const ck = Object.keys(q.choices).filter(k => q.choices[k].isCorrect).map(k => k.toLowerCase()); const sk = Array.isArray(sa) ? sa.map(k => String(k).toLowerCase()) : []; if (sk.length === ck.length && sk.every(k => ck.includes(k))) objectiveCorrect++; }
+        if (t === "pilihan_ganda") { 
+          if (q.choices?.[sa]?.isCorrect === true) objectiveCorrect++; 
+        }
+        else if (t === "benar_salah") {
+          const sts = q.statements || [];
+          if (sts.length > 0) {
+            let stCorrect = 0;
+            sts.forEach((st: any) => {
+              const expected = (st.answer || "benar").toLowerCase();
+              const given = (sa?.[st.id] || "").toLowerCase();
+              if (given === expected) stCorrect++;
+            });
+            objectiveCorrect += (stCorrect / sts.length);
+          } else if (q.choices?.[sa]?.isCorrect === true) {
+            objectiveCorrect++;
+          }
+        }
+        else if (t === "pilihan_ganda_kompleks") { 
+          const ck = Object.keys(q.choices || {}).filter(k => q.choices[k].isCorrect).map(k => k.toLowerCase()); 
+          const sk = Array.isArray(sa) ? sa.map(k => String(k).toLowerCase()) : []; 
+          const correctChosen = sk.filter(k => ck.includes(k));
+          const wrongChosen = sk.filter(k => !ck.includes(k));
+          const itemScore = ck.length > 0 ? Math.max(0, correctChosen.length - wrongChosen.length) / ck.length : 0;
+          objectiveCorrect += itemScore;
+        }
         else if (t === "menjodohkan") { const pairs = q.pairs || []; if (pairs.length > 0 && pairs.every((p: any) => sa[p.id] === p.right)) objectiveCorrect++; }
         else if (t === "urutkan" || t === "drag_drop") { const co = (q.items || []).map((it: any) => it.id); if (Array.isArray(sa) && sa.length === co.length && sa.every((v, index) => v === co[index])) objectiveCorrect++; }
       });
@@ -1491,7 +1626,7 @@ const CBTPage = () => {
   if (loading) {
     return (
       <div className="h-screen h-[100dvh] bg-slate-50 dark:bg-slate-950 flex flex-col overflow-hidden">
-        <header className="sticky top-0 z-50 bg-white/90 dark:bg-slate-900/90 backdrop-blur-3xl border-b border-slate-100 dark:border-slate-800 h-16 sm:h-20 px-4 sm:px-8 flex items-center justify-between shadow-sm">
+        <header className="sticky top-0 z-50 bg-white/90 dark:bg-slate-900/90 backdrop-blur-3xl border-b border-slate-100 dark:border-slate-800 min-h-[4rem] sm:min-h-[5rem] h-auto pt-[env(safe-area-inset-top,0px)] px-4 sm:px-8 flex items-center justify-between shadow-sm">
           <Skeleton className="h-10 w-24 sm:w-32 rounded-2xl" />
           <div className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/50 text-emerald-700 dark:text-emerald-300 text-xs font-bold tracking-wide animate-pulse">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
@@ -1596,7 +1731,13 @@ const CBTPage = () => {
     if (ans === undefined || ans === null) return false;
     if (typeof ans === "string") return ans.trim().length > 0;
     if (Array.isArray(ans)) return ans.length > 0;
-    if (typeof ans === "object") return Object.keys(ans).length > 0;
+    if (typeof ans === "object") {
+      const q = questions.find(item => item.id === qId);
+      if (q?.type === "benar_salah" && q.statements && q.statements.length > 0) {
+        return q.statements.every(st => ans[st.id] !== undefined);
+      }
+      return Object.keys(ans).length > 0;
+    }
     return true;
   };
 
@@ -1771,20 +1912,20 @@ const CBTPage = () => {
           </div>
         </div>
       )}
-      <header className="sticky top-0 z-50 bg-white/90 dark:bg-slate-900/90 backdrop-blur-3xl border-b border-slate-100 dark:border-slate-800 h-16 sm:h-20 px-4 sm:px-8 flex items-center justify-between shadow-sm">
-        <div className="flex items-center gap-2 sm:gap-4">
-          <div className="flex items-center gap-2 sm:gap-3 bg-slate-100 dark:bg-slate-800 px-3 sm:px-4 py-1.5 sm:py-2 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
+      <header className="sticky top-0 z-50 bg-white/90 dark:bg-slate-900/90 backdrop-blur-3xl border-b border-slate-100 dark:border-slate-800 min-h-[3rem] sm:min-h-[5rem] h-auto pt-[env(safe-area-inset-top,0px)] px-2.5 sm:px-8 py-1.5 sm:py-0 flex items-center justify-between shadow-sm">
+        <div className="flex items-center gap-1.5 sm:gap-4">
+          <div className="flex items-center gap-1.5 sm:gap-3 bg-slate-100 dark:bg-slate-800 px-2 sm:px-4 py-1 sm:py-2 rounded-xl sm:rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
             {/* Mobile: sync icon replaces clock when syncing */}
             {isSyncing ? (
-              <Cloud className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-500 animate-pulse sm:hidden" />
+              <Cloud className="h-3.5 w-3.5 sm:h-5 sm:w-5 text-emerald-500 animate-pulse sm:hidden" />
             ) : !isOnline ? (
-              <WifiOff className="h-4 w-4 sm:h-5 sm:w-5 text-rose-500 sm:hidden" />
+              <WifiOff className="h-3.5 w-3.5 sm:h-5 sm:w-5 text-rose-500 sm:hidden" />
             ) : (
-              <Clock className={`h-4 w-4 sm:hidden ${timeLeft < 300 ? "text-rose-500 animate-pulse" : "text-emerald-500 dark:text-emerald-400"}`} />
+              <Clock className={`h-3.5 w-3.5 sm:hidden ${timeLeft < 300 ? "text-rose-500 animate-pulse" : "text-emerald-500 dark:text-emerald-400"}`} />
             )}
             {/* Desktop: always show clock */}
             <Clock className={`hidden sm:block h-5 w-5 ${timeLeft < 300 ? "text-rose-500 animate-pulse" : "text-emerald-500 dark:text-emerald-400"}`} />
-            <span className={`font-mono font-black text-sm sm:text-lg tracking-wider ${timeLeft < 300 ? "text-rose-600" : "text-emerald-600 dark:text-emerald-400"}`}>
+            <span className={`font-mono font-black text-xs sm:text-lg tracking-wider ${timeLeft < 300 ? "text-rose-600" : "text-emerald-600 dark:text-emerald-400"}`}>
               {Math.floor(timeLeft / 60).toString().padStart(2, "0")}:{(timeLeft % 60).toString().padStart(2, "0")}
             </span>
           </div>
@@ -1815,13 +1956,23 @@ const CBTPage = () => {
         </div>
 
         <div className="flex-1 text-center min-w-0 px-2 sm:px-4">
-          <p className="font-black text-slate-800 dark:text-white uppercase tracking-tight truncate text-[10px] sm:text-base leading-tight">{roomData?.subject}</p>
-          <p className="text-[8px] sm:text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-none mt-0.5 sm:mt-1">{roomData?.room_name}</p>
+          <p className="font-black text-slate-800 dark:text-white uppercase tracking-tight truncate text-[9px] sm:text-base leading-tight">{roomData?.subject}</p>
+          <p className="text-[7.5px] sm:text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-none mt-0.5 sm:mt-1">{roomData?.room_name}</p>
         </div>
 
-        <div className="flex items-center gap-2 sm:gap-4 ml-auto relative z-10">
+        <div className="flex items-center gap-1.5 sm:gap-4 ml-auto relative z-10">
           {/* Refresh Button (PC only) — soft refresh without leaving fullscreen */}
-          <button onClick={() => { setLoading(true); setRefreshTrigger(p => p + 1); }} className="hidden sm:flex w-8 h-8 items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-emerald-600 border border-slate-200 dark:border-slate-700 transition-colors" title="Refresh data">
+          <button onClick={() => {
+            isNavigatingOrReloadingRef.current = true;
+            try { CheatAlert.stopAlarm(); } catch (err) { }
+            if (cheatTimerRef.current) {
+              clearTimeout(cheatTimerRef.current);
+              cheatTimerRef.current = null;
+            }
+            setLoading(true);
+            setRefreshTrigger(p => p + 1);
+            setTimeout(() => { isNavigatingOrReloadingRef.current = false; }, 1000);
+          }} className="hidden sm:flex w-8 h-8 items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-emerald-600 border border-slate-200 dark:border-slate-700 transition-colors" title="Refresh data">
             <RefreshCcw className="w-4 h-4" />
           </button>
 
@@ -1832,13 +1983,13 @@ const CBTPage = () => {
             <button onClick={() => setFontSize(p => Math.min(1.5, p + 0.1))} className="w-7 h-7 flex items-center justify-center rounded-lg bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:text-emerald-600 transition-colors shadow-sm disabled:opacity-30" disabled={fontSize >= 1.5}><ZoomIn className="w-3.5 h-3.5" /></button>
           </div>
 
-          <div className="flex items-center gap-x-2 sm:gap-4 ml-1 sm:ml-4 border-l border-slate-100 dark:border-slate-800 pl-2 sm:pl-4">
+          <div className="flex items-center gap-x-1.5 sm:gap-4 ml-1 sm:ml-4 border-l border-slate-100 dark:border-slate-800 pl-1.5 sm:pl-4">
             {/* Nama & Kelas */}
             <div className="text-right min-w-0">
-              <p className="font-black text-slate-800 dark:text-white text-[10px] sm:text-sm uppercase tracking-tight leading-tight truncate max-w-[70px] sm:max-w-none">
+              <p className="font-black text-slate-800 dark:text-white text-[9px] sm:text-sm uppercase tracking-tight leading-tight truncate max-w-[60px] sm:max-w-none">
                 {student?.name?.split(" ")[0]}
               </p>
-              <p className="text-[8px] sm:text-[9px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest mt-0.5 leading-none">
+              <p className="text-[7.5px] sm:text-[9px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest mt-0.5 leading-none">
                 {student?.className}
               </p>
             </div>
@@ -1846,8 +1997,8 @@ const CBTPage = () => {
             {/* Icon Profil (Dropdown) */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <div className="w-9 h-9 sm:w-11 sm:h-11 bg-emerald-50 dark:bg-emerald-950/30 rounded-xl sm:rounded-2xl flex items-center justify-center border border-emerald-100/50 dark:border-emerald-800/50 shadow-sm group cursor-pointer hover:bg-emerald-100 transition-all outline-none">
-                  <User className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform" />
+                <div className="w-7 h-7 sm:w-11 sm:h-11 bg-emerald-50 dark:bg-emerald-950/30 rounded-lg sm:rounded-2xl flex items-center justify-center border border-emerald-100/50 dark:border-emerald-800/50 shadow-sm group cursor-pointer hover:bg-emerald-100 transition-all outline-none">
+                  <User className="h-3.5 w-3.5 sm:h-5 sm:w-5 text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform" />
                 </div>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-64 p-2 rounded-2xl border-slate-100 dark:border-slate-800 shadow-2xl z-[100]">
@@ -1885,7 +2036,7 @@ const CBTPage = () => {
 
       <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
         <div
-          className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 space-y-4 sm:space-y-6 text-slate-800"
+          className="flex-1 min-h-0 overflow-y-auto p-2 sm:p-6 space-y-2.5 sm:space-y-6 text-slate-800"
           onClick={(e) => {
             const target = e.target as HTMLElement;
             // Only handle clicks on images inside MathText/rich-text content (not SmartImage which has its own handler)
@@ -1934,23 +2085,23 @@ const CBTPage = () => {
           )}
 
           {currentQuestion && !isExamOver && (
-            <Card className="rounded-[25px] sm:rounded-[35px] border border-slate-100 dark:border-slate-800 overflow-hidden bg-white dark:bg-slate-900 shadow-sm transition-all duration-300">
-              <CardHeader className="p-5 sm:p-8 pb-0 sm:pb-2">
-                <div className="relative flex items-center justify-between gap-4 mb-4 sm:mb-6 min-h-[48px] sm:min-h-[56px]">
-                  <div className="flex items-center gap-3 sm:gap-4">
-                    <div className="w-11 h-11 sm:w-14 sm:h-14 bg-emerald-600 text-white rounded-2xl sm:rounded-[35%] flex items-center justify-center font-black text-xl sm:text-2xl shrink-0">{currentQuestionIndex + 1}</div>
+            <Card className="rounded-[20px] sm:rounded-[35px] border border-slate-100 dark:border-slate-800 overflow-hidden bg-white dark:bg-slate-900 shadow-sm transition-all duration-300">
+              <CardHeader className="p-3.5 sm:p-8 pb-0 sm:pb-2">
+                <div className="relative flex items-center justify-between gap-3 mb-2.5 sm:mb-6 min-h-[38px] sm:min-h-[56px]">
+                  <div className="flex items-center gap-2.5 sm:gap-4">
+                    <div className="w-8 h-8 sm:w-14 sm:h-14 bg-emerald-600 text-white rounded-xl sm:rounded-[35%] flex items-center justify-center font-black text-sm sm:text-2xl shrink-0">{currentQuestionIndex + 1}</div>
                     <div className="flex flex-col">
-                      <span className="text-[9px] sm:text-[10px] font-black text-emerald-400 tracking-[0.2em] uppercase">Pertanyaan</span>
-                      <span className="text-base sm:text-xl font-black text-emerald-800 dark:text-white uppercase tracking-tight leading-tight">Soal Nomor {currentQuestionIndex + 1}</span>
+                      <span className="text-[8px] sm:text-[10px] font-black text-emerald-400 tracking-[0.2em] uppercase">Pertanyaan</span>
+                      <span className="text-xs sm:text-xl font-black text-emerald-800 dark:text-white uppercase tracking-tight leading-tight">Soal Nomor {currentQuestionIndex + 1}</span>
                     </div>
                   </div>
 
                   {/* Bookmark Button - Pindah ke Kanan */}
                   <button
                     onClick={() => toggleFlag(currentQuestion.id)}
-                    className={`h-11 w-11 sm:h-14 sm:w-14 flex items-center justify-center rounded-2xl sm:rounded-3xl transition-all active:scale-90 ${flaggedQuestions[currentQuestion.id] ? "bg-amber-500 text-white" : "bg-white dark:bg-slate-800 text-slate-400 border border-slate-100 dark:border-slate-700"}`}
+                    className={`h-8 w-8 sm:h-14 sm:w-14 flex items-center justify-center rounded-xl sm:rounded-3xl transition-all active:scale-90 ${flaggedQuestions[currentQuestion.id] ? "bg-amber-500 text-white" : "bg-white dark:bg-slate-800 text-slate-400 border border-slate-100 dark:border-slate-700"}`}
                   >
-                    <Bookmark className={`w-5 h-5 sm:w-6 sm:h-6 ${flaggedQuestions[currentQuestion.id] ? "fill-white" : ""}`} />
+                    <Bookmark className={`w-4 h-4 sm:w-6 sm:h-6 ${flaggedQuestions[currentQuestion.id] ? "fill-white" : ""}`} />
                   </button>
                 </div>
 
@@ -1958,8 +2109,8 @@ const CBTPage = () => {
                   <div className="relative group cursor-zoom-in select-none" onClick={() => setPreviewImage(currentQuestion.imageUrl!)}>
                     <SmartImage
                       src={currentQuestion.imageUrl}
-                      className="max-w-full h-auto mx-auto block rounded-2xl border border-slate-100 dark:border-slate-800 mb-4 sm:mb-6 transition-transform hover:scale-[1.01] select-none"
-                      containerClassName="min-h-[120px] rounded-2xl"
+                      className="max-w-full h-auto mx-auto block rounded-2xl border border-slate-100 dark:border-slate-800 mb-3 sm:mb-6 transition-transform hover:scale-[1.01] select-none"
+                      containerClassName="min-h-[100px] rounded-2xl"
                       alt="Soal"
                       draggable={false}
                       style={{ userSelect: 'none', WebkitUserDrag: 'none' } as React.CSSProperties}
@@ -1972,88 +2123,293 @@ const CBTPage = () => {
                 {currentQuestion.groupId && (() => {
                   const f = questions.find(x => x.groupId === currentQuestion.groupId);
                   if (f && (f.groupText || f.text)) return (
-                    <div className="bg-slate-50 dark:bg-slate-950 p-5 sm:p-8 rounded-[30px] border border-slate-200 dark:border-slate-800 mb-10 sm:mb-14 space-y-4 relative overflow-hidden group">
+                    <div className="bg-slate-50 dark:bg-slate-950 p-3.5 sm:p-8 rounded-2xl sm:rounded-[30px] border border-slate-200 dark:border-slate-800 mb-4 sm:mb-14 space-y-2.5 sm:space-y-4 relative overflow-hidden group">
                       <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:rotate-12 transition-transform duration-700">
-                        <FileText className="w-12 h-12 sm:w-20 sm:h-20 text-emerald-800" />
+                        <FileText className="w-10 h-10 sm:w-20 sm:h-20 text-emerald-800" />
                       </div>
 
-                      <div className="flex items-center gap-3 mb-4 relative z-10">
-                        <div className="h-5 sm:h-6 w-1 sm:w-1.5 rounded-full bg-emerald-600"></div>
-                        <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-[0.2em] text-emerald-500 dark:text-emerald-400">Bacaan</span>
+                      <div className="flex items-center gap-2.5 mb-2.5 sm:mb-4 relative z-10">
+                        <div className="h-4 sm:h-6 w-1 sm:w-1.5 rounded-full bg-emerald-600"></div>
+                        <span className="text-[9px] sm:text-[11px] font-black uppercase tracking-[0.2em] text-emerald-500 dark:text-emerald-400">Bacaan</span>
                       </div>
 
-                      <MathText
-                        content={f.groupText || f.text}
-                        className={`leading-relaxed text-slate-800 dark:text-slate-200 font-serif ql-editor !p-0 selection:bg-blue-100 dark:selection:bg-blue-900/40`}
-                      />
+                      <div style={{ fontSize: `${15 * fontSize}px` }}>
+                        <MathText
+                          content={f.groupText || f.text}
+                          className={`leading-relaxed text-slate-800 dark:text-slate-200 font-serif ql-editor !p-0 selection:bg-emerald-100 dark:selection:bg-emerald-900/40`}
+                        />
+                      </div>
 
-                      <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex justify-end opacity-50 dark:opacity-100">
-                        <span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest italic">Bacalah teks dengan seksama sebelum memberikan jawaban.</span>
+                      <div className="pt-2.5 border-t border-slate-100 dark:border-slate-800 flex justify-end opacity-50 dark:opacity-100">
+                        <span className="text-[8px] sm:text-[9px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest italic">Bacalah teks dengan seksama sebelum memberikan jawaban.</span>
                       </div>
                     </div>
                   );
                 })()}
 
-                <div className="h-3 sm:h-4" />
+                <div className="h-1.5 sm:h-4" />
 
-                <MathText
-                  content={currentQuestion.text}
-                  className={`ql-editor !p-0 font-serif text-slate-800 dark:text-slate-200 leading-relaxed break-words [&_strong]:text-slate-900 dark:[&_strong]:text-white [&_b]:text-slate-900 dark:[&_b]:text-white [&_p]:mb-3 [&_ol]:list-decimal [&_ul]:list-disc [&_ol]:pl-6 [&_ul]:pl-6 selection:bg-emerald-100 dark:selection:bg-emerald-900/40`}
-                />
+                <div style={{ fontSize: `${16 * fontSize}px` }}>
+                  <MathText
+                    content={currentQuestion.text}
+                    className={`ql-editor !p-0 font-serif text-slate-800 dark:text-slate-200 leading-relaxed break-words [&_strong]:text-slate-900 dark:[&_strong]:text-white [&_b]:text-slate-900 dark:[&_b]:text-white [&_p]:mb-2.5 [&_ol]:list-decimal [&_ul]:list-disc [&_ol]:pl-5 [&_ul]:pl-5 selection:bg-emerald-100 dark:selection:bg-emerald-900/40`}
+                  />
+                </div>
 
                 {(currentQuestion.type === "pilihan_ganda_kompleks" || currentQuestion.type === "menjodohkan" || currentQuestion.type === "urutkan") && (
-                  <div className="flex items-center gap-2 mb-6 px-4 py-2 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-100 dark:border-emerald-900/50 rounded-xl">
-                    <HelpCircle className="w-4 h-4 text-emerald-500" />
-                    <span className="text-[10px] sm:text-[11px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">
+                  <div className="flex items-center gap-2 my-2.5 sm:mb-6 px-3 sm:px-4 py-1.5 sm:py-2 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-100 dark:border-emerald-900/50 rounded-xl">
+                    <HelpCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-500 shrink-0" />
+                    <span className="text-[9px] sm:text-[11px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">
                       {currentQuestion.type === "pilihan_ganda_kompleks" ? "Pilih semua jawaban yang benar" :
                         currentQuestion.type === "menjodohkan" ? "Pasangkan pernyataan di bawah ini" :
                           "Urutkan pernyataan dengan benar"}
                     </span>
                   </div>
                 )}
-                <div className="h-4 sm:h-2" />
+                <div className="h-1 sm:h-2" />
               </CardHeader>
-              <CardContent className="px-5 sm:px-8 pb-6 sm:pb-8 space-y-3">
+              <CardContent className="px-3.5 sm:px-8 pb-4 sm:pb-8 space-y-2 sm:space-y-3">
                 {(currentQuestion.type === "pilihan_ganda" || currentQuestion.type === "pilihan_ganda_kompleks") && (
-                  <div className="space-y-2">
+                  <div className="space-y-1.5 sm:space-y-2">
                     {(choicesOrder[currentQuestion.id] || Object.keys(currentQuestion.choices || {})).map((choiceId, idx) => {
-                      const c = currentQuestion.choices![choiceId]; const isM = currentQuestion.type === "pilihan_ganda_kompleks"; const isS = isM ? (answers[currentQuestion.id] || []).includes(choiceId) : answers[currentQuestion.id] === choiceId;
+                      const c = currentQuestion.choices![choiceId];
+                      const isM = currentQuestion.type === "pilihan_ganda_kompleks";
+                      const isS = isM ? (answers[currentQuestion.id] || []).includes(choiceId) : answers[currentQuestion.id] === choiceId;
                       return (
-                        <button key={`${currentQuestion.id}-${choiceId}`} onClick={() => { if (isM) { const a = answers[currentQuestion.id] || []; handleAnswerSelect(currentQuestion.id, a.includes(choiceId) ? a.filter((i: any) => i !== choiceId) : [...a, choiceId]); } else handleAnswerSelect(currentQuestion.id, choiceId); }} className={`w-full text-left p-2 sm:p-3 rounded-xl sm:rounded-2xl border-2 flex items-center gap-2.5 sm:gap-4 outline-none group active:scale-[0.99] ${isS ? "bg-emerald-50 border-emerald-600 dark:bg-emerald-900/30 dark:border-emerald-500" : "bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 hover:border-emerald-200 dark:hover:border-emerald-700"}`}>
-                          <div className={`w-8 h-8 sm:w-9 sm:h-9 shrink-0 rounded-lg sm:rounded-xl border flex items-center justify-center font-black text-xs sm:text-sm ${isS ? "bg-emerald-600 border-emerald-600 text-white" : "bg-slate-50 dark:bg-slate-900 text-slate-400 border-slate-100 dark:border-slate-800 group-hover:bg-emerald-50 group-hover:text-emerald-900"}`}>{String.fromCharCode(65 + idx)}</div>
-                          <div className="flex-1 overflow-hidden">
-                            <MathText content={c.text} className={`break-words font-serif ql-editor !p-0 [&_img]:max-w-[300px] [&_img]:h-auto [&_img]:rounded-xl [&_img]:mt-2 text-inherit ${isS ? "font-bold" : "font-normal"}`} />
+                        <button
+                          key={`${currentQuestion.id}-${choiceId}`}
+                          onClick={() => {
+                            if (isM) {
+                              const a = answers[currentQuestion.id] || [];
+                              handleAnswerSelect(currentQuestion.id, a.includes(choiceId) ? a.filter((i: any) => i !== choiceId) : [...a, choiceId]);
+                            } else {
+                              handleAnswerSelect(currentQuestion.id, choiceId);
+                            }
+                          }}
+                          className={`w-full text-left p-2.5 sm:p-3 rounded-xl sm:rounded-2xl border-2 flex items-start gap-2.5 sm:gap-4 outline-none group active:scale-[0.99] transition-all ${
+                            isS
+                              ? "bg-emerald-50/80 border-emerald-600 dark:bg-emerald-900/30 dark:border-emerald-500"
+                              : "bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 hover:border-emerald-200 dark:hover:border-emerald-700"
+                          }`}
+                        >
+                          <div
+                            className={`w-7 h-7 sm:w-9 sm:h-9 shrink-0 rounded-lg sm:rounded-xl border flex items-center justify-center font-black text-xs sm:text-sm mt-0.5 ${
+                              isS
+                                ? "bg-emerald-600 border-emerald-600 text-white"
+                                : "bg-slate-50 dark:bg-slate-900 text-slate-400 border-slate-100 dark:border-slate-800 group-hover:bg-emerald-50 group-hover:text-emerald-900"
+                            }`}
+                          >
+                            {String.fromCharCode(65 + idx)}
+                          </div>
+                          <div className="flex-1 overflow-hidden min-w-0">
+                            <div style={{ fontSize: `${15 * fontSize}px` }}>
+                              <MathText
+                                content={c.text}
+                                disableJustify={true}
+                                className={`break-words font-serif ql-editor !p-0 cbt-choice-text text-left [&_p:not([dir="rtl"]):not(.arabic-text)]:!text-left [&_span:not([dir="rtl"]):not(.arabic-text)]:!text-left [&_div:not([dir="rtl"]):not(.arabic-text)]:!text-left [&_img]:max-w-[300px] [&_img]:h-auto [&_img]:rounded-xl [&_img]:mt-2 text-inherit ${
+                                  isS ? "font-bold" : "font-normal"
+                                }`}
+                              />
+                            </div>
                             {c.imageUrl && (
-                              <div className="relative inline-block cursor-zoom-in group mt-4 select-none" onClick={(e) => { e.stopPropagation(); setPreviewImage(c.imageUrl!); }}>
+                              <div
+                                className="relative inline-block cursor-zoom-in group mt-3 select-none"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setPreviewImage(c.imageUrl!);
+                                }}
+                              >
                                 <SmartImage
                                   src={c.imageUrl}
-                                  className="max-h-[200px] rounded-2xl border border-slate-100 dark:border-slate-800 group-hover:brightness-90 transition-all select-none"
-                                  containerClassName="min-h-[80px] rounded-2xl"
+                                  className="max-h-[180px] sm:max-h-[200px] rounded-xl sm:rounded-2xl border border-slate-100 dark:border-slate-800 group-hover:brightness-90 transition-all select-none"
+                                  containerClassName="min-h-[70px] rounded-xl sm:rounded-2xl"
                                   alt="Choice"
                                   draggable={false}
-                                  style={{ userSelect: 'none', WebkitUserDrag: 'none' } as React.CSSProperties}
+                                  style={{ userSelect: "none", WebkitUserDrag: "none" } as React.CSSProperties}
                                 />
                                 <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
                                   <Maximize2 className="w-6 h-6 text-white drop-shadow-md" />
                                 </div>
                               </div>
                             )}
+
+                            {/* Checklist Pilihan Ganda Kompleks: Dipindah ke Bawah Pilihan */}
+                            {isM && (
+                              <div className="mt-2.5 pt-2 border-t border-slate-100 dark:border-slate-800/80 flex items-center gap-2">
+                                <div
+                                  className={`w-5 h-5 sm:w-6 sm:h-6 rounded-md sm:rounded-lg border-2 flex items-center justify-center transition-all ${
+                                    isS
+                                      ? "bg-emerald-600 border-emerald-600 text-white shadow-sm"
+                                      : "border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800/80"
+                                  }`}
+                                >
+                                  {isS && <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2.5]" />}
+                                </div>
+                                <span
+                                  className={`text-[11px] sm:text-xs font-black uppercase tracking-wider transition-colors ${
+                                    isS ? "text-emerald-700 dark:text-emerald-400" : "text-slate-400 dark:text-slate-500"
+                                  }`}
+                                >
+                                  {isS ? "Jawaban Dipilih" : "Pilih Jawaban"}
+                                </span>
+                              </div>
+                            )}
                           </div>
-                          {isM && <div className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all ${isS ? "bg-emerald-600 border-emerald-600 text-white" : "border-slate-200 dark:border-slate-700"}`}>{isS && <CheckCircle2 className="w-4 h-4" />}</div>}
                         </button>
                       );
                     })}
                   </div>
                 )}
                 {currentQuestion.type === "benar_salah" && (
-                  <div className="grid grid-cols-2 gap-5 px-2">
-                    {Object.keys(currentQuestion.choices || {}).slice(0, 2).map((choiceId, idx) => {
-                      const isS = answers[currentQuestion.id] === choiceId; const isB = currentQuestion.choices![choiceId].text.toLowerCase().includes("benar") || idx === 0;
+                  (() => {
+                    const statements = currentQuestion.statements || [];
+                    const currentAnswers = (typeof answers[currentQuestion.id] === "object" && answers[currentQuestion.id] !== null)
+                      ? answers[currentQuestion.id]
+                      : {};
+
+                    if (statements.length > 0) {
                       return (
-                        <button key={choiceId} onClick={() => handleAnswerSelect(currentQuestion.id, choiceId)} className={`group relative flex flex-col items-center justify-center gap-4 py-8 px-6 rounded-[2.5rem] border-2 transition-all duration-300 active:scale-95 ${isS ? (isB ? "bg-gradient-to-br from-emerald-500 to-emerald-600 border-emerald-400 text-white shadow-xl shadow-emerald-500/20" : "bg-gradient-to-br from-rose-500 to-rose-600 border-rose-400 text-white shadow-xl shadow-rose-500/20") : "bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 text-slate-400 dark:text-slate-600 hover:border-emerald-200 dark:hover:border-emerald-800"}`}><div className={`w-16 h-16 rounded-[1.5rem] flex items-center justify-center transition-colors ${isS ? "bg-white/20 text-white" : (isB ? "bg-emerald-50 dark:bg-emerald-950/30 text-emerald-500" : "bg-rose-50 dark:bg-rose-950/30 text-rose-500")}`}>{isB ? <CheckCircle2 className="w-9 h-9" strokeWidth={2.5} /> : <X className="w-9 h-9" strokeWidth={2.5} />}</div><span className={`font-black text-sm uppercase tracking-widest ${isS ? "text-white" : "text-slate-700 dark:text-slate-300"}`}>{currentQuestion.choices![choiceId].text}</span></button>
+                        <div className="overflow-hidden rounded-xl sm:rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/90 shadow-sm">
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-left border-collapse">
+                              <thead>
+                                <tr className="border-b border-slate-200/80 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-800/60">
+                                  <th
+                                    className="py-2.5 px-3 sm:py-4 sm:px-6 font-black text-slate-700 dark:text-slate-300 uppercase tracking-wider"
+                                    style={{ fontSize: `${Math.max(11, Math.round(13 * fontSize))}px` }}
+                                  >
+                                    Pernyataan
+                                  </th>
+                                  <th
+                                    className="w-14 sm:w-32 py-2.5 px-1 sm:py-4 sm:px-4 text-center font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-wider"
+                                    style={{ fontSize: `${Math.max(11, Math.round(13 * fontSize))}px` }}
+                                  >
+                                    Benar
+                                  </th>
+                                  <th
+                                    className="w-14 sm:w-32 py-2.5 px-1 sm:py-4 sm:px-4 text-center font-black text-rose-600 dark:text-rose-400 uppercase tracking-wider"
+                                    style={{ fontSize: `${Math.max(11, Math.round(13 * fontSize))}px` }}
+                                  >
+                                    Salah
+                                  </th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
+                                {statements.map((s, idx) => {
+                                  const selected = currentAnswers[s.id];
+                                  const isBenar = selected === "benar";
+                                  const isSalah = selected === "salah";
+
+                                  return (
+                                    <tr
+                                      key={s.id || idx}
+                                      className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-colors"
+                                    >
+                                      <td className="py-2.5 px-3 sm:py-5 sm:px-6 font-serif text-slate-800 dark:text-slate-200 align-middle">
+                                        <div className="flex items-start gap-2">
+                                          <span
+                                            className="inline-flex shrink-0 w-5 h-5 sm:w-6 sm:h-6 rounded-md sm:rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-bold items-center justify-center mt-0.5"
+                                            style={{ fontSize: `${Math.max(10, Math.round(11 * fontSize))}px` }}
+                                          >
+                                            {idx + 1}
+                                          </span>
+                                          <div className="flex-1 min-w-0" style={{ fontSize: `${15 * fontSize}px` }}>
+                                            <MathText
+                                              content={s.text}
+                                              disableJustify={true}
+                                              className="cbt-choice-text text-left font-serif leading-relaxed !p-0 [&_p]:m-0"
+                                            />
+                                          </div>
+                                        </div>
+                                      </td>
+                                      <td className="py-2 px-1 sm:py-4 sm:px-4 text-center align-middle">
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            handleAnswerSelect(currentQuestion.id, {
+                                              ...currentAnswers,
+                                              [s.id]: "benar"
+                                            });
+                                          }}
+                                          className={`group/btn relative inline-flex items-center justify-center p-1.5 sm:px-4 sm:py-2.5 rounded-lg sm:rounded-2xl border-2 font-bold text-xs sm:text-sm transition-all active:scale-95 ${
+                                            isBenar
+                                              ? "bg-emerald-500 border-emerald-500 text-white shadow-md shadow-emerald-500/20"
+                                              : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-400 dark:text-slate-500 hover:border-emerald-300 dark:hover:border-emerald-700"
+                                          }`}
+                                          title="Pilih Benar"
+                                        >
+                                          <span className={`w-4 h-4 sm:w-5 sm:h-5 rounded-full border-2 flex items-center justify-center sm:mr-1.5 transition-colors ${
+                                            isBenar ? "border-white bg-white text-emerald-600" : "border-slate-300 dark:border-slate-700"
+                                          }`}>
+                                            {isBenar && <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-emerald-600" />}
+                                          </span>
+                                          <span className="hidden sm:inline">Benar</span>
+                                        </button>
+                                      </td>
+                                      <td className="py-2 px-1 sm:py-4 sm:px-4 text-center align-middle">
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            handleAnswerSelect(currentQuestion.id, {
+                                              ...currentAnswers,
+                                              [s.id]: "salah"
+                                            });
+                                          }}
+                                          className={`group/btn relative inline-flex items-center justify-center p-1.5 sm:px-4 sm:py-2.5 rounded-lg sm:rounded-2xl border-2 font-bold text-xs sm:text-sm transition-all active:scale-95 ${
+                                            isSalah
+                                              ? "bg-rose-500 border-rose-500 text-white shadow-md shadow-rose-500/20"
+                                              : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-400 dark:text-slate-500 hover:border-rose-300 dark:hover:border-rose-700"
+                                          }`}
+                                          title="Pilih Salah"
+                                        >
+                                          <span className={`w-4 h-4 sm:w-5 sm:h-5 rounded-full border-2 flex items-center justify-center sm:mr-1.5 transition-colors ${
+                                            isSalah ? "border-white bg-white text-rose-600" : "border-slate-300 dark:border-slate-700"
+                                          }`}>
+                                            {isSalah && <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-rose-600" />}
+                                          </span>
+                                          <span className="hidden sm:inline">Salah</span>
+                                        </button>
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
                       );
-                    })}
-                  </div>
+                    }
+
+                    // Fallback untuk format legacy lama
+                    return (
+                      <div className="grid grid-cols-2 gap-5 px-2">
+                        {Object.keys(currentQuestion.choices || {}).slice(0, 2).map((choiceId, idx) => {
+                          const isS = answers[currentQuestion.id] === choiceId;
+                          const isB = currentQuestion.choices![choiceId].text.toLowerCase().includes("benar") || idx === 0;
+                          return (
+                            <button
+                              key={choiceId}
+                              onClick={() => handleAnswerSelect(currentQuestion.id, choiceId)}
+                              className={`group relative flex flex-col items-center justify-center gap-4 py-8 px-6 rounded-[2.5rem] border-2 transition-all duration-300 active:scale-95 ${
+                                isS
+                                  ? (isB ? "bg-gradient-to-br from-emerald-500 to-emerald-600 border-emerald-400 text-white shadow-xl shadow-emerald-500/20" : "bg-gradient-to-br from-rose-500 to-rose-600 border-rose-400 text-white shadow-xl shadow-rose-500/20")
+                                  : "bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 text-slate-400 dark:text-slate-600 hover:border-emerald-200 dark:hover:border-emerald-800"
+                              }`}
+                            >
+                              <div className={`w-16 h-16 rounded-[1.5rem] flex items-center justify-center transition-colors ${
+                                isS ? "bg-white/20 text-white" : (isB ? "bg-emerald-50 dark:bg-emerald-950/30 text-emerald-500" : "bg-rose-50 dark:bg-rose-950/30 text-rose-500")
+                              }`}>
+                                {isB ? <CheckCircle2 className="w-9 h-9" strokeWidth={2.5} /> : <X className="w-9 h-9" strokeWidth={2.5} />}
+                              </div>
+                              <span className={`font-black text-sm uppercase tracking-widest ${isS ? "text-white" : "text-slate-700 dark:text-slate-300"}`}>
+                                {currentQuestion.choices![choiceId].text}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()
                 )}
                 {currentQuestion.type === "menjodohkan" && (
                   <div className="flex flex-col lg:flex-row gap-6">
@@ -2210,18 +2566,19 @@ const CBTPage = () => {
           {/* Footer Tombol (Fixed at Bottom) */}
           <div className="p-5 pt-6 border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900">
             <div className="grid grid-cols-2 gap-3">
-              <Button
-                variant="outline"
+              <button
+                type="button"
                 disabled={currentQuestionIndex === 0}
                 onClick={() => setCurrentQuestionIndex(prev => prev - 1)}
-                className="h-16 rounded-2xl font-black uppercase tracking-widest text-[12px] border-2 border-emerald-500/40 text-emerald-700 dark:text-emerald-400 bg-emerald-50/50 dark:bg-emerald-950/30 hover:bg-emerald-100/70 dark:hover:bg-emerald-900/50 disabled:opacity-30 disabled:border-slate-200 dark:disabled:border-slate-800 disabled:text-slate-400 disabled:bg-slate-50 dark:disabled:bg-slate-900 transition-all active:scale-95 flex items-center justify-center gap-2"
+                className="h-16 rounded-2xl font-black uppercase tracking-widest text-[12px] border-2 border-emerald-500/40 text-emerald-700 dark:text-emerald-400 bg-emerald-50/50 dark:bg-emerald-950/30 hover:bg-emerald-100/70 dark:hover:bg-emerald-900/50 active:bg-emerald-200/70 dark:active:bg-emerald-900/80 disabled:opacity-30 disabled:border-slate-200 dark:disabled:border-slate-800 disabled:text-slate-400 disabled:bg-slate-50 dark:disabled:bg-slate-900 transition-all active:scale-95 flex items-center justify-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
               >
                 <ChevronLeft className="w-4 h-4" />
                 Back
-              </Button>
-              <Button
+              </button>
+              <button
+                type="button"
                 onClick={() => currentQuestionIndex === questions.length - 1 ? setIsSubmitModalOpen(true) : handleNextClick()}
-                className="h-16 text-white font-black uppercase tracking-widest text-[12px] rounded-2xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 shadow-lg shadow-emerald-600/25 transition-all flex items-center justify-center gap-2"
+                className="h-16 text-white font-black uppercase tracking-widest text-[12px] rounded-2xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 dark:bg-emerald-600 dark:hover:bg-emerald-500 dark:active:bg-emerald-700 active:scale-95 shadow-lg shadow-emerald-600/25 transition-all flex items-center justify-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
               >
                 {currentQuestionIndex === questions.length - 1 ? (
                   <>
@@ -2234,47 +2591,46 @@ const CBTPage = () => {
                     <ChevronRight className="w-4 h-4" />
                   </>
                 )}
-              </Button>
+              </button>
             </div>
           </div>
         </aside>
       </div>
 
-      <div className="sticky bottom-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl border-t border-slate-100 dark:border-slate-800 p-4 sm:p-6 lg:hidden flex justify-between items-center z-40">
-        <Button
-          variant="outline"
-          size="sm"
+      <div className="sticky bottom-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl border-t border-slate-100 dark:border-slate-800 px-3 py-2 sm:p-6 lg:hidden flex justify-between items-center z-40 pb-[max(0.5rem,env(safe-area-inset-bottom,0px))]">
+        <button
+          type="button"
           disabled={currentQuestionIndex === 0}
           onClick={() => setCurrentQuestionIndex(p => p - 1)}
-          className="rounded-2xl h-14 px-6 font-black uppercase text-[12px] tracking-[0.2em] border-2 border-emerald-500/40 bg-emerald-50/50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100/70 dark:hover:bg-emerald-900/50 disabled:opacity-30 disabled:border-slate-200 dark:disabled:border-slate-800 disabled:text-slate-400 disabled:bg-slate-50 dark:disabled:bg-slate-900 active:scale-90 transition-all flex items-center gap-1.5"
+          className="rounded-xl h-10 px-4 sm:h-14 sm:px-6 font-black uppercase text-[10px] sm:text-[12px] tracking-[0.15em] border-2 border-emerald-500/40 bg-emerald-50/50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100/70 active:scale-95 transition-all flex items-center gap-1 focus:outline-none"
         >
-          <ChevronLeft className="w-4 h-4" />
+          <ChevronLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
           Back
-        </Button>
-        <Button
-          variant="ghost"
-          className="font-black text-emerald-800 dark:text-emerald-100 uppercase tracking-[0.3em] text-[16px]"
+        </button>
+        <button
+          type="button"
+          className="font-black text-emerald-800 dark:text-emerald-100 uppercase tracking-[0.2em] text-[13px] sm:text-[16px] px-2.5 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors focus:outline-none"
           onClick={() => setIsNavModalOpen(true)}
         >
           {currentQuestionIndex + 1} / {questions.length}
-        </Button>
-        <Button
+        </button>
+        <button
+          type="button"
           onClick={() => currentQuestionIndex === questions.length - 1 ? setIsSubmitModalOpen(true) : handleNextClick()}
-          size="sm"
-          className="rounded-2xl h-14 px-6 text-white font-black uppercase text-[12px] tracking-[0.2em] bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500 active:scale-90 transition-all shadow-lg shadow-emerald-600/25 flex items-center gap-1.5"
+          className="rounded-xl h-10 px-4 sm:h-14 sm:px-6 text-white font-black uppercase text-[10px] sm:text-[12px] tracking-[0.15em] bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 active:scale-90 transition-all shadow-md shadow-emerald-600/25 flex items-center gap-1 focus:outline-none"
         >
           {currentQuestionIndex === questions.length - 1 ? (
             <>
               End
-              <CheckCircle2 className="w-4 h-4" />
+              <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             </>
           ) : (
             <>
               Next
-              <ChevronRight className="w-4 h-4" />
+              <ChevronRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             </>
           )}
-        </Button>
+        </button>
       </div>
 
       <Dialog open={isNavModalOpen} onOpenChange={setIsNavModalOpen}>
@@ -2283,10 +2639,10 @@ const CBTPage = () => {
             <DialogTitle className="text-xl font-black text-emerald-800 dark:text-emerald-400 uppercase tracking-tighter">Navigasi Soal</DialogTitle>
 
             {/* Mobile Zoom Controls */}
-            <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-2xl border border-slate-200 dark:border-slate-700 sm:hidden">
-              <button onClick={() => setFontSize(p => Math.max(0.5, p - 0.1))} className="w-8 h-8 flex items-center justify-center rounded-xl bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 active:bg-emerald-50 dark:active:bg-emerald-950 shadow-sm disabled:opacity-30" disabled={fontSize <= 0.5}><ZoomOut className="w-4 h-4" /></button>
-              <div className="px-2 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase w-[35px] text-center">{Math.round(fontSize * 100)}%</div>
-              <button onClick={() => setFontSize(p => Math.min(1.5, p + 0.1))} className="w-8 h-8 flex items-center justify-center rounded-xl bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 active:bg-emerald-50 dark:active:bg-emerald-950 shadow-sm disabled:opacity-30" disabled={fontSize >= 1.5}><ZoomIn className="w-4 h-4" /></button>
+            <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-700 sm:hidden">
+              <button onClick={() => setFontSize(p => Math.max(0.5, p - 0.1))} className="min-h-[40px] min-w-[40px] w-10 h-10 flex items-center justify-center rounded-xl bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 active:bg-emerald-50 dark:active:bg-emerald-950 shadow-sm disabled:opacity-30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500" disabled={fontSize <= 0.5} title="Kecilkan teks"><ZoomOut className="w-4 h-4" /></button>
+              <div className="px-2 text-xs font-black text-slate-600 dark:text-slate-300 uppercase w-[38px] text-center">{Math.round(fontSize * 100)}%</div>
+              <button onClick={() => setFontSize(p => Math.min(1.5, p + 0.1))} className="min-h-[40px] min-w-[40px] w-10 h-10 flex items-center justify-center rounded-xl bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 active:bg-emerald-50 dark:active:bg-emerald-950 shadow-sm disabled:opacity-30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500" disabled={fontSize >= 1.5} title="Perbesar teks"><ZoomIn className="w-4 h-4" /></button>
             </div>
           </div>
 
@@ -2331,7 +2687,7 @@ const CBTPage = () => {
                         <div className="flex-1 h-px bg-amber-200 dark:bg-amber-800/40"></div>
                       </div>
                     )}
-                    <button onClick={() => { setCurrentQuestionIndex(i); setIsNavModalOpen(false); }} className={`aspect-square rounded-2xl flex items-center justify-center font-black text-xl border-3 transition-all active:scale-90 outline-none focus:outline-none ${i === currentQuestionIndex
+                    <button onClick={() => { setCurrentQuestionIndex(i); setIsNavModalOpen(false); }} className={`aspect-square rounded-2xl flex items-center justify-center font-black text-xl border-3 transition-all active:scale-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 ${i === currentQuestionIndex
                       ? "bg-emerald-700 border-emerald-700 text-white shadow-2xl"
                       : flaggedQuestions[q.id]
                         ? "bg-amber-500 border-amber-600 text-white shadow-xl shadow-amber-500/20"
@@ -2494,7 +2850,7 @@ const CBTPage = () => {
                         setIsSubmitModalOpen(false);
                         handleSubmitExam();
                       }}
-                      className="flex-1 bg-green-600 hover:bg-green-700 text-white rounded-xl"
+                      className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl"
                     >
                       {isSyncing ? "Menyimpan..." : "Kumpulkan"}
                     </Button>

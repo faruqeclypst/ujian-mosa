@@ -29,33 +29,50 @@ const isFuzzyMatch = (studentAns: any, correctKey: string) => {
   return dist <= maxAllowed;
 };
 
-// Helper for answer comparison (all types)
-const checkAns = (q: any, studentAns: any, overrides?: Record<string, boolean>) => {
-  if (overrides && overrides[q.id] !== undefined) return overrides[q.id];
-  if (!studentAns) return false;
+// Helper for answer comparison and proportional scoring (all types)
+const checkAns = (q: any, studentAns: any, overrides?: Record<string, boolean>): number => {
+  if (overrides && overrides[q.id] !== undefined) return overrides[q.id] ? 1 : 0;
+  if (studentAns === undefined || studentAns === null) return 0;
   const type = q.type || q.field || "pilihan_ganda";
 
-  if (type === "pilihan_ganda" || type === "benar_salah") {
+  if (type === "pilihan_ganda") {
     const ck = Object.keys(q.choices || {}).find(k => k.toLowerCase() === String(studentAns).toLowerCase());
-    return ck ? q.choices[ck].isCorrect === true : false;
+    return ck && q.choices[ck].isCorrect === true ? 1 : 0;
+  }
+  if (type === "benar_salah") {
+    const sts = q.statements || q.choices?.statements || [];
+    if (sts.length > 0) {
+      let stCorrect = 0;
+      sts.forEach((st: any) => {
+        const expected = (st.answer || "benar").toLowerCase();
+        const given = (studentAns?.[st.id] || "").toLowerCase();
+        if (given === expected) stCorrect++;
+      });
+      return sts.length > 0 ? stCorrect / sts.length : 0;
+    } else {
+      const ck = Object.keys(q.choices || {}).find(k => k.toLowerCase() === String(studentAns).toLowerCase());
+      return ck && q.choices[ck].isCorrect === true ? 1 : 0;
+    }
   }
   if (type === "pilihan_ganda_kompleks") {
     const correctKeys = Object.keys(q.choices || {}).filter(k => q.choices[k].isCorrect).map(k => k.toLowerCase());
     const studentKeys = Array.isArray(studentAns) ? studentAns.map((k: any) => String(k).toLowerCase()) : [];
-    return studentKeys.length === correctKeys.length && studentKeys.every((k: string) => correctKeys.includes(k));
+    const correctChosen = studentKeys.filter(k => correctKeys.includes(k));
+    const wrongChosen = studentKeys.filter(k => !correctKeys.includes(k));
+    return correctKeys.length > 0 ? Math.max(0, correctChosen.length - wrongChosen.length) / correctKeys.length : 0;
   }
   if (type === "isian_singkat") {
-    return isFuzzyMatch(studentAns, q.answerKey);
+    return isFuzzyMatch(studentAns, q.answerKey) ? 1 : 0;
   }
   if (type === "urutkan" || type === "drag_drop") {
     const co = (q.items || []).map((it: any) => it.id);
-    return Array.isArray(studentAns) && studentAns.length === co.length && studentAns.every((v: any, i: number) => v === co[i]);
+    return Array.isArray(studentAns) && studentAns.length === co.length && studentAns.every((v: any, i: number) => v === co[i]) ? 1 : 0;
   }
   if (type === "menjodohkan") {
     const pairs = q.pairs || [];
-    return pairs.length > 0 && pairs.every((p: any) => studentAns[p.id] === p.right);
+    return pairs.length > 0 && pairs.every((p: any) => studentAns[p.id] === p.right) ? 1 : 0;
   }
-  return false;
+  return 0;
 };
 
 // 📝 Real-time Live Score Calculator (Weighted: objective + essay)
@@ -77,38 +94,14 @@ const getLiveScore = (sisAnswers: Record<string, any>, monitorQuestions: any[], 
   targetQuestions.forEach((q: any) => {
     const type = q.type || "pilihan_ganda";
     const isEssay = type === "isian_singkat" || type === "uraian";
-    let itemCorrect = false;
-
-    if (overrides[q.id] !== undefined) {
-      itemCorrect = overrides[q.id];
-    } else {
-      const ansId = sisAnswers[q.id];
-      if (ansId !== undefined && ansId !== null) {
-        if (type === "pilihan_ganda" || type === "benar_salah") {
-          const ck = Object.keys(q.choices || {}).find(k => k.toLowerCase() === String(ansId).toLowerCase());
-          itemCorrect = ck ? q.choices[ck].isCorrect === true : false;
-        } else if (type === "pilihan_ganda_kompleks") {
-          const correctKeys = Object.keys(q.choices || {}).filter(k => q.choices[k].isCorrect).map(k => k.toLowerCase());
-          const studentKeys = Array.isArray(ansId) ? ansId.map(k => String(k).toLowerCase()) : [];
-          itemCorrect = studentKeys.length === correctKeys.length && studentKeys.every(k => correctKeys.includes(k));
-        } else if (type === "isian_singkat") {
-          itemCorrect = isFuzzyMatch(ansId, q.answerKey);
-        } else if (type === "urutkan" || type === "drag_drop") {
-          const co = (q.items || []).map((it: any) => it.id);
-          itemCorrect = Array.isArray(ansId) && ansId.length === co.length && ansId.every((v, i) => v === co[i]);
-        } else if (type === "menjodohkan") {
-          const pairs = q.pairs || [];
-          itemCorrect = pairs.length > 0 && pairs.every((p: any) => ansId[p.id] === p.right);
-        }
-      }
-    }
+    const itemScore = checkAns(q, sisAnswers[q.id], overrides);
 
     if (isEssay) {
       essayTotal++;
-      if (itemCorrect) essayCorrect++;
+      essayCorrect += itemScore;
     } else {
       objectiveTotal++;
-      if (itemCorrect) objectiveCorrect++;
+      objectiveCorrect += itemScore;
     }
   });
 
@@ -124,10 +117,24 @@ const getLiveScore = (sisAnswers: Record<string, any>, monitorQuestions: any[], 
 
 // Helper: format answer for display in Excel
 const formatAnswer = (q: any, studentAns: any) => {
-  if (!studentAns) return "-";
+  if (studentAns === undefined || studentAns === null) return "-";
   const type = q.type || "pilihan_ganda";
 
-  if (type === "pilihan_ganda" || type === "benar_salah") {
+  if (type === "benar_salah" || type === "true_false") {
+    const sts = q.statements || q.choices?.statements;
+    if (Array.isArray(sts) && sts.length > 0 && typeof studentAns === "object" && studentAns !== null) {
+      return sts.map((st: any, idx: number) => {
+        const val = studentAns?.[st.id] !== undefined
+          ? studentAns[st.id]
+          : (studentAns?.[String(idx + 1)] !== undefined
+              ? studentAns[String(idx + 1)]
+              : studentAns?.[String(idx)]);
+        return `${idx + 1}:${val ? String(val).toUpperCase().charAt(0) : '-'}`;
+      }).join(" ");
+    }
+    return String(studentAns).toUpperCase();
+  }
+  if (type === "pilihan_ganda") {
     return String(studentAns).toUpperCase();
   }
   if (type === "pilihan_ganda_kompleks") {
@@ -273,11 +280,13 @@ export async function exportActiveRoomsToZip({
         const typeMapReverse: Record<string, string> = {
           multiple_choice: "pilihan_ganda",
           complex_multiple_choice: "pilihan_ganda_kompleks",
+          complex_choice: "pilihan_ganda_kompleks",
           matching: "menjodohkan",
           true_false: "benar_salah",
           short_answer: "isian_singkat",
           essay: "uraian",
           ordering: "urutkan",
+          sequence: "urutkan",
           drag_drop: "drag_drop",
           pilihan_ganda: "pilihan_ganda",
           pilihan_ganda_kompleks: "pilihan_ganda_kompleks",
@@ -288,11 +297,15 @@ export async function exportActiveRoomsToZip({
           benar_salah: "benar_salah"
         };
         const mappedType = typeMapReverse[rawType] || rawType;
-        const options = q.options || {};
+        let options = q.options || {};
+        if (typeof options === "string") {
+          try { options = JSON.parse(options); } catch (e) { options = {}; }
+        }
         return {
           ...q,
           type: mappedType,
           choices: options,
+          statements: (mappedType === "benar_salah" && Array.isArray(options.statements)) ? options.statements : undefined,
           pairs: mappedType === "menjodohkan" ? options.pairs : undefined,
           items: (mappedType === "urutkan" || mappedType === "drag_drop") ? options.items : undefined,
           answerKey: q.correctAnswer || q.answerKey
@@ -463,7 +476,7 @@ export async function exportActiveRoomsToZip({
           { v: loginTime ? new Date(loginTime).toLocaleString("id-ID", { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' }) : "-", s: STYLES.cellCenter },
           { v: durationStr, s: STYLES.cellCenter },
           { v: att?.submitTime ? new Date(att.submitTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : (att?.submittedAt ? new Date(att.submittedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : (att?.status === "finished" ? "Selesai" : (att ? "Proses" : "-"))), s: STYLES.cellCenter },
-          { t: "s", v: `${objCorrect}/${objTotal}`, z: "@", s: STYLES.cellCenter },
+          { t: "s", v: `${Number(objCorrect.toFixed(1))}/${objTotal}`, z: "@", s: STYLES.cellCenter },
           { t: "n", v: Number(objScore), s: getFinalScoreStyle(objScore) },
           { t: "n", v: Math.round(objScore * 0.6), f: `ROUND(I${ri}*0.6,0)`, s: STYLES.cellCenter },
           essTotal > 0 ? (
@@ -479,7 +492,7 @@ export async function exportActiveRoomsToZip({
           const isQuestionAssigned = targetQuestions.some((tq: any) => tq.id === q.id);
           const ans = answers[q.id];
           const isOverridden = overrides[q.id] !== undefined;
-          const isCorrect = checkAns(q, ans, overrides);
+          const ansScore = checkAns(q, ans, overrides);
           const display = isOverridden ? `${formatAnswer(q, ans)} ✓` : formatAnswer(q, ans);
 
           let cellStyle = STYLES.unansweredWhite;
@@ -499,7 +512,7 @@ export async function exportActiveRoomsToZip({
             if (q.type === "uraian" && !isOverridden) {
               cellStyle = STYLES.neutral;
             } else {
-              cellStyle = isCorrect ? STYLES.correct : STYLES.wrong;
+              cellStyle = ansScore >= 1 ? STYLES.correct : ansScore > 0 ? STYLES.finalYellow : STYLES.wrong;
             }
           }
 

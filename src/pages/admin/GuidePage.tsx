@@ -415,7 +415,7 @@ const GuidePage = () => {
                 <div className="space-y-2">
                   <Step number="1" title="Konfigurasi Paket">Tentukan Mata Pelajaran dan target Kelas. Paket yang sudah dibuat dapat di-duplikasi (copy) ke tahun ajaran berikutnya.</Step>
                   <Step number="2" title="Rich Text Editor (Quill)">Masukkan teks soal. Gunakan menu <strong>Image</strong> untuk upload gambar pendukung. Copy-paste tabel dari Word akan otomatis dipreservasi. Untuk rumus matematika, gunakan format LaTeX ($...$) atau KaTeX (\(...\)).</Step>
-                  <Step number="3" title="Mode Literasi">Aktifkan switch <strong>Literasi</strong> jika soal memiliki wacana/bacaan yang sama untuk beberapa nomor soal. Bacaan akan muncul secara berdampingan dengan soal di layar siswa.</Step>
+                  <Step number="3" title="Mode Literasi">Aktifkan switch <strong>Literasi</strong> jika soal memiliki teks literasi / bacaan yang sama untuk beberapa nomor soal. Teks literasi akan muncul secara berdampingan dengan soal di layar siswa.</Step>
                 </div>
 
                 <SubSection title="Import & Export Soal">
@@ -793,7 +793,7 @@ const GuidePage = () => {
                             <Layers size={16} /> Asesmen Sumatif &amp; Pembelajaran Mendalam
                          </h6>
                          <p className="text-xs text-indigo-900/80 dark:text-indigo-300/80 leading-relaxed">
-                            Pada penilaian capaian pembelajaran akhir, digunakan soal berbasis stimulus wacana konteks nyata. Di sinilah daya pembeda tinggi (<code className="font-mono text-[10px]">D ≥ 0.30</code>) menjadi tolok ukur utama untuk membedakan siswa yang memiliki pemahaman konsep mendalam (<em>Deep Understanding</em>) dengan yang sekadar mengingat hafalan (<em>Surface Learning</em>).
+                            Pada penilaian capaian pembelajaran akhir, digunakan soal berbasis stimulus literasi konteks nyata. Di sinilah daya pembeda tinggi (<code className="font-mono text-[10px]">D ≥ 0.30</code>) menjadi tolok ukur utama untuk membedakan siswa yang memiliki pemahaman konsep mendalam (<em>Deep Understanding</em>) dengan yang sekadar mengingat hafalan (<em>Surface Learning</em>).
                          </p>
                       </div>
                    </div>

@@ -70,9 +70,14 @@ cronAdd("autoFinishAndScore", "* * * * *", () => {
   } catch (e) { }
 });
 
-// 🕒 3. ROTASI TOKEN UNIVERSAL (Setiap 5 Menit)
+// 🕒 3. ROTASI TOKEN UNIVERSAL (Setiap 5 Menit - HANYA jika ada ruangan ujian yang sedang aktif)
 cronAdd("rotateUniversalToken", "*/5 * * * *", () => {
   try {
+    // 🔒 Cek apakah ada ruang ujian yang sedang AKTIF
+    const activeRooms = [];
+    $app.db().newQuery("SELECT id FROM exam_rooms WHERE isActive = 1 LIMIT 1").all(activeRooms);
+    if (activeRooms.length === 0) return; // Hemat disk I/O & cegah korupsi jika tidak ada ujian aktif
+
     const settings = $app.findFirstRecordByFilter("settings", "1=1");
     if (!settings) return;
     const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";

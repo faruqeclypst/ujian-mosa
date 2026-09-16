@@ -5,6 +5,12 @@
 @tailwind utilities;
 
 :root {
+  /* Safe area insets for notches & edge-to-edge support */
+  --safe-area-top: env(safe-area-inset-top, 0px);
+  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-area-left: env(safe-area-inset-left, 0px);
+  --safe-area-right: env(safe-area-inset-right, 0px);
+
   /* Light theme - Basic Tailwind Colors */
   --background: 0 0% 100%; /* white */
   --foreground: 0 0% 3.9%; /* gray-950 */
@@ -254,6 +260,20 @@ body {
 }
 .ql-align-justify {
   text-align: justify !important;
+}
+
+/* 📝 Pilihan Jawaban CBT (ABCDE): Wajib rata kiri, DILARANG justify agar tidak merenggang di HP */
+.cbt-choice-text,
+.cbt-choice-text:not([dir="rtl"]),
+.cbt-choice-text *:not([dir="rtl"]):not(.arabic-text),
+.cbt-choice-text p:not([dir="rtl"]):not(.arabic-text),
+.cbt-choice-text div:not([dir="rtl"]):not(.arabic-text),
+.cbt-choice-text span:not([dir="rtl"]):not(.arabic-text),
+.cbt-choice-text .ql-align-justify:not([dir="rtl"]):not(.arabic-text),
+.cbt-choice-text [style*="text-align: justify"]:not([dir="rtl"]):not(.arabic-text),
+.cbt-choice-text [style*="text-align:justify"]:not([dir="rtl"]):not(.arabic-text),
+.cbt-choice-text [align="justify"]:not([dir="rtl"]):not(.arabic-text) {
+  text-align: left !important;
 }
 
 /* Render alignment untuk gambar di Quill */

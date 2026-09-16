@@ -471,7 +471,7 @@ export function DataTable<T>({
               <select
                 value={state.pageSize}
                 onChange={(e) => handlePageSizeChange(Number(e.target.value))}
-                className="h-8 sm:h-9 rounded border border-input bg-background px-2 text-xs sm:text-sm touch-manipulation"
+                className="h-10 min-h-[40px] sm:min-h-0 sm:h-9 rounded-xl border border-input bg-background px-2.5 text-xs sm:text-sm touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
               >
                 {[5, 10, 20, 50].map((size) => (
                   <option key={size} value={size}>
@@ -487,9 +487,9 @@ export function DataTable<T>({
                 size="sm"
                 onClick={() => handlePageChange(1)}
                 disabled={state.currentPage === 1}
-                className="h-8 w-8 sm:h-9 sm:w-9 p-0 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30"
+                className="min-h-[40px] min-w-[40px] h-10 w-10 sm:min-h-0 sm:min-w-0 sm:h-9 sm:w-9 p-0 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30"
               >
-                <ChevronsLeft className="h-3 w-3 sm:h-4 sm:w-4" />
+                <ChevronsLeft className="h-4 w-4" />
                 <span className="sr-only">First page</span>
               </Button>
               <Button
@@ -497,9 +497,9 @@ export function DataTable<T>({
                 size="sm"
                 onClick={() => handlePageChange(state.currentPage - 1)}
                 disabled={state.currentPage === 1}
-                className="h-8 w-8 sm:h-9 sm:w-9 p-0 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30"
+                className="min-h-[40px] min-w-[40px] h-10 w-10 sm:min-h-0 sm:min-w-0 sm:h-9 sm:w-9 p-0 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30"
               >
-                <ChevronLeft className="h-3 w-3 sm:h-4 sm:w-4" />
+                <ChevronLeft className="h-4 w-4" />
                 <span className="sr-only">Previous page</span>
               </Button>
 
@@ -527,9 +527,9 @@ export function DataTable<T>({
                           size="sm"
                           onClick={() => handlePageChange(pageNum)}
                           className={cn(
-                            "h-8 w-8 p-0 text-xs rounded-lg transition-colors border",
+                            "min-h-[40px] min-w-[40px] h-10 w-10 p-0 text-xs rounded-xl transition-colors border",
                             state.currentPage === pageNum 
-                              ? "bg-blue-50 text-blue-700 border-blue-100 dark:bg-blue-900/40 dark:text-blue-400 dark:border-blue-800/40 font-bold" 
+                              ? "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/40 dark:text-blue-300 dark:border-blue-800/60 font-bold" 
                               : "border-transparent bg-transparent hover:bg-slate-100 dark:hover:bg-slate-800"
                           )}
                         >
@@ -558,9 +558,9 @@ export function DataTable<T>({
                           size="sm"
                           onClick={() => handlePageChange(pageNum)}
                           className={cn(
-                            "h-9 w-9 p-0 text-sm rounded-lg transition-colors border",
+                            "min-h-[36px] min-w-[36px] h-9 w-9 p-0 text-sm rounded-xl transition-colors border",
                             state.currentPage === pageNum 
-                              ? "bg-blue-50 text-blue-700 border-blue-100 dark:bg-blue-900/40 dark:text-blue-400 dark:border-blue-800/40 font-bold" 
+                              ? "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/40 dark:text-blue-300 dark:border-blue-800/60 font-bold" 
                               : "border-transparent bg-transparent hover:bg-slate-100 dark:hover:bg-slate-800"
                           )}
                         >
@@ -577,9 +577,9 @@ export function DataTable<T>({
                 size="sm"
                 onClick={() => handlePageChange(state.currentPage + 1)}
                 disabled={state.currentPage === totalPages}
-                className="h-8 w-8 sm:h-9 sm:w-9 p-0 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30"
+                className="min-h-[40px] min-w-[40px] h-10 w-10 sm:min-h-0 sm:min-w-0 sm:h-9 sm:w-9 p-0 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30"
               >
-                <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4" />
+                <ChevronRight className="h-4 w-4" />
                 <span className="sr-only">Next page</span>
               </Button>
               <Button
@@ -587,9 +587,9 @@ export function DataTable<T>({
                 size="sm"
                 onClick={() => handlePageChange(totalPages)}
                 disabled={state.currentPage === totalPages}
-                className="h-8 w-8 sm:h-9 sm:w-9 p-0 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30"
+                className="min-h-[40px] min-w-[40px] h-10 w-10 sm:min-h-0 sm:min-w-0 sm:h-9 sm:w-9 p-0 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30"
               >
-                <ChevronsRight className="h-3 w-3 sm:h-4 sm:w-4" />
+                <ChevronsRight className="h-4 w-4" />
                 <span className="sr-only">Last page</span>
               </Button>
             </div>

@@ -21,6 +21,15 @@ public class MainActivity extends BridgeActivity {
     private boolean isExiting = false;
     private boolean isLockEnabled = false;
     private Runnable fallbackEnableLockRunnable;
+    private int currentThemeColor = android.graphics.Color.WHITE;
+    private int currentNavColor = android.graphics.Color.WHITE;
+    private boolean isCurrentDark = false;
+    private java.util.concurrent.ScheduledExecutorService lockCheckExecutor;
+
+    public static volatile boolean isScreenOff = false;
+    public static volatile long lastScreenOffTime = 0;
+    public static volatile long lastScreenOnTime = 0;
+    private android.content.BroadcastReceiver screenReceiver;
 
     private Runnable alarmRunnable = new Runnable() {
         @Override
@@ -39,20 +48,66 @@ public class MainActivity extends BridgeActivity {
         super.onCreate(savedInstanceState);
         instance = this;
         
-        // 2. Layar Penuh Otomatis
-        makeFullScreen();
-
-        // Ambil status awal lock task
+        // Jaga agar layar tidak mati otomatis saat ujian berlangsung
         try {
-            ActivityManager am = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
-            lastLockState = am.getLockTaskModeState();
+            getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        } catch (Exception e) {}
+
+        // Deteksi event layar mati / nyala agar tidak memicu alarm palsu
+        try {
+            android.content.IntentFilter filter = new android.content.IntentFilter();
+            filter.addAction(android.content.Intent.ACTION_SCREEN_OFF);
+            filter.addAction(android.content.Intent.ACTION_SCREEN_ON);
+            filter.addAction(android.content.Intent.ACTION_USER_PRESENT);
+            screenReceiver = new android.content.BroadcastReceiver() {
+                @Override
+                public void onReceive(Context context, android.content.Intent intent) {
+                    String action = (intent != null) ? intent.getAction() : null;
+                    if (android.content.Intent.ACTION_SCREEN_OFF.equals(action)) {
+                        isScreenOff = true;
+                        lastScreenOffTime = System.currentTimeMillis();
+                        Log.d(TAG, "Screen OFF event detected");
+                    } else if (android.content.Intent.ACTION_SCREEN_ON.equals(action) || 
+                               android.content.Intent.ACTION_USER_PRESENT.equals(action)) {
+                        isScreenOff = false;
+                        lastScreenOnTime = System.currentTimeMillis();
+                        Log.d(TAG, "Screen ON event detected");
+                    }
+                }
+            };
+            registerReceiver(screenReceiver, filter);
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to register screenReceiver", e);
+        }
+
+        // Notch / Display Cutout: Cegah header tertutup notch / punch-hole kamera HP
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+            WindowManager.LayoutParams lp = getWindow().getAttributes();
+            lp.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_NEVER;
+            getWindow().setAttributes(lp);
+        }
+
+        // Inisialisasi tema notch / status bar berdasarkan cache atau preferensi sistem
+        try {
+            android.content.SharedPreferences prefs = getSharedPreferences("app_theme_prefs", Context.MODE_PRIVATE);
+            String lastTheme = prefs.getString("last_theme", null);
+            if (lastTheme != null) {
+                setThemeModeInternal(lastTheme, null);
+            } else {
+                int nightMode = getResources().getConfiguration().uiMode & android.content.res.Configuration.UI_MODE_NIGHT_MASK;
+                boolean isSystemDark = nightMode == android.content.res.Configuration.UI_MODE_NIGHT_YES;
+                setThemeModeInternal(isSystemDark ? "dark" : "light", null);
+            }
         } catch (Exception e) {}
         
-        // 3. Keamanan: Anti Screenshot & Record, dan Sembunyikan Overlay (Android 12+)
+        // 2. Layar Penuh Otomatis
+        makeFullScreen();
+        
+        // 3. Keamanan: Anti Screenshot & Record (FLAG_SECURE)
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
-            getWindow().setHideOverlayWindows(true);
-        }
+        // CATATAN PENTING: setHideOverlayWindows sengaja TIDAK diaktifkan karena terbukti memblokir
+        // overlay suggestion bar dan predictive text pada keyboard Android (Gboard / Samsung / SwiftKey)
+        // yang menyebabkan lag dan delay parah saat mengetik.
         
         // 4. Inisialisasi Layar Blokir (Layout)
         createBlockingLayout();
@@ -72,6 +127,71 @@ public class MainActivity extends BridgeActivity {
         handler.postDelayed(fallbackEnableLockRunnable, 2500);
     }
 
+    public void setThemeModeInternal(final String theme, final String colorHex) {
+        isCurrentDark = "dark".equalsIgnoreCase(theme);
+        int parsedColor;
+        try {
+            if (colorHex != null && !colorHex.isEmpty()) {
+                parsedColor = android.graphics.Color.parseColor(colorHex);
+            } else {
+                parsedColor = isCurrentDark ? android.graphics.Color.parseColor("#0f172a") : android.graphics.Color.WHITE;
+            }
+        } catch (Exception e) {
+            parsedColor = isCurrentDark ? android.graphics.Color.parseColor("#0f172a") : android.graphics.Color.WHITE;
+        }
+        currentThemeColor = parsedColor;
+        currentNavColor = isCurrentDark ? android.graphics.Color.parseColor("#020617") : android.graphics.Color.WHITE;
+
+        try {
+            android.content.SharedPreferences prefs = getSharedPreferences("app_theme_prefs", Context.MODE_PRIVATE);
+            prefs.edit().putString("last_theme", isCurrentDark ? "dark" : "light").apply();
+        } catch (Exception e) {}
+
+        applyThemeColors();
+    }
+
+    public void applyThemeColors() {
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    // Update Window & DecorView background (digunakan oleh letterbox notch)
+                    getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(currentThemeColor));
+                    getWindow().getDecorView().setBackgroundColor(currentThemeColor);
+
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
+                        getWindow().setStatusBarColor(currentThemeColor);
+                        getWindow().setNavigationBarColor(currentNavColor);
+                    }
+
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                        androidx.core.view.WindowInsetsControllerCompat controller = 
+                            androidx.core.view.WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView());
+                        if (controller != null) {
+                            controller.setAppearanceLightStatusBars(!isCurrentDark);
+                            controller.setAppearanceLightNavigationBars(!isCurrentDark);
+                        }
+                    } else if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+                        View decorView = getWindow().getDecorView();
+                        int flags = decorView.getSystemUiVisibility();
+                        if (!isCurrentDark) {
+                            flags |= View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
+                        } else {
+                            flags &= ~View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
+                        }
+                        decorView.setSystemUiVisibility(flags);
+                    }
+
+                    if (getBridge() != null && getBridge().getWebView() != null) {
+                        getBridge().getWebView().setBackgroundColor(currentThemeColor);
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "Gagal sinkronisasi warna notch / status bar", e);
+                }
+            }
+        });
+    }
+
     public void enableLockModeInternal() {
         if (isExiting) return;
         isLockEnabled = true;
@@ -82,6 +202,14 @@ public class MainActivity extends BridgeActivity {
             @Override
             public void run() {
                 Log.d(TAG, "enableLockModeInternal: Kuncian diaktifkan");
+                try {
+                    ActivityManager am = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
+                    if (am != null && am.getLockTaskModeState() == ActivityManager.LOCK_TASK_MODE_NONE) {
+                        startLockTask();
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "Auto startLockTask failed: " + e.getMessage());
+                }
                 checkLockTaskOnly();
                 startRepeatingCheck();
             }
@@ -91,6 +219,7 @@ public class MainActivity extends BridgeActivity {
     public void disableLockForUpdateInternal() {
         isExiting = true;
         isLockEnabled = false;
+        stopRepeatingCheck();
         if (fallbackEnableLockRunnable != null) {
             handler.removeCallbacks(fallbackEnableLockRunnable);
         }
@@ -185,6 +314,7 @@ public class MainActivity extends BridgeActivity {
     public void exitAppInternal() {
         isExiting = true;
         isLockEnabled = false;
+        stopRepeatingCheck();
         if (fallbackEnableLockRunnable != null) {
             handler.removeCallbacks(fallbackEnableLockRunnable);
         }
@@ -217,7 +347,7 @@ public class MainActivity extends BridgeActivity {
                         public void run() {
                             System.exit(0);
                         }
-                    }, 500);
+                    }, 150);
                 } catch (Exception e) {}
             }
         });
@@ -280,63 +410,105 @@ public class MainActivity extends BridgeActivity {
     public void onResume() {
         super.onResume();
         makeFullScreen();
+        applyThemeColors();
         if (isLockEnabled) {
             checkLockTaskOnly();
         }
     }
 
     private void startRepeatingCheck() {
-        handler.removeCallbacksAndMessages(null);
-        handler.postDelayed(new Runnable() {
+        stopRepeatingCheck();
+        lockCheckExecutor = java.util.concurrent.Executors.newSingleThreadScheduledExecutor();
+        lockCheckExecutor.scheduleWithFixedDelay(new Runnable() {
             @Override
             public void run() {
                 if (isLockEnabled && !isExiting) {
                     checkLockTaskOnly();
-                    handler.postDelayed(this, 1000);
                 }
             }
-        }, 1000);
+        }, 1, 1, java.util.concurrent.TimeUnit.SECONDS);
+    }
+
+    private void stopRepeatingCheck() {
+        if (lockCheckExecutor != null) {
+            try {
+                lockCheckExecutor.shutdownNow();
+            } catch (Exception e) {}
+            lockCheckExecutor = null;
+        }
     }
 
     private void checkLockTaskOnly() {
         if (!isLockEnabled || isFinishing() || isExiting) return;
         try {
-            ActivityManager am = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
-            int lockState = am.getLockTaskModeState();
-            
-            if (lockState == ActivityManager.LOCK_TASK_MODE_NONE) {
-                blockingLayout.setVisibility(View.VISIBLE);
-                
-                // HANYA BERDERING jika sebelumnya pernah terkunci (Pinning aktif)
-                // Ini artinya siswa melepas kuncian secara paksa
-                if (lastLockState != -1 && lastLockState != ActivityManager.LOCK_TASK_MODE_NONE) {
-                    playRingtone();
-                }
-            } else {
-                blockingLayout.setVisibility(View.GONE);
-                
-                // Hanya stopRingtone otomatis jika sebelumnya memang dipicu oleh unpinning
-                if (lastLockState == ActivityManager.LOCK_TASK_MODE_NONE) {
-                    stopRingtone();
-                }
+            // 1. Cek apakah layar sedang mati/sleep. Jika mati, abaikan dan jangan bunyikan alarm!
+            android.os.PowerManager pm = (android.os.PowerManager) getSystemService(Context.POWER_SERVICE);
+            if (pm != null && !pm.isInteractive()) {
+                return;
             }
+
+            // 2. Beri jeda toleransi 2.5 detik setelah layar dinyalakan kembali agar status kuncian stabil
+            if (System.currentTimeMillis() - lastScreenOnTime < 2500) {
+                return;
+            }
+
+            ActivityManager am = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
+            final int lockState = (am != null) ? am.getLockTaskModeState() : ActivityManager.LOCK_TASK_MODE_NONE;
+            final int previousState = lastLockState;
+
+            // Jika aplikasi sudah dalam keadaan terkunci (Pinned) dan status tidak berubah,
+            // langsung abaikan agar tidak membebani UI thread saat siswa sedang mengetik ujian.
+            if (previousState == lockState && lockState != ActivityManager.LOCK_TASK_MODE_NONE) {
+                return;
+            }
+
             lastLockState = lockState;
-        } catch (Exception e) {}
+            final boolean stateChanged = (lockState != previousState);
+
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    if (isFinishing() || isExiting) return;
+                    if (lockState == ActivityManager.LOCK_TASK_MODE_NONE) {
+                        if (blockingLayout != null && blockingLayout.getVisibility() != View.VISIBLE) {
+                            blockingLayout.setVisibility(View.VISIBLE);
+                        }
+                        // Alarm HANYA berdering jika sebelumnya pernah terkunci (siswa melepas kuncian paksa)
+                        if (stateChanged && previousState != -1 && previousState != ActivityManager.LOCK_TASK_MODE_NONE) {
+                            playRingtone();
+                        }
+                    } else {
+                        if (blockingLayout != null && blockingLayout.getVisibility() != View.GONE) {
+                            blockingLayout.setVisibility(View.GONE);
+                        }
+                        if (previousState == ActivityManager.LOCK_TASK_MODE_NONE) {
+                            stopRingtone();
+                        }
+                    }
+                }
+            });
+        } catch (Exception e) {
+            Log.e(TAG, "checkLockTaskOnly error", e);
+        }
     }
 
     @Override
     public void onWindowFocusChanged(boolean hasFocus) {
         super.onWindowFocusChanged(hasFocus);
-        if (isFinishing()) return;
+        if (isFinishing() || isExiting) return;
         
         if (hasFocus) {
-            makeFullScreen();
-        } else {
-            try {
-                if (!isExiting) {
-                    sendBroadcast(new android.content.Intent(android.content.Intent.ACTION_CLOSE_SYSTEM_DIALOGS));
+            getWindow().getDecorView().postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    if (!isFinishing() && !isExiting) {
+                        makeFullScreen();
+                    }
                 }
-            } catch (Exception e) {}
+            }, 500);
+            if (isLockEnabled) {
+                checkLockTaskOnly();
+            }
         }
     }
 
@@ -387,16 +559,38 @@ public class MainActivity extends BridgeActivity {
     }
 
     private void makeFullScreen() {
-        if (isFinishing()) return;
-        View decorView = getWindow().getDecorView();
-        decorView.setSystemUiVisibility(
-            View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-            | View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-            | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-            | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-            | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-            | View.SYSTEM_UI_FLAG_FULLSCREEN
-        );
+        if (isFinishing() || isExiting) return;
+        try {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+                WindowManager.LayoutParams lp = getWindow().getAttributes();
+                if (lp.layoutInDisplayCutoutMode != WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_NEVER) {
+                    lp.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_NEVER;
+                    getWindow().setAttributes(lp);
+                }
+            }
+
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                androidx.core.view.WindowInsetsControllerCompat controller = 
+                    androidx.core.view.WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView());
+                if (controller != null) {
+                    controller.hide(androidx.core.view.WindowInsetsCompat.Type.systemBars());
+                    controller.setSystemBarsBehavior(
+                        androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                    );
+                }
+            } else {
+                View decorView = getWindow().getDecorView();
+                int flags = View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                    | View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                    | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                    | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                    | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                    | View.SYSTEM_UI_FLAG_FULLSCREEN;
+                if (decorView.getSystemUiVisibility() != flags) {
+                    decorView.setSystemUiVisibility(flags);
+                }
+            }
+        } catch (Exception e) {}
     }
 
     @Override
@@ -407,6 +601,7 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void finish() {
         isExiting = true;
+        stopRepeatingCheck();
         try {
             handler.removeCallbacksAndMessages(null);
             alarmHandler.removeCallbacksAndMessages(null);
@@ -429,6 +624,13 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     public void onDestroy() {
+        stopRepeatingCheck();
+        try {
+            if (screenReceiver != null) {
+                unregisterReceiver(screenReceiver);
+                screenReceiver = null;
+            }
+        } catch (Exception e) {}
         try {
             handler.removeCallbacksAndMessages(null);
             alarmHandler.removeCallbacksAndMessages(null);

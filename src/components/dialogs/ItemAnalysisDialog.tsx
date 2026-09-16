@@ -7,20 +7,20 @@ import { Skeleton } from "../ui/skeleton";
 import { MathText } from "../ui/MathText";
 import { useTenant } from "../../context/TenantContext";
 import { useExamData } from "../../context/ExamDataContext";
-import { 
-  BarChart2, 
-  CheckCircle2, 
-  AlertTriangle, 
-  XCircle, 
-  Download, 
-  Printer, 
-  Search, 
-  Users, 
-  Target, 
-  ChevronDown, 
-  ChevronUp, 
-  RefreshCw, 
-  FileSpreadsheet, 
+import {
+  BarChart2,
+  CheckCircle2,
+  AlertTriangle,
+  XCircle,
+  Download,
+  Printer,
+  Search,
+  Users,
+  Target,
+  ChevronDown,
+  ChevronUp,
+  RefreshCw,
+  FileSpreadsheet,
   BookOpen,
   Sparkles,
   Info,
@@ -53,21 +53,21 @@ export interface QuestionAnalysis {
   answerKey?: string;
   pairs?: Array<{ id: string; left: string; right: string }>;
   items?: Array<{ id: string; text: string }>;
-  
+
   // Analisis Metrik
   totalAnswered: number;
   totalCorrect: number;
   difficultyIndex: number; // P (0.0 - 1.0)
   difficultyCategory: "Sukar" | "Sedang" | "Mudah";
-  
+
   upperGroupCorrect: number;
   lowerGroupCorrect: number;
   discriminationIndex: number; // D (-1.0 - 1.0)
   discriminationCategory: "Sangat Baik" | "Baik" | "Cukup" | "Jelek" | "Negatif";
-  
+
   verdict: "Diterima" | "Direvisi" | "Ditolak";
   recommendation: string;
-  
+
   // Analisis Pengecoh (khusus Pilihan Ganda)
   distractors?: Array<{
     key: string;
@@ -92,7 +92,7 @@ const isFuzzyMatch = (studentAns: any, correctKey: string) => {
   if (!sAns || !cKey) return false;
   if (sAns.includes(cKey) || cKey.includes(sAns)) return true;
   if (cKey.length < 3) return sAns === cKey;
-  
+
   const distance = (a: string, b: string) => {
     const matrix = Array(b.length + 1).fill(null).map(() => Array(a.length + 1).fill(null));
     for (let i = 0; i <= a.length; i++) matrix[0][i] = i;
@@ -247,6 +247,8 @@ export const ItemAnalysisDialog: React.FC<ItemAnalysisDialogProps> = ({
           choices: choicesObj,
           pairs: mappedType === "menjodohkan" ? (options.pairs || q.pairs) : undefined,
           items: (mappedType === "urutkan" || mappedType === "drag_drop") ? (options.items || q.items) : undefined,
+          statements: mappedType === "benar_salah" ? (options.statements || q.statements) : undefined,
+          options: options,
           answerKey: ansKey || undefined,
         };
       });
@@ -284,7 +286,23 @@ export const ItemAnalysisDialog: React.FC<ItemAnalysisDialogProps> = ({
             isCorrect = Boolean(overrides[q.id]);
             selectedKey = typeof rawAns === "string" ? rawAns.toUpperCase() : (isCorrect ? "BENAR" : "SALAH");
           } else if (rawAns !== undefined && rawAns !== null && rawAns !== "") {
-            if (q.type === "pilihan_ganda" || q.type === "benar_salah") {
+            if (q.type === "benar_salah") {
+              const sts = (q as any).statements || (q as any).options?.statements || [];
+              if (sts.length > 0) {
+                let stCorrect = 0;
+                sts.forEach((st: any) => {
+                  const expected = (st.answer || "benar").toLowerCase();
+                  const given = (rawAns?.[st.id] || "").toLowerCase();
+                  if (given === expected) stCorrect++;
+                });
+                isCorrect = sts.length > 0 && stCorrect === sts.length;
+                selectedKey = sts.map((st: any, idx: number) => `${idx + 1}:${(rawAns?.[st.id] || "-").toUpperCase().charAt(0)}`).join(" ");
+              } else {
+                selectedKey = String(rawAns).trim().toUpperCase();
+                const ck = Object.keys(q.choices || {}).find(k => k.toLowerCase() === selectedKey.toLowerCase());
+                isCorrect = ck ? Boolean(q.choices![ck]?.isCorrect) : false;
+              }
+            } else if (q.type === "pilihan_ganda") {
               selectedKey = String(rawAns).trim().toUpperCase();
               const ck = Object.keys(q.choices || {}).find(k => k.toLowerCase() === selectedKey.toLowerCase());
               isCorrect = ck ? Boolean(q.choices![ck]?.isCorrect) : false;
@@ -542,14 +560,14 @@ export const ItemAnalysisDialog: React.FC<ItemAnalysisDialogProps> = ({
   // Metrik Ringkasan (KPIs)
   const summaryMetrics = useMemo(() => {
     const total = analyzedQuestions.length;
-    if (total === 0) return { 
-      avgP: 0, 
-      avgD: 0, 
-      acceptedCount: 0, 
-      revisedCount: 0, 
-      rejectedCount: 0, 
-      easyCount: 0, 
-      mediumCount: 0, 
+    if (total === 0) return {
+      avgP: 0,
+      avgD: 0,
+      acceptedCount: 0,
+      revisedCount: 0,
+      rejectedCount: 0,
+      easyCount: 0,
+      mediumCount: 0,
       hardCount: 0,
       goodDiscriminationCount: 0,
       moderateDiscriminationCount: 0,
@@ -823,11 +841,10 @@ export const ItemAnalysisDialog: React.FC<ItemAnalysisDialogProps> = ({
                 variant="outline"
                 size="sm"
                 onClick={() => setShowGuide(prev => !prev)}
-                className={`h-9 px-3 rounded-xl text-xs font-semibold gap-1.5 transition-colors ${
-                  showGuide 
-                    ? "bg-blue-500 text-white border-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700" 
-                    : "bg-blue-50/70 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 border-blue-200 dark:border-blue-800 hover:bg-blue-100"
-                }`}
+                className={`h-9 px-3 rounded-xl text-xs font-semibold gap-1.5 transition-colors ${showGuide
+                  ? "bg-blue-500 text-white border-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700"
+                  : "bg-blue-50/70 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 border-blue-200 dark:border-blue-800 hover:bg-blue-100"
+                  }`}
                 title="Panduan Cara Hitung & Interpretasi Psikometri"
               >
                 <HelpCircle className="h-3.5 w-3.5" />
@@ -940,7 +957,7 @@ export const ItemAnalysisDialog: React.FC<ItemAnalysisDialogProps> = ({
                   </p>
                   <div className="p-2 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-[10px] text-blue-800 dark:text-blue-300 font-medium space-y-1">
                     <div>🎯 <strong>Untuk Matrikulasi</strong>: Soal mudah (P &gt; 0.85, D rendah) membuktikan fondasi literasi/numerasi sudah dikuasai mayoritas siswa.</div>
-                    <div>🚀 <strong>Untuk Sumatif</strong>: Gunakan soal berbasis wacana kontekstual agar daya nalar kritis siswa terpetakan optimal.</div>
+                    <div>🚀 <strong>Untuk Sumatif</strong>: Gunakan soal berbasis Literasi kontekstual agar daya nalar kritis siswa terpetakan optimal.</div>
                   </div>
                 </div>
               </div>
@@ -1044,7 +1061,7 @@ export const ItemAnalysisDialog: React.FC<ItemAnalysisDialogProps> = ({
                   <Input
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Cari nomor, teks soal, wacana..."
+                    placeholder="Cari nomor, teks soal, Literasi..."
                     className="pl-9 h-9 text-xs rounded-xl border-slate-200 dark:border-slate-800"
                   />
                 </div>
@@ -1100,11 +1117,10 @@ export const ItemAnalysisDialog: React.FC<ItemAnalysisDialogProps> = ({
                     return (
                       <div
                         key={q.id}
-                        className={`rounded-2xl border transition-all overflow-hidden bg-white dark:bg-slate-900 ${
-                          isExpanded 
-                            ? "border-blue-400 dark:border-blue-700 shadow-md ring-2 ring-blue-400/10" 
-                            : "border-slate-200 dark:border-slate-800/80 hover:border-slate-300 dark:hover:border-slate-700"
-                        }`}
+                        className={`rounded-2xl border transition-all overflow-hidden bg-white dark:bg-slate-900 ${isExpanded
+                          ? "border-blue-400 dark:border-blue-700 shadow-md ring-2 ring-blue-400/10"
+                          : "border-slate-200 dark:border-slate-800/80 hover:border-slate-300 dark:hover:border-slate-700"
+                          }`}
                       >
                         {/* Row Summary Header */}
                         <div
@@ -1145,13 +1161,12 @@ export const ItemAnalysisDialog: React.FC<ItemAnalysisDialogProps> = ({
                               <span className="text-[10px] text-slate-400 block">Kesukaran (P)</span>
                               <div className="flex items-center justify-center gap-1">
                                 <span className="text-xs font-bold text-slate-800 dark:text-slate-200">{q.difficultyIndex}</span>
-                                <Badge variant="outline" className={`text-[8px] font-bold px-1 py-0 ${
-                                  q.difficultyCategory === "Sukar" 
-                                    ? "bg-rose-50 text-rose-700 border-rose-200" 
-                                    : q.difficultyCategory === "Mudah" 
-                                      ? "bg-sky-50 text-sky-700 border-sky-200" 
-                                      : "bg-emerald-50 text-emerald-700 border-emerald-200"
-                                }`}>
+                                <Badge variant="outline" className={`text-[8px] font-bold px-1 py-0 ${q.difficultyCategory === "Sukar"
+                                  ? "bg-rose-50 text-rose-700 border-rose-200"
+                                  : q.difficultyCategory === "Mudah"
+                                    ? "bg-sky-50 text-sky-700 border-sky-200"
+                                    : "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                  }`}>
                                   {q.difficultyCategory}
                                 </Badge>
                               </div>
@@ -1164,13 +1179,12 @@ export const ItemAnalysisDialog: React.FC<ItemAnalysisDialogProps> = ({
                                 <span className={`text-xs font-bold ${q.discriminationIndex < 0.2 ? "text-rose-600" : "text-emerald-600"}`}>
                                   {q.discriminationIndex > 0 ? `+${q.discriminationIndex}` : q.discriminationIndex}
                                 </span>
-                                <Badge variant="outline" className={`text-[8px] font-bold px-1 py-0 ${
-                                  q.discriminationCategory === "Sangat Baik" || q.discriminationCategory === "Baik"
-                                    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                                    : q.discriminationCategory === "Cukup"
-                                      ? "bg-amber-50 text-amber-700 border-amber-200"
-                                      : "bg-rose-50 text-rose-700 border-rose-200"
-                                }`}>
+                                <Badge variant="outline" className={`text-[8px] font-bold px-1 py-0 ${q.discriminationCategory === "Sangat Baik" || q.discriminationCategory === "Baik"
+                                  ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                  : q.discriminationCategory === "Cukup"
+                                    ? "bg-amber-50 text-amber-700 border-amber-200"
+                                    : "bg-rose-50 text-rose-700 border-rose-200"
+                                  }`}>
                                   {q.discriminationCategory}
                                 </Badge>
                               </div>
@@ -1207,12 +1221,12 @@ export const ItemAnalysisDialog: React.FC<ItemAnalysisDialogProps> = ({
                         {/* Expanded Detail Panel */}
                         {isExpanded && (
                           <div className="p-4 sm:p-5 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 space-y-4">
-                            {/* Wacana Stimulus (jika ada) */}
+                            {/* Literasi Stimulus (jika ada) */}
                             {q.groupText && (
                               <div className="p-3.5 rounded-xl bg-amber-50/80 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/40 text-xs text-amber-900 dark:text-amber-200 space-y-1">
                                 <div className="font-bold text-[10px] uppercase tracking-wider text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
                                   <BookOpen className="h-3 w-3" />
-                                  Teks Stimulus Wacana ({q.groupId}):
+                                  Teks Stimulus / Literasi ({q.groupId}):
                                 </div>
                                 <div className="font-serif leading-relaxed text-xs">
                                   <MathText content={q.groupText} />
@@ -1271,7 +1285,7 @@ export const ItemAnalysisDialog: React.FC<ItemAnalysisDialogProps> = ({
                                   <Target className="h-3.5 w-3.5 text-blue-500" />
                                   Analisis Efektivitas Pilihan Pengecoh (Distractor Analysis):
                                 </span>
-                                
+
                                 <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden bg-white dark:bg-slate-900 shadow-xs">
                                   <table className="w-full text-xs text-left">
                                     <thead className="bg-slate-100 dark:bg-slate-800 text-[10px] uppercase font-bold text-slate-500 border-b border-slate-200 dark:border-slate-800">

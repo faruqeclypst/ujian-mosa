@@ -113,7 +113,7 @@ export function downloadQuestionTemplate(filename = "Template_Soal_Baru.xlsx") {
     ["   - Untuk pilihan_ganda_kompleks: isi huruf dipisah koma (A,C,E)"],
     ["   - Untuk isian_singkat/uraian: isi teks jawaban"],
     ["5. Kolom GroupId & Teks Literasi (Opsional):"],
-    ["   - Jika beberapa soal memiliki stimulus/wacana yang sama, berikan GroupId yang identik."],
+    ["   - Jika beberapa soal memiliki stimulus/literasi yang sama, berikan GroupId yang identik."],
     ["   - Teks Literasi hanya perlu diisi pada soal pertama dalam grup tersebut."],
     [],
     ["Tips: Pastikan tidak ada karakter aneh atau baris kosong di tengah data."],

@@ -34,6 +34,11 @@ export const AppVersionGuard = ({ children }: AppVersionGuardProps) => {
       return;
     }
 
+    // Pastikan alarm dimatikan saat boot/reload
+    try {
+      CheatAlert.stopAlarm();
+    } catch (e) {}
+
     const checkAppVersion = async () => {
       try {
         const appInfo = await App.getInfo();

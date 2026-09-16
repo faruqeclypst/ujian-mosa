@@ -82,7 +82,15 @@ const StudentGradingDetailPage = () => {
       const mapped = qList.map(q => {
         const t = typeMap[q.field || q.type] || q.field || q.type || "pilihan_ganda";
         const opts = q.options || {};
-        return { ...q, type: t, choices: opts, pairs: t === "menjodohkan" ? opts.pairs : undefined, items: (t === "urutkan" || t === "drag_drop") ? opts.items : undefined, answerKey: q.correctAnswer || q.answerKey };
+        return { 
+          ...q, 
+          type: t, 
+          choices: opts, 
+          statements: (t === "benar_salah" && Array.isArray(opts.statements)) ? opts.statements : undefined,
+          pairs: t === "menjodohkan" ? opts.pairs : undefined, 
+          items: (t === "urutkan" || t === "drag_drop") ? opts.items : undefined, 
+          answerKey: q.correctAnswer || q.answerKey 
+        };
       });
       setBankQuestions(mapped);
 
@@ -107,6 +115,53 @@ const StudentGradingDetailPage = () => {
     finally { setLoading(false); }
   }, [pb, roomId, studentId]);
 
+// Helper to compute question score (supports proportional scoring for complex multiple choice and true/false matrix)
+const computeQuestionScore = (q: any, ans: any, overrideVal?: any): number | null => {
+  if (overrideVal !== undefined) {
+    return overrideVal === true ? 1 : (typeof overrideVal === "number" ? overrideVal : 0);
+  }
+  if (ans === undefined || ans === null) return 0;
+  const t = q.type;
+  if (t === "pilihan_ganda") {
+    const ck = Object.keys(q.choices || {}).find(k => k.toLowerCase() === String(ans).toLowerCase());
+    return ck && q.choices[ck].isCorrect === true ? 1 : 0;
+  }
+  if (t === "benar_salah") {
+    const sts = q.statements || q.choices?.statements;
+    if (Array.isArray(sts) && sts.length > 0) {
+      let stCorrect = 0;
+      sts.forEach((st: any) => {
+        const expected = (st.answer || "benar").toLowerCase();
+        const given = (ans?.[st.id] || "").toLowerCase();
+        if (given === expected) stCorrect++;
+      });
+      return sts.length > 0 ? stCorrect / sts.length : 0;
+    } else {
+      const ck = Object.keys(q.choices || {}).find(k => k.toLowerCase() === String(ans).toLowerCase());
+      return ck && q.choices[ck].isCorrect === true ? 1 : 0;
+    }
+  }
+  if (t === "pilihan_ganda_kompleks") {
+    const ck = Object.keys(q.choices || {}).filter(k => q.choices[k].isCorrect).map(k => k.toLowerCase());
+    const sk = Array.isArray(ans) ? ans.map((k: any) => String(k).toLowerCase()) : [];
+    const correctChosen = sk.filter(k => ck.includes(k));
+    const wrongChosen = sk.filter(k => !ck.includes(k));
+    return ck.length > 0 ? Math.max(0, correctChosen.length - wrongChosen.length) / ck.length : 0;
+  }
+  if (t === "menjodohkan") {
+    const pairs = q.pairs || [];
+    return pairs.length > 0 && pairs.every((p: any) => ans[p.id] === p.right) ? 1 : 0;
+  }
+  if (t === "urutkan" || t === "drag_drop") {
+    const co = (q.items || []).map((it: any) => it.id);
+    return Array.isArray(ans) && ans.length === co.length && ans.every((v: any, i: number) => v === co[i]) ? 1 : 0;
+  }
+  if (t === "isian_singkat") {
+    return isFuzzyMatch(ans, q.answerKey) ? 1 : 0;
+  }
+  return null; // essay - manual grading required
+};
+
   const objectiveQuestions = questions.filter(q => q.type !== "isian_singkat" && q.type !== "uraian");
   const essayQuestions = questions.filter(q => q.type === "isian_singkat" || q.type === "uraian");
   const hasEssay = essayQuestions.length > 0;
@@ -118,17 +173,8 @@ const StudentGradingDetailPage = () => {
 
     let objCorrect = 0;
     objectiveQuestions.forEach(q => {
-      let ic = false;
-      if (overrides[q.id] !== undefined) { ic = overrides[q.id]; }
-      else {
-        const a = answers[q.id]; if (!a) return;
-        const t = q.type;
-        if (t === "pilihan_ganda" || t === "benar_salah") { const ck = Object.keys(q.choices || {}).find(k => k.toLowerCase() === String(a).toLowerCase()); ic = ck ? q.choices[ck].isCorrect === true : false; }
-        else if (t === "pilihan_ganda_kompleks") { const ck = Object.keys(q.choices || {}).filter(k => q.choices[k].isCorrect).map(k => k.toLowerCase()); const sk = Array.isArray(a) ? a.map((k: any) => String(k).toLowerCase()) : []; ic = sk.length === ck.length && sk.every((k: any) => ck.includes(k)); }
-        else if (t === "menjodohkan") { const pairs = q.pairs || []; ic = pairs.length > 0 && pairs.every((p: any) => a[p.id] === p.right); }
-        else if (t === "urutkan" || t === "drag_drop") { const co = (q.items || []).map((it: any) => it.id); ic = Array.isArray(a) && a.length === co.length && a.every((v: any, i: number) => v === co[i]); }
-      }
-      if (ic) objCorrect++;
+      const s = computeQuestionScore(q, answers[q.id], overrides[q.id]);
+      if (s !== null) objCorrect += s;
     });
 
     let essCorrect = 0, essGraded = 0;
@@ -153,17 +199,8 @@ const StudentGradingDetailPage = () => {
     // Calculate new scores to save in DB
     let objCorrect = 0;
     objectiveQuestions.forEach(q => {
-      let ic = false;
-      if (newOverrides[q.id] !== undefined) { ic = newOverrides[q.id]; }
-      else {
-        const a = answers[q.id]; if (!a) return;
-        const t = q.type;
-        if (t === "pilihan_ganda" || t === "benar_salah") { const ck = Object.keys(q.choices || {}).find(k => k.toLowerCase() === String(a).toLowerCase()); ic = ck ? q.choices[ck].isCorrect === true : false; }
-        else if (t === "pilihan_ganda_kompleks") { const ck = Object.keys(q.choices || {}).filter(k => q.choices[k].isCorrect).map(k => k.toLowerCase()); const sk = Array.isArray(a) ? a.map((k: any) => String(k).toLowerCase()) : []; ic = sk.length === ck.length && sk.every((k: any) => ck.includes(k)); }
-        else if (t === "menjodohkan") { const pairs = q.pairs || []; ic = pairs.length > 0 && pairs.every((p: any) => a[p.id] === p.right); }
-        else if (t === "urutkan" || t === "drag_drop") { const co = (q.items || []).map((it: any) => it.id); ic = Array.isArray(a) && a.length === co.length && a.every((v: any, i: number) => v === co[i]); }
-      }
-      if (ic) objCorrect++;
+      const s = computeQuestionScore(q, answers[q.id], newOverrides[q.id]);
+      if (s !== null) objCorrect += s;
     });
 
     let essCorrect = 0, essGraded = 0;
@@ -332,9 +369,20 @@ const StudentGradingDetailPage = () => {
     const getAnswerText = (q: any) => {
       const ans = attempt.answers?.[q.id];
       if (!ans) return "<em>Tidak dijawab</em>";
-      if (q.type === "pilihan_ganda" || q.type === "benar_salah") {
+      if (q.type === "benar_salah") {
+        const sts = q.statements || q.choices?.statements;
+        if (Array.isArray(sts) && sts.length > 0) {
+          return sts.map((st: any) => {
+            const userAns = ans?.[st.id];
+            return `${stripHtml(st.text).substring(0, 35)}: ${userAns ? userAns.toUpperCase() : '<em>-</em>'}`;
+          }).join("<br>");
+        }
         const label = q.choices?.[ans]?.text || "";
-        return `${String(ans).toUpperCase()}${label ? ". " + label.replace(/<[^>]*>/g, '').substring(0, 60) : ""}`;
+        return `${String(ans).toUpperCase()}${label ? ". " + stripHtml(label).substring(0, 60) : ""}`;
+      }
+      if (q.type === "pilihan_ganda") {
+        const label = q.choices?.[ans]?.text || "";
+        return `${String(ans).toUpperCase()}${label ? ". " + stripHtml(label).substring(0, 60) : ""}`;
       }
       if (q.type === "pilihan_ganda_kompleks") return Array.isArray(ans) ? ans.map((k: string) => k.toUpperCase()).join(", ") : String(ans);
       if (q.type === "menjodohkan") { const pairs = q.pairs || []; return pairs.map((p: any) => `${p.left} → ${ans[p.id] || "?"}`).join("<br>"); }
@@ -343,11 +391,21 @@ const StudentGradingDetailPage = () => {
     };
 
     const getKeyText = (q: any) => {
-      if (q.type === "pilihan_ganda" || q.type === "benar_salah") {
+      if (q.type === "benar_salah") {
+        const sts = q.statements || q.choices?.statements;
+        if (Array.isArray(sts) && sts.length > 0) {
+          return sts.map((st: any) => `${stripHtml(st.text).substring(0, 35)}: ${(st.answer || 'benar').toUpperCase()}`).join("<br>");
+        }
         const ck = Object.keys(q.choices || {}).find(k => q.choices[k].isCorrect);
         if (!ck) return "-";
         const label = q.choices[ck]?.text || "";
-        return `${ck.toUpperCase()}${label ? ". " + label.replace(/<[^>]*>/g, '').substring(0, 60) : ""}`;
+        return `${ck.toUpperCase()}${label ? ". " + stripHtml(label).substring(0, 60) : ""}`;
+      }
+      if (q.type === "pilihan_ganda") {
+        const ck = Object.keys(q.choices || {}).find(k => q.choices[k].isCorrect);
+        if (!ck) return "-";
+        const label = q.choices[ck]?.text || "";
+        return `${ck.toUpperCase()}${label ? ". " + stripHtml(label).substring(0, 60) : ""}`;
       }
       if (q.type === "pilihan_ganda_kompleks") return Object.keys(q.choices || {}).filter(k => q.choices[k].isCorrect).map(k => k.toUpperCase()).join(", ");
       if (q.type === "menjodohkan") return (q.pairs || []).map((p: any) => `${p.left} → ${p.right}`).join("<br>");
@@ -356,10 +414,10 @@ const StudentGradingDetailPage = () => {
     };
 
     const rows = questions.map((q, idx) => {
-      const correct = isQuestionCorrect(q);
-      const status = correct === null ? "Belum" : correct ? "Benar" : "Salah";
-      const rowBg = correct === true ? "background:#f0fdf4;" : correct === false ? "background:#fef2f2;" : "";
-      const statusStyle = correct === true ? "color:#16a34a;font-weight:bold;" : correct === false ? "color:#dc2626;font-weight:bold;" : "color:#d97706;";
+      const qScore = getQuestionScore(q);
+      const status = qScore === null ? "Belum" : qScore >= 1 ? "Benar" : qScore > 0 ? `${Math.round(qScore * 100)}%` : "Salah";
+      const rowBg = qScore !== null && qScore >= 1 ? "background:#f0fdf4;" : qScore !== null && qScore > 0 ? "background:#fffbeb;" : qScore === 0 ? "background:#fef2f2;" : "";
+      const statusStyle = qScore !== null && qScore >= 1 ? "color:#16a34a;font-weight:bold;" : qScore !== null && qScore > 0 ? "color:#d97706;font-weight:bold;" : qScore === 0 ? "color:#dc2626;font-weight:bold;" : "color:#6b7280;";
       return `<tr style="page-break-inside:avoid;${rowBg}">
         <td class="cell center">${idx + 1}</td>
         <td class="cell soal">${q.text?.replace(/<[^>]*>/g, '').substring(0, 150) || "-"}</td>
@@ -462,14 +520,70 @@ const StudentGradingDetailPage = () => {
   const getStudentAnswer = (q: any) => {
     if (!attempt) return "-";
     const ans = attempt.answers?.[q.id];
-    if (!ans) return <span className="text-slate-300 italic">Tidak dijawab</span>;
+    if (ans === undefined || ans === null) return <span className="text-slate-300 italic">Tidak dijawab</span>;
 
-    if (q.type === "pilihan_ganda" || q.type === "benar_salah") {
+    if (q.type === "benar_salah") {
+      const sts = q.statements || q.choices?.statements;
+      if (Array.isArray(sts) && sts.length > 0) {
+        return (
+          <div className="space-y-1.5 my-0.5">
+            {sts.map((st: any) => {
+              const userAns = ans?.[st.id];
+              const isMatch = userAns && userAns.toLowerCase() === (st.answer || "benar").toLowerCase();
+              return (
+                <div key={st.id} className="text-[11px] flex items-start justify-between gap-2 border-b border-slate-100 dark:border-slate-800/60 pb-1 last:border-0 last:pb-0">
+                  <div className="flex-1 text-slate-700 dark:text-slate-300">
+                    <MathText content={st.text} className="inline text-[11px] [&_p]:inline [&_p]:m-0" />
+                  </div>
+                  <div className="shrink-0 flex items-center gap-1">
+                    {userAns ? (
+                      <span className={`px-1.5 py-0.2 rounded text-[10px] font-bold ${
+                        userAns.toLowerCase() === "benar"
+                          ? "bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400"
+                          : "bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-950/40 dark:text-rose-400"
+                      }`}>
+                        {userAns.toUpperCase()}
+                      </span>
+                    ) : (
+                      <span className="text-slate-400 italic text-[10px]">-</span>
+                    )}
+                    {userAns && (
+                      isMatch ? <span className="text-emerald-500 font-bold text-[11px]">✓</span> : <span className="text-rose-500 font-bold text-[11px]">✗</span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        );
+      }
+      const choiceText = q.choices?.[ans]?.text || ans;
+      return <span className="inline-flex items-baseline gap-1"><span className="font-bold">{String(ans).toUpperCase()}.</span> <MathText content={choiceText} className="inline text-xs [&_p]:inline [&_p]:m-0 [&_img]:hidden" /></span>;
+    }
+    if (q.type === "pilihan_ganda") {
       const choiceText = q.choices?.[ans]?.text || ans;
       return <span className="inline-flex items-baseline gap-1"><span className="font-bold">{String(ans).toUpperCase()}.</span> <MathText content={choiceText} className="inline text-xs [&_p]:inline [&_p]:m-0 [&_img]:hidden" /></span>;
     }
     if (q.type === "pilihan_ganda_kompleks") {
-      return Array.isArray(ans) ? ans.map((k: string) => String(k).toUpperCase()).join(", ") : String(ans);
+      const correctKeys = Object.keys(q.choices || {}).filter(k => q.choices[k].isCorrect).map(k => k.toLowerCase());
+      const selected = Array.isArray(ans) ? ans.map((k: string) => String(k).toLowerCase()) : [];
+      if (selected.length === 0) return <span className="text-slate-300 italic">Tidak dijawab</span>;
+      return (
+        <div className="flex flex-wrap gap-1">
+          {selected.map((k: string) => {
+            const isMatch = correctKeys.includes(k);
+            return (
+              <span key={k} className={`px-1.5 py-0.2 rounded text-[10px] font-bold inline-flex items-center gap-0.5 ${
+                isMatch 
+                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400"
+                  : "bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-950/40 dark:text-rose-400"
+              }`}>
+                {k.toUpperCase()} {isMatch ? "✓" : "✗"}
+              </span>
+            );
+          })}
+        </div>
+      );
     }
     if (q.type === "menjodohkan") {
       const pairs = q.pairs || [];
@@ -494,7 +608,37 @@ const StudentGradingDetailPage = () => {
   };
 
   const getCorrectAnswer = (q: any) => {
-    if (q.type === "pilihan_ganda" || q.type === "benar_salah") {
+    if (q.type === "benar_salah") {
+      const sts = q.statements || q.choices?.statements;
+      if (Array.isArray(sts) && sts.length > 0) {
+        return (
+          <div className="space-y-1.5 my-0.5">
+            {sts.map((st: any) => {
+              const expected = (st.answer || "benar").toUpperCase();
+              return (
+                <div key={st.id} className="text-[11px] flex items-start justify-between gap-2 border-b border-slate-100 dark:border-slate-800/60 pb-1 last:border-0 last:pb-0">
+                  <div className="flex-1 text-slate-500 dark:text-slate-400">
+                    <MathText content={st.text} className="inline text-[11px] [&_p]:inline [&_p]:m-0" />
+                  </div>
+                  <span className={`px-1.5 py-0.2 rounded text-[10px] font-bold shrink-0 ${
+                    expected === "BENAR"
+                      ? "bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400"
+                      : "bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-950/40 dark:text-rose-400"
+                  }`}>
+                    {expected}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        );
+      }
+      const correctKey = Object.keys(q.choices || {}).find(k => q.choices[k].isCorrect);
+      if (!correctKey) return "-";
+      const choiceText = q.choices[correctKey]?.text || "";
+      return <span className="inline-flex items-baseline gap-1"><span className="font-bold">{correctKey.toUpperCase()}.</span> <MathText content={choiceText} className="inline text-xs [&_p]:inline [&_p]:m-0 [&_img]:hidden" /></span>;
+    }
+    if (q.type === "pilihan_ganda") {
       const correctKey = Object.keys(q.choices || {}).find(k => q.choices[k].isCorrect);
       if (!correctKey) return "-";
       const choiceText = q.choices[correctKey]?.text || "";
@@ -517,35 +661,17 @@ const StudentGradingDetailPage = () => {
     return "-";
   };
 
-  const isQuestionCorrect = (q: any) => {
+  const getQuestionScore = (q: any): number | null => {
     if (!attempt) return null;
-    const overrides = attempt.overrides || (attempt.answers as any)?.__overrides__ || {};
-    if (overrides[q.id] !== undefined) return overrides[q.id];
+    const answers = attempt.answers || {};
+    const overrides = attempt.overrides || (answers as any)?.__overrides__ || {};
+    return computeQuestionScore(q, answers[q.id], overrides[q.id]);
+  };
 
-    const ans = attempt.answers?.[q.id];
-    if (!ans) return false;
-
-    if (q.type === "pilihan_ganda" || q.type === "benar_salah") {
-      const ck = Object.keys(q.choices || {}).find(k => k.toLowerCase() === String(ans).toLowerCase());
-      return ck ? q.choices[ck].isCorrect === true : false;
-    }
-    if (q.type === "pilihan_ganda_kompleks") {
-      const ck = Object.keys(q.choices || {}).filter(k => q.choices[k].isCorrect).map(k => k.toLowerCase());
-      const sk = Array.isArray(ans) ? ans.map((k: any) => String(k).toLowerCase()) : [];
-      return sk.length === ck.length && sk.every((k: any) => ck.includes(k));
-    }
-    if (q.type === "menjodohkan") {
-      const pairs = q.pairs || [];
-      return pairs.length > 0 && pairs.every((p: any) => ans[p.id] === p.right);
-    }
-    if (q.type === "urutkan" || q.type === "drag_drop") {
-      const co = (q.items || []).map((it: any) => it.id);
-      return Array.isArray(ans) && ans.length === co.length && ans.every((v: any, i: number) => v === co[i]);
-    }
-    if (q.type === "isian_singkat") {
-      return isFuzzyMatch(ans, q.answerKey);
-    }
-    return null; // essay - needs manual grading
+  const isQuestionCorrect = (q: any): boolean | null => {
+    const s = getQuestionScore(q);
+    if (s === null) return null;
+    return s >= 1;
   };
 
   return (
@@ -591,19 +717,19 @@ const StudentGradingDetailPage = () => {
           <p className="text-[10px] text-slate-400">{hasEssay ? "60% obj + 40% essay" : "100% objektif"}</p>
         </div>
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-emerald-100 dark:border-emerald-800/30 p-4 text-center">
-          <p className="text-[10px] uppercase tracking-widest text-emerald-500 mb-1">Benar</p>
-          <p className="text-2xl font-black text-emerald-600">{attempt ? questions.filter(q => isQuestionCorrect(q) === true).length : 0}</p>
+          <p className="text-[10px] uppercase tracking-widest text-emerald-500 mb-1">Benar Penuh</p>
+          <p className="text-2xl font-black text-emerald-600">{attempt ? questions.filter(q => { const s = getQuestionScore(q); return s !== null && s >= 1; }).length : 0}</p>
           <p className="text-[10px] text-slate-400">dari {questions.length} soal</p>
         </div>
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-rose-100 dark:border-rose-800/30 p-4 text-center">
           <p className="text-[10px] uppercase tracking-widest text-rose-500 mb-1">Salah</p>
-          <p className="text-2xl font-black text-rose-600">{attempt ? questions.filter(q => isQuestionCorrect(q) === false).length : 0}</p>
+          <p className="text-2xl font-black text-rose-600">{attempt ? questions.filter(q => { const s = getQuestionScore(q); return s !== null && s === 0; }).length : 0}</p>
           <p className="text-[10px] text-slate-400">dari {questions.length} soal</p>
         </div>
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 text-center">
           <p className="text-[10px] uppercase tracking-widest text-slate-400 mb-1">Objektif</p>
           <p className={`text-2xl font-black ${objScore >= 75 ? "text-emerald-600" : objScore >= 50 ? "text-amber-600" : "text-rose-600"}`}>{objScore}</p>
-          <p className="text-[10px] text-slate-400">{objCorrect}/{objectiveQuestions.length} benar</p>
+          <p className="text-[10px] text-slate-400">{Number(objCorrect.toFixed(1))}/{objectiveQuestions.length} poin</p>
         </div>
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 text-center">
           <p className="text-[10px] uppercase tracking-widest text-slate-400 mb-1">Subjektif</p>
@@ -636,7 +762,10 @@ const StudentGradingDetailPage = () => {
               </TableHeader>
               <TableBody>
                 {questions.map((q, idx) => {
-                  const correct = isQuestionCorrect(q);
+                  const qScore = getQuestionScore(q);
+                  const isFullCorrect = qScore !== null && qScore >= 1;
+                  const isPartialCorrect = qScore !== null && qScore > 0 && qScore < 1;
+                  const isWrong = qScore !== null && qScore === 0;
                   const isEssay = q.type === "isian_singkat" || q.type === "uraian";
                   const overrides = attempt.overrides || (attempt.answers as any)?.__overrides__ || {};
                   const isManuallyGraded = overrides[q.id] !== undefined;
@@ -665,7 +794,18 @@ const StudentGradingDetailPage = () => {
                   const bankNo = bankIdx !== -1 ? bankIdx + 1 : "-";
 
                   return (
-                    <TableRow key={q.id} className={`group transition-colors ${correct === true ? "hover:bg-emerald-50/50 dark:hover:bg-emerald-950/10" : correct === false ? "hover:bg-rose-50/50 dark:hover:bg-rose-950/10" : "hover:bg-slate-50 dark:hover:bg-slate-800/30"} ${isEssay ? "bg-purple-50/20 dark:bg-purple-950/5" : ""}`}>
+                    <TableRow 
+                      key={q.id} 
+                      className={`group transition-colors ${
+                        isFullCorrect 
+                          ? "hover:bg-emerald-50/50 dark:hover:bg-emerald-950/10" 
+                          : isPartialCorrect 
+                          ? "hover:bg-amber-50/50 dark:hover:bg-amber-950/10" 
+                          : isWrong 
+                          ? "hover:bg-rose-50/50 dark:hover:bg-rose-950/10" 
+                          : "hover:bg-slate-50 dark:hover:bg-slate-800/30"
+                      } ${isEssay ? "bg-purple-50/20 dark:bg-purple-950/5" : ""}`}
+                    >
                       <TableCell className="text-center">
                         <div className="flex flex-col items-center gap-0.5">
                           <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 font-mono">{idx + 1}</span>
@@ -693,16 +833,20 @@ const StudentGradingDetailPage = () => {
                         <div className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug whitespace-pre-wrap">{getCorrectAnswer(q)}</div>
                       </TableCell>
                       <TableCell className="text-center">
-                        {correct === null ? (
+                        {qScore === null ? (
                           <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/30" title="Belum dinilai">
                             <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
                           </span>
-                        ) : correct ? (
-                          <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/30" title="Benar">
+                        ) : isFullCorrect ? (
+                          <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/30" title="Benar Penuh (100%)">
                             <CheckCircle2 className="w-3 h-3 text-emerald-500" />
                           </span>
+                        ) : isPartialCorrect ? (
+                          <span className="inline-flex items-center justify-center px-1.5 py-0.5 rounded-full bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/30 text-[9px] font-black text-amber-700 dark:text-amber-400" title={`Benar Sebagian (${Math.round(qScore * 100)}%)`}>
+                            {Math.round(qScore * 100)}%
+                          </span>
                         ) : (
-                          <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800/30" title="Salah">
+                          <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800/30" title="Salah (0%)">
                             <X className="w-3 h-3 text-rose-500" />
                           </span>
                         )}

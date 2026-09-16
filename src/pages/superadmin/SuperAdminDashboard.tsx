@@ -22,6 +22,7 @@ interface SchoolRecord {
   plan?: string;
   student_quota?: number;
   contact_email?: string;
+  custom_domain?: string;
   created: string;
 }
 
@@ -371,10 +372,10 @@ const SuperAdminDashboard = () => {
           {/* Add */}
           <button
             onClick={() => { setEditSchool(null); setShowAddModal(true); }}
-            className="h-9 px-4 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl flex items-center gap-2 shadow-sm transition-all active:scale-95 whitespace-nowrap"
+            className="h-9 px-4 rounded-2xl bg-blue-50 hover:bg-blue-100 active:bg-blue-50 border border-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 dark:active:bg-blue-900/30 dark:border-blue-800/40 text-blue-700 font-bold shadow-sm flex items-center gap-1.5 transition-all text-sm whitespace-nowrap"
           >
             <Plus size={15} />
-            <span className="hidden sm:inline">Tambah</span>
+            <span className="hidden sm:inline">Tambah Sekolah</span>
           </button>
         </div>
       </div>
@@ -470,7 +471,7 @@ const SuperAdminDashboard = () => {
                         </div>
                       </td>
                       <td className="px-5 py-4">
-                        <div className="flex flex-col gap-2">
+                        <div className="flex flex-col gap-1.5">
                           <a
                             href={getSchoolUrl(school.slug)}
                             target="_blank" rel="noopener noreferrer"
@@ -479,6 +480,17 @@ const SuperAdminDashboard = () => {
                             <Monitor size={12} className="text-slate-400 group-hover/link:text-blue-500" />
                             {getSchoolDomain(school.slug)}
                           </a>
+                          {school.custom_domain && (
+                            <a
+                              href={`https://${school.custom_domain}`}
+                              target="_blank" rel="noopener noreferrer"
+                              className="flex items-center gap-1.5 text-[11px] font-bold bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-full w-fit border border-emerald-200 hover:border-emerald-300 hover:shadow-sm transition-all group/link"
+                              title="Custom Domain Aktif"
+                            >
+                              <Globe size={11} className="text-emerald-500 group-hover/link:scale-110 transition-transform" />
+                              <span className="truncate max-w-[170px]">{school.custom_domain}</span>
+                            </a>
+                          )}
                           <a
                             href={`${school.pb_url}${school.pb_url.endsWith("/") ? "" : "/"}_/`}
                             target="_blank" rel="noopener noreferrer"
@@ -591,14 +603,26 @@ const SuperAdminDashboard = () => {
                     <span className="text-[10px] text-slate-500">{school.student_quota || 100} Siswa</span>
                   </div>
 
-                  <a
-                    href={getSchoolUrl(school.slug)}
-                    target="_blank" rel="noopener noreferrer"
-                    className="text-xs font-mono bg-slate-100 text-slate-600 px-2 py-1.5 rounded-lg flex items-center gap-1.5 hover:bg-blue-50 hover:text-blue-700 transition-colors"
-                  >
-                    <Globe size={11} />
-                    {getSchoolDomain(school.slug)}
-                  </a>
+                  <div className="flex flex-col gap-1.5">
+                    <a
+                      href={getSchoolUrl(school.slug)}
+                      target="_blank" rel="noopener noreferrer"
+                      className="text-xs font-mono bg-slate-100 text-slate-600 px-2 py-1.5 rounded-lg flex items-center gap-1.5 hover:bg-blue-50 hover:text-blue-700 transition-colors"
+                    >
+                      <Globe size={11} />
+                      {getSchoolDomain(school.slug)}
+                    </a>
+                    {school.custom_domain && (
+                      <a
+                        href={`https://${school.custom_domain}`}
+                        target="_blank" rel="noopener noreferrer"
+                        className="text-xs font-mono bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-1 rounded-lg flex items-center gap-1.5 hover:bg-emerald-100 transition-colors"
+                      >
+                        <Globe size={11} className="text-emerald-500" />
+                        {school.custom_domain}
+                      </a>
+                    )}
+                  </div>
 
                   <div className="flex items-center gap-2 pt-1">
                     <button
@@ -965,6 +989,7 @@ const AddEditSchoolModal = ({
   const [form, setForm] = useState({
     name: school?.name || "",
     slug: school?.slug || "",
+    custom_domain: school?.custom_domain || "",
     pb_url: school?.pb_url || "",
     type: school?.type || "school",
     contact_email: school?.contact_email || "",
@@ -991,7 +1016,8 @@ const AddEditSchoolModal = ({
       [name]: type === "checkbox" ? (e.target as HTMLInputElement).checked
         : type === "number" ? (value === "" ? "" : Number(value))
           : name === "slug" ? value.toLowerCase().replace(/[^a-z0-9-]/g, "").replace(/--+/g, "-")
-            : value,
+            : name === "custom_domain" ? value.toLowerCase().trim().replace(/^https?:\/\//, '').replace(/\/.*$/, '')
+              : value,
     }));
   };
 
@@ -1003,7 +1029,15 @@ const AddEditSchoolModal = ({
       return;
     }
     const autoPbUrl = getSchoolUrl(form.slug);
-    const finalForm = { ...form, pb_url: autoPbUrl, student_quota: Number(form.student_quota) || 0 };
+    const cleanCustomDomain = form.custom_domain
+      ? form.custom_domain.toLowerCase().trim().replace(/^https?:\/\//, '').replace(/\/.*$/, '')
+      : "";
+    const finalForm = {
+      ...form,
+      custom_domain: cleanCustomDomain,
+      pb_url: autoPbUrl,
+      student_quota: Number(form.student_quota) || 0
+    };
     setLoading(true);
     try {
       if (isEdit) {
@@ -1139,6 +1173,32 @@ const AddEditSchoolModal = ({
                 className="w-full h-10 border border-slate-200 rounded-xl px-3.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 shadow-sm bg-white"
               />
             </div>
+          </div>
+
+          {/* Custom Domain Input */}
+          <div className="bg-slate-50/80 border border-slate-200/80 rounded-xl p-3.5 space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="block text-xs font-semibold text-slate-800">
+                Custom Domain <span className="text-slate-400 font-normal">(Opsional)</span>
+              </label>
+              <span className="text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-200/60 px-2 py-0.5 rounded-full font-bold">
+                Auto HTTPS / SSL
+              </span>
+            </div>
+            <div className="relative">
+              <Globe size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              <input
+                type="text"
+                name="custom_domain"
+                value={form.custom_domain}
+                onChange={handleChange}
+                placeholder="cth. cbt.sman1modalbangsa.sch.id"
+                className="w-full h-10 border border-slate-200 rounded-xl pl-9 pr-3.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 shadow-sm bg-white font-mono placeholder:font-sans placeholder:text-slate-400"
+              />
+            </div>
+            <p className="text-[11px] text-slate-500 leading-relaxed">
+              Sekolah cukup mengarahkan DNS <strong className="font-semibold text-slate-700">A Record</strong> ke <code className="text-blue-700 bg-white border border-slate-200 px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold">64.235.41.108</code> atau <strong className="font-semibold text-slate-700">CNAME</strong> ke <code className="text-blue-700 bg-white border border-slate-200 px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold">{form.slug ? `${form.slug}.examku.my.id` : `subdomain${getDomainSuffix()}`}</code>.
+            </p>
           </div>
 
           {/* Footer */}

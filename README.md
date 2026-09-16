@@ -33,7 +33,7 @@ Manajemen multi-sekolah dengan registrasi mandiri, isolasi data lengkap pada lev
 *   Antarmuka ujian siswa yang responsif, minimalis, dan dirancang fokus bebas gangguan.
 *   *Rendering* persamaan matematika kompleks berkecepatan tinggi menggunakan **KaTeX (LaTeX)**.
 *   **Auto-Save & Safe State**: Sinkronisasi jawaban berkala ke server untuk menghindari kehilangan progres jika terjadi kendala jaringan/daya.
-*   **Pengacakan & Subset Sampling Soal**: Dukungan pengambilan subset soal dinamis (misal ambil 30 soal dari 90 bank soal) dengan *cluster-based shuffle* yang menjaga keutuhan stimulus/wacana soal.
+*   **Pengacakan & Subset Sampling Soal**: Dukungan pengambilan subset soal dinamis (misal ambil 30 soal dari 90 bank soal) dengan *cluster-based shuffle* yang menjaga keutuhan stimulus/Literasi soal.
 *   **Anti-Refresh & Sesi Lintas Perangkat**: Urutan soal acak dan pilihan jawaban tersinkronisasi ke sesi dan database (`__order__`, `__choices__`, dll), menjamin kontinuitas 100% saat siswa me-refresh halaman atau berpindah perangkat/HP.
 
 ### 🔒 **Exambro Guard Security & Smart Unlock**
@@ -190,6 +190,13 @@ android: {
 }
 ```
 *Platform Ujian akan mendeteksi User-Agent di atas. Siswa yang tidak menggunakan aplikasi native Exambro resmi dengan User-Agent tersebut akan secara otomatis diblokir dari lembar ujian untuk menghindari kecurangan.*
+
+---
+
+## 🌐 Panduan Server & Skalabilitas Multi-VPS
+
+Untuk menjalankan institusi besar (500–1.000+ siswa) di VPS tersendiri (Worker Node) agar server utama tetap ringan, baca panduan lengkapnya di:
+👉 **[`vps/MULTI_VPS_SETUP_GUIDE.md`](file:///d:/PROJECT/ujian/vps/MULTI_VPS_SETUP_GUIDE.md)**
 
 ---
 

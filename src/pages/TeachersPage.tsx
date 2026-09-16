@@ -477,11 +477,11 @@ const TeachersPage = () => {
           </h2>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Kelola daftar {terminology.teacher.toLowerCase()} dan {terminology.subject.toLowerCase()} pengampu.</p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-stretch sm:items-center gap-2 w-full sm:w-auto">
           {loading ? (
              <>
-               <Skeleton className="h-9 w-28 rounded-2xl" />
-               <Skeleton className="h-9 w-28 rounded-2xl" />
+               <Skeleton className="h-9 w-28 rounded-xl" />
+               <Skeleton className="h-9 w-28 rounded-xl" />
              </>
           ) : (
             <>
@@ -527,7 +527,7 @@ const TeachersPage = () => {
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="secondary" size="sm" className="rounded-2xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 dark:hover:bg-emerald-900/40 dark:border-emerald-800/40 text-emerald-700 font-bold shadow-sm transition-all h-9 px-4">
+              <Button variant="softSuccess" size="sm" className="rounded-xl font-bold shadow-sm transition-all h-9 px-3.5">
                 <FileSpreadsheet className="mr-1.5 h-3.5 w-3.5" />
                 Opsi Data
                 <ChevronDown className="ml-1.5 h-3 w-3 opacity-50" />
@@ -535,8 +535,8 @@ const TeachersPage = () => {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56 p-2 rounded-2xl shadow-2xl border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 z-[100]">
               <DropdownMenuLabel className="text-[10px] font-bold uppercase tracking-widest text-slate-400 px-3 py-2 text-left">Kelola {terminology.teacher}</DropdownMenuLabel>
-              <div 
-                className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors group"
+              <DropdownMenuItem 
+                className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 focus:bg-slate-50 dark:focus:bg-slate-900 transition-colors group"
                 onClick={() => {
                   const input = document.getElementById("teacher-import-input") as HTMLInputElement;
                   if (input) input.click();
@@ -551,7 +551,7 @@ const TeachersPage = () => {
                   </span>
                   <span className="text-[10px] text-slate-400 mt-1">Unggah file data {terminology.teacher.toLowerCase()}</span>
                 </div>
-              </div>
+              </DropdownMenuItem>
               <DropdownMenuItem 
                 onClick={handleExportTeachers} 
                 className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 focus:bg-slate-50 dark:focus:bg-slate-900 transition-colors group"
@@ -595,8 +595,8 @@ const TeachersPage = () => {
 
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
-              <Button onClick={() => { setSelectedTeacher(null); setIsDialogOpen(true); }} size="sm" className="rounded-2xl bg-blue-50 hover:bg-blue-100 active:bg-blue-50 border border-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 dark:active:bg-blue-900/30 dark:border-blue-800/40 text-blue-700 font-bold shadow-sm h-9 px-4 focus-visible:ring-0 focus-visible:ring-offset-0">
-                <Plus className="mr-1 h-3.5 w-3.5" />
+              <Button onClick={() => { setSelectedTeacher(null); setIsDialogOpen(true); }} size="sm" className="rounded-2xl bg-blue-50 hover:bg-blue-100 active:bg-blue-50 border border-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 dark:active:bg-blue-900/30 dark:border-blue-800/40 text-blue-700 font-bold shadow-sm h-9 px-4">
+                <Plus className="mr-1.5 h-3.5 w-3.5" />
                 Tambah {terminology.teacher}
               </Button>
             </DialogTrigger>

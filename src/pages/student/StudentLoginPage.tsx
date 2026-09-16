@@ -107,10 +107,10 @@ const StudentLoginPage = () => {
   const showChangePassModal = !!(student && !student.hasChangedPassword);
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-[#f8fafc] dark:bg-[#020617] overflow-hidden relative font-sans leading-relaxed">
+    <div className="flex flex-col items-center justify-center min-h-[100dvh] overflow-y-auto bg-[#f8fafc] dark:bg-[#020617] relative font-sans leading-relaxed px-4 py-8">
       {/* Floating Change School Button (Android Only) */}
       {Capacitor.getPlatform() === 'android' && (
-        <div className="absolute top-6 left-6 z-50">
+        <div className="absolute top-[max(1.5rem,calc(env(safe-area-inset-top,0px)+1rem))] left-6 z-50">
           <button
             onClick={() => setManualSchool(null)}
             className="flex items-center gap-2 px-4 py-2 bg-white/90 border border-slate-200 rounded-full text-sm font-semibold text-slate-600 hover:text-emerald-600 hover:border-emerald-200 transition-colors shadow-sm"
@@ -122,7 +122,7 @@ const StudentLoginPage = () => {
       )}
       
       {/* Dark Mode Toggle Button */}
-      <div className="absolute top-6 right-6 z-50">
+      <div className="absolute top-[max(1.5rem,calc(env(safe-area-inset-top,0px)+1rem))] right-6 z-50">
         <button
           onClick={toggleTheme}
           className="flex items-center justify-center w-11 h-11 bg-white/90 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-full text-slate-600 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400 hover:border-emerald-200 dark:hover:border-emerald-900/50 transition-colors shadow-sm group"
@@ -136,27 +136,24 @@ const StudentLoginPage = () => {
         </button>
       </div>
 
-      {/* Dynamic Background (no animate-pulse to avoid input lag on Android) */}
-      <div className="absolute inset-0 z-0 will-change-auto">
-        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-emerald-400/20 rounded-full blur-[120px]"></div>
-        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-teal-400/20 rounded-full blur-[120px]"></div>
-        <div className="absolute top-[30%] right-[10%] w-[30%] h-[30%] bg-lime-400/10 rounded-full blur-[100px]"></div>
-
-        {/* Subtle Background Accent */}
-        <div className="absolute inset-0 bg-slate-50/50 dark:bg-slate-950/20"></div>
+      {/* Optimized Background (ringan, tanpa filter blur GPU berat) */}
+      <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
+        <div className="absolute -top-24 -left-24 w-96 h-96 bg-gradient-to-br from-emerald-500/15 via-emerald-500/5 to-transparent rounded-full" />
+        <div className="absolute -bottom-24 -right-24 w-96 h-96 bg-gradient-to-tl from-teal-500/15 via-teal-500/5 to-transparent rounded-full" />
+        <div className="absolute inset-0 bg-slate-50/70 dark:bg-slate-950/40" />
       </div>
 
-      <div className="w-full max-w-lg mx-auto z-10 p-6 flex flex-col items-center">
+      <div className="w-full max-w-lg mx-auto z-10 my-auto py-2 flex flex-col items-center">
         {/* Logo Section */}
-        <div className="mb-8 flex items-center justify-center gap-4 md:gap-6 relative">
+        <div className="mb-4 sm:mb-8 flex items-center justify-center gap-4 md:gap-6 relative">
           {logoLoading ? (
-            <div className="w-32 h-32 md:w-40 md:h-40 flex items-center justify-center">
-              <div className="h-10 w-10 rounded-full border-4 border-emerald-500/30 border-t-emerald-600 animate-spin" />
+            <div className="w-20 h-20 sm:w-28 sm:h-28 md:w-40 md:h-40 flex items-center justify-center">
+              <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-full border-4 border-emerald-500/30 border-t-emerald-600 animate-spin" />
             </div>
           ) : (
             <div className="flex items-center justify-center">
               {schoolLogo && !logoError ? (
-                <div className="relative w-32 h-32 md:w-44 md:h-44 flex items-center justify-center overflow-hidden">
+                <div className="relative w-20 h-20 sm:w-28 sm:h-28 md:w-40 md:h-40 flex items-center justify-center overflow-hidden">
                   <img
                     src={schoolLogo}
                     alt={`Logo ${terminology.school}`}
@@ -165,7 +162,7 @@ const StudentLoginPage = () => {
                   />
                 </div>
               ) : (
-                <div className="relative w-28 h-28 md:w-36 md:h-36 flex items-center justify-center overflow-hidden">
+                <div className="relative w-16 h-16 sm:w-24 sm:h-24 md:w-32 md:h-32 flex items-center justify-center overflow-hidden">
                   <img
                     src="/logo-default.png"
                     alt="Logo Default"
@@ -189,11 +186,11 @@ const StudentLoginPage = () => {
           </div>
         </div>
 
-        <Card className="w-full bg-white/90 dark:bg-slate-900/90 border border-white/60 dark:border-slate-800/60 shadow-[0_20px_50px_rgba(16,185,129,0.07)] dark:shadow-[0_20px_50px_rgba(0,0,0,0.3)] rounded-[32px] overflow-hidden">
+        <Card className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl rounded-3xl overflow-hidden">
           <CardContent className="p-8 md:p-10">
             <form onSubmit={handleLogin} className="space-y-6">
               {error && (
-                <div className="bg-red-50/80 backdrop-blur-sm border border-red-100 text-red-600 text-sm px-4 py-3 rounded-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top-4">
+                <div className="bg-red-50 border border-red-200 text-red-600 text-sm px-4 py-3 rounded-2xl flex items-center gap-3">
                   <div className="w-1.5 h-1.5 rounded-full bg-red-500" />
                   {error}
                 </div>
@@ -207,9 +204,13 @@ const StudentLoginPage = () => {
                   value={nisn}
                   onChange={(e) => setNisn(e.target.value)}
                   placeholder={`Masukkan nomor induk ${terminology.student.toLowerCase()}`}
-                  className="bg-white/50 dark:bg-slate-950/50 border-slate-200/60 dark:border-slate-800/60 text-slate-800 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 rounded-[20px] h-14 px-5 text-base"
+                  className="bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 rounded-2xl h-14 px-5 text-base transition-none"
                   disabled={loading}
                   autoComplete="username"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  inputMode="text"
                 />
               </div>
 
@@ -223,14 +224,18 @@ const StudentLoginPage = () => {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
-                    className="bg-white/50 dark:bg-slate-950/50 border-slate-200/60 dark:border-slate-800/60 text-slate-800 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 rounded-[20px] h-14 px-5 pr-12 text-base"
+                    className="bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 rounded-2xl h-14 px-5 pr-12 text-base transition-none"
                     disabled={loading}
                     autoComplete="current-password"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-600 hover:text-slate-600 dark:hover:text-slate-400 transition-colors focus:outline-none"
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-600 hover:text-slate-600 dark:hover:text-slate-400 transition-colors focus:outline-none min-h-[44px] min-w-[44px] flex items-center justify-center"
+                    aria-label={showPassword ? "Sembunyikan password" : "Lihat password"}
                   >
                     {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                   </button>

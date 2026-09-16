@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { IconContext } from "@phosphor-icons/react";
 
 import InventoryLayout from "./components/layout/InventoryLayout";
 import LoadingScreen from "./components/layout/LoadingScreen";
@@ -255,20 +256,27 @@ const AppRouter = () => {
 
 const App = () => {
   return (
-    <ThemeProvider defaultTheme="system">
-      <ToastProvider>
-        <SidebarProvider>
-          <TenantProvider>
-            <AuthProvider>
-              <AppVersionGuard>
-                <AppRouter />
-                <CapacitorOverlay />
-              </AppVersionGuard>
-            </AuthProvider>
-          </TenantProvider>
-        </SidebarProvider>
-      </ToastProvider>
-    </ThemeProvider>
+    <IconContext.Provider
+      value={{
+        weight: "bold",
+        mirrored: false,
+      }}
+    >
+      <ThemeProvider defaultTheme="light">
+        <ToastProvider>
+          <SidebarProvider>
+            <TenantProvider>
+              <AuthProvider>
+                <AppVersionGuard>
+                  <AppRouter />
+                  <CapacitorOverlay />
+                </AppVersionGuard>
+              </AuthProvider>
+            </TenantProvider>
+          </SidebarProvider>
+        </ToastProvider>
+      </ThemeProvider>
+    </IconContext.Provider>
   );
 };
 

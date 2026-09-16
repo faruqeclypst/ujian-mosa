@@ -10,6 +10,7 @@ import { useTheme } from "../../context/ThemeContext";
 interface MathTextProps {
   content: string;
   className?: string;
+  disableJustify?: boolean;
 }
 
 /**
@@ -17,7 +18,7 @@ interface MathTextProps {
  * Renders HTML content and automatically scans for LaTeX math formulas
  * between delimiters like \( ... \), \[ ... \], $ ... $, and $$ ... $$
  */
-export const MathText: React.FC<MathTextProps> = ({ content, className = "" }) => {
+export const MathText: React.FC<MathTextProps> = ({ content, className = "", disableJustify = false }) => {
   const containerRef = useRef<HTMLDivElement>(null);
 
   // 🔍 Processor for KaTeX
@@ -210,6 +211,14 @@ export const MathText: React.FC<MathTextProps> = ({ content, className = "" }) =
   const processHtml = (html: string) => {
     if (!html) return "";
     let processed = html;
+
+    // Remove justify alignment when disableJustify is enabled (e.g. for exam choice options)
+    if (disableJustify) {
+      processed = processed
+        .replace(/\bql-align-justify\b/g, '')
+        .replace(/text-align\s*:\s*justify\s*;?/gi, 'text-align: left;')
+        .replace(/align\s*=\s*["']?justify["']?/gi, 'align="left"');
+    }
 
     // 0. Strip dark text colors so they inherit parent color (fixes dark mode readability)
     // Remove color styles that are dark/black — they become invisible in dark mode
