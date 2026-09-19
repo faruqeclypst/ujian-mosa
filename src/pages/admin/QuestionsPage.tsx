@@ -274,6 +274,17 @@ const quillFormats = [
   'width', 'height', 'style', 'alt', 'class'
 ];
 
+// FORMATS WHITELIST KHUSUS PILIHAN JAWABAN (Opsi A, B, C, D, E)
+// Hanya BOLD, LIST (sub-pernyataan), formula, dan gambar yang diizinkan agar pilihan selalu rata kiri dan teks normal
+const quillFormatsChoice = [
+  'bold',
+  'list',
+  'formula',
+  'image',
+  'tableEmbed',
+  'width', 'height', 'style', 'alt', 'class'
+];
+
 // Allow standard CSS styles that might come from Word/Mammoth
 const AlignStyle = Quill.import('attributors/style/align');
 Quill.register(AlignStyle, true);
@@ -282,6 +293,7 @@ Quill.register(BackgroundStyle, true);
 const ColorStyle = Quill.import('attributors/style/color');
 Quill.register(ColorStyle, true);
 
+import { sanitizeChoiceContent, cleanDeltaForChoice, sanitizeChoiceText } from "../../lib/sanitizeChoice";
 import { useExamData } from "../../context/ExamDataContext";
 import { useAuth } from "../../context/AuthContext";
 import { useTenant } from "../../context/TenantContext";
@@ -1710,10 +1722,11 @@ const QuestionsPage = () => {
   };
 
   const updateBatchChoice = (index: number, letter: string, value: string) => {
+    const cleanVal = sanitizeChoiceText(value);
     setBatchQuestions(prev => {
       const updated = [...prev];
       const choices = { ...updated[index].choices };
-      choices[letter] = { ...choices[letter], text: value };
+      choices[letter] = { ...choices[letter], text: cleanVal };
       updated[index] = { ...updated[index], choices };
       return updated;
     });
@@ -2027,12 +2040,9 @@ const QuestionsPage = () => {
   const quillModulesChoice = useMemo(() => ({
     toolbar: {
       container: [
-        [{ 'header': [1, 2, 3, false] }],
-        ['bold', 'italic', 'underline', 'strike'],
-        [{ 'align': [] }],
-        [{ 'color': [] }, { 'background': [] }],
-        [{ 'list': 'ordered' }, { 'list': 'bullet' }, { 'indent': '-1' }, { 'indent': '+1' }],
-        ['image', 'formula', 'code-block', 'clean']
+        ['bold'],
+        [{ 'list': 'ordered' }, { 'list': 'bullet' }],
+        ['formula', 'image', 'clean']
       ],
       handlers: {
         image: imageHandler
@@ -2054,22 +2064,8 @@ const QuestionsPage = () => {
           tableEl.querySelectorAll('colgroup').forEach((el: Element) => el.remove());
           return new Delta().insert({ tableEmbed: tableEl.outerHTML });
         }],
-        [Node.ELEMENT_NODE, function (_node: any, delta: any) {
-          if (delta && delta.ops) {
-            delta.ops = delta.ops.map((op: any) => {
-              if (op.attributes) {
-                delete op.attributes.background;
-                if (op.attributes.color) {
-                  const c = op.attributes.color.toLowerCase();
-                  if (c === '#000000' || c === '#000' || c === 'black' || c === '#333333' || c === '#333' || c === '#444444' || c === '#444' || c === 'rgb(0, 0, 0)' || c === 'rgb(0,0,0)' || c === '#1e1e1e' || c === 'windowtext') {
-                    delete op.attributes.color;
-                  }
-                }
-              }
-              return op;
-            });
-          }
-          return delta;
+        [Node.ELEMENT_NODE, function (node: any, delta: any) {
+          return cleanDeltaForChoice(delta, node);
         }]
       ]
     },
@@ -2078,8 +2074,8 @@ const QuestionsPage = () => {
         tab: {
           key: 9,
           handler: function (this: any, range: any) {
-            this.quill.insertText(range.index, '\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0');
-            this.quill.setSelection(range.index + 8);
+            this.quill.insertText(range.index, ' ');
+            this.quill.setSelection(range.index + 1);
             return false;
           }
         },
@@ -2087,11 +2083,9 @@ const QuestionsPage = () => {
           key: 9,
           shiftKey: true,
           handler: function (this: any, range: any) {
-            const text = this.quill.getText(Math.max(0, range.index - 8), 8);
-            const nbspCount = (text.match(/\u00A0/g) || []).length;
-            if (nbspCount > 0) {
-              const deleteCount = Math.min(nbspCount, 8);
-              this.quill.deleteText(range.index - deleteCount, deleteCount);
+            const text = this.quill.getText(Math.max(0, range.index - 1), 1);
+            if (text === ' ' || text === '\u00A0') {
+              this.quill.deleteText(range.index - 1, 1);
             }
             return false;
           }
@@ -2338,11 +2332,11 @@ const QuestionsPage = () => {
       groupId: q.groupId || "",
       groupText: q.groupText || "",
       choices: {
-        a: { text: q.choices?.a?.text || "", imageUrl: q.choices?.a?.imageUrl, isCorrect: !!q.choices?.a?.isCorrect },
-        b: { text: q.choices?.b?.text || "", imageUrl: q.choices?.b?.imageUrl, isCorrect: !!q.choices?.b?.isCorrect },
-        c: { text: q.choices?.c?.text || "", imageUrl: q.choices?.c?.imageUrl, isCorrect: !!q.choices?.c?.isCorrect },
-        d: { text: q.choices?.d?.text || "", imageUrl: q.choices?.d?.imageUrl, isCorrect: !!q.choices?.d?.isCorrect },
-        e: { text: q.choices?.e?.text || "", imageUrl: q.choices?.e?.imageUrl, isCorrect: !!q.choices?.e?.isCorrect },
+        a: { text: sanitizeChoiceContent(q.choices?.a?.text || ""), imageUrl: q.choices?.a?.imageUrl, isCorrect: !!q.choices?.a?.isCorrect },
+        b: { text: sanitizeChoiceContent(q.choices?.b?.text || ""), imageUrl: q.choices?.b?.imageUrl, isCorrect: !!q.choices?.b?.isCorrect },
+        c: { text: sanitizeChoiceContent(q.choices?.c?.text || ""), imageUrl: q.choices?.c?.imageUrl, isCorrect: !!q.choices?.c?.isCorrect },
+        d: { text: sanitizeChoiceContent(q.choices?.d?.text || ""), imageUrl: q.choices?.d?.imageUrl, isCorrect: !!q.choices?.d?.isCorrect },
+        e: { text: sanitizeChoiceContent(q.choices?.e?.text || ""), imageUrl: q.choices?.e?.imageUrl, isCorrect: !!q.choices?.e?.isCorrect },
       },
       pairs: q.pairs || [{ id: "1", left: "", right: "" }],
       answerKey: q.answerKey || "",
@@ -2366,9 +2360,13 @@ const QuestionsPage = () => {
   };
 
   const handleChoiceChange = (key: string, field: string, value: any) => {
+    let finalValue = value;
+    if (field === 'text' && typeof value === 'string') {
+      finalValue = sanitizeChoiceContent(value);
+    }
     setFormValues((prev) => {
       const updatedChoices = { ...prev.choices };
-      updatedChoices[key] = { ...updatedChoices[key], [field]: value };
+      updatedChoices[key] = { ...updatedChoices[key], [field]: finalValue };
 
       // If setting isCorrect: true and current type is choices (single choice), set others to false
       if (prev.type === "pilihan_ganda" && field === "isCorrect" && value === true) {
@@ -2686,6 +2684,7 @@ const QuestionsPage = () => {
           delete choice.imageUrl;
         }
         if (choice.text) {
+          choice.text = sanitizeChoiceContent(choice.text);
           choice.text = await localizeInlineImages(choice.text);
         }
       }));
@@ -5578,8 +5577,8 @@ Aturan:
                                   onChange={(content) => handleChoiceChange(letter, 'text', content)}
                                   placeholder={`Jawaban opsi ${letter.toUpperCase()} ...`}
                                   modules={quillModulesChoice}
-                                  formats={quillFormats}
-                                  className="[&_.ql-editor]:min-h-[52px] [&_.ql-editor]:py-2 [&_.ql-container]:border-none [&_.ql-toolbar]:border-none [&_.ql-toolbar]:border-b [&_.ql-toolbar]:px-2 [&_.ql-toolbar]:py-0.5 [&_.ql-toolbar]:bg-slate-50/70 dark:[&_.ql-toolbar]:bg-slate-800/60"
+                                  formats={quillFormatsChoice}
+                                  className="[&_.ql-editor]:min-h-[52px] [&_.ql-editor]:py-2 [&_.ql-editor]:text-left [&_.ql-editor_p]:!text-left [&_.ql-container]:border-none [&_.ql-toolbar]:border-none [&_.ql-toolbar]:border-b [&_.ql-toolbar]:px-2 [&_.ql-toolbar]:py-0.5 [&_.ql-toolbar]:bg-slate-50/70 dark:[&_.ql-toolbar]:bg-slate-800/60"
                                 />
 
                                 {/* Pratinjau Opsi jika showPreview aktif */}
@@ -6352,7 +6351,7 @@ Aturan:
                         value={q.text}
                         onChange={(content) => updateBatchItem(index, 'text', content)}
                         placeholder="Tuliskan pertanyaan disini..."
-                        modules={quillModulesChoice}
+                        modules={quillModules}
                         formats={quillFormats}
                         className="font-serif [&_.ql-editor]:min-h-[80px] [&_.ql-editor]:py-3 [&_.ql-container]:border-none [&_.ql-toolbar]:border-none [&_.ql-toolbar]:border-b [&_.ql-toolbar]:px-2 [&_.ql-toolbar]:py-1 [&_.ql-formats]:mr-1 text-sm"
                       />

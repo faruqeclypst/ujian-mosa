@@ -179,10 +179,10 @@ chmod +x /usr/local/bin/add-school.sh
 1. Buka dashboard Super Admin: `https://examku.my.id/superadmin`.
 2. Klik **Tambah Institusi**.
 3. Di pilihan **Server Node**, pilih **VPS 2 (Dedicated)**.
-4. Masukkan Nama Sekolah, Slug, dan Custom Domain (misal `cbt.sman1mosa.sch.id`).
+4. Masukkan Nama Sekolah, Slug, dan Custom Domain (misal `cbt.smanmosa.sch.id`).
 5. Klik **Simpan**.
 6. Master PB di latar belakang mengeksekusi:
-   `ssh root@IP_VPS_2 "/usr/local/bin/add-school.sh modalbangsa 8095 cbt.sman1mosa.sch.id"`
+   `ssh root@IP_VPS_2 "/usr/local/bin/add-school.sh modalbangsa 8095 cbt.smanmosa.sch.id"`
 7. Tenant dan SSL di VPS 2 langsung aktif otomatis dalam 3 detik!
 
 ---
@@ -192,11 +192,11 @@ Jika Anda belum mengupdate kode dashboard Super Admin, Anda cukup jalankan 1 bar
 
 ```bash
 # Jalankan langsung dari VPS Master:
-ssh root@IP_VPS_BARU "/usr/local/bin/add-school.sh modalbangsa 8095 cbt.sman1mosa.sch.id"
+ssh root@IP_VPS_BARU "/usr/local/bin/add-school.sh modalbangsa 8095 cbt.smanmosa.sch.id"
 ```
 
 Lalu di database Master (`examku.my.id/superadmin`), ubah kolom **PocketBase URL** sekolah tersebut menjadi:
-`https://cbt.sman1mosa.sch.id`
+`https://cbt.smanmosa.sch.id`
 
 ---
 
@@ -342,12 +342,12 @@ Aplikasi Android EXAM AA **sudah 100% mendukung multi-VPS secara otomatis tanpa 
 1. Aplikasi menghubungi Master VPS (examku.my.id) meminta daftar sekolah aktif
                  │
                  ▼
-2. Siswa memilih sekolahnya (misal: "SMAN 1 Modal Bangsa")
+2. Siswa memilih sekolahnya (misal: "SMAN Modal Bangsa")
                  │
                  ▼
 3. Aplikasi membaca kolom `pb_url` dari data sekolah:
    - Sekolah di VPS 1  ──> Aplikasi otomatis konek ke https://alfa.examku.my.id (VPS 1)
-   - Sekolah di VPS 2  ──> Aplikasi otomatis konek ke https://cbt.sman1mosa.sch.id (VPS 2)
+   - Sekolah di VPS 2  ──> Aplikasi otomatis konek ke https://cbt.smanmosa.sch.id (VPS 2)
                  │
                  ▼
 4. Siswa login dan ujian langsung di VPS masing-masing!
