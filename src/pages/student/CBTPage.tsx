@@ -141,15 +141,6 @@ export const getQuestionStatus = (q: Question, ans: any): QuestionStatusInfo => 
   // 2. PILIHAN_GANDA_KOMPLEKS
   if (type === "pilihan_ganda_kompleks") {
     const selected = Array.isArray(ans) ? ans : (typeof ans === "string" && ans.trim() ? [ans] : []);
-    const choices = q.choices || {};
-    const totalChoices = Object.keys(choices).length;
-    const correctChoices = Object.entries(choices).filter(([_, c]) => (c as any)?.isCorrect).map(([k]) => k);
-    const correctCount = correctChoices.length;
-    // Expected minimum selections:
-    // If teacher set >= 2 correct choices, student must select at least that many choices.
-    // If correctCount is 0, complex choice requires >= 2 choices.
-    // If correctCount is 1, 1 choice is accepted.
-    const expectedMin = correctCount >= 2 ? correctCount : (correctCount === 1 ? 1 : (totalChoices >= 2 ? 2 : 1));
 
     if (selected.length === 0) {
       return {
@@ -159,15 +150,6 @@ export const getQuestionStatus = (q: Question, ans: any): QuestionStatusInfo => 
         typeLabel: "PG Kompleks",
         missingDetail: "Belum ada opsi yang dipilih",
         summaryText: "Belum dijawab"
-      };
-    } else if (selected.length < expectedMin) {
-      return {
-        isComplete: false,
-        isPartiallyAnswered: true,
-        isUnanswered: false,
-        typeLabel: "PG Kompleks",
-        missingDetail: `Baru memilih ${selected.length} jawaban (minimal ${expectedMin} pilihan jawaban)`,
-        summaryText: `Belum lengkap (${selected.length}/${expectedMin} opsi)`
       };
     } else {
       return {
@@ -558,7 +540,6 @@ const CBTPage = () => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncError, setSyncError] = useState(false);
   const [gimmickTimer, setGimmickTimer] = useState<number>(0);
-  const [isSkipNoticeOpen, setIsSkipNoticeOpen] = useState(false);
   const [targetIndex, setTargetIndex] = useState<number | null>(null);
   const [isAdminFinishedModalOpen, setIsAdminFinishedModalOpen] = useState(false);
   const [isErrorModalOpen, setIsErrorModalOpen] = useState(false);
@@ -828,12 +809,6 @@ const CBTPage = () => {
   };
 
   const handleNextClick = () => {
-    const q = questions[currentQuestionIndex];
-    if (!q) return;
-    const isA = isQuestionAnswered(q.id);
-    if (!isA && q.type !== "pilihan_ganda") {
-      setTargetIndex(currentQuestionIndex + 1); setIsSkipNoticeOpen(true); return;
-    }
     if (currentQuestionIndex < questions.length - 1) {
       const nextQ = questions[currentQuestionIndex + 1];
       // Jika soal berikutnya essay tapi objektif belum selesai, skip diam
@@ -847,13 +822,8 @@ const CBTPage = () => {
   };
 
   const handleNavClick = (idx: number) => {
-    const q = questions[currentQuestionIndex];
-    if (!q) return;
-    const isA = isQuestionAnswered(q.id);
-    if (!isA && idx !== currentQuestionIndex && q.type !== "pilihan_ganda") {
-      setTargetIndex(idx); setIsSkipNoticeOpen(true); return;
-    }
-    goToQuestion(idx); setIsNavModalOpen(false);
+    goToQuestion(idx);
+    setIsNavModalOpen(false);
   };
 
   useEffect(() => {
@@ -3205,37 +3175,6 @@ const CBTPage = () => {
               );
             }
           })()}
-        </DialogContent>
-      </Dialog>
-      <Dialog open={isSkipNoticeOpen} onOpenChange={setIsSkipNoticeOpen}>
-        <DialogContent className="max-w-xs rounded-[2rem] p-6 pointer-events-auto border-none bg-white dark:bg-slate-950 shadow-2xl text-center">
-          <HelpCircle className="w-14 h-14 text-amber-600 mx-auto mb-4" />
-          <DialogTitle className="text-base font-black uppercase tracking-tight dark:text-white">
-            {isQuestionPartiallyAnswered(currentQuestion?.id || "") ? "Jawaban Belum Lengkap" : "Soal Belum Dijawab"}
-          </DialogTitle>
-          <p className="text-slate-500 dark:text-slate-400 text-[11px] font-medium leading-relaxed mt-1">
-            {isQuestionPartiallyAnswered(currentQuestion?.id || "")
-              ? "Masih ada pernyataan atau opsi yang belum lengkap pada soal ini. Yakin ingin melewati?"
-              : "Anda belum memberikan jawaban. Yakin ingin melewati?"}
-          </p>
-          <div className="grid grid-cols-2 gap-3 mt-6">
-            <Button
-              variant="outline"
-              onClick={() => setIsSkipNoticeOpen(false)}
-              className="rounded-xl text-[10px] font-black uppercase tracking-widest border-emerald-100 dark:border-emerald-900/30 text-emerald-600 dark:text-emerald-400"
-            >
-              Kembali
-            </Button>
-            <Button
-              onClick={() => {
-                if (targetIndex !== null) goToQuestion(targetIndex);
-                setIsSkipNoticeOpen(false);
-              }}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[10px] rounded-xl uppercase tracking-widest shadow-lg shadow-emerald-600/20"
-            >
-              Lompati
-            </Button>
-          </div>
         </DialogContent>
       </Dialog>
       <Dialog open={isAdminFinishedModalOpen} onOpenChange={() => { }}>
