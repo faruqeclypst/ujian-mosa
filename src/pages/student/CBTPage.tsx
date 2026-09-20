@@ -72,6 +72,213 @@ interface Question {
   statements?: Array<{ id: string; text: string; answer?: "benar" | "salah" }>;
 }
 
+export interface QuestionStatusInfo {
+  isComplete: boolean;
+  isPartiallyAnswered: boolean;
+  isUnanswered: boolean;
+  typeLabel: string;
+  missingDetail: string;
+  summaryText: string;
+}
+
+export const getQuestionStatus = (q: Question, ans: any): QuestionStatusInfo => {
+  const type = q.type || "pilihan_ganda";
+
+  // 1. BENAR_SALAH
+  if (type === "benar_salah") {
+    const statements = q.statements || [];
+    if (statements.length > 0) {
+      const currentAns = (typeof ans === "object" && ans !== null && !Array.isArray(ans)) ? ans : {};
+      const answeredStatements = statements.filter(
+        s => currentAns[s.id] !== undefined && currentAns[s.id] !== ""
+      );
+      const unpickedStatements = statements
+        .map((s, idx) => ({ index: idx + 1, id: s.id, isFilled: currentAns[s.id] !== undefined && currentAns[s.id] !== "" }))
+        .filter(s => !s.isFilled);
+
+      if (answeredStatements.length === statements.length) {
+        return {
+          isComplete: true,
+          isPartiallyAnswered: false,
+          isUnanswered: false,
+          typeLabel: "Benar / Salah",
+          missingDetail: "",
+          summaryText: `Lengkap (${statements.length}/${statements.length} pernyataan)`
+        };
+      } else if (answeredStatements.length === 0) {
+        return {
+          isComplete: false,
+          isPartiallyAnswered: false,
+          isUnanswered: true,
+          typeLabel: "Benar / Salah",
+          missingDetail: `Belum dijawab (${statements.length} pernyataan)`,
+          summaryText: "Belum dijawab"
+        };
+      } else {
+        const unpickedList = unpickedStatements.map(s => `No. ${s.index}`).join(", ");
+        return {
+          isComplete: false,
+          isPartiallyAnswered: true,
+          isUnanswered: false,
+          typeLabel: "Benar / Salah",
+          missingDetail: `Baru ${answeredStatements.length}/${statements.length} pernyataan dipilih (${unpickedList} belum diisi)`,
+          summaryText: `Belum lengkap (${answeredStatements.length}/${statements.length})`
+        };
+      }
+    } else {
+      const isFilled = typeof ans === "string" ? ans.trim().length > 0 : (ans !== undefined && ans !== null);
+      return {
+        isComplete: isFilled,
+        isPartiallyAnswered: false,
+        isUnanswered: !isFilled,
+        typeLabel: "Benar / Salah",
+        missingDetail: isFilled ? "" : "Pilihan belum dijawab",
+        summaryText: isFilled ? "Terjawab" : "Belum dijawab"
+      };
+    }
+  }
+
+  // 2. PILIHAN_GANDA_KOMPLEKS
+  if (type === "pilihan_ganda_kompleks") {
+    const selected = Array.isArray(ans) ? ans : (typeof ans === "string" && ans.trim() ? [ans] : []);
+    const choices = q.choices || {};
+    const totalChoices = Object.keys(choices).length;
+    const correctChoices = Object.entries(choices).filter(([_, c]) => (c as any)?.isCorrect).map(([k]) => k);
+    const correctCount = correctChoices.length;
+    // Expected minimum selections:
+    // If teacher set >= 2 correct choices, student must select at least that many choices.
+    // If correctCount is 0, complex choice requires >= 2 choices.
+    // If correctCount is 1, 1 choice is accepted.
+    const expectedMin = correctCount >= 2 ? correctCount : (correctCount === 1 ? 1 : (totalChoices >= 2 ? 2 : 1));
+
+    if (selected.length === 0) {
+      return {
+        isComplete: false,
+        isPartiallyAnswered: false,
+        isUnanswered: true,
+        typeLabel: "PG Kompleks",
+        missingDetail: "Belum ada opsi yang dipilih",
+        summaryText: "Belum dijawab"
+      };
+    } else if (selected.length < expectedMin) {
+      return {
+        isComplete: false,
+        isPartiallyAnswered: true,
+        isUnanswered: false,
+        typeLabel: "PG Kompleks",
+        missingDetail: `Baru memilih ${selected.length} jawaban (minimal ${expectedMin} pilihan jawaban)`,
+        summaryText: `Belum lengkap (${selected.length}/${expectedMin} opsi)`
+      };
+    } else {
+      return {
+        isComplete: true,
+        isPartiallyAnswered: false,
+        isUnanswered: false,
+        typeLabel: "PG Kompleks",
+        missingDetail: "",
+        summaryText: `${selected.length} opsi dipilih`
+      };
+    }
+  }
+
+  // 3. MENJODOHKAN
+  if (type === "menjodohkan") {
+    const pairs = q.pairs || [];
+    if (pairs.length > 0) {
+      const currentAns = (typeof ans === "object" && ans !== null && !Array.isArray(ans)) ? ans : {};
+      const answeredPairs = pairs.filter(p => currentAns[p.id] !== undefined && currentAns[p.id] !== "");
+      if (answeredPairs.length === pairs.length) {
+        return {
+          isComplete: true,
+          isPartiallyAnswered: false,
+          isUnanswered: false,
+          typeLabel: "Menjodohkan",
+          missingDetail: "",
+          summaryText: "Semua pasangan lengkap"
+        };
+      } else if (answeredPairs.length === 0) {
+        return {
+          isComplete: false,
+          isPartiallyAnswered: false,
+          isUnanswered: true,
+          typeLabel: "Menjodohkan",
+          missingDetail: `Belum ada pasangan yang dijodohkan (total ${pairs.length} baris)`,
+          summaryText: "Belum dijawab"
+        };
+      } else {
+        return {
+          isComplete: false,
+          isPartiallyAnswered: true,
+          isUnanswered: false,
+          typeLabel: "Menjodohkan",
+          missingDetail: `Baru ${answeredPairs.length}/${pairs.length} pasangan dijodohkan`,
+          summaryText: `Belum lengkap (${answeredPairs.length}/${pairs.length})`
+        };
+      }
+    }
+  }
+
+  // 4. URUTKAN / DRAG_DROP
+  if (type === "urutkan" || type === "drag_drop") {
+    const items = q.items || [];
+    const currentOrder = Array.isArray(ans) ? ans : [];
+    if (items.length > 0) {
+      if (currentOrder.length === 0) {
+        return {
+          isComplete: false,
+          isPartiallyAnswered: false,
+          isUnanswered: true,
+          typeLabel: "Urutkan",
+          missingDetail: "Belum diurutkan",
+          summaryText: "Belum dijawab"
+        };
+      } else if (currentOrder.length < items.length) {
+        return {
+          isComplete: false,
+          isPartiallyAnswered: true,
+          isUnanswered: false,
+          typeLabel: "Urutkan",
+          missingDetail: `Baru ${currentOrder.length}/${items.length} item diurutkan`,
+          summaryText: `Belum lengkap (${currentOrder.length}/${items.length})`
+        };
+      } else {
+        return {
+          isComplete: true,
+          isPartiallyAnswered: false,
+          isUnanswered: false,
+          typeLabel: "Urutkan",
+          missingDetail: "",
+          summaryText: "Semua item diurutkan"
+        };
+      }
+    }
+  }
+
+  // 5. ISIAN_SINGKAT / URAIAN
+  if (type === "isian_singkat" || type === "uraian") {
+    const isFilled = typeof ans === "string" && ans.trim().length > 0;
+    return {
+      isComplete: isFilled,
+      isPartiallyAnswered: false,
+      isUnanswered: !isFilled,
+      typeLabel: type === "uraian" ? "Uraian" : "Isian Singkat",
+      missingDetail: isFilled ? "" : "Jawaban teks masih kosong",
+      summaryText: isFilled ? "Terjawab" : "Belum dijawab"
+    };
+  }
+
+  // 6. PILIHAN_GANDA BIASA
+  const isFilled = typeof ans === "string" ? ans.trim().length > 0 : (ans !== undefined && ans !== null);
+  return {
+    isComplete: isFilled,
+    isPartiallyAnswered: false,
+    isUnanswered: !isFilled,
+    typeLabel: "Pilihan Ganda",
+    missingDetail: isFilled ? "" : "Belum memilih jawaban",
+    summaryText: isFilled ? "Terjawab" : "Belum dijawab"
+  };
+};
+
 interface ExamAttempt {
   id: string;
   status: "ongoing" | "submitted" | "LOCKED" | "finished";
@@ -578,13 +785,25 @@ const CBTPage = () => {
     return t === "isian_singkat" || t === "uraian";
   };
 
+  const isQuestionAnswered = useCallback((qId: string) => {
+    const q = questions.find(item => item.id === qId);
+    if (!q) return false;
+    return getQuestionStatus(q, answers[qId]).isComplete;
+  }, [questions, answers]);
+
+  const isQuestionPartiallyAnswered = useCallback((qId: string) => {
+    const q = questions.find(item => item.id === qId);
+    if (!q) return false;
+    return getQuestionStatus(q, answers[qId]).isPartiallyAnswered;
+  }, [questions, answers]);
+
   const goToQuestion = (index: number) => {
     if (index === currentQuestionIndex) return;
     // Blokir navigasi ke soal essay jika objektif belum semua dijawab
     const targetQ = questions[index];
     if (isEssayQuestion(targetQ)) {
       const objQs = questions.filter(q => !isEssayQuestion(q));
-      const allObjDone = objQs.every(q => answers[q.id] !== undefined);
+      const allObjDone = objQs.every(q => isQuestionAnswered(q.id));
       if (!allObjDone) return; // diam saja — tombol essay sudah disembunyikan di UI
     }
     setTargetIndex(null); setCurrentQuestionIndex(index);
@@ -611,8 +830,8 @@ const CBTPage = () => {
   const handleNextClick = () => {
     const q = questions[currentQuestionIndex];
     if (!q) return;
-    const isA = answers[q.id] !== undefined;
-    if (!isA && !(!q.type || q.type.startsWith("pilihan_ganda"))) {
+    const isA = isQuestionAnswered(q.id);
+    if (!isA && q.type !== "pilihan_ganda") {
       setTargetIndex(currentQuestionIndex + 1); setIsSkipNoticeOpen(true); return;
     }
     if (currentQuestionIndex < questions.length - 1) {
@@ -620,7 +839,7 @@ const CBTPage = () => {
       // Jika soal berikutnya essay tapi objektif belum selesai, skip diam
       if (isEssayQuestion(nextQ)) {
         const objQs = questions.filter(q2 => !isEssayQuestion(q2));
-        const allObjDone = objQs.every(q2 => answers[q2.id] !== undefined);
+        const allObjDone = objQs.every(q2 => isQuestionAnswered(q2.id));
         if (!allObjDone) return;
       }
       goToQuestion(currentQuestionIndex + 1);
@@ -630,8 +849,8 @@ const CBTPage = () => {
   const handleNavClick = (idx: number) => {
     const q = questions[currentQuestionIndex];
     if (!q) return;
-    const isA = answers[q.id] !== undefined;
-    if (!isA && idx !== currentQuestionIndex && !(!q.type || q.type.startsWith("pilihan_ganda"))) {
+    const isA = isQuestionAnswered(q.id);
+    if (!isA && idx !== currentQuestionIndex && q.type !== "pilihan_ganda") {
       setTargetIndex(idx); setIsSkipNoticeOpen(true); return;
     }
     goToQuestion(idx); setIsNavModalOpen(false);
@@ -1726,21 +1945,6 @@ const CBTPage = () => {
 
   const currentQuestion = questions[currentQuestionIndex];
 
-  const isQuestionAnswered = (qId: string) => {
-    const ans = answers[qId];
-    if (ans === undefined || ans === null) return false;
-    if (typeof ans === "string") return ans.trim().length > 0;
-    if (Array.isArray(ans)) return ans.length > 0;
-    if (typeof ans === "object") {
-      const q = questions.find(item => item.id === qId);
-      if (q?.type === "benar_salah" && q.statements && q.statements.length > 0) {
-        return q.statements.every(st => ans[st.id] !== undefined);
-      }
-      return Object.keys(ans).length > 0;
-    }
-    return true;
-  };
-
   // Check if all objective questions are answered (gate for essay)
   const objectiveQuestions = questions.filter(q => { const t = q.type || "pilihan_ganda"; return t !== "isian_singkat" && t !== "uraian"; });
   const allObjectiveAnswered = objectiveQuestions.every(q => isQuestionAnswered(q.id));
@@ -2156,16 +2360,43 @@ const CBTPage = () => {
                   />
                 </div>
 
-                {(currentQuestion.type === "pilihan_ganda_kompleks" || currentQuestion.type === "menjodohkan" || currentQuestion.type === "urutkan") && (
-                  <div className="flex items-center gap-2 my-2.5 sm:mb-6 px-3 sm:px-4 py-1.5 sm:py-2 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-100 dark:border-emerald-900/50 rounded-xl">
-                    <HelpCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-500 shrink-0" />
-                    <span className="text-[9px] sm:text-[11px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">
-                      {currentQuestion.type === "pilihan_ganda_kompleks" ? "Pilih semua jawaban yang benar" :
-                        currentQuestion.type === "menjodohkan" ? "Pasangkan pernyataan di bawah ini" :
-                          "Urutkan pernyataan dengan benar"}
-                    </span>
-                  </div>
-                )}
+                {(() => {
+                  const t = currentQuestion.type;
+                  if (t === "pilihan_ganda_kompleks" || t === "benar_salah" || t === "menjodohkan" || t === "urutkan") {
+                    const status = getQuestionStatus(currentQuestion, answers[currentQuestion.id]);
+                    const instruction = t === "pilihan_ganda_kompleks"
+                      ? "Pilih semua jawaban yang benar"
+                      : t === "benar_salah"
+                        ? "Pilih Benar atau Salah untuk tiap baris pernyataan"
+                        : t === "menjodohkan"
+                          ? "Pasangkan pernyataan di bawah ini"
+                          : "Urutkan pernyataan dengan benar";
+
+                    return (
+                      <div className="flex flex-wrap items-center gap-2 my-2.5 sm:mb-6 px-3 sm:px-4 py-2 bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800 rounded-xl">
+                        <div className="flex items-center gap-2">
+                          <HelpCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-500 shrink-0" />
+                          <span className="text-[9px] sm:text-[11px] font-black text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                            {instruction}
+                          </span>
+                        </div>
+                        {status.isPartiallyAnswered && (
+                          <span className="inline-flex items-center gap-1 text-[10px] sm:text-xs font-bold px-2 py-0.5 rounded-lg bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300 border border-amber-200 dark:border-amber-800 sm:ml-auto">
+                            <AlertCircle className="w-3 h-3 text-amber-500 shrink-0" />
+                            {status.missingDetail}
+                          </span>
+                        )}
+                        {status.isComplete && (
+                          <span className="inline-flex items-center gap-1 text-[10px] sm:text-xs font-bold px-2 py-0.5 rounded-lg bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 sm:ml-auto">
+                            <CheckCircle2 className="w-3 h-3 text-emerald-500 shrink-0" />
+                            {status.summaryText}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
                 <div className="h-1 sm:h-2" />
               </CardHeader>
               <CardContent className="px-3.5 sm:px-8 pb-4 sm:pb-8 space-y-2 sm:space-y-3">
@@ -2498,10 +2729,20 @@ const CBTPage = () => {
         </div>
         <aside className="hidden lg:flex w-[320px] bg-white dark:bg-slate-900 border-l border-slate-100 dark:border-slate-800 flex-col shadow-sm relative z-10 overflow-hidden">
           {/* Header Navigasi */}
-          <div className="p-5 pb-4">
-            <div className="flex items-center gap-3 mb-2 px-1">
-              <div className="w-3 h-3 bg-emerald-600 rounded-full animate-pulse" />
-              <h3 className="text-[11px] font-black text-emerald-600 uppercase tracking-[0.3em]">Navigasi Soal</h3>
+          <div className="p-5 pb-3">
+            <div className="flex items-center justify-between mb-2 px-1">
+              <div className="flex items-center gap-2">
+                <div className="w-2.5 h-2.5 bg-emerald-600 rounded-full animate-pulse" />
+                <h3 className="text-[11px] font-black text-emerald-600 uppercase tracking-[0.2em]">Navigasi Soal</h3>
+              </div>
+              <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                {questions.filter(q => isQuestionAnswered(q.id)).length} / {questions.length}
+              </span>
+            </div>
+            <div className="flex items-center gap-3 px-1 text-[9px] font-bold text-slate-400">
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" /> Lengkap</span>
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-500 inline-block" /> Kurang</span>
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-slate-300 dark:bg-slate-700 inline-block" /> Kosong</span>
             </div>
           </div>
 
@@ -2543,18 +2784,23 @@ const CBTPage = () => {
                       )}
                       <button
                         onClick={() => handleNavClick(i)}
-                        className={`aspect-square rounded-xl flex items-center justify-center font-black text-xl border-2 transition-all active:scale-[0.85] outline-none focus:outline-none ${i === currentQuestionIndex
+                        className={`aspect-square rounded-xl flex items-center justify-center font-black text-xl border-2 transition-all active:scale-[0.85] outline-none focus:outline-none relative ${i === currentQuestionIndex
                           ? "bg-emerald-700 border-emerald-700 text-white shadow-lg shadow-emerald-700/30"
                           : flaggedQuestions[q.id]
                             ? "bg-amber-500 border-amber-600 text-white shadow-lg shadow-amber-500/20"
                             : isQuestionAnswered(q.id)
                               ? "bg-emerald-500 border-emerald-500 text-white shadow-md shadow-emerald-500/20"
-                              : isEssay
-                                ? "bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800/40 text-amber-500 dark:text-amber-400"
-                                : "bg-slate-50 dark:bg-slate-800/50 border-slate-100 dark:border-slate-800 text-slate-400 dark:text-slate-500"
+                              : isQuestionPartiallyAnswered(q.id)
+                                ? "bg-amber-50 dark:bg-amber-950/40 border-2 border-dashed border-amber-500 text-amber-700 dark:text-amber-300 shadow-sm"
+                                : isEssay
+                                  ? "bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800/40 text-amber-500 dark:text-amber-400"
+                                  : "bg-slate-50 dark:bg-slate-800/50 border-slate-100 dark:border-slate-800 text-slate-400 dark:text-slate-500"
                           }`}
                       >
                         {i + 1}
+                        {isQuestionPartiallyAnswered(q.id) && !flaggedQuestions[q.id] && i !== currentQuestionIndex && (
+                          <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-amber-500 ring-2 ring-white dark:ring-slate-900" />
+                        )}
                       </button>
                     </React.Fragment>
                   );
@@ -2687,20 +2933,34 @@ const CBTPage = () => {
                         <div className="flex-1 h-px bg-amber-200 dark:bg-amber-800/40"></div>
                       </div>
                     )}
-                    <button onClick={() => { setCurrentQuestionIndex(i); setIsNavModalOpen(false); }} className={`aspect-square rounded-2xl flex items-center justify-center font-black text-xl border-3 transition-all active:scale-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 ${i === currentQuestionIndex
+                    <button onClick={() => { setCurrentQuestionIndex(i); setIsNavModalOpen(false); }} className={`aspect-square rounded-2xl flex items-center justify-center font-black text-xl border-2 transition-all active:scale-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 relative ${i === currentQuestionIndex
                       ? "bg-emerald-700 border-emerald-700 text-white shadow-2xl"
                       : flaggedQuestions[q.id]
                         ? "bg-amber-500 border-amber-600 text-white shadow-xl shadow-amber-500/20"
                         : isQuestionAnswered(q.id)
                           ? "bg-emerald-500 border-emerald-500 text-white shadow-md shadow-emerald-500/20"
-                          : isEssay
-                            ? "bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800/40 text-amber-500 dark:text-amber-400"
-                            : "bg-slate-50 dark:bg-slate-900 border-slate-100 dark:border-slate-800 text-slate-400 dark:text-slate-500"
-                      }`}>{i + 1}</button>
+                          : isQuestionPartiallyAnswered(q.id)
+                            ? "bg-amber-50 dark:bg-amber-950/40 border-2 border-dashed border-amber-500 text-amber-700 dark:text-amber-300 shadow-sm"
+                            : isEssay
+                              ? "bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800/40 text-amber-500 dark:text-amber-400"
+                              : "bg-slate-50 dark:bg-slate-900 border-slate-100 dark:border-slate-800 text-slate-400 dark:text-slate-500"
+                      }`}>
+                      {i + 1}
+                      {isQuestionPartiallyAnswered(q.id) && !flaggedQuestions[q.id] && i !== currentQuestionIndex && (
+                        <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-amber-500 ring-2 ring-white dark:ring-slate-900" />
+                      )}
+                    </button>
                   </React.Fragment>
                 );
               });
             })()}
+          </div>
+
+          <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-center gap-3 text-[11px] font-bold text-slate-500 dark:text-slate-400">
+            <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block" /> Lengkap</span>
+            <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block" /> Belum Lengkap</span>
+            <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-amber-400 inline-block" /> Ditandai</span>
+            <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-slate-300 dark:bg-slate-700 inline-block" /> Kosong</span>
           </div>
         </DialogContent>
       </Dialog>
@@ -2754,8 +3014,19 @@ const CBTPage = () => {
       )}
 
       <Dialog open={isSubmitModalOpen} onOpenChange={setIsSubmitModalOpen}>
-        <DialogContent className="max-w-md rounded-2xl p-6 pointer-events-auto text-center bg-white dark:bg-slate-950 border-none shadow-2xl">
+        <DialogContent className="max-w-lg rounded-2xl p-6 pointer-events-auto text-center bg-white dark:bg-slate-950 border-none shadow-2xl">
           {(() => {
+            const questionStatuses = questions.map((q, idx) => ({
+              ...getQuestionStatus(q, answers[q.id]),
+              index: idx,
+              number: idx + 1,
+              id: q.id,
+            }));
+
+            const incompleteList = questionStatuses.filter(s => s.isPartiallyAnswered);
+            const unansweredList = questionStatuses.filter(s => s.isUnanswered);
+            const pendingList = [...incompleteList, ...unansweredList];
+
             // Calculate flagged questions
             const flaggedQuestionNumbers = questions
               .map((q, idx) => ({ id: q.id, number: idx + 1 }))
@@ -2763,21 +3034,96 @@ const CBTPage = () => {
               .map(q => q.number);
             const flaggedCount = flaggedQuestionNumbers.length;
 
-            if (!isAllAnswered) {
-              // Has unanswered questions
+            if (pendingList.length > 0) {
+              // Has incomplete or unanswered questions
               return (
                 <>
-                  <AlertCircle className="w-12 h-12 text-amber-600 mx-auto mb-2" />
-                  <DialogTitle className="text-lg font-bold dark:text-white">Belum Selesai</DialogTitle>
-                  <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
-                    Ada {unansweredCount} soal belum dijawab. Yakin?
+                  <div className="mx-auto w-12 h-12 bg-amber-50 dark:bg-amber-950/40 rounded-full flex items-center justify-center mb-2">
+                    <AlertCircle className="w-6 h-6 text-amber-600 dark:text-amber-500" />
+                  </div>
+                  <DialogTitle className="text-lg sm:text-xl font-black text-slate-800 dark:text-white uppercase tracking-tight">
+                    Jawaban Belum Lengkap
+                  </DialogTitle>
+                  <p className="text-slate-500 dark:text-slate-400 text-xs sm:text-sm mt-1">
+                    {incompleteList.length > 0 && unansweredList.length > 0 ? (
+                      <>Ada <span className="font-bold text-amber-600 dark:text-amber-400">{incompleteList.length} soal belum lengkap</span> dan <span className="font-bold text-amber-600 dark:text-amber-400">{unansweredList.length} soal belum dijawab</span>.</>
+                    ) : incompleteList.length > 0 ? (
+                      <>Ada <span className="font-bold text-amber-600 dark:text-amber-400">{incompleteList.length} soal belum lengkap</span> dijawab.</>
+                    ) : (
+                      <>Ada <span className="font-bold text-amber-600 dark:text-amber-400">{unansweredList.length} soal belum dijawab</span>.</>
+                    )}
+                    {" "}Pilih nomor soal di bawah untuk langsung melengkapinya:
                   </p>
-                  <div className="mt-6">
+
+                  <div className="bg-slate-50 dark:bg-slate-900/70 border border-slate-200 dark:border-slate-800 rounded-2xl p-2 sm:p-2.5 mt-4 max-h-[260px] overflow-y-auto space-y-1.5 text-left">
+                    {pendingList.map((item) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => {
+                          setIsSubmitModalOpen(false);
+                          if (item.index !== currentQuestionIndex) {
+                            goToQuestion(item.index);
+                          }
+                        }}
+                        className="w-full flex items-center justify-between gap-3 p-2.5 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-emerald-500 dark:hover:border-emerald-500 hover:shadow-sm transition-all group text-left outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                          <span
+                            className={`w-7 h-7 sm:w-8 sm:h-8 shrink-0 rounded-lg font-black text-xs flex items-center justify-center border ${
+                              item.isPartiallyAnswered
+                                ? "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border-amber-300 dark:border-amber-700"
+                                : "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border-slate-200 dark:border-slate-700"
+                            }`}
+                          >
+                            {item.number}
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                                Soal No. {item.number}
+                              </span>
+                              <span
+                                className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider ${
+                                  item.isPartiallyAnswered
+                                    ? "bg-amber-100/80 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-300/60 dark:border-amber-700/60"
+                                    : "bg-slate-200/70 text-slate-600 dark:bg-slate-800 dark:text-slate-400"
+                                }`}
+                              >
+                                {item.typeLabel}
+                              </span>
+                            </div>
+                            <p
+                              className={`text-[11px] truncate mt-0.5 ${
+                                item.isPartiallyAnswered
+                                  ? "text-amber-700 dark:text-amber-400 font-medium"
+                                  : "text-slate-400 dark:text-slate-500"
+                              }`}
+                            >
+                              {item.missingDetail}
+                            </p>
+                          </div>
+                        </div>
+                        <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-0.5 shrink-0 group-hover:translate-x-0.5 transition-transform">
+                          Lengkapi <ChevronRight className="w-3.5 h-3.5" />
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="mt-5">
                     <Button
-                      onClick={() => setIsSubmitModalOpen(false)}
-                      className="w-full bg-amber-600 hover:bg-amber-700 text-white rounded-xl"
+                      type="button"
+                      onClick={() => {
+                        setIsSubmitModalOpen(false);
+                        const firstPending = pendingList[0];
+                        if (firstPending && firstPending.index !== currentQuestionIndex) {
+                          goToQuestion(firstPending.index);
+                        }
+                      }}
+                      className="w-full bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-bold h-11 text-xs uppercase tracking-wider shadow-md shadow-amber-600/20"
                     >
-                      Kembali Mengerjakan
+                      Lengkapi Soal Sekarang
                     </Button>
                   </div>
                 </>
@@ -2861,7 +3207,37 @@ const CBTPage = () => {
           })()}
         </DialogContent>
       </Dialog>
-      <Dialog open={isSkipNoticeOpen} onOpenChange={setIsSkipNoticeOpen}><DialogContent className="max-w-xs rounded-[2rem] p-6 pointer-events-auto border-none bg-white dark:bg-slate-950 shadow-2xl text-center"><HelpCircle className="w-14 h-14 text-amber-600 mx-auto mb-4" /><DialogTitle className="text-base font-black uppercase tracking-tight dark:text-white">Soal Belum Dijawab</DialogTitle><p className="text-slate-500 dark:text-slate-400 text-[11px] font-medium leading-relaxed">Anda belum memberikan jawaban. Yakin ingin melewati?</p><div className="grid grid-cols-2 gap-3 mt-6"><Button variant="outline" onClick={() => setIsSkipNoticeOpen(false)} className="rounded-xl text-[10px] font-black uppercase tracking-widest border-emerald-100 dark:border-emerald-900/30 text-emerald-600 dark:text-emerald-400">Kembali</Button><Button onClick={() => { if (targetIndex !== null) goToQuestion(targetIndex); setIsSkipNoticeOpen(false); }} className="bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[10px] rounded-xl uppercase tracking-widest shadow-lg shadow-emerald-600/20">Lompati</Button></div></DialogContent></Dialog>
+      <Dialog open={isSkipNoticeOpen} onOpenChange={setIsSkipNoticeOpen}>
+        <DialogContent className="max-w-xs rounded-[2rem] p-6 pointer-events-auto border-none bg-white dark:bg-slate-950 shadow-2xl text-center">
+          <HelpCircle className="w-14 h-14 text-amber-600 mx-auto mb-4" />
+          <DialogTitle className="text-base font-black uppercase tracking-tight dark:text-white">
+            {isQuestionPartiallyAnswered(currentQuestion?.id || "") ? "Jawaban Belum Lengkap" : "Soal Belum Dijawab"}
+          </DialogTitle>
+          <p className="text-slate-500 dark:text-slate-400 text-[11px] font-medium leading-relaxed mt-1">
+            {isQuestionPartiallyAnswered(currentQuestion?.id || "")
+              ? "Masih ada pernyataan atau opsi yang belum lengkap pada soal ini. Yakin ingin melewati?"
+              : "Anda belum memberikan jawaban. Yakin ingin melewati?"}
+          </p>
+          <div className="grid grid-cols-2 gap-3 mt-6">
+            <Button
+              variant="outline"
+              onClick={() => setIsSkipNoticeOpen(false)}
+              className="rounded-xl text-[10px] font-black uppercase tracking-widest border-emerald-100 dark:border-emerald-900/30 text-emerald-600 dark:text-emerald-400"
+            >
+              Kembali
+            </Button>
+            <Button
+              onClick={() => {
+                if (targetIndex !== null) goToQuestion(targetIndex);
+                setIsSkipNoticeOpen(false);
+              }}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[10px] rounded-xl uppercase tracking-widest shadow-lg shadow-emerald-600/20"
+            >
+              Lompati
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
       <Dialog open={isAdminFinishedModalOpen} onOpenChange={() => { }}>
         <DialogContent className="max-w-md rounded-[2.5rem] p-8 text-center pointer-events-auto bg-white dark:bg-slate-950 border-none shadow-2xl">
           <div className="w-20 h-20 bg-amber-100 dark:bg-amber-900/20 rounded-3xl flex items-center justify-center mx-auto mb-6">
