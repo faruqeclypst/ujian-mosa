@@ -34,6 +34,7 @@ export interface ExamRoomOption {
   duration: number;
   end_time: string;
   isDisabled?: boolean;
+  max_questions?: number;
 }
 
 const LiveScoreViewPage = () => {
@@ -52,6 +53,7 @@ const LiveScoreViewPage = () => {
 
   // Selection states
   const [rooms, setRooms] = useState<ExamRoomOption[]>([]);
+  const roomsRef = useRef<ExamRoomOption[]>([]);
   const [selectedRoomId, setSelectedRoomId] = useState<string>("");
   const [roomsLoading, setRoomsLoading] = useState(true);
 
@@ -102,9 +104,11 @@ const LiveScoreViewPage = () => {
             duration: r.duration || 0,
             end_time: r.end_time || r.endTime || "",
             isDisabled: r.isDisabled || false,
+            max_questions: Number(r.max_questions) || 0,
           };
         });
 
+        roomsRef.current = mapped;
         setRooms(mapped);
         if (mapped.length > 0) {
           setSelectedRoomId(mapped[0].id);
@@ -238,10 +242,22 @@ const LiveScoreViewPage = () => {
     if (!pb || !roomId) return;
     setIsRefreshing(true);
     try {
-      const activeRoom = rooms.find(r => r.id === roomId);
-      if (activeRoom) {
+      // Dapatkan active room dari ref atau fetch langsung dari PocketBase jika belum tersedia di state
+      let activeRoom = roomsRef.current.find(r => r.id === roomId);
+      let targetExamId = activeRoom?.examId;
+
+      if (!targetExamId) {
+        try {
+          const roomRecord = await pb.collection("exam_rooms").getOne(roomId);
+          targetExamId = roomRecord.examId || (roomRecord as any).examid || "";
+        } catch (e) {
+          console.error("Gagal mengambil detail ruang ujian:", e);
+        }
+      }
+
+      if (targetExamId) {
         const qList = await pb.collection("questions").getFullList({
-          filter: `examId = "${activeRoom.examId}"`,
+          filter: `examId = "${targetExamId}"`,
           sort: "order,created",
         });
 
@@ -371,10 +387,28 @@ const LiveScoreViewPage = () => {
       const className = examClasses.find(c => c.id === s.classId)?.name || "-";
 
       const sisAnswers = attempt?.answers || {};
-      const answeredCount = Object.keys(sisAnswers).filter(k =>
-        k !== "__overrides__" &&
-        monitorQuestions.some((q: any) => q.id === k)
-      ).length;
+      const studentOrder = (sisAnswers as any)?.__order__ || (sisAnswers as any)?.__meta?.questionOrder;
+      const targetQuestions = Array.isArray(studentOrder) && studentOrder.length > 0
+        ? monitorQuestions.filter((q: any) => studentOrder.includes(q.id))
+        : monitorQuestions;
+
+      const totalStudentQuestions =
+        (Array.isArray(studentOrder) && studentOrder.length > 0 ? studentOrder.length : 0) ||
+        attempt?.totalQuestions ||
+        attempt?.total ||
+        (activeRoom?.max_questions && activeRoom.max_questions > 0 ? activeRoom.max_questions : 0) ||
+        monitorQuestions.length;
+
+      const answeredCount = Object.keys(sisAnswers).filter(k => {
+        if (k.startsWith("__")) return false;
+        const val = sisAnswers[k];
+        if (val === null || val === undefined || val === "") return false;
+        if (Array.isArray(val) && val.length === 0) return false;
+        if (typeof val === "object" && Object.keys(val).length === 0) return false;
+        return targetQuestions.length > 0
+          ? targetQuestions.some((q: any) => q.id === k)
+          : true;
+      }).length;
 
       return {
         id: s.id,
@@ -383,6 +417,7 @@ const LiveScoreViewPage = () => {
         className,
         attempt,
         answeredCount,
+        totalQuestions: totalStudentQuestions,
         score,
       };
     });
@@ -658,7 +693,7 @@ const LiveScoreViewPage = () => {
                         <h3 className={`font-bold text-base truncate max-w-[180px] ${isDarkMode ? "text-slate-100" : "text-gray-900"
                           }`}>{rankedStudents[1].name}</h3>
                         <p className={`text-[10px] font-semibold mt-0.5 ${isDarkMode ? "text-slate-500" : "text-gray-500"
-                          }`}>{rankedStudents[1].className} • {rankedStudents[1].answeredCount}/{monitorQuestions.length} Soal</p>
+                          }`}>{rankedStudents[1].className} • {rankedStudents[1].answeredCount}/{rankedStudents[1].totalQuestions || monitorQuestions.length} Soal</p>
                       </div>
                     </div>
                     <div className="text-right relative z-10">
@@ -684,7 +719,7 @@ const LiveScoreViewPage = () => {
                         <h3 className={`font-black text-lg truncate max-w-[180px] ${isDarkMode ? "text-indigo-100" : "text-indigo-900"
                           }`}>{rankedStudents[0].name}</h3>
                         <p className={`text-[10px] font-semibold mt-0.5 ${isDarkMode ? "text-indigo-400" : "text-indigo-600"
-                          }`}>{rankedStudents[0].className} • {rankedStudents[0].answeredCount}/{monitorQuestions.length} Soal</p>
+                          }`}>{rankedStudents[0].className} • {rankedStudents[0].answeredCount}/{rankedStudents[0].totalQuestions || monitorQuestions.length} Soal</p>
                       </div>
                     </div>
                     <div className="text-right relative z-10">
@@ -709,7 +744,7 @@ const LiveScoreViewPage = () => {
                         <h3 className={`font-bold text-base truncate max-w-[180px] ${isDarkMode ? "text-slate-100" : "text-gray-900"
                           }`}>{rankedStudents[2].name}</h3>
                         <p className={`text-[10px] font-semibold mt-0.5 ${isDarkMode ? "text-slate-500" : "text-gray-500"
-                          }`}>{rankedStudents[2].className} • {rankedStudents[2].answeredCount}/{monitorQuestions.length} Soal</p>
+                          }`}>{rankedStudents[2].className} • {rankedStudents[2].answeredCount}/{rankedStudents[2].totalQuestions || monitorQuestions.length} Soal</p>
                       </div>
                     </div>
                     <div className="text-right relative z-10">
@@ -825,15 +860,15 @@ const LiveScoreViewPage = () => {
                             <div className="flex flex-col items-center gap-2">
                               <span className={`text-xs font-mono font-bold ${isDarkMode ? "text-slate-300" : "text-gray-700"
                                 }`}>
-                                {s.answeredCount} <span className={isDarkMode ? "text-slate-600" : "text-gray-400"}>/ {monitorQuestions.length}</span>
+                                {s.answeredCount} <span className={isDarkMode ? "text-slate-600" : "text-gray-400"}>/ {s.totalQuestions || monitorQuestions.length}</span>
                               </span>
                               <div className={`w-28 h-2 rounded-full overflow-hidden shadow-inner transition-all ${isDarkMode ? "bg-slate-900/60 border border-slate-800" : "bg-gray-100 border border-gray-200"
                                 }`}>
                                 <div
                                   className="h-full bg-gradient-to-r from-indigo-500 to-indigo-600 rounded-full transition-all duration-500 ease-out"
                                   style={{
-                                    width: `${monitorQuestions.length > 0
-                                      ? (s.answeredCount / monitorQuestions.length) * 100
+                                    width: `${(s.totalQuestions || monitorQuestions.length) > 0
+                                      ? Math.min(100, Math.round((s.answeredCount / (s.totalQuestions || monitorQuestions.length)) * 100))
                                       : 0
                                       }%`,
                                   }}
