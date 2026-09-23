@@ -68,7 +68,152 @@ import {
   type DiscriminationCategory,
   type PointBiserialCategory
 } from "../../lib/itemAnalysisEvaluator";
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+  TooltipProvider
+} from "../../components/ui/tooltip";
 import { cn } from "../../lib/utils";
+
+type MetricInfoType = "difficulty" | "discrimination" | "point_biserial" | "distractor";
+
+interface MetricInfoData {
+  title: string;
+  formula: string;
+  formulaDesc: string;
+  reference: string;
+  description: string;
+  ranges: Array<{
+    label: string;
+    value: string;
+  }>;
+}
+
+const METRIC_INFO_DETAILS: Record<MetricInfoType, MetricInfoData> = {
+  difficulty: {
+    title: "Tingkat Kesukaran (P)",
+    formula: "P = B / N",
+    formulaDesc: "B: Jumlah siswa benar, N: Total peserta tes.",
+    reference: "Standar Depdiknas & Arikunto",
+    description: "Mengukur derajat kesukaran butir soal. Butir yang ideal untuk evaluasi sumatif berada pada kategori Sedang (0.30 s.d. 0.70).",
+    ranges: [
+      { label: "Mudah", value: "P > 0.70" },
+      { label: "Sedang (Ideal)", value: "0.30 <= P <= 0.70" },
+      { label: "Sukar", value: "P < 0.30" },
+    ],
+  },
+  discrimination: {
+    title: "Daya Pembeda (D)",
+    formula: "D = (Ba - Bb) / n",
+    formulaDesc: "Ba: Benar kelompok atas, Bb: Benar kelompok bawah, n: Ukuran kelompok (27% Kelley).",
+    reference: "Standar Robert L. Ebel & Arikunto",
+    description: "Mengukur kemampuan butir soal membedakan siswa pandai (kelompok atas) dari siswa yang belum paham (kelompok bawah).",
+    ranges: [
+      { label: "Sangat Baik", value: "D >= +0.40" },
+      { label: "Baik", value: "+0.30 <= D < +0.40" },
+      { label: "Cukup", value: "+0.20 <= D < +0.30" },
+      { label: "Jelek", value: "0.00 <= D < +0.20" },
+      { label: "Negatif (Anomali)", value: "D < 0.00" },
+    ],
+  },
+  point_biserial: {
+    title: "Point-Biserial (r_pb)",
+    formula: "r_pb = Pearson(Yi, X - Yi)",
+    formulaDesc: "Korelasi skor butir Yi dengan skor total tes murni tanpa butir tersebut (X - Yi).",
+    reference: "Corrected Item-Total Pearson Correlation",
+    description: "Menguji validitas dan konsistensi internal butir terhadap keseluruhan instrumen tes tanpa bias spuriositas.",
+    ranges: [
+      { label: "Baik (Diskriminasi Kuat)", value: "r_pb >= +0.30" },
+      { label: "Cukup (Memadai)", value: "+0.20 <= r_pb < +0.30" },
+      { label: "Rendah", value: "0.00 <= r_pb < +0.20" },
+      { label: "Negatif (Kontradiktif)", value: "r_pb < 0.00" },
+    ],
+  },
+  distractor: {
+    title: "Efektivitas Pengecoh (DE)",
+    formula: "DE = (Pengecoh Efektif / Total Pengecoh) * 100%",
+    formulaDesc: "Syarat efektif: Dipilih >= 5% siswa & pemilih kelompok bawah > kelompok atas.",
+    reference: "Distractor Efficiency Analysis",
+    description: "Menilai apakah opsi jawaban salah (pengecoh) bekerja memancing siswa yang belum menguasai materi dan tidak menjebak siswa pintar.",
+    ranges: [
+      { label: "Efektif", value: "Fo >= 5% & nBB > nBA" },
+      { label: "Tidak Efektif (Mati)", value: "Fo < 5%" },
+      { label: "Menyesatkan (Jebakan)", value: "nBA > nBB & Fo >= 1" },
+    ],
+  },
+};
+
+const MetricInfoTooltip: React.FC<{ type: MetricInfoType; side?: "top" | "bottom" | "left" | "right" }> = ({
+  type,
+  side = "top",
+}) => {
+  const info = METRIC_INFO_DETAILS[type];
+  if (!info) return null;
+
+  return (
+    <Tooltip delayDuration={150}>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          onClick={(e) => e.stopPropagation()}
+          className="inline-flex items-center justify-center text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors p-0.5 rounded-full hover:bg-slate-200/60 dark:hover:bg-slate-700/60 focus:outline-none focus:ring-2 focus:ring-blue-500/40 cursor-pointer"
+          aria-label={`Informasi ${info.title}`}
+        >
+          <Info className="h-3.5 w-3.5" />
+        </button>
+      </TooltipTrigger>
+      <TooltipContent
+        side={side}
+        align="start"
+        className="w-80 max-w-[90vw] p-3.5 bg-slate-900/95 dark:bg-slate-950 text-slate-100 text-xs rounded-xl shadow-2xl border border-slate-800 backdrop-blur-md z-50 animate-in fade-in-0 zoom-in-95"
+      >
+        <div className="space-y-2">
+          {/* Header */}
+          <div className="border-b border-slate-800 pb-1.5 flex items-center justify-between">
+            <span className="font-bold text-white text-xs flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-500 inline-block" />
+              {info.title}
+            </span>
+            <span className="text-[10px] text-slate-400 font-mono">
+              {info.reference}
+            </span>
+          </div>
+
+          {/* Formula Box */}
+          <div className="bg-slate-800/80 rounded-lg p-2 border border-slate-700/50">
+            <div className="font-mono text-emerald-400 font-bold text-[11px]">
+              {info.formula}
+            </div>
+            <div className="text-[10px] text-slate-300 mt-0.5">
+              {info.formulaDesc}
+            </div>
+          </div>
+
+          {/* Kategori / Klasifikasi */}
+          <div className="space-y-1">
+            <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+              Kriteria & Klasifikasi:
+            </div>
+            <div className="space-y-1">
+              {info.ranges.map((r, rIdx) => (
+                <div key={rIdx} className="flex items-center justify-between text-[10px] bg-slate-800/40 px-2 py-0.5 rounded">
+                  <span className="font-medium text-slate-200">{r.label}</span>
+                  <span className="font-mono text-slate-300">{r.value}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Deskripsi Evaluasi */}
+          <div className="text-[10px] text-slate-300 leading-relaxed pt-1 border-t border-slate-800">
+            {info.description}
+          </div>
+        </div>
+      </TooltipContent>
+    </Tooltip>
+  );
+};
 
 interface ExamRoomOption {
   id: string;
@@ -1307,6 +1452,7 @@ export const ItemAnalysisPage: React.FC = () => {
   };
 
   return (
+    <TooltipProvider delayDuration={150}>
     <div className="space-y-6 pb-16 print:p-0 print:space-y-4">
       {/* PRINT STYLESHEET OVERRIDE */}
       <style>{`
@@ -1620,7 +1766,10 @@ export const ItemAnalysisPage: React.FC = () => {
           {/* KPI 1: Tingkat Kesukaran Rata-Rata */}
           <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 shadow-2xs relative overflow-hidden">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Tingkat Kesukaran (P)</span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Tingkat Kesukaran (P)</span>
+                <MetricInfoTooltip type="difficulty" side="bottom" />
+              </div>
               <div className="w-8 h-8 rounded-xl bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold text-xs">
                 %
               </div>
@@ -1643,7 +1792,10 @@ export const ItemAnalysisPage: React.FC = () => {
           {/* KPI 2: Daya Pembeda Rata-Rata */}
           <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 shadow-2xs relative overflow-hidden">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Daya Pembeda (D)</span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Daya Pembeda (D)</span>
+                <MetricInfoTooltip type="discrimination" side="bottom" />
+              </div>
               <div className="w-8 h-8 rounded-xl bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold text-xs">
                 <TrendingUp className="h-4 w-4" />
               </div>
@@ -1673,7 +1825,10 @@ export const ItemAnalysisPage: React.FC = () => {
           {/* KPI 3: Point-Biserial Rata-Rata */}
           <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 shadow-2xs relative overflow-hidden">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Point-Biserial (r_pb)</span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Point-Biserial (r_pb)</span>
+                <MetricInfoTooltip type="point_biserial" side="bottom" />
+              </div>
               <div className="w-8 h-8 rounded-xl bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 flex items-center justify-center font-bold text-xs">
                 <BarChart2 className="h-4 w-4" />
               </div>
@@ -1701,7 +1856,10 @@ export const ItemAnalysisPage: React.FC = () => {
           {/* KPI 4: Efektivitas Pengecoh Rata-Rata */}
           <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 shadow-2xs relative overflow-hidden">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Efektivitas Pengecoh</span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Efektivitas Pengecoh</span>
+                <MetricInfoTooltip type="distractor" side="bottom" />
+              </div>
               <div className="w-8 h-8 rounded-xl bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold text-xs">
                 <Layers className="h-4 w-4" />
               </div>
@@ -2232,7 +2390,10 @@ export const ItemAnalysisPage: React.FC = () => {
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 bg-slate-50 dark:bg-slate-800/50 p-3.5 rounded-xl border border-slate-200/60 dark:border-slate-700/60 print:bg-white print:border-slate-300">
                       {/* P */}
                       <div>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Tingkat Kesukaran (P)</span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Tingkat Kesukaran (P)</span>
+                          <MetricInfoTooltip type="difficulty" side="top" />
+                        </div>
                         <div className="flex items-baseline gap-1.5 mt-0.5">
                           <span className="text-sm font-black text-slate-900 dark:text-white">
                             P = {q.difficultyIndex.toFixed(2)}
@@ -2251,7 +2412,10 @@ export const ItemAnalysisPage: React.FC = () => {
 
                       {/* D */}
                       <div>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Daya Pembeda (D)</span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Daya Pembeda (D)</span>
+                          <MetricInfoTooltip type="discrimination" side="top" />
+                        </div>
                         <div className="flex items-baseline gap-1.5 mt-0.5">
                           <span className={cn(
                             "text-sm font-black",
@@ -2270,7 +2434,10 @@ export const ItemAnalysisPage: React.FC = () => {
 
                       {/* r_pb */}
                       <div>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Point-Biserial (r_pb)</span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Point-Biserial (r_pb)</span>
+                          <MetricInfoTooltip type="point_biserial" side="top" />
+                        </div>
                         <div className="flex items-baseline gap-1.5 mt-0.5">
                           <span className="text-sm font-black text-slate-900 dark:text-white">
                             r_pb = {q.pointBiserial >= 0 ? `+${q.pointBiserial.toFixed(2)}` : q.pointBiserial.toFixed(2)}
@@ -2286,7 +2453,10 @@ export const ItemAnalysisPage: React.FC = () => {
 
                       {/* Distractor Efficiency */}
                       <div>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Efektivitas Pengecoh</span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Efektivitas Pengecoh</span>
+                          <MetricInfoTooltip type="distractor" side="top" />
+                        </div>
                         <div className="flex items-baseline gap-1.5 mt-0.5">
                           <span className="text-sm font-black text-slate-900 dark:text-white">
                             DE = {q.distractorEfficiency}%
@@ -2767,6 +2937,7 @@ export const ItemAnalysisPage: React.FC = () => {
         </DialogContent>
       </Dialog>
     </div>
+    </TooltipProvider>
   );
 };
 
