@@ -37,7 +37,7 @@ public class CheatAlert extends Plugin {
         } catch (Exception e) {}
 
         long now = System.currentTimeMillis();
-        boolean wasScreenOffRecently = (MainActivity.isScreenOff || (now - MainActivity.lastScreenOffTime < 15000));
+        boolean wasScreenOffRecently = (MainActivity.isScreenOff || (now - MainActivity.lastScreenOffTime < 3000));
         ret.put("isScreenOn", isInteractive);
         ret.put("wasScreenOffRecently", wasScreenOffRecently);
         call.resolve(ret);

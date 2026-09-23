@@ -48,6 +48,12 @@ const SchoolNotFoundPage = () => {
 
         <div className="flex flex-col sm:flex-row gap-3 justify-center">
           <button
+            onClick={() => window.location.reload()}
+            className="flex items-center justify-center gap-2 border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 font-semibold px-6 py-3 rounded-xl text-sm transition-colors shadow-sm"
+          >
+            <RefreshCw size={16} /> Coba Lagi
+          </button>
+          <button
             onClick={() => window.history.back()}
             className="flex items-center justify-center gap-2 border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 font-semibold px-6 py-3 rounded-xl text-sm transition-colors shadow-sm"
           >

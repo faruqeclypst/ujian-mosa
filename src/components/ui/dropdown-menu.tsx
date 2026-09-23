@@ -114,16 +114,19 @@ interface DropdownMenuItemProps {
   children: React.ReactNode;
   onClick?: () => void;
   className?: string;
+  disabled?: boolean;
 }
 
 const DropdownMenuItem: React.FC<DropdownMenuItemProps> = ({
   children,
   onClick,
-  className
+  className,
+  disabled
 }) => {
   const { setOpen } = useDropdownMenu();
   
   const handleClick = () => {
+    if (disabled) return;
     onClick?.();
     setOpen(false);
   };
@@ -132,6 +135,7 @@ const DropdownMenuItem: React.FC<DropdownMenuItemProps> = ({
     <div
       className={cn(
         "relative flex cursor-default select-none items-center rounded-sm px-2 py-2 text-sm outline-none transition-colors focus:bg-accent focus:text-accent-foreground hover:bg-accent cursor-pointer",
+        disabled && "opacity-50 pointer-events-none cursor-not-allowed",
         className
       )}
       onClick={handleClick}

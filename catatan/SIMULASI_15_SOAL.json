@@ -1,0 +1,215 @@
+[
+  {
+    "text": "<p>Berdasarkan bacaan <b>di atas</b>, manakah pernyataan yang <b>BENAR</b> terkait tampilan soal literasi pada sistem ini? <i>(Pilih semua jawaban yang benar!)</i></p>",
+    "type": "pilihan_ganda_kompleks",
+    "groupId": "LIT-01",
+    "groupText": "<h3 style='color:#1e3a8a;margin-bottom:12px;'>Panduan Simulasi: Literasi & Teknologi Ujian</h3><p>Ujian Berbasis Komputer (CBT) dirancang untuk menguji kecakapan kognitif, ketelitian, dan literasi digital siswa. Pada soal berbasis literasi, kotak stimulus bacaan ditampilkan di bagian atas mendahului butir pertanyaan. Satu teks bacaan dapat digunakan untuk menjawab beberapa soal berturut-turut tanpa perlu memuat ulang halaman.</p>",
+    "imageUrl": "",
+    "choices": {
+      "a": { "text": "Kotak stimulus bacaan ditampilkan mendahului butir pertanyaan", "isCorrect": true },
+      "b": { "text": "Satu teks bacaan dapat digunakan untuk lebih dari satu butir pertanyaan", "isCorrect": true },
+      "c": { "text": "Siswa harus membaca ulang teks di halaman yang berbeda setiap berpindah nomor", "isCorrect": false },
+      "d": { "text": "Soal literasi hanya menguji kemampuan menghafal rumus cepat", "isCorrect": false },
+      "e": { "text": "Teks bacaan akan otomatis hilang jika siswa membuka nomor berikutnya dalam paket yang sama", "isCorrect": false }
+    },
+    "answerKey": "a,b"
+  },
+  {
+    "text": "<p>Berdasarkan bacaan <b>di atas</b>, tentukan <b>Benar</b> atau <b>Salah</b> untuk setiap pernyataan berikut:</p>",
+    "type": "benar_salah",
+    "groupId": "LIT-01",
+    "groupText": "<h3 style='color:#1e3a8a;margin-bottom:12px;'>Panduan Simulasi: Literasi & Teknologi Ujian</h3><p>Ujian Berbasis Komputer (CBT) dirancang untuk menguji kecakapan kognitif, ketelitian, dan literasi digital siswa. Pada soal berbasis literasi, kotak stimulus bacaan ditampilkan di bagian atas mendahului butir pertanyaan. Satu teks bacaan dapat digunakan untuk menjawab beberapa soal berturut-turut tanpa perlu memuat ulang halaman.</p>",
+    "imageUrl": "",
+    "statements": [
+      { "id": "1", "text": "Satu teks bacaan (stimulus) hanya boleh digunakan untuk tepat satu butir soal saja.", "answer": "salah" },
+      { "id": "2", "text": "Siswa dapat langsung membaca pertanyaan tanpa perlu memuat ulang teks bacaan.", "answer": "benar" },
+      { "id": "3", "text": "Kotak stimulus bacaan terletak di atas pertanyaan pada lembar ujian.", "answer": "benar" }
+    ]
+  },
+  {
+    "text": "<p><img src=\"https://picsum.photos/id/10/600/300\" alt=\"Panel Surya\" style=\"max-height:300px;max-width:100%;border-radius:16px;margin-bottom:12px;\" /></p><p>Menurut teks bacaan <b>di atas</b>, jenis arus listrik yang langsung dihasilkan oleh panel surya fotovoltaik adalah ...</p>",
+    "type": "pilihan_ganda",
+    "groupId": "LIT-02",
+    "groupText": "<h3 style='color:#047857;margin-bottom:12px;'>Energi Terbarukan: Masa Depan Tenaga Surya</h3><p>Panel surya fotovoltaik mengonversi energi foton dari cahaya matahari langsung menjadi energi listrik arus searah (DC). Di Indonesia yang beriklim tropis dengan intensitas radiasi matahari rata-rata 4,8 kWh/m² per hari, pemanfaatan panel surya memiliki potensi yang sangat besar. Keunggulan utamanya adalah ramah lingkungan, tidak menghasilkan emisi gas rumah kaca, dan minim biaya perawatan setelah instalasi selesai.</p>",
+    "imageUrl": "https://picsum.photos/id/10/600/300",
+    "choices": {
+      "a": { "text": "Arus bolak-balik (AC)", "isCorrect": false },
+      "b": { "text": "Arus searah (DC)", "isCorrect": true },
+      "c": { "text": "Arus induksi elektromagnetik", "isCorrect": false },
+      "d": { "text": "Arus frekuensi tinggi", "isCorrect": false },
+      "e": { "text": "Arus statis", "isCorrect": false }
+    },
+    "answerKey": "b"
+  },
+  {
+    "text": "<p>Berdasarkan bacaan <b>di atas</b>, manakah yang merupakan keunggulan utama dari penggunaan panel surya? <i>(Pilih semua yang benar!)</i></p>",
+    "type": "pilihan_ganda_kompleks",
+    "groupId": "LIT-02",
+    "groupText": "<h3 style='color:#047857;margin-bottom:12px;'>Energi Terbarukan: Masa Depan Tenaga Surya</h3><p>Panel surya fotovoltaik mengonversi energi foton dari cahaya matahari langsung menjadi energi listrik arus searah (DC). Di Indonesia yang beriklim tropis dengan intensitas radiasi matahari rata-rata 4,8 kWh/m² per hari, pemanfaatan panel surya memiliki potensi yang sangat besar. Keunggulan utamanya adalah ramah lingkungan, tidak menghasilkan emisi gas rumah kaca, dan minim biaya perawatan setelah instalasi selesai.</p>",
+    "imageUrl": "",
+    "choices": {
+      "a": { "text": "Ramah lingkungan dan bebas emisi gas rumah kaca", "isCorrect": true },
+      "b": { "text": "Menghasilkan energi listrik maksimal saat malam hari", "isCorrect": false },
+      "c": { "text": "Minim biaya perawatan berkala setelah instalasi selesai", "isCorrect": true },
+      "d": { "text": "Hanya dapat dipasang di wilayah beriklim dingin", "isCorrect": false },
+      "e": { "text": "Sangat potensial untuk wilayah tropis seperti Indonesia", "isCorrect": true }
+    },
+    "answerKey": "a,c,e"
+  },
+  {
+    "text": "<p>Ibu kota negara Indonesia saat ini adalah ...</p>",
+    "type": "pilihan_ganda",
+    "groupId": "",
+    "groupText": "",
+    "imageUrl": "",
+    "choices": {
+      "a": { "text": "Surabaya", "isCorrect": false },
+      "b": { "text": "Bandung", "isCorrect": false },
+      "c": { "text": "Jakarta", "isCorrect": true },
+      "d": { "text": "Medan", "isCorrect": false },
+      "e": { "text": "Semarang", "isCorrect": false }
+    },
+    "answerKey": "c"
+  },
+  {
+    "text": "<p>Jika diketahui persamaan kuadrat \\(x^2 - 5x + 6 = 0\\), maka akar-akar penyelesaian \\(x_1\\) dan \\(x_2\\) dari persamaan tersebut adalah ...</p>",
+    "type": "pilihan_ganda",
+    "groupId": "",
+    "groupText": "",
+    "imageUrl": "",
+    "choices": {
+      "a": { "text": "\\(x = 1\\) dan \\(x = 6\\)", "isCorrect": false },
+      "b": { "text": "\\(x = 2\\) dan \\(x = 3\\)", "isCorrect": true },
+      "c": { "text": "\\(x = -2\\) dan \\(x = -3\\)", "isCorrect": false },
+      "d": { "text": "\\(x = -1\\) dan \\(x = -6\\)", "isCorrect": false },
+      "e": { "text": "\\(x = 2\\) dan \\(x = 5\\)", "isCorrect": false }
+    },
+    "answerKey": "b"
+  },
+  {
+    "text": "<p>Lambang sila ke-3 dalam Pancasila yang melambangkan <i>Persatuan Indonesia</i> adalah ...</p>",
+    "type": "pilihan_ganda",
+    "groupId": "",
+    "groupText": "",
+    "imageUrl": "",
+    "choices": {
+      "a": { "text": "Bintang", "isCorrect": false },
+      "b": { "text": "Rantai Emas", "isCorrect": false },
+      "c": { "text": "Pohon Beringin", "isCorrect": true },
+      "d": { "text": "Kepala Banteng", "isCorrect": false },
+      "e": { "text": "Padi dan Kapas", "isCorrect": false }
+    },
+    "answerKey": "c"
+  },
+  {
+    "text": "<p><img src=\"https://picsum.photos/id/1/600/300\" alt=\"Perangkat Komputer\" style=\"max-height:300px;max-width:100%;border-radius:16px;margin-bottom:12px;\" /></p><p>Perhatikan gambar perangkat komputer di atas! Komponen perangkat keras (*hardware*) yang berfungsi sebagai pemroses utama seluruh instruksi program adalah ...</p>",
+    "type": "pilihan_ganda",
+    "groupId": "",
+    "groupText": "",
+    "imageUrl": "https://picsum.photos/id/1/600/300",
+    "choices": {
+      "a": { "text": "RAM (Random Access Memory)", "isCorrect": false },
+      "b": { "text": "CPU / Processor", "isCorrect": true },
+      "c": { "text": "Harddisk / SSD", "isCorrect": false },
+      "d": { "text": "Layar Monitor", "isCorrect": false },
+      "e": { "text": "Power Supply Unit", "isCorrect": false }
+    },
+    "answerKey": "b"
+  },
+  {
+    "text": "<p>Manakah dari komponen berikut yang termasuk ke dalam <b>Perangkat Masukan (*Input Device*)</b> pada komputer? <i>(Pilih semua yang benar!)</i></p>",
+    "type": "pilihan_ganda_kompleks",
+    "groupId": "",
+    "groupText": "",
+    "imageUrl": "",
+    "choices": {
+      "a": { "text": "Keyboard", "isCorrect": true },
+      "b": { "text": "Mouse", "isCorrect": true },
+      "c": { "text": "Monitor", "isCorrect": false },
+      "d": { "text": "Scanner", "isCorrect": true },
+      "e": { "text": "Speaker", "isCorrect": false }
+    },
+    "answerKey": "a,b,d"
+  },
+  {
+    "text": "<p>Manakah dari besaran-besaran berikut yang termasuk ke dalam <b>Besaran Pokok</b> dalam Sistem Internasional (SI)? <i>(Pilih semua yang benar!)</i></p>",
+    "type": "pilihan_ganda_kompleks",
+    "groupId": "",
+    "groupText": "",
+    "imageUrl": "",
+    "choices": {
+      "a": { "text": "Panjang", "isCorrect": true },
+      "b": { "text": "Massa", "isCorrect": true },
+      "c": { "text": "Kecepatan", "isCorrect": false },
+      "d": { "text": "Waktu", "isCorrect": true },
+      "e": { "text": "Gaya", "isCorrect": false }
+    },
+    "answerKey": "a,b,d"
+  },
+  {
+    "text": "<p>Manakah organel sel berikut yang <b>HANYA</b> ditemukan pada sel tumbuhan dan <b>TIDAK</b> ditemukan pada sel hewan? <i>(Pilih semua yang benar!)</i></p>",
+    "type": "pilihan_ganda_kompleks",
+    "groupId": "",
+    "groupText": "",
+    "imageUrl": "",
+    "choices": {
+      "a": { "text": "Dinding Sel", "isCorrect": true },
+      "b": { "text": "Mitokondria", "isCorrect": false },
+      "c": { "text": "Kloroplas / Plastida", "isCorrect": true },
+      "d": { "text": "Membran Sel", "isCorrect": false },
+      "e": { "text": "Vakuola Sentral Ukuran Besar", "isCorrect": true }
+    },
+    "answerKey": "a,c,e"
+  },
+  {
+    "text": "<p>Manakah bangun datar berikut yang memiliki <b>simetri lipat lebih dari dua</b>? <i>(Pilih semua yang benar!)</i></p>",
+    "type": "pilihan_ganda_kompleks",
+    "groupId": "",
+    "groupText": "",
+    "imageUrl": "",
+    "choices": {
+      "a": { "text": "Persegi (Bujur Sangkar)", "isCorrect": true },
+      "b": { "text": "Segitiga Sama Sisi", "isCorrect": true },
+      "c": { "text": "Persegi Panjang", "isCorrect": false },
+      "d": { "text": "Lingkaran", "isCorrect": true },
+      "e": { "text": "Jajar Genjang", "isCorrect": false }
+    },
+    "answerKey": "a,b,d"
+  },
+  {
+    "text": "<p>Tentukan <b>Benar</b> atau <b>Salah</b> untuk setiap pernyataan mengenai navigasi dan fitur ujian CBT berikut:</p>",
+    "type": "benar_salah",
+    "groupId": "",
+    "groupText": "",
+    "imageUrl": "",
+    "statements": [
+      { "id": "1", "text": "Tombol 'Ragu-ragu' berfungsi menandai nomor soal berwarna kuning agar mudah diperiksa kembali.", "answer": "benar" },
+      { "id": "2", "text": "Nomor soal yang sudah dijawab akan otomatis berubah warna di panel navigasi.", "answer": "benar" },
+      { "id": "3", "text": "Ujian akan otomatis terkirim jika sisa waktu pengerjaan telah habis.", "answer": "benar" }
+    ]
+  },
+  {
+    "text": "<p>Tentukan <b>Benar</b> atau <b>Salah</b> untuk setiap pernyataan ilmiah tentang proses fotosintesis berikut:</p>",
+    "type": "benar_salah",
+    "groupId": "",
+    "groupText": "",
+    "imageUrl": "",
+    "statements": [
+      { "id": "1", "text": "Fotosintesis menghasilkan gas oksigen \\((O_2)\\) dan glukosa.", "answer": "benar" },
+      { "id": "2", "text": "Fotosintesis dapat berlangsung secara optimal di tempat yang sama sekali gelap tanpa cahaya.", "answer": "salah" },
+      { "id": "3", "text": "Klorofil merupakan pigmen hijau daun yang menyerap energi cahaya matahari.", "answer": "benar" }
+    ]
+  },
+  {
+    "text": "<p>Tentukan <b>Benar</b> atau <b>Salah</b> untuk setiap pernyataan mengenai tata tertib penggunaan aplikasi EXAM AA:</p>",
+    "type": "benar_salah",
+    "groupId": "",
+    "groupText": "",
+    "imageUrl": "",
+    "statements": [
+      { "id": "1", "text": "Siswa dilarang keras membuka aplikasi lain atau browsing jawaban selama ujian.", "answer": "benar" },
+      { "id": "2", "text": "Mencoba keluar dari aplikasi EXAM AA dapat memicu peringatan pelanggaran dan penguncian akun.", "answer": "benar" },
+      { "id": "3", "text": "Siswa boleh meminjamkan akun ujian kepada siswa lain yang belum ujian.", "answer": "salah" }
+    ]
+  }
+]

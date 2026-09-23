@@ -4,6 +4,7 @@
  */
 
 import PocketBase from "pocketbase";
+import { compressImage } from "./imageCompression";
 
 const workerUrl = import.meta.env.VITE_R2_WORKER_URL as string | undefined;
 const publicBaseUrl = import.meta.env.VITE_R2_PUBLIC_BASE_URL as string | undefined;
@@ -157,9 +158,25 @@ export async function safeDeleteImages(
 }
 
 export async function uploadInventoryImage(folder: string, file: File): Promise<UploadResult> {
-  return uploadViaWorker(folder, file);
+  let fileToUpload = file;
+  if (file.type.startsWith("image/") && file.type !== "image/svg+xml" && file.type !== "image/gif") {
+    try {
+      fileToUpload = await compressImage(file);
+    } catch {
+      fileToUpload = file;
+    }
+  }
+  return uploadViaWorker(folder, fileToUpload);
 }
 
 export async function uploadFixedAssetImage(folder: string, file: File): Promise<UploadResult> {
-  return uploadViaWorker(folder, file);
+  let fileToUpload = file;
+  if (file.type.startsWith("image/") && file.type !== "image/svg+xml" && file.type !== "image/gif") {
+    try {
+      fileToUpload = await compressImage(file);
+    } catch {
+      fileToUpload = file;
+    }
+  }
+  return uploadViaWorker(folder, fileToUpload);
 }

@@ -14,9 +14,11 @@ import { Input } from "../../components/ui/input";
 import { Separator } from "../../components/ui/separator";
 import FormField from "../../components/forms/FormField";
 import { uploadInventoryImage, deleteImageFromStorage, deleteImagesFromStorage, safeDeleteImage, safeDeleteImages } from "../../lib/storage";
+import { compressImage } from "../../lib/imageCompression";
 import { ImportButton } from "../../components/ui/import-button";
 import { parseQuestionsFromWord } from "../../lib/questionWordParser";
 import { Select } from "../../components/ui/select";
+import { latexToOmml } from "../../lib/latexToWordMath";
 
 import { downloadQuestionTemplate, parseQuestionImportExcel } from "../../lib/questionExcel";
 import { jsonrepair } from "jsonrepair";
@@ -152,7 +154,10 @@ const forceSmallImage = (imgTag: string, physW: number, physH: number): string =
   return cleaned;
 };
 
-const processHtmlInlineImages = (htmlText: string, imageMapping?: Map<string, { mappedUrl: string, base64: string, width: number, height: number }>): string => {
+const processHtmlInlineImages = (
+  htmlText: string,
+  imageMapping?: Map<string, { mappedUrl: string, base64: string, width: number, height: number }>
+): string => {
   if (!htmlText) return "";
   let result = htmlText;
   const imgRegex = /<img[^>]+src="([^"]+)"[^>]*>/g;
@@ -165,90 +170,170 @@ const processHtmlInlineImages = (htmlText: string, imageMapping?: Map<string, { 
     let replacedUrl = "";
     let width = 0;
     let height = 0;
-    if (imageMapping && imageMapping.has(m.src)) {
-      const info = imageMapping.get(m.src)!;
+    const absSrc = getAbsoluteUrl(m.src);
+    const info = imageMapping ? (imageMapping.get(m.src) || (absSrc ? imageMapping.get(absSrc) : undefined)) : undefined;
+
+    if (info) {
       replacedUrl = info.mappedUrl;
       width = info.width;
       height = info.height;
+      let replacedImg = m.full.replace(m.src, replacedUrl);
+
+      // For Word export compatibility, strictly force standard images to be small and proportional
+      const isLatex = m.src.includes("latex.codecogs.com");
+      if (!isLatex) {
+        replacedImg = forceSmallImage(replacedImg, width, height);
+      } else if (width > 480) {
+        const scaledH = Math.round((height * 480) / width);
+        replacedImg = replacedImg.replace(/\/?>$/, ` width="480" height="${scaledH}"$&`);
+      }
+
+      result = result.replace(m.full, replacedImg);
     } else {
-      replacedUrl = getAbsoluteUrl(m.src);
+      replacedUrl = absSrc || m.src;
+      let replacedImg = m.full.replace(m.src, replacedUrl);
+      const isLatex = m.src.includes("latex.codecogs.com");
+      if (!isLatex) {
+        replacedImg = forceSmallImage(replacedImg, width, height);
+      }
+      result = result.replace(m.full, replacedImg);
     }
-    let replacedImg = m.full.replace(m.src, replacedUrl);
-
-    // For Word export compatibility, strictly force standard images to be small and proportional
-    const isLatex = m.src.includes("latex.codecogs.com");
-    if (!isLatex) {
-      replacedImg = forceSmallImage(replacedImg, width, height);
-    }
-
-    result = result.replace(m.full, replacedImg);
   }
   return result;
 };
 
-const convertToPngBase64 = async (url: string): Promise<{ base64: string, width: number, height: number }> => {
-  try {
-    const resp = await fetch(url);
-    if (!resp.ok) return { base64: "", width: 0, height: 0 };
-    const blob = await resp.blob();
+const convertToPngBase64 = async (
+  url: string,
+  pb?: any
+): Promise<{ base64: string, width: number, height: number }> => {
+  if (!url) return { base64: "", width: 0, height: 0 };
 
-    // LaTeX formulas from codecogs are already small and should never be resized (to avoid CORS/canvas scaling issues)
-    const isLatex = url.toLowerCase().includes("latex.codecogs.com");
-    if (isLatex) {
-      return await new Promise((resolve) => {
-        const img = new window.Image();
-        img.crossOrigin = "anonymous";
-        img.onload = () => {
-          const reader = new FileReader();
-          reader.onloadend = () => {
-            const dataUrl = reader.result as string || "";
-            const base64Data = dataUrl.split(",")[1] || "";
-            resolve({ base64: base64Data, width: img.width, height: img.height });
-          };
-          reader.readAsDataURL(blob);
-        };
-        img.onerror = () => {
-          resolve({ base64: "", width: 0, height: 0 });
-        };
-        img.src = URL.createObjectURL(blob);
-      });
-    }
-
-    // For all other images (WebP, PNG, JPG), we load them onto a canvas and convert them to standard PNGs
-    // at their full original resolution to preserve absolute sharpness, while Word handles display scaling.
-    const img = new window.Image();
-    img.crossOrigin = "anonymous";
-    const objectUrl = URL.createObjectURL(blob);
-    return await new Promise((resolve) => {
+  const processDataUriWithCanvas = (dataUri: string): Promise<{ base64: string, width: number, height: number }> => {
+    return new Promise((resolve) => {
+      const img = new window.Image();
       img.onload = () => {
-        const canvas = document.createElement("canvas");
-        const w = img.width;
-        const h = img.height;
-        canvas.width = w;
-        canvas.height = h;
-        const ctx = canvas.getContext("2d");
-        ctx?.drawImage(img, 0, 0, w, h);
         try {
-          const dataUrl = canvas.toDataURL("image/png");
-          URL.revokeObjectURL(objectUrl);
-          const base64Data = dataUrl.split(",")[1] || "";
+          const canvas = document.createElement("canvas");
+          const w = img.naturalWidth || img.width;
+          const h = img.naturalHeight || img.height;
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext("2d");
+          ctx?.drawImage(img, 0, 0, w, h);
+          const outDataUrl = canvas.toDataURL("image/png");
+          const base64Data = outDataUrl.split(",")[1] || "";
           resolve({ base64: base64Data, width: w, height: h });
         } catch (canvasErr) {
           console.warn("Canvas export failed for image:", canvasErr);
-          URL.revokeObjectURL(objectUrl);
-          resolve({ base64: "", width: 0, height: 0 });
+          const rawBase64 = dataUri.split(",")[1] || "";
+          resolve({ base64: rawBase64, width: img.naturalWidth || 290, height: img.naturalHeight || 200 });
         }
       };
       img.onerror = () => {
-        URL.revokeObjectURL(objectUrl);
         resolve({ base64: "", width: 0, height: 0 });
       };
-      img.src = objectUrl;
+      img.src = dataUri;
     });
+  };
+
+  // 1. Data URI directly
+  if (url.startsWith("data:")) {
+    return processDataUriWithCanvas(url);
+  }
+
+  // 2. Direct fetch with optional PocketBase authorization header
+  let blob: Blob | null = null;
+  const isPbFile = url.includes("/api/files/");
+  const pbToken = pb?.authStore?.token;
+
+  try {
+    const resp = await fetch(url, (isPbFile && pbToken) ? { headers: { "Authorization": pbToken } } : undefined);
+    if (resp.ok) {
+      blob = await resp.blob();
+    }
   } catch (err) {
-    console.error("Error converting image:", url, err);
+    // Expected when browser CORS blocks cross-origin requests
+    blob = null;
+  }
+
+  // 2b. Cloudflare Worker fallback (with open CORS headers)
+  const workerUrl = (import.meta.env.VITE_R2_WORKER_URL as string | undefined || "").replace(/\/$/, "");
+  const publicBaseUrl = (import.meta.env.VITE_R2_PUBLIC_BASE_URL as string | undefined || "").replace(/\/$/, "");
+
+  if (!blob && workerUrl) {
+    try {
+      let workerFetchUrl = "";
+      if (publicBaseUrl && url.startsWith(publicBaseUrl)) {
+        const key = url.replace(publicBaseUrl, "").replace(/^\/+/, "");
+        workerFetchUrl = `${workerUrl}/${encodeURI(key)}`;
+      } else if (!isPbFile) {
+        workerFetchUrl = `${workerUrl}/proxy?url=${encodeURIComponent(url)}`;
+      }
+      if (workerFetchUrl) {
+        const wResp = await fetch(workerFetchUrl);
+        if (wResp.ok) {
+          blob = await wResp.blob();
+        }
+      }
+    } catch {
+      // Proceed to PocketBase fallback
+    }
+  }
+
+  // 3. Fallback to PocketBase image proxy if direct and worker fetch failed
+  if (!blob && pb) {
+    try {
+      const pbBase = (pb.baseUrl || window.location.origin).replace(/\/$/, "");
+      const proxyUrl = `${pbBase}/api/image-proxy?url=${encodeURIComponent(url)}`;
+      const proxyResp = await fetch(proxyUrl);
+      if (proxyResp.ok) {
+        const json = await proxyResp.json();
+        if (json.base64) {
+          const mime = json.contentType || "image/png";
+          const dataUri = `data:${mime};base64,${json.base64}`;
+          return processDataUriWithCanvas(dataUri);
+        }
+      }
+    } catch (proxyErr) {
+      console.warn("PocketBase image proxy fallback failed for:", url, proxyErr);
+    }
+  }
+
+  if (!blob) {
     return { base64: "", width: 0, height: 0 };
   }
+
+  // 4. Codecogs LaTeX: already standard small PNG, avoid re-rendering through canvas
+  const isLatex = url.toLowerCase().includes("latex.codecogs.com");
+  if (isLatex) {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const dataUrl = (reader.result as string) || "";
+        const base64Data = dataUrl.split(",")[1] || "";
+        const img = new window.Image();
+        img.onload = () => resolve({ base64: base64Data, width: img.width, height: img.height });
+        img.onerror = () => resolve({ base64: base64Data, width: 0, height: 0 });
+        img.src = dataUrl;
+      };
+      reader.readAsDataURL(blob);
+    });
+  }
+
+  // 5. All other images (WebP, JPG, PNG): load via FileReader and canvas to convert to PNG
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const dataUrl = reader.result as string;
+      if (!dataUrl) {
+        resolve({ base64: "", width: 0, height: 0 });
+        return;
+      }
+      processDataUriWithCanvas(dataUrl).then(resolve);
+    };
+    reader.onerror = () => resolve({ base64: "", width: 0, height: 0 });
+    reader.readAsDataURL(blob);
+  });
 };
 
 // REGISTER CUSTOM FORMATS (only line-height, NOT margin-left/text-indent which trap indentation)
@@ -332,63 +417,6 @@ export interface QuestionData {
   options?: any;
   order?: number;
 }
-
-const compressImage = (file: File): Promise<File> => {
-  return new Promise((resolve, reject) => {
-    // Timeout: if compression takes > 8s, return original file
-    const timeout = setTimeout(() => resolve(file), 8000);
-
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = (event) => {
-      const img = new window.Image();
-      img.src = event.target?.result as string;
-      img.onload = () => {
-        const canvas = document.createElement("canvas");
-        let width = img.width;
-        let height = img.height;
-        const MAX_WIDTH = 1200;
-        const MAX_HEIGHT = 1200;
-
-        if (width > height) {
-          if (width > MAX_WIDTH) {
-            height *= MAX_WIDTH / width;
-            width = MAX_WIDTH;
-          }
-        } else {
-          if (height > MAX_HEIGHT) {
-            width *= MAX_HEIGHT / height;
-            height = MAX_HEIGHT;
-          }
-        }
-
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext("2d");
-        ctx?.drawImage(img, 0, 0, width, height);
-
-        canvas.toBlob(
-          (blob) => {
-            clearTimeout(timeout);
-            if (blob) {
-              const compressedFile = new File([blob], file.name.replace(/\.[^/.]+$/, "") + ".webp", {
-                type: "image/webp",
-                lastModified: Date.now(),
-              });
-              resolve(compressedFile);
-            } else {
-              resolve(file); // fallback to original instead of rejecting
-            }
-          },
-          "image/webp",
-          0.80
-        );
-      };
-      img.onerror = () => { clearTimeout(timeout); resolve(file); };
-    };
-    reader.onerror = () => { clearTimeout(timeout); resolve(file); };
-  });
-};
 
 
 
@@ -494,7 +522,12 @@ const QuestionsPage = () => {
             let optionsToSave: any = {};
             let correctAnswer = q.answerKey || "";
 
-            if (qType === "pilihan_ganda" || qType === "pilihan_ganda_kompleks" || qType === "benar_salah") {
+            if ((qType === "benar_salah" || (qType as any) === "true_false") && q.statements && q.statements.length > 0) {
+              optionsToSave = { statements: q.statements };
+              if (!correctAnswer) {
+                correctAnswer = q.statements.map((s: any) => `${s.id}:${s.answer || "benar"}`).join(",");
+              }
+            } else if (qType === "pilihan_ganda" || qType === "pilihan_ganda_kompleks" || qType === "benar_salah") {
               optionsToSave = q.choices || {};
               if (!correctAnswer && q.choices) {
                 correctAnswer = Object.entries(q.choices)
@@ -508,12 +541,17 @@ const QuestionsPage = () => {
               optionsToSave = { items: q.items || [] };
             }
 
+            let qText = q.text || "";
+            if (q.imageUrl && !qText.includes(q.imageUrl)) {
+              qText = `<p><img src="${q.imageUrl}" alt="Gambar Soal" style="max-height:320px;max-width:100%;border-radius:16px;margin-bottom:12px;" /></p>` + qText;
+            }
+
             const payload = {
               examId: targetId,
               examid: targetId,
               type: qType,
               field: fieldType,
-              text: q.text || "",
+              text: qText,
               imageUrl: q.imageUrl || "",
               groupId: q.groupId || "",
               group_id: q.groupId || "",
@@ -806,18 +844,16 @@ const QuestionsPage = () => {
     const file = e.target.files?.[0] || null;
     if (!file) return;
 
-    const maxSize = 2 * 1024 * 1024;
+    const maxSize = 10 * 1024 * 1024;
     if (file.size > maxSize) {
-      showAlert("Gagal", "Ukuran file gambar maksimal adalah 2MB.", "danger");
+      showAlert("Gagal", "Ukuran file gambar maksimal adalah 10MB.", "danger");
       return;
     }
 
     let fileToUpload = file;
     const origSize = formatSize(file.size);
 
-    if (file.size > 200 * 1024) {
-      fileToUpload = await compressImage(file);
-    }
+    fileToUpload = await compressImage(file);
     const finalSize = formatSize(fileToUpload.size);
 
     if (!galleryTarget) return;
@@ -1390,6 +1426,7 @@ const QuestionsPage = () => {
             groupText: q.groupText || q.group_text || "",
             pairs: q.pairs || undefined,
             items: q.items || undefined,
+            statements: q.statements || (q.options?.statements ? q.options.statements : undefined),
           };
         }).filter((q: any) => q.text);
 
@@ -1486,13 +1523,27 @@ const QuestionsPage = () => {
         const field = typeMap[type] || "multiple_choice";
 
         // Localize inline images
-        const localizedQText = await localizeInlineImages(q.text || "Pertanyaan Tanpa Judul");
+        let localizedQText = await localizeInlineImages(q.text || "Pertanyaan Tanpa Judul");
+        const qImageUrl = q.imageUrl || q.image_url || "";
+        if (qImageUrl && !localizedQText.includes(qImageUrl)) {
+          const localizedImg = await localizeImage(qImageUrl, `ai_q_${idx}`);
+          if (localizedImg) {
+            localizedQText = `<p><img src="${localizedImg}" alt="Gambar Soal" style="max-height:320px;max-width:100%;border-radius:16px;margin-bottom:12px;" /></p>` + localizedQText;
+          }
+        }
         const rawGroupText = q.groupText || q.group_text || "";
         const localizedGroupText = rawGroupText ? await localizeInlineImages(rawGroupText) : "";
 
         // Localize options
         let options: any = {};
-        if (type === "pilihan_ganda" || type === "pilihan_ganda_kompleks" || type === "benar_salah") {
+        if (type === "benar_salah" && q.statements && Array.isArray(q.statements) && q.statements.length > 0) {
+          const validStatements = await Promise.all(q.statements.map(async (st: any) => ({
+            id: String(st.id || Math.random()),
+            text: await localizeInlineImages(st.text || ""),
+            answer: (st.answer || "benar").toLowerCase() === "salah" ? "salah" : "benar"
+          })));
+          options = { statements: validStatements };
+        } else if (type === "pilihan_ganda" || type === "pilihan_ganda_kompleks" || type === "benar_salah") {
           const rawChoices = q.choices || {};
           const opts: any = {};
           const keys = Object.keys(rawChoices);
@@ -1537,7 +1588,9 @@ const QuestionsPage = () => {
         }
 
         let correctAnswer = "";
-        if (type === "pilihan_ganda" || type === "pilihan_ganda_kompleks" || type === "benar_salah") {
+        if (type === "benar_salah" && options?.statements && Array.isArray(options.statements)) {
+          correctAnswer = options.statements.map((s: any) => `${s.id}:${s.answer}`).join(",");
+        } else if (type === "pilihan_ganda" || type === "pilihan_ganda_kompleks" || type === "benar_salah") {
           correctAnswer = q.correctAnswer || q.answerKey || "";
           if (!correctAnswer && options) {
             const correctKeys = Object.keys(options).filter(k => options[k].isCorrect);
@@ -1548,7 +1601,6 @@ const QuestionsPage = () => {
         }
 
         // Localize main question imageUrl
-        const qImageUrl = q.imageUrl || q.image_url || "";
         const localizedQImageUrl = qImageUrl ? await localizeImage(qImageUrl, `ai_q_${idx}`) : "";
 
         const createPayload: any = {
@@ -1801,10 +1853,7 @@ const QuestionsPage = () => {
         let imageUrl = q.imageUrl || "";
         if (q.imageFile) {
           try {
-            let fileToUpload = q.imageFile;
-            if (q.imageFile.size > 200 * 1024) {
-              fileToUpload = await compressImage(q.imageFile);
-            }
+            const fileToUpload = await compressImage(q.imageFile);
             const uploadSnap = await uploadInventoryImage(`questions/${examId}`, fileToUpload);
             imageUrl = uploadSnap.url;
           } catch (e) {
@@ -2332,11 +2381,11 @@ const QuestionsPage = () => {
       groupId: q.groupId || "",
       groupText: q.groupText || "",
       choices: {
-        a: { text: sanitizeChoiceContent(q.choices?.a?.text || ""), imageUrl: q.choices?.a?.imageUrl, isCorrect: !!q.choices?.a?.isCorrect },
-        b: { text: sanitizeChoiceContent(q.choices?.b?.text || ""), imageUrl: q.choices?.b?.imageUrl, isCorrect: !!q.choices?.b?.isCorrect },
-        c: { text: sanitizeChoiceContent(q.choices?.c?.text || ""), imageUrl: q.choices?.c?.imageUrl, isCorrect: !!q.choices?.c?.isCorrect },
-        d: { text: sanitizeChoiceContent(q.choices?.d?.text || ""), imageUrl: q.choices?.d?.imageUrl, isCorrect: !!q.choices?.d?.isCorrect },
-        e: { text: sanitizeChoiceContent(q.choices?.e?.text || ""), imageUrl: q.choices?.e?.imageUrl, isCorrect: !!q.choices?.e?.isCorrect },
+        a: { text: q.choices?.a?.text || "", imageUrl: q.choices?.a?.imageUrl, isCorrect: !!q.choices?.a?.isCorrect },
+        b: { text: q.choices?.b?.text || "", imageUrl: q.choices?.b?.imageUrl, isCorrect: !!q.choices?.b?.isCorrect },
+        c: { text: q.choices?.c?.text || "", imageUrl: q.choices?.c?.imageUrl, isCorrect: !!q.choices?.c?.isCorrect },
+        d: { text: q.choices?.d?.text || "", imageUrl: q.choices?.d?.imageUrl, isCorrect: !!q.choices?.d?.isCorrect },
+        e: { text: q.choices?.e?.text || "", imageUrl: q.choices?.e?.imageUrl, isCorrect: !!q.choices?.e?.isCorrect },
       },
       pairs: q.pairs || [{ id: "1", left: "", right: "" }],
       answerKey: q.answerKey || "",
@@ -2360,13 +2409,9 @@ const QuestionsPage = () => {
   };
 
   const handleChoiceChange = (key: string, field: string, value: any) => {
-    let finalValue = value;
-    if (field === 'text' && typeof value === 'string') {
-      finalValue = sanitizeChoiceContent(value);
-    }
     setFormValues((prev) => {
       const updatedChoices = { ...prev.choices };
-      updatedChoices[key] = { ...updatedChoices[key], [field]: finalValue };
+      updatedChoices[key] = { ...updatedChoices[key], [field]: value };
 
       // If setting isCorrect: true and current type is choices (single choice), set others to false
       if (prev.type === "pilihan_ganda" && field === "isCorrect" && value === true) {
@@ -2617,10 +2662,7 @@ const QuestionsPage = () => {
 
       // 1. Upload file Cover Soal (dari tombol input file)
       if (questionFile) {
-        let fileToUpload = questionFile;
-        if (questionFile.size > 200 * 1024) { // kompress > 200KB
-          fileToUpload = await compressImage(questionFile);
-        }
+        const fileToUpload = await compressImage(questionFile);
         if (dialogMode === "edit" && selectedQuestion?.imageUrl) {
           const oldUrl = selectedQuestion.imageUrl;
           if (oldUrl && !oldUrl.startsWith("data:")) {
@@ -2659,10 +2701,7 @@ const QuestionsPage = () => {
       for (const key in choiceFiles) {
         const file = choiceFiles[key];
         if (file) {
-          let fileToUpload = file;
-          if (file.size > 200 * 1024) {
-            fileToUpload = await compressImage(file);
-          }
+          const fileToUpload = await compressImage(file);
           if (dialogMode === "edit" && selectedQuestion?.choices?.[key]?.imageUrl) {
             const oldUrl = selectedQuestion.choices[key].imageUrl!;
             if (oldUrl && !oldUrl.startsWith("data:")) {
@@ -3702,7 +3741,11 @@ const QuestionsPage = () => {
         // Localize remote image and inline images
         const qImageUrl = q.imageUrl || q.image_url || "";
         const localizedQImageUrl = qImageUrl ? await localizeImage(qImageUrl, `json_q_${i}`) : "";
-        const localizedQText = await localizeInlineImages(q.text || q.question || "");
+        const finalQImageUrl = localizedQImageUrl || qImageUrl;
+        let localizedQText = await localizeInlineImages(q.text || q.question || "");
+        if (finalQImageUrl && !localizedQText.includes(finalQImageUrl)) {
+          localizedQText = `<p><img src="${finalQImageUrl}" alt="Gambar Soal" style="max-height:320px;max-width:100%;border-radius:16px;margin-bottom:12px;" /></p>` + localizedQText;
+        }
         const rawGroupText = q.groupText || q.group_text || "";
         const localizedGroupText = rawGroupText ? await localizeInlineImages(rawGroupText) : "";
 
@@ -3721,7 +3764,15 @@ const QuestionsPage = () => {
         };
 
         // Build options based on type with image localization
-        if (qType === "pilihan_ganda" || qType === "pilihan_ganda_kompleks" || qType === "benar_salah" || qType === "multiple_choice" || qType === "complex_choice" || qType === "true_false") {
+        if ((qType === "benar_salah" || qType === "true_false") && q.statements && Array.isArray(q.statements) && q.statements.length > 0) {
+          const validStatements = await Promise.all(q.statements.map(async (st: any) => ({
+            id: String(st.id || Math.random()),
+            text: await localizeInlineImages(st.text || ""),
+            answer: (st.answer || "benar").toLowerCase() === "salah" ? "salah" : "benar"
+          })));
+          payload.options = { statements: validStatements };
+          payload.correctAnswer = validStatements.map((s: any) => `${s.id}:${s.answer}`).join(",");
+        } else if (qType === "pilihan_ganda" || qType === "pilihan_ganda_kompleks" || qType === "benar_salah" || qType === "multiple_choice" || qType === "complex_choice" || qType === "true_false") {
           const opts: any = {};
           const keys = Object.keys(choices);
           for (let kIdx = 0; kIdx < keys.length; kIdx++) {
@@ -3874,7 +3925,7 @@ const QuestionsPage = () => {
         .trim();
     };
 
-    // Replace LaTeX in text with codecogs absolute image URLs directly
+    // Replace LaTeX in text with native Word OMML equations (or CodeCogs image fallback)
     const processLatex = (htmlInput: string) => {
       if (!htmlInput) return htmlInput;
       let result = htmlInput;
@@ -3882,19 +3933,25 @@ const QuestionsPage = () => {
 
       result = result.replace(/(\$\$|\\\[)([\s\S]*?)(\$\$|\\\])/g, (_, _s, formula) => {
         const clean = fixFormula(formula);
-        const url = `https://latex.codecogs.com/png.latex?\\dpi{200}\\bg_white ${encodeURIComponent(clean)}`;
+        const omml = latexToOmml(clean);
+        if (omml) return `<br/>${omml}<br/>`;
+        const url = `https://latex.codecogs.com/png.latex?\\dpi{110}\\bg_white ${encodeURIComponent(clean)}`;
         return `<br/><img src="${url}" class="latex-formula" /><br/>`;
       });
       result = result.replace(/(?<!\$)(\$)([^\$\n]+?)(\$)(?!\$)/g, (_, _s, formula) => {
         const clean = fixFormula(formula);
         if (!/[\\^_{}]/.test(clean)) return formula;
-        const url = `https://latex.codecogs.com/png.latex?\\dpi{200}\\bg_white ${encodeURIComponent(clean)}`;
-        return ` <img src="${url}" class="latex-formula" style="vertical-align: middle;" /> `;
+        const omml = latexToOmml(clean);
+        if (omml) return ` ${omml} `;
+        const url = `https://latex.codecogs.com/png.latex?\\dpi{110}\\bg_white ${encodeURIComponent(clean)}`;
+        return `&nbsp;<img src="${url}" class="latex-formula" style="vertical-align: -2px; margin: 0 1pt;" />&nbsp;`;
       });
       result = result.replace(/(\\\()([\s\S]*?)(\\\))/g, (_, _s, formula) => {
         const clean = fixFormula(formula);
-        const url = `https://latex.codecogs.com/png.latex?\\dpi{200}\\bg_white ${encodeURIComponent(clean)}`;
-        return ` <img src="${url}" class="latex-formula" style="vertical-align: middle;" /> `;
+        const omml = latexToOmml(clean);
+        if (omml) return ` ${omml} `;
+        const url = `https://latex.codecogs.com/png.latex?\\dpi{110}\\bg_white ${encodeURIComponent(clean)}`;
+        return `&nbsp;<img src="${url}" class="latex-formula" style="vertical-align: -2px; margin: 0 1pt;" />&nbsp;`;
       });
       return result;
     };
@@ -3908,6 +3965,7 @@ const QuestionsPage = () => {
       if (abs) {
         urlsToConvert.add(abs);
       }
+      urlsToConvert.add(url);
     };
 
     const collectFromHtml = (htmlText: string | undefined) => {
@@ -3965,13 +4023,13 @@ const QuestionsPage = () => {
         message: `Mengunduh & mengonversi gambar (${idx + 1}/${urlList.length})...`
       }));
 
-      const result = await convertToPngBase64(originalUrl);
+      const result = await convertToPngBase64(originalUrl, pb);
       if (result.base64) {
         const mappedUrl = `https://local-asset/img_${idx}.png`;
         const mappedObj = { mappedUrl, base64: result.base64, width: result.width, height: result.height };
         imageMapping.set(originalUrl, mappedObj);
         const abs = getAbsoluteUrl(originalUrl);
-        if (abs !== originalUrl) {
+        if (abs) {
           imageMapping.set(abs, mappedObj);
         }
       }
@@ -3979,7 +4037,7 @@ const QuestionsPage = () => {
 
     const dateStr = new Date().toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-');
 
-    let html = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+    let html = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns:m='http://schemas.microsoft.com/office/2004/12/omml' xmlns='http://www.w3.org/TR/REC-html40'>
 <head><meta charset='utf-8'>
 <style>
   @page { size: A4; margin: 2cm; }
@@ -3988,7 +4046,7 @@ const QuestionsPage = () => {
   .hanging { margin-left: 0pt; padding-left: 0pt; text-indent: 0pt; margin-bottom: 3pt; text-align: left; }
   .choice { padding-left: 45pt; text-indent: -20pt; margin-bottom: 1pt; text-align: left; }
   img { display: block; margin: 5pt 0; border: none; }
-  img.latex-formula { display: inline; margin: 0; width: auto; height: auto; vertical-align: middle; }
+  img.latex-formula { display: inline; margin: 0 1pt; vertical-align: -2px; }
   .wacana { border: 1pt solid #000; padding: 10pt; margin-bottom: 15pt; background: #f5f5f5; font-style: italic; }
   .spacer { margin: 0; padding: 0; line-height: 12pt; font-size: 12pt; height: 12pt; }
   p, div, span { margin: 0; padding: 0; line-height: 1.3; text-align: left; }
@@ -4036,14 +4094,12 @@ const QuestionsPage = () => {
 
       // Render main question imageUrl if present
       if (q.imageUrl) {
-        const info = imageMapping.get(q.imageUrl);
+        const absImg = getAbsoluteUrl(q.imageUrl);
+        const info = imageMapping.get(q.imageUrl) || (absImg ? imageMapping.get(absImg) : undefined);
         if (info) {
           const displayW = Math.round(info.width > 290 ? 290 : info.width);
           const displayH = Math.round(info.width > 290 ? (info.height * 290) / info.width : info.height);
           html += `<div style="margin: 5pt 0 5pt 25pt;"><img src="${info.mappedUrl}" width="${displayW}" height="${displayH}" alt="Gambar Soal" /></div>`;
-        } else {
-          const imgUrl = getAbsoluteUrl(q.imageUrl);
-          html += `<div style="margin: 5pt 0 5pt 25pt;"><img src="${imgUrl}" width="290" alt="Gambar Soal" /></div>`;
         }
       }
 
@@ -4059,14 +4115,12 @@ const QuestionsPage = () => {
                 <td valign="top" style="border: none; padding: 0; font-family: 'Times New Roman', serif; font-size: 11pt; line-height: 1.3; text-align: left;">
                   <span>${processedCText}</span>`;
             if (c.imageUrl) {
-              const info = imageMapping.get(c.imageUrl);
+              const absChoiceImg = getAbsoluteUrl(c.imageUrl);
+              const info = imageMapping.get(c.imageUrl) || (absChoiceImg ? imageMapping.get(absChoiceImg) : undefined);
               if (info) {
                 const displayW = Math.round(info.width > 181 ? 181 : info.width);
                 const displayH = Math.round(info.width > 181 ? (info.height * 181) / info.width : info.height);
                 choiceHtml += `<br/><img src="${info.mappedUrl}" width="${displayW}" height="${displayH}" alt="Gambar Pilihan" />`;
-              } else {
-                const imgUrl = getAbsoluteUrl(c.imageUrl);
-                choiceHtml += `<br/><img src="${imgUrl}" width="181" alt="Gambar Pilihan" />`;
               }
             }
             choiceHtml += `
@@ -4094,14 +4148,12 @@ const QuestionsPage = () => {
         for (const item of q.items) {
           let itemHtml = `<li>${cleanForWord(processHtmlInlineImages(processLatex(item.text || ""), imageMapping))}`;
           if (item.imageUrl) {
-            const info = imageMapping.get(item.imageUrl);
+            const absItemImg = getAbsoluteUrl(item.imageUrl);
+            const info = imageMapping.get(item.imageUrl) || (absItemImg ? imageMapping.get(absItemImg) : undefined);
             if (info) {
               const displayW = Math.round(info.width > 145 ? 145 : info.width);
               const displayH = Math.round(info.width > 145 ? (info.height * 145) / info.width : info.height);
               itemHtml += `<br/><img src="${info.mappedUrl}" width="${displayW}" height="${displayH}" alt="Gambar Item" />`;
-            } else {
-              const imgUrl = getAbsoluteUrl(item.imageUrl);
-              itemHtml += `<br/><img src="${imgUrl}" width="145" alt="Gambar Item" />`;
             }
           }
           itemHtml += `</li>`;
@@ -4130,12 +4182,13 @@ const QuestionsPage = () => {
 
     let mhtml = "";
     mhtml += "MIME-Version: 1.0\r\n";
-    mhtml += `Content-Type: multipart/related; boundary="${boundary}"\r\n\r\n`;
+    mhtml += `Content-Type: multipart/related; type="text/html"; boundary="${boundary}"\r\n\r\n`;
 
     // HTML Part
     mhtml += `--${boundary}\r\n`;
     mhtml += "Content-Type: text/html; charset=\"utf-8\"\r\n";
-    mhtml += "Content-Transfer-Encoding: 8bit\r\n\r\n";
+    mhtml += "Content-Transfer-Encoding: 8bit\r\n";
+    mhtml += "Content-Location: https://local-asset/document.html\r\n\r\n";
     mhtml += html + "\r\n\r\n";
 
     // Attached image parts
@@ -4144,9 +4197,12 @@ const QuestionsPage = () => {
       if (attachedUrls.has(mapped.mappedUrl)) continue;
       attachedUrls.add(mapped.mappedUrl);
 
+      const filename = mapped.mappedUrl.split('/').pop() || 'image.png';
+
       mhtml += `--${boundary}\r\n`;
       mhtml += "Content-Type: image/png\r\n";
       mhtml += "Content-Transfer-Encoding: base64\r\n";
+      mhtml += `Content-ID: <${filename}>\r\n`;
       mhtml += `Content-Location: ${mapped.mappedUrl}\r\n\r\n`;
 
       const base64Formatted = mapped.base64.replace(/(.{76})/g, "$1\r\n");
@@ -4254,19 +4310,25 @@ const QuestionsPage = () => {
 
         result = result.replace(/(\$\$|\\\[)([\s\S]*?)(\$\$|\\\])/g, (_, _s, formula) => {
           const clean = fixFormula(formula);
-          const url = `https://latex.codecogs.com/png.latex?\\dpi{200}\\bg_white ${encodeURIComponent(clean)}`;
+          const omml = latexToOmml(clean);
+          if (omml) return `<br/>${omml}<br/>`;
+          const url = `https://latex.codecogs.com/png.latex?\\dpi{110}\\bg_white ${encodeURIComponent(clean)}`;
           return `<br/><img src="${url}" class="latex-formula" /><br/>`;
         });
         result = result.replace(/(?<!\$)(\$)([^\$\n]+?)(\$)(?!\$)/g, (_, _s, formula) => {
           const clean = fixFormula(formula);
           if (!/[\\^_{}]/.test(clean)) return formula;
-          const url = `https://latex.codecogs.com/png.latex?\\dpi{200}\\bg_white ${encodeURIComponent(clean)}`;
-          return ` <img src="${url}" class="latex-formula" style="vertical-align: middle;" /> `;
+          const omml = latexToOmml(clean);
+          if (omml) return ` ${omml} `;
+          const url = `https://latex.codecogs.com/png.latex?\\dpi{110}\\bg_white ${encodeURIComponent(clean)}`;
+          return `&nbsp;<img src="${url}" class="latex-formula" style="vertical-align: -2px; margin: 0 1pt;" />&nbsp;`;
         });
         result = result.replace(/(\\\()([\s\S]*?)(\\\))/g, (_, _s, formula) => {
           const clean = fixFormula(formula);
-          const url = `https://latex.codecogs.com/png.latex?\\dpi{200}\\bg_white ${encodeURIComponent(clean)}`;
-          return ` <img src="${url}" class="latex-formula" style="vertical-align: middle;" /> `;
+          const omml = latexToOmml(clean);
+          if (omml) return ` ${omml} `;
+          const url = `https://latex.codecogs.com/png.latex?\\dpi{110}\\bg_white ${encodeURIComponent(clean)}`;
+          return `&nbsp;<img src="${url}" class="latex-formula" style="vertical-align: -2px; margin: 0 1pt;" />&nbsp;`;
         });
         return result;
       };
@@ -4287,6 +4349,7 @@ const QuestionsPage = () => {
         if (abs) {
           urlsToConvert.add(abs);
         }
+        urlsToConvert.add(url);
       };
 
       const collectFromHtml = (htmlText: string | undefined) => {
@@ -4345,19 +4408,19 @@ const QuestionsPage = () => {
           message: `Mengunduh & mengonversi gambar (${idx + 1}/${urlList.length})...`
         }));
 
-        const result = await convertToPngBase64(originalUrl);
+        const result = await convertToPngBase64(originalUrl, pb);
         if (result.base64) {
           const mappedUrl = `https://local-asset/img_${idx}.png`;
           const mappedObj = { mappedUrl, base64: result.base64, width: result.width, height: result.height };
           imageMapping.set(originalUrl, mappedObj);
           const abs = getAbsoluteUrl(originalUrl);
-          if (abs !== originalUrl) {
+          if (abs) {
             imageMapping.set(abs, mappedObj);
           }
         }
       }
 
-      let html = `<html><head><meta charset="utf-8"><style>
+      let html = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns:m='http://schemas.microsoft.com/office/2004/12/omml' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset="utf-8"><style>
         body { font-family: 'Times New Roman', serif; font-size: 12pt; line-height: 1.5; margin: 2cm; }
         table { border-collapse: collapse; width: 100%; margin: 10px 0; }
         td, th { border: 1px solid #000; padding: 6px 8px; vertical-align: top; font-size: 11pt; }
@@ -4395,14 +4458,12 @@ const QuestionsPage = () => {
 
         // Render main question image
         if (q.imageUrl) {
-          const info = imageMapping.get(q.imageUrl);
+          const absImg = getAbsoluteUrl(q.imageUrl);
+          const info = imageMapping.get(q.imageUrl) || (absImg ? imageMapping.get(absImg) : undefined);
           if (info) {
             const displayW = Math.round(info.width > 290 ? 290 : info.width);
             const displayH = Math.round(info.width > 290 ? (info.height * 290) / info.width : info.height);
             html += `<br/><img src="${info.mappedUrl}" width="${displayW}" height="${displayH}" alt="Gambar Soal" /><br/>`;
-          } else {
-            const imgUrl = getAbsoluteUrl(q.imageUrl);
-            html += `<br/><img src="${imgUrl}" width="290" alt="Gambar Soal" /><br/>`;
           }
         }
 
@@ -4420,14 +4481,12 @@ const QuestionsPage = () => {
                 <td valign="top" style="border: none; padding: 0; font-family: 'Times New Roman', serif; font-size: 11pt; line-height: 1.5; text-align: left;">
                   ${isCorrect ? '<span class="kunci">' : ''}${processedCText}`;
             if (choice.imageUrl) {
-              const info = imageMapping.get(choice.imageUrl);
+              const absChoiceImg = getAbsoluteUrl(choice.imageUrl);
+              const info = imageMapping.get(choice.imageUrl) || (absChoiceImg ? imageMapping.get(absChoiceImg) : undefined);
               if (info) {
                 const displayW = Math.round(info.width > 181 ? 181 : info.width);
                 const displayH = Math.round(info.width > 181 ? (info.height * 181) / info.width : info.height);
                 choiceHtml += `<br/><img src="${info.mappedUrl}" width="${displayW}" height="${displayH}" alt="Gambar Pilihan" />`;
-              } else {
-                const imgUrl = getAbsoluteUrl(choice.imageUrl);
-                choiceHtml += `<br/><img src="${imgUrl}" width="181" alt="Gambar Pilihan" />`;
               }
             }
             choiceHtml += `${isCorrect ? '</span>' : ''}
@@ -4448,14 +4507,12 @@ const QuestionsPage = () => {
           for (const item of q.items) {
             let itemHtml = `<li>${cleanForWord(processHtmlInlineImages(processLatex(item.text || ""), imageMapping))}`;
             if (item.imageUrl) {
-              const info = imageMapping.get(item.imageUrl);
+              const absItemImg = getAbsoluteUrl(item.imageUrl);
+              const info = imageMapping.get(item.imageUrl) || (absItemImg ? imageMapping.get(absItemImg) : undefined);
               if (info) {
                 const displayW = Math.round(info.width > 145 ? 145 : info.width);
                 const displayH = Math.round(info.width > 145 ? (info.height * 145) / info.width : info.height);
                 itemHtml += `<br/><img src="${info.mappedUrl}" width="${displayW}" height="${displayH}" alt="Gambar Item" />`;
-              } else {
-                const imgUrl = getAbsoluteUrl(item.imageUrl);
-                itemHtml += `<br/><img src="${imgUrl}" width="145" alt="Gambar Item" />`;
               }
             }
             itemHtml += `</li>`;
@@ -4477,12 +4534,13 @@ const QuestionsPage = () => {
 
       let mhtml = "";
       mhtml += "MIME-Version: 1.0\r\n";
-      mhtml += `Content-Type: multipart/related; boundary="${boundary}"\r\n\r\n`;
+      mhtml += `Content-Type: multipart/related; type="text/html"; boundary="${boundary}"\r\n\r\n`;
 
       // HTML Part
       mhtml += `--${boundary}\r\n`;
       mhtml += "Content-Type: text/html; charset=\"utf-8\"\r\n";
-      mhtml += "Content-Transfer-Encoding: 8bit\r\n\r\n";
+      mhtml += "Content-Transfer-Encoding: 8bit\r\n";
+      mhtml += "Content-Location: https://local-asset/document.html\r\n\r\n";
       mhtml += html + "\r\n\r\n";
 
       // Attached image parts
@@ -4491,9 +4549,12 @@ const QuestionsPage = () => {
         if (attachedUrls.has(mapped.mappedUrl)) continue;
         attachedUrls.add(mapped.mappedUrl);
 
+        const filename = mapped.mappedUrl.split('/').pop() || 'image.png';
+
         mhtml += `--${boundary}\r\n`;
         mhtml += "Content-Type: image/png\r\n";
         mhtml += "Content-Transfer-Encoding: base64\r\n";
+        mhtml += `Content-ID: <${filename}>\r\n`;
         mhtml += `Content-Location: ${mapped.mappedUrl}\r\n\r\n`;
 
         const base64Formatted = mapped.base64.replace(/(.{76})/g, "$1\r\n");
@@ -5376,7 +5437,10 @@ Aturan:
                                 key={`group-create`}
                                 theme="snow"
                                 value={formValues.groupText || ""}
-                                onChange={(content) => setFormValues({ ...formValues, groupText: content })}
+                                onChange={(content, _delta, source) => {
+                                  if (source !== 'user') return;
+                                  setFormValues(prev => ({ ...prev, groupText: content }));
+                                }}
                                 placeholder="Ketikkan teks stimulus / literasi di sini..."
                                 modules={quillModules}
                                 formats={quillFormats}
@@ -5407,7 +5471,10 @@ Aturan:
                       ref={quillRef}
                       theme="snow"
                       value={formValues.text}
-                      onChange={(content) => setFormValues({ ...formValues, text: content })}
+                      onChange={(content, _delta, source) => {
+                        if (source !== 'user') return;
+                        setFormValues(prev => ({ ...prev, text: content }));
+                      }}
                       placeholder="Tuliskan pertanyaan disini..."
                       modules={quillModules}
                       formats={quillFormats}
@@ -5574,7 +5641,10 @@ Aturan:
                                   key={selectedQuestion ? `edit-${selectedQuestion.id}-${letter}` : `create-${letter}`}
                                   theme="snow"
                                   value={formValues.choices[letter].text}
-                                  onChange={(content) => handleChoiceChange(letter, 'text', content)}
+                                  onChange={(content, _delta, source) => {
+                                    if (source !== 'user') return;
+                                    handleChoiceChange(letter, 'text', content);
+                                  }}
                                   placeholder={`Jawaban opsi ${letter.toUpperCase()} ...`}
                                   modules={quillModulesChoice}
                                   formats={quillFormatsChoice}
@@ -6265,7 +6335,8 @@ Aturan:
                     <ReactQuill
                       theme="snow"
                       value={batchQuestions[0].groupText}
-                      onChange={(content) => {
+                      onChange={(content, _delta, source) => {
+                        if (source !== 'user') return;
                         // Update all questions in batch to share same stimulus
                         const updatedBatch = batchQuestions.map(bq => ({ ...bq, groupText: content }));
                         setBatchQuestions(updatedBatch);
@@ -6349,7 +6420,10 @@ Aturan:
                       <ReactQuill
                         theme="snow"
                         value={q.text}
-                        onChange={(content) => updateBatchItem(index, 'text', content)}
+                        onChange={(content, _delta, source) => {
+                          if (source !== 'user') return;
+                          updateBatchItem(index, 'text', content);
+                        }}
                         placeholder="Tuliskan pertanyaan disini..."
                         modules={quillModules}
                         formats={quillFormats}
@@ -7216,6 +7290,11 @@ Aturan:
                               </div>
                             )}
                             <MathText content={q.text} className="text-sm font-bold text-slate-800 dark:text-slate-100 leading-normal" />
+                            {q.imageUrl && (
+                              <div className="my-2 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800 max-w-sm bg-slate-50 dark:bg-slate-900">
+                                <img src={q.imageUrl} alt="Gambar Soal" className="w-full max-h-48 object-contain" />
+                              </div>
+                            )}
                             {/* Type badge */}
                             {q.type && q.type !== "pilihan_ganda" && (
                               <span className={`inline-block text-[9px] font-bold px-2 py-0.5 rounded-full border ${q.type === "pilihan_ganda_kompleks" ? "bg-blue-50 text-blue-600 border-blue-200" :
@@ -7235,8 +7314,36 @@ Aturan:
                                             q.type === "drag_drop" ? "Drag & Drop" : q.type}
                               </span>
                             )}
-                            {/* Choices (pilihan ganda, benar/salah) */}
-                            {q.choices && Object.keys(q.choices).length > 0 && (
+                            {/* Statements (benar_salah tabel matriks) */}
+                            {q.statements && q.statements.length > 0 && (
+                              <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs mt-2">
+                                <table className="w-full text-left border-collapse">
+                                  <thead>
+                                    <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
+                                      <th className="p-2.5 text-xs font-bold text-slate-700 dark:text-slate-300">Pernyataan</th>
+                                      <th className="w-24 p-2.5 text-center text-xs font-black text-emerald-600 uppercase">Kunci</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                                    {q.statements.map((s: any, sIdx: number) => (
+                                      <tr key={s.id || sIdx}>
+                                        <td className="p-2.5 text-xs text-slate-700 dark:text-slate-300">
+                                          <span className="font-bold mr-1.5 text-slate-400">{sIdx + 1}.</span>
+                                          <MathText content={s.text} disableJustify={true} className="inline !p-0 [&_p]:inline" />
+                                        </td>
+                                        <td className="p-2.5 text-center">
+                                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${s.answer === "benar" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400" : "bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400"}`}>
+                                            {s.answer || "benar"}
+                                          </span>
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            )}
+                            {/* Choices (pilihan ganda, atau benar/salah legacy tanpa statements) */}
+                            {(!q.statements || q.statements.length === 0) && q.choices && Object.keys(q.choices).length > 0 && (
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 mt-2">
                                 {Object.entries(q.choices).map(([key, val]: [string, any]) => (
                                   <div key={key} className={`p-2.5 rounded-xl border flex items-center gap-3 transition-all ${val.isCorrect ? 'bg-emerald-50 border-emerald-200 dark:bg-emerald-950/20 dark:border-emerald-800/40 text-emerald-700 dark:text-emerald-400' : 'bg-slate-50/50 dark:bg-slate-800/40 border-slate-100 dark:border-slate-700 text-slate-500 dark:text-slate-400'}`}>

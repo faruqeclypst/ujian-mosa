@@ -61,9 +61,11 @@ export const resetTokenUsage = (): void => { localStorage.removeItem(TOKEN_USAGE
 export interface AIGeneratedQuestion {
   text: string;
   type: string;
+  imageUrl?: string;
   choices?: Record<string, { text: string; isCorrect: boolean }>;
   pairs?: Array<{ id: string; left: string; right: string }>;
   items?: Array<{ id: string; text: string }>;
+  statements?: Array<{ id: string; text: string; answer?: "benar" | "salah" }>;
   answerKey?: string;
   groupId?: string;
   groupText?: string;
@@ -612,7 +614,7 @@ const validateQuestions = (questions: any[], isExactSubject: boolean = false, re
     const qType = q.type || requestedType || "pilihan_ganda";
 
     // For multiple choice: must have at least 2 choices
-    if ((qType === "pilihan_ganda" || qType === "pilihan_ganda_kompleks" || qType === "benar_salah") && q.choices && typeof q.choices === "object") {
+    if ((qType === "pilihan_ganda" || qType === "pilihan_ganda_kompleks") && q.choices && typeof q.choices === "object") {
       const keys = Object.keys(q.choices);
       if (keys.length < 2) return false;
       // Ensure answer key exists in choices
@@ -713,6 +715,8 @@ const validateQuestions = (questions: any[], isExactSubject: boolean = false, re
     })(),
     pairs: q.pairs || undefined,
     items: q.items || undefined,
+    statements: q.statements || (q.options?.statements ? q.options.statements : undefined),
+    imageUrl: q.imageUrl || q.image_url || undefined,
     answerKey: q.answerKey || q.answer_key || q.answer || "",
     groupId: q.groupId || "",
     groupText: wrapLatexInHtml(unescapeLatex(q.groupText || ""))

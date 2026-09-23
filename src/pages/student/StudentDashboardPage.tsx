@@ -264,16 +264,24 @@ const StudentDashboardPage = () => {
               if (local.status === "finished" &&
                 myStatus[rId]?.status !== "finished" &&
                 local.id === myStatus[rId]?.id) {
-                myStatus[rId] = {
-                  ...myStatus[rId],
-                  status: "finished",
-                  submittedAt: local.submittedAt,
-                  score: local.score ?? myStatus[rId]?.score,
-                  objectiveScore: local.objectiveScore ?? myStatus[rId]?.objectiveScore,
-                  objectiveCorrect: local.objectiveCorrect ?? myStatus[rId]?.objectiveCorrect,
-                  objectiveTotal: local.objectiveTotal ?? myStatus[rId]?.objectiveTotal,
-                  essayTotal: local.essayTotal ?? myStatus[rId]?.essayTotal,
-                };
+                const serverUpdated = new Date(myStatus[rId]?.updated || 0).getTime();
+                const localSub = new Date(local.submittedAt || local.updated || 0).getTime();
+                if (myStatus[rId]?.status === "ongoing" && serverUpdated > localSub) {
+                  localStorage.removeItem(`local_attempt_${student.id}_${rId}`);
+                  localStorage.removeItem(`offline_answers_${student.id}_${rId}`);
+                  localStorage.removeItem(`pending_sync_${student.id}_${rId}`);
+                } else {
+                  myStatus[rId] = {
+                    ...myStatus[rId],
+                    status: "finished",
+                    submittedAt: local.submittedAt,
+                    score: local.score ?? myStatus[rId]?.score,
+                    objectiveScore: local.objectiveScore ?? myStatus[rId]?.objectiveScore,
+                    objectiveCorrect: local.objectiveCorrect ?? myStatus[rId]?.objectiveCorrect,
+                    objectiveTotal: local.objectiveTotal ?? myStatus[rId]?.objectiveTotal,
+                    essayTotal: local.essayTotal ?? myStatus[rId]?.essayTotal,
+                  };
+                }
               }
             }
           } catch { }
@@ -393,19 +401,28 @@ const StudentDashboardPage = () => {
     }
   }, [student?.id]);
 
-  const totalActive = activeRooms.filter(r => {
+  const isRoomFinishedOrExpired = useCallback((r: any) => {
     const att = userAttempts[r.id];
     const finished = att && (att.status === "finished" || att.status === "submitted" || att.status === "graded");
-    const expired = r.timeStatus === "expired";
-    return !finished && !expired;
-  }).length;
+    if (finished) return true;
 
-  const totalFinished = activeRooms.filter(r => {
-    const att = userAttempts[r.id];
-    const finished = att && (att.status === "finished" || att.status === "submitted" || att.status === "graded");
-    const expired = r.timeStatus === "expired";
-    return finished || expired;
-  }).length;
+    // Jika siswa memiliki sesi aktif (ongoing / LOCKED)
+    if (att && (att.status === "ongoing" || att.status === "LOCKED")) {
+      const startStr = att.startedAt || att.startTime || att.created;
+      if (startStr) {
+        const durMs = (r.duration || 60) * 60000;
+        const isDurationOver = new Date(startStr).getTime() + durMs < Date.now();
+        return isDurationOver;
+      }
+      return false;
+    }
+
+    // Jika belum ada attempt, expired ditentukan oleh jadwal batas akhir akses ruangan
+    return r.timeStatus === "expired";
+  }, [userAttempts]);
+
+  const totalActive = activeRooms.filter(r => !isRoomFinishedOrExpired(r)).length;
+  const totalFinished = activeRooms.filter(r => isRoomFinishedOrExpired(r)).length;
 
   const bannerMessages = useMemo(() => [
     { text: "Anda memiliki", highlight: `${totalActive} agenda ujian aktif`, suffix: "hari ini." },
@@ -597,12 +614,7 @@ const StudentDashboardPage = () => {
                         : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
                     )}
                   >
-                    Aktif ({activeRooms.filter(r => {
-                      const att = userAttempts[r.id];
-                      const finished = att && (att.status === "finished" || att.status === "submitted" || att.status === "graded");
-                      const expired = r.timeStatus === "expired";
-                      return !finished && !expired;
-                    }).length})
+                    Aktif ({totalActive})
                   </button>
                   <button 
                     onClick={() => setActiveTab("history")} 
@@ -613,12 +625,7 @@ const StudentDashboardPage = () => {
                         : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
                     )}
                   >
-                    Selesai ({activeRooms.filter(r => {
-                      const att = userAttempts[r.id];
-                      const finished = att && (att.status === "finished" || att.status === "submitted" || att.status === "graded");
-                      const expired = r.timeStatus === "expired";
-                      return finished || expired;
-                    }).length})
+                    Selesai ({totalFinished})
                   </button>
                 </div>
               </div>
@@ -631,10 +638,7 @@ const StudentDashboardPage = () => {
                     ))}
                   </div>
                 ) : activeRooms.filter(r => {
-                  const att = userAttempts[r.id];
-                  const finished = att && (att.status === "finished" || att.status === "submitted" || att.status === "graded");
-                  const expired = r.timeStatus === "expired";
-                  const isHistory = finished || expired;
+                  const isHistory = isRoomFinishedOrExpired(r);
                   return activeTab === "active" ? !isHistory : isHistory;
                 }).length === 0 ? (
                   <div className="py-20 border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl text-center bg-white dark:bg-slate-900/50">
@@ -647,10 +651,7 @@ const StudentDashboardPage = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-4">
                     {activeRooms
                       .filter(r => {
-                        const att = userAttempts[r.id];
-                        const finished = att && (att.status === "finished" || att.status === "submitted" || att.status === "graded");
-                        const expired = r.timeStatus === "expired";
-                        const isHistory = finished || expired;
+                        const isHistory = isRoomFinishedOrExpired(r);
                         return activeTab === "active" ? !isHistory : isHistory;
                       })
                       .map((room, idx) => {
@@ -800,7 +801,7 @@ const StudentDashboardPage = () => {
                                       <div className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse" />
                                       <span className="text-[10px] font-black text-rose-600 uppercase tracking-[0.2em]">Akun Terkunci</span>
                                     </div>
-                                  ) : room.timeStatus === "ongoing" ? (
+                                  ) : (!isRoomFinishedOrExpired(room) && (room.timeStatus === "ongoing" || !!attempt)) ? (
                                     <Button
                                       onClick={() => setSelectedRoom(room)}
                                       className="w-full h-12 bg-emerald-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] shadow-lg shadow-emerald-200 dark:shadow-none transition-all active:scale-95 group-hover:bg-emerald-700"
@@ -810,7 +811,7 @@ const StudentDashboardPage = () => {
                                   ) : (
                                     <div className="h-12 px-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl flex items-center justify-center border border-slate-100 dark:border-slate-800">
                                       <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                                        {room.timeStatus === "expired" ? "Waktu Telah Habis" : "Menunggu Jadwal Mulai"}
+                                        {isRoomFinishedOrExpired(room) ? "Waktu Telah Habis" : "Menunggu Jadwal Mulai"}
                                       </span>
                                     </div>
                                   )}

@@ -10,6 +10,7 @@ const CapacitorOverlay = () => {
   const [showMenu, setShowMenu] = useState(false);
   const [dialogType, setDialogType] = useState<"none" | "refresh" | "exit">("none");
   const [isExitingApp, setIsExitingApp] = useState(false);
+  const [isKickedOverlay, setIsKickedOverlay] = useState(false);
 
   // Simple drag implementation
   const fabRef = useRef<HTMLDivElement>(null);
@@ -51,8 +52,17 @@ const CapacitorOverlay = () => {
     // Block back button
     const backListener = App.addListener("backButton", () => {});
 
+    // Sembunyikan FAB jika siswa di-kick karena double login
+    const handleStudentKicked = () => {
+      setIsKickedOverlay(true);
+      setShowMenu(false);
+      setDialogType("none");
+    };
+    window.addEventListener("app:studentKicked", handleStudentKicked);
+
     return () => {
       backListener.then((l) => l.remove());
+      window.removeEventListener("app:studentKicked", handleStudentKicked);
     };
   }, []);
 
@@ -60,7 +70,7 @@ const CapacitorOverlay = () => {
     window.location.pathname.startsWith("/admin") ||
     window.location.pathname.startsWith("/superadmin");
 
-  if (!isCapacitor || isExcludedRoute) return null;
+  if (!isCapacitor || isExcludedRoute || isKickedOverlay) return null;
 
   const handleRefresh = async () => {
     try {

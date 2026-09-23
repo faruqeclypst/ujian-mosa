@@ -11,7 +11,6 @@ import { useAuth } from "../../context/AuthContext";
 import { getExamTypeColorClass } from "./ExamsPage";
 import { useTenant } from "../../context/TenantContext";
 import { ConfirmationDialog } from "../../components/dialogs/ConfirmationDialog";
-import { ItemAnalysisDialog } from "../../components/dialogs/ItemAnalysisDialog";
 import { BatchProgressDialog, type BatchProgressState } from "../../components/dialogs/BatchProgressDialog";
 import { useToast } from "../../components/ui/toast";
 import { cn } from "../../lib/utils";
@@ -76,7 +75,6 @@ const ExamRoomsPage = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [dialogMode, setDialogMode] = useState<"create" | "edit">("create");
   const [selectedRoom, setSelectedRoom] = useState<ExamRoomData | null>(null);
-  const [analysisRoom, setAnalysisRoom] = useState<ExamRoomData | null>(null);
 
   const [examSearch, setExamSearch] = useState("");
   const [lastSelectedClassIndex, setLastSelectedClassIndex] = useState<number | null>(null);
@@ -331,15 +329,23 @@ const ExamRoomsPage = () => {
                 {room.examType || "UMUM"}
               </span>
               {room.max_questions && room.max_questions > 0 ? (
-                <span className="text-[9px] px-1.5 py-0 rounded font-black border bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/40 dark:text-indigo-400 dark:border-indigo-800/40 whitespace-nowrap">
+                <span className={cn(
+                  "text-[9px] px-1.5 py-0 rounded font-black border whitespace-nowrap",
+                  room.randomize_questions !== false
+                    ? "bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/40 dark:text-indigo-400 dark:border-indigo-800/40"
+                    : "bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400"
+                )}>
                   {room.max_questions} Soal {room.randomize_questions !== false ? "(Acak)" : "(Urut)"}
                 </span>
               ) : (
-                room.randomize_questions === false && (
-                  <span className="text-[9px] px-1.5 py-0 rounded font-black border bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400 whitespace-nowrap">
-                    Soal Urut
-                  </span>
-                )
+                <span className={cn(
+                  "text-[9px] px-1.5 py-0 rounded font-black border whitespace-nowrap",
+                  room.randomize_questions !== false
+                    ? "bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/40 dark:text-indigo-400 dark:border-indigo-800/40"
+                    : "bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400"
+                )}>
+                  Semua Soal {room.randomize_questions !== false ? "(Acak)" : "(Urut)"}
+                </span>
               )}
             </div>
             <div className="flex flex-col gap-0.5 text-slate-500 dark:text-slate-400 font-bold text-[10px]">
@@ -1367,7 +1373,7 @@ const ExamRoomsPage = () => {
 
                   <button
                     className="p-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg dark:bg-blue-900/10 dark:text-blue-400 border border-blue-100 dark:border-blue-800/40 transition-colors"
-                    onClick={() => setAnalysisRoom(room)}
+                    onClick={() => navigate(`/admin/analisis-butir-soal?roomId=${room.id}&examId=${room.examId || ""}`)}
                     title="Analisis Butir Soal & Daya Pembeda"
                   >
                     <BarChart2 className="h-4 w-4" />
@@ -1710,17 +1716,6 @@ const ExamRoomsPage = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {analysisRoom && (
-        <ItemAnalysisDialog
-          isOpen={!!analysisRoom}
-          onClose={() => setAnalysisRoom(null)}
-          roomId={analysisRoom.id}
-          examId={analysisRoom.examId}
-          roomName={analysisRoom.room_name}
-          examTitle={analysisRoom.examTitle}
-        />
-      )}
 
       {/* Batch Operation Progress Dialog */}
       <BatchProgressDialog progress={batchProgress} colorClass="bg-indigo-600" />

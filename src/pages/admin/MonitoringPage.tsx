@@ -35,7 +35,6 @@ import { useTenant } from "../../context/TenantContext";
 import { useExamData } from "../../context/ExamDataContext";
 import { useAuth } from "../../context/AuthContext";
 import { ConfirmationDialog } from "../../components/dialogs/ConfirmationDialog";
-import { ItemAnalysisDialog } from "../../components/dialogs/ItemAnalysisDialog";
 import { MathText } from "../../components/ui/MathText";
 import { gradeEssayWithAI } from "../../lib/ai";
 
@@ -47,6 +46,8 @@ export interface ExamRoomData {
   token: string;
   start_time: string;
   end_time: string;
+  startTime?: string;
+  endTime?: string;
   duration: number;
   cheat_limit: number;
   submit_window?: number;
@@ -97,15 +98,8 @@ const StudentTimer = ({ attempt, room }: { attempt: any, room: any }) => {
       const durationMs = (room?.duration || 0) * 60 * 1000;
       const endByDuration = start + durationMs;
 
-      // Also respect room end_time if it's earlier than duration expiry
-      let finalEnd = endByDuration;
-      if (room?.end_time) {
-        const roomEnd = new Date(room.end_time).getTime();
-        if (roomEnd < finalEnd) finalEnd = roomEnd;
-      }
-
       const now = Date.now();
-      const diff = finalEnd - now;
+      const diff = endByDuration - now;
 
       if (diff <= 0) {
         setTimeLeft("HABIS");
@@ -505,7 +499,6 @@ const MonitoringPage = () => {
   const [isMonitorRefreshing, setIsMonitorRefreshing] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState("");
-  const [isItemAnalysisOpen, setIsItemAnalysisOpen] = useState(false);
 
   // 📝 Real-time Live Score Calculator (Weighted: objective + essay)
   const getLiveScore = (sisAnswers: Record<string, any>, attOverrides: Record<string, boolean> = {}) => {
@@ -626,6 +619,25 @@ const MonitoringPage = () => {
     confirmLabel: "Konfirmasi",
     onConfirm: () => { }
   });
+
+  const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
+
+  const [reopenDialog, setReopenDialog] = useState<{
+    isOpen: boolean;
+    attemptIds: string[];
+    title: string;
+    remainingMinutes: number;
+    timeOption: "keep" | "reset" | "extra";
+    extraMinutes: number;
+  }>({
+    isOpen: false,
+    attemptIds: [],
+    title: "",
+    remainingMinutes: 0,
+    timeOption: "extra",
+    extraMinutes: 10,
+  });
+  const [isReopening, setIsReopening] = useState(false);
 
   const teacherId = user?.id;
 
@@ -940,8 +952,21 @@ const MonitoringPage = () => {
   const handleUnlockStudent = async (attId: string) => {
     if (!pb) return;
     try {
+      const targetAtt = attempts.find(a => a.id === attId);
+      const roomDur = monitorRoom?.duration || 60;
+      let newStartedAt = targetAtt?.startedAt;
+
+      // Jika durasi siswa sudah habis saat terkunci, beri waktu tambahan 5 menit agar tidak langsung auto-finish
+      if (targetAtt?.startedAt) {
+        const targetEnd = new Date(targetAtt.startedAt).getTime() + roomDur * 60000;
+        if (targetEnd <= Date.now()) {
+          newStartedAt = new Date(Date.now() + 5 * 60000 - roomDur * 60000).toISOString();
+        }
+      }
+
       await pb.collection('attempts').update(attId, {
-        status: 'ongoing'
+        status: 'ongoing',
+        ...(newStartedAt ? { startedAt: newStartedAt } : {})
       });
       showAlert("Berhasil", `${terminology.student} berhasil dibuka kuncinya.`, "success");
     } catch (e) { showAlert("Gagal", "Gagal membuka kunci.", "danger"); }
@@ -1034,6 +1059,120 @@ const MonitoringPage = () => {
         } catch (e) { showAlert("Gagal", "Gagal.", "danger"); }
       }
     });
+  };
+
+  const handleOpenReopenDialog = (att: any, studentName: string) => {
+    const roomDur = monitorRoom?.duration || 60;
+    const startStr = att.startedAt || att.startTime || att.created;
+    let remainingMins = 0;
+    if (startStr) {
+      const targetEnd = new Date(startStr).getTime() + roomDur * 60000;
+      remainingMins = Math.max(0, Math.floor((targetEnd - Date.now()) / 60000));
+    }
+
+    setReopenDialog({
+      isOpen: true,
+      attemptIds: [att.id],
+      title: studentName || "Siswa",
+      remainingMinutes: remainingMins,
+      timeOption: remainingMins > 0 ? "keep" : "extra",
+      extraMinutes: 10,
+    });
+  };
+
+  const handleOpenReopenAllFinishedDialog = () => {
+    const finishedAtts = attempts.filter(a => a.status === "finished");
+    if (finishedAtts.length === 0) return;
+
+    setReopenDialog({
+      isOpen: true,
+      attemptIds: finishedAtts.map(a => a.id),
+      title: `${finishedAtts.length} Siswa yang Sudah Selesai`,
+      remainingMinutes: 0,
+      timeOption: "extra",
+      extraMinutes: 10,
+    });
+  };
+
+  const handleOpenReopenSelectedDialog = () => {
+    const selectedAtts = attempts.filter(a => selectedStudentIds.includes(a.studentId || (a as any).student_id) && a.status === "finished");
+    if (selectedAtts.length === 0) {
+      showAlert("Info", "Dari siswa yang dipilih, tidak ada yang berstatus 'finished' (selesai).", "warning");
+      return;
+    }
+
+    setReopenDialog({
+      isOpen: true,
+      attemptIds: selectedAtts.map(a => a.id),
+      title: `${selectedAtts.length} Siswa Terpilih (Selesai)`,
+      remainingMinutes: 0,
+      timeOption: "extra",
+      extraMinutes: 10,
+    });
+  };
+
+  const handleConfirmReopen = async () => {
+    if (!pb || reopenDialog.attemptIds.length === 0) return;
+    setIsReopening(true);
+    try {
+      const roomDur = monitorRoom?.duration || 60;
+      const targetAtts = attempts.filter(a => reopenDialog.attemptIds.includes(a.id));
+
+      // 🛡️ Jika jadwal batas waktu ruangan sudah terlewati (expired), otomatis perpanjang endTime ruangan
+      // agar siswa tidak terblokir saat mencoba masuk kembali (terutama di APK lama)
+      const rawEnd = monitorRoom?.endTime || monitorRoom?.end_time;
+      if (monitorRoom?.id && rawEnd) {
+        const roomEnd = new Date(rawEnd).getTime();
+        if (roomEnd <= Date.now()) {
+          const newRoomEndTime = new Date(Date.now() + 120 * 60000).toISOString();
+          try {
+            await pb.collection('exam_rooms').update(monitorRoom.id, {
+              endTime: newRoomEndTime
+            });
+            console.log(`[REOPEN] Jadwal ruangan telah diperpanjang otomatis hingga 2 jam ke depan: ${newRoomEndTime}`);
+          } catch (roomErr) {
+            console.warn("[REOPEN] Gagal update endTime ruangan otomatis:", roomErr);
+          }
+        }
+      }
+
+      const chunkSize = 10;
+      for (let i = 0; i < targetAtts.length; i += chunkSize) {
+        const chunk = targetAtts.slice(i, i + chunkSize);
+        await Promise.all(chunk.map(att => {
+          let newStartedAt = att?.startedAt || att?.created || new Date().toISOString();
+
+          if (reopenDialog.timeOption === "reset") {
+            newStartedAt = new Date().toISOString();
+          } else if (reopenDialog.timeOption === "extra") {
+            const extraMs = (reopenDialog.extraMinutes || 10) * 60000;
+            newStartedAt = new Date(Date.now() + extraMs - roomDur * 60000).toISOString();
+          } else if (reopenDialog.timeOption === "keep") {
+            const origEnd = new Date(newStartedAt).getTime() + roomDur * 60000;
+            if (origEnd <= Date.now()) {
+              newStartedAt = new Date(Date.now() + 5 * 60000 - roomDur * 60000).toISOString();
+            }
+          }
+
+          return pb.collection('attempts').update(att.id, {
+            status: "ongoing",
+            submittedAt: "",
+            startedAt: newStartedAt,
+            isOnline: true,
+            lastHeartbeat: new Date().toISOString()
+          });
+        }));
+      }
+
+      showAlert("Berhasil", `Berhasil membuka kembali ${reopenDialog.attemptIds.length} ujian siswa menjadi Ongoing.`, "success");
+      setReopenDialog(prev => ({ ...prev, isOpen: false, attemptIds: [] }));
+      setSelectedStudentIds([]);
+      handleManualRefreshMonitor();
+    } catch (err: any) {
+      showAlert("Gagal", err.message || "Gagal membuka kembali ujian.", "danger");
+    } finally {
+      setIsReopening(false);
+    }
   };
 
   const handleManualGrade = async (studentId: string, qId: string, isForcedCorrect: boolean) => {
@@ -2476,7 +2615,7 @@ const MonitoringPage = () => {
                       <Trophy className="h-3.5 w-3.5 text-amber-500 shrink-0" /> Live Score
                     </button>
                     <button
-                      onClick={() => setIsItemAnalysisOpen(true)}
+                      onClick={() => navigate(`/admin/analisis-butir-soal?roomId=${roomId || ""}&examId=${monitorRoom?.examId || ""}`)}
                       className="w-full col-span-2 rounded-xl bg-blue-50 hover:bg-blue-100 border border-blue-100 dark:bg-blue-900/20 dark:text-blue-400 dark:hover:bg-blue-900/40 dark:border-blue-800/40 text-blue-700 font-bold text-[10px] py-2 px-2 shadow-sm transition-all flex items-center justify-center gap-1.5 whitespace-nowrap tracking-tight"
                     >
                       <BarChart2 className="h-3.5 w-3.5 text-blue-600 shrink-0" /> Analisis Butir Soal (Item Analysis)
@@ -2550,6 +2689,14 @@ const MonitoringPage = () => {
                 {(role === "admin" || (role === "teacher" && teacherFullAccess)) && (
                   <div className="space-y-1.5">
                     <span className="text-[10px] font-black text-rose-500/80 dark:text-rose-400/80 uppercase tracking-widest pl-1">Zona Bahaya (Aksi Massal)</span>
+                    <button
+                      onClick={handleOpenReopenAllFinishedDialog}
+                      disabled={attempts.filter(a => a.status === "finished").length === 0}
+                      className="w-full rounded-xl bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 dark:bg-indigo-950/40 dark:text-indigo-400 dark:border-indigo-800/40 font-bold text-[10px] py-2.5 px-2 shadow-sm transition-all flex items-center justify-center gap-1.5 whitespace-nowrap tracking-tight disabled:opacity-40 disabled:cursor-not-allowed mb-2"
+                    >
+                      <RotateCcw className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                      Buka Semua yang Selesai ({attempts.filter(a => a.status === "finished").length})
+                    </button>
                     <div className="grid grid-cols-2 gap-2">
                       <button
                         onClick={handleForceSubmitAll}
@@ -2596,6 +2743,20 @@ const MonitoringPage = () => {
               <Table>
                 <TableHeader className="bg-slate-50 dark:bg-slate-900/50">
                   <TableRow>
+                    <TableHead className="w-9 text-center px-1">
+                      <input
+                        type="checkbox"
+                        checked={students.length > 0 && students.every(s => selectedStudentIds.includes(s.id))}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedStudentIds(students.map(s => s.id));
+                          } else {
+                            setSelectedStudentIds([]);
+                          }
+                        }}
+                        className="rounded border-slate-300 dark:border-slate-700 text-indigo-600 focus:ring-indigo-500 cursor-pointer h-3.5 w-3.5"
+                      />
+                    </TableHead>
                     <TableHead className="w-10 text-center text-[10px]">No</TableHead>
                     <TableHead
                       className="cursor-pointer hover:text-blue-600 transition-colors group select-none"
@@ -2654,6 +2815,7 @@ const MonitoringPage = () => {
                   {isLoading ? (
                     Array.from({ length: 10 }).map((_, i) => (
                       <TableRow key={`skele-row-${i}`} className="h-16">
+                        <TableCell className="text-center px-1"><Skeleton className="h-3.5 w-3.5 mx-auto rounded" /></TableCell>
                         <TableCell className="text-center"><Skeleton className="h-3 w-3 mx-auto" /></TableCell>
                         <TableCell><Skeleton className="h-5 w-48" /><Skeleton className="h-3 w-32 mt-1.5" /></TableCell>
                         <TableCell><Skeleton className="h-6 w-16" /></TableCell>
@@ -2720,7 +2882,7 @@ const MonitoringPage = () => {
                     const startIndex = (monitorPage - 1) * monitorPageSize;
                     const currentData = filtered.slice(startIndex, startIndex + monitorPageSize);
 
-                    if (currentData.length === 0 && monitorPage === 1) return <TableRow><TableCell colSpan={7} className="h-60 text-center text-slate-400">{terminology.student} tidak ditemukan</TableCell></TableRow>;
+                    if (currentData.length === 0 && monitorPage === 1) return <TableRow><TableCell colSpan={8} className="h-60 text-center text-slate-400">{terminology.student} tidak ditemukan</TableCell></TableRow>;
 
                     const rows = currentData.map((student, localIdx) => {
                       const attempt = attempts.find(a => a.studentId === student.id || a.student_id === student.id);
@@ -2736,6 +2898,20 @@ const MonitoringPage = () => {
                       return (
                         <React.Fragment key={student.id}>
                           <TableRow className={`hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors h-16 ${isExpanded ? "bg-blue-50/30 dark:bg-blue-900/10" : ""}`}>
+                            <TableCell className="text-center px-1">
+                              <input
+                                type="checkbox"
+                                checked={selectedStudentIds.includes(student.id)}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setSelectedStudentIds(prev => [...prev, student.id]);
+                                  } else {
+                                    setSelectedStudentIds(prev => prev.filter(id => id !== student.id));
+                                  }
+                                }}
+                                className="rounded border-slate-300 dark:border-slate-700 text-indigo-600 focus:ring-indigo-500 cursor-pointer h-3.5 w-3.5"
+                              />
+                            </TableCell>
                             <TableCell className="text-center text-slate-400 text-[10px] px-1">{startIndex + localIdx + 1}</TableCell>
                             <TableCell>
                               <div className="flex flex-col cursor-pointer" onClick={() => { sessionStorage.setItem("activeGradingRoomId", roomId || ""); navigate(`/admin/penilaian/${student.id}`); }}>                                <span className="font-bold text-indigo-600 dark:text-indigo-400 hover:underline">{student.name}</span>
@@ -2907,6 +3083,14 @@ const MonitoringPage = () => {
                                               <div className="h-1.5 w-1.5 rounded-full bg-blue-500" /> Selesaikan
                                             </button>
                                           )}
+                                          {attempt.status === "finished" && (
+                                            <button
+                                              onClick={() => { handleOpenReopenDialog(attempt, student.name); setOpenMenuId(null); }}
+                                              className="w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 text-[10px] text-indigo-600 dark:text-indigo-400 font-bold transition-colors flex items-center gap-2"
+                                            >
+                                              <RotateCcw className="h-3 w-3 text-indigo-500" /> Buka Kembali (Ongoing)
+                                            </button>
+                                          )}
                                           <button
                                             onClick={() => { handleResetSession(attempt.id, student.id); setOpenMenuId(null); }}
                                             className="w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 text-[10px] text-rose-600 dark:text-rose-500 font-bold transition-colors flex items-center gap-2"
@@ -2923,7 +3107,7 @@ const MonitoringPage = () => {
                           </TableRow>
                           {isExpanded && (
                             <TableRow className="bg-slate-50/50 dark:bg-slate-900/40">
-                              <TableCell colSpan={7} className="p-4">
+                              <TableCell colSpan={8} className="p-4">
                                 {/* Header Info Paket Soal Siswa */}
                                 <div className="mb-3 flex items-center justify-between flex-wrap gap-2 px-3.5 py-2 bg-indigo-50/70 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-800/40 rounded-xl text-xs">
                                   <div className="flex items-center gap-2 flex-wrap">
@@ -2935,9 +3119,13 @@ const MonitoringPage = () => {
                                       <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300 border border-purple-200 dark:border-purple-800/50 flex items-center gap-1 shadow-sm">
                                         <span>🎲</span> {targetQuestions.length} Soal Teracak (dari {monitorQuestions.length} Bank Soal)
                                       </span>
+                                    ) : monitorRoom?.randomize_questions !== false ? (
+                                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300 border border-purple-200 dark:border-purple-800/50 flex items-center gap-1 shadow-sm">
+                                        <span>🎲</span> Total {targetQuestions.length} Soal (Acak)
+                                      </span>
                                     ) : (
                                       <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300">
-                                        Total {targetQuestions.length} Soal
+                                        Total {targetQuestions.length} Soal (Urut)
                                       </span>
                                     )}
                                   </div>
@@ -3437,6 +3625,149 @@ const MonitoringPage = () => {
         requireWord={confirmDialog.requireWord}
       />
 
+      {/* 📋 Floating Batch Action Bar */}
+      {selectedStudentIds.length > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white dark:bg-slate-800 px-5 py-3 rounded-2xl shadow-2xl border border-slate-700 flex items-center gap-3.5 animate-in fade-in slide-in-from-bottom-5 duration-200">
+          <span className="text-xs font-black tracking-wide text-slate-200 whitespace-nowrap">
+            <span className="text-indigo-400 font-black mr-1">{selectedStudentIds.length}</span> Siswa Dipilih
+          </span>
+          <div className="h-4 w-px bg-slate-700" />
+          <button
+            onClick={handleOpenReopenSelectedDialog}
+            className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95 shadow-md shadow-indigo-900/50 whitespace-nowrap"
+          >
+            <RotateCcw className="w-3.5 h-3.5" /> Buka Kembali (Ongoing)
+          </button>
+          <button
+            onClick={() => setSelectedStudentIds([])}
+            className="text-xs font-semibold text-slate-400 hover:text-white px-2 py-1 transition-colors whitespace-nowrap"
+          >
+            Batal
+          </button>
+        </div>
+      )}
+
+      {/* 🔄 Dialog Buka Kembali Ujian (Jadikan Ongoing) */}
+      <Dialog open={reopenDialog.isOpen} onOpenChange={(open) => setReopenDialog(prev => ({ ...prev, isOpen: open }))}>
+        <DialogContent className="max-w-md p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl">
+          <DialogHeader className="space-y-1">
+            <div className="w-10 h-10 rounded-2xl bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 flex items-center justify-center mb-2 border border-indigo-100 dark:border-indigo-800/50">
+              <RotateCcw className="w-5 h-5" />
+            </div>
+            <DialogTitle className="text-base font-black text-slate-900 dark:text-white uppercase tracking-tight">
+              Buka Kembali Ujian Siswa {reopenDialog.attemptIds.length > 1 ? `(${reopenDialog.attemptIds.length} Siswa)` : ""}
+            </DialogTitle>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Mengembalikan status pengerjaan <span className="font-bold text-slate-800 dark:text-slate-200">{reopenDialog.title}</span> menjadi <span className="font-black text-blue-600 dark:text-blue-400">ONGOING</span>.
+            </p>
+          </DialogHeader>
+
+          <div className="mt-4 space-y-4">
+            <div className="p-3 bg-indigo-50/60 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-900/40 rounded-2xl text-xs text-indigo-900 dark:text-indigo-300">
+              <p className="font-bold">✨ Jawaban Aman Tersimpan</p>
+              <p className="text-[11px] text-indigo-700 dark:text-indigo-400 mt-0.5">
+                Semua butir jawaban yang telah diisi siswa sebelumnya tetap utuh. Siswa dapat langsung melanjutkan pengerjaan soal.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[11px] font-black uppercase tracking-wider text-slate-400">Pilihan Waktu Pengerjaan</label>
+              
+              <div className="space-y-2">
+                {reopenDialog.remainingMinutes > 0 && (
+                  <label className={cn(
+                    "flex items-center gap-3 p-3 rounded-2xl border cursor-pointer transition-all",
+                    reopenDialog.timeOption === "keep" 
+                      ? "border-indigo-500 bg-indigo-50/30 dark:bg-indigo-950/20 shadow-sm" 
+                      : "border-slate-200 dark:border-slate-800 hover:border-slate-300"
+                  )}>
+                    <input 
+                      type="radio" 
+                      name="timeOption" 
+                      checked={reopenDialog.timeOption === "keep"} 
+                      onChange={() => setReopenDialog(prev => ({ ...prev, timeOption: "keep" }))}
+                      className="text-indigo-600 focus:ring-indigo-500" 
+                    />
+                    <div className="text-xs">
+                      <p className="font-bold text-slate-800 dark:text-slate-200">Gunakan Sisa Waktu Asli</p>
+                      <p className="text-[10px] text-slate-400">Tersisa sekitar {reopenDialog.remainingMinutes} menit dari durasi semula.</p>
+                    </div>
+                  </label>
+                )}
+
+                <label className={cn(
+                  "flex items-center gap-3 p-3 rounded-2xl border cursor-pointer transition-all",
+                  reopenDialog.timeOption === "extra" 
+                    ? "border-indigo-500 bg-indigo-50/30 dark:bg-indigo-950/20 shadow-sm" 
+                    : "border-slate-200 dark:border-slate-800 hover:border-slate-300"
+                )}>
+                  <input 
+                    type="radio" 
+                    name="timeOption" 
+                    checked={reopenDialog.timeOption === "extra"} 
+                    onChange={() => setReopenDialog(prev => ({ ...prev, timeOption: "extra" }))}
+                    className="text-indigo-600 focus:ring-indigo-500" 
+                  />
+                  <div className="text-xs flex-1">
+                    <p className="font-bold text-slate-800 dark:text-slate-200">Beri Tambahan Waktu Baru</p>
+                    <p className="text-[10px] text-slate-400 mb-1.5">Siswa mendapat waktu pengerjaan tambahan dihitung mulai saat ini.</p>
+                    {reopenDialog.timeOption === "extra" && (
+                      <div className="flex items-center gap-2 mt-2">
+                        <input
+                          type="number"
+                          min="1"
+                          max="180"
+                          value={reopenDialog.extraMinutes}
+                          onChange={(e) => setReopenDialog(prev => ({ ...prev, extraMinutes: Math.max(1, parseInt(e.target.value) || 1) }))}
+                          className="w-20 px-2.5 py-1 text-xs font-bold border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                        />
+                        <span className="text-xs font-bold text-slate-500">Menit dari sekarang</span>
+                      </div>
+                    )}
+                  </div>
+                </label>
+
+                <label className={cn(
+                  "flex items-center gap-3 p-3 rounded-2xl border cursor-pointer transition-all",
+                  reopenDialog.timeOption === "reset" 
+                    ? "border-indigo-500 bg-indigo-50/30 dark:bg-indigo-950/20 shadow-sm" 
+                    : "border-slate-200 dark:border-slate-800 hover:border-slate-300"
+                )}>
+                  <input 
+                    type="radio" 
+                    name="timeOption" 
+                    checked={reopenDialog.timeOption === "reset"} 
+                    onChange={() => setReopenDialog(prev => ({ ...prev, timeOption: "reset" }))}
+                    className="text-indigo-600 focus:ring-indigo-500" 
+                  />
+                  <div className="text-xs">
+                    <p className="font-bold text-slate-800 dark:text-slate-200">Reset Durasi Penuh ({monitorRoom?.duration || 60} Menit)</p>
+                    <p className="text-[10px] text-slate-400">Timer siswa akan dimulai ulang dari awal secara penuh mulai dari sekarang.</p>
+                  </div>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-6 flex items-center justify-end gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setReopenDialog(prev => ({ ...prev, isOpen: false }))}
+              className="rounded-xl text-xs h-9"
+            >
+              Batal
+            </Button>
+            <Button
+              onClick={handleConfirmReopen}
+              disabled={isReopening}
+              className="rounded-xl text-xs h-9 bg-indigo-600 hover:bg-indigo-700 text-white font-bold"
+            >
+              {isReopening ? "Memproses..." : `Buka ${reopenDialog.attemptIds.length} Ujian Sekarang`}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* ⚡ Dialog Quick Grade */}
       <Dialog open={quickGradeOpen} onOpenChange={(open) => { if (!open) { setQuickGradeOpen(false); setQuickGradeProgress(null); } }}>
         <DialogContent className="max-w-2xl bg-white dark:bg-slate-950 rounded-2xl border-none shadow-2xl p-0 overflow-hidden flex flex-col max-h-[90vh]">
@@ -3722,17 +4053,6 @@ const MonitoringPage = () => {
           {previewImage && <img src={previewImage} className="w-full rounded-xl" />}
         </DialogContent>
       </Dialog>
-
-      {isItemAnalysisOpen && (
-        <ItemAnalysisDialog
-          isOpen={isItemAnalysisOpen}
-          onClose={() => setIsItemAnalysisOpen(false)}
-          roomId={roomId || undefined}
-          examId={monitorRoom?.examId}
-          roomName={monitorRoom?.room_name}
-          examTitle={monitorRoom?.examTitle}
-        />
-      )}
     </div>
   );
 };

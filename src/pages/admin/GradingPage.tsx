@@ -8,7 +8,6 @@ import { Skeleton } from "../../components/ui/skeleton";
 import { useTenant } from "../../context/TenantContext";
 import { useExamData } from "../../context/ExamDataContext";
 import { useToast } from "../../components/ui/toast";
-import { ItemAnalysisDialog } from "../../components/dialogs/ItemAnalysisDialog";
 
 const isFuzzyMatch = (studentAns: any, correctKey: string) => {
   if (typeof studentAns !== "string" || !correctKey) return false;
@@ -44,7 +43,6 @@ const GradingPage = () => {
   const [questions, setQuestions] = useState<any[]>([]);
   const [attempts, setAttempts] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
-  const [isAnalysisOpen, setIsAnalysisOpen] = useState(false);
 
   useEffect(() => {
     if (!roomId) { navigate("/admin/ruang-ujian", { replace: true }); return; }
@@ -242,7 +240,7 @@ const GradingPage = () => {
           <Button variant="outline" size="sm" onClick={loadData} className="rounded-xl text-xs">
             <RefreshCw className="w-3.5 h-3.5 mr-1.5" /> Refresh
           </Button>
-          <Button size="sm" onClick={() => setIsAnalysisOpen(true)} className="rounded-xl text-xs bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-xs">
+          <Button size="sm" onClick={() => navigate(`/admin/analisis-butir-soal?roomId=${roomId || ""}&examId=${room?.examId || ""}`)} className="rounded-xl text-xs bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-xs">
             <BarChart2 className="w-3.5 h-3.5 mr-1.5" /> Analisis Butir Soal
           </Button>
           <Button size="sm" onClick={handleExportGrading} className="rounded-xl text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-xs">
@@ -328,17 +326,6 @@ const GradingPage = () => {
           </Table>
         </div>
       </div>
-
-      {isAnalysisOpen && (
-        <ItemAnalysisDialog
-          isOpen={isAnalysisOpen}
-          onClose={() => setIsAnalysisOpen(false)}
-          roomId={roomId || undefined}
-          examId={room?.examId}
-          roomName={room?.room_name}
-          examTitle={room?.examTitle}
-        />
-      )}
     </div>
   );
 };

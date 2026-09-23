@@ -124,15 +124,43 @@ function resolveSlugFromUrl(): { slug: string | null; customDomain: string | nul
 }
 
 
+// Helper cache functions for instant resolution and offline resilience
+const getTenantCacheKey = (slug: string | null, customDomain: string | null) => {
+  if (slug) return `tenant_school_cache_${slug}`;
+  if (customDomain) return `tenant_school_cache_domain_${customDomain}`;
+  return null;
+};
+
+const getCachedSchool = (key: string | null): SchoolRecord | null => {
+  if (typeof window === 'undefined' || !key) return null;
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed && parsed.id && parsed.pb_url) return parsed;
+  } catch {
+    // Ignore parse errors
+  }
+  return null;
+};
+
+const setCachedSchool = (key: string | null, record: SchoolRecord | null) => {
+  if (typeof window === 'undefined' || !key) return;
+  try {
+    if (record) {
+      localStorage.setItem(key, JSON.stringify(record));
+    } else {
+      localStorage.removeItem(key);
+    }
+  } catch {
+    // Ignore storage quota / access errors
+  }
+};
+
 // ============================================================
 // TenantProvider
 // ============================================================
 export const TenantProvider = ({ children }: { children: ReactNode }) => {
-  const [school, setSchool] = useState<SchoolRecord | null>(null);
-  const [pb, setPb] = useState<PocketBase | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [notFound, setNotFound] = useState(false);
-  const [inactive, setInactive] = useState(false);
   const [manualSlug, setManualSlug] = useState<string | null>(() => {
     return typeof window !== 'undefined' ? localStorage.getItem('selected_school_slug') : null;
   });
@@ -142,6 +170,17 @@ export const TenantProvider = ({ children }: { children: ReactNode }) => {
   // Effective slug: URL slug takes priority on web, manual slug for native/override
   const slug = urlSlug || manualSlug;
   const isLanding = isUrlLanding && !manualSlug;
+
+  const cacheKey = useMemo(() => getTenantCacheKey(slug, customDomain), [slug, customDomain]);
+
+  // Read initial cache: instant load with 0ms latency
+  const initialCached = useMemo(() => getCachedSchool(cacheKey), [cacheKey]);
+
+  const [school, setSchool] = useState<SchoolRecord | null>(() => initialCached);
+  const [pb, setPb] = useState<PocketBase | null>(() => (initialCached?.pb_url ? getSchoolPb(initialCached.pb_url) : null));
+  const [loading, setLoading] = useState<boolean>(() => !initialCached && !isLanding && Boolean(slug || customDomain));
+  const [notFound, setNotFound] = useState(false);
+  const [inactive, setInactive] = useState(false);
 
   const setManualSchool = (newSlug: string | null) => {
     if (newSlug) {
@@ -179,7 +218,6 @@ export const TenantProvider = ({ children }: { children: ReactNode }) => {
           setLoading(false);
           return;
         } catch (e) {
-          // Fallback to dev school if master pb fails or not set up
           console.warn("Master PB fetch failed in DEV mode, using fallback dev school mock.");
           const directPbUrl = import.meta.env.VITE_POCKETBASE_URL || 'http://127.0.0.1:8090';
           const devSchool: SchoolRecord = {
@@ -197,40 +235,106 @@ export const TenantProvider = ({ children }: { children: ReactNode }) => {
         }
       }
 
-      try {
-        const currentHostname = typeof window !== 'undefined' ? window.location.hostname.toLowerCase() : '';
-        let filter = '';
-        if (customDomain && slug) {
-          filter = `custom_domain = "${customDomain}" || slug = "${slug}"`;
-        } else if (customDomain) {
-          filter = `custom_domain = "${customDomain}" || slug = "${customDomain}"`;
-        } else if (slug) {
-          filter = `custom_domain = "${currentHostname}" || slug = "${slug}"`;
-        } else if (currentHostname) {
-          filter = `custom_domain = "${currentHostname}"`;
+      const currentHostname = typeof window !== 'undefined' ? window.location.hostname.toLowerCase() : '';
+      let filter = '';
+      if (customDomain && slug) {
+        filter = `custom_domain = "${customDomain}" || slug = "${slug}"`;
+      } else if (customDomain) {
+        filter = `custom_domain = "${customDomain}" || slug = "${customDomain}"`;
+      } else if (slug) {
+        filter = `custom_domain = "${currentHostname}" || slug = "${slug}"`;
+      } else if (currentHostname) {
+        filter = `custom_domain = "${currentHostname}"`;
+      }
+
+      // Fetch with automatic retry (up to 2 retries for transient network/server delays)
+      let record: SchoolRecord | null = null;
+      let lastErr: any = null;
+      const maxRetries = 2;
+
+      for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        try {
+          record = await masterPb
+            .collection('schools')
+            .getFirstListItem<SchoolRecord>(filter);
+          break;
+        } catch (err: any) {
+          lastErr = err;
+          const isGenuine404 = err?.status === 404 || err?.data?.code === 404;
+          if (isGenuine404) break; // If genuinely 404, don't retry
+          if (attempt < maxRetries) {
+            await new Promise((r) => setTimeout(r, 400 * (attempt + 1)));
+          }
         }
+      }
 
-        const record = await masterPb
-          .collection('schools')
-          .getFirstListItem<SchoolRecord>(filter);
-
+      if (record) {
         if (!record.is_active) {
+          setCachedSchool(cacheKey, null);
           setInactive(true);
+          setNotFound(false);
+          setSchool(null);
+          setPb(null);
           setLoading(false);
           return;
         }
 
+        // Active school verified
+        setCachedSchool(cacheKey, record);
         setSchool(record);
         setPb(getSchoolPb(record.pb_url));
-      } catch (err: any) {
-        setNotFound(true);
-      } finally {
+        setNotFound(false);
+        setInactive(false);
         setLoading(false);
+        return;
       }
+
+      // If record could not be fetched from Master PB, inspect the error
+      const isGenuine404 = lastErr?.status === 404 || lastErr?.data?.code === 404;
+
+      if (isGenuine404) {
+        // Genuine 404: The school does not exist in the Master database
+        setCachedSchool(cacheKey, null);
+        setNotFound(true);
+        setSchool(null);
+        setPb(null);
+      } else {
+        // Network failure, timeout, 502/504, or abort
+        console.warn('[TenantContext] Koneksi ke Master PB terganggu, menggunakan fallback:', lastErr);
+
+        // Fallback 1: Use cached school profile if available
+        const cached = getCachedSchool(cacheKey);
+        if (cached) {
+          setSchool(cached);
+          setPb(getSchoolPb(cached.pb_url));
+          setNotFound(false);
+          setInactive(false);
+        } else if (slug && typeof window !== 'undefined' && (currentHostname.endsWith('.examku.my.id') || currentHostname.endsWith('.alfaruqasri.my.id'))) {
+          // Fallback 2: We are on school subdomain (e.g. modalbangsa.examku.my.id)
+          // The school database is directly reachable at current origin (/api/*)
+          const fallbackPbUrl = window.location.origin;
+          const fallbackRecord: SchoolRecord = {
+            id: slug,
+            name: slug.toUpperCase(),
+            slug: slug,
+            pb_url: fallbackPbUrl,
+            type: 'school',
+            is_active: true,
+          };
+          setSchool(fallbackRecord);
+          setPb(getSchoolPb(fallbackPbUrl));
+          setNotFound(false);
+          setInactive(false);
+        } else {
+          setNotFound(true);
+        }
+      }
+
+      setLoading(false);
     };
 
     resolveSchool();
-  }, [slug, customDomain, isLanding]);
+  }, [slug, customDomain, isLanding, cacheKey]);
 
 
   const value = useMemo<TenantContextValue>(

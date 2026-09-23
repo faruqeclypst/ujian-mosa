@@ -1,7 +1,8 @@
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { registerPlugin, Capacitor } from "@capacitor/core";
 import { App } from "@capacitor/app";
-import { ShieldAlert, LogOut } from "lucide-react";
+import { ShieldAlert, LogOut, Loader2 } from "lucide-react";
 import { useTenant } from "./TenantContext";
 
 const CheatAlert = registerPlugin<any>("CheatAlert");
@@ -15,9 +16,20 @@ interface StudentUser {
   hasChangedPassword?: boolean;
 }
 
+const isStudentPasswordDefault = (data: any): boolean => {
+  if (!data) return false;
+  return (
+    data.hasChangedPassword === false ||
+    data.hasChangedPassword === "false" ||
+    data.hasChangedPassword === 0 ||
+    data.hasChangedPassword === "0"
+  );
+};
+
 interface StudentAuthContextValue {
   student: StudentUser | null;
   loading: boolean;
+  isKicked: boolean;
   loginStudent: (nisn: string, password: string) => Promise<void>;
   logoutStudent: () => void;
   changePassword: (newPassword: string) => Promise<void>;
@@ -95,7 +107,7 @@ export const StudentAuthProvider = ({ children }: { children: ReactNode }) => {
             name: refreshed.name,
             classId: refreshed.classId || refreshed.classid || (refreshed as any).class_id || "",
             className: classObj?.name || classObj?.nama || (classObj as any)?.classname || "-",
-            hasChangedPassword: refreshed.hasChangedPassword,
+            hasChangedPassword: !isStudentPasswordDefault(refreshed),
           });
         } catch (err: any) {
           if (err.status === 404) {
@@ -117,6 +129,8 @@ export const StudentAuthProvider = ({ children }: { children: ReactNode }) => {
   const loginStudent = useCallback(async (nisn: string, password: string) => {
     if (!pb) throw new Error("Koneksi ke sekolah belum tersedia.");
 
+    setIsKicked(false);
+
     // Generate unique session ID SEBELUM login
     const newSessionId = (typeof crypto !== 'undefined' && crypto.randomUUID) 
       ? crypto.randomUUID() 
@@ -135,12 +149,15 @@ export const StudentAuthProvider = ({ children }: { children: ReactNode }) => {
       const model = authData.record;
       const classId = model.classId || model.class_id || model.classid || "";
       const classObj = model.expand?.classId || (model.expand as any)?.class_id || (model.expand as any)?.classid;
+      const isDefault = isStudentPasswordDefault(model);
 
-      // Update activeSessionId di database agar perangkat lain yang sedang aktif terputus
+      // Update activeSessionId di database jika bukan password default
       try {
-        await pb.collection("students").update(model.id, { activeSessionId: newSessionId }, { $autoCancel: false });
+        await pb.collection("students").update(model.id, { 
+          activeSessionId: isDefault ? "" : newSessionId 
+        }, { $autoCancel: false });
       } catch (sessionErr) {
-        console.error("GAGAL UPDATE SESSION ID:", sessionErr);
+        console.warn("Update session ID saat login:", sessionErr);
       }
 
       setstudent({
@@ -149,7 +166,7 @@ export const StudentAuthProvider = ({ children }: { children: ReactNode }) => {
         name: model.name,
         classId: classId,
         className: classObj?.name || model.className || model.class_name || "-",
-        hasChangedPassword: model.hasChangedPassword !== false && model.hasChangedPassword !== "false" && model.hasChangedPassword !== "0" && model.hasChangedPassword !== 0,
+        hasChangedPassword: !isDefault,
       });
     } catch (err: any) {
       sessionStorage.removeItem("student_session_active");
@@ -187,40 +204,92 @@ export const StudentAuthProvider = ({ children }: { children: ReactNode }) => {
     window.location.replace(`${window.location.origin}/exam`);
   }, [pb]);
 
+  const [isExiting, setIsExiting] = useState(false);
+
   // Aksi keluar dari aplikasi EXAM AA saat tombol OK pada dialog Kicked ditekan
-  const handleKickedExit = async () => {
+  const handleKickedExit = useCallback(async () => {
+    if (isExiting) return;
+    setIsExiting(true);
+
     try {
       sessionStorage.removeItem("student_session_active");
       sessionStorage.removeItem("student_session_id");
       localStorage.removeItem("student_session_id");
+      sessionStorage.removeItem("activeCBTRoomId");
       pb?.authStore.clear();
       setstudent(null);
       sessionStorage.clear();
     } catch (_) {}
 
+    // 1. Android Native Kiosk (Capacitor)
     if (Capacitor.isNativePlatform()) {
+      try { CheatAlert.stopAlarm(); } catch (_) {}
       try {
-        await CheatAlert.stopAlarm();
         await CheatAlert.exitApp();
         return;
-      } catch (_) {}
+      } catch (e) {
+        console.warn("CheatAlert.exitApp error:", e);
+      }
       try {
         await App.exitApp();
         return;
+      } catch (e) {
+        console.warn("App.exitApp error:", e);
+      }
+    }
+
+    // 2. Safe Exam Browser (SEB)
+    const isSEB = typeof window !== "undefined" && (
+      Boolean((window as any).SafeExamBrowser) ||
+      navigator.userAgent.toLowerCase().includes("seb") ||
+      navigator.userAgent.toLowerCase().includes("safeexambrowser")
+    );
+
+    if (isSEB) {
+      try { (window as any).SafeExamBrowser?.security?.quit?.(); } catch (_) {}
+      try { (window as any).SafeExamBrowser?.quit?.(); } catch (_) {}
+      try { window.close(); } catch (_) {}
+      try {
+        window.location.href = "seb://quit";
+        setTimeout(() => {
+          window.location.replace(`${window.location.origin}/exam`);
+        }, 500);
+        return;
       } catch (_) {}
     }
+
+    // 3. Android Exambro WebViews bridges (Exambro Android, Exambro Klas, dll)
+    try { (window as any).Android?.exitApp?.(); } catch (_) {}
+    try { (window as any).Android?.closeApp?.(); } catch (_) {}
+    try { (window as any).Exambro?.exit?.(); } catch (_) {}
+    try { (window as any).exambro?.exitApp?.(); } catch (_) {}
+    try { window.close(); } catch (_) {}
+
+    // 4. Web browser fallback: arahkan kembali ke halaman login siswa
     window.location.replace(`${window.location.origin}/exam`);
-  };
+  }, [isExiting, pb]);
 
   useEffect(() => {
     if (!student?.id || isKicked || !pb) return;
 
-    const checkSessionMatch = (serverSid: string | undefined) => {
+    // 🛡️ Jangan aktifkan pendeteksi double login jika status password siswa default / baru saja di-reset
+    // Siswa sedang berada di alur ganti password wajib sehingga tidak boleh terblokir peringatan double login
+    if (isStudentPasswordDefault(student)) return;
+
+    const checkSessionMatch = (serverSid: string | undefined, serverRecord?: any) => {
+      // Abaikan jika record di database menandakan password default / reset
+      if (isStudentPasswordDefault(serverRecord)) {
+        return false;
+      }
+
       const localSid = sessionStorage.getItem("student_session_id") || localStorage.getItem("student_session_id");
       // Jika di server ada session ID dan berbeda dari yang tersimpan di perangkat ini:
       // Berarti akun ini telah login di perangkat lain!
       if (serverSid && localSid && serverSid !== localSid) {
         setIsKicked(true);
+        try {
+          window.dispatchEvent(new CustomEvent("app:studentKicked"));
+        } catch (_) {}
         pb.authStore.clear();
         sessionStorage.removeItem("student_session_active");
         return true;
@@ -231,7 +300,7 @@ export const StudentAuthProvider = ({ children }: { children: ReactNode }) => {
     const checkInitialSession = async () => {
       try {
         const refreshed = await pb.collection("students").getOne(student.id, { $autoCancel: false });
-        checkSessionMatch(refreshed.activeSessionId);
+        checkSessionMatch(refreshed.activeSessionId, refreshed);
       } catch (err) {}
     };
     checkInitialSession();
@@ -240,18 +309,19 @@ export const StudentAuthProvider = ({ children }: { children: ReactNode }) => {
     const unsubscribe = pb.collection("students").subscribe(student.id, (e) => {
       if (e.action === "update") {
         const serverSid = e.record.activeSessionId;
-        if (checkSessionMatch(serverSid)) {
+        if (checkSessionMatch(serverSid, e.record)) {
           return;
         }
 
         // Check for Admin Reset
-        if (e.record.hasChangedPassword === false || e.record.hasChangedPassword === "false" || e.record.hasChangedPassword === "0" || e.record.hasChangedPassword === 0) {
+        const isNowReset = isStudentPasswordDefault(e.record);
+        if (isNowReset) {
           logoutStudent();
         } else {
           setstudent(prev => prev ? { 
             ...prev, 
             name: e.record.name, 
-            hasChangedPassword: e.record.hasChangedPassword 
+            hasChangedPassword: true 
           } : null);
         }
       }
@@ -261,7 +331,7 @@ export const StudentAuthProvider = ({ children }: { children: ReactNode }) => {
     const heartbeatTimer = setInterval(async () => {
       try {
         const refreshed = await pb.collection("students").getOne(student.id, { $autoCancel: false });
-        checkSessionMatch(refreshed.activeSessionId);
+        checkSessionMatch(refreshed.activeSessionId, refreshed);
       } catch (err) {}
     }, 3000);
 
@@ -269,17 +339,69 @@ export const StudentAuthProvider = ({ children }: { children: ReactNode }) => {
       unsubscribe.then(u => u());
       clearInterval(heartbeatTimer);
     };
-  }, [student?.id, student?.hasChangedPassword, isKicked, pb]);
+  }, [student?.id, student?.hasChangedPassword, isKicked, pb, logoutStudent]);
+
+  // Handler darurat saat isKicked aktif: pastikan alarm mati, pointer-events aktif, dan pasang listener tangkap langsung
+  useEffect(() => {
+    if (!isKicked) return;
+
+    if (Capacitor.isNativePlatform()) {
+      try { CheatAlert.stopAlarm(); } catch (_) {}
+    }
+
+    if (typeof document !== "undefined") {
+      document.body.style.pointerEvents = "auto";
+      const rootEl = document.getElementById("root");
+      if (rootEl) {
+        rootEl.style.pointerEvents = "auto";
+      }
+    }
+
+    const onDirectExit = (e: Event) => {
+      e.preventDefault();
+      e.stopPropagation();
+      handleKickedExit();
+    };
+
+    const btn = document.getElementById("btn-kicked-exit");
+    if (btn) {
+      btn.addEventListener("click", onDirectExit, { capture: true });
+      btn.addEventListener("touchend", onDirectExit, { capture: true });
+    }
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Enter" || e.key === "Escape" || e.key === " ") {
+        e.preventDefault();
+        handleKickedExit();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown, { capture: true });
+
+    return () => {
+      if (btn) {
+        btn.removeEventListener("click", onDirectExit, { capture: true } as any);
+        btn.removeEventListener("touchend", onDirectExit, { capture: true } as any);
+      }
+      window.removeEventListener("keydown", onKeyDown, { capture: true } as any);
+    };
+  }, [isKicked, handleKickedExit]);
 
   return (
-    <StudentAuthContext.Provider value={{ student, loading, loginStudent, logoutStudent, changePassword }}>
+    <StudentAuthContext.Provider value={{ student, loading, isKicked, loginStudent, logoutStudent, changePassword }}>
       {children}
 
-      {isKicked && (
-        <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-sm animate-in fade-in duration-300">
-          <div className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-[2rem] p-7 shadow-2xl border border-rose-200 dark:border-rose-900/50 text-center relative overflow-hidden group">
+      {isKicked && typeof document !== "undefined" && createPortal(
+        <div
+          id="kicked-double-login-overlay"
+          style={{ pointerEvents: "auto", zIndex: 9999999 }}
+          className="fixed inset-0 z-[9999999] flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-sm animate-in fade-in duration-300 pointer-events-auto select-none touch-auto"
+        >
+          <div
+            style={{ pointerEvents: "auto" }}
+            className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-[2rem] p-7 shadow-2xl border border-rose-200 dark:border-rose-900/50 text-center relative overflow-hidden group pointer-events-auto"
+          >
             <div className="absolute top-0 left-0 w-full h-1.5 bg-rose-500"></div>
-            <div className="relative z-10">
+            <div className="relative z-10 pointer-events-auto">
               <div className="w-16 h-16 bg-rose-50 dark:bg-rose-950/40 rounded-2xl flex items-center justify-center mx-auto mb-5">
                 <ShieldAlert className="w-9 h-9 text-rose-600 dark:text-rose-400 animate-pulse" />
               </div>
@@ -290,15 +412,30 @@ export const StudentAuthProvider = ({ children }: { children: ReactNode }) => {
                 Akun NISN ini baru saja login di perangkat lain. Demi keamanan ujian, akun pada perangkat ini dinonaktifkan.
               </p>
               <button
+                id="btn-kicked-exit"
                 type="button"
                 onClick={handleKickedExit}
-                className="w-full bg-rose-600 hover:bg-rose-700 active:scale-[0.98] text-white h-12 rounded-xl font-black uppercase tracking-wider text-xs shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+                onTouchEnd={(e) => {
+                  e.preventDefault();
+                  handleKickedExit();
+                }}
+                disabled={isExiting}
+                style={{ pointerEvents: "auto" }}
+                className="w-full min-h-[48px] bg-rose-600 hover:bg-rose-700 active:scale-[0.98] text-white rounded-xl font-black uppercase tracking-wider text-xs shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer pointer-events-auto touch-manipulation disabled:opacity-75 disabled:cursor-wait"
               >
-                <span>OK, Keluar Aplikasi</span>
+                {isExiting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin text-white" />
+                    <span>Menutup Aplikasi...</span>
+                  </>
+                ) : (
+                  <span>OK, Keluar Aplikasi</span>
+                )}
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
     </StudentAuthContext.Provider>

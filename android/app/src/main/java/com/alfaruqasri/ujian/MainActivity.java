@@ -103,11 +103,15 @@ public class MainActivity extends BridgeActivity {
         // 2. Layar Penuh Otomatis
         makeFullScreen();
         
-        // 3. Keamanan: Anti Screenshot & Record (FLAG_SECURE)
+        // 3. Keamanan: Anti Screenshot & Record (FLAG_SECURE) & Blokir Floating Overlay (Android 12+)
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);
-        // CATATAN PENTING: setHideOverlayWindows sengaja TIDAK diaktifkan karena terbukti memblokir
-        // overlay suggestion bar dan predictive text pada keyboard Android (Gboard / Samsung / SwiftKey)
-        // yang menyebabkan lag dan delay parah saat mengetik.
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+            try {
+                getWindow().setHideOverlayWindows(true);
+            } catch (Exception e) {
+                Log.e(TAG, "Gagal setHideOverlayWindows", e);
+            }
+        }
         
         // 4. Inisialisasi Layar Blokir (Layout)
         createBlockingLayout();
@@ -210,6 +214,11 @@ public class MainActivity extends BridgeActivity {
                 } catch (Exception e) {
                     Log.e(TAG, "Auto startLockTask failed: " + e.getMessage());
                 }
+                try {
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                        getWindow().setHideOverlayWindows(true);
+                    }
+                } catch (Exception e) {}
                 checkLockTaskOnly();
                 startRepeatingCheck();
             }
@@ -239,6 +248,12 @@ public class MainActivity extends BridgeActivity {
 
                     try {
                         stopLockTask();
+                    } catch (Exception e) {}
+
+                    try {
+                        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                            getWindow().setHideOverlayWindows(false);
+                        }
                     } catch (Exception e) {}
                 } catch (Exception e) {}
             }
@@ -508,6 +523,45 @@ public class MainActivity extends BridgeActivity {
             }, 500);
             if (isLockEnabled) {
                 checkLockTaskOnly();
+                // Beri tahu WebView bahwa fokus jendela telah kembali
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            if (getBridge() != null && getBridge().getWebView() != null) {
+                                getBridge().getWebView().evaluateJavascript(
+                                    "window.dispatchEvent(new CustomEvent('appWindowFocus'));" +
+                                    "window.dispatchEvent(new Event('focus'));",
+                                    null
+                                );
+                            }
+                        } catch (Exception e) {}
+                    }
+                });
+            }
+        } else {
+            try {
+                if (!isExiting) {
+                    sendBroadcast(new android.content.Intent(android.content.Intent.ACTION_CLOSE_SYSTEM_DIALOGS));
+                }
+            } catch (Exception e) {}
+
+            if (isLockEnabled) {
+                // Deteksi floating apps atau overlay yang menutupi ujian: segera picu blur di WebView
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            if (getBridge() != null && getBridge().getWebView() != null) {
+                                getBridge().getWebView().evaluateJavascript(
+                                    "window.dispatchEvent(new CustomEvent('appWindowBlur'));" +
+                                    "window.dispatchEvent(new Event('blur'));",
+                                    null
+                                );
+                            }
+                        } catch (Exception e) {}
+                    }
+                });
             }
         }
     }

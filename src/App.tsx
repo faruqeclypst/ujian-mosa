@@ -44,6 +44,7 @@ const MonitoringPage = lazy(() => import("./pages/admin/MonitoringPage"));
 const GradingPage = lazy(() => import("./pages/admin/GradingPage"));
 const StudentGradingDetailPage = lazy(() => import("./pages/admin/StudentGradingDetailPage"));
 const GuidePage = lazy(() => import("./pages/admin/GuidePage"));
+const ItemAnalysisPage = lazy(() => import("./pages/admin/ItemAnalysisPage"));
 const TokenViewPage = lazy(() => import("./pages/TokenViewPage"));
 const LiveScoreViewPage = lazy(() => import("./pages/LiveScoreViewPage"));
 
@@ -173,6 +174,7 @@ const SchoolAppContent = () => {
               <Route path="penilaian" element={<GradingPage />} />
               <Route path="penilaian/:studentId" element={<StudentGradingDetailPage />} />
               <Route path="panduan" element={<GuidePage />} />
+              <Route path="analisis-butir-soal" element={<ItemAnalysisPage />} />
               <Route path="pengaturan" element={<SettingsPage />} />
             </Route>
 

@@ -234,6 +234,27 @@ export const MathText: React.FC<MathTextProps> = ({ content, className = "", dis
     // Remove empty spans that are left over
     processed = processed.replace(/<span>([^<]*)<\/span>/gi, '$1');
     
+    // 0.1 Clean & Convert common LaTeX text-mode formatting commands that appear in questions
+    processed = processed.replace(/\\noindent\s*/gi, "");
+    processed = processed.replace(/\\(?:dots|ldots|cdots)\b/g, "...");
+    processed = processed.replace(/\\newline\b/gi, "<br/>");
+    processed = processed.replace(/\\par\b/gi, "<br/>");
+    processed = processed.replace(/\\qquad\b/g, "&emsp;&emsp;").replace(/\\quad\b/g, "&emsp;");
+
+    // Convert text styles (loop to handle nested formatting)
+    let prevText;
+    let formatIter = 0;
+    do {
+      prevText = processed;
+      processed = processed.replace(/\\textbf\{([^{}]+)\}/gi, "<strong>$1</strong>");
+      processed = processed.replace(/\\(?:textit|emph)\{([^{}]+)\}/gi, "<em>$1</em>");
+      processed = processed.replace(/\\underline\{([^{}]+)\}/gi, "<u>$1</u>");
+      processed = processed.replace(/\\(?:sout|st)\{([^{}]+)\}/gi, "<s>$1</s>");
+      processed = processed.replace(/\\textsuperscript\{([^{}]+)\}/gi, "<sup>$1</sup>");
+      processed = processed.replace(/\\textsubscript\{([^{}]+)\}/gi, "<sub>$1</sub>");
+      formatIter++;
+    } while (prevText !== processed && formatIter < 5);
+
     // 1. Convert HTML fractions to LaTeX (e.g. <sup>3</sup>&frasl;<sub>2</sub> → $\frac{3}{2}$)
     processed = processed.replace(
       /<sup>([^<]+)<\/sup>\s*(?:&frasl;|\/)\s*<sub>([^<]+)<\/sub>/gi,

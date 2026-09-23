@@ -28,6 +28,7 @@ import { useToast } from "../../components/ui/toast";
 import { Avatar, AvatarFallback } from "../../components/ui/avatar";
 import { Badge } from "../../components/ui/badge";
 import { cn } from "../../lib/utils";
+import { latexToOmml } from "../../lib/latexToWordMath";
 
 export interface ExamData {
   id: string;
@@ -87,24 +88,34 @@ const processLatex = (htmlInput: string) => {
   
   result = result.replace(/(\$\$|\\\[)([\s\S]*?)(\$\$|\\\])/g, (_, _s, formula) => {
     const clean = fixFormula(formula);
-    const url = `https://latex.codecogs.com/png.latex?\\dpi{200}\\bg_white ${encodeURIComponent(clean)}`;
+    const omml = latexToOmml(clean);
+    if (omml) return `<br/>${omml}<br/>`;
+    const url = `https://latex.codecogs.com/png.latex?\\dpi{110}\\bg_white ${encodeURIComponent(clean)}`;
     return `<br/><img src="${url}" class="latex-formula" /><br/>`;
   });
   result = result.replace(/(?<!\$)(\$)([^\$\n]+?)(\$)(?!\$)/g, (_, _s, formula) => {
     const clean = fixFormula(formula);
     if (!/[\\^_{}]/.test(clean)) return formula;
-    const url = `https://latex.codecogs.com/png.latex?\\dpi{200}\\bg_white ${encodeURIComponent(clean)}`;
-    return ` <img src="${url}" class="latex-formula" style="vertical-align: middle;" /> `;
+    const omml = latexToOmml(clean);
+    if (omml) return ` ${omml} `;
+    const url = `https://latex.codecogs.com/png.latex?\\dpi{110}\\bg_white ${encodeURIComponent(clean)}`;
+    return `&nbsp;<img src="${url}" class="latex-formula" style="vertical-align: -2px; margin: 0 1pt;" />&nbsp;`;
   });
   result = result.replace(/(\\\()([\s\S]*?)(\\\))/g, (_, _s, formula) => {
     const clean = fixFormula(formula);
-    const url = `https://latex.codecogs.com/png.latex?\\dpi{200}\\bg_white ${encodeURIComponent(clean)}`;
-    return ` <img src="${url}" class="latex-formula" style="vertical-align: middle;" /> `;
+    const omml = latexToOmml(clean);
+    if (omml) return ` ${omml} `;
+    const url = `https://latex.codecogs.com/png.latex?\\dpi{110}\\bg_white ${encodeURIComponent(clean)}`;
+    return `&nbsp;<img src="${url}" class="latex-formula" style="vertical-align: -2px; margin: 0 1pt;" />&nbsp;`;
   });
   return result;
 };
 
-const processHtmlInlineImages = (htmlText: string, getAbsoluteUrlFn: (url: string) => string, imageMapping?: Map<string, { mappedUrl: string, base64: string, width: number, height: number }>): string => {
+const processHtmlInlineImages = (
+  htmlText: string,
+  getAbsoluteUrlFn: (url: string) => string,
+  imageMapping?: Map<string, { mappedUrl: string, base64: string, width: number, height: number }>
+): string => {
   if (!htmlText) return "";
   let result = htmlText;
   const imgRegex = /<img[^>]+src="([^"]+)"[^>]*>/g;
@@ -117,87 +128,169 @@ const processHtmlInlineImages = (htmlText: string, getAbsoluteUrlFn: (url: strin
     let replacedUrl = "";
     let width = 0;
     let height = 0;
-    if (imageMapping && imageMapping.has(m.src)) {
-      const info = imageMapping.get(m.src)!;
+    const absSrc = getAbsoluteUrlFn(m.src);
+    const info = imageMapping ? (imageMapping.get(m.src) || (absSrc ? imageMapping.get(absSrc) : undefined)) : undefined;
+
+    if (info) {
       replacedUrl = info.mappedUrl;
       width = info.width;
       height = info.height;
+      let replacedImg = m.full.replace(m.src, replacedUrl);
+
+      const isLatex = m.src.includes("latex.codecogs.com");
+      if (!isLatex) {
+        replacedImg = forceSmallImage(replacedImg, width, height);
+      } else if (width > 480) {
+        const scaledH = Math.round((height * 480) / width);
+        replacedImg = replacedImg.replace(/\/?>$/, ` width="480" height="${scaledH}"$&`);
+      }
+
+      result = result.replace(m.full, replacedImg);
     } else {
-      replacedUrl = getAbsoluteUrlFn(m.src);
+      replacedUrl = absSrc || m.src;
+      let replacedImg = m.full.replace(m.src, replacedUrl);
+      const isLatex = m.src.includes("latex.codecogs.com");
+      if (!isLatex) {
+        replacedImg = forceSmallImage(replacedImg, width, height);
+      }
+      result = result.replace(m.full, replacedImg);
     }
-    let replacedImg = m.full.replace(m.src, replacedUrl);
-    
-    const isLatex = m.src.includes("latex.codecogs.com");
-    if (!isLatex) {
-      replacedImg = forceSmallImage(replacedImg, width, height);
-    }
-    
-    result = result.replace(m.full, replacedImg);
   }
   return result;
 };
 
-const convertToPngBase64 = async (url: string, pbToken?: string): Promise<{ base64: string, width: number, height: number }> => {
-  try {
-    const isPbFile = url.includes("/api/files/");
-    const resp = await fetch(url, (isPbFile && pbToken) ? { headers: { "Authorization": pbToken } } : undefined);
-    if (!resp.ok) return { base64: "", width: 0, height: 0 };
-    const blob = await resp.blob();
-    
-    const isLatex = url.toLowerCase().includes("latex.codecogs.com");
-    if (isLatex) {
-      return await new Promise((resolve) => {
-        const img = new window.Image();
-        img.crossOrigin = "anonymous";
-        img.onload = () => {
-          const reader = new FileReader();
-          reader.onloadend = () => {
-            const dataUrl = reader.result as string || "";
-            const base64Data = dataUrl.split(",")[1] || "";
-            resolve({ base64: base64Data, width: img.width, height: img.height });
-          };
-          reader.readAsDataURL(blob);
-        };
-        img.onerror = () => {
-          resolve({ base64: "", width: 0, height: 0 });
-        };
-        img.src = URL.createObjectURL(blob);
-      });
-    }
-    
-    const img = new window.Image();
-    img.crossOrigin = "anonymous";
-    const objectUrl = URL.createObjectURL(blob);
-    return await new Promise((resolve) => {
+const convertToPngBase64 = async (
+  url: string,
+  pbToken?: string,
+  pb?: any
+): Promise<{ base64: string, width: number, height: number }> => {
+  if (!url) return { base64: "", width: 0, height: 0 };
+
+  const processDataUriWithCanvas = (dataUri: string): Promise<{ base64: string, width: number, height: number }> => {
+    return new Promise((resolve) => {
+      const img = new window.Image();
       img.onload = () => {
-        const canvas = document.createElement("canvas");
-        const w = img.width;
-        const h = img.height;
-        canvas.width = w;
-        canvas.height = h;
-        const ctx = canvas.getContext("2d");
-        ctx?.drawImage(img, 0, 0, w, h);
         try {
-          const dataUrl = canvas.toDataURL("image/png");
-          URL.revokeObjectURL(objectUrl);
-          const base64Data = dataUrl.split(",")[1] || "";
+          const canvas = document.createElement("canvas");
+          const w = img.naturalWidth || img.width;
+          const h = img.naturalHeight || img.height;
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext("2d");
+          ctx?.drawImage(img, 0, 0, w, h);
+          const outDataUrl = canvas.toDataURL("image/png");
+          const base64Data = outDataUrl.split(",")[1] || "";
           resolve({ base64: base64Data, width: w, height: h });
         } catch (canvasErr) {
           console.warn("Canvas export failed for image:", canvasErr);
-          URL.revokeObjectURL(objectUrl);
-          resolve({ base64: "", width: 0, height: 0 });
+          const rawBase64 = dataUri.split(",")[1] || "";
+          resolve({ base64: rawBase64, width: img.naturalWidth || 290, height: img.naturalHeight || 200 });
         }
       };
       img.onerror = () => {
-        URL.revokeObjectURL(objectUrl);
         resolve({ base64: "", width: 0, height: 0 });
       };
-      img.src = objectUrl;
+      img.src = dataUri;
     });
+  };
+
+  // 1. Data URI directly
+  if (url.startsWith("data:")) {
+    return processDataUriWithCanvas(url);
+  }
+
+  // 2. Direct fetch with optional PocketBase authorization header
+  let blob: Blob | null = null;
+  const isPbFile = url.includes("/api/files/");
+
+  try {
+    const resp = await fetch(url, (isPbFile && pbToken) ? { headers: { "Authorization": pbToken } } : undefined);
+    if (resp.ok) {
+      blob = await resp.blob();
+    }
   } catch (err) {
-    console.error("Error converting image:", url, err);
+    // Expected when browser CORS blocks cross-origin requests
+    blob = null;
+  }
+
+  // 2b. Cloudflare Worker fallback (with open CORS headers)
+  const workerUrl = (import.meta.env.VITE_R2_WORKER_URL as string | undefined || "").replace(/\/$/, "");
+  const publicBaseUrl = (import.meta.env.VITE_R2_PUBLIC_BASE_URL as string | undefined || "").replace(/\/$/, "");
+
+  if (!blob && workerUrl) {
+    try {
+      let workerFetchUrl = "";
+      if (publicBaseUrl && url.startsWith(publicBaseUrl)) {
+        const key = url.replace(publicBaseUrl, "").replace(/^\/+/, "");
+        workerFetchUrl = `${workerUrl}/${encodeURI(key)}`;
+      } else if (!isPbFile) {
+        workerFetchUrl = `${workerUrl}/proxy?url=${encodeURIComponent(url)}`;
+      }
+      if (workerFetchUrl) {
+        const wResp = await fetch(workerFetchUrl);
+        if (wResp.ok) {
+          blob = await wResp.blob();
+        }
+      }
+    } catch {
+      // Proceed to PocketBase fallback
+    }
+  }
+
+  // 3. Fallback to PocketBase image proxy if direct and worker fetch failed
+  if (!blob && pb) {
+    try {
+      const pbBase = (pb.baseUrl || window.location.origin).replace(/\/$/, "");
+      const proxyUrl = `${pbBase}/api/image-proxy?url=${encodeURIComponent(url)}`;
+      const proxyResp = await fetch(proxyUrl);
+      if (proxyResp.ok) {
+        const json = await proxyResp.json();
+        if (json.base64) {
+          const mime = json.contentType || "image/png";
+          const dataUri = `data:${mime};base64,${json.base64}`;
+          return processDataUriWithCanvas(dataUri);
+        }
+      }
+    } catch (proxyErr) {
+      console.warn("PocketBase image proxy fallback failed for:", url, proxyErr);
+    }
+  }
+
+  if (!blob) {
     return { base64: "", width: 0, height: 0 };
   }
+
+  // 4. Codecogs LaTeX: already standard small PNG, avoid re-rendering through canvas
+  const isLatex = url.toLowerCase().includes("latex.codecogs.com");
+  if (isLatex) {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const dataUrl = (reader.result as string) || "";
+        const base64Data = dataUrl.split(",")[1] || "";
+        const img = new window.Image();
+        img.onload = () => resolve({ base64: base64Data, width: img.width, height: img.height });
+        img.onerror = () => resolve({ base64: base64Data, width: 0, height: 0 });
+        img.src = dataUrl;
+      };
+      reader.readAsDataURL(blob);
+    });
+  }
+
+  // 5. All other images (WebP, JPG, PNG): load via FileReader and canvas to convert to PNG
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const dataUrl = reader.result as string;
+      if (!dataUrl) {
+        resolve({ base64: "", width: 0, height: 0 });
+        return;
+      }
+      processDataUriWithCanvas(dataUrl).then(resolve);
+    };
+    reader.onerror = () => resolve({ base64: "", width: 0, height: 0 });
+    reader.readAsDataURL(blob);
+  });
 };
 
 const ExamsPage = () => {
@@ -992,6 +1085,7 @@ const ExamsPage = () => {
 
       const addUrl = (url: string | undefined, rawRecord?: any) => {
         if (!url) return;
+        urlsToConvert.add(url);
         const abs = getAbsoluteUrl(url, rawRecord);
         if (abs) {
           urlsToConvert.add(abs);
@@ -1045,20 +1139,20 @@ const ExamsPage = () => {
 
       for (let idx = 0; idx < urlList.length; idx++) {
         const originalUrl = urlList[idx];
-        const result = await convertToPngBase64(originalUrl, token);
+        const result = await convertToPngBase64(originalUrl, token, pb);
         if (result.base64) {
           const mappedUrl = `https://local-asset/img_${idx}.png`;
           const mappedObj = { mappedUrl, base64: result.base64, width: result.width, height: result.height };
           imageMapping.set(originalUrl, mappedObj);
           
           const abs = getAbsoluteUrl(originalUrl);
-          if (abs !== originalUrl) {
+          if (abs) {
             imageMapping.set(abs, mappedObj);
           }
         }
       }
 
-      let html = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+      let html = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns:m='http://schemas.microsoft.com/office/2004/12/omml' xmlns='http://www.w3.org/TR/REC-html40'>
 <head><meta charset='utf-8'>
 <style>
   @page { size: A4; margin: 2cm; }
@@ -1067,7 +1161,7 @@ const ExamsPage = () => {
   .hanging { margin-left: 0pt; padding-left: 0pt; text-indent: 0pt; margin-bottom: 3pt; text-align: left; }
   .choice { padding-left: 45pt; text-indent: -20pt; margin-bottom: 1pt; text-align: left; }
   img { display: block; margin: 5pt 0; border: none; }
-  img.latex-formula { display: inline; margin: 0; width: auto; height: auto; vertical-align: middle; }
+  img.latex-formula { display: inline; margin: 0 1pt; vertical-align: -2px; }
   .wacana { border: 1pt solid #000; padding: 10pt; margin-bottom: 15pt; background: #f5f5f5; font-style: italic; }
   .spacer { margin: 0; padding: 0; line-height: 12pt; font-size: 12pt; height: 12pt; }
   p, div, span { margin: 0; padding: 0; line-height: 1.3; text-align: left; }
@@ -1120,13 +1214,11 @@ const ExamsPage = () => {
 
         if (q.imageUrl) {
           const absImg = getAbsoluteUrl(q.imageUrl, q);
-          const info = imageMapping.get(absImg);
+          const info = imageMapping.get(q.imageUrl) || (absImg ? imageMapping.get(absImg) : undefined);
           if (info) {
             const displayW = Math.round(info.width > 290 ? 290 : info.width);
             const displayH = Math.round(info.width > 290 ? (info.height * 290) / info.width : info.height);
             html += `<div style="margin: 5pt 0 5pt 25pt;"><img src="${info.mappedUrl}" width="${displayW}" height="${displayH}" alt="Gambar Soal" /></div>`;
-          } else {
-            html += `<div style="margin: 5pt 0 5pt 25pt;"><img src="${absImg}" width="290" alt="Gambar Soal" /></div>`;
           }
         }
 
@@ -1148,13 +1240,11 @@ const ExamsPage = () => {
                     <span>${processedCText}</span>`;
               if (cImg) {
                 const absChoiceImg = getAbsoluteUrl(cImg, q);
-                const info = imageMapping.get(absChoiceImg);
+                const info = imageMapping.get(cImg) || (absChoiceImg ? imageMapping.get(absChoiceImg) : undefined);
                 if (info) {
                   const displayW = Math.round(info.width > 181 ? 181 : info.width);
                   const displayH = Math.round(info.width > 181 ? (info.height * 181) / info.width : info.height);
                   choiceHtml += `<br/><img src="${info.mappedUrl}" width="${displayW}" height="${displayH}" alt="Gambar Pilihan" />`;
-                } else {
-                  choiceHtml += `<br/><img src="${absChoiceImg}" width="181" alt="Gambar Pilihan" />`;
                 }
               }
               choiceHtml += `
@@ -1188,13 +1278,11 @@ const ExamsPage = () => {
             let itemHtml = `<li>${cleanForWord(processHtmlInlineImages(processLatex(item.text || ""), getAbsoluteUrl, imageMapping))}`;
             if (item.imageUrl) {
               const absItemImg = getAbsoluteUrl(item.imageUrl, q);
-              const info = imageMapping.get(absItemImg);
+              const info = imageMapping.get(item.imageUrl) || (absItemImg ? imageMapping.get(absItemImg) : undefined);
               if (info) {
                 const displayW = Math.round(info.width > 145 ? 145 : info.width);
                 const displayH = Math.round(info.width > 145 ? (info.height * 145) / info.width : info.height);
                 itemHtml += `<br/><img src="${info.mappedUrl}" width="${displayW}" height="${displayH}" alt="Gambar Item" />`;
-              } else {
-                itemHtml += `<br/><img src="${absItemImg}" width="145" alt="Gambar Item" />`;
               }
             }
             itemHtml += `</li>`;
@@ -1228,11 +1316,12 @@ const ExamsPage = () => {
       const boundary = "----=_NextPart_Boundary_Ujian_CBT";
       let mhtml = "";
       mhtml += "MIME-Version: 1.0\r\n";
-      mhtml += `Content-Type: multipart/related; boundary="${boundary}"\r\n\r\n`;
+      mhtml += `Content-Type: multipart/related; type="text/html"; boundary="${boundary}"\r\n\r\n`;
 
       mhtml += `--${boundary}\r\n`;
       mhtml += "Content-Type: text/html; charset=\"utf-8\"\r\n";
-      mhtml += "Content-Transfer-Encoding: 8bit\r\n\r\n";
+      mhtml += "Content-Transfer-Encoding: 8bit\r\n";
+      mhtml += "Content-Location: https://local-asset/document.html\r\n\r\n";
       mhtml += html + "\r\n\r\n";
 
       const attachedUrls = new Set<string>();
@@ -1240,9 +1329,12 @@ const ExamsPage = () => {
         if (attachedUrls.has(mapped.mappedUrl)) continue;
         attachedUrls.add(mapped.mappedUrl);
 
+        const filename = mapped.mappedUrl.split('/').pop() || 'image.png';
+
         mhtml += `--${boundary}\r\n`;
         mhtml += "Content-Type: image/png\r\n";
         mhtml += "Content-Transfer-Encoding: base64\r\n";
+        mhtml += `Content-ID: <${filename}>\r\n`;
         mhtml += `Content-Location: ${mapped.mappedUrl}\r\n\r\n`;
 
         const base64Formatted = mapped.base64.replace(/(.{76})/g, "$1\r\n");
@@ -1285,7 +1377,7 @@ const ExamsPage = () => {
           .trim()
           .substring(0, 100);
 
-        zip.file(`${safeName}.doc`, "\ufeff" + wordMhtml);
+        zip.file(`${safeName}.doc`, wordMhtml);
       }
 
       const label = customExams ? `${customExams.length}_TERPILIH` : (activeTab === "arsip" ? "ARSIP" : "AKTIF");

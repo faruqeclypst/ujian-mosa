@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useTenant } from "../context/TenantContext";
 import { masterPb } from "../lib/pocketbase";
 import { uploadInventoryImage, deleteImageFromStorage } from "../lib/storage";
+import { compressImage } from "../lib/imageCompression";
 import { AI_MODELS, testAIConnection } from "../lib/ai";
 import { Skeleton } from "../components/ui/skeleton";
 import { ThemeToggle } from "../components/ui/theme-toggle";
@@ -450,33 +451,7 @@ const SettingsPage = () => {
   }, [aiProvider, aiGatewayKey, groqApiKey, aiGatewayUrl, loading]);
 
   const compressLogo = (file: File): Promise<File> =>
-    new Promise((resolve) => {
-      const timeout = setTimeout(() => resolve(file), 8000);
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = (e) => {
-        const img = new window.Image();
-        img.src = e.target?.result as string;
-        img.onload = () => {
-          const MAX = 512;
-          let { width, height } = img;
-          if (width > MAX || height > MAX) {
-            if (width > height) { height = Math.round((height * MAX) / width); width = MAX; }
-            else { width = Math.round((width * MAX) / height); height = MAX; }
-          }
-          const canvas = document.createElement("canvas");
-          canvas.width = width; canvas.height = height;
-          canvas.getContext("2d")?.drawImage(img, 0, 0, width, height);
-          canvas.toBlob((blob) => {
-            clearTimeout(timeout);
-            if (blob) resolve(new File([blob], file.name.replace(/\.[^/.]+$/, "") + ".webp", { type: "image/webp", lastModified: Date.now() }));
-            else resolve(file);
-          }, "image/webp", 0.85);
-        };
-        img.onerror = () => { clearTimeout(timeout); resolve(file); };
-      };
-      reader.onerror = () => resolve(file);
-    });
+    compressImage(file, { maxWidth: 800, maxHeight: 800, quality: 0.90 });
 
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -500,8 +475,7 @@ const SettingsPage = () => {
       if (logoFile) {
         try {
           const schoolFolder = school?.slug || "unknown";
-          // Compress & convert ke webp sebelum upload
-          const fileToUpload = logoFile.size > 100 * 1024 ? await compressLogo(logoFile) : logoFile;
+          const fileToUpload = await compressLogo(logoFile);
           // Hapus logo lama dari bucket jika ada
           if (schoolLogo && !schoolLogo.startsWith("data:")) {
             try {

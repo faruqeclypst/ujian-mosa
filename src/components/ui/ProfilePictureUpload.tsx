@@ -2,6 +2,7 @@ import { useState, useRef } from "react";
 import { Camera, X, Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { uploadInventoryImage, deleteImageFromStorage } from "../../lib/storage";
+import { compressImage } from "../../lib/imageCompression";
 import { useAuth } from "../../context/AuthContext";
 import { useTenant } from "../../context/TenantContext";
 import { useToast } from "../../components/ui/toast";
@@ -52,8 +53,8 @@ const ProfilePictureUpload = ({
       return;
     }
 
-    if (file.size > 5 * 1024 * 1024) {
-      setError('Ukuran gambar maksimal 5MB.');
+    if (file.size > 10 * 1024 * 1024) {
+      setError('Ukuran gambar maksimal 10MB.');
       return;
     }
 
@@ -73,9 +74,9 @@ const ProfilePictureUpload = ({
 
     setIsUploading(true);
     try {
-      // 1. Upload ke Storage (R2/PocketBase via uploadInventoryImage)
+      const fileToUpload = await compressImage(file, { maxWidth: 800, maxHeight: 800, quality: 0.90 });
       const schoolFolder = school?.slug || "unknown";
-      const uploadRes = await uploadInventoryImage(`schools/${schoolFolder}/profiles`, file);
+      const uploadRes = await uploadInventoryImage(`schools/${schoolFolder}/profiles`, fileToUpload);
       const downloadURL = uploadRes.url;
 
       // 2. Update record user di PocketBase

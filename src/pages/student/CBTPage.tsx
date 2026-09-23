@@ -493,7 +493,7 @@ const CBTPage = () => {
   const { roomId: paramRoomId } = useParams<{ roomId: string }>();
   const navigate = useNavigate();
   const { pb, terminology } = useTenant();
-  const { student, logoutStudent } = useStudentAuth();
+  const { student, logoutStudent, isKicked } = useStudentAuth();
   const { theme, setTheme } = useTheme();
 
   const [roomId, setRoomId] = useState<string | null>(null);
@@ -546,6 +546,8 @@ const CBTPage = () => {
   const [errorMessage, setErrorMessage] = useState("");
   const [loadingMessage, setLoadingMessage] = useState("Menyiapkan lembar ujian...");
 
+  const [penaltyCountdown, setPenaltyCountdown] = useState<number | null>(null);
+  const penaltyCountdownIntervalRef = useRef<any>(null);
   const saveTimeoutRef = useRef<any>(null);
   const cheatTimerRef = useRef<any>(null);
   const lastLeftTimeRef = useRef<number | null>(null);
@@ -561,6 +563,31 @@ const CBTPage = () => {
   useEffect(() => {
     try { CheatAlert.stopAlarm(); } catch (err) { }
   }, []);
+
+  // Jika siswa terdeteksi double login (isKicked), segera tutup semua modal lembar ujian & hentikan penalti
+  useEffect(() => {
+    if (isKicked) {
+      setIsResetModalOpen(false);
+      setIsSessionExpiredModalOpen(false);
+      setIsCheatWarningOpen(false);
+      setIsSubmitModalOpen(false);
+      setIsNavModalOpen(false);
+      setIsAdminFinishedModalOpen(false);
+      setIsErrorModalOpen(false);
+      setPenaltyCountdown(null);
+      if (cheatTimerRef.current) {
+        clearTimeout(cheatTimerRef.current);
+        cheatTimerRef.current = null;
+      }
+      if (penaltyCountdownIntervalRef.current) {
+        clearInterval(penaltyCountdownIntervalRef.current);
+        penaltyCountdownIntervalRef.current = null;
+      }
+      if (Capacitor.isNativePlatform()) {
+        try { CheatAlert.stopAlarm(); } catch (_) {}
+      }
+    }
+  }, [isKicked]);
 
   // 🛡️ Enhanced Screen Wake Lock (WakeLock API + Video Hack)
   useEffect(() => {
@@ -745,6 +772,7 @@ const CBTPage = () => {
           isOnline: true,
           lastHeartbeat: new Date().toISOString()
         }).catch((err: any) => {
+          if (isKicked) return;
           if (err?.status === 404) {
             // Jika attempt sudah dihapus/reset oleh admin
             sessionStorage.removeItem("activeCBTRoomId");
@@ -1005,15 +1033,14 @@ const CBTPage = () => {
           }
         }
 
-        const pg = poolIds.filter(id => { const q = loaded.find(x => x.id === id); return !q?.type || q.type.startsWith("pilihan_ganda"); });
+        const obj = poolIds.filter(id => { const q = loaded.find(x => x.id === id); return q?.type !== "isian_singkat" && q?.type !== "uraian"; });
         const es = poolIds.filter(id => { const q = loaded.find(x => x.id === id); return q?.type === "isian_singkat" || q?.type === "uraian"; });
-        const it = poolIds.filter(id => !pg.includes(id) && !es.includes(id));
 
         let ord: string[] = [];
         if (isRandom) {
-          ord = [...clusterShuffle(pg), ...clusterShuffle(it), ...es];
+          ord = [...clusterShuffle(obj), ...es];
         } else {
-          ord = [...pg, ...it, ...es];
+          ord = [...obj, ...es];
         }
         return Array.from(new Set(ord));
       };
@@ -1053,7 +1080,14 @@ const CBTPage = () => {
           // ==============================================
           att = existingAttempts[0];
           const status = att.status || (att as any).status;
-          if (status === "finished") { navigate("/cbt/" + roomId + "/result"); return; }
+          if (status === "finished" || status === "submitted") {
+            sessionStorage.removeItem("activeCBTRoomId");
+            const pr = `${student.nisn}_${roomId}`;
+            sessionStorage.removeItem(`order_${pr}`);
+            sessionStorage.removeItem(`currentIndex_${pr}`);
+            window.location.href = "/exam";
+            return;
+          }
           if (status === "LOCKED") {
             setIsLocked(true);
             sessionStorage.removeItem("activeCBTRoomId");
@@ -1170,6 +1204,14 @@ const CBTPage = () => {
           // ==============================================
           // KASUS 2: SISWA PERTAMA KALI MULAI UJIAN (07:30)
           // ==============================================
+          const roomEnd = parseSafeDate(rData.end_time);
+          if (roomEnd && Date.now() > roomEnd.getTime()) {
+            sessionStorage.removeItem("activeCBTRoomId");
+            alert("Batas waktu akses ruang ujian ini telah berakhir.");
+            window.location.href = "/exam";
+            return;
+          }
+
           if (isCreatingRef.current) return;
           isCreatingRef.current = true;
 
@@ -1282,9 +1324,7 @@ const CBTPage = () => {
       const stD = parseSafeDate(att.startTime || att.startedAt) || new Date();
       const dur = (rData.duration || 60) * 60000;
       const targetEnd = new Date(stD.getTime() + dur);
-      const roomEnd = parseSafeDate(rData.end_time);
-      const actualEnd = roomEnd && roomEnd.getTime() < targetEnd.getTime() ? roomEnd : targetEnd;
-      const diff = Math.floor((actualEnd.getTime() - Date.now()) / 1000);
+      const diff = Math.floor((targetEnd.getTime() - Date.now()) / 1000);
       if (diff <= 0) setIsExamOver(true); setTimeLeft(Math.max(0, diff));
       const sFlagStored = sessionStorage.getItem(`flags_${pr}`); if (sFlagStored) try { setFlaggedQuestions(JSON.parse(sFlagStored)); } catch (e) { }
       const sConfirmed = sessionStorage.getItem(`confirmed_${pr}`); if (sConfirmed === "true") setIsConfirmed(true);
@@ -1296,6 +1336,7 @@ const CBTPage = () => {
   // Keep latest state in refs to avoid resubscribing when they change
   const attemptRef = useRef(attempt);
   const roomDataRef = useRef(roomData);
+  const isCheatWarningOpenRef = useRef(isCheatWarningOpen);
 
   useEffect(() => {
     attemptRef.current = attempt;
@@ -1304,6 +1345,10 @@ const CBTPage = () => {
   useEffect(() => {
     roomDataRef.current = roomData;
   }, [roomData]);
+
+  useEffect(() => {
+    isCheatWarningOpenRef.current = isCheatWarningOpen;
+  }, [isCheatWarningOpen]);
 
   useEffect(() => {
     if (!roomId || !attempt?.id || !pb) return;
@@ -1315,7 +1360,10 @@ const CBTPage = () => {
       if (e.action === "update") {
         setRoomData((prev: any) => ({ ...prev, ...e.record }));
         const isOff = e.record.isDisabled === true || e.record.status === "archive";
-        if (isOff) navigate("/dashboard");
+        if (isOff) {
+          sessionStorage.removeItem("activeCBTRoomId");
+          window.location.href = "/exam";
+        }
       }
     });
 
@@ -1343,6 +1391,7 @@ const CBTPage = () => {
             window.location.href = "/";
           }
         } else if ((newS === "finished" || newS === "submitted") && !isSubmittingRef.current) {
+          sessionStorage.removeItem("activeCBTRoomId");
           setIsAdminFinishedModalOpen(true);
         }
       }
@@ -1360,9 +1409,7 @@ const CBTPage = () => {
       const st = parseSafeDate(attempt.startTime || attempt.startedAt || attempt.created) || new Date();
       const dur = (roomData.duration || 60) * 60000;
       const targetEnd = new Date(st.getTime() + dur);
-      const roomEnd = parseSafeDate(roomData.end_time);
-      const actualEnd = roomEnd && roomEnd.getTime() < targetEnd.getTime() ? roomEnd : targetEnd;
-      const d = Math.floor((actualEnd.getTime() - Date.now()) / 1000);
+      const d = Math.floor((targetEnd.getTime() - Date.now()) / 1000);
       if (d <= 0) { clearInterval(timer); setTimeLeft(0); setIsExamOver(true); }
       else setTimeLeft(d);
     }, 1000);
@@ -1375,6 +1422,7 @@ const CBTPage = () => {
         try {
           await safeUpdateAttempt(attempt.id, { isOnline: true, lastHeartbeat: new Date().toISOString() });
         } catch (err: any) {
+          if (isKicked) return;
           if (err?.status === 404) {
             // Jika 404 berarti sesi sudah dihapus/reset oleh admin
             clearInterval(heartbeat);
@@ -1402,36 +1450,101 @@ const CBTPage = () => {
 
   useEffect(() => {
     if (!attempt?.id || isLocked || isExamOver) return;
-    const triggerPenalty = async () => {
-      if (isCheatWarningOpen || isLocked || isExamOver || isNavigatingOrReloadingRef.current) return;
 
-      // Clear timers and state immediately to prevent race conditions
-      if (cheatTimerRef.current) clearTimeout(cheatTimerRef.current);
-      cheatTimerRef.current = null;
+    const cancelPenaltyCountdown = () => {
+      if (cheatTimerRef.current) {
+        clearTimeout(cheatTimerRef.current);
+        cheatTimerRef.current = null;
+      }
+      if (penaltyCountdownIntervalRef.current) {
+        clearInterval(penaltyCountdownIntervalRef.current);
+        penaltyCountdownIntervalRef.current = null;
+      }
+      setPenaltyCountdown(null);
+    };
+
+    const triggerPenalty = async () => {
+      if (isKicked || isCheatWarningOpenRef.current || isLocked || isExamOver || isNavigatingOrReloadingRef.current) return;
+
+      // Hentikan timer dan countdown segera
+      cancelPenaltyCountdown();
       lastLeftTimeRef.current = null;
 
-      const currentCheat = attempt?.cheatCount || 0;
+      const currentAttempt = attemptRef.current || attempt;
+      const currentCheat = currentAttempt?.cheatCount || 0;
       const newCount = currentCheat + 1;
-      const limit = roomData?.cheat_limit || 3;
+      const currentRoom = roomDataRef.current || roomData;
+      const limit = currentRoom?.cheat_limit || 3;
 
-      // Alarm HANYA berbunyi saat penalti benar-benar dieksekusi (setelah lewat jeda 5 detik)
+      // 1. Alarm HANYA berbunyi saat penalti benar-benar dieksekusi (setelah lewat jeda 5 detik)
       try { CheatAlert.startAlarm(); } catch (err) { }
 
-      try {
-        const res = await safeUpdateAttempt(attempt!.id, {
-          cheatCount: newCount,
-          status: newCount > limit ? "LOCKED" : "ongoing"
-        });
-        if (res) setAttempt(res as any);
-        if (newCount > limit) setIsLocked(true); else setIsCheatWarningOpen(true);
-      } catch (e) { }
+      // 2. Tampilkan dialog peringatan atau kunci seketika secara OPTIMISTIK
+      const isNowLocked = newCount > limit;
+      setAttempt(prev => (prev ? { ...prev, cheatCount: newCount, status: isNowLocked ? "LOCKED" : prev.status } : prev));
+      if (isNowLocked) {
+        setIsLocked(true);
+      } else {
+        setIsCheatWarningOpen(true);
+      }
+
+      // 3. Sinkronisasikan ke PocketBase di background
+      if (currentAttempt?.id) {
+        try {
+          const res = await safeUpdateAttempt(currentAttempt.id, {
+            cheatCount: newCount,
+            status: isNowLocked ? "LOCKED" : "ongoing"
+          });
+          if (res) {
+            setAttempt(res as any);
+            attemptRef.current = res as any;
+          }
+        } catch (e) {
+          console.warn("Sinkronisasi penalti ke server ditunda, data tersimpan offline", e);
+        }
+      }
+    };
+
+    const startPenaltyCountdown = () => {
+      if (isKicked || cheatTimerRef.current || isCheatWarningOpenRef.current || isLocked || isExamOver) return;
+
+      setPenaltyCountdown(5);
+      if (penaltyCountdownIntervalRef.current) clearInterval(penaltyCountdownIntervalRef.current);
+
+      let secLeft = 5;
+      penaltyCountdownIntervalRef.current = setInterval(() => {
+        secLeft -= 1;
+        if (secLeft <= 0) {
+          if (penaltyCountdownIntervalRef.current) {
+            clearInterval(penaltyCountdownIntervalRef.current);
+            penaltyCountdownIntervalRef.current = null;
+          }
+          setPenaltyCountdown(null);
+        } else {
+          setPenaltyCountdown(secLeft);
+        }
+      }, 1000);
+
+      cheatTimerRef.current = setTimeout(async () => {
+        cancelPenaltyCountdown();
+        // Sebelum eksekusi penalti, pastikan bukan karena layar sedang mati
+        if (Capacitor.isNativePlatform()) {
+          try {
+            const screen = await (CheatAlert as any).getScreenState();
+            if (screen?.isScreenOn === false || screen?.wasScreenOffRecently) {
+              return;
+            }
+          } catch (_) {}
+        }
+        triggerPenalty();
+      }, 5000);
     };
 
     const handleCheatDetection = async (e: Event) => {
-      if (isNavigatingOrReloadingRef.current) return;
+      if (isKicked || isNavigatingOrReloadingRef.current) return;
 
-      if (document.visibilityState === "hidden" || e.type === "blur") {
-        if (isCheatWarningOpen || isLocked) return;
+      if (document.visibilityState === "hidden" || e.type === "blur" || e.type === "appWindowBlur") {
+        if (isCheatWarningOpenRef.current || isLocked) return;
         if (orientationChangeRef.current) return;
 
         // Cek apakah event terjadi karena layar HP mati (bukan pindah aplikasi)
@@ -1449,22 +1562,9 @@ const CBTPage = () => {
           lastLeftTimeRef.current = Date.now();
         }
 
-        if (!cheatTimerRef.current) {
-          cheatTimerRef.current = setTimeout(async () => {
-            // Sebelum eksekusi penalti, pastikan bukan karena layar sedang mati
-            if (Capacitor.isNativePlatform()) {
-              try {
-                const screen = await (CheatAlert as any).getScreenState();
-                if (screen?.isScreenOn === false || screen?.wasScreenOffRecently) {
-                  return;
-                }
-              } catch (_) {}
-            }
-            triggerPenalty();
-          }, 5000);
-        }
+        startPenaltyCountdown();
       } else {
-        // Returned to app
+        // Returned to app (focus / appWindowFocus / visibilitychange visible)
         let wasScreenOff = false;
         if (Capacitor.isNativePlatform()) {
           try {
@@ -1475,34 +1575,34 @@ const CBTPage = () => {
           } catch (_) {}
         }
 
-        if (cheatTimerRef.current) {
-          clearTimeout(cheatTimerRef.current);
-          cheatTimerRef.current = null;
-        }
+        const hadDepartureTime = lastLeftTimeRef.current;
+        cancelPenaltyCountdown();
 
-        if (lastLeftTimeRef.current) {
-          const elapsed = Date.now() - lastLeftTimeRef.current;
-          // Hanya beri penalti jika siswa benar-benar meninggalkan aplikasi (bukan karena layar mati)
+        if (hadDepartureTime) {
+          const elapsed = Date.now() - hadDepartureTime;
+          lastLeftTimeRef.current = null;
+          // Hanya beri penalti jika siswa benar-benar meninggalkan aplikasi lebih dari 5 detik saat JS pause
           if (elapsed >= 5000 && !wasScreenOff) {
             triggerPenalty();
+            return;
           }
-          lastLeftTimeRef.current = null;
         }
 
-        try { CheatAlert.stopAlarm(); } catch (err) { }
+        // Hanya stopAlarm jika modal peringatan kecurangan tidak sedang aktif
+        if (!isCheatWarningOpenRef.current) {
+          try { CheatAlert.stopAlarm(); } catch (err) { }
+        }
       }
     };
 
     const handleOrientationChange = () => {
       // Mark orientation is changing so blur events are ignored
       orientationChangeRef.current = true;
-      // Cancel any pending cheat timer triggered by orientation blur
-      if (cheatTimerRef.current) {
-        clearTimeout(cheatTimerRef.current);
-        cheatTimerRef.current = null;
+      cancelPenaltyCountdown();
+      lastLeftTimeRef.current = null;
+      if (!isCheatWarningOpenRef.current) {
         try { CheatAlert.stopAlarm(); } catch (err) { }
       }
-      lastLeftTimeRef.current = null;
       setTimeout(() => { orientationChangeRef.current = false; }, 1500);
     };
 
@@ -1511,7 +1611,7 @@ const CBTPage = () => {
       if (isNavigatingOrReloadingRef.current) return;
 
       if (!isActive) {
-        if (isCheatWarningOpen || isLocked) return;
+        if (isCheatWarningOpenRef.current || isLocked) return;
 
         if (Capacitor.isNativePlatform()) {
           try {
@@ -1526,19 +1626,7 @@ const CBTPage = () => {
         if (!lastLeftTimeRef.current) {
           lastLeftTimeRef.current = Date.now();
         }
-        if (!cheatTimerRef.current) {
-          cheatTimerRef.current = setTimeout(async () => {
-            if (Capacitor.isNativePlatform()) {
-              try {
-                const screen = await (CheatAlert as any).getScreenState();
-                if (screen?.isScreenOn === false || screen?.wasScreenOffRecently) {
-                  return;
-                }
-              } catch (_) {}
-            }
-            triggerPenalty();
-          }, 5000);
-        }
+        startPenaltyCountdown();
       } else {
         // App returned to foreground
         let wasScreenOff = false;
@@ -1551,30 +1639,28 @@ const CBTPage = () => {
           } catch (_) {}
         }
 
-        if (cheatTimerRef.current) {
-          clearTimeout(cheatTimerRef.current);
-          cheatTimerRef.current = null;
-        }
+        const hadDepartureTime = lastLeftTimeRef.current;
+        cancelPenaltyCountdown();
 
-        if (lastLeftTimeRef.current) {
-          const elapsed = Date.now() - lastLeftTimeRef.current;
+        if (hadDepartureTime) {
+          const elapsed = Date.now() - hadDepartureTime;
+          lastLeftTimeRef.current = null;
           if (elapsed >= 5000 && !wasScreenOff) {
             triggerPenalty();
+            return;
           }
-          lastLeftTimeRef.current = null;
         }
 
-        try { CheatAlert.stopAlarm(); } catch (err) { }
+        if (!isCheatWarningOpenRef.current) {
+          try { CheatAlert.stopAlarm(); } catch (err) { }
+        }
       }
     });
 
     const handleBeforeUnload = () => {
       isNavigatingOrReloadingRef.current = true;
       try { CheatAlert.stopAlarm(); } catch (err) { }
-      if (cheatTimerRef.current) {
-        clearTimeout(cheatTimerRef.current);
-        cheatTimerRef.current = null;
-      }
+      cancelPenaltyCountdown();
     };
 
     window.addEventListener("beforeunload", handleBeforeUnload);
@@ -1584,6 +1670,8 @@ const CBTPage = () => {
       document.addEventListener("visibilitychange", handleCheatDetection);
       window.addEventListener("blur", handleCheatDetection);
       window.addEventListener("focus", handleCheatDetection);
+      window.addEventListener("appWindowBlur", handleCheatDetection);
+      window.addEventListener("appWindowFocus", handleCheatDetection);
       window.addEventListener("orientationchange", handleOrientationChange);
       if (window.screen?.orientation) {
         window.screen.orientation.addEventListener("change", handleOrientationChange);
@@ -1594,21 +1682,22 @@ const CBTPage = () => {
       clearTimeout(graceTimer);
       window.removeEventListener("beforeunload", handleBeforeUnload);
       window.removeEventListener("pagehide", handleBeforeUnload);
-      try { CheatAlert.stopAlarm(); } catch (err) { }
+      if (!isCheatWarningOpenRef.current) {
+        try { CheatAlert.stopAlarm(); } catch (err) { }
+      }
       unsubApp.then(h => h.remove());
       document.removeEventListener("visibilitychange", handleCheatDetection);
       window.removeEventListener("blur", handleCheatDetection);
       window.removeEventListener("focus", handleCheatDetection);
+      window.removeEventListener("appWindowBlur", handleCheatDetection);
+      window.removeEventListener("appWindowFocus", handleCheatDetection);
       window.removeEventListener("orientationchange", handleOrientationChange);
       if (window.screen?.orientation) {
         window.screen.orientation.removeEventListener("change", handleOrientationChange);
       }
-      if (cheatTimerRef.current) {
-        clearTimeout(cheatTimerRef.current);
-        cheatTimerRef.current = null;
-      }
+      cancelPenaltyCountdown();
     };
-  }, [attempt, roomData, isLocked, isExamOver, isCheatWarningOpen]);
+  }, [attempt?.id, isLocked, isExamOver]);
 
   useEffect(() => {
     const p = (e: Event) => { e.preventDefault(); return false; };
@@ -1619,7 +1708,24 @@ const CBTPage = () => {
 
   const handleSubmitExam = useCallback(async (isAuto = false) => {
     const currentAttempt = attemptRef.current || attempt;
-    if (!student || !roomId || !currentAttempt || (currentAttempt.status !== "ongoing" && currentAttempt.status !== "LOCKED") || isSubmitting) return;
+    if (!student || !roomId || !currentAttempt) return;
+
+    if (currentAttempt.status === "finished" || currentAttempt.status === "submitted") {
+      const pr = `${student.nisn}_${roomId}`;
+      sessionStorage.removeItem(`order_${pr}`);
+      sessionStorage.removeItem(`currentIndex_${pr}`);
+      sessionStorage.removeItem("activeCBTRoomId");
+      if (student && roomId) {
+        localStorage.removeItem(`pending_sync_${student.id}_${roomId}`);
+      }
+      if (document.fullscreenElement) {
+        document.exitFullscreen().catch(() => {});
+      }
+      window.location.href = "/exam";
+      return;
+    }
+
+    if ((currentAttempt.status !== "ongoing" && currentAttempt.status !== "LOCKED") || isSubmitting) return;
 
     setIsSubmitting(true);
     isSubmittingRef.current = true;
@@ -1752,6 +1858,7 @@ const CBTPage = () => {
         if (student && roomId) {
           localStorage.setItem(`pending_sync_${student.id}_${roomId}`, "true");
         }
+        if (isKicked) return;
         // Jika 404 (attempt dihapus admin), jangan tampilkan error submit biasa
         if (serverErr?.status === 404) {
           setIsSubmitModalOpen(false);
@@ -1775,7 +1882,11 @@ const CBTPage = () => {
       const pr = `${student.nisn}_${roomId}`;
       sessionStorage.removeItem(`order_${pr}`);
       sessionStorage.removeItem(`currentIndex_${pr}`);
-      navigate(`/`);
+      sessionStorage.removeItem("activeCBTRoomId");
+      if (document.fullscreenElement) {
+        document.exitFullscreen().catch(() => {});
+      }
+      window.location.href = "/exam";
     } catch (e) {
       console.error(e);
       setIsSubmitting(false);
@@ -2020,7 +2131,10 @@ const CBTPage = () => {
             </Button>
 
             <button
-              onClick={() => navigate("/")}
+              onClick={() => {
+                sessionStorage.removeItem("activeCBTRoomId");
+                navigate("/");
+              }}
               className="w-full text-center text-[11px] font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 uppercase tracking-widest transition-colors py-2"
             >
               Kembali ke Dashboard
@@ -2078,7 +2192,10 @@ const CBTPage = () => {
               Muat Ulang Halaman
             </Button>
             <button
-              onClick={() => navigate("/")}
+              onClick={() => {
+                sessionStorage.removeItem("activeCBTRoomId");
+                navigate("/");
+              }}
               className="text-slate-500 hover:text-white text-[11px] font-bold uppercase tracking-widest transition-colors"
             >
               Kembali ke Dashboard
@@ -2238,7 +2355,18 @@ const CBTPage = () => {
                 <h3 className="text-lg font-black text-slate-800 dark:text-white uppercase tracking-tight">Daftar Soal Kosong</h3>
                 <p className="text-sm text-slate-500 dark:text-slate-400 max-w-xs mx-auto">Tidak ditemukan pertanyaan dalam paket soal ini. Silakan hubungi proktor.</p>
               </div>
-              <Button onClick={() => navigate("/")} variant="outline" className="rounded-2xl h-12 px-8 font-black uppercase text-[10px] tracking-widest border-2 dark:border-slate-700 dark:text-slate-300">Kembali ke Dashboard</Button>
+              <Button onClick={() => {
+                sessionStorage.removeItem("activeCBTRoomId");
+                if (student && roomId) {
+                  const pr = `${student.nisn}_${roomId}`;
+                  sessionStorage.removeItem(`order_${pr}`);
+                  sessionStorage.removeItem(`currentIndex_${pr}`);
+                }
+                if (document.fullscreenElement) {
+                  document.exitFullscreen().catch(() => {});
+                }
+                window.location.href = "/exam";
+              }} variant="outline" className="rounded-2xl h-12 px-8 font-black uppercase text-[10px] tracking-widest border-2 dark:border-slate-700 dark:text-slate-300">Kembali ke Dashboard</Button>
             </div>
           )}
 
@@ -2253,7 +2381,18 @@ const CBTPage = () => {
               </div>
               <div className="flex flex-col sm:flex-row gap-3">
                 <Button onClick={() => handleSubmitExam()} className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl h-12 px-8 font-black uppercase text-[10px] tracking-widest shadow-lg shadow-emerald-500/20">Selesaikan Ujian</Button>
-                <Button onClick={() => navigate("/")} variant="outline" className="rounded-2xl h-12 px-8 font-black uppercase text-[10px] tracking-widest border-2 dark:border-slate-700 dark:text-slate-300">Ke Dashboard</Button>
+                <Button onClick={() => {
+                  sessionStorage.removeItem("activeCBTRoomId");
+                  if (student && roomId) {
+                    const pr = `${student.nisn}_${roomId}`;
+                    sessionStorage.removeItem(`order_${pr}`);
+                    sessionStorage.removeItem(`currentIndex_${pr}`);
+                  }
+                  if (document.fullscreenElement) {
+                    document.exitFullscreen().catch(() => {});
+                  }
+                  window.location.href = "/exam";
+                }} variant="outline" className="rounded-2xl h-12 px-8 font-black uppercase text-[10px] tracking-widest border-2 dark:border-slate-700 dark:text-slate-300">Ke Dashboard</Button>
               </div>
             </div>
           )}
@@ -2934,9 +3073,9 @@ const CBTPage = () => {
           </div>
         </DialogContent>
       </Dialog>
-      <Dialog open={isResetModalOpen} onOpenChange={() => { }}><DialogContent className="max-w-md rounded-2xl p-6 text-center pointer-events-auto bg-white dark:bg-slate-950 border-none shadow-2xl"><AlertCircle className="w-12 h-12 text-red-600 mx-auto mb-2 animate-bounce" /><DialogTitle className="text-lg font-bold dark:text-white">Sesi Ujian Di-Reset</DialogTitle><p className="text-slate-500 dark:text-slate-400 text-sm mt-1">Sesi Anda telah di-reset oleh Pengawas. Silakan login kembali.</p><Button onClick={() => logoutStudent()} className="w-full bg-red-600 hover:bg-red-700 text-white rounded-xl h-11 mt-4"><LogOut className="w-4 h-4 mr-2" /> Keluar & Login Ulang</Button></DialogContent></Dialog>
+      <Dialog open={!isKicked && isResetModalOpen} onOpenChange={() => { }}><DialogContent className="max-w-md rounded-2xl p-6 text-center pointer-events-auto bg-white dark:bg-slate-950 border-none shadow-2xl"><AlertCircle className="w-12 h-12 text-red-600 mx-auto mb-2 animate-bounce" /><DialogTitle className="text-lg font-bold dark:text-white">Sesi Ujian Di-Reset</DialogTitle><p className="text-slate-500 dark:text-slate-400 text-sm mt-1">Sesi Anda telah di-reset oleh Pengawas. Silakan login kembali.</p><Button onClick={() => logoutStudent()} className="w-full bg-red-600 hover:bg-red-700 text-white rounded-xl h-11 mt-4"><LogOut className="w-4 h-4 mr-2" /> Keluar & Login Ulang</Button></DialogContent></Dialog>
 
-      <Dialog open={isSessionExpiredModalOpen} onOpenChange={() => { }}>
+      <Dialog open={!isKicked && isSessionExpiredModalOpen} onOpenChange={() => { }}>
         <DialogContent className="max-w-md rounded-2xl p-6 text-center pointer-events-auto bg-white dark:bg-slate-950 border-none shadow-2xl">
           <AlertCircle className="w-12 h-12 text-amber-500 mx-auto mb-2 animate-bounce" />
           <DialogTitle className="text-lg font-bold dark:text-white">Sesi Login Berakhir</DialogTitle>
@@ -2949,7 +3088,7 @@ const CBTPage = () => {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={isErrorModalOpen} onOpenChange={setIsErrorModalOpen}>
+      <Dialog open={!isKicked && isErrorModalOpen} onOpenChange={setIsErrorModalOpen}>
         <DialogContent className="max-w-md rounded-2xl p-6 text-center pointer-events-auto bg-white dark:bg-slate-950 border-none shadow-2xl">
           <AlertCircle className="w-12 h-12 text-red-600 mx-auto mb-2 animate-pulse" />
           <DialogTitle className="text-lg font-bold dark:text-white">Gagal Mengumpulkan Ujian</DialogTitle>
@@ -2983,7 +3122,7 @@ const CBTPage = () => {
         <ImageZoomOverlay src={previewImage} onClose={() => setPreviewImage(null)} />
       )}
 
-      <Dialog open={isSubmitModalOpen} onOpenChange={setIsSubmitModalOpen}>
+      <Dialog open={!isKicked && isSubmitModalOpen} onOpenChange={setIsSubmitModalOpen}>
         <DialogContent className="max-w-lg rounded-2xl p-6 pointer-events-auto text-center bg-white dark:bg-slate-950 border-none shadow-2xl">
           {(() => {
             const questionStatuses = questions.map((q, idx) => ({
@@ -3177,7 +3316,7 @@ const CBTPage = () => {
           })()}
         </DialogContent>
       </Dialog>
-      <Dialog open={isAdminFinishedModalOpen} onOpenChange={() => { }}>
+      <Dialog open={!isKicked && isAdminFinishedModalOpen} onOpenChange={() => { }}>
         <DialogContent className="max-w-md rounded-[2.5rem] p-8 text-center pointer-events-auto bg-white dark:bg-slate-950 border-none shadow-2xl">
           <div className="w-20 h-20 bg-amber-100 dark:bg-amber-900/20 rounded-3xl flex items-center justify-center mx-auto mb-6">
             <ShieldAlert className="w-10 h-10 text-amber-600 animate-pulse" />
@@ -3193,7 +3332,17 @@ const CBTPage = () => {
           <Button
             onClick={() => {
               setIsAdminFinishedModalOpen(false);
-              handleSubmitExam();
+              const pr = `${student?.nisn}_${roomId}`;
+              sessionStorage.removeItem(`order_${pr}`);
+              sessionStorage.removeItem(`currentIndex_${pr}`);
+              sessionStorage.removeItem("activeCBTRoomId");
+              if (student && roomId) {
+                localStorage.removeItem(`pending_sync_${student.id}_${roomId}`);
+              }
+              if (document.fullscreenElement) {
+                document.exitFullscreen().catch(() => {});
+              }
+              window.location.href = "/exam";
             }}
             className="w-full bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl h-14 font-black uppercase tracking-widest text-xs shadow-lg shadow-emerald-500/20 active:scale-95 transition-all"
           >
@@ -3202,7 +3351,26 @@ const CBTPage = () => {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={isCheatWarningOpen} onOpenChange={setIsCheatWarningOpen}>
+      {/* Peringatan Hitung Mundur Penalti 5 Detik */}
+      {!isKicked && penaltyCountdown !== null && (
+        <div className="fixed inset-0 z-[9999] pointer-events-none flex items-start justify-center p-4 sm:p-6 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-rose-600 text-white rounded-2xl shadow-2xl p-4 sm:p-5 max-w-md w-full border border-rose-400/30 flex items-center gap-4 animate-bounce pointer-events-auto">
+            <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0 font-black text-2xl tabular-nums text-white border border-white/30 shadow-inner">
+              {penaltyCountdown}s
+            </div>
+            <div className="flex-1 min-w-0 text-left">
+              <p className="font-black text-sm uppercase tracking-wider text-rose-100 flex items-center gap-1.5">
+                <ShieldAlert className="w-4 h-4 text-white animate-pulse" /> Peringatan Keamanan
+              </p>
+              <p className="text-xs font-semibold text-white/90 leading-tight mt-0.5">
+                Kembali ke lembar ujian sekarang! Penalti pelanggaran akan dicatat dalam {penaltyCountdown} detik.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <Dialog open={!isKicked && isCheatWarningOpen} onOpenChange={setIsCheatWarningOpen}>
         <DialogContent className="max-w-xs rounded-[2rem] p-6 text-center border-none shadow-2xl pointer-events-auto bg-white dark:bg-slate-950">
           <AlertCircle className="w-16 h-16 text-red-600 mx-auto mb-4 animate-pulse" />
           <DialogTitle className="text-xl font-black text-red-600 uppercase tracking-tighter">Pelanggaran!</DialogTitle>

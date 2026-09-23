@@ -13,7 +13,8 @@ import {
   ShieldAlert,
   GraduationCap,
   Award,
-  ChevronDown
+  ChevronDown,
+  BarChart2
 } from "lucide-react";
 import * as React from "react";
 
@@ -80,7 +81,8 @@ const Sidebar = () => {
       badge: null,
       children: [
         { to: "/admin/bank-soal", label: "Bank Soal", icon: BookOpen },
-        { to: "/admin/ruang-ujian", label: "Ruang Ujian", icon: ClipboardList }
+        { to: "/admin/ruang-ujian", label: "Ruang Ujian", icon: ClipboardList },
+        { to: "/admin/analisis-butir-soal", label: "Analisis Butir Soal", icon: BarChart2 }
       ]
     },
     { 

@@ -282,10 +282,8 @@ export const ItemAnalysisDialog: React.FC<ItemAnalysisDialogProps> = ({
           let isCorrect = false;
           let selectedKey = "-";
 
-          if (hasOverride) {
-            isCorrect = Boolean(overrides[q.id]);
-            selectedKey = typeof rawAns === "string" ? rawAns.toUpperCase() : (isCorrect ? "BENAR" : "SALAH");
-          } else if (rawAns !== undefined && rawAns !== null && rawAns !== "") {
+          // 1. Selalu parse pilihan jawaban asli siswa terlebih dahulu
+          if (rawAns !== undefined && rawAns !== null && rawAns !== "") {
             if (q.type === "benar_salah") {
               const sts = (q as any).statements || (q as any).options?.statements || [];
               if (sts.length > 0) {
@@ -308,7 +306,11 @@ export const ItemAnalysisDialog: React.FC<ItemAnalysisDialogProps> = ({
               isCorrect = ck ? Boolean(q.choices![ck]?.isCorrect) : false;
             } else if (q.type === "pilihan_ganda_kompleks") {
               const correctKeys = Object.keys(q.choices || {}).filter(k => q.choices![k]?.isCorrect).map(k => k.toLowerCase());
-              const studentKeys = Array.isArray(rawAns) ? rawAns.map((k: string) => String(k).toLowerCase()) : [];
+              const studentKeys = Array.isArray(rawAns)
+                ? rawAns.map((k: string) => String(k).toLowerCase())
+                : typeof rawAns === "string" && rawAns.trim().length > 0
+                  ? rawAns.replace(/[\[\]"']/g, "").split(/[,|;\s]+/).map((k: string) => k.toLowerCase().trim())
+                  : [];
               isCorrect = studentKeys.length === correctKeys.length && studentKeys.every((k: string) => correctKeys.includes(k));
               selectedKey = studentKeys.map(k => k.toUpperCase()).sort().join(",");
             } else if (q.type === "isian_singkat") {
@@ -324,6 +326,14 @@ export const ItemAnalysisDialog: React.FC<ItemAnalysisDialogProps> = ({
             } else if (q.type === "urutkan" || q.type === "drag_drop") {
               const co = (q.items || []).map((it: any) => it.id);
               isCorrect = Array.isArray(rawAns) && rawAns.length === co.length && rawAns.every((v: string, i: number) => v === co[i]);
+              selectedKey = isCorrect ? "BENAR" : "SALAH";
+            }
+          }
+
+          // 2. Override hanya mempengaruhi status kelulusan skor, bukan menghapus pilihan siswa
+          if (hasOverride) {
+            isCorrect = Boolean(overrides[q.id]);
+            if (!selectedKey || selectedKey === "-") {
               selectedKey = isCorrect ? "BENAR" : "SALAH";
             }
           }
@@ -384,30 +394,42 @@ export const ItemAnalysisDialog: React.FC<ItemAnalysisDialogProps> = ({
             totalAnswered++;
             if (res.isCorrect) totalCorrect++;
 
-            // Hitung opsi yang dipilih jika Pilihan Ganda
-            const optKey = res.selectedKey ? res.selectedKey.toUpperCase() : "";
-            if (optKey && choiceCounts[optKey]) {
-              choiceCounts[optKey].total++;
-            }
+            // Hitung opsi yang dipilih jika Pilihan Ganda / Kompleks
+            const rawKeys = res.selectedKey && res.selectedKey !== "-" && res.selectedKey !== "BENAR" && res.selectedKey !== "SALAH"
+              ? res.selectedKey.split(/[, ;]+/).map((s: string) => s.trim().toUpperCase())
+              : [];
+            rawKeys.forEach((k: string) => {
+              if (k && choiceCounts[k]) {
+                choiceCounts[k].total++;
+              }
+            });
           }
         });
 
         upperGroup.forEach((student) => {
           const res = student.questionResults[q.id];
           if (res?.isCorrect) upperCorrect++;
-          const optKey = res?.selectedKey ? res.selectedKey.toUpperCase() : "";
-          if (optKey && choiceCounts[optKey]) {
-            choiceCounts[optKey].upper++;
-          }
+          const rawKeys = res?.selectedKey && res.selectedKey !== "-" && res.selectedKey !== "BENAR" && res.selectedKey !== "SALAH"
+            ? res.selectedKey.split(/[, ;]+/).map((s: string) => s.trim().toUpperCase())
+            : [];
+          rawKeys.forEach((k: string) => {
+            if (k && choiceCounts[k]) {
+              choiceCounts[k].upper++;
+            }
+          });
         });
 
         lowerGroup.forEach((student) => {
           const res = student.questionResults[q.id];
           if (res?.isCorrect) lowerCorrect++;
-          const optKey = res?.selectedKey ? res.selectedKey.toUpperCase() : "";
-          if (optKey && choiceCounts[optKey]) {
-            choiceCounts[optKey].lower++;
-          }
+          const rawKeys = res?.selectedKey && res.selectedKey !== "-" && res.selectedKey !== "BENAR" && res.selectedKey !== "SALAH"
+            ? res.selectedKey.split(/[, ;]+/).map((s: string) => s.trim().toUpperCase())
+            : [];
+          rawKeys.forEach((k: string) => {
+            if (k && choiceCounts[k]) {
+              choiceCounts[k].lower++;
+            }
+          });
         });
 
         // Tingkat Kesukaran P = B / N

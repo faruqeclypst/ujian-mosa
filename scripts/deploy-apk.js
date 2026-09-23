@@ -52,12 +52,14 @@ if (!fs.existsSync(localApkPath)) {
 }
 
 // 5. Transfer ke VPS
-console.log(`\n[3/4] Mengirim ${apkFileName} ke VPS (${VPS_HOST})...`);
+console.log(`\n[3/4] Mengirim ${apkFileName} & web assets ke VPS (${VPS_HOST})...`);
 execSync(`scp "${localApkPath}" ${VPS_HOST}:${VPS_DIST}/${apkFileName}`, { stdio: 'inherit' });
+execSync(`scp dist/index.html ${VPS_HOST}:${VPS_DIST}/index.html`, { stdio: 'inherit' });
+execSync(`scp -r dist/assets ${VPS_HOST}:${VPS_DIST}/`, { stdio: 'inherit' });
 
 // 6. Update symlink / fallback app-debug.apk & izin akses Caddy
 console.log(`\n[4/4] Memperbarui izin akses & Caddy di VPS...`);
-execSync(`ssh ${VPS_HOST} "cp -f ${VPS_DIST}/${apkFileName} ${VPS_DIST}/app-debug.apk && chown caddy:caddy ${VPS_DIST}/${apkFileName} ${VPS_DIST}/app-debug.apk && chmod 644 ${VPS_DIST}/${apkFileName} ${VPS_DIST}/app-debug.apk && systemctl reload caddy"`, { stdio: 'inherit' });
+execSync(`ssh ${VPS_HOST} "cp -f ${VPS_DIST}/${apkFileName} ${VPS_DIST}/app-debug.apk && chown -R caddy:caddy ${VPS_DIST} && chmod -R 755 ${VPS_DIST} && chmod 644 ${VPS_DIST}/${apkFileName} ${VPS_DIST}/app-debug.apk && systemctl reload caddy"`, { stdio: 'inherit' });
 
 console.log(`\n======================================================`);
 console.log(`  [SUKSES] APK Berhasil Di-build & Dikirim ke VPS!`);

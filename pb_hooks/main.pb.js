@@ -39,9 +39,7 @@ cronAdd("autoFinishAndScore", "* * * * *", () => {
                 (r.id IS NULL AND datetime(COALESCE(NULLIF(a.startedAt, ''), a.created), '+60 minutes') < datetime('now'))
                 -- 2. Timer durasi pengerjaan siswa habis
                 OR (r.id IS NOT NULL AND datetime(COALESCE(NULLIF(a.startedAt, ''), a.created), '+' || COALESCE(r.duration, 60) || ' minutes') < datetime('now'))
-                -- 3. Batas akhir ruangan ujian (endTime) telah terlewati
-                OR (r.endTime IS NOT NULL AND r.endTime != '' AND datetime(r.endTime) < datetime('now'))
-                -- 4. Ruangan telah dinonaktifkan atau diarsipkan
+                -- 3. Ruangan telah dinonaktifkan atau diarsipkan
                 OR r.status = 'archive'
                 OR r.isActive = 0
               )
