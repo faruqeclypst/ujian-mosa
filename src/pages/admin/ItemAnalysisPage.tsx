@@ -146,7 +146,7 @@ const METRIC_INFO_DETAILS: Record<MetricInfoType, MetricInfoData> = {
 
 const MetricInfoTooltip: React.FC<{ type: MetricInfoType; side?: "top" | "bottom" | "left" | "right" }> = ({
   type,
-  side = "top",
+  side = "bottom",
 }) => {
   const info = METRIC_INFO_DETAILS[type];
   if (!info) return null;
@@ -157,56 +157,72 @@ const MetricInfoTooltip: React.FC<{ type: MetricInfoType; side?: "top" | "bottom
         <button
           type="button"
           onClick={(e) => e.stopPropagation()}
-          className="inline-flex items-center justify-center text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors p-0.5 rounded-full hover:bg-slate-200/60 dark:hover:bg-slate-700/60 focus:outline-none focus:ring-2 focus:ring-blue-500/40 cursor-pointer"
+          className="inline-flex items-center justify-center h-4 w-4 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-all rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500/30 cursor-pointer"
           aria-label={`Informasi ${info.title}`}
         >
-          <Info className="h-3.5 w-3.5" />
+          <HelpCircle className="h-3.5 w-3.5" />
         </button>
       </TooltipTrigger>
       <TooltipContent
         side={side}
         align="start"
-        className="w-80 max-w-[90vw] p-3.5 bg-slate-900/95 dark:bg-slate-950 text-slate-100 text-xs rounded-xl shadow-2xl border border-slate-800 backdrop-blur-md z-50 animate-in fade-in-0 zoom-in-95"
+        sideOffset={8}
+        collisionPadding={16}
+        className="w-[320px] max-w-[calc(100vw-32px)] p-3.5 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 text-xs rounded-2xl shadow-xl shadow-slate-900/10 dark:shadow-2xl border border-slate-200/90 dark:border-slate-800 backdrop-blur-md z-50 animate-in fade-in-0 zoom-in-95"
       >
-        <div className="space-y-2">
+        <div className="space-y-2.5">
           {/* Header */}
-          <div className="border-b border-slate-800 pb-1.5 flex items-center justify-between">
-            <span className="font-bold text-white text-xs flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-blue-500 inline-block" />
-              {info.title}
-            </span>
-            <span className="text-[10px] text-slate-400 font-mono">
+          <div className="border-b border-slate-100 dark:border-slate-800 pb-2 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <span
+                className={cn(
+                  "w-2 h-2 rounded-full shrink-0",
+                  type === "difficulty" && "bg-blue-500",
+                  type === "discrimination" && "bg-indigo-500",
+                  type === "point_biserial" && "bg-purple-500",
+                  type === "distractor" && "bg-emerald-500"
+                )}
+              />
+              <span className="font-black text-slate-900 dark:text-white text-xs">
+                {info.title}
+              </span>
+            </div>
+            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-mono tracking-tight shrink-0">
               {info.reference}
             </span>
           </div>
 
           {/* Formula Box */}
-          <div className="bg-slate-800/80 rounded-lg p-2 border border-slate-700/50">
-            <div className="font-mono text-emerald-400 font-bold text-[11px]">
+          <div className="bg-slate-50 dark:bg-slate-800/60 rounded-xl p-2.5 border border-slate-200/70 dark:border-slate-700/50">
+            <div className="font-mono text-blue-600 dark:text-emerald-400 font-black text-xs">
               {info.formula}
             </div>
-            <div className="text-[10px] text-slate-300 mt-0.5">
+            <div className="text-[10px] text-slate-500 dark:text-slate-300 mt-1 leading-relaxed">
               {info.formulaDesc}
             </div>
           </div>
 
-          {/* Kategori / Klasifikasi */}
+          {/* Kriteria & Klasifikasi */}
           <div className="space-y-1">
-            <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
-              Kriteria & Klasifikasi:
+            <div className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+              Kriteria Standar:
             </div>
-            <div className="space-y-1">
+            <div className="grid grid-cols-1 gap-1">
               {info.ranges.map((r, rIdx) => (
-                <div key={rIdx} className="flex items-center justify-between text-[10px] bg-slate-800/40 px-2 py-0.5 rounded">
-                  <span className="font-medium text-slate-200">{r.label}</span>
-                  <span className="font-mono text-slate-300">{r.value}</span>
+                <div
+                  key={rIdx}
+                  className="flex items-center justify-between text-[11px] bg-slate-50/70 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800/80 px-2 py-1 rounded-lg"
+                >
+                  <span className="font-semibold text-slate-700 dark:text-slate-200">{r.label}</span>
+                  <span className="font-mono text-[10px] font-bold text-slate-500 dark:text-slate-400">{r.value}</span>
                 </div>
               ))}
             </div>
           </div>
 
           {/* Deskripsi Evaluasi */}
-          <div className="text-[10px] text-slate-300 leading-relaxed pt-1 border-t border-slate-800">
+          <div className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed bg-blue-50/50 dark:bg-blue-950/20 border border-blue-100/70 dark:border-blue-900/30 p-2 rounded-xl">
+            <span className="font-bold text-blue-700 dark:text-blue-300">Makna Evaluasi: </span>
             {info.description}
           </div>
         </div>
@@ -2384,88 +2400,115 @@ export const ItemAnalysisPage: React.FC = () => {
 
                   {/* 2. LAPISAN 1: STATISTIK ITEM CTT (Item Statistics) */}
                   <div className="space-y-2">
-                    <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block">
-                      Lapisan 1: Statistik Psikometri Butir Soal (CTT)
-                    </span>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 bg-slate-50 dark:bg-slate-800/50 p-3.5 rounded-xl border border-slate-200/60 dark:border-slate-700/60 print:bg-white print:border-slate-300">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block">
+                        Lapisan 1: Statistik Psikometri Butir Soal (CTT)
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setShowGuideModal(true)}
+                        className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:underline cursor-pointer"
+                      >
+                        <BookOpen className="h-3 w-3" />
+                        Panduan Parameter
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 bg-slate-50 dark:bg-slate-800/40 p-3 rounded-2xl border border-slate-200/60 dark:border-slate-700/60 print:bg-white print:border-slate-300">
                       {/* P */}
-                      <div>
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Tingkat Kesukaran (P)</span>
-                          <MetricInfoTooltip type="difficulty" side="top" />
+                      <div className="bg-white dark:bg-slate-900/80 p-3 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-2xs hover:border-blue-200 dark:hover:border-blue-900/50 transition-all flex flex-col justify-between">
+                        <div>
+                          <div className="flex items-center justify-between gap-1.5">
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Tingkat Kesukaran (P)</span>
+                            <MetricInfoTooltip type="difficulty" side="bottom" />
+                          </div>
+                          <div className="flex items-baseline gap-1.5 mt-1">
+                            <span className="text-base font-black text-slate-900 dark:text-white">
+                              P = {q.difficultyIndex.toFixed(2)}
+                            </span>
+                            <span className={cn(
+                              "text-[10px] font-bold px-1.5 py-0.5 rounded",
+                              q.difficultyCategory === "Sedang" ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300" : (q.difficultyCategory === "Mudah" ? "bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300" : "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300")
+                            )}>
+                              {q.difficultyCategory}
+                            </span>
+                          </div>
                         </div>
-                        <div className="flex items-baseline gap-1.5 mt-0.5">
-                          <span className="text-sm font-black text-slate-900 dark:text-white">
-                            P = {q.difficultyIndex.toFixed(2)}
-                          </span>
-                          <span className={cn(
-                            "text-[10px] font-bold",
-                            q.difficultyCategory === "Sedang" ? "text-emerald-600" : (q.difficultyCategory === "Mudah" ? "text-blue-600" : "text-amber-600")
-                          )}>
-                            ({q.difficultyCategory})
-                          </span>
-                        </div>
-                        <span className="text-[11px] text-slate-500 dark:text-slate-400 block mt-0.5">
+                        <span className="text-[11px] text-slate-500 dark:text-slate-400 block mt-2 pt-2 border-t border-slate-100 dark:border-slate-800/60">
                           B / N = {q.totalCorrect} / {q.totalAnswered} Siswa ({Math.round(q.difficultyIndex * 100)}%)
                         </span>
                       </div>
 
                       {/* D */}
-                      <div>
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Daya Pembeda (D)</span>
-                          <MetricInfoTooltip type="discrimination" side="top" />
+                      <div className="bg-white dark:bg-slate-900/80 p-3 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-2xs hover:border-blue-200 dark:hover:border-blue-900/50 transition-all flex flex-col justify-between">
+                        <div>
+                          <div className="flex items-center justify-between gap-1.5">
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Daya Pembeda (D)</span>
+                            <MetricInfoTooltip type="discrimination" side="bottom" />
+                          </div>
+                          <div className="flex items-baseline gap-1.5 mt-1">
+                            <span className={cn(
+                              "text-base font-black",
+                              q.discriminationIndex >= 0.40 ? "text-emerald-600" : (q.discriminationIndex >= 0.30 ? "text-blue-600" : (q.discriminationIndex >= 0.20 ? "text-amber-600" : "text-rose-600"))
+                            )}>
+                              D = {q.discriminationIndex >= 0 ? `+${q.discriminationIndex.toFixed(2)}` : q.discriminationIndex.toFixed(2)}
+                            </span>
+                            <span className={cn(
+                              "text-[10px] font-bold px-1.5 py-0.5 rounded",
+                              q.discriminationIndex >= 0.40 ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300" : (q.discriminationIndex >= 0.30 ? "bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300" : (q.discriminationIndex >= 0.20 ? "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300" : "bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300"))
+                            )}>
+                              {q.discriminationCategory}
+                            </span>
+                          </div>
                         </div>
-                        <div className="flex items-baseline gap-1.5 mt-0.5">
-                          <span className={cn(
-                            "text-sm font-black",
-                            q.discriminationIndex >= 0.40 ? "text-emerald-600" : (q.discriminationIndex >= 0.30 ? "text-blue-600" : (q.discriminationIndex >= 0.20 ? "text-amber-600" : "text-rose-600"))
-                          )}>
-                            D = {q.discriminationIndex >= 0 ? `+${q.discriminationIndex.toFixed(2)}` : q.discriminationIndex.toFixed(2)}
-                          </span>
-                          <span className="text-[10px] font-bold text-slate-600 dark:text-slate-300">
-                            ({q.discriminationCategory})
-                          </span>
-                        </div>
-                        <span className="text-[11px] text-slate-500 dark:text-slate-400 block mt-0.5">
+                        <span className="text-[11px] text-slate-500 dark:text-slate-400 block mt-2 pt-2 border-t border-slate-100 dark:border-slate-800/60 truncate" title={`Ba: ${q.upperGroupCorrect}/${examMeta.upperCount} vs Bb: ${q.lowerGroupCorrect}/${examMeta.lowerCount}`}>
                           Ba: {q.upperGroupCorrect}/{examMeta.upperCount} vs Bb: {q.lowerGroupCorrect}/{examMeta.lowerCount} (Δ {q.upperGroupCorrect - q.lowerGroupCorrect})
                         </span>
                       </div>
 
                       {/* r_pb */}
-                      <div>
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Point-Biserial (r_pb)</span>
-                          <MetricInfoTooltip type="point_biserial" side="top" />
+                      <div className="bg-white dark:bg-slate-900/80 p-3 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-2xs hover:border-blue-200 dark:hover:border-blue-900/50 transition-all flex flex-col justify-between">
+                        <div>
+                          <div className="flex items-center justify-between gap-1.5">
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Point-Biserial (r_pb)</span>
+                            <MetricInfoTooltip type="point_biserial" side="bottom" />
+                          </div>
+                          <div className="flex items-baseline gap-1.5 mt-1">
+                            <span className="text-base font-black text-slate-900 dark:text-white">
+                              r_pb = {q.pointBiserial >= 0 ? `+${q.pointBiserial.toFixed(2)}` : q.pointBiserial.toFixed(2)}
+                            </span>
+                            <span className={cn(
+                              "text-[10px] font-bold px-1.5 py-0.5 rounded",
+                              q.pointBiserial >= 0.30 ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300" : (q.pointBiserial >= 0.20 ? "bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300" : (q.pointBiserial >= 0 ? "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300" : "bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300"))
+                            )}>
+                              {q.pointBiserialCategory}
+                            </span>
+                          </div>
                         </div>
-                        <div className="flex items-baseline gap-1.5 mt-0.5">
-                          <span className="text-sm font-black text-slate-900 dark:text-white">
-                            r_pb = {q.pointBiserial >= 0 ? `+${q.pointBiserial.toFixed(2)}` : q.pointBiserial.toFixed(2)}
-                          </span>
-                          <span className="text-[10px] font-bold text-slate-600 dark:text-slate-300">
-                            ({q.pointBiserialCategory})
-                          </span>
-                        </div>
-                        <span className="text-[11px] text-slate-500 dark:text-slate-400 block mt-0.5">
-                          Corrected Item-Total Pearson (Yi vs X - Yi)
+                        <span className="text-[11px] text-slate-500 dark:text-slate-400 block mt-2 pt-2 border-t border-slate-100 dark:border-slate-800/60 truncate" title="Corrected Item-Total Pearson (Yi vs X - Yi)">
+                          Corrected Item-Total Pearson
                         </span>
                       </div>
 
                       {/* Distractor Efficiency */}
-                      <div>
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Efektivitas Pengecoh</span>
-                          <MetricInfoTooltip type="distractor" side="top" />
+                      <div className="bg-white dark:bg-slate-900/80 p-3 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-2xs hover:border-blue-200 dark:hover:border-blue-900/50 transition-all flex flex-col justify-between">
+                        <div>
+                          <div className="flex items-center justify-between gap-1.5">
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Efektivitas Pengecoh</span>
+                            <MetricInfoTooltip type="distractor" side="bottom" />
+                          </div>
+                          <div className="flex items-baseline gap-1.5 mt-1">
+                            <span className="text-base font-black text-slate-900 dark:text-white">
+                              DE = {q.distractorEfficiency}%
+                            </span>
+                            <span className={cn(
+                              "text-[10px] font-bold px-1.5 py-0.5 rounded",
+                              q.distractorEfficiency >= 66 ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300" : (q.distractorEfficiency >= 33 ? "bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300" : "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300")
+                            )}>
+                              {q.effectiveDistractorCount}/{q.totalDistractorCount} Efektif
+                            </span>
+                          </div>
                         </div>
-                        <div className="flex items-baseline gap-1.5 mt-0.5">
-                          <span className="text-sm font-black text-slate-900 dark:text-white">
-                            DE = {q.distractorEfficiency}%
-                          </span>
-                          <span className="text-[10px] font-bold text-slate-600 dark:text-slate-300">
-                            ({q.effectiveDistractorCount}/{q.totalDistractorCount} Efektif)
-                          </span>
-                        </div>
-                        <span className="text-[11px] text-slate-500 dark:text-slate-400 block mt-0.5">
+                        <span className="text-[11px] text-slate-500 dark:text-slate-400 block mt-2 pt-2 border-t border-slate-100 dark:border-slate-800/60 truncate" title="Syarat: Fo ≥ 5% & nBB > nBA">
                           Syarat: Fo ≥ 5% &amp; nBB &gt; nBA
                         </span>
                       </div>
