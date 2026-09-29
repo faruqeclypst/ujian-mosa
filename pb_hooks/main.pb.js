@@ -143,7 +143,20 @@ cronAdd("autoFinishAndScore", "* * * * *", () => {
                             objectiveCorrect++;
                         }
                     } else if (t === "benar_salah") {
-                        if (typeof studentAns === "object" && studentAns !== null) {
+                        if (options.statements && Array.isArray(options.statements)) {
+                            let stCount = 0;
+                            let stCorr = 0;
+                            for (let si = 0; si < options.statements.length; si++) {
+                                const st = options.statements[si] || {};
+                                const sid = String(st.id != null ? st.id : "");
+                                if (!sid) continue;
+                                stCount++;
+                                const expected = String(st.answer || "").toLowerCase();
+                                const given = String((typeof studentAns === "object" && studentAns !== null ? studentAns[sid] : "") || "").toLowerCase();
+                                if (given === expected) stCorr++;
+                            }
+                            if (stCount > 0) objectiveCorrect += (stCorr / stCount);
+                        } else if (typeof studentAns === "object" && studentAns !== null) {
                             let stCount = 0;
                             let stCorr = 0;
                             Object.keys(options).forEach(k => {
@@ -221,7 +234,7 @@ cronAdd("rotateUniversalToken", "*/5 * * * *", () => {
         settings.set("universal_token_updated_at", new Date().toISOString());
         $app.save(settings);
 
-        console.log("[CRON TOKEN] Token universal berhasil dirotasi ke: " + token);
+        console.log("[CRON TOKEN] Token universal berhasil dirotasi.");
     } catch (e) {
         console.error("[CRON TOKEN ROTATION ERROR]:", e);
     }

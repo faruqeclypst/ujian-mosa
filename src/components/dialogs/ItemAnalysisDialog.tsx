@@ -159,28 +159,37 @@ export const ItemAnalysisDialog: React.FC<ItemAnalysisDialogProps> = ({
     try {
       let targetExamId = propExamId || "";
       let currentRoomName = propRoomName || "Ujian";
-
-      // 1. Fetch Room jika ada roomId
-      if (roomId) {
-        const roomRecord = await pb.collection("exam_rooms").getOne(roomId).catch(() => null);
-        if (roomRecord) {
-          targetExamId = roomRecord.examId;
-          currentRoomName = roomRecord.room_name || currentRoomName;
-        }
-      }
-
-      // 2. Fetch Exam
       let currentExamTitle = propExamTitle || "Ujian";
       let subjName = "-";
       let teachName = "-";
 
-      if (targetExamId) {
-        const examRecord = await pb.collection("exams").getOne(targetExamId).catch(() => null);
+      // 1. Fetch Room jika ada roomId
+      if (roomId) {
+        const roomRecord = await pb.collection("exam_rooms").getOne(roomId, {
+          expand: "examId,examId.subjectId,examId.teacherId"
+        }).catch(() => null);
+        if (roomRecord) {
+          targetExamId = roomRecord.examId;
+          currentRoomName = roomRecord.room_name || currentRoomName;
+          const expExam = roomRecord.expand?.examId;
+          if (expExam) {
+            currentExamTitle = expExam.title || currentExamTitle;
+            subjName = expExam.expand?.subjectId?.name || subjName;
+            teachName = expExam.expand?.teacherId?.name || teachName;
+          }
+        }
+      }
+
+      // 2. Fetch Exam
+      if (targetExamId && (subjName === "-" || teachName === "-")) {
+        const examRecord = await pb.collection("exams").getOne(targetExamId, {
+          expand: "subjectId,teacherId"
+        }).catch(() => null);
         if (examRecord) {
           currentExamTitle = examRecord.title || currentExamTitle;
-          const s = subjects.find((sub: any) => sub.id === (examRecord.subjectId || examRecord.subjectid));
+          const s = examRecord.expand?.subjectId || subjects.find((sub: any) => sub.id === (examRecord.subjectId || examRecord.subjectid));
           subjName = s ? s.name : "-";
-          const t = teachers.find((tc: any) => tc.id === (examRecord.teacherId || examRecord.teacherid));
+          const t = examRecord.expand?.teacherId || teachers.find((tc: any) => tc.id === (examRecord.teacherId || examRecord.teacherid));
           teachName = t ? t.name : "-";
         }
       }

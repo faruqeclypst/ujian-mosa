@@ -662,15 +662,17 @@ const MonitoringPage = () => {
       // 1. Ambil Data Ruangan jika belum ada
       let currentRoom = monitorRoom;
       if (!currentRoom) {
-        const roomRecord = await pb.collection('exam_rooms').getOne(id);
-        const examObj = await pb.collection('exams').getOne(roomRecord.examId).catch(() => null);
+        const roomRecord = await pb.collection('exam_rooms').getOne(id, {
+          expand: 'examId,examId.teacherId,examId.subjectId'
+        });
+        const examObj = roomRecord.expand?.examId || await pb.collection('exams').getOne(roomRecord.examId).catch(() => null);
 
         // Robust mapping similar to ExamRoomsPage
         const sId = roomRecord.examId || (roomRecord as any).examid || "";
         const roomName = roomRecord.room_name || (roomRecord as any).title || roomRecord.title || "Tanpa Nama";
         const isOff = roomRecord.isDisabled !== undefined ? roomRecord.isDisabled : (roomRecord as any).isActive === false;
-        const subjectObj = subjects.find((s: any) => s.id === (examObj?.subjectId || (examObj as any)?.subjectid));
-        const teacherObj = masterTeachers.find((t: any) => t.id === (examObj?.teacherId || (examObj as any)?.teacherid));
+        const subjectObj = examObj?.expand?.subjectId || subjects.find((s: any) => s.id === (examObj?.subjectId || (examObj as any)?.subjectid));
+        const teacherObj = examObj?.expand?.teacherId || masterTeachers.find((t: any) => t.id === (examObj?.teacherId || (examObj as any)?.teacherid));
 
         // Robust mapping for Class IDs
         const isAllClasses = roomRecord.allClasses || (roomRecord as any).all_classes || false;

@@ -68,10 +68,12 @@ const StudentGradingDetailPage = () => {
     if (!pb || !roomId || !studentId) return;
     setLoading(true);
     try {
-      const roomRecord = await pb.collection("exam_rooms").getOne(roomId);
-      const examObj = await pb.collection("exams").getOne(roomRecord.examId).catch(() => null);
-      let subjectName = "";
-      if (examObj?.subjectId) {
+      const roomRecord = await pb.collection("exam_rooms").getOne(roomId, {
+        expand: "examId,examId.subjectId"
+      });
+      const examObj = roomRecord.expand?.examId || await pb.collection("exams").getOne(roomRecord.examId).catch(() => null);
+      let subjectName = examObj?.expand?.subjectId?.name || "";
+      if (!subjectName && examObj?.subjectId) {
         const subjectObj = await pb.collection("subjects").getOne(examObj.subjectId).catch(() => null);
         subjectName = subjectObj?.name || "";
       }

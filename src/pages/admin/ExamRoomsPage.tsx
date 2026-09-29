@@ -488,17 +488,25 @@ const ExamRoomsPage = () => {
       if (!pb) return;
       try {
         setExamsLoading(true);
-        const loaded = await pb.collection('exams').getFullList({ sort: '-created' });
+        const [loaded, fastCounts] = await Promise.all([
+          pb.collection('exams').getFullList({ sort: '-created' }),
+          pb.send("/api/exam-question-counts", {}).catch(() => null)
+        ]);
         setExams(loaded);
-        try {
-          const qList = await pb.collection('questions').getFullList({ fields: 'id,examId' });
-          const counts: Record<string, number> = {};
-          qList.forEach((q: any) => {
-            const exId = q.examId || (q as any).examid;
-            if (exId) counts[exId] = (counts[exId] || 0) + 1;
-          });
-          setExamQuestionCounts(counts);
-        } catch (qErr) { }
+
+        if (fastCounts && typeof fastCounts === 'object') {
+          setExamQuestionCounts(fastCounts);
+        } else {
+          try {
+            const qList = await pb.collection('questions').getFullList({ fields: 'id,examId' });
+            const counts: Record<string, number> = {};
+            qList.forEach((q: any) => {
+              const exId = q.examId || (q as any).examid;
+              if (exId) counts[exId] = (counts[exId] || 0) + 1;
+            });
+            setExamQuestionCounts(counts);
+          } catch (qErr) { }
+        }
       } catch (e) { } finally {
         setExamsLoading(false);
       }
@@ -506,16 +514,19 @@ const ExamRoomsPage = () => {
     fetchExams();
   }, [pb]);
 
-  // Sync Exam Rooms listing
+  // Sync Exam Rooms listing with single-request relation expansion
   const fetchRooms = useCallback(async () => {
     if (!pb) return;
     try {
-      const loaded = await pb.collection('exam_rooms').getFullList({ sort: '-created' });
+      const loaded = await pb.collection('exam_rooms').getFullList({
+        sort: '-created',
+        expand: 'examId,examId.teacherId,examId.subjectId',
+      });
 
       const mapped = loaded.map(room => {
-        const sId = room.examId || (room as any).examid || "";
-        const examObj = exams.find(e => e.id === sId);
-        const eTeacherId = examObj?.teacherId || (examObj as any)?.teacherid || "";
+        const sId = room.examId || (room as any).examid || (room.expand?.examId as any)?.id || "";
+        const examObj = room.expand?.examId || exams.find(e => e.id === sId);
+        const eTeacherId = examObj?.teacherId || (examObj as any)?.teacherid || examObj?.expand?.teacherId?.id || "";
 
         const startTime = room.start_time || (room as any).startTime || "";
         const endTime = room.end_time || (room as any).endTime || "";
@@ -523,8 +534,8 @@ const ExamRoomsPage = () => {
         const clsId = room.classId || (room as any).classIds || "";
         const isOff = room.isDisabled !== undefined ? room.isDisabled : (room as any).isActive === false;
 
-        const subjectObj = subjects.find(s => s.id === (examObj?.subjectId || (examObj as any)?.subjectid));
-        const teacherObj = masterTeachers.find(t => t.id === eTeacherId);
+        const subjectObj = examObj?.expand?.subjectId || subjects.find(s => s.id === (examObj?.subjectId || (examObj as any)?.subjectid));
+        const teacherObj = examObj?.expand?.teacherId || masterTeachers.find(t => t.id === eTeacherId);
 
         let className = `Semua ${terminology.class}`;
         if (!room.allClasses) {

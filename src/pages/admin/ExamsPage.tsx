@@ -349,20 +349,25 @@ const ExamsPage = () => {
   const fetchQuestionCounts = useCallback(async () => {
     if (!pb) return;
     try {
-      // Kita hanya butuh examId untuk menghitung jumlah soal per exam
+      const counts = await pb.send("/api/exam-question-counts", {}).catch(() => null);
+      if (counts && typeof counts === 'object') {
+        setQuestionCounts(counts);
+        return;
+      }
+
       const questions = await pb.collection('questions').getFullList({
         fields: 'examId',
-        requestKey: 'question_counts_fetch' // Prevent cancellation issues
+        requestKey: 'question_counts_fetch'
       });
 
-      const counts: Record<string, number> = {};
+      const countsFallback: Record<string, number> = {};
       questions.forEach((q: any) => {
         const eId = q.examId || q.examid;
         if (eId) {
-          counts[eId] = (counts[eId] || 0) + 1;
+          countsFallback[eId] = (countsFallback[eId] || 0) + 1;
         }
       });
-      setQuestionCounts(counts);
+      setQuestionCounts(countsFallback);
     } catch (e) {
       console.warn("Gagal load data jumlah soal:", e);
     }
@@ -756,9 +761,17 @@ const ExamsPage = () => {
       if (!pb) return;
 
       try {
-        const loaded = await pb.collection('exams').getFullList({
-          sort: '-created'
-        });
+        const [loaded, counts] = await Promise.all([
+          pb.collection('exams').getFullList({
+            sort: '-created',
+            expand: 'teacherId,subjectId'
+          }),
+          pb.send("/api/exam-question-counts", {}).catch(() => null)
+        ]);
+
+        if (counts && typeof counts === 'object') {
+          setQuestionCounts(counts);
+        }
 
         const mapped = loaded.map((exam) => {
           // Handle possible lowercase field names from PocketBase
@@ -766,8 +779,8 @@ const ExamsPage = () => {
           const tId = exam.teacherId || (exam as any).teacherid;
           const type = exam.examType || (exam as any).examtype || "Latihan";
 
-          const subjectObj = subjects.find((s: any) => s.id === sId);
-          const teacherObj = teachers.find((t: any) => t.id === tId);
+          const subjectObj = exam.expand?.subjectId || subjects.find((s: any) => s.id === sId);
+          const teacherObj = exam.expand?.teacherId || teachers.find((t: any) => t.id === tId);
 
           const { id, ...rest } = exam;
           return {
@@ -805,7 +818,7 @@ const ExamsPage = () => {
     return () => {
       unsub.then(u => u()).catch(() => {});
     };
-  }, [subjects, teachers, role, user, pb]);
+  }, [subjects, teachers, role, user, pb, teacherId, terminology.teacher]);
 
   const handleCreateClick = () => {
     setDialogMode("create");

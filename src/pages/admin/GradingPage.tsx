@@ -53,8 +53,8 @@ const GradingPage = () => {
     if (!pb || !roomId) return;
     setLoading(true);
     try {
-      const roomRecord = await pb.collection("exam_rooms").getOne(roomId);
-      const examObj = await pb.collection("exams").getOne(roomRecord.examId).catch(() => null);
+      const roomRecord = await pb.collection("exam_rooms").getOne(roomId, { expand: "examId" });
+      const examObj = roomRecord.expand?.examId || await pb.collection("exams").getOne(roomRecord.examId).catch(() => null);
       setRoom({ ...roomRecord, examTitle: examObj?.title || "Ujian", examId: roomRecord.examId });
 
       const qList = await pb.collection("questions").getFullList({ filter: `examId = "${roomRecord.examId}"`, sort: "order,created" });
