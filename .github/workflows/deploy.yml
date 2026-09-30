@@ -39,13 +39,34 @@ jobs:
           VITE_R2_WORKER_URL: "https://r2-delete-worker.faruq-blogger.workers.dev"
           VITE_DISABLE_EXAMBRO_GUARD: "false"
 
-      - name: Deploy to VPS via SSH
-        uses: appleboy/scp-action@master
+      - name: Deploy ke VPS (/opt/frontend)
+        uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.SSH_PORT || 22 }}
           source: "dist/*"
-          target: "${{ secrets.REMOTE_DIR }}/pb_public/"
+          target: "${{ secrets.REMOTE_DIR }}"
           strip_components: 1
           overwrite: true
+
+      - name: Verifikasi hasil deploy
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.SSH_PORT || 22 }}
+          script: |
+            set -e
+            DIR="${{ secrets.REMOTE_DIR }}"
+            echo "== Isi $DIR =="
+            ls -la "$DIR" | head -20
+            echo
+            echo "== index.html =="
+            test -f "$DIR/index.html" || { echo "GAGAL: index.html tidak ada!"; exit 1; }
+            echo "Bundle terpasang: $(grep -oE 'index-[A-Za-z0-9_-]+\.js' "$DIR/index.html" | head -1)"
+            echo "Commit          : ${{ github.sha }}"
+            echo "Waktu           : $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "Total file      : $(find "$DIR" -type f | wc -l)"
