@@ -1,4 +1,4 @@
-import isEqual from "lodash/isEqual";
+import { isEqual } from "../../lib/deepEqual";
 import { safeSetItem } from "../../lib/syncManager";
 import React, { useEffect, useState, useCallback, useRef } from "react";
 import { Capacitor, registerPlugin } from "@capacitor/core";
