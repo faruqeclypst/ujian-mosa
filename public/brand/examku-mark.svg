@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" role="img" aria-label="Examku">
+  <defs>
+    <linearGradient id="ekg" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#3B82F6"/>
+      <stop offset="52%" stop-color="#1D4ED8"/>
+      <stop offset="100%" stop-color="#3D34C9"/>
+    </linearGradient>
+  </defs>
+
+  <rect x="0" y="0" width="64" height="64" rx="16" fill="url(#ekg)"/>
+
+  <path d="M14.5 18.5h26" stroke="#ffffff" stroke-width="5" stroke-linecap="round"/>
+  <path d="M14.5 32h19" stroke="#ffffff" stroke-width="5" stroke-linecap="round" opacity="0.7"/>
+  <path d="M14.5 45.5h26" stroke="#ffffff" stroke-width="5" stroke-linecap="round"/>
+
+  <circle cx="49.6" cy="18.5" r="3.4" fill="#4ADE80"/>
+</svg>

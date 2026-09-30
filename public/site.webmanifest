@@ -1,0 +1,14 @@
+{
+  "name": "Examku - Sistem Ujian Daring untuk Sekolah",
+  "short_name": "Examku",
+  "description": "Platform ujian daring untuk sekolah dan kampus.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#1d4ed8",
+  "icons": [
+    { "src": "/brand/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/brand/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/brand/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
