@@ -1,3 +1,4 @@
+import { getOnlineFlag } from "../../lib/network";
 import React, { useState, useEffect, useCallback } from "react";
 import {
   RefreshCw,
@@ -1160,7 +1161,7 @@ const MonitoringPage = () => {
             status: "ongoing",
             submittedAt: "",
             startedAt: newStartedAt,
-            isOnline: true,
+            isOnline: getOnlineFlag(),
             lastHeartbeat: new Date().toISOString()
           });
         }));

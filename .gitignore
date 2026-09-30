@@ -5,3 +5,18 @@ dist
 .backup*
 .vscode
 .DS_Store
+
+# ── KEBOCORAN (fix 2026-10-01) ───────────────────────────────
+# Signing key JANGAN pernah di-commit.
+keystore/
+*.jks
+*.keystore
+release-key.*
+
+# Folder backup lokal (bukan template tenant).
+/backup pocketbase/
+/backup-pb/
+
+# CATATAN: JANGAN pakai pola global *.db / pb_data/ — akan memblokir
+# vps/template_school/pb_data/data.db yang DIBUTUHKAN setup-school.sh
+# untuk provisioning tenant baru.

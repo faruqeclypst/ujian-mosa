@@ -66,6 +66,28 @@ else
     echo "Pastikan Anda sudah menjalankan 'npm run build' jika ini adalah project React."
 fi
 
+# 2.55 Deploy PB HOOKS (WAJIB!) — security_fix, main, exam_counts, dll
+# TANPA INI: kunci jawaban tidak di-strip dari API, skoring server-side mati,
+# dan hook session guard tidak aktif. Ini proteksi inti, bukan opsional.
+echo "[1.55/5] Mendeploy pb_hooks ke $BASE_DIR/pb_hooks..."
+mkdir -p "$BASE_DIR/pb_hooks"
+if [ -d "$CURRENT_DIR/pb_hooks" ]; then
+    cp -r "$CURRENT_DIR/pb_hooks/." "$BASE_DIR/pb_hooks/"
+    HOOK_COUNT=$(ls -1 "$BASE_DIR/pb_hooks"/*.pb.js 2>/dev/null | wc -l)
+    echo "Berhasil menyalin $HOOK_COUNT file hook ke $BASE_DIR/pb_hooks"
+    # Verifikasi kritis: security_fix.pb.js harus ada
+    if [ ! -f "$BASE_DIR/pb_hooks/security_fix.pb.js" ]; then
+        echo "⚠️  PERINGATAN KRITIS: security_fix.pb.js TIDAK ADA!"
+        echo "    Kunci jawaban akan BOCOR ke sisi siswa. Periksa folder pb_hooks di repo."
+    fi
+elif [ -d "$CURRENT_DIR/vps/template_school/pb_hooks" ]; then
+    cp -r "$CURRENT_DIR/vps/template_school/pb_hooks/." "$BASE_DIR/pb_hooks/"
+    echo "Berhasil menyalin hook dari template_school (fallback)"
+else
+    echo "❌ ERROR KRITIS: Tidak ditemukan folder pb_hooks!"
+    echo "   JANGAN lanjutkan — tenant ini akan berjalan tanpa proteksi kunci jawaban."
+fi
+
 # 2.6 Sinkronisasi Struktur Database (Migrations)
 echo "[1.6/5] Menyalin struktur database (migrations) ke $BASE_DIR..."
 if [ -d "$CURRENT_DIR/pb_migrations" ]; then

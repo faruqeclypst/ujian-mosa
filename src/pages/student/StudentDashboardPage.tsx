@@ -17,7 +17,8 @@ import { useTheme } from "../../context/ThemeContext";
 import { Card, CardHeader, CardContent } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
 import { cn } from "../../lib/utils";
-import { syncPendingData } from "../../lib/syncManager";
+import { syncPendingDataLocked } from "../../lib/syncManager";
+import { syncJitter } from "../../lib/network";
 import ExamConfirmationPage from "./ExamConfirmationPage";
 
 // ── Isolated banner: typing name + rotating message ──
@@ -153,7 +154,7 @@ const StudentDashboardPage = () => {
     isSyncingRef.current = true;
     setIsSyncingData(true);
     try {
-      const synced = await syncPendingData(pb, student.id);
+      const synced = await syncPendingDataLocked(pb, student.id);
       // Re-check localStorage setelah sync — bisa jadi masih ada pending dari room lain
       const remaining = Object.keys(localStorage).filter(k => k.startsWith(`pending_sync_${student.id}_`));
       setHasPendingSync(remaining.length > 0);
@@ -185,8 +186,13 @@ const StudentDashboardPage = () => {
     checkAndSync();
     const interval = setInterval(checkAndSync, 8000);
 
-    // Juga sync saat koneksi kembali online
-    const onOnline = () => { checkAndSync(); };
+    // Juga sync saat koneksi kembali online — pakai jitter agar 500+ perangkat
+    // tidak mengirim antrean pada detik yang sama (retry storm).
+    let onlineTimer: ReturnType<typeof setTimeout> | null = null;
+    const onOnline = () => {
+      if (onlineTimer) clearTimeout(onlineTimer);
+      onlineTimer = setTimeout(() => { checkAndSync(); }, syncJitter(1000, 30000));
+    };
     window.addEventListener("online", onOnline);
 
     return () => {
@@ -395,7 +401,7 @@ const StudentDashboardPage = () => {
 
   useEffect(() => {
     if (student?.id && pb && navigator.onLine) {
-      syncPendingData(pb, student.id).then((synced) => {
+      syncPendingDataLocked(pb, student.id).then((synced) => {
         if (synced && synced.length > 0) fetchData(true);
       });
     }

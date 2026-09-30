@@ -418,4 +418,85 @@ routerAdd("POST", "/api/verify-pin", (c) => {
     }
 });
 
+/* =========================================================
+   BAGIAN 6 — PENEGAKAN SESI DI SISI SERVER (2026-09-30)
+   Tujuan: menutup jendela race antara "device di-kick" dan
+   "device berhenti menulis".
+
+   MASALAH: deteksi double login di klien bersifat REAKTIF —
+   realtime/polling 3 detik baru memberi tahu device lama
+   bahwa ia sudah di-kick. Di dalam jendela itu, device lama
+   masih sah menurut dirinya sendiri dan tetap bisa menulis
+   ke attempts.
+
+   SOLUSI: saat login, students.activeSessionId diisi SID baru.
+   Klien menyertakan SID yang sama pada setiap write attempts
+   lewat field `sessionToken`. Hook ini MENOLAK (403) setiap
+   tulisan yang SID-nya tidak cocok dengan SID aktif siswa.
+
+   Hasil: device yang sudah di-kick tidak bisa menulis sama
+   sekali — bukan sekadar diberi tahu. Aturan "tanpa double
+   login" ditegakkan server, bukan diserahkan ke klien.
+
+   KOMPATIBEL-MUNDUR: jika klien lama belum mengirim
+   sessionToken, hook tidak memblokir (hanya klien baru yang
+   mendapat proteksi). Aman untuk rollout bertahap.
+   ========================================================= */
+onRecordUpdateRequest((e) => {
+    try {
+        if (e.record.collection().name !== "attempts") { e.next(); return; }
+
+        // Guru/admin/superuser tetap boleh mengubah (reset, koreksi nilai uraian)
+        let authNameStr = "";
+        try {
+            const authObj = e.requestInfo && e.requestInfo.auth;
+            if (authObj) {
+                const c = authObj.collection();
+                if (c && c.name) authNameStr = c.name;
+            }
+        } catch (x) {}
+        if (authNameStr === "_superusers" || authNameStr === "users") { e.next(); return; }
+
+        // Ambil token: dari body request ATAU field record
+        let incoming = "";
+        try { incoming = (e.record.get("sessionToken") || "").toString(); } catch (x) {}
+        if (!incoming) {
+            try {
+                const body = e.requestInfo && e.requestInfo.body;
+                if (body && body["sessionToken"]) incoming = body["sessionToken"].toString();
+            } catch (x) {}
+        }
+
+        // Tanpa token (klien lama) -> jangan blokir, biarkan lewat
+        if (!incoming) { e.next(); return; }
+
+        // Cari SID aktif siswa
+        const studentId = e.record.getString("studentId");
+        if (!studentId) { e.next(); return; }
+
+        let activeSid = "";
+        try {
+            const st = $app.findRecordById("students", studentId);
+            if (st) activeSid = (st.getString("activeSessionId") || "").toString();
+        } catch (x) { e.next(); return; }
+
+        // Server belum punya SID (siswa password default / belum login ulang) -> jangan blokir
+        if (!activeSid) { e.next(); return; }
+
+        // INTI: tolak tulisan dari sesi yang sudah tidak aktif
+        if (incoming !== activeSid) {
+            throw new ForbiddenError("Sesi sudah tidak aktif. Akun ini sedang dipakai di perangkat lain.");
+        }
+
+        e.next();
+    } catch (err) {
+        if (err instanceof ForbiddenError) throw err;
+        // Error tak terduga jangan sampai mengunci ujian siswa
+        console.error("[SESSION_GUARD] error:", err);
+        e.next();
+    }
+}).add("attempts");
+
+console.log("[SESSION_GUARD] hook loaded: penegakan sesi di sisi server untuk collection attempts");
+
 console.log("[SECURITY_FIX] hook loaded: strip kunci jawaban, strip AI key, skoring server-side, verify-pin");

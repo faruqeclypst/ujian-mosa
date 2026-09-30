@@ -1,9 +1,131 @@
 import PocketBase from "pocketbase";
+import { getOnlineFlag } from "./network";
+
+/**
+ * LOCK GLOBAL.
+ * syncPendingData dipanggil dari beberapa tempat (CBTPage, StudentDashboardPage).
+ * Tanpa lock, dua pemanggilan bersamaan menulis ke attempt yang sama dua kali
+ * dan menabrak SQLite (SQLITE_BUSY) — terutama saat retry storm.
+ */
+let syncInFlight: Promise<string[]> | null = null;
+
+/**
+ * Wrapper ber-lock. Selalu panggil INI dari komponen, bukan syncPendingData langsung.
+ */
+export function syncPendingDataLocked(
+  pb: PocketBase,
+  studentId: string
+): Promise<string[]> {
+  if (syncInFlight) return syncInFlight;
+
+  syncInFlight = syncPendingData(pb, studentId).finally(() => {
+    syncInFlight = null;
+  });
+
+  return syncInFlight;
+}
+
+/** Apakah sedang ada sinkronisasi berjalan? (untuk indikator UI) */
+export function isSyncing(): boolean {
+  return syncInFlight !== null;
+}
+
+/**
+ * FIX #5 — Penulis localStorage anti-QuotaExceededError.
+ *
+ * Pengukuran: 1 ujian 60 soal ~ 67 KB (1,3% dari 5 MB).
+ * Masalah muncul bila data TIDAK pernah dibersihkan (ujian offline beruntun
+ * atau sync terus gagal) -> setelah puluhan ujian, localStorage penuh dan
+ * `setItem` melempar -> jawaban siswa GAGAL disimpan.
+ *
+ * @param key   kunci tujuan
+ * @param value nilai (string)
+ * @returns true bila berhasil disimpan
+ */
+export function safeSetItem(key: string, value: string): boolean {
+  try {
+    localStorage.setItem(key, value);
+    return true;
+  } catch (e: any) {
+    const isQuota =
+      e?.name === "QuotaExceededError" ||
+      e?.name === "NS_ERROR_DOM_QUOTA_REACHED" ||
+      e?.code === 22 ||
+      e?.code === 1014;
+
+    if (!isQuota) {
+      console.warn("[safeSetItem] gagal menyimpan (bukan kuota):", e);
+      return false;
+    }
+
+    console.warn("[safeSetItem] localStorage PENUH — membersihkan data lama...");
+
+    // ── Tahap 1: buang data attempt yang sudah selesai (aman dihapus)
+    const hapus: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k) continue;
+
+      if (k.startsWith("offline_answers_") || k.startsWith("local_attempt_")) {
+        try {
+          const raw = localStorage.getItem(k);
+          if (!raw) continue;
+          const parsed = JSON.parse(raw);
+          const st = parsed?.status;
+          if (st === "finished" || st === "submitted") hapus.push(k);
+        } catch {
+          // Data rusak -> aman dihapus
+          hapus.push(k);
+        }
+      }
+    }
+    for (const k of hapus) {
+      try { localStorage.removeItem(k); } catch {}
+    }
+    if (hapus.length) {
+      console.warn(`[safeSetItem] dibersihkan ${hapus.length} key attempt selesai`);
+    }
+
+    // ── Tahap 2: coba lagi
+    try {
+      localStorage.setItem(key, value);
+      return true;
+    } catch {
+      // masih penuh
+    }
+
+    // ── Tahap 3: sisakan HANYA key dari roomId yang sedang ditulis.
+    // Jawaban ujian yang SEDANG berjalan adalah yang paling berharga.
+    const roomIdAktif = key.includes("_") ? key.split("_").slice(2).join("_") : "";
+    const sisa: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k) continue;
+      if (k.startsWith("offline_answers_") || k.startsWith("local_attempt_")) {
+        if (roomIdAktif && !k.endsWith(roomIdAktif)) sisa.push(k);
+      }
+    }
+    for (const k of sisa) {
+      try { localStorage.removeItem(k); } catch {}
+    }
+
+    try {
+      localStorage.setItem(key, value);
+      console.log("[safeSetItem] berhasil setelah pembersihan agresif");
+      return true;
+    } catch (e2) {
+      console.error("[safeSetItem] GAGAL TOTAL — localStorage tidak bisa dipakai:", e2);
+      return false;
+    }
+  }
+}
 
 export async function syncPendingData(pb: PocketBase, studentId: string): Promise<string[]> {
   if (!navigator.onLine || !studentId) return [];
 
   const syncedRoomIds: string[] = [];
+
+
 
   // Snapshot keys dulu agar tidak iterasi sambil delete
   const pendingKeys = [];
@@ -35,7 +157,7 @@ export async function syncPendingData(pb: PocketBase, studentId: string): Promis
 
       // Bangun payload bersih
       const cleanData: Record<string, any> = {
-        isOnline: true,
+        isOnline: getOnlineFlag(),
         lastHeartbeat: new Date().toISOString(),
       };
 

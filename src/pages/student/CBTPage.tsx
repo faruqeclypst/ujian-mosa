@@ -1,3 +1,5 @@
+import isEqual from "lodash/isEqual";
+import { safeSetItem } from "../../lib/syncManager";
 import React, { useEffect, useState, useCallback, useRef } from "react";
 import { Capacitor, registerPlugin } from "@capacitor/core";
 import { useParams, useNavigate } from "react-router-dom";
@@ -47,7 +49,8 @@ import {
   Lock
 } from "lucide-react";
 import { useNetworkStatus } from "../../lib/network";
-import { syncPendingData } from "../../lib/syncManager";
+import { syncPendingDataLocked } from "../../lib/syncManager";
+import { getOnlineFlag, syncJitter } from "../../lib/network";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -499,6 +502,51 @@ const CBTPage = () => {
   const [roomId, setRoomId] = useState<string | null>(null);
   const isOnline = useNetworkStatus();
 
+  // ── MERGE JAWABAN PER-SOAL (anti-timpa) ────────────────────────────────
+  // MASALAH: `update({answers: u})` mengganti SELURUH objek answers. Jika dua
+  // perangkat menulis (HP lama belum ter-kick, atau sesi lanjut di HP lain),
+  // device yang menulis belakangan akan MENGHAPUS jawaban device lain.
+  // SOLUSI: gabungkan per questionId; jika bentrok, ambil yang lebih baru
+  // berdasarkan stempel waktu __ts per soal.
+  const mergeAnswers = useCallback((serverAns: any, localAns: any) => {
+    const srv = (serverAns && typeof serverAns === "object") ? serverAns : {};
+    const loc = (localAns && typeof localAns === "object") ? localAns : {};
+    const out: Record<string, any> = { ...srv };
+
+    for (const qid of Object.keys(loc)) {
+      if (qid === "__meta" || qid === "__order__" || qid === "__choices__"
+          || qid === "__items__" || qid === "__match__") {
+        continue; // metadata ditangani terpisah di bawah
+      }
+      const lVal = loc[qid];
+      const sVal = srv[qid];
+
+      if (sVal === undefined || sVal === null || sVal === "") {
+        out[qid] = lVal;                      // soal belum dijawab di server
+        continue;
+      }
+      if (lVal === undefined || lVal === null || lVal === "") {
+        continue;                             // jangan hapus jawaban server
+      }
+
+      // Keduanya ada -> bandingkan stempel waktu (fallback: jawaban lokal menang
+      // karena siswa mengerjakan di perangkat ini sekarang)
+      const lTs = (typeof lVal === "object" && lVal !== null) ? (lVal.__ts || 0) : 0;
+      const sTs = (typeof sVal === "object" && sVal !== null) ? (sVal.__ts || 0) : 0;
+
+      if (lTs >= sTs) out[qid] = lVal;
+    }
+
+    // Metadata: ambil yang punya nilai lebih lengkap
+    for (const mk of ["__meta", "__order__", "__choices__", "__items__", "__match__"]) {
+      if (loc[mk] !== undefined) out[mk] = loc[mk];
+      else if (srv[mk] !== undefined && out[mk] === undefined) out[mk] = srv[mk];
+    }
+
+    return out;
+  }, []);
+
+
   useEffect(() => {
     if (paramRoomId) {
       sessionStorage.setItem("activeCBTRoomId", paramRoomId);
@@ -693,31 +741,37 @@ const CBTPage = () => {
     // Backup locally
     if (student && roomId) {
       if (data.answers) {
-        localStorage.setItem(`offline_answers_${student.id}_${roomId}`, JSON.stringify(data.answers));
+        safeSetItem(`offline_answers_${student.id}_${roomId}`, JSON.stringify(data.answers));
       }
       const currentLocal = localStorage.getItem(`local_attempt_${student.id}_${roomId}`);
       let updatedAtt = attempt || (currentLocal ? JSON.parse(currentLocal) : {});
       updatedAtt = { ...updatedAtt, ...data };
-      localStorage.setItem(`local_attempt_${student.id}_${roomId}`, JSON.stringify(updatedAtt));
+      safeSetItem(`local_attempt_${student.id}_${roomId}`, JSON.stringify(updatedAtt));
     }
 
     if (!isOnline) {
       setSyncError(true);
       setIsSyncing(false);
-      localStorage.setItem(`pending_sync_${student?.id}_${roomId}`, "true");
+      safeSetItem(`pending_sync_${student?.id}_${roomId}`, "true");
       return null;
     }
 
     const startTime = Date.now();
     if (!pb) return null;
     try {
-      const res = await pb.collection("attempts").update(attId, data);
+      // Sertakan sessionToken agar server dapat MENOLAK tulisan dari sesi
+      // yang sudah tidak aktif (double login). Hook: pb_hooks/security_fix.pb.js
+      const sid = sessionStorage.getItem("student_session_id")
+               || localStorage.getItem("student_session_id") || "";
+      const payload = sid ? Object.assign({}, data, { sessionToken: sid }) : data;
+
+      const res = await pb.collection("attempts").update(attId, payload);
       localStorage.removeItem(`pending_sync_${student?.id}_${roomId}`);
       lastWriteTimeRef.current = Date.now();
       return res;
     } catch (err: any) {
       setSyncError(true);
-      localStorage.setItem(`pending_sync_${student?.id}_${roomId}`, "true");
+      safeSetItem(`pending_sync_${student?.id}_${roomId}`, "true");
       throw err;
     } finally {
       const elapsed = Date.now() - startTime;
@@ -729,7 +783,7 @@ const CBTPage = () => {
   const syncAllLocalData = useCallback(async () => {
     if (!isOnline || !student?.id) return;
     try {
-      await syncPendingData(pb!, student.id);
+      await syncPendingDataLocked(pb!, student.id);
       setSyncError(false);
     } catch (e) {
       setSyncError(true);
@@ -737,7 +791,17 @@ const CBTPage = () => {
   }, [isOnline, student?.id]);
 
   useEffect(() => {
-    if (isOnline) syncAllLocalData();
+    if (!isOnline) return;
+
+    // JITTER: sebar waktu sinkronisasi 1–30 detik secara acak.
+    // Tanpa ini, seluruh perangkat yang jaringan-nya pulih bersamaan akan
+    // mengirim antrean pada detik yang sama -> retry storm -> SQLite terkunci.
+    const delay = syncJitter(1000, 30000);
+    const timer = setTimeout(() => {
+      syncAllLocalData();
+    }, delay);
+
+    return () => clearTimeout(timer);
   }, [isOnline, syncAllLocalData]);
 
   const handleAnswerSelect = (questionId: string, value: any) => {
@@ -760,7 +824,7 @@ const CBTPage = () => {
 
       // 1. SIMPAN KE HP INSTAN (0 DETIK)
       if (student && roomId) {
-        localStorage.setItem(`offline_answers_${student.id}_${roomId}`, JSON.stringify(u));
+        safeSetItem(`offline_answers_${student.id}_${roomId}`, JSON.stringify(u));
       }
 
       // 2. BACKUP KE SERVER (TUNGGU 2 DETIK)
@@ -769,7 +833,7 @@ const CBTPage = () => {
         setIsSyncing(true);
         safeUpdateAttempt(currentAttempt.id, {
           answers: u,
-          isOnline: true,
+          isOnline: getOnlineFlag(),
           lastHeartbeat: new Date().toISOString()
         }).catch((err: any) => {
           if (isKicked) return;
@@ -1106,7 +1170,9 @@ const CBTPage = () => {
                   break;
                 }
               }
-              mergedAnswers = { ...mergedAnswers, ...parsedLocal };
+              // MERGE per-soal: jangan `spread` mentah — spread akan menghapus
+              // jawaban yang hanya ada di server (mis. dari perangkat lain).
+              mergedAnswers = mergeAnswers(mergedAnswers, parsedLocal);
             } catch (e) { }
           }
           setAnswers(mergedAnswers);
@@ -1115,7 +1181,17 @@ const CBTPage = () => {
           // HANYA update ke server jika benar-benar ada perbedaan jawaban lokal yang belum tersinkron
           // Mengeliminasi penumpukan write jika siswa sekadar refresh halaman
           if (hasNewLocalAnswers) {
-            safeUpdateAttempt(att.id, { answers: mergedAnswers, isOnline: true, lastHeartbeat: new Date().toISOString() });
+            // DEDUP realtime: cegah write balik akibat event realtime sendiri,
+            // dan cegah menimpa jawaban dari perangkat lain.
+            const srvAns = (att?.answers && typeof att.answers === "object") ? att.answers : {};
+            const toSend = mergeAnswers(srvAns, mergedAnswers);
+            if (!isEqual(srvAns, toSend)) {
+              safeUpdateAttempt(att.id, {
+                answers: toSend,
+                isOnline: getOnlineFlag(),
+                lastHeartbeat: new Date().toISOString()
+              });
+            }
           }
 
           // Restore urutan soal dari att.answers atau sessionStorage
@@ -1169,9 +1245,13 @@ const CBTPage = () => {
                 totalQuestions: order.length,
               }
             };
-            answersRef.current = updatedAnswers;
-            setAnswers(updatedAnswers);
-            safeUpdateAttempt(att.id, { answers: updatedAnswers, isOnline: true, lastHeartbeat: new Date().toISOString() });
+            const srvAns2 = (att?.answers && typeof att.answers === "object") ? att.answers : {};
+            const sendOrder = mergeAnswers(srvAns2, updatedAnswers);
+            answersRef.current = sendOrder;
+            setAnswers(sendOrder);
+            if (!isEqual(srvAns2, sendOrder)) {
+              safeUpdateAttempt(att.id, { answers: sendOrder, isOnline: getOnlineFlag(), lastHeartbeat: new Date().toISOString() });
+            }
           }
 
           // Restore acakan opsi pilihan
@@ -1277,7 +1357,7 @@ const CBTPage = () => {
                 cheatCount: 0,
                 answers: initialAnswers,
                 startedAt: new Date().toISOString(),
-                isOnline: true,
+                isOnline: getOnlineFlag(),
                 lastHeartbeat: new Date().toISOString()
               });
             });
@@ -1299,7 +1379,7 @@ const CBTPage = () => {
 
       // Simpan attempt ke React state dan localStorage agar siswa bisa memilih jawaban
       if (att) {
-        localStorage.setItem(`local_attempt_${student.id}_${roomId}`, JSON.stringify(att));
+        safeSetItem(`local_attempt_${student.id}_${roomId}`, JSON.stringify(att));
         setAttempt(att);
         attemptRef.current = att;
       }
@@ -1352,6 +1432,7 @@ const CBTPage = () => {
 
   useEffect(() => {
     if (!roomId || !attempt?.id || !pb) return;
+    const pbClient = pb;   // FIX #6: alias stabil untuk dipakai di dalam closure
     const rId = roomId;
     const attId = attempt.id;
 
@@ -1397,9 +1478,34 @@ const CBTPage = () => {
       }
     });
 
+    // FIX #6: Tandai bahwa subscription ini masih "hidup". Dipakai untuk
+    // mencegah race saat effect re-run cepat (mis. navigasi kilat).
+    let cancelled = false;
+
+    // FIX #6: Resync status attempt segera setelah subscribe terpasang.
+    // Menutup celah event yang terlewat selama jendela unsubscribe.
+    (async () => {
+      try {
+        const fresh = await pbClient.collection("attempts").getOne(attId);
+        if (cancelled) return;
+        setAttempt(fresh as any);
+        const st = (fresh as any).status;
+        if (st === "LOCKED") setIsLocked(true);
+        else if (st === "finished" || st === "submitted") {
+          if (!isSubmittingRef.current) setIsAdminFinishedModalOpen(true);
+        }
+      } catch { /* 404 ditangani oleh heartbeat */ }
+    })();
+
     return () => {
-      unsubRoom.then(u => u()).catch(() => { });
-      unsubAttempt.then(u => u()).catch(() => { });
+      cancelled = true;
+      // FIX #6: AWAIT unsubscribe sebelum effect berikutnya memasang
+      // subscription baru. Tanpa await, unsub yang telat bisa membunuh
+      // subscription BARU -> device berhenti menerima perintah pengawas.
+      Promise.allSettled([
+        Promise.resolve(unsubRoom).then(u => u && u()),
+        Promise.resolve(unsubAttempt).then(u => u && u()),
+      ]);
     };
   }, [roomId, attempt?.id, pb, navigate]);
 
@@ -1420,7 +1526,7 @@ const CBTPage = () => {
           return;
         }
         try {
-          await safeUpdateAttempt(attempt.id, { isOnline: true, lastHeartbeat: new Date().toISOString() });
+          await safeUpdateAttempt(attempt.id, { isOnline: getOnlineFlag(), lastHeartbeat: new Date().toISOString() });
         } catch (err: any) {
           if (isKicked) return;
           if (err?.status === 404) {
@@ -1738,7 +1844,7 @@ const CBTPage = () => {
         try {
           await safeUpdateAttempt(currentAttempt.id, {
             answers: answersRef.current,
-            isOnline: true,
+            isOnline: getOnlineFlag(),
             lastHeartbeat: new Date().toISOString()
           });
         } catch (flushErr) {
@@ -1814,7 +1920,7 @@ const CBTPage = () => {
 
       const finalPayload = {
         answers: answersWithMeta,
-        isOnline: true,
+        isOnline: getOnlineFlag(),
         lastHeartbeat: submittedAt,
         score,
         totalQuestions,
@@ -1831,9 +1937,9 @@ const CBTPage = () => {
 
       // Simpan ke localStorage sebagai fallback SEBELUM kirim ke server
       if (student && roomId) {
-        localStorage.setItem(`offline_answers_${student.id}_${roomId}`, JSON.stringify(answersRef.current));
+        safeSetItem(`offline_answers_${student.id}_${roomId}`, JSON.stringify(answersRef.current));
         const localAtt = { ...(currentAttempt || {}), ...finalPayload, id: currentAttempt.id };
-        localStorage.setItem(`local_attempt_${student.id}_${roomId}`, JSON.stringify(localAtt));
+        safeSetItem(`local_attempt_${student.id}_${roomId}`, JSON.stringify(localAtt));
       }
       // Thundering Herd mitigation
       if (isAuto) {
@@ -1856,7 +1962,7 @@ const CBTPage = () => {
       } catch (serverErr: any) {
         // Gagal kirim ke server — tandai pending sync agar di-retry saat online
         if (student && roomId) {
-          localStorage.setItem(`pending_sync_${student.id}_${roomId}`, "true");
+          safeSetItem(`pending_sync_${student.id}_${roomId}`, "true");
         }
         if (isKicked) return;
         // Jika 404 (attempt dihapus admin), jangan tampilkan error submit biasa
