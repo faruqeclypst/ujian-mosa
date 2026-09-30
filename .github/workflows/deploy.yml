@@ -1,10 +1,12 @@
 name: Deploy to VPS
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - dev
       - main
+      - feature/saas-v2
 
 jobs:
   build-and-deploy:
@@ -22,7 +24,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 20
           cache: 'pnpm'
 
       - name: Install dependencies
