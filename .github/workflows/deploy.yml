@@ -52,7 +52,7 @@ jobs:
           SSH_REMOTE_DIR: ${{ secrets.SSH_REMOTE_DIR }}
         run: |
           set -euo pipefail
-          TARGET="${SSH_REMOTE_DIR:-/opt/frontend}"
+          TARGET="${SSH_REMOTE_DIR}"
           echo "Host   : $SSH_HOST"
           echo "Target : $TARGET"
 
@@ -66,7 +66,7 @@ jobs:
           $SSHC "$SSH_USER@$SSH_HOST" 'echo "  terhubung ke: $(hostname)"'
 
           echo "--- siapkan folder penerima di VPS ---"
-          $SSHC "$SSH_USER@$SSH_HOST" "mkdir -p /tmp/examku_incoming && rm -rf /tmp/examku_incoming/* && echo '  folder siap'"
+          $SSHC "$SSH_USER@$SSH_HOST" "rm -rf /tmp/examku_incoming && mkdir -p /tmp/examku_incoming && echo '  folder siap'"
 
           echo "--- kirim paket ---"
           TARBALL=/tmp/rollout.tar.gz
@@ -81,14 +81,28 @@ jobs:
             set -e
             echo \"  file diterima : \$(find /tmp/examku_incoming -type f | wc -l)\"
             test -f /tmp/examku_incoming/index.html || { echo \"GAGAL: index.html tidak ada\"; exit 1; }
-            if [ -d \"\$TARGET\" ]; then rm -rf /tmp/frontend_prev; cp -a \"\$TARGET\" /tmp/frontend_prev 2>/dev/null || true; fi
-            mkdir -p \"\$TARGET\"
-            find \"\$TARGET\" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
-            cp -a /tmp/examku_incoming/. \"\$TARGET\"/
-            chmod -R 755 \"\$TARGET\"
+            test -n \"\$TARGET\" || { echo \"GAGAL: TARGET kosong\"; exit 1; }
+
+            # AMAN: tidak menimpa folder di luar TARGET (mis. /opt/frontend/ujian)
+            if [ \"\$TARGET\" = \"/\" ] || [ \"\$TARGET\" = \"/opt\" ] || [ \"\$TARGET\" = \"/opt/frontend\" ]; then
+              echo \"GAGAL: TARGET=\$TARGET terlalu luas, dibatalkan.\"; exit 1
+            fi
+
+            # jangan pernah pakai rm -rf isi TARGET langsung.
+            # pola atomik: siapkan di samping, rename, baru hapus cadangan lama.
+            STAGE=\"\$TARGET.new.\$\$\"
+            mkdir -p \"\$STAGE\"
+            cp -a /tmp/examku_incoming/. \"\$STAGE\"/
+            chmod -R 755 \"\$STAGE\"
+            test -f \"\$STAGE/index.html\" || { echo \"GAGAL: staging tidak lengkap\"; rm -rf \"\$STAGE\"; exit 1; }
+
+            OLD=\"\$TARGET.old.\$\$\"
+            if [ -d \"\$TARGET\" ]; then mv \"\$TARGET\" \"\$OLD\"; fi
+            mv \"\$STAGE\" \"\$TARGET\"
             echo \"  index.html    : \$(stat -c%s \"\$TARGET/index.html\") bytes\"
             echo \"  total file    : \$(find \"\$TARGET\" -type f | wc -l)\"
             rm -rf /tmp/examku_incoming
+            echo \"  cadangan lama : \$OLD  (hapus manual bila sudah yakin)\"
             echo SELESAI
           '"
 
@@ -100,7 +114,7 @@ jobs:
           SSH_REMOTE_DIR: ${{ secrets.SSH_REMOTE_DIR }}
         run: |
           set -euo pipefail
-          TARGET="${SSH_REMOTE_DIR:-/opt/frontend}"
+          TARGET="${SSH_REMOTE_DIR}"
           mkdir -p ~/.ssh && chmod 700 ~/.ssh
           printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
