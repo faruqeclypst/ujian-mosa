@@ -24,7 +24,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: 'pnpm'
 
       - name: Install dependencies
@@ -141,4 +141,26 @@ jobs:
           if [ -f /tmp/live.html ]; then
             LIVE=$(grep -oE 'index-[A-Za-z0-9_-]+\.js' /tmp/live.html | head -1)
             echo "  Bundle live    : ${LIVE:-tidak terdeteksi}"
+          fi
+
+      - name: Purge cache Cloudflare (opsional)
+        if: ${{ secrets.CF_ZONE_ID != '' && secrets.CF_API_TOKEN != '' }}
+        env:
+          CF_ZONE_ID: ${{ secrets.CF_ZONE_ID }}
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+        run: |
+          set -uo pipefail
+          echo "== Purge cache Cloudflare =="
+          BODY='{"purge_everything":true}'
+          CODE=$(curl -s -o /tmp/purge.json -w "%{http_code}" -X POST \
+            "https://api.cloudflare.com/client/v4/zones/${CF_ZONE_ID}/purge_cache" \
+            -H "Authorization: Bearer ${CF_API_TOKEN}" \
+            -H "Content-Type: application/json" \
+            --data "$BODY")
+          echo "  HTTP $CODE"
+          if [ "$CODE" = "200" ]; then
+            echo "  ✅ cache dibersihkan — siswa langsung dapat versi terbaru"
+          else
+            echo "  ⚠️  purge gagal (bukan penghalang deploy):"
+            head -c 500 /tmp/purge.json; echo
           fi
