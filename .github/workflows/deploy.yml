@@ -59,18 +59,38 @@ jobs:
           mkdir -p ~/.ssh && chmod 700 ~/.ssh
           printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -p 22 -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
-          SSHC="ssh -i ~/.ssh/deploy_key -p 22 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ConnectTimeout=30"
+          ssh-keyscan -p 22 -H "$SSH_HOST" > ~/.ssh/known_hosts 2>/dev/null || true
+          SSHC="ssh -i $HOME/.ssh/deploy_key -p 22 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ConnectTimeout=30"
 
           echo "--- uji koneksi ---"
           $SSHC "$SSH_USER@$SSH_HOST" 'echo "  terhubung ke: $(hostname)"'
+
+          echo "--- siapkan folder penerima di VPS ---"
+          $SSHC "$SSH_USER@$SSH_HOST" "mkdir -p /tmp/examku_incoming && rm -rf /tmp/examku_incoming/* && echo '  folder siap'"
 
           echo "--- kirim paket ---"
           TARBALL=/tmp/rollout.tar.gz
           tar -czf "$TARBALL" -C dist .
           echo "  ukuran paket: $(du -h $TARBALL | cut -f1)"
 
-          cat "$TARBALL" | $SSHC "$SSH_USER@$SSH_HOST" 'bash -s' -- "$TARGET"
+          # Data (tar) masuk lewat stdin, skrip remote lewat argumen -> TIDAK bentrok
+          $SSHC "$SSH_USER@$SSH_HOST" "cd /tmp/examku_incoming && tar -xzf -" < "$TARBALL"
+
+          echo "--- pasang di $TARGET ---"
+          $SSHC "$SSH_USER@$SSH_HOST" "TARGET='$TARGET' bash -c '
+            set -e
+            echo \"  file diterima : \$(find /tmp/examku_incoming -type f | wc -l)\"
+            test -f /tmp/examku_incoming/index.html || { echo \"GAGAL: index.html tidak ada\"; exit 1; }
+            if [ -d \"\$TARGET\" ]; then rm -rf /tmp/frontend_prev; cp -a \"\$TARGET\" /tmp/frontend_prev 2>/dev/null || true; fi
+            mkdir -p \"\$TARGET\"
+            find \"\$TARGET\" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+            cp -a /tmp/examku_incoming/. \"\$TARGET\"/
+            chmod -R 755 \"\$TARGET\"
+            echo \"  index.html    : \$(stat -c%s \"\$TARGET/index.html\") bytes\"
+            echo \"  total file    : \$(find \"\$TARGET\" -type f | wc -l)\"
+            rm -rf /tmp/examku_incoming
+            echo SELESAI
+          '"
 
       - name: Verifikasi hasil deploy
         env:
