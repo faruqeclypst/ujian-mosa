@@ -144,13 +144,17 @@ jobs:
           fi
 
       - name: Purge cache Cloudflare (opsional)
-        if: ${{ secrets.CF_ZONE_ID != '' && secrets.CF_API_TOKEN != '' }}
+        continue-on-error: true
         env:
           CF_ZONE_ID: ${{ secrets.CF_ZONE_ID }}
           CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
         run: |
           set -uo pipefail
           echo "== Purge cache Cloudflare =="
+          if [ -z "${CF_ZONE_ID:-}" ] || [ -z "${CF_API_TOKEN:-}" ]; then
+            echo "  dilewati: secret CF_ZONE_ID / CF_API_TOKEN belum diisi"
+            exit 0
+          fi
           BODY='{"purge_everything":true}'
           CODE=$(curl -s -o /tmp/purge.json -w "%{http_code}" -X POST \
             "https://api.cloudflare.com/client/v4/zones/${CF_ZONE_ID}/purge_cache" \
