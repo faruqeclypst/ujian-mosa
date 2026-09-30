@@ -45,16 +45,40 @@ jobs:
           VITE_DISABLE_EXAMBRO_GUARD: "false"
 
       - name: Deploy ke VPS (/opt/frontend)
-        uses: appleboy/scp-action@v0.1.7
+        uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
-          port: ${{ secrets.SSH_PORT || 22 }}
-          source: "dist/*"
-          target: "${{ secrets.REMOTE_DIR }}"
-          strip_components: 1
-          overwrite: true
+          port: 22
+          script_stop: true
+          script: |
+            TARGET="${{ secrets.SSH_REMOTE_DIR }}"
+            if [ -z "$TARGET" ]; then TARGET="/opt/frontend"; fi
+            echo "Target deploy : $TARGET"
+            echo "Host          : $(hostname)"
+            echo "--- menyiapkan folder ---"
+            mkdir -p "$TARGET"
+            mkdir -p /tmp/rollout
+            rm -rf /tmp/rollout/*
+            echo "--- menerima file ---"
+            tar -xzf - -C /tmp/rollout
+            echo "  file diterima : $(find /tmp/rollout -type f | wc -l)"
+            if [ ! -f /tmp/rollout/index.html ]; then
+              echo "GAGAL: index.html tidak ada di paket"; exit 1
+            fi
+            echo "--- backup build lama ---"
+            if [ -d "$TARGET" ]; then
+              rm -rf /tmp/frontend_prev
+              cp -a "$TARGET" /tmp/frontend_prev 2>/dev/null || true
+            fi
+            echo "--- memasang build baru ---"
+            find "$TARGET" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+            cp -a /tmp/rollout/. "$TARGET"/
+            echo "  index.html terpasang : $(ls -la $TARGET/index.html | awk '{print $5" bytes"}')"
+            chown -R www-data:www-data "$TARGET" 2>/dev/null || true
+            chmod -R 755 "$TARGET"
+            echo "SELESAI"
 
       - name: Verifikasi hasil deploy
         uses: appleboy/ssh-action@v1.0.3
@@ -62,10 +86,10 @@ jobs:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
-          port: ${{ secrets.SSH_PORT || 22 }}
+          port: 22
           script: |
             set -e
-            DIR="${{ secrets.REMOTE_DIR }}"
+            DIR="${{ secrets.SSH_REMOTE_DIR }}"
             echo "== Isi $DIR =="
             ls -la "$DIR" | head -20
             echo
