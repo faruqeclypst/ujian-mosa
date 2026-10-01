@@ -43,6 +43,10 @@ jobs:
           VITE_R2_SECRET_ACCESS_KEY: ${{ secrets.VITE_R2_SECRET_ACCESS_KEY }}
           VITE_R2_WORKER_URL: "https://r2-delete-worker.faruq-blogger.workers.dev"
           VITE_DISABLE_EXAMBRO_GUARD: "false"
+          # ── WAJIB: tanpa ini build produksi jatuh ke fallback
+          #    http://127.0.0.1:8090 -> login superadmin pasti gagal (CORS).
+          VITE_MASTER_PB_URL: ${{ secrets.VITE_MASTER_PB_URL }}
+          VITE_MAIN_DOMAIN: ${{ secrets.VITE_MAIN_DOMAIN }}
 
       - name: Kirim build ke VPS (/opt/frontend)
         env:

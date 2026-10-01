@@ -9,7 +9,22 @@
  * Get main domain (e.g., "examku.my.id")
  */
 export const getMainDomain = (): string => {
-  return import.meta.env.VITE_MAIN_DOMAIN || 'localhost:5173';
+  const fromEnv = import.meta.env.VITE_MAIN_DOMAIN;
+  if (fromEnv && fromEnv.trim()) return fromEnv.trim();
+
+  if (typeof window !== 'undefined') {
+    const host = window.location.hostname;
+    const isLocal = /^(localhost|127\.|0\.0\.0\.0$|\[::1\])/.test(host)
+      || /\.local$/.test(host)
+      || /^(192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.)/.test(host);
+    if (!isLocal) {
+      // Ambil domain induk: xxx.examku.my.id -> examku.my.id
+      const parts = host.split('.');
+      if (parts.length >= 3) return parts.slice(-3).join('.');
+      if (parts.length === 2) return host;
+    }
+  }
+  return 'localhost:5173';
 };
 
 /**

@@ -22,10 +22,22 @@ const SuperAdminLoginPage = () => {
     setError("");
     setLoading(true);
     try {
-      await masterPb.collection("super_admins").authWithPassword(email, password);
+      // .trim() wajib: spasi tak terlihat (dari copy-paste / autofill)
+      // adalah penyebab umum kegagalan autentikasi yang sulit dilacak.
+      await masterPb.collection("super_admins").authWithPassword(
+        email.trim(),
+        password.trim(),
+      );
       navigate("/superadmin");
-    } catch {
-      setError("Autentikasi gagal. Periksa email dan master key Anda.");
+    } catch (err: unknown) {
+      const status = (err as { status?: number })?.status;
+      if (status === 0 || status === 404) {
+        setError(`Tidak dapat menghubungi server (${masterPb.baseURL}). Periksa koneksi internet Anda.`);
+      } else if (status === 429) {
+        setError("Terlalu banyak percobaan. Tunggu 1 menit lalu coba lagi.");
+      } else {
+        setError("Email atau password salah. Periksa kembali dan pastikan tidak ada spasi.");
+      }
     } finally {
       setLoading(false);
     }
@@ -78,6 +90,11 @@ const SuperAdminLoginPage = () => {
                   type="email"
                   value={email}
                   onChange={e => setEmail(e.target.value)}
+                  onBlur={e => setEmail(e.target.value.trim())}
+                  autoComplete="off"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
                   placeholder="admin@exam.id"
                   required
                   className={cn(
@@ -92,7 +109,7 @@ const SuperAdminLoginPage = () => {
             {/* Password Field */}
             <div className="space-y-2">
               <label className="block text-[11px] font-black text-slate-400 uppercase tracking-[0.15em] ml-1">
-                Master Security Key
+                Password
               </label>
               <div className="relative group">
                 <Lock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-blue-500 transition-colors" />
@@ -100,8 +117,12 @@ const SuperAdminLoginPage = () => {
                   type="password"
                   value={password}
                   onChange={e => setPassword(e.target.value)}
+                  onBlur={e => setPassword(e.target.value.trim())}
                   placeholder="••••••••••••"
                   required
+                  autoComplete="new-password"
+                  autoCapitalize="none"
+                  spellCheck={false}
                   className={cn(
                     "w-full h-14 bg-slate-50 border-transparent rounded-[1.5rem] pl-12 pr-5",
                     "text-slate-900 placeholder:text-slate-300 text-sm font-semibold transition-all",
