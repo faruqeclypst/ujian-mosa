@@ -38,10 +38,22 @@ class SessionAuthStore extends LocalAuthStore {
 const sessionStore = new SessionAuthStore();
 sessionStore.loadFromStorage();
 
-export const masterPb = new PocketBase(
-    import.meta.env.VITE_MASTER_PB_URL || 'http://127.0.0.1:8090',
-    sessionStore
-);
+/**
+ * Resolve master PocketBase URL.
+ * Prioritas: env var -> origin browser (produksi) -> localhost (dev).
+ * JANGAN hardcode 127.0.0.1:8090 sebagai fallback produksi — di browser
+ * pengguna itu menunjuk ke komputer mereka sendiri dan CORS pasti gagal.
+ */
+const resolveMasterUrl = (): string => {
+    const fromEnv = import.meta.env.VITE_MASTER_PB_URL as string | undefined;
+    if (fromEnv && fromEnv.trim()) return fromEnv.trim().replace(/\/$/, '');
+    if (typeof window !== 'undefined' && window.location.origin) {
+        return window.location.origin;
+    }
+    return 'http://127.0.0.1:8090';
+};
+
+export const masterPb = new PocketBase(resolveMasterUrl(), sessionStore);
 masterPb.autoCancellation(false);
 
 // ============================================================
