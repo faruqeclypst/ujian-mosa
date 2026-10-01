@@ -13,12 +13,12 @@ const LandingPage = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const features = [
-    { icon: Monitor, title: "Ujian CBT Stabil", desc: "Sistem ujian online yang dioptimasi agar lancar diakses ratusan siswa serentak tanpa server down.", color: "text-blue-600 bg-blue-50 border-blue-100" },
-    { icon: BarChart3, title: "Nilai & Analisis Otomatis", desc: "Hasil ujian langsung dihitung otomatis. Tersedia analitik butir soal untuk evaluasi guru.", color: "text-violet-600 bg-violet-50 border-violet-100" },
-    { icon: Shield, title: "Cegah Menyontek", desc: "Fitur wajib fullscreen, pencegahan buka tab lain, dan kunci ujian otomatis jika melanggar.", color: "text-emerald-600 bg-emerald-50 border-emerald-100" },
-    { icon: Wand2, title: "AI Question Generator", desc: "Buat soal berkualitas dalam hitungan detik dengan bantuan AI. Hemat waktu persiapan ujian hingga 90%.", color: "text-amber-600 bg-amber-50 border-amber-100" },
-    { icon: Zap, title: "Zero Maintenance", desc: "Sekolah tidak perlu sewa server atau urus teknis. Semuanya sudah kami kelola sepenuhnya.", color: "text-rose-600 bg-rose-50 border-rose-100" },
-    { icon: Building2, title: "Identitas Sekolah", desc: "Siswa mengakses link ujian khusus dengan logo dan nama sekolah Anda sendiri.", color: "text-cyan-600 bg-cyan-50 border-cyan-100" },
+    { icon: Globe, title: "CDN & Ujian Anti-Lag", desc: "Didukung jaringan Cloudflare CDN berkecepatan tinggi agar akses ujian lancar serentak ribuan siswa tanpa lemot atau server down.", color: "text-blue-600 bg-blue-50 border-blue-100" },
+    { icon: Shield, title: "Kiosk APK & Alarm HP Berbunyi", desc: "Layar terkunci penuh, blokir split screen, dan alarm suara otomatis berbunyi kencang di HP jika siswa mencoba curang atau keluar aplikasi.", color: "text-emerald-600 bg-emerald-50 border-emerald-100" },
+    { icon: Wand2, title: "AI Question Generator", desc: "Buat naskah soal berkualitas otomatis dari modul guru dalam hitungan detik. Hemat waktu persiapan ujian hingga 90%.", color: "text-amber-600 bg-amber-50 border-amber-100" },
+    { icon: BarChart3, title: "Nilai & Analisis Butir Soal", desc: "Hasil ujian langsung dihitung otomatis lengkap dengan analisis tingkat kesulitan butir soal dan ekspor nilai format rapor.", color: "text-violet-600 bg-violet-50 border-violet-100" },
+    { icon: Zap, title: "Zero Maintenance", desc: "Sekolah tidak perlu sewa server, install Linux, atau pusing teknis. Seluruh infrastruktur kami kelola penuh.", color: "text-rose-600 bg-rose-50 border-rose-100" },
+    { icon: Building2, title: "Subdomain & Identitas Sekolah", desc: "Siswa mengakses link ujian dengan nama subdomain resmi dan logo sekolah Anda sendiri (contoh: sman1.examku.my.id).", color: "text-cyan-600 bg-cyan-50 border-cyan-100" },
   ];
 
   const testimonials = [
@@ -65,17 +65,18 @@ const LandingPage = () => {
   const plans = [
     {
       name: "Paket Berkembang",
-      price: "160.000",
-      oldPrice: "200.000",
-      discountBadge: "Hemat 20%",
+      price: "380.000",
+      oldPrice: "400.000",
+      discountBadge: "Diskon 5%",
       period: "/ bulan",
       desc: "Untuk SD, SMP, & bimbingan belajar",
       quota: "Maks. 250 Siswa",
       features: [
+        "Akses CDN & Ujian Anti-Lag",
+        "APK Kiosk & Alarm HP Berbunyi",
         "Ujian CBT (8 Tipe Soal Lengkap)",
         "Import Word, Excel & Generator AI",
-        "APK Kiosk Kunci Layar (Anti-Contek)",
-        "Monitoring Peserta Real-time",
+        "Monitoring Pengawas Real-Time",
         "Bantuan Teknis via WhatsApp"
       ],
       cta: "Pilih Paket Berkembang",
@@ -84,17 +85,18 @@ const LandingPage = () => {
     },
     {
       name: "Paket Lanjutan",
-      price: "280.000",
-      oldPrice: "350.000",
-      discountBadge: "Hemat 20%",
+      price: "760.000",
+      oldPrice: "800.000",
+      discountBadge: "Diskon 5%",
       period: "/ bulan",
       desc: "Standar ideal SMP & SMA/SMK",
       quota: "Maks. 500 Siswa",
       features: [
         "Semua fitur di Paket Berkembang",
-        "Server Cloud Kapasitas Medium",
-        "Analisis Butir Soal & Ekspor Nilai",
+        "Kapasitas 500 Siswa Serentak",
+        "Infrastruktur Cloud Prioritas Anti-Lag",
         "Custom Subdomain (sekolah.examku.my.id)",
+        "Analisis Butir Soal & Ekspor Nilai",
         "Pelatihan Guru & Admin via Zoom"
       ],
       cta: "Pilih Paket Lanjutan",
@@ -103,18 +105,19 @@ const LandingPage = () => {
     },
     {
       name: "Paket Premium",
-      price: "480.000",
-      oldPrice: "600.000",
-      discountBadge: "Hemat 20%",
+      price: "1.235.000",
+      oldPrice: "1.300.000",
+      discountBadge: "Diskon 5%",
       period: "/ bulan",
       desc: "Sekolah besar, yayasan, & kampus",
       quota: "Maks. 1.000 Siswa",
       features: [
         "Semua fitur di Paket Lanjutan",
-        "Resource Server Prioritas Tinggi",
+        "Kapasitas 1.000 Siswa Serentak",
+        "Resource Server High-Priority Dedicated",
         "Dukungan Custom Domain Sekolah",
         "Bank Soal Terpusat Antar Guru",
-        "Dukungan Teknis Prioritas Saat Ujian"
+        "Pendampingan Teknis Siaga Saat Ujian"
       ],
       cta: "Pilih Paket Premium",
       highlight: false,
@@ -499,19 +502,19 @@ const LandingPage = () => {
         <div className="max-w-7xl mx-auto">
           {/* Section Header */}
           <div className="text-center mb-12">
-            <div className="inline-flex items-center gap-2 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold px-3.5 py-1.5 rounded-full mb-4 uppercase tracking-wider">
-              🏷️ 20% Lebih Hemat dari Pasar CBT
+            <div className="inline-flex items-center gap-2 bg-blue-50 border border-blue-200 text-blue-800 text-xs font-bold px-3.5 py-1.5 rounded-full mb-4 uppercase tracking-wider">
+              ⚡ Jaringan CDN Global & Ujian Anti-Lag
             </div>
             <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold mb-3 text-slate-900">
-              Biaya Operasional Jelas, Lebih Hemat 20%
+              Paket Berlangganan Resmi EXAM AA
             </h2>
             <p className="text-slate-600 text-base max-w-2xl mx-auto font-medium">
-              Dibandingkan rata-rata biaya platform CBT sekolah di Indonesia, EXAM AA memberikan harga 20% lebih terjangkau dengan server cloud yang dikelola penuh dan zero maintenance.
+              Sistem ujian online siap pakai dengan akselerasi Cloudflare CDN, server anti-lag, dan keamanan APK Kiosk dengan alarm suara HP otomatis. Dapatkan potongan 5% dari harga normal.
             </p>
           </div>
 
           {/* Pricing Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
             {plans.map((plan, i) => (
               <div
                 key={i}
@@ -553,7 +556,7 @@ const LandingPage = () => {
                           Rp {plan.oldPrice}
                         </span>
                         <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-500 text-white uppercase tracking-wider">
-                          Pasar Normal
+                          Harga Normal
                         </span>
                       </div>
                     )}
@@ -601,6 +604,34 @@ const LandingPage = () => {
             ))}
           </div>
 
+          {/* Custom Package Banner */}
+          <div className="bg-gradient-to-r from-slate-900 to-blue-950 text-white border border-slate-800 rounded-2xl p-6 sm:p-8 flex flex-col lg:flex-row items-center justify-between gap-6 mb-16 shadow-xl relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-80 h-80 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
+            <div className="flex items-start gap-4 relative z-10">
+              <div className="w-12 h-12 rounded-xl bg-blue-600/30 border border-blue-400/30 text-blue-300 flex items-center justify-center flex-shrink-0">
+                <Building2 size={24} />
+              </div>
+              <div>
+                <div className="inline-block bg-blue-500/20 text-blue-300 text-[11px] font-bold px-2.5 py-0.5 rounded-full mb-1 border border-blue-400/20">
+                  Kapasitas Besar & Yayasan
+                </div>
+                <h3 className="text-xl font-bold text-white">Butuh Paket Kustom atau Lebih dari 1.000 Siswa?</h3>
+                <p className="text-sm text-slate-300 max-w-2xl font-normal mt-1 leading-relaxed">
+                  Untuk yayasan multi-sekolah, dinas pendidikan, atau kampus dengan kebutuhan server mandiri dan kapasitas ujian akbar ribuan siswa serentak, hubungi kami untuk proposal penawaran khusus.
+                </p>
+              </div>
+            </div>
+            <a
+              href="https://wa.me/6285359907696?text=Halo%20Admin%20EXAM%20AA,%20kami%20ingin%20konsultasi%20Paket%20Kustom%20CBT%20untuk%20sekolah/institusi%20kami..."
+              target="_blank"
+              rel="noopener noreferrer"
+              className="relative z-10 w-full lg:w-auto h-12 px-7 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-sm transition-all flex items-center justify-center gap-2 whitespace-nowrap active:scale-95 shadow-lg shadow-emerald-500/20 flex-shrink-0"
+            >
+              <MessageCircle size={18} />
+              Hubungi Kami via WhatsApp
+            </a>
+          </div>
+
           {/* Free Trial Callout */}
           <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 sm:p-8 flex flex-col sm:flex-row items-center justify-between gap-6 mb-16 shadow-sm">
             <div className="flex items-start gap-4">
@@ -613,7 +644,7 @@ const LandingPage = () => {
                 </div>
                 <h3 className="text-lg font-bold text-slate-900">Ingin Menguji Sistem Terlebih Dahulu?</h3>
                 <p className="text-sm text-slate-600 max-w-xl font-medium mt-0.5">
-                  Dapatkan akses simulasi gratis hingga 50 siswa untuk mencoba kestabilan ujian dan aplikasi kunci layar APK di sekolah Anda.
+                  Dapatkan akses simulasi gratis hingga 50 siswa untuk mencoba kestabilan server anti-lag dan aplikasi kunci layar APK di sekolah Anda.
                 </p>
               </div>
             </div>
@@ -645,7 +676,7 @@ const LandingPage = () => {
                   <tr className="border-b border-slate-200 bg-slate-50">
                     <th className="py-4 px-5 font-bold text-slate-700 w-1/4">Kriteria Evaluasi</th>
                     <th className="py-4 px-5 font-bold text-blue-700 bg-blue-50/70 border-x border-blue-200 w-1/4">
-                      EXAM AA (Managed)
+                      EXAM AA (Managed Cloud)
                     </th>
                     <th className="py-4 px-5 font-bold text-slate-700 w-1/4">
                       Platform SaaS Lain (E-Ujian / CBT Pro)
@@ -659,9 +690,9 @@ const LandingPage = () => {
                   <tr>
                     <td className="py-4 px-5 font-semibold text-slate-900">Perkiraan Biaya</td>
                     <td className="py-4 px-5 bg-blue-50/30 border-x border-blue-100 text-blue-900 font-bold">
-                      Rp 160rb - 480rb / bulan
+                      Rp 380rb - 1,23jt / bulan
                       <span className="block text-[11px] font-semibold text-emerald-600 mt-0.5">
-                        20% Lebih Hemat dari Pasar
+                        Diskon 5% (Sudah Termasuk CDN & Kiosk)
                       </span>
                     </td>
                     <td className="py-4 px-5 text-slate-600">
@@ -674,6 +705,25 @@ const LandingPage = () => {
                       Gratis kode sumber
                       <span className="block text-[11px] text-rose-600 font-medium mt-0.5">
                         Sewa VPS sendiri Rp 150rb - 500rb/bln
+                      </span>
+                    </td>
+                  </tr>
+
+                  <tr>
+                    <td className="py-4 px-5 font-semibold text-slate-900">Jaringan CDN & Performa</td>
+                    <td className="py-4 px-5 bg-blue-50/30 border-x border-blue-100 text-blue-900 font-semibold">
+                      Cloudflare CDN Global + Anti-Lag
+                      <span className="block text-[11px] text-slate-500 font-normal mt-0.5">
+                        Akses secepat kilat ribuan siswa serentak
+                      </span>
+                    </td>
+                    <td className="py-4 px-5 text-slate-600">
+                      CDN Standar / Tergantung Paket
+                    </td>
+                    <td className="py-4 px-5 text-slate-600">
+                      Tergantung spesifikasi VPS sekolah
+                      <span className="block text-[11px] text-rose-600 font-medium mt-0.5">
+                        Rentan lemot jika VPS spesifikasi minim
                       </span>
                     </td>
                   </tr>
@@ -698,11 +748,11 @@ const LandingPage = () => {
                   </tr>
 
                   <tr>
-                    <td className="py-4 px-5 font-semibold text-slate-900">Aplikasi Kiosk Anti-Contek</td>
+                    <td className="py-4 px-5 font-semibold text-slate-900">Keamanan APK Kiosk & Alarm</td>
                     <td className="py-4 px-5 bg-blue-50/30 border-x border-blue-100 text-blue-900 font-semibold">
-                      Tersedia 2 APK Khusus
+                      Kunci Layar + Alarm HP Berbunyi
                       <span className="block text-[11px] text-slate-500 font-normal mt-0.5">
-                        Kunci layar, blokir split screen & tombol back
+                        Alarm suara kencang jika siswa coba keluar/split
                       </span>
                     </td>
                     <td className="py-4 px-5 text-slate-600">
