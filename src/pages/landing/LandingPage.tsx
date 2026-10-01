@@ -505,19 +505,25 @@ const LandingPage = () => {
         <div className="absolute bottom-10 left-1/3 w-[500px] h-[500px] bg-teal-400/10 rounded-full blur-[140px] animate-pulse-glow" style={{ animationDelay: "5s" }} />
       </div>
 
-      {/* Top Banner */}
-      <div className="bg-gradient-to-r from-blue-700 via-blue-600 to-blue-800 text-white text-xs py-2 px-4 text-center font-medium shadow-sm flex items-center justify-center gap-2 relative overflow-hidden">
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,transparent,rgba(255,255,255,0.15),transparent)] animate-marquee" />
-        <span className="inline-flex items-center justify-center bg-white/20 text-white rounded-full px-2.5 py-0.5 text-[11px] font-bold">
-          Promo Ujian 2026
-        </span>
-        <span className="relative z-10">Dapatkan potongan 5% untuk semua paket langganan bulanan EXAM AA.</span>
-        <button
-          onClick={() => document.getElementById("pricing")?.scrollIntoView({ behavior: "smooth" })}
-          className="relative z-10 underline font-bold hover:text-blue-100 ml-1"
-        >
-          Lihat Paket
-        </button>
+      {/* Top Banner - Fully Responsive on Android/Mobile */}
+      <div className="bg-gradient-to-r from-blue-700 via-blue-600 to-blue-800 text-white py-2 px-3 sm:px-4 text-center font-medium shadow-xs relative overflow-hidden">
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,transparent,rgba(255,255,255,0.15),transparent)] animate-marquee pointer-events-none" />
+        <div className="relative z-10 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-[11px] sm:text-xs">
+          <span className="inline-flex items-center justify-center bg-white/20 text-white rounded-full px-2 py-0.5 text-[10px] sm:text-[11px] font-extrabold whitespace-nowrap shadow-2xs">
+            Promo Ujian 2026
+          </span>
+          <span className="leading-snug">
+            Dapatkan potongan 5% untuk semua paket langganan bulanan EXAM AA.
+          </span>
+          <button
+            type="button"
+            onClick={() => document.getElementById("pricing")?.scrollIntoView({ behavior: "smooth" })}
+            className="underline font-bold hover:text-blue-100 transition-colors cursor-pointer inline-flex items-center gap-0.5 ml-0.5 whitespace-nowrap"
+          >
+            <span>Lihat Paket</span>
+            <span aria-hidden="true">&rarr;</span>
+          </button>
+        </div>
       </div>
 
       {/* Navbar - Clean without "Masuk Portal" button as requested */}
@@ -1825,23 +1831,14 @@ const LandingPage = () => {
               </p>
 
               {/* Action Buttons */}
-              <div className="flex flex-col sm:flex-row items-center justify-center gap-3.5 mb-10">
+              <div className="flex justify-center mb-10">
                 <button
                   onClick={() => navigate("/daftar")}
-                  className="w-full sm:w-auto h-12 px-8 rounded-xl bg-white text-blue-800 hover:bg-blue-50 font-bold text-sm shadow-xl transition-all hover:scale-105 active:scale-95 flex items-center justify-center gap-2"
+                  className="w-full sm:w-auto h-12 px-8 rounded-xl bg-white text-blue-800 hover:bg-blue-50 font-bold text-sm shadow-xl transition-all hover:scale-105 active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
                 >
                   <span>Mulai Uji Coba Gratis (50 Siswa)</span>
                   <ArrowRight size={16} />
                 </button>
-                <a
-                  href="https://wa.me/6285359907696?text=Halo%20Admin%20EXAM%20AA,%20kami%20ingin%20konsultasi%20penggunaan%20CBT%20untuk%20sekolah%20kami..."
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-full sm:w-auto h-12 px-7 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-sm shadow-xl shadow-emerald-500/25 transition-all hover:scale-105 active:scale-95 flex items-center justify-center gap-2.5"
-                >
-                  <MessageCircle size={18} />
-                  <span>Chat WhatsApp: 0853 5990 7696</span>
-                </a>
               </div>
 
               {/* Confidence badges */}
