@@ -8,7 +8,10 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "switch": "node scripts/switch-school.js",
+    "switch:examaa": "node scripts/switch-app.js examaa",
+    "switch:browser": "node scripts/switch-app.js browser",
     "deploy:apk": "node scripts/deploy-apk.js",
+    "deploy:apks": "node scripts/deploy-both-apks.js",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "format": "prettier --write ."
   },
@@ -31,6 +34,7 @@
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.0",
     "framer-motion": "^10.18.0",
+    "html5-qrcode": "^2.3.8",
     "jsonrepair": "^3.14.0",
     "jszip": "^3.10.1",
     "katex": "^0.16.45",

@@ -68,7 +68,8 @@ const CapacitorOverlay = () => {
 
   const isExcludedRoute =
     window.location.pathname.startsWith("/admin") ||
-    window.location.pathname.startsWith("/superadmin");
+    window.location.pathname.startsWith("/superadmin") ||
+    window.location.pathname.startsWith("/browser");
 
   if (!isCapacitor || isExcludedRoute || isKickedOverlay) return null;
 

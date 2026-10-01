@@ -1,0 +1,7 @@
+{
+  "id": "com.alfaruqasri.ujian",
+  "name": "EXAM AA",
+  "serverUrl": "https://examku.my.id",
+  "targetApk": "exam-aa-latest.apk",
+  "vpsLink": "exam-aa-latest"
+}

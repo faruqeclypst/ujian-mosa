@@ -25,6 +25,9 @@ public class MainActivity extends BridgeActivity {
     private int currentNavColor = android.graphics.Color.WHITE;
     private boolean isCurrentDark = false;
     private java.util.concurrent.ScheduledExecutorService lockCheckExecutor;
+    private android.view.View floatingExamButton;
+    private String customExamPin = "1234";
+    private String customLauncherUrl = null;
 
     public static volatile boolean isScreenOff = false;
     public static volatile long lastScreenOffTime = 0;
@@ -368,6 +371,177 @@ public class MainActivity extends BridgeActivity {
         });
     }
 
+    public void startCustomExamInternal(final String url, final String pin) {
+        this.customExamPin = (pin != null && !pin.trim().isEmpty()) ? pin.trim() : "1234";
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    if (getBridge() != null && getBridge().getWebView() != null) {
+                        customLauncherUrl = getBridge().getWebView().getUrl();
+                    }
+                    enableLockModeInternal();
+                    showFloatingExamButton();
+                    if (getBridge() != null && getBridge().getWebView() != null) {
+                        getBridge().getWebView().loadUrl(url);
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "startCustomExamInternal failed", e);
+                }
+            }
+        });
+    }
+
+    public void stopCustomExamInternal() {
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                hideFloatingExamButton();
+                disableLockForUpdateInternal();
+                if (customLauncherUrl != null && getBridge() != null && getBridge().getWebView() != null) {
+                    getBridge().getWebView().loadUrl(customLauncherUrl);
+                }
+            }
+        });
+    }
+
+    private void showFloatingExamButton() {
+        if (floatingExamButton != null) {
+            hideFloatingExamButton();
+        }
+
+        final android.widget.TextView btn = new android.widget.TextView(this);
+        btn.setText("🔒 MENU");
+        btn.setTextColor(android.graphics.Color.WHITE);
+        btn.setTextSize(13);
+        btn.setTypeface(null, android.graphics.Typeface.BOLD);
+        btn.setGravity(android.view.Gravity.CENTER);
+        btn.setPadding(32, 18, 32, 18);
+
+        android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
+        bg.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
+        bg.setColor(android.graphics.Color.parseColor("#1E293B")); // Slate 800
+        bg.setStroke(3, android.graphics.Color.parseColor("#3B82F6")); // Blue 500 border
+        bg.setCornerRadius(50f);
+        btn.setBackground(bg);
+
+        if (android.os.Build.VERSION.SDK_INT >= 21) {
+            btn.setElevation(25f);
+        }
+
+        android.widget.FrameLayout.LayoutParams params = new android.widget.FrameLayout.LayoutParams(
+            android.widget.FrameLayout.LayoutParams.WRAP_CONTENT,
+            android.widget.FrameLayout.LayoutParams.WRAP_CONTENT
+        );
+        params.gravity = android.view.Gravity.TOP | android.view.Gravity.END;
+        params.topMargin = 60;
+        params.rightMargin = 40;
+
+        btn.setOnTouchListener(new android.view.View.OnTouchListener() {
+            private int initialX, initialY;
+            private float initialTouchX, initialTouchY;
+            private boolean isClick = false;
+
+            @Override
+            public boolean onTouch(android.view.View v, android.view.MotionEvent event) {
+                switch (event.getAction()) {
+                    case android.view.MotionEvent.ACTION_DOWN:
+                        initialX = (int) v.getX();
+                        initialY = (int) v.getY();
+                        initialTouchX = event.getRawX();
+                        initialTouchY = event.getRawY();
+                        isClick = true;
+                        return true;
+
+                    case android.view.MotionEvent.ACTION_MOVE:
+                        float dx = event.getRawX() - initialTouchX;
+                        float dy = event.getRawY() - initialTouchY;
+                        if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
+                            isClick = false;
+                            v.setX(initialX + dx);
+                            v.setY(initialY + dy);
+                        }
+                        return true;
+
+                    case android.view.MotionEvent.ACTION_UP:
+                        if (isClick) {
+                            showExamMenuDialog();
+                        }
+                        return true;
+                }
+                return false;
+            }
+        });
+
+        floatingExamButton = btn;
+        addContentView(floatingExamButton, params);
+    }
+
+    private void hideFloatingExamButton() {
+        if (floatingExamButton != null) {
+            try {
+                if (floatingExamButton.getParent() instanceof android.view.ViewGroup) {
+                    ((android.view.ViewGroup) floatingExamButton.getParent()).removeView(floatingExamButton);
+                }
+            } catch (Exception e) {}
+            floatingExamButton = null;
+        }
+    }
+
+    private void showExamMenuDialog() {
+        android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(this);
+        builder.setTitle("Menu Pengawas Ujian");
+
+        android.widget.LinearLayout layout = new android.widget.LinearLayout(this);
+        layout.setOrientation(android.widget.LinearLayout.VERTICAL);
+        layout.setPadding(60, 30, 60, 30);
+
+        final android.widget.EditText inputPin = new android.widget.EditText(this);
+        inputPin.setHint("Masukkan PIN Pengawas");
+        inputPin.setInputType(android.text.InputType.TYPE_CLASS_NUMBER | android.text.InputType.TYPE_NUMBER_VARIATION_PASSWORD);
+        inputPin.setGravity(android.view.Gravity.CENTER);
+        inputPin.setTextSize(18);
+        layout.addView(inputPin);
+
+        builder.setView(layout);
+
+        builder.setNeutralButton("Muat Ulang Halaman", new android.content.DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(android.content.DialogInterface dialog, int which) {
+                if (getBridge() != null && getBridge().getWebView() != null) {
+                    getBridge().getWebView().reload();
+                }
+            }
+        });
+
+        builder.setNegativeButton("Kembali ke Menu", new android.content.DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(android.content.DialogInterface dialog, int which) {
+                String typed = inputPin.getText().toString().trim();
+                if (typed.equals(customExamPin)) {
+                    stopCustomExamInternal();
+                } else {
+                    android.widget.Toast.makeText(MainActivity.this, "PIN Salah! Akses ditolak.", android.widget.Toast.LENGTH_SHORT).show();
+                }
+            }
+        });
+
+        builder.setPositiveButton("Keluar Aplikasi", new android.content.DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(android.content.DialogInterface dialog, int which) {
+                String typed = inputPin.getText().toString().trim();
+                if (typed.equals(customExamPin)) {
+                    exitAppInternal();
+                } else {
+                    android.widget.Toast.makeText(MainActivity.this, "PIN Salah! Akses ditolak.", android.widget.Toast.LENGTH_SHORT).show();
+                }
+            }
+        });
+
+        android.app.AlertDialog dialog = builder.create();
+        dialog.show();
+    }
+
     private void createBlockingLayout() {
         blockingLayout = new android.widget.LinearLayout(this);
         blockingLayout.setOrientation(android.widget.LinearLayout.VERTICAL);
@@ -664,6 +838,9 @@ public class MainActivity extends BridgeActivity {
             
             if (blockingLayout != null) {
                 blockingLayout.setVisibility(View.GONE);
+            }
+            if (floatingExamButton != null) {
+                hideFloatingExamButton();
             }
             
             stopLockTask();

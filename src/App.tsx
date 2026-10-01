@@ -55,6 +55,7 @@ import SchoolNotFoundPage from "./pages/landing/SchoolNotFoundPage";
 import SuperAdminLoginPage from "./pages/superadmin/SuperAdminLoginPage";
 import SuperAdminDashboard from "./pages/superadmin/SuperAdminDashboard";
 import SelectSchoolPage from "./pages/landing/SelectSchoolPage";
+const CustomBrowserPage = lazy(() => import("./pages/browser/CustomBrowserPage"));
 
 import { ExamDataProvider } from "./context/ExamDataContext";
 import CapacitorOverlay from "./components/auth/CapacitorOverlay";
@@ -218,6 +219,7 @@ const LandingContent = () => {
         <Route path="/pilih-sekolah" element={<SelectSchoolPage />} />
         <Route path="/pilih sekolah" element={<SelectSchoolPage />} />
         <Route path="/pilihsekolah" element={<SelectSchoolPage />} />
+        <Route path="/browser" element={<CustomBrowserPage />} />
         <Route path="*" element={<LandingPage />} />
       </Routes>
     </Suspense>
@@ -233,10 +235,18 @@ const AppRouter = () => {
 
   if (loading) return <LoadingScreen />;
 
+  if (location.pathname === '/browser') {
+    return (
+      <Suspense fallback={<LoadingScreen />}>
+        <CustomBrowserPage />
+      </Suspense>
+    );
+  }
+
   if (isLandingDomain) {
     // Jika di mobile app, paksa ke halaman pilih sekolah (simulation mode untuk localhost tetap tersedia via /pilih-sekolah)
     const isAppMode = Capacitor.isNativePlatform();
-    const isSpecialRoute = location.pathname.startsWith('/superadmin') || location.pathname === '/daftar';
+    const isSpecialRoute = location.pathname.startsWith('/superadmin') || location.pathname === '/daftar' || location.pathname === '/browser';
 
     if (isAppMode && location.pathname !== '/pilih-sekolah' && !isSpecialRoute) {
       return (

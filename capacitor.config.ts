@@ -6,8 +6,9 @@ const config: CapacitorConfig = {
   webDir: 'dist',
   server: {
     androidScheme: 'https',
-    // url: 'https://exam.sman-modalbangsa.sch.id/',
-    cleartext: true
+    // url: 'https://examku.my.id',
+    cleartext: true,
+    allowNavigation: ['*']
   },
   android: {
     overrideUserAgent: 'MosaExambro/2.0 (Android)'

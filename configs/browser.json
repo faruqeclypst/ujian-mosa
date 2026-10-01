@@ -1,0 +1,7 @@
+{
+  "id": "com.alfaruqasri.ujian.browser",
+  "name": "EXAM AA Browser",
+  "serverUrl": "https://examku.my.id/browser",
+  "targetApk": "exam-aa-browser-latest.apk",
+  "vpsLink": "exam-aa-browser-latest"
+}

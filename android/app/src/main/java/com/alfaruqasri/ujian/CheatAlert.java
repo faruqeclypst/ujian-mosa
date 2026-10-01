@@ -119,4 +119,30 @@ public class CheatAlert extends Plugin {
         }
         call.resolve();
     }
+
+    @PluginMethod
+    public void startCustomExam(PluginCall call) {
+        final String url = call.getString("url");
+        final String pin = call.getString("pin", "1234");
+        Log.d(TAG, "startCustomExam called from JS: url=" + url + ", pin=" + pin);
+        if (url == null || url.isEmpty()) {
+            call.reject("URL is empty");
+            return;
+        }
+        MainActivity act = getMainActivity();
+        if (act != null) {
+            act.startCustomExamInternal(url, pin);
+        }
+        call.resolve();
+    }
+
+    @PluginMethod
+    public void stopCustomExam(PluginCall call) {
+        Log.d(TAG, "stopCustomExam called from JS");
+        MainActivity act = getMainActivity();
+        if (act != null) {
+            act.stopCustomExamInternal();
+        }
+        call.resolve();
+    }
 }
