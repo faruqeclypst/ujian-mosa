@@ -8,6 +8,7 @@ const __dirname = path.dirname(__filename);
 
 const VPS_HOST = 'root@64.235.41.108';
 const VPS_DIST = '/opt/frontend/ujian/dist';
+const VPS_APKS = '/opt/frontend/ujian/apks';
 
 const APKS = [
   {
@@ -63,13 +64,14 @@ for (let i = 0; i < APKS.length; i++) {
     process.exit(1);
   }
 
-  // Kirim ke VPS
+  // Kirim ke VPS (ke folder apks permanen dan dist)
   console.log(`[+] Mengirim ${item.targetApk} ke VPS...`);
+  execSync(`scp "${localApkPath}" ${VPS_HOST}:${VPS_APKS}/${item.targetApk}`, { stdio: 'inherit' });
   execSync(`scp "${localApkPath}" ${VPS_HOST}:${VPS_DIST}/${item.targetApk}`, { stdio: 'inherit' });
 
   // Buat copy / symlink tanpa ekstensi .apk agar endpoint examku.my.id/exam-aa-latest bisa langsung diakses
   console.log(`[+] Menautkan endpoint ${item.targetLink} di VPS...`);
-  execSync(`ssh ${VPS_HOST} "cp -f ${VPS_DIST}/${item.targetApk} ${VPS_DIST}/${item.targetLink} && chmod 644 ${VPS_DIST}/${item.targetApk} ${VPS_DIST}/${item.targetLink}"`, { stdio: 'inherit' });
+  execSync(`ssh ${VPS_HOST} "cp -f ${VPS_APKS}/${item.targetApk} ${VPS_APKS}/${item.targetLink} && cp -f ${VPS_DIST}/${item.targetApk} ${VPS_DIST}/${item.targetLink} && chmod -R 755 ${VPS_APKS}"`, { stdio: 'inherit' });
 }
 
 // 3. Update izin dan kirim web dist terbaru ke VPS
