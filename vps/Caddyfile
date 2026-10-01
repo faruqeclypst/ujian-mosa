@@ -1,0 +1,46 @@
+{
+    email admin@examku.my.id
+    servers {
+        max_header_size 16kb
+    }
+}
+
+(quiz_proxy) {
+    handle_path /api-quiz/* {
+        rewrite * /api/main/quiz/{path}
+        reverse_proxy https://wayground.com {
+            header_up Host wayground.com
+            header_up User-Agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            header_down -Set-Cookie
+        }
+    }
+}
+
+import /etc/caddy/conf.d/*.caddy
+
+examku.my.id {
+    import quiz_proxy
+
+    root * /opt/frontend/ujian/dist
+
+    redir /exam-aa-latest /exam-aa-latest.apk 302
+    redir /exam-aa-browser-latest /exam-aa-browser-latest.apk 302
+
+    @apk path *.apk
+    header @apk {
+        Content-Type application/vnd.android.package-archive
+        Content-Disposition "attachment"
+        Cache-Control "no-cache, no-store, must-revalidate"
+    }
+
+    handle /api/* {
+        reverse_proxy localhost:8090
+    }
+    handle /_* {
+        reverse_proxy localhost:8090
+    }
+    handle {
+        try_files {path} /index.html
+        file_server
+    }
+}

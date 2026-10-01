@@ -1,12 +1,12 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.alfaruqasri.ujian',
-  appName: 'EXAM AA',
+  appId: 'com.alfaruqasri.ujian.browser',
+  appName: 'EXAM AA Browser',
   webDir: 'dist',
   server: {
     androidScheme: 'https',
-    // url: 'https://examku.my.id',
+    // url: 'https://examku.my.id/browser',
     cleartext: true,
     allowNavigation: ['*']
   },
