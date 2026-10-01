@@ -514,23 +514,52 @@ public class MainActivity extends BridgeActivity {
             hideFloatingExamButton();
         }
 
-        final android.widget.TextView btn = new android.widget.TextView(this);
-        btn.setText("🔒 MENU");
-        btn.setTextColor(android.graphics.Color.WHITE);
-        btn.setTextSize(13);
-        btn.setTypeface(null, android.graphics.Typeface.BOLD);
-        btn.setGravity(android.view.Gravity.CENTER);
-        btn.setPadding(32, 18, 32, 18);
+        final android.widget.LinearLayout container = new android.widget.LinearLayout(this);
+        container.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+        container.setGravity(android.view.Gravity.CENTER_VERTICAL);
 
-        android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
-        bg.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
-        bg.setColor(android.graphics.Color.parseColor("#1E293B")); // Slate 800
-        bg.setStroke(3, android.graphics.Color.parseColor("#3B82F6")); // Blue 500 border
-        bg.setCornerRadius(50f);
-        btn.setBackground(bg);
+        // 1. Tombol Muat Ulang / Reload (Langsung refresh seketika tanpa PIN)
+        final android.widget.TextView btnReload = new android.widget.TextView(this);
+        btnReload.setText("🔄 RELOAD");
+        btnReload.setTextColor(android.graphics.Color.WHITE);
+        btnReload.setTextSize(12);
+        btnReload.setTypeface(null, android.graphics.Typeface.BOLD);
+        btnReload.setGravity(android.view.Gravity.CENTER);
+        btnReload.setPadding(26, 16, 26, 16);
+
+        android.graphics.drawable.GradientDrawable bgReload = new android.graphics.drawable.GradientDrawable();
+        bgReload.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
+        bgReload.setColor(android.graphics.Color.parseColor("#1E293B"));
+        bgReload.setStroke(3, android.graphics.Color.parseColor("#10B981")); // Emerald border
+        bgReload.setCornerRadius(40f);
+        btnReload.setBackground(bgReload);
+
+        // 2. Tombol Menu Pengawas (Kembali ke launcher / Keluar aplikasi dengan PIN)
+        final android.widget.TextView btnMenu = new android.widget.TextView(this);
+        btnMenu.setText("🔒 MENU");
+        btnMenu.setTextColor(android.graphics.Color.WHITE);
+        btnMenu.setTextSize(12);
+        btnMenu.setTypeface(null, android.graphics.Typeface.BOLD);
+        btnMenu.setGravity(android.view.Gravity.CENTER);
+        btnMenu.setPadding(28, 16, 28, 16);
+
+        android.graphics.drawable.GradientDrawable bgMenu = new android.graphics.drawable.GradientDrawable();
+        bgMenu.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
+        bgMenu.setColor(android.graphics.Color.parseColor("#1E293B"));
+        bgMenu.setStroke(3, android.graphics.Color.parseColor("#3B82F6")); // Blue border
+        bgMenu.setCornerRadius(40f);
+        btnMenu.setBackground(bgMenu);
+
+        android.widget.LinearLayout.LayoutParams reloadParams = new android.widget.LinearLayout.LayoutParams(
+            android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
+            android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
+        );
+        reloadParams.rightMargin = 16;
+        container.addView(btnReload, reloadParams);
+        container.addView(btnMenu);
 
         if (android.os.Build.VERSION.SDK_INT >= 21) {
-            btn.setElevation(25f);
+            container.setElevation(25f);
         }
 
         android.widget.FrameLayout.LayoutParams params = new android.widget.FrameLayout.LayoutParams(
@@ -539,9 +568,10 @@ public class MainActivity extends BridgeActivity {
         );
         params.gravity = android.view.Gravity.TOP | android.view.Gravity.END;
         params.topMargin = getTopCutoutHeight() + 20;
-        params.rightMargin = 40;
+        params.rightMargin = 30;
 
-        btn.setOnTouchListener(new android.view.View.OnTouchListener() {
+        // Touch Listener untuk Reload (bisa tap dan bisa drag container)
+        btnReload.setOnTouchListener(new android.view.View.OnTouchListener() {
             private int initialX, initialY;
             private float initialTouchX, initialTouchY;
             private boolean isClick = false;
@@ -550,8 +580,8 @@ public class MainActivity extends BridgeActivity {
             public boolean onTouch(android.view.View v, android.view.MotionEvent event) {
                 switch (event.getAction()) {
                     case android.view.MotionEvent.ACTION_DOWN:
-                        initialX = (int) v.getX();
-                        initialY = (int) v.getY();
+                        initialX = (int) container.getX();
+                        initialY = (int) container.getY();
                         initialTouchX = event.getRawX();
                         initialTouchY = event.getRawY();
                         isClick = true;
@@ -562,8 +592,48 @@ public class MainActivity extends BridgeActivity {
                         float dy = event.getRawY() - initialTouchY;
                         if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
                             isClick = false;
-                            v.setX(initialX + dx);
-                            v.setY(initialY + dy);
+                            container.setX(initialX + dx);
+                            container.setY(initialY + dy);
+                        }
+                        return true;
+
+                    case android.view.MotionEvent.ACTION_UP:
+                        if (isClick) {
+                            if (getBridge() != null && getBridge().getWebView() != null) {
+                                getBridge().getWebView().reload();
+                                android.widget.Toast.makeText(MainActivity.this, "Memuat ulang halaman...", android.widget.Toast.LENGTH_SHORT).show();
+                            }
+                        }
+                        return true;
+                }
+                return false;
+            }
+        });
+
+        // Touch Listener untuk Menu Pengawas (bisa tap dan bisa drag container)
+        btnMenu.setOnTouchListener(new android.view.View.OnTouchListener() {
+            private int initialX, initialY;
+            private float initialTouchX, initialTouchY;
+            private boolean isClick = false;
+
+            @Override
+            public boolean onTouch(android.view.View v, android.view.MotionEvent event) {
+                switch (event.getAction()) {
+                    case android.view.MotionEvent.ACTION_DOWN:
+                        initialX = (int) container.getX();
+                        initialY = (int) container.getY();
+                        initialTouchX = event.getRawX();
+                        initialTouchY = event.getRawY();
+                        isClick = true;
+                        return true;
+
+                    case android.view.MotionEvent.ACTION_MOVE:
+                        float dx = event.getRawX() - initialTouchX;
+                        float dy = event.getRawY() - initialTouchY;
+                        if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
+                            isClick = false;
+                            container.setX(initialX + dx);
+                            container.setY(initialY + dy);
                         }
                         return true;
 
@@ -577,7 +647,7 @@ public class MainActivity extends BridgeActivity {
             }
         });
 
-        floatingExamButton = btn;
+        floatingExamButton = container;
         addContentView(floatingExamButton, params);
     }
 
@@ -610,15 +680,6 @@ public class MainActivity extends BridgeActivity {
 
         builder.setView(layout);
 
-        builder.setNeutralButton("Muat Ulang Halaman", new android.content.DialogInterface.OnClickListener() {
-            @Override
-            public void onClick(android.content.DialogInterface dialog, int which) {
-                if (getBridge() != null && getBridge().getWebView() != null) {
-                    getBridge().getWebView().reload();
-                }
-            }
-        });
-
         builder.setNegativeButton("Kembali ke Menu", new android.content.DialogInterface.OnClickListener() {
             @Override
             public void onClick(android.content.DialogInterface dialog, int which) {
@@ -640,6 +701,13 @@ public class MainActivity extends BridgeActivity {
                 } else {
                     android.widget.Toast.makeText(MainActivity.this, "PIN Salah! Akses ditolak.", android.widget.Toast.LENGTH_SHORT).show();
                 }
+            }
+        });
+
+        builder.setNeutralButton("Batal", new android.content.DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(android.content.DialogInterface dialog, int which) {
+                dialog.dismiss();
             }
         });
 
