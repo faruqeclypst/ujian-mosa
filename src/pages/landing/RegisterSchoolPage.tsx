@@ -233,7 +233,7 @@ const RegisterSchoolPage = () => {
                     {[
                       { name: "Paket Berkembang", quota: "250 Siswa", icon: Zap, color: "blue" },
                       { name: "Paket Lanjutan", quota: "500 Siswa", icon: ShieldCheck, color: "amber" },
-                      { name: "Paket Premium", quota: "1000 Siswa", icon: Sparkles, color: "purple" },
+                      { name: "Paket Premium", quota: "1000 Siswa", icon: Sparkles, color: "sky" },
                     ].map((p) => (
                       <button
                         key={p.name}
@@ -292,11 +292,11 @@ const RegisterSchoolPage = () => {
                       className={cn(
                         "flex flex-col items-center gap-3 p-4 rounded-2xl border transition-all relative overflow-hidden group",
                         form.type === 'campus'
-                          ? "bg-indigo-50 border-indigo-500/50 text-indigo-600 shadow-md ring-2 ring-indigo-500/10"
+                          ? "bg-sky-50 border-sky-500/50 text-sky-700 shadow-md ring-2 ring-sky-500/10"
                           : "bg-white border-slate-200 text-slate-400 hover:border-slate-300"
                       )}
                     >
-                      {form.type === 'campus' && <div className="absolute top-2 right-2 w-2 h-2 bg-indigo-500 rounded-full animate-pulse" />}
+                      {form.type === 'campus' && <div className="absolute top-2 right-2 w-2 h-2 bg-sky-500 rounded-full animate-pulse" />}
                       <Building2 size={28} className={cn("transition-transform", form.type === 'campus' && "scale-110")} />
                       <div className="text-center">
                         <p className="text-[10px] font-black uppercase tracking-[0.2em]">Universitas</p>
