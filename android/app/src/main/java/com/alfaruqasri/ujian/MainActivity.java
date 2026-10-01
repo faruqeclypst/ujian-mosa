@@ -200,7 +200,7 @@ public class MainActivity extends BridgeActivity {
     }
 
     public void enableLockModeInternal() {
-        if (isExiting) return;
+        isExiting = false;
         isLockEnabled = true;
         if (fallbackEnableLockRunnable != null) {
             handler.removeCallbacks(fallbackEnableLockRunnable);
@@ -392,12 +392,34 @@ public class MainActivity extends BridgeActivity {
         });
     }
 
+    public void unlockScreenInternal() {
+        isLockEnabled = false;
+        stopRepeatingCheck();
+        if (fallbackEnableLockRunnable != null) {
+            handler.removeCallbacks(fallbackEnableLockRunnable);
+        }
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    stopRingtone();
+                    if (blockingLayout != null) {
+                        blockingLayout.setVisibility(View.GONE);
+                    }
+                    try {
+                        stopLockTask();
+                    } catch (Exception e) {}
+                } catch (Exception e) {}
+            }
+        });
+    }
+
     public void stopCustomExamInternal() {
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
                 hideFloatingExamButton();
-                disableLockForUpdateInternal();
+                unlockScreenInternal();
                 if (customLauncherUrl != null && getBridge() != null && getBridge().getWebView() != null) {
                     getBridge().getWebView().loadUrl(customLauncherUrl);
                 }

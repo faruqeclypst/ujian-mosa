@@ -25,7 +25,8 @@ const appConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
 console.log(`\n======================================================`);
 console.log(`  Beralih Profil Aplikasi ke: ${appConfig.name}`);
 console.log(`  Package ID : ${appConfig.id}`);
-console.log(`  Server URL : ${appConfig.serverUrl}`);
+console.log(`  Web Dir    : ${appConfig.webDir || 'dist'}`);
+console.log(`  Server URL : ${appConfig.serverUrl || '(Standalone Local Assets)'}`);
 console.log(`======================================================\n`);
 
 // 1. Update capacitor.config.ts
@@ -35,13 +36,19 @@ let capConfig = fs.readFileSync(capConfigPath, 'utf8');
 capConfig = capConfig.replace(/appId:\s*'.*'/, `appId: '${appConfig.id}'`);
 capConfig = capConfig.replace(/appName:\s*'.*'/, `appName: '${appConfig.name}'`);
 
-// Pastikan block server memiliki url dan allowNavigation
-if (/url:\s*'.*'/.test(capConfig)) {
-  capConfig = capConfig.replace(/url:\s*'.*'/, `url: '${appConfig.serverUrl}'`);
-} else if (/\/\/\s*url:/.test(capConfig)) {
-  capConfig = capConfig.replace(/\/\/\s*url:\s*'.*',?/, `url: '${appConfig.serverUrl}',`);
+const targetWebDir = appConfig.webDir || 'dist';
+capConfig = capConfig.replace(/webDir:\s*'.*'/, `webDir: '${targetWebDir}'`);
+
+// Handle server.url
+if (appConfig.serverUrl) {
+  if (/url:\s*'.*'/.test(capConfig)) {
+    capConfig = capConfig.replace(/url:\s*'.*'/, `url: '${appConfig.serverUrl}'`);
+  } else {
+    capConfig = capConfig.replace(/androidScheme:\s*'https',/, `androidScheme: 'https',\n    url: '${appConfig.serverUrl}',`);
+  }
 } else {
-  capConfig = capConfig.replace(/server:\s*\{/, `server: {\n    url: '${appConfig.serverUrl}',`);
+  // Standalone local mode: hapus setting url agar load local webDir
+  capConfig = capConfig.replace(/\s*url:\s*'.*',?/g, '');
 }
 
 if (!/allowNavigation/.test(capConfig)) {

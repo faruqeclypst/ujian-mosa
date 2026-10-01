@@ -21,17 +21,24 @@ import /etc/caddy/conf.d/*.caddy
 examku.my.id {
     import quiz_proxy
 
-    root * /opt/frontend/ujian/dist
-
+    # Redirect short URL to .apk
     redir /exam-aa-latest /exam-aa-latest.apk 302
     redir /exam-aa-browser-latest /exam-aa-browser-latest.apk 302
 
-    @apk path *.apk
-    header @apk {
-        Content-Type application/vnd.android.package-archive
-        Content-Disposition "attachment"
-        Cache-Control "no-cache, no-store, must-revalidate"
+    # Dedicated APK download handler from permanent storage
+    @apk path /exam-aa-*.apk
+    handle @apk {
+        root * /opt/frontend/ujian/apks
+        header {
+            Content-Type application/vnd.android.package-archive
+            Content-Disposition "attachment"
+            Cache-Control "no-cache, no-store, must-revalidate"
+        }
+        file_server
     }
+
+    # Main Web App
+    root * /opt/frontend/ujian/dist
 
     handle /api/* {
         reverse_proxy localhost:8090

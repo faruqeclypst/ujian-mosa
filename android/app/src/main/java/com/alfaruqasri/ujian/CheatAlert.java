@@ -145,4 +145,14 @@ public class CheatAlert extends Plugin {
         }
         call.resolve();
     }
+
+    @PluginMethod
+    public void unlockScreen(PluginCall call) {
+        Log.d(TAG, "unlockScreen called from JS");
+        MainActivity act = getMainActivity();
+        if (act != null) {
+            act.unlockScreenInternal();
+        }
+        call.resolve();
+    }
 }

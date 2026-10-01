@@ -3,10 +3,10 @@ import type { CapacitorConfig } from '@capacitor/cli';
 const config: CapacitorConfig = {
   appId: 'com.alfaruqasri.ujian.browser',
   appName: 'EXAM AA Browser',
-  webDir: 'dist',
+  webDir: 'dist-browser',
   server: {
     androidScheme: 'https',
-    // url: 'https://examku.my.id/browser',
+    //
     cleartext: true,
     allowNavigation: ['*']
   },
