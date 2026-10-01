@@ -505,24 +505,44 @@ const LandingPage = () => {
         <div className="absolute bottom-10 left-1/3 w-[500px] h-[500px] bg-teal-400/10 rounded-full blur-[140px] animate-pulse-glow" style={{ animationDelay: "5s" }} />
       </div>
 
-      {/* Top Banner - Fully Responsive on Android/Mobile */}
+      {/* Top Banner - Running Marquee on Mobile/Android, Centered on Desktop */}
       <div className="bg-gradient-to-r from-blue-700 via-blue-600 to-blue-800 text-white py-2 px-3 sm:px-4 text-center font-medium shadow-xs relative overflow-hidden">
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,transparent,rgba(255,255,255,0.15),transparent)] animate-marquee pointer-events-none" />
-        <div className="relative z-10 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-[11px] sm:text-xs">
-          <span className="inline-flex items-center justify-center bg-white/20 text-white rounded-full px-2 py-0.5 text-[10px] sm:text-[11px] font-extrabold whitespace-nowrap shadow-2xs">
+        {/* Desktop View: Centered & Clean */}
+        <div className="hidden sm:flex items-center justify-center gap-2 relative z-10 text-xs">
+          <span className="inline-flex items-center justify-center bg-white/20 text-white rounded-full px-2.5 py-0.5 text-[11px] font-bold shadow-2xs">
             Promo Ujian 2026
           </span>
-          <span className="leading-snug">
-            Dapatkan potongan 5% untuk semua paket langganan bulanan EXAM AA.
-          </span>
+          <span className="relative z-10">Dapatkan potongan 5% untuk semua paket langganan bulanan EXAM AA.</span>
           <button
             type="button"
             onClick={() => document.getElementById("pricing")?.scrollIntoView({ behavior: "smooth" })}
-            className="underline font-bold hover:text-blue-100 transition-colors cursor-pointer inline-flex items-center gap-0.5 ml-0.5 whitespace-nowrap"
+            className="relative z-10 underline font-bold hover:text-blue-100 transition-colors cursor-pointer ml-1 inline-flex items-center gap-0.5"
           >
             <span>Lihat Paket</span>
             <span aria-hidden="true">&rarr;</span>
           </button>
+        </div>
+
+        {/* Mobile / Android View: Smooth Continuous Running Text Ticker */}
+        <div
+          onClick={() => document.getElementById("pricing")?.scrollIntoView({ behavior: "smooth" })}
+          className="sm:hidden flex overflow-hidden whitespace-nowrap cursor-pointer select-none py-0.5 relative z-10"
+          aria-label="Promo Ujian 2026: Dapatkan potongan 5% untuk semua paket langganan bulanan EXAM AA. Ketuk untuk melihat paket."
+        >
+          <div className="flex w-max animate-marquee items-center" style={{ animationDuration: "16s" }}>
+            {[1, 2, 3, 4].map((k) => (
+              <div key={k} className="flex items-center gap-2 text-xs font-medium pr-6">
+                <span className="inline-flex items-center justify-center bg-white/20 text-white rounded-full px-2 py-0.5 text-[10px] font-extrabold shadow-2xs">
+                  Promo Ujian 2026
+                </span>
+                <span>Dapatkan potongan 5% untuk semua paket langganan bulanan EXAM AA.</span>
+                <span className="underline font-bold text-blue-100 flex items-center gap-0.5">
+                  Lihat Paket &rarr;
+                </span>
+                <span className="text-white/40 font-bold ml-2">•</span>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
