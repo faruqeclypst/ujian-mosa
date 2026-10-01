@@ -709,14 +709,14 @@ const LandingPage = () => {
           </div>
 
           {/* Trust indicators - Only 2 requested badges */}
-          <div className="mt-8 flex items-center justify-center gap-3 sm:gap-4 flex-wrap text-xs sm:text-sm text-slate-700 font-semibold">
-            <span className="flex items-center gap-2 bg-white px-4 py-2 rounded-xl border border-slate-200/90 shadow-2xs hover:border-slate-300 transition-colors">
+          <div className="mt-8 flex items-center justify-center gap-2.5 sm:gap-4 flex-wrap text-xs sm:text-sm text-slate-700 font-semibold px-2">
+            <span className="flex items-center gap-2 bg-white px-3 sm:px-4 py-2 rounded-xl border border-slate-200/90 shadow-2xs hover:border-slate-300 transition-colors max-w-full text-left">
               <CheckCircle size={16} className="text-emerald-500 flex-shrink-0" />
-              <span>APK Android Kiosk & iOS Safe Exam Browser</span>
+              <span className="leading-snug">APK Android Kiosk & iOS Safe Exam Browser</span>
             </span>
-            <span className="flex items-center gap-2 bg-white px-4 py-2 rounded-xl border border-slate-200/90 shadow-2xs hover:border-slate-300 transition-colors">
+            <span className="flex items-center gap-2 bg-white px-3 sm:px-4 py-2 rounded-xl border border-slate-200/90 shadow-2xs hover:border-slate-300 transition-colors max-w-full text-left">
               <CheckCircle size={16} className="text-blue-600 flex-shrink-0" />
-              <span>Cloudflare CDN Anti-Lag 99.98%</span>
+              <span className="leading-snug">Cloudflare CDN Anti-Lag 99.98%</span>
             </span>
           </div>
         </div>
@@ -1020,12 +1020,8 @@ const LandingPage = () => {
       </section>
 
       {/* ANIMATED TECH STACK MARQUEE (BELOVED OLD VERSION WITH 3D LUXURY EFFECT) */}
-      <section id="technology" className="py-20 bg-white overflow-hidden border-y border-slate-200/80 relative">
-        {/* Soft edge blur overlays */}
-        <div className="absolute inset-y-0 left-0 w-32 bg-gradient-to-r from-white via-white/80 to-transparent z-10 pointer-events-none" />
-        <div className="absolute inset-y-0 right-0 w-32 bg-gradient-to-l from-white via-white/80 to-transparent z-10 pointer-events-none" />
-
-        <div className="max-w-4xl mx-auto text-center mb-14 px-4">
+      <section id="technology" className="py-16 sm:py-20 bg-white overflow-hidden border-y border-slate-200/80">
+        <div className="max-w-4xl mx-auto text-center mb-10 sm:mb-14 px-4">
           <div className="inline-flex items-center gap-2 bg-blue-50 border border-blue-200 text-blue-700 text-xs font-bold px-3 py-1 rounded-full mb-3 uppercase tracking-wider">
             <Zap size={13} />
             Arsitektur Teknologi Kelas Dunia
@@ -1038,52 +1034,59 @@ const LandingPage = () => {
           </p>
         </div>
 
-        {/* Marquee Row 1: Scrolling Left */}
-        <div className="flex w-max animate-marquee whitespace-nowrap gap-6 items-center mb-6 hover:[animation-play-state:paused]">
-          {[...techStackRow1, ...techStackRow1, ...techStackRow1].map((tech, i) => (
-            <div
-              key={i}
-              className="flex items-center gap-3.5 bg-slate-50 hover:bg-white border border-slate-200/90 hover:border-blue-300 rounded-2xl px-5 py-3 shadow-xs hover:shadow-lg hover:-translate-y-1 transition-all duration-300 group cursor-default"
-            >
-              <img
-                src={tech.logo}
-                alt={tech.name}
-                className="h-8 w-auto object-contain grayscale group-hover:grayscale-0 transition-all duration-300 group-hover:scale-110"
-              />
-              <div className="text-left">
-                <span className="text-sm font-bold text-slate-800 group-hover:text-blue-700 transition-colors block">
-                  {tech.name}
-                </span>
-                <span className="text-[10px] text-slate-400 block font-medium">
-                  {tech.desc}
-                </span>
-              </div>
-            </div>
-          ))}
-        </div>
+        {/* Marquee Container with edge fades ONLY for the running logos track */}
+        <div className="relative overflow-hidden py-1">
+          {/* Soft edge blur overlays - only over the running logos track */}
+          <div className="absolute inset-y-0 left-0 w-16 sm:w-28 bg-gradient-to-r from-white via-white/90 to-transparent z-10 pointer-events-none" />
+          <div className="absolute inset-y-0 right-0 w-16 sm:w-28 bg-gradient-to-l from-white via-white/90 to-transparent z-10 pointer-events-none" />
 
-        {/* Marquee Row 2: Scrolling Right */}
-        <div className="flex w-max animate-marquee-reverse whitespace-nowrap gap-6 items-center hover:[animation-play-state:paused]">
-          {[...techStackRow2, ...techStackRow2, ...techStackRow2].map((tech, i) => (
-            <div
-              key={i}
-              className="flex items-center gap-3.5 bg-slate-50 hover:bg-white border border-slate-200/90 hover:border-blue-300 rounded-2xl px-5 py-3 shadow-xs hover:shadow-lg hover:-translate-y-1 transition-all duration-300 group cursor-default"
-            >
-              <img
-                src={tech.logo}
-                alt={tech.name}
-                className="h-8 w-auto object-contain grayscale group-hover:grayscale-0 transition-all duration-300 group-hover:scale-110"
-              />
-              <div className="text-left">
-                <span className="text-sm font-bold text-slate-800 group-hover:text-blue-700 transition-colors block">
-                  {tech.name}
-                </span>
-                <span className="text-[10px] text-slate-400 block font-medium">
-                  {tech.desc}
-                </span>
+          {/* Marquee Row 1: Scrolling Left */}
+          <div className="flex w-max animate-marquee whitespace-nowrap gap-6 items-center mb-6 hover:[animation-play-state:paused]">
+            {[...techStackRow1, ...techStackRow1, ...techStackRow1].map((tech, i) => (
+              <div
+                key={i}
+                className="flex items-center gap-3.5 bg-slate-50 hover:bg-white border border-slate-200/90 hover:border-blue-300 rounded-2xl px-5 py-3 shadow-xs hover:shadow-lg hover:-translate-y-1 transition-all duration-300 group cursor-default"
+              >
+                <img
+                  src={tech.logo}
+                  alt={tech.name}
+                  className="h-8 w-auto object-contain grayscale group-hover:grayscale-0 transition-all duration-300 group-hover:scale-110"
+                />
+                <div className="text-left">
+                  <span className="text-sm font-bold text-slate-800 group-hover:text-blue-700 transition-colors block">
+                    {tech.name}
+                  </span>
+                  <span className="text-[10px] text-slate-400 block font-medium">
+                    {tech.desc}
+                  </span>
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
+
+          {/* Marquee Row 2: Scrolling Right */}
+          <div className="flex w-max animate-marquee-reverse whitespace-nowrap gap-6 items-center hover:[animation-play-state:paused]">
+            {[...techStackRow2, ...techStackRow2, ...techStackRow2].map((tech, i) => (
+              <div
+                key={i}
+                className="flex items-center gap-3.5 bg-slate-50 hover:bg-white border border-slate-200/90 hover:border-blue-300 rounded-2xl px-5 py-3 shadow-xs hover:shadow-lg hover:-translate-y-1 transition-all duration-300 group cursor-default"
+              >
+                <img
+                  src={tech.logo}
+                  alt={tech.name}
+                  className="h-8 w-auto object-contain grayscale group-hover:grayscale-0 transition-all duration-300 group-hover:scale-110"
+                />
+                <div className="text-left">
+                  <span className="text-sm font-bold text-slate-800 group-hover:text-blue-700 transition-colors block">
+                    {tech.name}
+                  </span>
+                  <span className="text-[10px] text-slate-400 block font-medium">
+                    {tech.desc}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -1133,32 +1136,36 @@ const LandingPage = () => {
           </div>
 
           {/* Billing Cycle Selector (Bulanan / Semester / 1 Tahun) */}
-          <div className="flex justify-center mb-10 sm:mb-14">
-            <div className="inline-flex items-center p-1.5 bg-slate-200/70 backdrop-blur-xs rounded-2xl border border-slate-300/70 shadow-inner gap-1">
+          <div className="flex justify-center mb-8 sm:mb-14 px-2 w-full">
+            <div className="w-full max-w-xl grid grid-cols-3 p-1 sm:p-1.5 bg-slate-200/80 backdrop-blur-xs rounded-2xl border border-slate-300/80 shadow-inner gap-1">
               <button
                 type="button"
                 onClick={() => setBillingCycle("bulanan")}
                 className={cn(
-                  "px-4 sm:px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer",
+                  "py-2 sm:py-2.5 px-1 sm:px-4 rounded-xl text-center font-bold transition-all cursor-pointer flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1.5 min-h-[44px]",
                   billingCycle === "bulanan"
                     ? "bg-white text-slate-900 shadow-xs border border-slate-200/80"
                     : "text-slate-600 hover:text-slate-900"
                 )}
               >
-                Bulanan (1 Bulan)
+                <span className="text-xs sm:text-sm font-extrabold">Bulanan</span>
+                <span className="text-[10px] sm:text-xs text-slate-400 font-normal sm:font-medium whitespace-nowrap">(1 Bulan)</span>
               </button>
               <button
                 type="button"
                 onClick={() => setBillingCycle("semester")}
                 className={cn(
-                  "px-4 sm:px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer flex items-center gap-1.5",
+                  "py-2 sm:py-2.5 px-1 sm:px-4 rounded-xl text-center font-bold transition-all cursor-pointer flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1.5 min-h-[44px]",
                   billingCycle === "semester"
                     ? "bg-white text-slate-900 shadow-xs border border-slate-200/80"
                     : "text-slate-600 hover:text-slate-900"
                 )}
               >
-                <span>Paket Semester (6 Bulan)</span>
-                <span className="text-[10px] bg-emerald-100 text-emerald-800 font-extrabold px-2 py-0.5 rounded-full">
+                <div className="flex items-center gap-1">
+                  <span className="text-xs sm:text-sm font-extrabold">Semester</span>
+                  <span className="text-[10px] text-slate-400 font-normal hidden sm:inline">(6 Bln)</span>
+                </div>
+                <span className="text-[9px] sm:text-[10px] bg-emerald-100 text-emerald-800 font-extrabold px-1.5 py-0.5 rounded-full whitespace-nowrap shadow-2xs">
                   Hemat 12%
                 </span>
               </button>
@@ -1166,14 +1173,17 @@ const LandingPage = () => {
                 type="button"
                 onClick={() => setBillingCycle("tahunan")}
                 className={cn(
-                  "px-4 sm:px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer flex items-center gap-1.5",
+                  "py-2 sm:py-2.5 px-1 sm:px-4 rounded-xl text-center font-bold transition-all cursor-pointer flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1.5 min-h-[44px]",
                   billingCycle === "tahunan"
                     ? "bg-white text-slate-900 shadow-xs border border-slate-200/80"
                     : "text-slate-600 hover:text-slate-900"
                 )}
               >
-                <span>Paket 1 Tahun (12 Bulan)</span>
-                <span className="text-[10px] bg-blue-600 text-white font-extrabold px-2 py-0.5 rounded-full">
+                <div className="flex items-center gap-1">
+                  <span className="text-xs sm:text-sm font-extrabold">1 Tahun</span>
+                  <span className="text-[10px] text-slate-400 font-normal hidden sm:inline">(12 Bln)</span>
+                </div>
+                <span className="text-[9px] sm:text-[10px] bg-blue-600 text-white font-extrabold px-1.5 py-0.5 rounded-full whitespace-nowrap shadow-2xs">
                   Hemat 20%
                 </span>
               </button>
@@ -1319,10 +1329,17 @@ const LandingPage = () => {
             </p>
           </div>
 
+          {/* Mobile Swipe Hint */}
+          <div className="sm:hidden flex items-center justify-center gap-1.5 text-[11px] text-slate-500 font-medium mb-3 bg-slate-100/90 py-1.5 px-3 rounded-xl border border-slate-200/70">
+            <span>←</span>
+            <span>Geser tabel ke samping untuk melihat seluruh parameter</span>
+            <span>→</span>
+          </div>
+
           {/* Clean & Neat Table Container */}
           <div className="bg-white border border-slate-200/90 rounded-2xl shadow-xs overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs sm:text-sm border-collapse min-w-[720px]">
+              <table className="w-full text-left text-xs sm:text-sm border-collapse min-w-[700px]">
                 <thead>
                   <tr className="border-b border-slate-200 bg-slate-50/80">
                     <th className="py-4 px-5 font-bold text-slate-700 w-1/4 border-r border-slate-200/80">
