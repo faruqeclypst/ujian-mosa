@@ -75,10 +75,19 @@ for (let i = 0; i < APKS.length; i++) {
 }
 
 // 3. Update izin dan kirim web dist terbaru ke VPS
-console.log('\n🌐 [Langkah 3/3] Memperbarui web bundle & Caddy di VPS...');
+console.log('\n🌐 [Langkah 3/4] Memperbarui web bundle & Caddy di VPS...');
 execSync(`scp dist/index.html ${VPS_HOST}:${VPS_DIST}/index.html`, { stdio: 'inherit' });
 execSync(`scp -r dist/assets ${VPS_HOST}:${VPS_DIST}/`, { stdio: 'inherit' });
 execSync(`ssh ${VPS_HOST} "chown -R caddy:caddy ${VPS_DIST} && chmod -R 755 ${VPS_DIST} && systemctl reload caddy"`, { stdio: 'inherit' });
+
+// 4. Purge Cache Cloudflare otomatis
+console.log('\n⚡ [Langkah 4/4] Membersihkan Cache Cloudflare (Purge Cache)...');
+try {
+  execSync(`ssh ${VPS_HOST} "/root/purge_cache.sh"`, { stdio: 'inherit' });
+  console.log('✅ Cloudflare Cache berhasil dibersihkan otomatis!');
+} catch (err) {
+  console.warn('⚠️ Gagal membersihkan cache Cloudflare otomatis:', err.message);
+}
 
 console.log('\n======================================================');
 console.log('   🎉 SEMUA APK SELESAI DI-BUILD & DIPUBLIKASIKAN!');
