@@ -101,6 +101,22 @@ public class MainActivity extends BridgeActivity {
         } catch (Exception e) {
             Log.e(TAG, "Failed to register AndroidExam JavascriptInterface", e);
         }
+
+        // Cegah tombol back keluar dari aplikasi (AndroidX Dispatcher)
+        getOnBackPressedDispatcher().addCallback(this, new androidx.activity.OnBackPressedCallback(true) {
+            @Override
+            public void handleOnBackPressed() {
+                handleBackAction();
+            }
+        });
+
+        // Pastikan web content berada di bawah notch kamera
+        getWindow().getDecorView().post(new Runnable() {
+            @Override
+            public void run() {
+                applyNotchToWebView();
+            }
+        });
         
         // Jaga agar layar tidak mati otomatis saat ujian berlangsung
         try {
@@ -437,6 +453,7 @@ public class MainActivity extends BridgeActivity {
                     if (getBridge() != null && getBridge().getWebView() != null) {
                         customLauncherUrl = getBridge().getWebView().getUrl();
                     }
+                    applyNotchToWebView();
                     showFloatingExamButton();
                     enableLockModeInternal();
                     if (getBridge() != null && getBridge().getWebView() != null) {
@@ -521,7 +538,7 @@ public class MainActivity extends BridgeActivity {
             android.widget.FrameLayout.LayoutParams.WRAP_CONTENT
         );
         params.gravity = android.view.Gravity.TOP | android.view.Gravity.END;
-        params.topMargin = 60;
+        params.topMargin = getTopCutoutHeight() + 20;
         params.rightMargin = 40;
 
         btn.setOnTouchListener(new android.view.View.OnTouchListener() {
@@ -694,6 +711,7 @@ public class MainActivity extends BridgeActivity {
         super.onResume();
         makeFullScreen();
         applyThemeColors();
+        applyNotchToWebView();
         if (isLockEnabled) {
             checkLockTaskOnly();
         }
@@ -919,6 +937,60 @@ public class MainActivity extends BridgeActivity {
         }
     }
 
+    public int getTopCutoutHeight() {
+        int top = 0;
+        try {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+                android.view.WindowInsets insets = getWindow().getDecorView().getRootWindowInsets();
+                if (insets != null) {
+                    android.view.DisplayCutout cutout = insets.getDisplayCutout();
+                    if (cutout != null) {
+                        top = cutout.getSafeInsetTop();
+                    }
+                }
+            }
+            if (top == 0) {
+                int resourceId = getResources().getIdentifier("status_bar_height", "dimen", "android");
+                if (resourceId > 0) {
+                    top = getResources().getDimensionPixelSize(resourceId);
+                }
+            }
+        } catch (Exception e) {}
+        return top;
+    }
+
+    public void applyNotchToWebView() {
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    if (getBridge() == null || getBridge().getWebView() == null) return;
+                    View webView = getBridge().getWebView();
+                    int top = getTopCutoutHeight();
+                    if (top > 0) {
+                        android.view.ViewGroup.LayoutParams lp = webView.getLayoutParams();
+                        if (lp instanceof android.view.ViewGroup.MarginLayoutParams) {
+                            android.view.ViewGroup.MarginLayoutParams mlp = (android.view.ViewGroup.MarginLayoutParams) lp;
+                            if (mlp.topMargin != top) {
+                                mlp.topMargin = top;
+                                webView.setLayoutParams(mlp);
+                                Log.d(TAG, "Applied top margin " + top + "px to WebView to stay below camera notch");
+                            }
+                        }
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "applyNotchToWebView error", e);
+                }
+            }
+        });
+    }
+
+    @Override
+    public void onAttachedToWindow() {
+        super.onAttachedToWindow();
+        applyNotchToWebView();
+    }
+
     private void makeFullScreen() {
         if (isFinishing() || isExiting) return;
         try {
@@ -951,19 +1023,56 @@ public class MainActivity extends BridgeActivity {
                     decorView.setSystemUiVisibility(flags);
                 }
             }
+            applyNotchToWebView();
         } catch (Exception e) {}
     }
 
     @Override
+    public boolean onKeyDown(int keyCode, android.view.KeyEvent event) {
+        if (keyCode == android.view.KeyEvent.KEYCODE_BACK) {
+            handleBackAction();
+            return true;
+        }
+        return super.onKeyDown(keyCode, event);
+    }
+
+    @Override
     public void onBackPressed() {
-        if (isLockEnabled && !isExiting) {
-            // Cegah keluar aplikasi saat mode kuncian ujian aktif
-            if (getBridge() != null && getBridge().getWebView() != null && getBridge().getWebView().canGoBack()) {
-                getBridge().getWebView().goBack();
+        handleBackAction();
+    }
+
+    public void handleBackAction() {
+        Log.d(TAG, "handleBackAction called. isLockEnabled=" + isLockEnabled);
+        
+        // 1. Jika dalam mode kuncian ujian aktif
+        if (isLockEnabled) {
+            if (getBridge() != null && getBridge().getWebView() != null) {
+                android.webkit.WebBackForwardList history = getBridge().getWebView().copyBackForwardList();
+                int currentIndex = history.getCurrentIndex();
+                if (currentIndex > 0) {
+                    String prevUrl = history.getItemAtIndex(currentIndex - 1).getUrl();
+                    // Cegah mundur ke launcher lokal jika sedang ujian
+                    if (prevUrl != null && (prevUrl.contains("localhost") || prevUrl.equals(customLauncherUrl))) {
+                        Log.d(TAG, "Mencegah back ke launcher ujian saat mode terkunci aktif");
+                        android.widget.Toast.makeText(this, "Gunakan tombol MENU pengawas untuk keluar ujian", android.widget.Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    getBridge().getWebView().goBack();
+                    return;
+                }
             }
+            android.widget.Toast.makeText(this, "Tombol Kembali dinonaktifkan demi keamanan ujian", android.widget.Toast.LENGTH_SHORT).show();
             return;
         }
-        super.onBackPressed();
+
+        // 2. Jika di luar mode ujian (launcher)
+        if (getBridge() != null && getBridge().getWebView() != null && getBridge().getWebView().canGoBack()) {
+            getBridge().getWebView().goBack();
+            return;
+        }
+
+        // DILARANG KERAS panggil super.onBackPressed() atau finish() agar aplikasi tidak pernah tertutup via tombol back!
+        android.widget.Toast.makeText(this, "Tombol Kembali dinonaktifkan demi keamanan ujian", android.widget.Toast.LENGTH_SHORT).show();
     }
 
     @Override
