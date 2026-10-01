@@ -155,4 +155,23 @@ public class CheatAlert extends Plugin {
         }
         call.resolve();
     }
+
+    @Override
+    public Boolean shouldOverrideLoad(android.net.Uri url) {
+        if (url == null) return null;
+        String scheme = url.getScheme();
+        if ("http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme)) {
+            // Jangan pernah lempar link HTTP/HTTPS ke Chrome luar!
+            // Tetap buka di dalam WebView aplikasi agar kuncian kiosk tidak lepas.
+            return false;
+        }
+        // Skema selain http/https (misal intent:, market:, fb:, tel:) saat mode lock aktif:
+        // Blokir total tanpa melempar intent agar siswa tidak bisa melarikan diri dari ujian.
+        if (MainActivity.instance != null && MainActivity.instance.isLockEnabled) {
+            Log.w(TAG, "Memblokir URL non-http di mode ujian: " + url);
+            return true;
+        }
+        return null;
+    }
 }
+

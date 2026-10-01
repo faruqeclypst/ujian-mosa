@@ -480,7 +480,12 @@
         if (savedPin) pinInput.value = savedPin;
       } catch (e) {}
 
-      if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.CheatAlert) {
+      // Lepaskan mode kuncian saat di halaman launcher agar leluasa mengetik & scan QR
+      if (window.AndroidExam && window.AndroidExam.unlockScreen) {
+        try {
+          window.AndroidExam.unlockScreen();
+        } catch (e) {}
+      } else if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.CheatAlert) {
         try {
           window.Capacitor.Plugins.CheatAlert.unlockScreen();
         } catch (e) {}
@@ -502,6 +507,11 @@
     }
 
     urlInput.addEventListener('input', updateInputState);
+    urlInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        startExam();
+      }
+    });
 
     btnClear.addEventListener('click', () => {
       urlInput.value = '';
@@ -530,7 +540,10 @@
     // Start Exam
     async function startExam(targetUrl) {
       let url = (targetUrl || urlInput.value).trim();
-      if (!url) return;
+      if (!url) {
+        alert('Silakan masukkan link URL ujian terlebih dahulu.');
+        return;
+      }
 
       if (!/^https?:\/\//i.test(url)) {
         url = 'https://' + url;
@@ -540,17 +553,27 @@
       const pin = pinInput.value.trim() || '1234';
 
       btnStart.disabled = true;
-      btnStart.textContent = 'Menyiapkan Ujian...';
+      btnStart.textContent = 'Mengunci Layar & Membuka Ujian...';
 
+      // 1. Panggil Native Android Bridge (Paling Utama & Pasti Ada)
+      if (window.AndroidExam && window.AndroidExam.startExam) {
+        console.log('Memanggil AndroidExam.startExam...');
+        window.AndroidExam.startExam(url, pin);
+        return;
+      }
+
+      // 2. Fallback jika lewat Capacitor Plugin CheatAlert
       if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.CheatAlert) {
         try {
+          console.log('Memanggil CheatAlert.startCustomExam...');
           await window.Capacitor.Plugins.CheatAlert.startCustomExam({ url, pin });
           return;
         } catch (e) {
-          console.error('startCustomExam error:', e);
+          console.error('startCustomExam plugin error:', e);
         }
       }
 
+      // 3. Fallback jika dibuka di browser desktop biasa (bukan aplikasi Android native)
       window.location.href = url;
     }
 

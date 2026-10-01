@@ -19,7 +19,8 @@ public class MainActivity extends BridgeActivity {
     private android.os.Handler alarmHandler = new android.os.Handler();
     private boolean isAlarmPlaying = false;
     private boolean isExiting = false;
-    private boolean isLockEnabled = false;
+    public boolean isLockEnabled = false;
+    private boolean isMenuDialogOpen = false;
     private Runnable fallbackEnableLockRunnable;
     private int currentThemeColor = android.graphics.Color.WHITE;
     private int currentNavColor = android.graphics.Color.WHITE;
@@ -28,6 +29,46 @@ public class MainActivity extends BridgeActivity {
     private android.view.View floatingExamButton;
     private String customExamPin = "1234";
     private String customLauncherUrl = null;
+
+    public class NativeExamBridge {
+        @android.webkit.JavascriptInterface
+        public void startExam(final String url, final String pin) {
+            Log.d(TAG, "NativeExamBridge.startExam: url=" + url + ", pin=" + pin);
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    startCustomExamInternal(url, pin);
+                }
+            });
+        }
+
+        @android.webkit.JavascriptInterface
+        public void unlockScreen() {
+            Log.d(TAG, "NativeExamBridge.unlockScreen");
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    unlockScreenInternal();
+                }
+            });
+        }
+
+        @android.webkit.JavascriptInterface
+        public void exitApp() {
+            Log.d(TAG, "NativeExamBridge.exitApp");
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    exitAppInternal();
+                }
+            });
+        }
+
+        @android.webkit.JavascriptInterface
+        public boolean isNative() {
+            return true;
+        }
+    }
 
     public static volatile boolean isScreenOff = false;
     public static volatile long lastScreenOffTime = 0;
@@ -50,6 +91,16 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(CheatAlert.class);
         super.onCreate(savedInstanceState);
         instance = this;
+
+        // Daftarkan NativeExamBridge langsung pada WebView agar HTML lokal dapat memanggil fungsi kuncian native
+        try {
+            if (getBridge() != null && getBridge().getWebView() != null) {
+                getBridge().getWebView().addJavascriptInterface(new NativeExamBridge(), "AndroidExam");
+                Log.d(TAG, "AndroidExam JavascriptInterface registered successfully");
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to register AndroidExam JavascriptInterface", e);
+        }
         
         // Jaga agar layar tidak mati otomatis saat ujian berlangsung
         try {
@@ -222,8 +273,13 @@ public class MainActivity extends BridgeActivity {
                         getWindow().setHideOverlayWindows(true);
                     }
                 } catch (Exception e) {}
-                checkLockTaskOnly();
-                startRepeatingCheck();
+                handler.postDelayed(new Runnable() {
+                    @Override
+                    public void run() {
+                        checkLockTaskOnly();
+                        startRepeatingCheck();
+                    }
+                }, 800);
             }
         });
     }
@@ -377,11 +433,12 @@ public class MainActivity extends BridgeActivity {
             @Override
             public void run() {
                 try {
+                    Log.d(TAG, "startCustomExamInternal: URL=" + url + ", PIN=" + customExamPin);
                     if (getBridge() != null && getBridge().getWebView() != null) {
                         customLauncherUrl = getBridge().getWebView().getUrl();
                     }
-                    enableLockModeInternal();
                     showFloatingExamButton();
+                    enableLockModeInternal();
                     if (getBridge() != null && getBridge().getWebView() != null) {
                         getBridge().getWebView().loadUrl(url);
                     }
@@ -418,10 +475,18 @@ public class MainActivity extends BridgeActivity {
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
-                hideFloatingExamButton();
-                unlockScreenInternal();
-                if (customLauncherUrl != null && getBridge() != null && getBridge().getWebView() != null) {
-                    getBridge().getWebView().loadUrl(customLauncherUrl);
+                try {
+                    hideFloatingExamButton();
+                    unlockScreenInternal();
+                    if (getBridge() != null && getBridge().getWebView() != null) {
+                        if (customLauncherUrl != null && !customLauncherUrl.isEmpty()) {
+                            getBridge().getWebView().loadUrl(customLauncherUrl);
+                        } else {
+                            getBridge().getWebView().loadUrl("https://localhost");
+                        }
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "stopCustomExamInternal failed", e);
                 }
             }
         });
@@ -511,6 +576,7 @@ public class MainActivity extends BridgeActivity {
     }
 
     private void showExamMenuDialog() {
+        isMenuDialogOpen = true;
         android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(this);
         builder.setTitle("Menu Pengawas Ujian");
 
@@ -561,6 +627,12 @@ public class MainActivity extends BridgeActivity {
         });
 
         android.app.AlertDialog dialog = builder.create();
+        dialog.setOnDismissListener(new android.content.DialogInterface.OnDismissListener() {
+            @Override
+            public void onDismiss(android.content.DialogInterface d) {
+                isMenuDialogOpen = false;
+            }
+        });
         dialog.show();
     }
 
@@ -582,7 +654,7 @@ public class MainActivity extends BridgeActivity {
         title.setPadding(0, 0, 0, 40);
 
         android.widget.TextView desc = new android.widget.TextView(this);
-        desc.setText("Demi keamanan ujian, aplikasi ini harus menggunakan mode 'Sematkan Layar'.\n\nSilakan klik tombol di bawah untuk mengaktifkan kuncian.\n\nJika ingin keluar, silakan klik tombol melayang 'CBT' > Icon Keluar > Masukkan password 'quit'.");
+        desc.setText("Demi keamanan ujian, aplikasi ini wajib menggunakan mode 'Sematkan Layar'.\n\nSilakan klik tombol di bawah untuk mengaktifkan kuncian.\n\nUntuk keluar ujian, gunakan tombol '🔒 MENU' dan masukkan PIN pengawas.");
         desc.setTextColor(android.graphics.Color.WHITE);
         desc.setTextSize(16);
         desc.setGravity(android.view.Gravity.CENTER);
@@ -742,8 +814,13 @@ public class MainActivity extends BridgeActivity {
                 }
             } catch (Exception e) {}
 
-            if (isLockEnabled) {
-                // Deteksi floating apps atau overlay yang menutupi ujian: segera picu blur di WebView
+            if (isLockEnabled && !isExiting && !isMenuDialogOpen) {
+                // Deteksi floating apps atau overlay yang menutupi ujian: segera picu blur & alarm jika kehilangan fokus
+                Log.w(TAG, "onWindowFocusChanged(false): Fokus jendela hilang saat ujian!");
+                playRingtone();
+                if (blockingLayout != null) {
+                    blockingLayout.setVisibility(View.VISIBLE);
+                }
                 runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
@@ -758,6 +835,40 @@ public class MainActivity extends BridgeActivity {
                         } catch (Exception e) {}
                     }
                 });
+            }
+        }
+    }
+
+    @Override
+    protected void onUserLeaveHint() {
+        super.onUserLeaveHint();
+        if (isLockEnabled && !isExiting && !isMenuDialogOpen) {
+            Log.w(TAG, "onUserLeaveHint: Siswa mencoba menekan tombol Home atau Recent Apps!");
+            playRingtone();
+            try {
+                if (blockingLayout != null) {
+                    blockingLayout.setVisibility(View.VISIBLE);
+                }
+            } catch (Exception e) {}
+            try {
+                android.content.Intent intent = new android.content.Intent(this, MainActivity.class);
+                intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK | android.content.Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
+                startActivity(intent);
+            } catch (Exception e) {}
+        }
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+        if (isLockEnabled && !isExiting && !isMenuDialogOpen) {
+            android.os.PowerManager pm = (android.os.PowerManager) getSystemService(Context.POWER_SERVICE);
+            if (pm != null && pm.isInteractive() && !isScreenOff) {
+                Log.w(TAG, "onPause: Aplikasi beralih atau diminimize saat ujian!");
+                playRingtone();
+                if (blockingLayout != null) {
+                    blockingLayout.setVisibility(View.VISIBLE);
+                }
             }
         }
     }
@@ -845,7 +956,14 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     public void onBackPressed() {
-        // Biarkan kosong
+        if (isLockEnabled && !isExiting) {
+            // Cegah keluar aplikasi saat mode kuncian ujian aktif
+            if (getBridge() != null && getBridge().getWebView() != null && getBridge().getWebView().canGoBack()) {
+                getBridge().getWebView().goBack();
+            }
+            return;
+        }
+        super.onBackPressed();
     }
 
     @Override
