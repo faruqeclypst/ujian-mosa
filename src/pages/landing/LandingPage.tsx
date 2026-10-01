@@ -2,7 +2,8 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   GraduationCap, Monitor, BarChart3, Shield, Users, Zap,
-  ArrowRight, CheckCircle, Building2, Menu, X, Globe, Star, Wand2, MessageCircle, Phone
+  ArrowRight, CheckCircle, Building2, Menu, X, Globe, Star, Wand2, MessageCircle, Phone,
+  Check, AlertCircle
 } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { getDomainSuffix } from "../../utils/domainHelper";
@@ -64,55 +65,58 @@ const LandingPage = () => {
   const plans = [
     {
       name: "Paket Berkembang",
-      price: "225.000",
-      oldPrice: "315.000",
+      price: "160.000",
+      oldPrice: "200.000",
+      discountBadge: "Hemat 20%",
       period: "/ bulan",
-      desc: "Ideal untuk sekolah/kampus kecil",
+      desc: "Untuk SD, SMP, & bimbingan belajar",
       quota: "Maks. 250 Siswa",
       features: [
-        "Ujian CBT (8 Tipe Soal)",
-        "Import Word, Excel & AI",
-        "Anti-Contek & Lock Browser",
-        "Monitoring Real-time",
-        "Bantuan Teknis via WA"
+        "Ujian CBT (8 Tipe Soal Lengkap)",
+        "Import Word, Excel & Generator AI",
+        "APK Kiosk Kunci Layar (Anti-Contek)",
+        "Monitoring Peserta Real-time",
+        "Bantuan Teknis via WhatsApp"
       ],
-      cta: "Daftar Sekarang",
+      cta: "Pilih Paket Berkembang",
       highlight: false,
       comingSoon: false,
     },
     {
       name: "Paket Lanjutan",
-      price: "450.000",
-      oldPrice: "675.000",
+      price: "280.000",
+      oldPrice: "350.000",
+      discountBadge: "Hemat 20%",
       period: "/ bulan",
-      desc: "Untuk institusi menengah",
+      desc: "Standar ideal SMP & SMA/SMK",
       quota: "Maks. 500 Siswa",
       features: [
-        "Semua di Paket Berkembang",
-        "Kapasitas Server Medium",
-        "Analisis Hasil & Ekspor Excel",
-        "Custom Subdomain Sekolah",
-        "Pelatihan Guru via Zoom"
+        "Semua fitur di Paket Berkembang",
+        "Server Cloud Kapasitas Medium",
+        "Analisis Butir Soal & Ekspor Nilai",
+        "Custom Subdomain (sekolah.examku.my.id)",
+        "Pelatihan Guru & Admin via Zoom"
       ],
-      cta: "Daftar Sekarang",
+      cta: "Pilih Paket Lanjutan",
       highlight: true,
       comingSoon: false,
     },
     {
       name: "Paket Premium",
-      price: "700.000",
-      oldPrice: "1.000.000",
+      price: "480.000",
+      oldPrice: "600.000",
+      discountBadge: "Hemat 20%",
       period: "/ bulan",
-      desc: "Untuk entitas skala besar",
-      quota: "Maks. 1000 Siswa",
+      desc: "Sekolah besar, yayasan, & kampus",
+      quota: "Maks. 1.000 Siswa",
       features: [
-        "Semua di Paket Lanjutan",
-        "Server Dedicated (High Performance)",
-        "Custom Domain (segera)",
-        "Bank Soal Terpusat (Global)",
-        "Support Prioritas 24/7"
+        "Semua fitur di Paket Lanjutan",
+        "Resource Server Prioritas Tinggi",
+        "Dukungan Custom Domain Sekolah",
+        "Bank Soal Terpusat Antar Guru",
+        "Dukungan Teknis Prioritas Saat Ujian"
       ],
-      cta: "Daftar Sekarang",
+      cta: "Pilih Paket Premium",
       highlight: false,
       comingSoon: false,
     },
@@ -493,93 +497,259 @@ const LandingPage = () => {
       {/* Pricing */}
       <section id="pricing" className="py-24 sm:py-32 px-6 sm:px-10 lg:px-16 relative z-10 bg-white border-t border-slate-100">
         <div className="max-w-7xl mx-auto">
+          {/* Section Header */}
           <div className="text-center mb-12">
-            <div className="inline-flex items-center gap-2 bg-blue-50 border border-blue-200 text-blue-700 text-xs font-bold px-3 py-1.5 rounded-full mb-4 uppercase tracking-wider">
-              💰 Harga
+            <div className="inline-flex items-center gap-2 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold px-3.5 py-1.5 rounded-full mb-4 uppercase tracking-wider">
+              🏷️ 20% Lebih Hemat dari Pasar CBT
             </div>
-            <h2 className="text-2xl sm:text-3xl font-extrabold mb-3 text-slate-900">Biaya Operasional Jelas & Terjangkau</h2>
-            <p className="text-slate-500 text-base font-medium">Tidak ada tarif tersembunyi. Sesuai kemampuan sekolah menengah.</p>
+            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold mb-3 text-slate-900">
+              Biaya Operasional Jelas, Lebih Hemat 20%
+            </h2>
+            <p className="text-slate-600 text-base max-w-2xl mx-auto font-medium">
+              Dibandingkan rata-rata biaya platform CBT sekolah di Indonesia, EXAM AA memberikan harga 20% lebih terjangkau dengan server cloud yang dikelola penuh dan zero maintenance.
+            </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Pricing Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16">
             {plans.map((plan, i) => (
               <div
                 key={i}
                 className={cn(
-                  "relative rounded-2xl border p-6 sm:p-8 transition-all duration-300",
+                  "relative rounded-2xl border p-6 sm:p-8 transition-all duration-300 flex flex-col justify-between",
                   plan.highlight
                     ? "bg-blue-600 border-blue-500 shadow-2xl shadow-blue-600/30 md:-translate-y-3 text-white"
                     : "bg-white border-slate-200 shadow-sm hover:shadow-md"
                 )}
               >
-                {plan.highlight && (
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-amber-400 text-amber-900 text-[10px] font-black px-4 py-1 rounded-full shadow whitespace-nowrap uppercase tracking-wider">
-                    ⭐ Paling Diminati
-                  </div>
-                )}
-                {plan.comingSoon && (
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-slate-200 text-slate-600 text-[10px] font-bold px-4 py-1 rounded-full shadow whitespace-nowrap">
-                    Coming Soon
-                  </div>
-                )}
-
-                <h3 className={cn("font-bold text-lg mb-1", plan.highlight ? "text-white" : "text-slate-900")}>{plan.name}</h3>
-                <p className={cn("text-sm mb-5", plan.highlight ? "text-blue-100" : "text-slate-500")}>{plan.desc}</p>
-
-                <div className="flex flex-col mb-5">
-                  {plan.oldPrice && (
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className={cn("text-lg font-bold line-through decoration-rose-500 decoration-2", plan.highlight ? "text-blue-200/80" : "text-slate-400")}>
-                        Rp {plan.oldPrice}
-                      </span>
-                      <span className="text-[10px] font-black px-2 py-0.5 rounded-md bg-rose-500 text-white shadow-sm uppercase tracking-wider">
-                        Diskon
-                      </span>
+                <div>
+                  {plan.highlight && (
+                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-amber-400 text-amber-950 text-[10px] font-black px-4 py-1 rounded-full shadow whitespace-nowrap uppercase tracking-wider">
+                      ⭐ Paling Diminati
                     </div>
                   )}
-                  <div className="flex items-baseline gap-1.5">
-                    <span className={cn("text-xs font-bold mr-1", plan.highlight ? "text-blue-200" : "text-slate-500")}>Rp</span>
-                    <span className={cn("text-3xl sm:text-4xl font-black", plan.comingSoon ? "text-slate-400" : plan.highlight ? "text-white" : "text-slate-900")}>
-                      {plan.price}
+
+                  <div className="flex items-center justify-between mb-1">
+                    <h3 className={cn("font-bold text-lg", plan.highlight ? "text-white" : "text-slate-900")}>
+                      {plan.name}
+                    </h3>
+                    <span className={cn(
+                      "text-[10px] font-bold px-2 py-0.5 rounded-md",
+                      plan.highlight
+                        ? "bg-blue-500 text-white border border-blue-400"
+                        : "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                    )}>
+                      {plan.discountBadge}
                     </span>
-                    <span className={cn("text-xs font-semibold", plan.highlight ? "text-blue-200" : "text-slate-400")}>{plan.period}</span>
                   </div>
-                </div>
+                  <p className={cn("text-sm mb-5", plan.highlight ? "text-blue-100" : "text-slate-500")}>
+                    {plan.desc}
+                  </p>
 
-                <div className={cn(
-                  "inline-block rounded-lg px-3 py-1 text-xs font-bold mb-6 border",
-                  plan.highlight ? "bg-blue-500/40 text-blue-100 border-blue-400"
-                    : plan.comingSoon ? "bg-slate-50 text-slate-500 border-slate-200"
+                  <div className="flex flex-col mb-5">
+                    {plan.oldPrice && (
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className={cn("text-sm font-semibold line-through decoration-rose-500 decoration-2", plan.highlight ? "text-blue-200/80" : "text-slate-400")}>
+                          Rp {plan.oldPrice}
+                        </span>
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-500 text-white uppercase tracking-wider">
+                          Pasar Normal
+                        </span>
+                      </div>
+                    )}
+                    <div className="flex items-baseline gap-1.5">
+                      <span className={cn("text-xs font-bold mr-1", plan.highlight ? "text-blue-200" : "text-slate-500")}>Rp</span>
+                      <span className={cn("text-3xl sm:text-4xl font-black tracking-tight", plan.highlight ? "text-white" : "text-slate-900")}>
+                        {plan.price}
+                      </span>
+                      <span className={cn("text-xs font-semibold", plan.highlight ? "text-blue-200" : "text-slate-400")}>{plan.period}</span>
+                    </div>
+                  </div>
+
+                  <div className={cn(
+                    "inline-block rounded-lg px-3 py-1 text-xs font-bold mb-6 border",
+                    plan.highlight
+                      ? "bg-blue-500/40 text-blue-100 border-blue-400"
                       : "bg-blue-50 text-blue-700 border-blue-100"
-                )}>
-                  {plan.quota}
-                </div>
+                  )}>
+                    {plan.quota}
+                  </div>
 
-                <ul className="space-y-3 mb-8">
-                  {plan.features.map((feat, j) => (
-                    <li key={j} className={cn("flex items-center gap-2.5 text-sm font-medium", plan.highlight ? "text-blue-100" : plan.comingSoon ? "text-slate-400" : "text-slate-700")}>
-                      <CheckCircle size={16} className={plan.highlight ? "text-blue-300" : plan.comingSoon ? "text-slate-300" : "text-blue-500"} />
-                      {feat}
-                    </li>
-                  ))}
-                </ul>
+                  <ul className="space-y-3 mb-8">
+                    {plan.features.map((feat, j) => (
+                      <li key={j} className={cn("flex items-center gap-2.5 text-sm font-medium", plan.highlight ? "text-blue-100" : "text-slate-700")}>
+                        <CheckCircle size={16} className={plan.highlight ? "text-blue-300 flex-shrink-0" : "text-blue-600 flex-shrink-0"} />
+                        <span>{feat}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
 
                 <button
-                  onClick={() => { if (!plan.comingSoon) navigate("/daftar", { state: { selectedPlan: plan.name } }); }}
-                  disabled={plan.comingSoon}
+                  onClick={() => navigate("/daftar", { state: { selectedPlan: plan.name } })}
                   className={cn(
-                    "w-full h-11 rounded-xl font-bold text-sm transition-all",
-                    plan.comingSoon
-                      ? "bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200"
-                      : plan.highlight
-                        ? "bg-white text-blue-700 hover:bg-blue-50 shadow-lg hover:shadow-xl active:scale-95"
-                        : "bg-blue-600 hover:bg-blue-700 text-white shadow-sm hover:shadow-md active:scale-95"
+                    "w-full h-11 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2",
+                    plan.highlight
+                      ? "bg-white text-blue-700 hover:bg-blue-50 shadow-lg hover:shadow-xl active:scale-95"
+                      : "bg-blue-600 hover:bg-blue-700 text-white shadow-sm hover:shadow-md active:scale-95"
                   )}
                 >
                   {plan.cta}
+                  <ArrowRight size={15} />
                 </button>
               </div>
             ))}
+          </div>
+
+          {/* Free Trial Callout */}
+          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 sm:p-8 flex flex-col sm:flex-row items-center justify-between gap-6 mb-16 shadow-sm">
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center flex-shrink-0">
+                <CheckCircle size={24} />
+              </div>
+              <div>
+                <div className="inline-block bg-emerald-100 text-emerald-800 text-[11px] font-bold px-2.5 py-0.5 rounded-full mb-1">
+                  Uji Coba Tanpa Risiko
+                </div>
+                <h3 className="text-lg font-bold text-slate-900">Ingin Menguji Sistem Terlebih Dahulu?</h3>
+                <p className="text-sm text-slate-600 max-w-xl font-medium mt-0.5">
+                  Dapatkan akses simulasi gratis hingga 50 siswa untuk mencoba kestabilan ujian dan aplikasi kunci layar APK di sekolah Anda.
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => navigate("/daftar")}
+              className="w-full sm:w-auto h-11 px-6 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-sm transition-all whitespace-nowrap active:scale-95 shadow-sm"
+            >
+              Mulai Uji Coba Gratis
+            </button>
+          </div>
+
+          {/* Competitor Comparison Section */}
+          <div className="mt-8 border-t border-slate-100 pt-16">
+            <div className="text-center mb-10">
+              <div className="inline-flex items-center gap-2 bg-blue-50 border border-blue-200 text-blue-800 text-xs font-bold px-3.5 py-1.5 rounded-full mb-3 uppercase tracking-wider">
+                ⚖️ Komparasi Transparan
+              </div>
+              <h3 className="text-xl sm:text-2xl font-extrabold text-slate-900 mb-2">
+                Perbandingan EXAM AA vs Pilihan CBT Lainnya
+              </h3>
+              <p className="text-slate-600 text-sm max-w-2xl mx-auto font-medium">
+                Pahami perbedaan antara layanan managed cloud seperti EXAM AA, platform SaaS umum, dan script mandiri (self-hosted).
+              </p>
+            </div>
+
+            <div className="overflow-x-auto border border-slate-200 rounded-2xl shadow-sm bg-white">
+              <table className="w-full text-left text-xs sm:text-sm border-collapse min-w-[700px]">
+                <thead>
+                  <tr className="border-b border-slate-200 bg-slate-50">
+                    <th className="py-4 px-5 font-bold text-slate-700 w-1/4">Kriteria Evaluasi</th>
+                    <th className="py-4 px-5 font-bold text-blue-700 bg-blue-50/70 border-x border-blue-200 w-1/4">
+                      EXAM AA (Managed)
+                    </th>
+                    <th className="py-4 px-5 font-bold text-slate-700 w-1/4">
+                      Platform SaaS Lain (E-Ujian / CBT Pro)
+                    </th>
+                    <th className="py-4 px-5 font-bold text-slate-700 w-1/4">
+                      Script Mandiri (Extraordinary CBT / ZenCBT)
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-slate-700 font-medium">
+                  <tr>
+                    <td className="py-4 px-5 font-semibold text-slate-900">Perkiraan Biaya</td>
+                    <td className="py-4 px-5 bg-blue-50/30 border-x border-blue-100 text-blue-900 font-bold">
+                      Rp 160rb - 480rb / bulan
+                      <span className="block text-[11px] font-semibold text-emerald-600 mt-0.5">
+                        20% Lebih Hemat dari Pasar
+                      </span>
+                    </td>
+                    <td className="py-4 px-5 text-slate-600">
+                      Rp 300rb - 995rb / bulan
+                      <span className="block text-[11px] text-slate-400 mt-0.5">
+                        Add-on fitur berbayar terpisah
+                      </span>
+                    </td>
+                    <td className="py-4 px-5 text-slate-600">
+                      Gratis kode sumber
+                      <span className="block text-[11px] text-rose-600 font-medium mt-0.5">
+                        Sewa VPS sendiri Rp 150rb - 500rb/bln
+                      </span>
+                    </td>
+                  </tr>
+
+                  <tr>
+                    <td className="py-4 px-5 font-semibold text-slate-900">Pengelolaan Server</td>
+                    <td className="py-4 px-5 bg-blue-50/30 border-x border-blue-100 text-blue-900 font-semibold">
+                      Dikelola Penuh (Zero Maintenance)
+                      <span className="block text-[11px] text-slate-500 font-normal mt-0.5">
+                        Sekolah siap pakai, tanpa tim IT khusus
+                      </span>
+                    </td>
+                    <td className="py-4 px-5 text-slate-600">
+                      Dikelola Vendor
+                    </td>
+                    <td className="py-4 px-5 text-slate-600">
+                      Sekolah Urus Sendiri
+                      <span className="block text-[11px] text-rose-600 font-medium mt-0.5">
+                        Wajib konfigurasi Linux, database, & backup
+                      </span>
+                    </td>
+                  </tr>
+
+                  <tr>
+                    <td className="py-4 px-5 font-semibold text-slate-900">Aplikasi Kiosk Anti-Contek</td>
+                    <td className="py-4 px-5 bg-blue-50/30 border-x border-blue-100 text-blue-900 font-semibold">
+                      Tersedia 2 APK Khusus
+                      <span className="block text-[11px] text-slate-500 font-normal mt-0.5">
+                        Kunci layar, blokir split screen & tombol back
+                      </span>
+                    </td>
+                    <td className="py-4 px-5 text-slate-600">
+                      Safe Exam Browser dasar
+                      <span className="block text-[11px] text-slate-400 mt-0.5">
+                        Sebagian meminta biaya APK tambahan
+                      </span>
+                    </td>
+                    <td className="py-4 px-5 text-slate-600">
+                      Tergantung setup sekolah
+                      <span className="block text-[11px] text-slate-400 mt-0.5">
+                        Perlu setelan manual oleh teknisi
+                      </span>
+                    </td>
+                  </tr>
+
+                  <tr>
+                    <td className="py-4 px-5 font-semibold text-slate-900">AI Generator Soal</td>
+                    <td className="py-4 px-5 bg-blue-50/30 border-x border-blue-100 text-blue-900 font-semibold">
+                      Tersedia Langsung
+                      <span className="block text-[11px] text-slate-500 font-normal mt-0.5">
+                        Buat naskah soal otomatis dari materi
+                      </span>
+                    </td>
+                    <td className="py-4 px-5 text-slate-600">
+                      Paket add-on berbayar
+                    </td>
+                    <td className="py-4 px-5 text-slate-600">
+                      Tidak tersedia (Input manual)
+                    </td>
+                  </tr>
+
+                  <tr>
+                    <td className="py-4 px-5 font-semibold text-slate-900">Dukungan Teknis Ujian</td>
+                    <td className="py-4 px-5 bg-blue-50/30 border-x border-blue-100 text-blue-900 font-semibold">
+                      Pendampingan Langsung via WhatsApp
+                    </td>
+                    <td className="py-4 px-5 text-slate-600">
+                      Sistem tiket antrean / bot
+                    </td>
+                    <td className="py-4 px-5 text-slate-600">
+                      Mandiri / forum komunitas
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       </section>
