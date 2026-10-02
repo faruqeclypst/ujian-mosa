@@ -4,12 +4,63 @@ import {
   Plus, Check, X, Edit, Power, PowerOff,
   School, Clock, Users, RefreshCw,
   Search, Trash2, Monitor, Zap, Server, ChevronDown,
-  Building2, Globe
+  Building2, Globe, Sparkles, ShieldCheck, Calendar,
+  Activity, CheckCircle2, XCircle, AlertTriangle, Info
 } from "lucide-react";
 import { masterPb } from "../../lib/pocketbase";
 import SuperAdminLayout from "../../components/layout/SuperAdminLayout";
 import { cn } from "../../lib/utils";
 import { getSchoolUrl, getSchoolDomain, getDomainSuffix } from "../../utils/domainHelper";
+
+// ── Activity Log ──────────────────────────────────────────────
+type LogType = "create" | "update" | "delete" | "approve" | "reject" | "activate" | "deactivate";
+interface ActivityLog {
+  id: string;
+  type: LogType;
+  message: string;
+  target: string;
+  timestamp: string;
+}
+const LOG_KEY = "sa_activity_logs";
+const MAX_LOGS = 200;
+
+const addLog = (type: LogType, message: string, target: string) => {
+  try {
+    const existing: ActivityLog[] = JSON.parse(localStorage.getItem(LOG_KEY) || "[]");
+    const entry: ActivityLog = {
+      id: Date.now().toString(),
+      type, message, target,
+      timestamp: new Date().toISOString(),
+    };
+    const updated = [entry, ...existing].slice(0, MAX_LOGS);
+    localStorage.setItem(LOG_KEY, JSON.stringify(updated));
+  } catch {}
+};
+
+const getLogs = (): ActivityLog[] => {
+  try { return JSON.parse(localStorage.getItem(LOG_KEY) || "[]"); } catch { return []; }
+};
+
+const clearLogs = () => { try { localStorage.removeItem(LOG_KEY); } catch {} };
+
+const timeAgo = (iso: string): string => {
+  const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+  if (diff < 60) return `${diff}d lalu`;
+  if (diff < 3600) return `${Math.floor(diff / 60)}m lalu`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}j lalu`;
+  return `${Math.floor(diff / 86400)} hari lalu`;
+};
+
+const LOG_STYLE: Record<LogType, { icon: typeof CheckCircle2; color: string; bg: string; border: string }> = {
+  create:     { icon: Plus,          color: "text-emerald-700", bg: "bg-emerald-50",  border: "border-emerald-200" },
+  update:     { icon: Edit,          color: "text-blue-700",    bg: "bg-blue-50",     border: "border-blue-200" },
+  delete:     { icon: Trash2,        color: "text-red-700",     bg: "bg-red-50",      border: "border-red-200" },
+  approve:    { icon: CheckCircle2,  color: "text-emerald-700", bg: "bg-emerald-50",  border: "border-emerald-200" },
+  reject:     { icon: XCircle,       color: "text-red-700",     bg: "bg-red-50",      border: "border-red-200" },
+  activate:   { icon: Zap,           color: "text-amber-700",   bg: "bg-amber-50",   border: "border-amber-200" },
+  deactivate: { icon: AlertTriangle, color: "text-slate-600",   bg: "bg-slate-100",  border: "border-slate-200" },
+};
+// ─────────────────────────────────────────────────────────────
 
 interface SchoolRecord {
   id: string;
@@ -23,6 +74,7 @@ interface SchoolRecord {
   student_quota?: number;
   contact_email?: string;
   custom_domain?: string;
+  active_until?: string;
   created: string;
 }
 
@@ -33,6 +85,10 @@ interface SchoolRequest {
   contact_email: string;
   contact_phone?: string;
   address?: string;
+  type?: "school" | "campus";
+  plan?: string;
+  duration?: string;
+  is_demo?: boolean;
   status: "pending" | "approved" | "rejected";
   created: string;
 }
@@ -44,14 +100,64 @@ const PLAN_CONFIG: Record<string, { label: string; color: string }> = {
   ultimate: { label: "Premium", color: "bg-purple-50 text-purple-700 border-purple-200" },
 };
 
+const formatToDateInput = (val?: string): string => {
+  if (!val) return "";
+  const s = val.trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
+    return s.slice(0, 10);
+  }
+  try {
+    const d = new Date(s);
+    if (!isNaN(d.getTime())) {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, "0");
+      const date = String(d.getDate()).padStart(2, "0");
+      return `${year}-${month}-${date}`;
+    }
+  } catch {}
+  return "";
+};
+
+const getActiveUntilInfo = (dateStr?: string) => {
+  if (!dateStr || !dateStr.trim()) {
+    return { isExpired: false, label: "Masa aktif: permanen", isPermanent: true };
+  }
+  try {
+    const raw = dateStr.trim();
+    const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    let d: Date;
+    if (match) {
+      d = new Date(parseInt(match[1], 10), parseInt(match[2], 10) - 1, parseInt(match[3], 10), 23, 59, 59);
+    } else {
+      d = new Date(raw.replace(" ", "T"));
+    }
+    if (isNaN(d.getTime())) {
+      return { isExpired: false, label: "Masa aktif: permanen", isPermanent: true };
+    }
+    const now = new Date();
+    const isExpired = d.getTime() < now.getTime();
+    const diffDays = Math.ceil((d.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    const formatted = d.toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
+    
+    if (isExpired) {
+      return { isExpired: true, label: `Kadaluarsa (${formatted})`, isPermanent: false };
+    }
+    return { isExpired: false, label: `s/d ${formatted} (${diffDays} hr)`, isPermanent: false };
+  } catch {
+    return { isExpired: false, label: "Masa aktif: permanen", isPermanent: true };
+  }
+};
+
 const SuperAdminDashboard = () => {
   const navigate = useNavigate();
-  const [tab, setTab] = useState<"all" | "active" | "inactive" | "requests">("all");
+  const [tab, setTab] = useState<"all" | "active" | "inactive" | "requests" | "logs">("all");
   const [schools, setSchools] = useState<SchoolRecord[]>([]);
   const [requests, setRequests] = useState<SchoolRequest[]>([]);
+  const [logEntries, setLogEntries] = useState<ActivityLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editSchool, setEditSchool] = useState<SchoolRecord | null>(null);
+  const [approvingRequestId, setApprovingRequestId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [confirmData, setConfirmData] = useState<{
@@ -61,11 +167,16 @@ const SuperAdminDashboard = () => {
     type: "danger" | "warning" | "success";
   } | null>(null);
 
+  const refreshLogs = () => setLogEntries(getLogs());
+
   useEffect(() => {
     if (!masterPb.authStore.isValid) {
       navigate("/superadmin/login");
     }
   }, [navigate]);
+
+  // Load log saat mount
+  useEffect(() => { setLogEntries(getLogs()); }, []);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -97,6 +208,12 @@ const SuperAdminDashboard = () => {
       onConfirm: async () => {
         try {
           await masterPb.collection("schools").update(school.id, { is_active: newState });
+          addLog(
+            newState ? "activate" : "deactivate",
+            newState ? `Mengaktifkan institusi` : `Menonaktifkan institusi`,
+            school.name
+          );
+          refreshLogs();
           loadData();
           setConfirmData(null);
         } catch {
@@ -114,6 +231,8 @@ const SuperAdminDashboard = () => {
       onConfirm: async () => {
         try {
           await masterPb.collection("schools").delete(school.id);
+          addLog("delete", "Menghapus institusi secara permanen", school.name);
+          refreshLogs();
           loadData();
           setConfirmData(null);
         } catch {
@@ -128,12 +247,61 @@ const SuperAdminDashboard = () => {
       await masterPb.collection("school_requests").update(req.id, { status: "approved" });
       loadData();
       setTab("active");
+
+      let targetPlan: 'free' | 'basic' | 'pro' | 'ultimate' = 'basic';
+      let targetQuota = 250;
+      let durationDays = 365;
+
+      if (req.is_demo || (req.plan && req.plan.toLowerCase().includes("demo"))) {
+        targetPlan = 'free';
+        targetQuota = 50;
+        durationDays = 14;
+      } else if (req.plan) {
+        const p = req.plan.toLowerCase();
+        if (p.includes("premium")) {
+          targetPlan = 'ultimate';
+          targetQuota = 1000;
+        } else if (p.includes("lanjutan")) {
+          targetPlan = 'pro';
+          targetQuota = 500;
+        } else if (p.includes("berkembang")) {
+          targetPlan = 'basic';
+          targetQuota = 250;
+        }
+      }
+
+      if (!req.is_demo && req.duration) {
+        const d = req.duration.toLowerCase();
+        const monthMatch = d.match(/(\d+)\s*bulan/);
+        if (monthMatch) {
+          const m = parseInt(monthMatch[1], 10);
+          durationDays = m * 30;
+        } else if (d.includes("6 bulan") || d.includes("semester")) {
+          durationDays = 180;
+        } else if (d.includes("1 tahun") || d.includes("12 bulan") || d.includes("tahun")) {
+          durationDays = 365;
+        } else if (d.includes("14")) {
+          durationDays = 14;
+        }
+      }
+
+      const expDate = new Date();
+      expDate.setDate(expDate.getDate() + durationDays);
+
       setEditSchool({
-        id: "", name: req.school_name, slug: req.slug_request,
-        pb_url: "", is_active: true, contact_email: req.contact_email,
+        id: "",
+        name: req.school_name,
+        slug: req.slug_request,
+        pb_url: "",
+        is_active: true,
+        contact_email: req.contact_email,
         created: new Date().toISOString(),
-        type: 'school'
+        type: req.type || 'school',
+        plan: targetPlan,
+        student_quota: targetQuota,
+        active_until: expDate.toISOString(),
       });
+      setApprovingRequestId(req.id);
       setShowAddModal(true);
     } catch {
       alert("Gagal menyetujui pendaftaran.");
@@ -148,6 +316,8 @@ const SuperAdminDashboard = () => {
       onConfirm: async () => {
         try {
           await masterPb.collection("school_requests").update(req.id, { status: "rejected" });
+          addLog("reject", "Menolak pendaftaran institusi", req.school_name);
+          refreshLogs();
           loadData();
           setConfirmData(null);
         } catch {
@@ -165,6 +335,8 @@ const SuperAdminDashboard = () => {
       onConfirm: async () => {
         try {
           await masterPb.collection("school_requests").delete(req.id);
+          addLog("delete", "Menghapus data pendaftaran", req.school_name);
+          refreshLogs();
           loadData();
           setConfirmData(null);
         } catch {
@@ -182,6 +354,13 @@ const SuperAdminDashboard = () => {
       onConfirm: async () => {
         try {
           await Promise.all(selectedIds.map(id => masterPb.collection("schools").update(id, { is_active: active })));
+          const names = schools.filter(s => selectedIds.includes(s.id)).map(s => s.name).join(", ");
+          addLog(
+            active ? "activate" : "deactivate",
+            `${active ? "Mengaktifkan" : "Menonaktifkan"} ${selectedIds.length} institusi sekaligus`,
+            names
+          );
+          refreshLogs();
           loadData();
           setSelectedIds([]);
           setConfirmData(null);
@@ -200,6 +379,9 @@ const SuperAdminDashboard = () => {
       onConfirm: async () => {
         try {
           await Promise.all(selectedIds.map(id => masterPb.collection("schools").delete(id)));
+          const names = schools.filter(s => selectedIds.includes(s.id)).map(s => s.name).join(", ");
+          addLog("delete", `Menghapus ${selectedIds.length} institusi sekaligus`, names);
+          refreshLogs();
           loadData();
           setSelectedIds([]);
           setConfirmData(null);
@@ -339,6 +521,28 @@ const SuperAdminDashboard = () => {
               {pendingCount > 0 && (
                 <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-red-100 text-red-600 animate-pulse">
                   {pendingCount}
+                </span>
+              )}
+            </span>
+          </button>
+          <button
+            onClick={() => { setTab("logs"); refreshLogs(); }}
+            className={cn(
+              "px-4 py-2 rounded-lg text-sm font-semibold transition-all whitespace-nowrap",
+              tab === "logs"
+                ? "bg-white text-blue-700 shadow-sm"
+                : "text-slate-500 hover:text-slate-700"
+            )}
+          >
+            <span className="flex items-center gap-2">
+              <Activity size={14} className={tab === "logs" ? "text-blue-500" : ""} />
+              Log Aktivitas
+              {logEntries.length > 0 && (
+                <span className={cn(
+                  "text-[10px] font-bold px-1.5 py-0.5 rounded-full",
+                  tab === "logs" ? "bg-blue-100 text-blue-700" : "bg-slate-200 text-slate-600"
+                )}>
+                  {logEntries.length}
                 </span>
               )}
             </span>
@@ -502,15 +706,34 @@ const SuperAdminDashboard = () => {
                       </td>
                       <td className="px-5 py-4">
                         <div className="flex flex-col gap-1.5">
-                          <span className={cn(
-                            "inline-flex items-center justify-center text-[10px] font-black uppercase px-2.5 py-1 rounded-lg border tracking-wide w-fit",
-                            school.plan === "pro" ? "bg-amber-50 text-amber-600 border-amber-100" :
-                              school.plan === "ultimate" ? "bg-purple-50 text-purple-600 border-purple-100" :
-                                "bg-slate-50 text-slate-500 border-slate-100"
-                          )}>
-                            {school.plan || "Free"}
-                          </span>
-                          <p className="text-[11px] text-slate-400 font-bold pl-1">{school.student_quota || 0} Siswa</p>
+                          <div className="flex items-center gap-1.5">
+                            <span className={cn(
+                              "inline-flex items-center justify-center text-[10px] font-black uppercase px-2.5 py-1 rounded-lg border tracking-wide w-fit",
+                              school.plan === "pro" ? "bg-amber-50 text-amber-600 border-amber-100" :
+                                school.plan === "ultimate" ? "bg-purple-50 text-purple-600 border-purple-100" :
+                                  "bg-slate-50 text-slate-500 border-slate-100"
+                            )}>
+                              {PLAN_CONFIG[school.plan || "free"]?.label || school.plan || "Free"}
+                            </span>
+                            <p className="text-[11px] text-slate-400 font-bold">{school.student_quota || 0} Siswa</p>
+                          </div>
+                          {(() => {
+                            const info = getActiveUntilInfo(school.active_until);
+                            if (info.isPermanent) {
+                              return <span className="text-[10px] text-slate-400 italic">Masa aktif: permanen</span>;
+                            }
+                            return (
+                              <span className={cn(
+                                "text-[10px] font-semibold flex items-center gap-1 px-2 py-0.5 rounded border w-fit",
+                                info.isExpired
+                                  ? "bg-rose-50 text-rose-700 border-rose-200"
+                                  : "bg-blue-50 text-blue-700 border-blue-200/80"
+                              )}>
+                                <Clock size={10} className={info.isExpired ? "text-rose-500" : "text-blue-500"} />
+                                {info.label}
+                              </span>
+                            );
+                          })()}
                         </div>
                       </td>
                       <td className="px-5 py-4">
@@ -596,11 +819,25 @@ const SuperAdminDashboard = () => {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <span className={cn("text-[10px] font-bold uppercase px-2 py-0.5 rounded border", PLAN_CONFIG[school.plan || "free"]?.color)}>
                       {PLAN_CONFIG[school.plan || "free"]?.label}
                     </span>
                     <span className="text-[10px] text-slate-500">{school.student_quota || 100} Siswa</span>
+                    {(() => {
+                      const info = getActiveUntilInfo(school.active_until);
+                      if (info.isPermanent) return null;
+                      return (
+                        <span className={cn(
+                          "text-[10px] font-semibold px-2 py-0.5 rounded border",
+                          info.isExpired
+                            ? "bg-rose-50 text-rose-700 border-rose-200"
+                            : "bg-blue-50 text-blue-700 border-blue-200/80"
+                        )}>
+                          {info.label}
+                        </span>
+                      );
+                    })()}
                   </div>
 
                   <div className="flex flex-col gap-1.5">
@@ -676,6 +913,7 @@ const SuperAdminDashboard = () => {
                     </th>
                     <th className="px-2 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Nama Institusi</th>
                     <th className="px-5 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Domain</th>
+                    <th className="px-5 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Paket & Durasi</th>
                     <th className="px-5 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Kontak</th>
                     <th className="px-5 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Status</th>
                     <th className="px-5 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider text-right">Aksi</th>
@@ -683,7 +921,7 @@ const SuperAdminDashboard = () => {
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {requests.length === 0 ? (
-                    <tr><td colSpan={6} className="px-5 py-12 text-center text-slate-400 text-sm">Belum ada pendaftaran.</td></tr>
+                    <tr><td colSpan={7} className="px-5 py-12 text-center text-slate-400 text-sm">Belum ada pendaftaran.</td></tr>
                   ) : requests.map(req => (
                     <tr key={req.id} className={cn(
                       "hover:bg-slate-50 transition-colors border-b border-slate-50 last:border-0",
@@ -711,6 +949,22 @@ const SuperAdminDashboard = () => {
                         <code className="text-xs font-mono px-2 py-1 bg-amber-50 text-amber-700 border border-amber-200 rounded-md">
                           {getSchoolDomain(req.slug_request)}
                         </code>
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <div className="flex flex-col gap-1 items-start">
+                          {req.is_demo ? (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
+                              <Sparkles size={10} /> Free Trial
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center text-[10px] font-bold uppercase px-2 py-0.5 rounded border bg-blue-50 text-blue-700 border-blue-200">
+                              {req.plan || "Paket"}
+                            </span>
+                          )}
+                          <span className="text-[11px] text-slate-500 font-medium">
+                            {req.duration || (req.is_demo ? "14 Hari" : "1 Tahun")}
+                          </span>
+                        </div>
                       </td>
                       <td className="px-5 py-3.5">
                         <p className="text-sm text-slate-800 font-medium">{req.contact_email}</p>
@@ -784,6 +1038,22 @@ const SuperAdminDashboard = () => {
                       {req.status === "pending" ? "Menunggu" : req.status === "approved" ? "Disetujui" : "Ditolak"}
                     </span>
                   </div>
+
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {req.is_demo ? (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
+                        <Sparkles size={10} /> Free Trial
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center text-[10px] font-bold uppercase px-2 py-0.5 rounded border bg-blue-50 text-blue-700 border-blue-200">
+                        {req.plan || "Paket"}
+                      </span>
+                    )}
+                    <span className="text-[10px] text-slate-500 font-medium bg-slate-50 border border-slate-200 px-1.5 py-0.5 rounded">
+                      Durasi: {req.duration || (req.is_demo ? "14 Hari" : "1 Tahun")}
+                    </span>
+                  </div>
+
                   <code className="text-xs font-mono px-2 py-1 bg-amber-50 text-amber-700 border border-amber-200 rounded-md block">
                     {getSchoolDomain(req.slug_request)}
                   </code>
@@ -815,18 +1085,110 @@ const SuperAdminDashboard = () => {
       {/* Footer */}
       <div className="mt-4 flex items-center justify-between text-xs text-slate-400">
         <span>
-          {tab !== "requests"
-            ? `${filteredSchools.length} sekolah ${tab === "all" ? "terdaftar" : tab === "active" ? "aktif" : "nonaktif"}`
-            : `${requests.length} pendaftaran`}
+          {tab === "logs"
+            ? `${logEntries.length} aktivitas tercatat`
+            : tab !== "requests"
+              ? `${filteredSchools.length} sekolah ${tab === "all" ? "terdaftar" : tab === "active" ? "aktif" : "nonaktif"}`
+              : `${requests.length} pendaftaran`}
         </span>
       </div>
+
+      {/* Log Aktivitas Panel */}
+      {tab === "logs" && (
+        <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden mb-4">
+          <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100 bg-slate-50">
+            <div className="flex items-center gap-2">
+              <Activity size={16} className="text-blue-500" />
+              <span className="text-sm font-bold text-slate-800">Log Aktivitas Admin</span>
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700">{logEntries.length}</span>
+            </div>
+            {logEntries.length > 0 && (
+              <button
+                onClick={() => { clearLogs(); refreshLogs(); }}
+                className="text-xs font-semibold text-red-500 hover:text-red-700 hover:bg-red-50 px-3 py-1.5 rounded-lg transition-all flex items-center gap-1"
+              >
+                <Trash2 size={12} /> Bersihkan Log
+              </button>
+            )}
+          </div>
+          {logEntries.length === 0 ? (
+            <div className="py-16 text-center">
+              <Activity size={36} className="mx-auto text-slate-200 mb-3" strokeWidth={1.5} />
+              <p className="text-sm text-slate-400 font-medium">Belum ada aktivitas yang tercatat.</p>
+              <p className="text-xs text-slate-300 mt-1">Setiap aksi di dashboard akan muncul di sini.</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-slate-50">
+              {logEntries.map((log, idx) => {
+                const style = LOG_STYLE[log.type];
+                const Icon = style.icon;
+                const dateStr = new Date(log.timestamp).toLocaleString("id-ID", {
+                  day: "numeric", month: "short", year: "numeric",
+                  hour: "2-digit", minute: "2-digit"
+                });
+                return (
+                  <div key={log.id} className="flex items-start gap-4 px-5 py-4 hover:bg-slate-50/60 transition-colors">
+                    {/* Timeline line */}
+                    <div className="flex flex-col items-center flex-shrink-0">
+                      <div className={cn("w-8 h-8 rounded-xl flex items-center justify-center border", style.bg, style.border)}>
+                        <Icon size={14} className={style.color} />
+                      </div>
+                      {idx < logEntries.length - 1 && (
+                        <div className="w-px h-full min-h-[20px] bg-slate-100 mt-1" />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0 pt-0.5">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <p className="text-[13px] font-semibold text-slate-800">{log.message}</p>
+                          <p className="text-[12px] text-slate-500 mt-0.5 truncate">
+                            <span className={cn("font-bold", style.color)}>{log.target}</span>
+                          </p>
+                        </div>
+                        <div className="text-right flex-shrink-0">
+                          <p className="text-[11px] text-slate-400 font-medium whitespace-nowrap">{timeAgo(log.timestamp)}</p>
+                          <p className="text-[10px] text-slate-300 mt-0.5 whitespace-nowrap">{dateStr}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Modal */}
       {showAddModal && (
         <AddEditSchoolModal
           school={editSchool}
-          onClose={() => { setShowAddModal(false); setEditSchool(null); }}
-          onSaved={() => { setShowAddModal(false); setEditSchool(null); loadData(); }}
+          onClose={() => {
+            setShowAddModal(false);
+            setEditSchool(null);
+            setApprovingRequestId(null);
+          }}
+          onSaved={async () => {
+            const isNewSchool = !editSchool?.id;
+            const schoolName = editSchool?.name || "Institusi Baru";
+            if (approvingRequestId) {
+              try {
+                await masterPb.collection("school_requests").update(approvingRequestId, { status: "approved" });
+                addLog("approve", "Menyetujui dan membuat institusi dari pendaftaran", schoolName);
+              } catch (e) {
+                console.error("Gagal update status pendaftaran:", e);
+              }
+              setApprovingRequestId(null);
+            } else if (isNewSchool) {
+              addLog("create", "Membuat institusi baru", schoolName);
+            } else {
+              addLog("update", "Mengedit konfigurasi institusi", schoolName);
+            }
+            refreshLogs();
+            setShowAddModal(false);
+            setEditSchool(null);
+            loadData();
+          }}
         />
       )}
 
@@ -995,10 +1357,37 @@ const AddEditSchoolModal = ({
     contact_email: school?.contact_email || "",
     student_quota: school?.student_quota || 50,
     plan: school?.plan || "free",
+    active_until: formatToDateInput(school?.active_until),
     is_active: school?.is_active ?? true,
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (school) {
+      setForm({
+        name: school.name || "",
+        slug: school.slug || "",
+        custom_domain: school.custom_domain || "",
+        pb_url: school.pb_url || "",
+        type: school.type || "school",
+        contact_email: school.contact_email || "",
+        student_quota: school.student_quota || 50,
+        plan: school.plan || "free",
+        active_until: formatToDateInput(school.active_until),
+        is_active: school.is_active ?? true,
+      });
+    }
+  }, [school]);
+
+  const handleAddDays = (days: number) => {
+    const d = new Date();
+    d.setDate(d.getDate() + days);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    setForm(prev => ({ ...prev, active_until: `${y}-${m}-${day}` }));
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
@@ -1008,7 +1397,25 @@ const AddEditSchoolModal = ({
       else if (value === "basic") autoQuota = 250;
       else if (value === "pro") autoQuota = 500;
       else if (value === "ultimate") autoQuota = 1000;
-      setForm(prev => ({ ...prev, plan: value, student_quota: autoQuota }));
+
+      // Free Trial selalu 14 hari — override tanggal apapun
+      let autoDate = form.active_until;
+      if (value === "free") {
+        const d = new Date();
+        d.setDate(d.getDate() + 14);
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, "0");
+        const day = String(d.getDate()).padStart(2, "0");
+        autoDate = `${y}-${m}-${day}`;
+      } else if (!autoDate) {
+        const d = new Date();
+        d.setFullYear(d.getFullYear() + 1);
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, "0");
+        const day = String(d.getDate()).padStart(2, "0");
+        autoDate = `${y}-${m}-${day}`;
+      }
+      setForm(prev => ({ ...prev, plan: value, student_quota: autoQuota, active_until: autoDate }));
       return;
     }
     setForm(prev => ({
@@ -1032,8 +1439,15 @@ const AddEditSchoolModal = ({
     const cleanCustomDomain = form.custom_domain
       ? form.custom_domain.toLowerCase().trim().replace(/^https?:\/\//, '').replace(/\/.*$/, '')
       : "";
+
+    let finalActiveUntil = "";
+    if (form.active_until && form.active_until.trim()) {
+      finalActiveUntil = `${form.active_until.trim()} 23:59:59.000Z`;
+    }
+
     const finalForm = {
       ...form,
+      active_until: finalActiveUntil,
       custom_domain: cleanCustomDomain,
       pb_url: autoPbUrl,
       student_quota: Number(form.student_quota) || 0
@@ -1043,7 +1457,53 @@ const AddEditSchoolModal = ({
       if (isEdit) {
         await masterPb.collection("schools").update(school!.id, finalForm);
       } else {
-        await masterPb.collection("schools").create(finalForm);
+        const createdSchool = await masterPb.collection("schools").create(finalForm);
+        
+        // Auto-generate invoice perdana untuk tenant baru
+        try {
+          const planKey = (form.plan || "free").toLowerCase();
+          const isDemo = planKey === "free";
+          const planRates: Record<string, { label: string; monthly: number }> = {
+            free: { label: "Free Trial", monthly: 0 },
+            basic: { label: "Berkembang", monthly: 149000 },
+            pro: { label: "Lanjutan", monthly: 299000 },
+            ultimate: { label: "Premium", monthly: 499000 },
+          };
+          const selectedRate = planRates[planKey] || { label: form.plan || "Standar", monthly: 149000 };
+
+          const now = new Date();
+          const yy = now.getFullYear().toString().slice(2);
+          const mm = String(now.getMonth() + 1).padStart(2, "0");
+          const seq = String(Math.floor(Math.random() * 9000) + 1000);
+          const invNum = `INV-${yy}${mm}-${seq}`;
+
+          const dueDate = new Date();
+          dueDate.setDate(dueDate.getDate() + (isDemo ? 14 : 7));
+
+          const newInvoice = {
+            id: Date.now().toString(),
+            invoice_number: invNum,
+            school_id: createdSchool?.id || "",
+            school_name: form.name,
+            school_slug: form.slug,
+            plan: planKey,
+            duration_months: 1,
+            amount: isDemo ? 0 : selectedRate.monthly,
+            status: isDemo ? "paid" : "unpaid",
+            due_date: dueDate.toISOString().slice(0, 10),
+            paid_date: isDemo ? now.toISOString().slice(0, 10) : undefined,
+            notes: isDemo
+              ? "Akun Demo / Free Trial (Otomatis Aktif)"
+              : `Tagihan Perdana Paket ${selectedRate.label}`,
+            created: now.toISOString(),
+            updated: now.toISOString(),
+          };
+
+          const stored = JSON.parse(localStorage.getItem("sa_invoices_v1") || "[]");
+          localStorage.setItem("sa_invoices_v1", JSON.stringify([newInvoice, ...stored]));
+        } catch (invErr) {
+          console.error("Gagal membuat auto invoice:", invErr);
+        }
       }
       onSaved();
     } catch (err: any) {
@@ -1173,6 +1633,125 @@ const AddEditSchoolModal = ({
                 className="w-full h-10 border border-slate-200 rounded-xl px-3.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 shadow-sm bg-white"
               />
             </div>
+          </div>
+
+          {/* Masa Aktif Paket Section */}
+          <div className="bg-slate-50/70 border border-slate-200/80 rounded-2xl p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <label className="block text-xs font-bold text-slate-800">
+                  Masa Aktif Paket
+                </label>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  Batas waktu operasional sistem untuk sekolah ini
+                </p>
+              </div>
+              {form.active_until ? (
+                <span className="text-[11px] font-semibold text-blue-700 bg-blue-100/70 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                  <Clock size={11} />
+                  Terjadwal
+                </span>
+              ) : (
+                <span className="text-[11px] font-semibold text-slate-600 bg-slate-200/70 px-2.5 py-0.5 rounded-full">
+                  Permanen
+                </span>
+              )}
+            </div>
+
+            {/* Quick Preset Chips */}
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1.5">
+                Pilihan Cepat (Preset Durasi)
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {[
+                  { label: "14 Hari (Free Trial)", days: 14 },
+                  { label: "1 Bulan", days: 30 },
+                  { label: "2 Bulan", days: 60 },
+                  { label: "3 Bulan", days: 90 },
+                  { label: "6 Bulan", days: 180 },
+                  { label: "1 Tahun", days: 365 },
+                ].map(preset => (
+                  <button
+                    key={preset.label}
+                    type="button"
+                    onClick={() => handleAddDays(preset.days)}
+                    className="text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-white border border-slate-200/90 text-slate-700 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 transition-all shadow-xs active:scale-95"
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => setForm(prev => ({ ...prev, active_until: "" }))}
+                  className="text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-white border border-slate-200/90 text-slate-500 hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-all shadow-xs active:scale-95"
+                  title="Jadikan paket permanen tanpa batas waktu"
+                >
+                  Tanpa Batas (Reset)
+                </button>
+              </div>
+            </div>
+
+            {/* Custom Date Input */}
+            <div>
+              <label className="block text-[11px] font-medium text-slate-600 mb-1">
+                Atur Tanggal Spesifik
+              </label>
+              <div className="relative">
+                <input
+                  type="date"
+                  name="active_until"
+                  value={form.active_until}
+                  onChange={handleChange}
+                  className="w-full h-10 border border-slate-200 rounded-xl px-3.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 shadow-sm bg-white cursor-pointer"
+                />
+              </div>
+            </div>
+
+            {/* Status Preview Card */}
+            {form.active_until ? (
+              <div className="bg-blue-50/80 border border-blue-200/70 rounded-xl p-3 flex items-start gap-2.5">
+                <div className="p-1 rounded-lg bg-blue-600 text-white mt-0.5 flex-shrink-0">
+                  <Clock size={13} />
+                </div>
+                <div className="text-xs space-y-0.5">
+                  <p className="font-semibold text-blue-950">
+                    Berlaku hingga: {(() => {
+                      const match = form.active_until.match(/^(\d{4})-(\d{2})-(\d{2})/);
+                      if (match) {
+                        const d = new Date(parseInt(match[1], 10), parseInt(match[2], 10) - 1, parseInt(match[3], 10));
+                        return d.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
+                      }
+                      return form.active_until;
+                    })()}
+                  </p>
+                  <p className="text-[11px] text-blue-700 font-medium">
+                    {(() => {
+                      const match = form.active_until.match(/^(\d{4})-(\d{2})-(\d{2})/);
+                      if (match) {
+                        const target = new Date(parseInt(match[1], 10), parseInt(match[2], 10) - 1, parseInt(match[3], 10), 23, 59, 59);
+                        const now = new Date();
+                        const diff = Math.ceil((target.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+                        if (diff > 0) return `Sistem akan aktif selama ${diff} hari lagi dari hari ini.`;
+                        if (diff === 0) return "Berakhir hari ini pada pukul 23:59 WIB.";
+                        return `Tanggal telah lewat (${Math.abs(diff)} hari yang lalu). Institusi akan langsung berstatus kadaluarsa.`;
+                      }
+                      return "";
+                    })()}
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-slate-100/70 border border-slate-200/70 rounded-xl p-3 flex items-center gap-2.5 text-xs text-slate-600">
+                <div className="p-1 rounded-lg bg-slate-300 text-slate-700 flex-shrink-0">
+                  <ShieldCheck size={13} />
+                </div>
+                <div>
+                  <p className="font-semibold text-slate-800">Paket Tanpa Batas Waktu (Permanen)</p>
+                  <p className="text-[11px] text-slate-500">Akses tenant tidak akan kadaluarsa secara otomatis.</p>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Custom Domain Input */}
