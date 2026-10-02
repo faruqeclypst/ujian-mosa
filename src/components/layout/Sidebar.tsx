@@ -14,7 +14,8 @@ import {
   GraduationCap,
   Award,
   ChevronDown,
-  BarChart2
+  BarChart2,
+  FileText
 } from "lucide-react";
 import * as React from "react";
 
@@ -102,6 +103,7 @@ const Sidebar = () => {
       icon: Settings, 
       badge: null,
       children: [
+        { to: "/admin/invoice", label: "Invoice", icon: FileText },
         { to: "/admin/kelola-akun", label: "Kelola Akun", icon: ShieldAlert },
         { to: "/admin/pengaturan", label: "Pengaturan", icon: Settings }
       ]

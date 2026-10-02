@@ -99,6 +99,7 @@ const SettingsPage = () => {
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [showDnsGuide, setShowDnsGuide] = useState(false);
   const SERVER_IP = "64.235.41.108";
+  const isHighestPlan = school?.plan === "ultimate" || school?.plan === "premium" || school?.plan === "Paket Premium" || Boolean(school?.custom_domain);
 
   const getDnsHostName = (domain?: string): string => {
     if (!domain) return "@";
@@ -164,7 +165,9 @@ const SettingsPage = () => {
       if (records.length > 0) {
         const data = records[0];
         setSettingsId(data.id);
-        setSchoolName(data.name || "EXAM AA");
+        // Jika name belum pernah diubah dari default, pakai nama dari registry
+        const savedName = data.name || "";
+        setSchoolName(savedName && savedName !== "EXAM AA" ? savedName : (school?.name || "EXAM AA"));
         setGroqApiKey(data.groq_api_key || "");
         setAiGatewayUrl(data.ai_gateway_url || "");
         setAiGatewayKey(data.ai_gateway_key || "");
@@ -181,7 +184,8 @@ const SettingsPage = () => {
         if (data.allowed_types) setAllowedTypes(data.allowed_types);
         else if (data.allowed_question_types) setAllowedTypes(data.allowed_question_types);
       } else {
-        setSchoolName("EXAM AA");
+        // Tenant baru: belum ada record settings, pakai nama dari registry
+        setSchoolName(school?.name || "EXAM AA");
       }
     } catch (e) {
       console.error("Settings fetch err", e);
@@ -1166,28 +1170,35 @@ const SettingsPage = () => {
                       </a>
                     </div>
                     
-                    <div className="mt-3 p-3 rounded-xl bg-blue-50/70 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900/50 space-y-2">
-                      <div className="flex items-start gap-2">
-                        <Info size={14} className="text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
-                        <div className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
-                          Ingin memakai domain sekolah sendiri (cth: <code className="text-blue-600 dark:text-blue-400 font-mono font-semibold">cbt.sekolah.sch.id</code>)? Minta Administrator Pusat mengaktifkannya.
+                    {isHighestPlan ? (
+                      <div className="mt-3 p-3 rounded-xl bg-blue-50/70 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900/50 space-y-2">
+                        <div className="flex items-start gap-2">
+                          <Info size={14} className="text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
+                          <div className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
+                            Paket Premium mendukung penggunaan domain sekolah sendiri (cth: <code className="text-blue-600 dark:text-blue-400 font-mono font-semibold">cbt.sekolah.sch.id</code>). Hubungi Administrator Pusat untuk mengaktifkannya.
+                          </div>
                         </div>
+                        <button
+                          type="button"
+                          onClick={() => setShowDnsGuide(!showDnsGuide)}
+                          className="text-[11px] font-bold text-blue-600 hover:text-blue-700 dark:text-blue-400 flex items-center gap-1 pt-1"
+                        >
+                          {showDnsGuide ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                          {showDnsGuide ? "Tutup Petunjuk DNS" : "Lihat Petunjuk DNS untuk Admin IT Domain"}
+                        </button>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => setShowDnsGuide(!showDnsGuide)}
-                        className="text-[11px] font-bold text-blue-600 hover:text-blue-700 dark:text-blue-400 flex items-center gap-1 pt-1"
-                      >
-                        {showDnsGuide ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-                        {showDnsGuide ? "Tutup Petunjuk DNS" : "Lihat Petunjuk DNS untuk Admin IT Domain"}
-                      </button>
-                    </div>
+                    ) : (
+                      <div className="mt-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-800 flex items-center gap-2.5 text-[11px] text-slate-500 dark:text-slate-400">
+                        <ShieldCheck size={15} className="text-slate-400 shrink-0" />
+                        <span>Fitur Custom Domain hanya tersedia pada paket tertinggi (Paket Premium). Hubungi Administrator Pusat untuk upgrade paket.</span>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
 
-              {/* ── Petunjuk DNS (Muncul jika custom_domain telah diset ATAU tombol buka panduan diklik) ── */}
-              {(school?.custom_domain || showDnsGuide) && (
+              {/* ── Petunjuk DNS (Hanya muncul jika custom_domain diset ATAU paket tertinggi dan tombol dibuka) ── */}
+              {(school?.custom_domain || (isHighestPlan && showDnsGuide)) && (
                 <div className="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-3">
                   <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800 dark:text-slate-200">
                     <ShieldCheck size={14} className="text-emerald-500" />

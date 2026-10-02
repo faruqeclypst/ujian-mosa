@@ -45,7 +45,7 @@ const StudentLoginPage = () => {
 
         if (records.length > 0) {
           const data = records[0];
-          setSchoolName(data.name || "EXAM AA CBT");
+          setSchoolName(data.name && data.name !== "EXAM AA CBT" ? data.name : (school?.name || "EXAM AA CBT"));
 
           let logoUrl = data.logoUrl || data.logo || "";
           if (logoUrl && !logoUrl.startsWith('http') && !logoUrl.startsWith('data:')) {

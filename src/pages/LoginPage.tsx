@@ -24,7 +24,7 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 
 const LoginPage = () => {
   const { signInWithUsername, user, changePassword } = useAuth();
-  const { pb: tenantPb, setManualSchool } = useTenant();
+  const { pb: tenantPb, school, setManualSchool } = useTenant();
   const { actualTheme, toggleTheme } = useTheme();
   const pb = tenantPb;
   const [formError, setFormError] = useState<string | null>(null);
@@ -54,7 +54,7 @@ const LoginPage = () => {
 
         if (records.length > 0) {
           const data = records[0];
-          setSchoolName(data.name || "EXAM AA CBT");
+          setSchoolName(data.name && data.name !== "EXAM AA CBT" ? data.name : (school?.name || "EXAM AA CBT"));
 
           let logoUrl = data.logoUrl || data.logo || "";
           if (logoUrl && !logoUrl.startsWith('http') && !logoUrl.startsWith('data:')) {

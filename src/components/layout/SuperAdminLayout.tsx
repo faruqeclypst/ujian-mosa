@@ -9,6 +9,7 @@ import {
   Menu,
   X,
   ChevronRight,
+  FileText,
 } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { masterPb } from "../../lib/pocketbase";
@@ -22,6 +23,7 @@ const navItems = [
   { label: "Dashboard", sublabel: "Seluruh Tenant", icon: LayoutDashboard, path: "/superadmin" },
   { label: "Infrastruktur", sublabel: "Status & Latensi", icon: Database, path: "/superadmin/infra" },
   { label: "Statistik", sublabel: "Analitik Server", icon: Globe, path: "/superadmin/analytics" },
+  { label: "Invoice", sublabel: "Tagihan & Pembayaran", icon: FileText, path: "/superadmin/invoice" },
   { label: "Pengaturan", sublabel: "Akun & Keamanan", icon: Settings, path: "/superadmin/settings" },
 ];
 

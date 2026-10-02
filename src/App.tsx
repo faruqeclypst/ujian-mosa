@@ -47,6 +47,7 @@ const GuidePage = lazy(() => import("./pages/admin/GuidePage"));
 const ItemAnalysisPage = lazy(() => import("./pages/admin/ItemAnalysisPage"));
 const TokenViewPage = lazy(() => import("./pages/TokenViewPage"));
 const LiveScoreViewPage = lazy(() => import("./pages/LiveScoreViewPage"));
+const SchoolInvoicePage = lazy(() => import("./pages/admin/SchoolInvoicePage"));
 
 // Landing & SaaS pages
 import LandingPage from "./pages/landing/LandingPage";
@@ -178,6 +179,7 @@ const SchoolAppContent = () => {
               <Route path="panduan" element={<GuidePage />} />
               <Route path="analisis-butir-soal" element={<ItemAnalysisPage />} />
               <Route path="pengaturan" element={<SettingsPage />} />
+              <Route path="invoice" element={<SchoolInvoicePage />} />
             </Route>
 
             {/* Root redirect */}
@@ -198,6 +200,7 @@ const SchoolAppContent = () => {
 import SuperAdminInfraPage from "./pages/superadmin/SuperAdminInfraPage";
 import SuperAdminAnalyticsPage from "./pages/superadmin/SuperAdminAnalyticsPage";
 import SuperAdminSettingsPage from "./pages/superadmin/SuperAdminSettingsPage";
+import SuperAdminInvoicePage from "./pages/superadmin/SuperAdminInvoicePage";
 
 const LandingContent = () => {
   useEffect(() => {
@@ -214,9 +217,12 @@ const LandingContent = () => {
         <Route path="/daftar" element={<RegisterSchoolPage />} />
         <Route path="/fitur" element={<FeaturesPage />} />
         <Route path="/superadmin" element={<SuperAdminDashboard />} />
+        <Route path="/super_admin" element={<Navigate to="/superadmin" replace />} />
+        <Route path="/super_admin/*" element={<Navigate to="/superadmin" replace />} />
         <Route path="/superadmin/infra" element={<SuperAdminInfraPage />} />
         <Route path="/superadmin/analytics" element={<SuperAdminAnalyticsPage />} />
         <Route path="/superadmin/settings" element={<SuperAdminSettingsPage />} />
+        <Route path="/superadmin/invoice" element={<SuperAdminInvoicePage />} />
         <Route path="/superadmin/login" element={<SuperAdminLoginPage />} />
         <Route path="/pilih-sekolah" element={<SelectSchoolPage />} />
         <Route path="/pilih sekolah" element={<SelectSchoolPage />} />
@@ -248,7 +254,7 @@ const AppRouter = () => {
   if (isLandingDomain) {
     // Jika di mobile app, paksa ke halaman pilih sekolah (simulation mode untuk localhost tetap tersedia via /pilih-sekolah)
     const isAppMode = Capacitor.isNativePlatform();
-    const isSpecialRoute = location.pathname.startsWith('/superadmin') || location.pathname === '/daftar' || location.pathname === '/fitur' || location.pathname === '/browser';
+    const isSpecialRoute = location.pathname.startsWith('/superadmin') || location.pathname.startsWith('/super_admin') || location.pathname === '/daftar' || location.pathname === '/fitur' || location.pathname === '/browser';
 
     if (isAppMode && location.pathname !== '/pilih-sekolah' && !isSpecialRoute) {
       return (

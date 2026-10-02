@@ -3,7 +3,7 @@ import { useTenant } from "../../context/TenantContext";
 
 const Logo = () => {
   const { pb, school } = useTenant();
-  const [profile, setProfile] = useState({ name: "EXAM AA", logoUrl: "" });
+  const [profile, setProfile] = useState({ name: school?.name || "EXAM AA", logoUrl: "" });
   const [logoError, setLogoError] = useState(false);
 
   useEffect(() => {
@@ -26,7 +26,7 @@ const Logo = () => {
           }
 
           setProfile({
-            name: data.name || "EXAM AA",
+            name: data.name && data.name !== "EXAM AA" ? data.name : (school?.name || "EXAM AA"),
             logoUrl: logoUrl
           });
           setLogoError(false);
@@ -48,7 +48,7 @@ const Logo = () => {
         }
 
         setProfile({
-          name: e.record.name || "EXAM AA",
+          name: e.record.name && e.record.name !== "EXAM AA" ? e.record.name : (school?.name || "EXAM AA"),
           logoUrl: logoUrl
         });
         setLogoError(false);
