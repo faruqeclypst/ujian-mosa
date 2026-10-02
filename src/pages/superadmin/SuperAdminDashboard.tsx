@@ -312,12 +312,8 @@ const SuperAdminDashboard = () => {
     });
   };
 
-  const approveRequest = async (req: SchoolRequest) => {
+  const approveRequest = (req: SchoolRequest) => {
     try {
-      await masterPb.collection("school_requests").update(req.id, { status: "approved" });
-      loadData();
-      setTab("active");
-
       let targetPlan: 'free' | 'basic' | 'pro' | 'ultimate' = 'basic';
       let targetQuota = 250;
       let durationDays = 365;
@@ -372,7 +368,18 @@ const SuperAdminDashboard = () => {
       setApprovingRequestId(req.id);
       setShowAddModal(true);
     } catch {
-      alert("Gagal menyetujui pendaftaran.");
+      alert("Gagal membuka formulir pendaftaran.");
+    }
+  };
+
+  const resetRequestStatus = async (req: SchoolRequest, newStatus: "pending" | "approved" | "rejected") => {
+    try {
+      await masterPb.collection("school_requests").update(req.id, { status: newStatus });
+      addLog("update", `Mengubah status pendaftaran menjadi ${newStatus === "pending" ? "Menunggu" : newStatus === "approved" ? "Disetujui" : "Ditolak"}`, req.school_name);
+      refreshLogs();
+      loadData();
+    } catch {
+      alert("Gagal mengubah status pendaftaran.");
     }
   };
 
@@ -1149,7 +1156,39 @@ const SuperAdminDashboard = () => {
                               </button>
                             </>
                           ) : (
-                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mr-2">Selesai</span>
+                            <div className="flex items-center gap-1.5">
+                              {(() => {
+                                const existingSchool = schools.find(s => s.slug === req.slug_request);
+                                if (existingSchool) {
+                                  return (
+                                    <button
+                                      onClick={() => { setEditSchool(existingSchool); setShowAddModal(true); }}
+                                      className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-xs font-semibold rounded-lg transition-all flex items-center gap-1"
+                                      title="Tenant sudah ada di daftar sekolah, klik untuk edit konfigurasi"
+                                    >
+                                      <Edit size={12} /> Edit Tenant
+                                    </button>
+                                  );
+                                } else {
+                                  return (
+                                    <button
+                                      onClick={() => approveRequest(req)}
+                                      className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition-all flex items-center gap-1 shadow-sm"
+                                      title="Buat tenant sekarang dari pendaftaran ini"
+                                    >
+                                      <Plus size={12} /> Buat Tenant
+                                    </button>
+                                  );
+                                }
+                              })()}
+                              <button
+                                onClick={() => resetRequestStatus(req, "pending")}
+                                className="px-2 py-1.5 text-[11px] font-semibold text-slate-500 hover:text-amber-700 bg-slate-50 hover:bg-amber-50 border border-slate-200 hover:border-amber-200 rounded-lg transition-all"
+                                title="Kembalikan status pendaftaran ke Menunggu / Pending"
+                              >
+                                Reset
+                              </button>
+                            </div>
                           )}
                           <button
                             onClick={() => deleteRequest(req)}
@@ -1217,7 +1256,37 @@ const SuperAdminDashboard = () => {
                         </button>
                       </>
                     ) : (
-                      <div className="flex-1 h-8 flex items-center px-1 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Pendaftaran Selesai</div>
+                      <div className="flex-1 flex items-center gap-1.5">
+                        {(() => {
+                          const existingSchool = schools.find(s => s.slug === req.slug_request);
+                          if (existingSchool) {
+                            return (
+                              <button
+                                onClick={() => { setEditSchool(existingSchool); setShowAddModal(true); }}
+                                className="flex-1 h-8 bg-blue-50 text-blue-700 border border-blue-200 text-xs font-semibold rounded-lg flex items-center justify-center gap-1"
+                              >
+                                <Edit size={12} /> Edit Tenant
+                              </button>
+                            );
+                          } else {
+                            return (
+                              <button
+                                onClick={() => approveRequest(req)}
+                                className="flex-1 h-8 bg-emerald-600 text-white text-xs font-bold rounded-lg flex items-center justify-center gap-1"
+                              >
+                                <Plus size={12} /> Buat Tenant
+                              </button>
+                            );
+                          }
+                        })()}
+                        <button
+                          onClick={() => resetRequestStatus(req, "pending")}
+                          className="h-8 px-2.5 text-xs font-semibold text-slate-600 border border-slate-200 rounded-lg hover:bg-amber-50 hover:text-amber-700"
+                          title="Kembalikan status pendaftaran ke Menunggu / Pending"
+                        >
+                          Reset
+                        </button>
+                      </div>
                     )}
                     <button onClick={() => deleteRequest(req)} className="h-8 w-8 border border-slate-200 text-slate-400 rounded-lg flex items-center justify-center hover:text-red-600">
                       <Trash2 size={13} />
@@ -1336,6 +1405,7 @@ const SuperAdminDashboard = () => {
             setShowAddModal(false);
             setEditSchool(null);
             loadData();
+            setTab("active");
           }}
         />
       )}
