@@ -56,6 +56,7 @@ export interface SchoolRecord {
   contact_email?: string;
   custom_domain?: string;
   active_until?: string;
+  server_host?: string;
   created?: string;
 }
 

@@ -10,6 +10,7 @@ interface SchoolNode {
   name: string;
   slug: string;
   pb_url: string;
+  server_host?: string;
   is_active: boolean;
   status: "checking" | "online" | "offline";
   latency: number;
@@ -25,7 +26,7 @@ const SuperAdminInfraPage = () => {
     try {
       const records = await masterPb.collection("schools").getFullList({ sort: "-created" });
       const initialNodes: SchoolNode[] = records.map(r => ({
-        id: r.id, name: r.name, slug: r.slug, pb_url: r.pb_url, is_active: r.is_active,
+        id: r.id, name: r.name, slug: r.slug, pb_url: r.pb_url, server_host: r.server_host, is_active: r.is_active,
         status: "checking", latency: 0,
       }));
       setNodes(initialNodes);
@@ -181,6 +182,17 @@ const SuperAdminInfraPage = () => {
                       className="text-xs font-mono bg-slate-100 border border-slate-200 px-2 py-1 rounded-md text-blue-600 hover:underline inline-block">
                       {node.pb_url}
                     </a>
+                    <div className="mt-1">
+                      {node.server_host && node.server_host !== "127.0.0.1" && node.server_host !== "localhost" ? (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-purple-700 bg-purple-50 border border-purple-200/70 px-2 py-0.5 rounded">
+                          Worker: {node.server_host}
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-medium text-slate-500 bg-slate-50 border border-slate-200/60 px-2 py-0.5 rounded">
+                          Master VPS (Lokal)
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="px-5 py-3.5">
                     {node.status === "checking" ? (
@@ -239,6 +251,17 @@ const SuperAdminInfraPage = () => {
                 <div>
                   <p className="font-semibold text-slate-900 text-sm">{node.name}</p>
                   <p className="text-xs text-slate-400">{getSchoolDomain(node.slug)}</p>
+                  <div className="mt-1">
+                    {node.server_host && node.server_host !== "127.0.0.1" && node.server_host !== "localhost" ? (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-purple-700 bg-purple-50 border border-purple-200/70 px-2 py-0.5 rounded">
+                        Worker: {node.server_host}
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-medium text-slate-500 bg-slate-50 border border-slate-200/60 px-2 py-0.5 rounded">
+                        Master VPS (Lokal)
+                      </span>
+                    )}
+                  </div>
                 </div>
                 {node.status === "checking" ? (
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-100 text-slate-500 rounded-full text-[10px] font-bold border border-slate-200 flex-shrink-0">

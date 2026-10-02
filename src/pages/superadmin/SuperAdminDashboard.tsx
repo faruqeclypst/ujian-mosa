@@ -4,7 +4,7 @@ import {
   Plus, Check, X, Edit, Power, PowerOff,
   School, Clock, Users, RefreshCw,
   Search, Trash2, Monitor, Zap, Server, ChevronDown,
-  Building2, Globe, Sparkles, ShieldCheck, Calendar,
+  Building2, Globe, Sparkles, ShieldCheck, Calendar, Cpu,
   Activity, CheckCircle2, XCircle, AlertTriangle, Info
 } from "lucide-react";
 import { masterPb } from "../../lib/pocketbase";
@@ -77,6 +77,7 @@ interface SchoolRecord {
   contact_email?: string;
   custom_domain?: string;
   active_until?: string;
+  server_host?: string;
   created: string;
 }
 
@@ -767,6 +768,17 @@ const SuperAdminDashboard = () => {
                           >
                             <Server size={11} /> Database Engine
                           </a>
+                          <div className="flex items-center gap-1.5 pl-3 pt-0.5">
+                            {school.server_host && school.server_host !== "127.0.0.1" && school.server_host !== "localhost" ? (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-purple-700 bg-purple-50 border border-purple-200/70 px-2 py-0.5 rounded-md" title={`Worker Node: ${school.server_host}`}>
+                                <Cpu size={10} className="text-purple-600" /> Worker: {school.server_host}
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-medium text-slate-500 bg-slate-50 border border-slate-200/60 px-2 py-0.5 rounded-md" title="Dijalankan di VPS Master">
+                                <Server size={10} className="text-slate-400" /> Master Node (Lokal)
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </td>
                       <td className="px-5 py-4">
@@ -935,6 +947,17 @@ const SuperAdminDashboard = () => {
                         {school.custom_domain}
                       </a>
                     )}
+                    <div className="flex items-center gap-1.5 pt-0.5">
+                      {school.server_host && school.server_host !== "127.0.0.1" && school.server_host !== "localhost" ? (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-purple-700 bg-purple-50 border border-purple-200/70 px-2 py-0.5 rounded-md">
+                          <Cpu size={11} className="text-purple-600" /> Worker Node: {school.server_host}
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 bg-slate-50 border border-slate-200/60 px-2 py-0.5 rounded-md">
+                          <Server size={11} className="text-slate-400" /> Master Node (Lokal)
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   {school.active_until && getDiffDays(school.active_until) <= 14 && (
@@ -1454,6 +1477,7 @@ const AddEditSchoolModal = ({
     student_quota: school?.student_quota || 50,
     plan: school?.plan || "free",
     active_until: isEdit ? initialDate : getTrialDate(),
+    server_host: school?.server_host || "127.0.0.1",
     is_active: school?.is_active ?? true,
   });
   const [loading, setLoading] = useState(false);
@@ -1479,6 +1503,7 @@ const AddEditSchoolModal = ({
         student_quota: school.student_quota || 50,
         plan: school.plan || "free",
         active_until: parsedDate,
+        server_host: school.server_host || "127.0.0.1",
         is_active: school.is_active ?? true,
       });
     } else {
@@ -1495,6 +1520,7 @@ const AddEditSchoolModal = ({
         student_quota: 50,
         plan: "free",
         active_until: trial,
+        server_host: "127.0.0.1",
         is_active: true,
       });
     }
@@ -1632,6 +1658,7 @@ const AddEditSchoolModal = ({
 
     const finalForm = {
       ...form,
+      server_host: (form.server_host || "127.0.0.1").trim(),
       active_until: finalActiveUntil,
       custom_domain: cleanCustomDomain,
       pb_url: autoPbUrl,
@@ -2209,6 +2236,81 @@ const AddEditSchoolModal = ({
             <p className="text-[11px] text-slate-500 leading-relaxed">
               Sekolah cukup mengarahkan DNS <strong className="font-semibold text-slate-700">A Record</strong> ke <code className="text-blue-700 bg-white border border-slate-200 px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold">64.235.41.108</code> atau <strong className="font-semibold text-slate-700">CNAME</strong> ke <code className="text-blue-700 bg-white border border-slate-200 px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold">{form.slug ? `${form.slug}.examku.my.id` : `subdomain${getDomainSuffix()}`}</code>.
             </p>
+          </div>
+
+          {/* Server Node Selection (Multi-VPS) */}
+          <div className="bg-slate-50/80 border border-slate-200/80 rounded-xl p-3.5 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <label className="block text-xs font-semibold text-slate-800">
+                Lokasi Server Node <span className="text-slate-400 font-normal">(Multi-VPS)</span>
+              </label>
+              <span className="text-[10px] text-blue-700 bg-blue-50 border border-blue-200/60 px-2 py-0.5 rounded-full font-bold">
+                Isolasi Beban Ujian
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setForm(prev => ({ ...prev, server_host: "127.0.0.1" }))}
+                className={cn(
+                  "p-2.5 rounded-xl border text-left transition-all",
+                  (!form.server_host || form.server_host === "127.0.0.1" || form.server_host === "localhost")
+                    ? "border-blue-500 bg-blue-50/70 text-blue-900 shadow-xs"
+                    : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
+                )}
+              >
+                <div className="flex items-center gap-1.5 font-bold text-xs">
+                  <Server size={13} className="text-blue-600" />
+                  <span>Master VPS</span>
+                </div>
+                <p className="text-[11px] text-slate-500 mt-1">Lokal (64.235.41.108)</p>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setForm(prev => ({
+                  ...prev,
+                  server_host: prev.server_host && prev.server_host !== "127.0.0.1" && prev.server_host !== "localhost"
+                    ? prev.server_host
+                    : ""
+                }))}
+                className={cn(
+                  "p-2.5 rounded-xl border text-left transition-all",
+                  (form.server_host && form.server_host !== "127.0.0.1" && form.server_host !== "localhost")
+                    ? "border-purple-500 bg-purple-50/70 text-purple-900 shadow-xs"
+                    : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
+                )}
+              >
+                <div className="flex items-center gap-1.5 font-bold text-xs">
+                  <Cpu size={13} className="text-purple-600" />
+                  <span>Worker Node</span>
+                </div>
+                <p className="text-[11px] text-slate-500 mt-1">VPS Eksternal Terpisah</p>
+              </button>
+            </div>
+
+            {form.server_host !== "127.0.0.1" && form.server_host !== "localhost" && (
+              <div className="space-y-1.5 pt-1">
+                <label className="block text-[11px] font-semibold text-slate-700">
+                  IP Address / Hostname Worker VPS
+                </label>
+                <div className="relative">
+                  <Server size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                  <input
+                    type="text"
+                    name="server_host"
+                    value={form.server_host === "127.0.0.1" ? "" : form.server_host}
+                    onChange={handleChange}
+                    placeholder="cth. 103.123.45.67"
+                    className="w-full h-10 border border-purple-200 rounded-xl pl-9 pr-3.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-400 shadow-sm bg-white font-mono placeholder:font-sans placeholder:text-slate-400"
+                  />
+                </div>
+                <p className="text-[11px] text-slate-500 leading-relaxed">
+                  Master Ingress Caddy akan otomatis mem-proxy request API dan database ke IP ini. Pengguna tetap mengakses via domain tanpa kendala CORS dan SSL otomatis aman.
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Footer */}
