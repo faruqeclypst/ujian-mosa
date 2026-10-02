@@ -13,6 +13,7 @@ import { cn } from "../../lib/utils";
 import { getSchoolUrl, getSchoolDomain, getDomainSuffix } from "../../utils/domainHelper";
 import { calculatePlanInvoice, PLAN_PRICING, normalizePlanKey } from "../../utils/pricingHelper";
 import { ensureRenewalInvoice } from "../../utils/subscriptionHelper";
+import { OneClickMigrationModal } from "./OneClickMigrationModal";
 
 // ── Activity Log ──────────────────────────────────────────────
 type LogType = "create" | "update" | "delete" | "approve" | "reject" | "activate" | "deactivate";
@@ -205,6 +206,7 @@ const SuperAdminDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editSchool, setEditSchool] = useState<SchoolRecord | null>(null);
+  const [migrationSchool, setMigrationSchool] = useState<SchoolRecord | null>(null);
   const [approvingRequestId, setApprovingRequestId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -780,13 +782,23 @@ const SuperAdminDashboard = () => {
                           </a>
                           <div className="flex items-center gap-1.5 pl-3 pt-0.5">
                             {school.server_host && school.server_host !== "127.0.0.1" && school.server_host !== "localhost" ? (
-                              <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-purple-700 bg-purple-50 border border-purple-200/70 px-2 py-0.5 rounded-md" title={`Worker Node: ${school.server_host}`}>
+                              <button
+                                type="button"
+                                onClick={() => setMigrationSchool(school)}
+                                className="inline-flex items-center gap-1 text-[10px] font-semibold text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200/70 px-2 py-0.5 rounded-md transition-colors"
+                                title="Klik untuk atur / tarik kembali ke Master"
+                              >
                                 <Cpu size={10} className="text-purple-600" /> Worker: {school.server_host}
-                              </span>
+                              </button>
                             ) : (
-                              <span className="inline-flex items-center gap-1 text-[10px] font-medium text-slate-500 bg-slate-50 border border-slate-200/60 px-2 py-0.5 rounded-md" title="Dijalankan di VPS Master">
+                              <button
+                                type="button"
+                                onClick={() => setMigrationSchool(school)}
+                                className="inline-flex items-center gap-1 text-[10px] font-medium text-slate-500 bg-slate-50 hover:bg-slate-100 border border-slate-200/60 px-2 py-0.5 rounded-md transition-colors"
+                                title="Klik untuk burst mode ke Worker VPS"
+                              >
                                 <Server size={10} className="text-slate-400" /> Master Node (Lokal)
-                              </span>
+                              </button>
                             )}
                           </div>
                         </div>
@@ -850,6 +862,13 @@ const SuperAdminDashboard = () => {
                               <span>{sendingRenewalId === school.id ? "Memproses..." : "Kirim Tagihan"}</span>
                             </button>
                           )}
+                          <button
+                            onClick={() => setMigrationSchool(school)}
+                            className="w-8 h-8 rounded-full border border-purple-200 bg-purple-50 text-purple-700 hover:bg-purple-100 hover:border-purple-300 hover:shadow-md transition-all flex items-center justify-center group/btn"
+                            title={school.server_host && school.server_host !== "127.0.0.1" && school.server_host !== "localhost" ? "Migrasi Server / Tarik ke Master" : "1-Klik Burst Mode (Pindah ke Worker)"}
+                          >
+                            <Zap size={14} className="group-hover/btn:scale-110 text-purple-600 transition-transform" />
+                          </button>
                           <button
                             onClick={() => { setEditSchool(school); setShowAddModal(true); }}
                             className="w-8 h-8 rounded-full border border-slate-200 bg-white text-slate-400 hover:text-blue-600 hover:border-blue-200 hover:shadow-md transition-all flex items-center justify-center group/btn"
@@ -969,6 +988,16 @@ const SuperAdminDashboard = () => {
                       )}
                     </div>
                   </div>
+
+                  <button
+                    onClick={() => setMigrationSchool(school)}
+                    className="w-full h-8 text-xs font-bold border border-purple-200 bg-purple-50 hover:bg-purple-100 text-purple-800 rounded-lg flex items-center justify-center gap-1.5 transition-all shadow-xs"
+                  >
+                    <Zap size={13} className="text-purple-600" />
+                    {school.server_host && school.server_host !== "127.0.0.1" && school.server_host !== "localhost"
+                      ? "Migrasi / Tarik ke Master VPS"
+                      : "1-Klik Burst Mode (Pindah ke Worker)"}
+                  </button>
 
                   {school.active_until && getDiffDays(school.active_until) <= 14 && (
                     <button
@@ -1307,6 +1336,19 @@ const SuperAdminDashboard = () => {
             setShowAddModal(false);
             setEditSchool(null);
             loadData();
+          }}
+        />
+      )}
+
+      {/* 1-Click Migration / Burst Mode Modal */}
+      {migrationSchool && (
+        <OneClickMigrationModal
+          school={migrationSchool}
+          onClose={() => setMigrationSchool(null)}
+          onSuccess={() => {
+            setMigrationSchool(null);
+            loadData();
+            refreshLogs();
           }}
         />
       )}

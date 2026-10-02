@@ -16,10 +16,32 @@ if [ "$EUID" -ne 0 ]; then
   exit 1
 fi
 
+MASTER_PUBKEY="${1:-ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICmezFyH8hAAToSr4Aw3f0dtTcGVxp8fTkatn1ZdS0w3 root@alfaruqasr-sg}"
+
 info "Memulai persiapan Worker Node..."
 
-# 1. Update paket sistem
-apt-get update && apt-get install -y curl wget unzip ufw
+# 1. Update paket sistem & tool dasar
+apt-get update && apt-get install -y curl wget unzip ufw rsync
+
+# 2. Otomasi pairing SSH Master VPS
+if [ -n "$MASTER_PUBKEY" ]; then
+  info "Memasang kunci SSH Master VPS untuk otomasi 1-klik..."
+  mkdir -p /root/.ssh
+  chmod 700 /root/.ssh
+  touch /root/.ssh/authorized_keys
+  if ! grep -qF "$MASTER_PUBKEY" /root/.ssh/authorized_keys 2>/dev/null; then
+    echo "$MASTER_PUBKEY" >> /root/.ssh/authorized_keys
+    chmod 600 /root/.ssh/authorized_keys
+    log "Kunci SSH Master berhasil didaftarkan ke /root/.ssh/authorized_keys"
+  else
+    log "Kunci SSH Master sudah aktif di /root/.ssh/authorized_keys"
+  fi
+fi
+
+# 3. Buka port firewall jika UFW aktif
+if command -v ufw >/dev/null 2>&1; then
+  ufw allow proto tcp from 64.235.41.108 to any port 8091:8150 >/dev/null 2>&1 || true
+fi
 
 # 2. Siapkan folder PocketBase template
 mkdir -p /opt/pocketbase/schools/template/pb_hooks
