@@ -95,53 +95,60 @@ Agar saat Anda menekan tombol **Simpan** di dashboard Superadmin, Master VPS oto
 
 ---
 
-## 5. Strategi Sewa VPS 1 Bulan ("Burst Mode" Ujian Sekolah)
+## 5. Sistem Otomasi 1-Klik ("Burst Mode" Ujian Sekolah)
 
 Sekolah umumnya hanya membutuhkan server berspesifikasi tinggi selama 1 sampai 2 pekan masa ujian semester (PAS/PAT). Di luar masa ujian, aktivitas sekolah minim sehingga menyewa VPS mahal sepanjang tahun adalah pemborosan.
 
-### Alur Kerja Siklus 1 Bulan:
+Sistem Ujian AA kini telah dilengkapi **Fitur Otomasi 1-Klik di SuperAdmin Dashboard**, sehingga Anda tidak perlu mengetik perintah terminal manual lagi.
 
-#### Fase 1: H-3 Sebelum Ujian Dimulai (Kirim Data ke Worker)
-1. Sewa VPS baru 1 bulan (RAM 4GB sampai 8GB).
-2. Jalankan setup otomatis:
-   ```bash
-   curl -sSL https://raw.githubusercontent.com/faruqeclypst/ujian-mosa/feature/saas-v2/vps/setup_worker_node.sh | bash
-   ```
-3. Stop service lokal di Master:
-   ```bash
-   systemctl stop pb-modalbangsa
-   ```
-4. Kirim folder database SQLite dari Master ke Worker VPS:
-   ```bash
-   rsync -avz /opt/pocketbase/schools/modalbangsa/pb_data/* root@IP_WORKER:/opt/pocketbase/schools/modalbangsa/pb_data/
-   ```
-5. Buka Superadmin (`/superadmin`), edit sekolah tersebut dan ganti Lokasi Server Node menjadi IP Worker.
-6. Jalankan service di Worker:
-   ```bash
-   ssh root@IP_WORKER "systemctl restart pb-modalbangsa"
-   ```
+---
 
-#### Fase 2: Masa Ujian Berlangsung
-* Ribuan siswa mengerjakan soal serentak di Worker VPS.
-* Master VPS tetap ringan dan stabil.
-* Pembayaran dan perpanjangan langganan tetap ditangani terpusat di Master VPS.
+### A. Alur Kerja 1-Klik (Melalui Antarmuka SuperAdmin)
 
-#### Fase 3: H+2 Setelah Ujian Selesai (Tarik Balik ke Master)
-1. Stop service di Worker VPS:
-   ```bash
-   ssh root@IP_WORKER "systemctl stop pb-modalbangsa"
-   ```
-2. Tarik database terbaru (berisi nilai dan jawaban siswa) kembali ke Master VPS:
-   ```bash
-   rsync -avz root@IP_WORKER:/opt/pocketbase/schools/modalbangsa/pb_data/* /opt/pocketbase/schools/modalbangsa/pb_data/
-   ```
-3. Di Superadmin (`/superadmin`), ubah Lokasi Server Node kembali ke **Master VPS (Lokal)**.
-4. Restart service di Master:
-   ```bash
-   systemctl restart pb-modalbangsa
-   ```
-5. Biarkan VPS Worker expired / hapus instance VPS Worker tersebut.
-6. Hasil ujian, bank soal, dan siswa tetap aman 100% di Master VPS tanpa biaya langganan VPS tambahan.
+#### 1. Setup VPS Worker Baru (Hanya 1 Baris Perintah)
+Buka terminal VPS Worker baru Anda lalu jalankan:
+```bash
+curl -sSL https://raw.githubusercontent.com/faruqeclypst/ujian-mosa/feature/saas-v2/vps/setup_worker_node.sh | bash
+```
+> Script ini otomatis menginstal PocketBase, membuka firewall, dan **memasangkan kunci SSH Master VPS**, sehingga Master bisa mengontrol worker tanpa password.
+
+#### 2. Pindahkan Sekolah Sebelum Ujian (Fase Ujian)
+1. Buka SuperAdmin Dashboard: `https://examku.my.id/superadmin`.
+2. Cari nama sekolah pada tabel, lalu klik **ikon Petir (⚡)** atau klik tombol badge server.
+3. Masukkan IP Worker VPS baru (misal: `103.123.45.67`).
+4. Klik **"Tes Koneksi"** (akan muncul latensi ms dan status PocketBase siap).
+5. Pilih opsi **"Mulai Ujian (Ke Worker VPS)"**.
+6. Klik **"Mulai Migrasi Sekarang"**.
+7. Sistem otomatis:
+   - Menghentikan sementara service untuk menjaga integritas database.
+   - Menyinkronkan file SQLite dan bank soal via `rsync`.
+   - Mengalihkan Caddy reverse-proxy ke IP Worker.
+   - Menyalakan service PocketBase di Worker node.
+   - Status sekolah langsung aktif di Worker!
+
+#### 3. Tarik Kembali Data Setelah Ujian Selesai (Fase Penghematan)
+1. Setelah ujian semester selesai, buka kembali SuperAdmin Dashboard.
+2. Klik **ikon Petir (⚡)** pada sekolah yang ada di worker.
+3. Sistem otomatis mendeteksi bahwa sekolah berada di worker dan mengarahkan ke opsi **"Selesai Ujian (Tarik ke Master VPS)"**.
+4. Klik **"Mulai Migrasi Sekarang"**.
+5. Seluruh jawaban ujian siswa, rekap nilai, dan log aktivitas ditarik 100% utuh ke Master VPS.
+6. Anda dapat mematikan atau menghapus VPS Worker tersebut tanpa khawatir ada data yang tertinggal.
+
+---
+
+### B. Opsi Manual CLI (Darurat / Fallback)
+
+Jika suatu saat Anda ingin memindahkan data langsung via command-line Master VPS:
+
+**Kirim ke Worker:**
+```bash
+/usr/local/bin/migrate-tenant.sh "SLUG_SEKOLAH" "IP_WORKER" "to_worker"
+```
+
+**Tarik balik ke Master:**
+```bash
+/usr/local/bin/migrate-tenant.sh "SLUG_SEKOLAH" "IP_WORKER" "to_master"
+```
 
 ---
 

@@ -51,6 +51,12 @@ Manajemen multi-sekolah dengan registrasi mandiri, isolasi data lengkap pada lev
 *   **Ekspor Excel Presisi**: Pembagi skor otomatis menyesuaikan jumlah soal subset acak yang didapat siswa (misal 1/30 alih-alih 1/90) dengan penandaan warna sel (Abu-abu pekat untuk soal di luar paket siswa, Putih untuk belum dijawab, Hijau untuk benar, Merah untuk salah).
 *   Fitur **Salin Laporan WhatsApp** untuk memudahkan guru membagikan rekap progres bank soal ke grup chat sekolah.
 
+### ⚡ **Multi-Node Worker & 1-Click Burst Mode (Hemat Biaya VPS)**
+* **Arsitektur Multi-VPS**: Menjalankan database PocketBase sekolah ujian di VPS Worker terpisah untuk mengisolasi beban ribuan siswa tanpa memecah billing dan domain terpusat.
+* **1-Klik Migrasi**: Pindahkan beban sekolah ke worker node saat pekan ujian (PAS/PAT), dan tarik kembali ke VPS Master setelah ujian selesai hanya dengan 1 klik di dashboard SuperAdmin (ikon ⚡).
+* **Setup Worker 1 Baris**: Otomasi pairing SSH key, binary PocketBase, dan firewall UFW melalui satu baris perintah curl.
+* **Panduan Lengkap**: Buka menu **Panduan Multi-VPS** (`/superadmin/multi-vps-docs`) di SuperAdmin atau baca [vps/MULTI_VPS_SETUP_GUIDE.md](vps/MULTI_VPS_SETUP_GUIDE.md).
+
 ### 📲 **Capacitor Hybrid Mobile Support**
 *   Konfigurasi terintegrasi untuk memaketkan platform web menjadi aplikasi native Android & iOS menggunakan framework **Capacitor**.
 

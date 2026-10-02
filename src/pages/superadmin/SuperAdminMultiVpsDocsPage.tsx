@@ -238,7 +238,7 @@ const SuperAdminMultiVpsDocsPage = () => {
                 1
               </div>
               <div>
-                <h4 className="font-bold text-slate-900 text-base">Jalankan Script Onboarding di VPS Baru</h4>
+                <h4 className="font-bold text-slate-900 text-base">Jalankan Script Onboarding di VPS Baru (Hanya 1 Baris)</h4>
                 <p className="text-slate-600 text-xs mt-0.5 leading-relaxed">
                   Login via SSH ke VPS Worker baru (Ubuntu 22.04 / 24.04 sebagai user <code className="text-blue-700 font-mono">root</code>), lalu jalankan perintah otomatis satu baris berikut:
                 </p>
@@ -252,36 +252,25 @@ const SuperAdminMultiVpsDocsPage = () => {
 
             <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-4 space-y-2 text-xs text-slate-700">
               <p className="font-bold text-slate-900 flex items-center gap-1.5">
-                <FileCode size={14} className="text-blue-600" /> Apa yang dikerjakan oleh script ini?
+                <FileCode size={14} className="text-blue-600" /> Apa yang otomatis dikerjakan oleh script ini?
               </p>
               <ul className="list-disc list-inside space-y-1 text-slate-600 pl-1">
-                <li>Mengunduh PocketBase binary v0.22.20 dan menyiapkan struktur folder template sekolah.</li>
+                <li>Mengunduh PocketBase binary v0.22.20 dan menyiapkan struktur direktori template sekolah.</li>
+                <li><strong>Otomatis memasangkan SSH Public Key Master VPS</strong> ke <code className="font-mono text-slate-800">/root/.ssh/authorized_keys</code> sehingga Master bisa mengontrol worker tanpa password.</li>
+                <li>Membuka port firewall UFW otomatis (SSH port 22 dan rentang port PocketBase 8090 s/d 8200).</li>
                 <li>Memasang hook SQLite <code className="font-mono text-slate-800">busy_timeout=5000</code> dan optimasi jurnal WAL.</li>
-                <li>Memasang script helper <code className="font-mono text-slate-800">/usr/local/bin/add-school.sh</code> pada worker.</li>
-                <li>Menyiapkan template systemd service otomatis untuk tenant.</li>
+                <li>Menyiapkan template systemd service otomatis untuk tenant (<code className="font-mono text-slate-800">pb-school@.service</code>).</li>
               </ul>
             </div>
           </div>
 
-          <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs space-y-4">
-            <div className="flex items-start gap-3">
-              <div className="w-8 h-8 rounded-lg bg-purple-50 text-purple-700 flex items-center justify-center font-bold text-sm flex-shrink-0">
-                2
-              </div>
-              <div>
-                <h4 className="font-bold text-slate-900 text-base">Buka Port UFW Firewall pada Worker VPS</h4>
-                <p className="text-slate-600 text-xs mt-0.5 leading-relaxed">
-                  Agar Master Caddy (64.235.41.108) dapat mem-proxy request ke Worker, izinkan rentang port tenant (contoh port 8091 s/d 8150):
-                </p>
-              </div>
-            </div>
-
-            <CommandSnippet
-              title="Izinkan koneksi dari Master VPS di firewall Worker"
-              code="ufw allow proto tcp from 64.235.41.108 to any port 8091:8150"
-            />
-            <p className="text-[11px] text-slate-500">
-              Catatan: Jika Anda tidak mengaktifkan UFW firewall di worker node, langkah ini boleh dilewati.
+          <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-6 shadow-xs space-y-2 text-xs text-emerald-900">
+            <h4 className="font-bold text-emerald-950 text-sm flex items-center gap-2">
+              <ShieldCheck size={16} className="text-emerald-700" />
+              Selesai! Tidak Perlu Konfigurasi Tambahan
+            </h4>
+            <p className="leading-relaxed">
+              Setelah script di atas selesai berjalan, worker node sudah 100% siap. Anda langsung bisa membuka SuperAdmin Dashboard dan memindahkan sekolah menggunakan fitur <strong>1-Klik Burst Mode (ikon Petir ⚡)</strong>.
             </p>
           </div>
         </div>
@@ -290,44 +279,53 @@ const SuperAdminMultiVpsDocsPage = () => {
       {/* Tab 2: Hubungkan SSH */}
       {activeTab === "ssh" && (
         <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs space-y-6">
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-xs text-blue-900">
+            <p className="font-bold flex items-center gap-1.5 mb-1">
+              <Zap size={14} className="text-blue-700" /> Sudah Otomatis Terhubung
+            </p>
+            <p className="leading-relaxed text-blue-800">
+              Jika Anda sudah menjalankan perintah <code className="font-mono bg-blue-100 px-1 py-0.5 rounded">setup_worker_node.sh</code> di Tab 1, kunci SSH Master VPS sudah terpasang otomatis. Anda bisa langsung mengujinya dari menu SuperAdmin melalui tombol <strong>Tes Koneksi</strong> di modal 1-Klik Migrasi.
+            </p>
+          </div>
+
           <div>
-            <h4 className="font-bold text-slate-900 text-base">Hubungkan Kunci SSH untuk Otomasi Penuh</h4>
+            <h4 className="font-bold text-slate-900 text-base">Verifikasi atau Pasang Kunci SSH Manual (Opsional)</h4>
             <p className="text-slate-600 text-xs mt-1 leading-relaxed">
-              Jika langkah ini dikerjakan, saat Anda menekan tombol <strong>Simpan</strong> di Superadmin Dashboard, Master VPS akan otomatis login via SSH ke Worker Node dan membuatkan folder serta systemd service PocketBase secara instan tanpa perlu menyentuh terminal worker lagi.
+              Gunakan panduan manual ini hanya jika Anda ingin memverifikasi koneksi atau memasang kunci SSH secara mandiri tanpa menggunakan script otomatis.
             </p>
           </div>
 
           <div className="space-y-4">
             <div className="border border-slate-200 rounded-xl p-4 bg-slate-50/60 space-y-2">
-              <p className="font-bold text-xs text-slate-900">Langkah A: Ambil Public Key dari Master VPS</p>
+              <p className="font-bold text-xs text-slate-900">Langkah A: Public Key Master VPS (64.235.41.108)</p>
               <p className="text-xs text-slate-600">
-                Jalankan perintah ini di terminal Master VPS (64.235.41.108) untuk melihat public key root:
+                Kunci publik Master VPS:
               </p>
               <CommandSnippet
-                title="Di terminal Master VPS:"
-                code="cat /root/.ssh/id_ed25519.pub || ssh-keygen -t ed25519 -N '' -f /root/.ssh/id_ed25519"
+                title="Public Key Master VPS:"
+                code="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICmezFyH8hAAToSr4Aw3f0dtTcGVxp8fTkatn1ZdS0w3 root@alfaruqasr-sg"
               />
             </div>
 
             <div className="border border-slate-200 rounded-xl p-4 bg-slate-50/60 space-y-2">
-              <p className="font-bold text-xs text-slate-900">Langkah B: Tempelkan Public Key ke Worker VPS</p>
+              <p className="font-bold text-xs text-slate-900">Langkah B: Tempelkan ke Worker VPS</p>
               <p className="text-xs text-slate-600">
-                Buka file <code className="font-mono text-slate-800">/root/.ssh/authorized_keys</code> di Worker VPS baru dan tempelkan teks hasil dari Langkah A:
+                Pastikan kunci di atas terdaftar di file <code className="font-mono text-slate-800">/root/.ssh/authorized_keys</code> pada Worker VPS:
               </p>
               <CommandSnippet
                 title="Di terminal Worker VPS:"
-                code="mkdir -p /root/.ssh && nano /root/.ssh/authorized_keys && chmod 600 /root/.ssh/authorized_keys"
+                code="echo 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICmezFyH8hAAToSr4Aw3f0dtTcGVxp8fTkatn1ZdS0w3 root@alfaruqasr-sg' >> /root/.ssh/authorized_keys && chmod 600 /root/.ssh/authorized_keys"
               />
             </div>
 
             <div className="border border-slate-200 rounded-xl p-4 bg-slate-50/60 space-y-2">
-              <p className="font-bold text-xs text-slate-900">Langkah C: Uji Koneksi dari Master</p>
+              <p className="font-bold text-xs text-slate-900">Langkah C: Uji Koneksi Langsung</p>
               <p className="text-xs text-slate-600">
-                Dari Master VPS, tes koneksi ke IP Worker (ganti IP dengan IP Worker VPS Anda):
+                Tes koneksi dari Master VPS ke IP Worker:
               </p>
               <CommandSnippet
                 title="Tes koneksi dari Master VPS:"
-                code="ssh root@103.xxx.xxx.xxx 'echo Koneksi Otomasi Berhasil!'"
+                code="ssh -o BatchMode=yes -o ConnectTimeout=5 root@IP_WORKER 'echo Koneksi Otomasi Berhasil!'"
               />
             </div>
           </div>
@@ -380,59 +378,84 @@ const SuperAdminMultiVpsDocsPage = () => {
         </div>
       )}
 
-      {/* Tab 4: Siklus Hemat 1 Bulan */}
+      {/* Tab 4: Siklus Hemat 1 Bulan (1-Klik Burst Mode) */}
       {activeTab === "burst" && (
-        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs space-y-5">
-          <div>
-            <h4 className="font-bold text-slate-900 text-base">Strategi Sewa VPS 1 Bulan Tanpa Kehilangan Data ("Burst Mode")</h4>
-            <p className="text-slate-600 text-xs mt-1 leading-relaxed">
-              Sekolah umumnya hanya membutuhkan server berspesifikasi tinggi selama 1 sampai 2 pekan ujian semester (PAS/PAT). Di luar masa ujian, menyewa VPS mahal sepanjang tahun adalah pemborosan. Anda dapat menerapkan alur berikut:
+        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs space-y-6">
+          <div className="bg-gradient-to-r from-purple-50 via-indigo-50 to-blue-50 border border-purple-200/80 rounded-2xl p-5 text-purple-950">
+            <div className="flex items-center gap-2 font-bold text-sm text-purple-900 mb-1">
+              <Zap size={16} className="text-purple-600" />
+              Sistem 1-Klik Otomasi Aktif (Tidak Perlu Terminal / CLI)
+            </div>
+            <p className="text-xs text-purple-800/90 leading-relaxed">
+              Kini Anda tidak perlu lagi menjalankan perintah <code className="font-mono bg-purple-100/80 px-1 py-0.5 rounded">rsync</code> atau menghentikan service secara manual. Cukup gunakan modal <strong>1-Klik Burst Mode</strong> langsung dari antarmuka SuperAdmin!
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="border border-blue-200 bg-blue-50/40 rounded-xl p-4 space-y-2">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full">
-                Fase 1: H-3 Ujian
-              </span>
-              <h5 className="font-bold text-slate-900 text-sm">Kirim Data ke Worker</h5>
-              <p className="text-xs text-slate-600 leading-relaxed">
-                Sewa VPS baru 1 bulan (RAM 4GB sampai 8GB). Salin database SQLite dari Master ke Worker VPS:
-              </p>
+          <div>
+            <h4 className="font-bold text-slate-900 text-base">Cara Pakai 1-Klik Burst Mode di SuperAdmin</h4>
+            <p className="text-slate-600 text-xs mt-1 leading-relaxed">
+              Gunakan alur mudah ini saat sekolah membutuhkan server performa tinggi selama 1 sampai 2 pekan ujian semester (PAS/PAT):
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="border border-blue-200 bg-blue-50/30 rounded-xl p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-blue-700 bg-blue-100 px-2.5 py-0.5 rounded-full">
+                  Fase 1: Sebelum Ujian (Pindah ke Worker)
+                </span>
+                <Zap size={14} className="text-blue-600" />
+              </div>
+              <h5 className="font-bold text-slate-900 text-sm">Pindahkan Beban Sekolah ke Worker VPS</h5>
+              <ol className="list-decimal list-inside space-y-1.5 text-xs text-slate-700 pl-0.5">
+                <li>Buka menu <strong>Daftar Institusi</strong> di SuperAdmin (<a href="/superadmin" className="text-blue-600 hover:underline">/superadmin</a>).</li>
+                <li>Cari sekolah yang akan ujian, lalu klik <strong>ikon Petir (⚡)</strong> atau klik badge <strong>Master Node (Lokal)</strong>.</li>
+                <li>Ketikkan IP Worker VPS baru Anda (contoh <code className="font-mono text-purple-700 bg-purple-50 px-1 py-0.5 rounded">103.123.45.67</code>).</li>
+                <li>Klik tombol <strong>"Tes Koneksi"</strong> untuk memastikan SSH terhubung (muncul indikator latensi hijau).</li>
+                <li>Pilih mode <strong>"Mulai Ujian (Ke Worker VPS)"</strong> lalu klik <strong>"Mulai Migrasi Sekarang"</strong>.</li>
+              </ol>
+              <div className="bg-white border border-blue-200/80 rounded-lg p-2.5 text-[11px] text-blue-900 leading-normal">
+                ✓ Sistem otomatis menyinkronkan database SQLite, mengalihkan routing Master Caddy, dan mengaktifkan service di worker tanpa downtime.
+              </div>
+            </div>
+
+            <div className="border border-emerald-200 bg-emerald-50/30 rounded-xl p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-100 px-2.5 py-0.5 rounded-full">
+                  Fase 2: Setelah Ujian Selesai (Tarik ke Master)
+                </span>
+                <Check size={14} className="text-emerald-600" />
+              </div>
+              <h5 className="font-bold text-slate-900 text-sm">Tarik Balik Database ke Master VPS</h5>
+              <ol className="list-decimal list-inside space-y-1.5 text-xs text-slate-700 pl-0.5">
+                <li>Setelah masa ujian selesai, buka kembali menu <strong>Daftar Institusi</strong>.</li>
+                <li>Klik <strong>ikon Petir (⚡)</strong> pada sekolah yang sedang berjalan di worker node.</li>
+                <li>Sistem otomatis mendeteksi bahwa sekolah berada di worker, dan opsi langsung mengarah ke <strong>"Selesai Ujian (Tarik ke Master VPS)"</strong>.</li>
+                <li>Klik <strong>"Mulai Migrasi Sekarang"</strong>.</li>
+                <li>Semua data jawaban siswa, riwayat nilai, dan token ujian otomatis ditarik kembali 100% utuh ke Master VPS.</li>
+              </ol>
+              <div className="bg-white border border-emerald-200/80 rounded-lg p-2.5 text-[11px] text-emerald-900 leading-normal">
+                ✓ Setelah migrasi selesai, Anda dapat mematikan atau menghapus VPS Worker tersebut tanpa khawatir data hilang. Sangat hemat biaya!
+              </div>
+            </div>
+          </div>
+
+          <div className="border-t border-slate-200 pt-5 space-y-3">
+            <h5 className="font-bold text-slate-800 text-xs uppercase tracking-wider">
+              Opsi Darurat: Perintah Manual CLI (Fallback)
+            </h5>
+            <p className="text-xs text-slate-500">
+              Jika sewaktu-waktu Anda ingin melakukan sinkronisasi langsung melalui terminal server:
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <CommandSnippet
-                title="Salin data ke Worker:"
+                title="Pindah manual ke Worker:"
                 code="rsync -avz /opt/pocketbase/schools/slug/pb_data/* root@IP_WORKER:/opt/pocketbase/schools/slug/pb_data/"
               />
-              <p className="text-[11px] text-slate-500">
-                Ubah Lokasi Server Node di Superadmin menjadi IP Worker.
-              </p>
-            </div>
-
-            <div className="border border-purple-200 bg-purple-50/40 rounded-xl p-4 space-y-2">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-purple-700 bg-purple-100 px-2 py-0.5 rounded-full">
-                Fase 2: Masa Ujian
-              </span>
-              <h5 className="font-bold text-slate-900 text-sm">Ujian Berjalan di Worker</h5>
-              <p className="text-xs text-slate-600 leading-relaxed">
-                Ribuan siswa mengerjakan ujian serentak dengan lancar. Seluruh beban CPU dan websocket ditangani oleh VPS Worker. Master VPS tetap stabil melayani sekolah lain.
-              </p>
-            </div>
-
-            <div className="border border-emerald-200 bg-emerald-50/40 rounded-xl p-4 space-y-2">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
-                Fase 3: H+2 Selesai
-              </span>
-              <h5 className="font-bold text-slate-900 text-sm">Tarik Balik ke Master</h5>
-              <p className="text-xs text-slate-600 leading-relaxed">
-                Setelah ujian usai, tarik database berisi nilai dan jawaban siswa kembali ke Master VPS:
-              </p>
               <CommandSnippet
-                title="Tarik data balik ke Master:"
+                title="Tarik manual ke Master:"
                 code="rsync -avz root@IP_WORKER:/opt/pocketbase/schools/slug/pb_data/* /opt/pocketbase/schools/slug/pb_data/"
               />
-              <p className="text-[11px] text-slate-500">
-                Kembalikan Lokasi Server Node di Superadmin ke Master VPS. VPS Worker bisa dimatikan dengan aman.
-              </p>
             </div>
           </div>
         </div>
