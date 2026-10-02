@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Activity, Server, Database, Cloud, CheckCircle, RefreshCw, AlertCircle, Wifi, PowerOff } from "lucide-react";
+import { Activity, Server, Database, Cloud, CheckCircle, RefreshCw, AlertCircle, Wifi, PowerOff, BookOpen } from "lucide-react";
 import SuperAdminLayout from "../../components/layout/SuperAdminLayout";
 import { masterPb } from "../../lib/pocketbase";
 import { cn } from "../../lib/utils";
@@ -81,14 +81,23 @@ const SuperAdminInfraPage = () => {
           <h2 className="text-xl font-bold text-slate-900">Status Infrastruktur</h2>
           <p className="text-slate-500 text-sm mt-0.5">Monitoring latensi realtime ke seluruh tenant node.</p>
         </div>
-        <button
-          onClick={fetchAndPingNodes}
-          disabled={loading}
-          className="flex items-center gap-2 h-9 px-4 bg-white border border-slate-200 text-slate-700 text-sm font-semibold rounded-xl hover:bg-slate-50 shadow-sm transition-all disabled:opacity-50 w-fit"
-        >
-          <RefreshCw size={14} className={cn(loading && "animate-spin")} />
-          Segarkan
-        </button>
+        <div className="flex items-center gap-2">
+          <a
+            href="/superadmin/multi-vps-docs"
+            className="flex items-center gap-1.5 h-9 px-3.5 bg-purple-50 border border-purple-200 text-purple-700 text-xs font-semibold rounded-xl hover:bg-purple-100 shadow-xs transition-all w-fit"
+          >
+            <BookOpen size={14} className="text-purple-600" />
+            <span>Panduan Multi-VPS</span>
+          </a>
+          <button
+            onClick={fetchAndPingNodes}
+            disabled={loading}
+            className="flex items-center gap-2 h-9 px-4 bg-white border border-slate-200 text-slate-700 text-sm font-semibold rounded-xl hover:bg-slate-50 shadow-sm transition-all disabled:opacity-50 w-fit"
+          >
+            <RefreshCw size={14} className={cn(loading && "animate-spin")} />
+            Segarkan
+          </button>
+        </div>
       </div>
 
       {/* Global Status Cards */}

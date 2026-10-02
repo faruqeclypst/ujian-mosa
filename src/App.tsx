@@ -209,10 +209,11 @@ import SuperAdminInfraPage from "./pages/superadmin/SuperAdminInfraPage";
 import SuperAdminAnalyticsPage from "./pages/superadmin/SuperAdminAnalyticsPage";
 import SuperAdminSettingsPage from "./pages/superadmin/SuperAdminSettingsPage";
 import SuperAdminInvoicePage from "./pages/superadmin/SuperAdminInvoicePage";
+import SuperAdminMultiVpsDocsPage from "./pages/superadmin/SuperAdminMultiVpsDocsPage";
 
 const LandingContent = () => {
   useEffect(() => {
-    document.title = "EXAM AA — Platform CBT Online untuk Sekolah";
+    document.title = "EXAM AA: Platform CBT Online untuk Sekolah";
     if (Capacitor.isNativePlatform()) {
       SplashScreen.hide().catch(() => { });
     }
@@ -231,6 +232,8 @@ const LandingContent = () => {
         <Route path="/superadmin/analytics" element={<SuperAdminAnalyticsPage />} />
         <Route path="/superadmin/settings" element={<SuperAdminSettingsPage />} />
         <Route path="/superadmin/invoice" element={<SuperAdminInvoicePage />} />
+        <Route path="/superadmin/multi-vps-docs" element={<SuperAdminMultiVpsDocsPage />} />
+        <Route path="/superadmin/docs" element={<Navigate to="/superadmin/multi-vps-docs" replace />} />
         <Route path="/superadmin/login" element={<SuperAdminLoginPage />} />
         <Route path="/pilih-sekolah" element={<SelectSchoolPage />} />
         <Route path="/pilih sekolah" element={<SelectSchoolPage />} />

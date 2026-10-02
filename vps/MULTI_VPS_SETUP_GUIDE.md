@@ -1,377 +1,168 @@
-# Panduan Arsitektur & Setup Multi-VPS (Worker Node) — EXAM AA
+# Panduan Arsitektur & Operasional Multi-VPS (Worker Node) : EXAM AA
 
-Dokumen ini berisi panduan lengkap untuk menjalankan institusi/tenant di VPS terpisah (**Worker Node**) sementara Master Control Plane tetap berada di VPS Utama (`64.235.41.108`).
-
----
-
-## 1. Konsep & Arsitektur
-
-```
-                               ┌─────────────────────────────────────────┐
-                               │           VPS 1 (MASTER CONTROL)        │
-                               │              64.235.41.108              │
-                               │  - Master Registry PB (examku.my.id)    │
-                               │  - Super Admin Dashboard                │
-                               │  - Tenant Standar (Starter/Reguler)     │
-                               └──────────────────┬──────────────────────┘
-                                                  │ (SSH / API)
-                          ┌───────────────────────┴───────────────────────┐
-                          ▼                                               ▼
-             ┌─────────────────────────┐                     ┌─────────────────────────┐
-             │   VPS 2 (WORKER NODE)   │                     │   VPS 3 (WORKER NODE)   │
-             │      IP: 103.xxx.xxx.1  │                     │      IP: 103.xxx.xxx.2  │
-             │  - Sekolah A (1000 Siswa│                     │  - Sekolah B (800 Siswa)│
-             │  - Caddy Auto SSL       │                     │  - Caddy Auto SSL       │
-             │  - Port 8090/8095       │                     │  - Port 8090/8095       │
-             └─────────────────────────┘                     └─────────────────────────┘
-```
-
-### Mengapa Perlu Multi-VPS?
-* **Isolasi Beban Ujian**: Saat sekolah dengan 500–1.000 siswa ujian serentak, proses baca-tulis soal, timer, dan websocket realtime akan mengonsumsi CPU & RAM tinggi. Dengan memindahkannya ke VPS tersendiri, sekolah lain dan VPS Master tidak akan pernah lag atau tumbang.
-* **Skalabilitas Fleksibel**: Anda cukup menyewa VPS terjangkau (misal 2 vCPU 4GB RAM) khusus untuk sekolah tersebut.
-* **Frontend Bebas**: Frontend React kita (`TenantContext.tsx`) secara dinamis menghubungkan database siswa ke URL yang tertera di `record.pb_url`.
+Dokumen ini berisi panduan teknis dan operasional untuk mengelola tenant/institusi yang di-hosting pada VPS terpisah (**Worker Node**), dengan **Master Control Plane, Billing Gateway, dan Central Ingress** tetap terpusat di VPS Utama (`64.235.41.108`).
 
 ---
 
-## 2. Persiapan Awal di VPS Baru (Cukup 1x Saja)
+## 1. Konsep & Alur Arsitektur
+
+```
+                                    ┌────────────────────────────────────────────────────────┐
+                                    │               VPS MASTER (64.235.41.108)               │
+                                    │  - Master Registry PB (examku.my.id)                   │
+                                    │  - Super Admin Dashboard                               │
+                                    │  - Central Billing, Invoice & SumoPod Payment API      │
+                                    │  - Caddy Ingress Gateway (Wildcard SSL *.examku.my.id) │
+                                    └───────────────┬────────────────────────┬───────────────┘
+                                                    │                        │
+                    Proxy /api/* & /_*              │                        │ Proxy /api/* & /_*
+                    (0ms frontend latency)          │                        │ (0ms frontend latency)
+                                                    ▼                        ▼
+                                     ┌────────────────────────┐    ┌────────────────────────┐
+                                     │  WORKER VPS 1 (NODE A) │    │  WORKER VPS 2 (NODE B) │
+                                     │     IP: 103.xxx.xxx.1  │    │     IP: 103.xxx.xxx.2  │
+                                     │  - SMAN Modal Bangsa   │    │  - SMP 1 Banda Aceh    │
+                                     │  - 1000 Siswa Ujian    │    │  - 800 Siswa Ujian     │
+                                     └────────────────────────┘    └────────────────────────┘
+```
+
+### Keunggulan Arsitektur Ini:
+1. **Central Ingress Gateway & Zero CORS**:
+   - Master Caddy tetap memegang wildcard SSL `*.examku.my.id` dan custom domain.
+   - Master Caddy menyajikan berkas React frontend statis dari `/opt/frontend/ujian/dist` dengan kecepatan 0ms, lalu mem-proxy `/api/*` dan `/_*` ke IP Worker Node tujuan (`$SERVER_HOST:$PORT`).
+   - Browser siswa tidak perlu mengakses IP asing langsung atau terbentur CORS & multi-SSL.
+2. **Billing & Pembayaran Terpusat 100%**:
+   - Tagihan (invoices), webhook SumoPod (QRIS / Virtual Account), serta kwitansi SPJ BOS tetap diproses di Master VPS melalui `masterPb`.
+   - Worker VPS sama sekali tidak menyimpan data keuangan; murni menangani beban baca-tulis ujian.
+3. **Fleksibilitas Sewa VPS (Burst Mode Ujian)**:
+   - Sekolah yang butuh server besar saat PAS/PAT (1 bulan) bisa diarahkan ke Worker VPS, dan datanya bisa dipindah kembali ke Master saat ujian usai tanpa merubah URL atau login siswa.
+
+---
+
+## 2. Persiapan VPS Baru (Cukup 1x Saja)
 
 Saat Anda baru menyewa VPS baru (Ubuntu 22.04 / 24.04 LTS), lakukan langkah berikut sekali saja:
 
-### A. Install Caddy & PocketBase di VPS Baru
-Login via SSH ke VPS Baru (`root`), lalu jalankan:
+### Cara Cepat (1 Baris Perintah Otomatis)
+Login via SSH ke VPS Worker baru sebagai `root`, lalu jalankan:
 
 ```bash
-# 1. Update sistem & install dependencies
-apt update && apt upgrade -y
-apt install -y curl wget unzip debian-keyring debian-archive-keyring apt-transport-https ufw
-
-# 2. Install Caddy Web Server
-curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
-curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | tee /etc/apt/sources.list.d/caddy-stable.list
-apt update && apt install caddy -y
-
-# 3. Buat direktori kerja
-mkdir -p /opt/pocketbase/schools/template/pb_hooks
-mkdir -p /opt/pocketbase/schools/template/pb_data
-mkdir -p /opt/frontend/ujian/dist
-mkdir -p /etc/caddy/conf.d
-
-# 4. Download PocketBase binary (sesuai versi yang dipakai)
-PB_VERSION="0.22.20"
-wget -qO /tmp/pb.zip "https://github.com/pocketbase/pocketbase/releases/download/v${PB_VERSION}/pocketbase_${PB_VERSION}_linux_amd64.zip"
-unzip -o /tmp/pb.zip -d /opt/pocketbase/schools/template/
-chmod +x /opt/pocketbase/schools/template/pocketbase
-rm /tmp/pb.zip
-
-# 5. Konfigurasi Caddy agar membaca folder conf.d
-cat << 'EOF' > /etc/caddy/Caddyfile
-import /etc/caddy/conf.d/*.caddy
-EOF
-
-systemctl restart caddy
+curl -sSL https://raw.githubusercontent.com/faruqeclypst/ujian-mosa/feature/saas-v2/vps/setup_worker_node.sh | bash
 ```
 
-### B. Hubungkan SSH Key dari VPS Master ke VPS Baru (Untuk Otomasi)
-Agar VPS Master (`64.235.41.108`) bisa mengeksekusi pembuatan tenant secara otomatis tanpa password:
+Script ini otomatis:
+1. Mengunduh PocketBase binary v0.22.20 ke `/opt/pocketbase/schools/template/pocketbase`.
+2. Memasang hook database `busy_timeout=5000` dan journal size limit untuk SQLite.
+3. Memasang helper script `/usr/local/bin/add-school.sh` dan `/usr/local/bin/remove-school.sh` pada worker.
+4. Menyiapkan systemd template service untuk PocketBase.
 
-1. Di **VPS Master (`64.235.41.108`)**, lihat public key root:
+---
+
+## 3. Menghubungkan Kunci SSH untuk Otomasi Penuh (Direkomendasikan)
+
+Agar saat Anda menekan tombol **Simpan** di dashboard Superadmin, Master VPS otomatis membuatkan folder sekolah dan menjalankan PocketBase di Worker tanpa Anda harus menyentuh terminal worker lagi:
+
+1. **Lihat Public Key di Master VPS (64.235.41.108)**:
    ```bash
-   cat /root/.ssh/id_ed25519.pub
-   # Jika belum ada key, buat dengan: ssh-keygen -t ed25519 -N "" -f /root/.ssh/id_ed25519
+   cat /root/.ssh/id_ed25519.pub || ssh-keygen -t ed25519 -N '' -f /root/.ssh/id_ed25519
    ```
-2. Di **VPS Baru**, buka file `authorized_keys` dan tempelkan public key tadi:
+2. **Buka file `authorized_keys` di Worker VPS baru dan tempelkan kunci di atas**:
    ```bash
    mkdir -p /root/.ssh
    nano /root/.ssh/authorized_keys
    chmod 600 /root/.ssh/authorized_keys
    ```
-3. Tes dari VPS Master:
+3. **Uji koneksi dari Master VPS**:
    ```bash
-   ssh root@IP_VPS_BARU "echo 'Koneksi Berhasil!'"
+   ssh root@IP_WORKER_BARU "echo 'Koneksi Berhasil!'"
    ```
 
-### C. Pasang Script Otomasi di VPS Baru (`/usr/local/bin/add-school.sh`)
-Buat script pembuat tenant di VPS Baru:
+---
 
-```bash
-cat << 'EOF' > /usr/local/bin/add-school.sh
-#!/bin/bash
-set -e
+## 4. Cara Menempatkan Tenant ke Worker VPS
 
-SLUG="$1"
-PORT="$2"
-CUSTOM_DOMAIN="$3"
-
-if [ -z "$SLUG" ] || [ -z "$PORT" ]; then
-    echo "Usage: $0 <slug> <port> [custom_domain]"
-    exit 1
-fi
-
-SCHOOL_DIR="/opt/pocketbase/schools/${SLUG}"
-TEMPLATE_DIR="/opt/pocketbase/schools/template"
-CADDY_FILE="/etc/caddy/conf.d/${SLUG}.caddy"
-SERVICE_NAME="pb-${SLUG}"
-
-# 1. Buat folder jika belum ada
-mkdir -p "${SCHOOL_DIR}"
-if [ ! -f "${SCHOOL_DIR}/pocketbase" ]; then
-    cp -r "${TEMPLATE_DIR}/"* "${SCHOOL_DIR}/"
-fi
-chown -R root:root "${SCHOOL_DIR}"
-
-# 2. Buat systemd service
-cat > /etc/systemd/system/${SERVICE_NAME}.service << SVCEOF
-[Unit]
-Description=PocketBase - ${SLUG}
-After=network.target
-
-[Service]
-Type=simple
-User=root
-WorkingDirectory=${SCHOOL_DIR}
-ExecStart=${SCHOOL_DIR}/pocketbase serve --http="127.0.0.1:${PORT}"
-Restart=always
-RestartSec=3
-LimitNOFILE=65535
-
-[Install]
-WantedBy=multi-user.target
-SVCEOF
-
-systemctl daemon-reload
-systemctl enable --now ${SERVICE_NAME}
-
-# 3. Buat Caddy routing & Auto SSL
-DOMAINS="${SLUG}.examku.my.id"
-if [ -n "$CUSTOM_DOMAIN" ]; then
-    DOMAINS="${DOMAINS}, ${CUSTOM_DOMAIN}"
-fi
-
-cat > "${CADDY_FILE}" << CADEOF
-${DOMAINS} {
-    root * /opt/frontend/ujian/dist
-    file_server
-
-    handle /api/* {
-        reverse_proxy localhost:${PORT}
-    }
-    handle /_* {
-        reverse_proxy localhost:${PORT}
-    }
-    handle {
-        try_files {path} /index.html
-    }
-}
-CADEOF
-
-systemctl reload caddy
-echo "Tenant ${SLUG} berhasil dibuat di port ${PORT}!"
-EOF
-
-chmod +x /usr/local/bin/add-school.sh
-```
+1. Buka Dashboard Superadmin: `https://examku.my.id/superadmin`.
+2. Klik tombol **Tambah Sekolah** (atau tombol **Edit** pada institusi yang sudah ada).
+3. Pada bagian **Lokasi Server Node (Multi-VPS)**:
+   - Pilih tombol **Worker Node**.
+   - Masukkan IP address VPS Worker Anda (misal `103.123.45.67`).
+4. Klik **Simpan** / **Buat Tenant**.
+5. Master PB akan otomatis:
+   - Menyimpan `server_host` ke database Master.
+   - Mengonfigurasi Caddy di Master VPS agar mem-proxy `/api/*` dan `/_*` ke `http://103.123.45.67:PORT`.
+   - Menjalankan pembuatan instance PocketBase pada Worker VPS via SSH.
+6. Tenant siap diakses di `https://slug.examku.my.id` dengan enkripsi HTTPS penuh!
 
 ---
 
-## 3. Cara Mengaktifkan Tenant di VPS Baru
+## 5. Strategi Sewa VPS 1 Bulan ("Burst Mode" Ujian Sekolah)
 
-### Opsi A: Cara Otomatis (Saat Fitur Multi-Node Master Diaktifkan)
-1. Buka dashboard Super Admin: `https://examku.my.id/superadmin`.
-2. Klik **Tambah Institusi**.
-3. Di pilihan **Server Node**, pilih **VPS 2 (Dedicated)**.
-4. Masukkan Nama Sekolah, Slug, dan Custom Domain (misal `cbt.smanmosa.sch.id`).
-5. Klik **Simpan**.
-6. Master PB di latar belakang mengeksekusi:
-   `ssh root@IP_VPS_2 "/usr/local/bin/add-school.sh modalbangsa 8095 cbt.smanmosa.sch.id"`
-7. Tenant dan SSL di VPS 2 langsung aktif otomatis dalam 3 detik!
-
----
-
-### Opsi B: Cara Cepat (Manual 1 Perintah dari Master)
-Jika Anda belum mengupdate kode dashboard Super Admin, Anda cukup jalankan 1 baris perintah ini dari VPS Master:
-
-```bash
-# Jalankan langsung dari VPS Master:
-ssh root@IP_VPS_BARU "/usr/local/bin/add-school.sh modalbangsa 8095 cbt.smanmosa.sch.id"
-```
-
-Lalu di database Master (`examku.my.id/superadmin`), ubah kolom **PocketBase URL** sekolah tersebut menjadi:
-`https://cbt.smanmosa.sch.id`
-
----
-
-## 4. Konfigurasi DNS di Cloudflare
-Minta tim IT sekolah (atau atur di panel Cloudflare Anda):
-* **Type**: `A`
-* **Name**: Subdomain sekolah (contoh: `cbt`)
-* **IPv4 Address**: Masukkan **IP VPS Baru**
-* **Proxy Status**: `DNS Only` (awan abu-abu agar Caddy bisa menerbitkan SSL Let's Encrypt secara otomatis)
-
----
-
-## 5. Cara Memindahkan Tenant yang Sudah Ada (Migrasi Data)
-Jika sekolah tersebut sebelumnya sudah aktif di VPS 1 (Master) dan ingin dipindahkan ke VPS Baru:
-
-1. **Stop service di VPS 1**:
-   ```bash
-   systemctl stop pb-modalbangsa
-   ```
-2. **Kirim database SQLite ke VPS Baru**:
-   ```bash
-   rsync -avz /opt/pocketbase/schools/modalbangsa/pb_data/* root@IP_VPS_BARU:/opt/pocketbase/schools/modalbangsa/pb_data/
-   ```
-3. **Restart service di VPS Baru**:
-   ```bash
-   ssh root@IP_VPS_BARU "systemctl restart pb-modalbangsa"
-   ```
-4. **Update DNS A Record**:
-   Ubah IP domain sekolah di Cloudflare dari `64.235.41.108` menjadi `IP_VPS_BARU`.
-
-Semua bank soal, siswa, guru, dan nilai ujian akan langsung berpindah 100% utuh tanpa perlu re-input.
-
----
-
-## 6. Strategi Sewa VPS Murah 1 Bulan Tanpa Takut Kehilangan Data ("Burst Mode")
-
-Sekolah biasanya **hanya butuh server berspesifikasi tinggi selama 1–2 minggu masa ujian semester (PAS/PAT)**. Di luar masa ujian, aktivitas sekolah sangat minim sehingga menyewa VPS mahal sepanjang tahun adalah pemborosan.
-
-Dengan pola **Burst Mode**, Anda bisa menyewa VPS murah hanya untuk **1 bulan**, lalu mengembalikan database ke VPS Master setelah ujian selesai:
-
-```
-[Bulan Biasa]                   [H-3 Masa Ujian: Sewa 1 Bln]                 [H+2 Ujian Selesai: Tutup VPS]
-Database aktif di Master   ──>  Data di-copy ke VPS Worker       ──>   Hasil ujian ditarik balik ke Master
-(Spek hemat / murah)            (Tahan 1000 siswa serentak)            (VPS Worker dibiarkan expired/mati)
-```
+Sekolah umumnya hanya membutuhkan server berspesifikasi tinggi selama 1 sampai 2 pekan masa ujian semester (PAS/PAT). Di luar masa ujian, aktivitas sekolah minim sehingga menyewa VPS mahal sepanjang tahun adalah pemborosan.
 
 ### Alur Kerja Siklus 1 Bulan:
 
 #### Fase 1: H-3 Sebelum Ujian Dimulai (Kirim Data ke Worker)
-1. Sewa VPS baru 1 bulan (misal RAM 4GB–8GB).
-2. Jalankan setup awal Caddy + PocketBase di VPS Baru (lihat Bab 2).
-3. Salin data dari Master ke Worker:
+1. Sewa VPS baru 1 bulan (RAM 4GB sampai 8GB).
+2. Jalankan setup otomatis:
    ```bash
-   # Di VPS Master:
+   curl -sSL https://raw.githubusercontent.com/faruqeclypst/ujian-mosa/feature/saas-v2/vps/setup_worker_node.sh | bash
+   ```
+3. Stop service lokal di Master:
+   ```bash
    systemctl stop pb-modalbangsa
-   rsync -avz /opt/pocketbase/schools/modalbangsa/pb_data/* root@IP_VPS_WORKER:/opt/pocketbase/schools/modalbangsa/pb_data/
-   ssh root@IP_VPS_WORKER "systemctl restart pb-modalbangsa"
    ```
-4. Ubah A Record di Cloudflare ke IP VPS Worker.
-5. Ujian siap diselenggarakan di VPS Worker dengan performa maksimal!
-
----
-
-#### Fase 2: Selama Ujian Berlangsung (Pengaman Auto-Sync Tengah Malam)
-Untuk mengantisipasi jika VPS murah tersebut mati mendadak sebelum 1 bulan:
-Pasang Cron Job di VPS Worker agar menyalin file `data.db` ke VPS Master setiap jam 02:00 malam:
-```bash
-# Tambahkan di crontab VPS Worker (crontab -e):
-0 2 * * * rsync -az /opt/pocketbase/schools/*/pb_data/data.db root@64.235.41.108:/backup/worker_nightly/
-```
-Jika terjadi kerusakan hardware pada VPS Worker, Anda paling banyak hanya kehilangan beberapa jam data, bukan seluruh data ujian.
-
----
-
-#### Fase 3: H+2 Setelah Ujian Selesai (Tarik Balik Data & Hentikan VPS)
-Setelah seluruh siswa selesai ujian dan guru selesai merekap nilai:
-
-1. **Tarik seluruh hasil ujian terbaru dari Worker ke Master**:
+4. Kirim folder database SQLite dari Master ke Worker VPS:
    ```bash
-   # Jalankan perintah ini dari VPS Master:
-   rsync -avz root@IP_VPS_WORKER:/opt/pocketbase/schools/modalbangsa/pb_data/* /opt/pocketbase/schools/modalbangsa/pb_data/
+   rsync -avz /opt/pocketbase/schools/modalbangsa/pb_data/* root@IP_WORKER:/opt/pocketbase/schools/modalbangsa/pb_data/
    ```
-2. **Nyalakan kembali service di VPS Master**:
+5. Buka Superadmin (`/superadmin`), edit sekolah tersebut dan ganti Lokasi Server Node menjadi IP Worker.
+6. Jalankan service di Worker:
    ```bash
-   systemctl start pb-modalbangsa
+   ssh root@IP_WORKER "systemctl restart pb-modalbangsa"
    ```
-3. **Kembalikan DNS Cloudflare** ke IP VPS Master (`64.235.41.108`).
-4. **Biarkan VPS Worker expired / hapus server (terminate)**:
-   * Anda tidak perlu memperpanjang biaya sewa VPS tersebut.
-   * Seluruh nilai siswa, riwayat jawaban, dan soal ujian sudah **100% aman dan tersimpan abadi di VPS Master**.
+
+#### Fase 2: Masa Ujian Berlangsung
+* Ribuan siswa mengerjakan soal serentak di Worker VPS.
+* Master VPS tetap ringan dan stabil.
+* Pembayaran dan perpanjangan langganan tetap ditangani terpusat di Master VPS.
+
+#### Fase 3: H+2 Setelah Ujian Selesai (Tarik Balik ke Master)
+1. Stop service di Worker VPS:
+   ```bash
+   ssh root@IP_WORKER "systemctl stop pb-modalbangsa"
+   ```
+2. Tarik database terbaru (berisi nilai dan jawaban siswa) kembali ke Master VPS:
+   ```bash
+   rsync -avz root@IP_WORKER:/opt/pocketbase/schools/modalbangsa/pb_data/* /opt/pocketbase/schools/modalbangsa/pb_data/
+   ```
+3. Di Superadmin (`/superadmin`), ubah Lokasi Server Node kembali ke **Master VPS (Lokal)**.
+4. Restart service di Master:
+   ```bash
+   systemctl restart pb-modalbangsa
+   ```
+5. Biarkan VPS Worker expired / hapus instance VPS Worker tersebut.
+6. Hasil ujian, bank soal, dan siswa tetap aman 100% di Master VPS tanpa biaya langganan VPS tambahan.
 
 ---
 
-### Pengaman Tambahan: Backup Otomatis ke Cloudflare R2
-Agar semakin aman dari kehilangan data, database SQLite sekolah juga dapat diunggah berkala ke bucket Cloudflare R2 menggunakan script rclone / S3 tool:
-* Ukuran database SQLite terkompresi (zip) umumnya hanya 10–50 MB.
-* Penyimpanan di Cloudflare R2 berbiaya $0 (gratis untuk kuota awal hingga 10 GB).
-* File backup dapat diunduh kapan saja untuk di-restore ke server manapun.
+## 6. Troubleshooting & FAQ
 
----
-
-## 7. Cara Update & Deploy Kode Otomatis ke Banyak VPS
-
-Anda **tidak perlu login dan SCP satu per satu secara manual** saat ada pembaruan kode frontend atau backend hook.
-
-Sistem deploy kita menggunakan script Python otomatis yang mendukung daftar multi-server:
-
-### Contoh Konfigurasi `deploy_all.py` untuk Multi-Node:
-```python
-# Daftar seluruh server produksi Anda:
-SERVERS = [
-    {"host": "64.235.41.108", "user": "root", "name": "VPS Master"},
-    {"host": "103.xxx.xxx.1", "user": "root", "name": "VPS Worker 1 (Mosa)"},
-    {"host": "103.xxx.xxx.2", "user": "root", "name": "VPS Worker 2 (Kampus B)"},
-]
-
-# Script melakukan sinkronisasi otomatis ke semua server:
-for s in SERVERS:
-    print(f"🚀 Deploying update to {s['name']} ({s['host']})...")
-    upload_frontend(s['host'], local_dist, remote_dist)
-    upload_hooks(s['host'], local_hook)
-    reload_services(s['host'])
-```
-
-**Cara Menjalankannya:**
-Cukup jalankan satu perintah di laptop/komputer Anda:
+### Q1: Latensi di halaman Infrastruktur menunjukkan TIMEOUT?
+Pastikan port tenant pada Worker VPS (misal 8095) sudah dibuka di firewall UFW:
 ```bash
-bun run build && python deploy_all.py
+ufw allow proto tcp from 64.235.41.108 to any port 8091:8150
 ```
-Semua file frontend di seluruh VPS akan diperbarui secara serentak dalam sekali jalan.
-
----
-
-## 8. Kompatibilitas Aplikasi Android (Exambro Mobile)
-
-Aplikasi Android EXAM AA **sudah 100% mendukung multi-VPS secara otomatis tanpa perlu rebuild / update APK**.
-
-### Bagaimana Aplikasi Mendeteksi VPS yang Tepat?
-```
-[Siswa Buka Aplikasi Android (1 File APK)]
-                 │
-                 ▼
-1. Aplikasi menghubungi Master VPS (examku.my.id) meminta daftar sekolah aktif
-                 │
-                 ▼
-2. Siswa memilih sekolahnya (misal: "SMAN Modal Bangsa")
-                 │
-                 ▼
-3. Aplikasi membaca kolom `pb_url` dari data sekolah:
-   - Sekolah di VPS 1  ──> Aplikasi otomatis konek ke https://alfa.examku.my.id (VPS 1)
-   - Sekolah di VPS 2  ──> Aplikasi otomatis konek ke https://cbt.smanmosa.sch.id (VPS 2)
-                 │
-                 ▼
-4. Siswa login dan ujian langsung di VPS masing-masing!
+Dan pastikan service PocketBase di Worker VPS berstatus aktif:
+```bash
+systemctl status pb-slug.service
 ```
 
-**Kode Sumber yang Bertanggung Jawab (`TenantContext.tsx`):**
-```typescript
-// Saat sekolah dipilih, koneksi database instan dialihkan ke URL server sekolah tersebut
-const record = await masterPb.collection('schools').getFirstListItem(filter);
-setPb(getSchoolPb(record.pb_url));
+### Q2: Apakah Custom Domain sekolah bisa diarahkan ke Worker?
+Bisa. Tim IT sekolah tetap mengarahkan DNS (A Record) ke IP Master (`64.235.41.108`). Master Caddy yang mengurus SSL Let's Encrypt secara otomatis dan meneruskan lalu lintas API ke Worker VPS.
+
+### Q3: Bagaimana jika Master VPS tidak memiliki akses SSH ke Worker?
+Jika SSH key belum dipasang, Anda cukup menjalankan perintah manual sekali di Worker VPS:
+```bash
+/usr/local/bin/add-school.sh <slug> <port> [custom_domain] [quota]
 ```
-Karena arsitektur ini sudah dinamis, Anda bebas menambah 5 hingga 10 VPS Worker baru di masa depan tanpa pernah perlu merilis ulang file APK Android.
-
----
-
-## 9. Mengapa Menggunakan "Tenant Partitioning" (Bukan Load Balancing Tradisional)?
-
-Sering muncul pertanyaan: *Kenapa kita tidak memakai Load Balancing biasa (membagi siswa 1 sekolah ke 2 VPS sekaligus)?*
-
-### Alasan Teknis (SQLite Concurrency):
-1. **Database PocketBase adalah SQLite (Embedded File)**:
-   Database tersimpan dalam 1 file lokal (`data.db`). Jika 1 sekolah di-load balance secara aktif ke 2 server fisik berbeda, data jawaban siswa yang masuk ke Server A tidak akan ada di Server B, sehingga terjadi bentrok data atau sesi ujian terputus.
-2. **Kapasitas 1 VPS PocketBase Sangat Besar**:
-   PocketBase dibangun menggunakan **Golang** dan mode **SQLite WAL (Write-Ahead Logging)**. Satu VPS standar (misal 4 vCPU, 4–8 GB RAM) sanggup menangani **2.000 hingga 5.000 request per detik**, sedangkan 1.000 siswa ujian serentak rata-rata hanya menghasilkan 20–50 request per detik.
-3. **Pemisahan Berdasarkan Tenant (Tenant Sharding)**:
-   Maka dari itu, pola yang paling stabil, aman, dan zero-risk adalah memisahkan beban **per sekolah** ke server masing-masing. Sekolah besar tidak akan mengganggu sekolah lain, dan data setiap sekolah 100% konsisten.
-
+Lalu di Superadmin dashboard, masukkan IP Worker tersebut. Master Caddy akan langsung mem-proxy traffic ke worker.

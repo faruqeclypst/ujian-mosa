@@ -4,7 +4,7 @@ import {
   Plus, Check, X, Edit, Power, PowerOff,
   School, Clock, Users, RefreshCw,
   Search, Trash2, Monitor, Zap, Server, ChevronDown,
-  Building2, Globe, Sparkles, ShieldCheck, Calendar, Cpu,
+  Building2, Globe, Sparkles, ShieldCheck, Calendar, Cpu, BookOpen,
   Activity, CheckCircle2, XCircle, AlertTriangle, Info
 } from "lucide-react";
 import { masterPb } from "../../lib/pocketbase";
@@ -638,6 +638,16 @@ const SuperAdminDashboard = () => {
           >
             <RefreshCw size={15} className={cn("text-slate-600", loading && "animate-spin")} />
           </button>
+
+          {/* Docs Multi-VPS */}
+          <a
+            href="/superadmin/multi-vps-docs"
+            className="h-9 px-3 rounded-2xl bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 font-semibold shadow-xs flex items-center gap-1.5 transition-all text-xs whitespace-nowrap"
+            title="Buka panduan manual Multi-VPS"
+          >
+            <BookOpen size={14} className="text-purple-600" />
+            <span className="hidden md:inline">Panduan Multi-VPS</span>
+          </a>
 
           {/* Add */}
           <button

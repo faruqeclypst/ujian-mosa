@@ -10,6 +10,7 @@ import {
   X,
   ChevronRight,
   FileText,
+  BookOpen,
 } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { masterPb } from "../../lib/pocketbase";
@@ -22,6 +23,7 @@ interface SuperAdminLayoutProps {
 const navItems = [
   { label: "Dashboard", sublabel: "Seluruh Tenant", icon: LayoutDashboard, path: "/superadmin" },
   { label: "Infrastruktur", sublabel: "Status & Latensi", icon: Database, path: "/superadmin/infra" },
+  { label: "Panduan Multi-VPS", sublabel: "Manual Worker Node", icon: BookOpen, path: "/superadmin/multi-vps-docs" },
   { label: "Statistik", sublabel: "Analitik Server", icon: Globe, path: "/superadmin/analytics" },
   { label: "Invoice", sublabel: "Tagihan & Pembayaran", icon: FileText, path: "/superadmin/invoice" },
   { label: "Pengaturan", sublabel: "Akun & Keamanan", icon: Settings, path: "/superadmin/settings" },
