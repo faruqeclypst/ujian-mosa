@@ -1,0 +1,7 @@
+﻿{
+  "name": "exam-aa-payment-api",
+  "private": true,
+  "type": "module",
+  "scripts": { "start": "node server.js" },
+  "dependencies": { "express": "^4.21.2", "pocketbase": "^0.26.8" }
+}

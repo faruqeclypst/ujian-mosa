@@ -55,7 +55,11 @@ export interface SchoolRecord {
   student_quota?: number;
   contact_email?: string;
   custom_domain?: string;
+  active_until?: string;
+  created?: string;
 }
+
+import { getSubscriptionStatus, SubscriptionStatusInfo } from '../utils/subscriptionHelper';
 
 interface TenantContextValue {
   school: SchoolRecord | null;
@@ -66,7 +70,9 @@ interface TenantContextValue {
   notFound: boolean;           // true jika slug ada tapi tidak di registry
   inactive: boolean;           // true jika sekolah is_active = false
   terminology: Terminology;     // Helper untuk label dinamis
+  subscriptionStatus: SubscriptionStatusInfo; // Status masa aktif, grace period, dan suspensi
   setManualSchool: (slug: string | null) => void;
+  refreshSchool: () => Promise<void>;
 }
 
 const TenantContext = createContext<TenantContextValue | undefined>(undefined);
@@ -336,6 +342,24 @@ export const TenantProvider = ({ children }: { children: ReactNode }) => {
     resolveSchool();
   }, [slug, customDomain, isLanding, cacheKey]);
 
+  const refreshSchool = async () => {
+    if (!school?.id) return;
+    try {
+      const updated = await masterPb.collection('schools').getOne<SchoolRecord>(school.id);
+      setSchool(updated);
+      setCachedSchool(cacheKey, updated);
+      if (updated.pb_url) {
+        setPb(getSchoolPb(updated.pb_url));
+      }
+    } catch (e) {
+      console.warn('[TenantContext] Gagal refresh data sekolah:', e);
+    }
+  };
+
+  const subscriptionStatus = useMemo(
+    () => getSubscriptionStatus(school),
+    [school]
+  );
 
   const value = useMemo<TenantContextValue>(
     () => ({ 
@@ -347,9 +371,11 @@ export const TenantProvider = ({ children }: { children: ReactNode }) => {
       notFound, 
       inactive,
       terminology: TERMINOLOGY[school?.type || 'school'],
-      setManualSchool
+      subscriptionStatus,
+      setManualSchool,
+      refreshSchool
     }),
-    [school, pb, slug, isLanding, loading, notFound, inactive]
+    [school, pb, slug, isLanding, loading, notFound, inactive, subscriptionStatus]
   );
 
   return <TenantContext.Provider value={value}>{children}</TenantContext.Provider>;

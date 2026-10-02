@@ -11,6 +11,8 @@ import { masterPb } from "../../lib/pocketbase";
 import SuperAdminLayout from "../../components/layout/SuperAdminLayout";
 import { cn } from "../../lib/utils";
 import { getSchoolUrl, getSchoolDomain, getDomainSuffix } from "../../utils/domainHelper";
+import { calculatePlanInvoice, PLAN_PRICING, normalizePlanKey } from "../../utils/pricingHelper";
+import { ensureRenewalInvoice } from "../../utils/subscriptionHelper";
 
 // ── Activity Log ──────────────────────────────────────────────
 type LogType = "create" | "update" | "delete" | "approve" | "reject" | "activate" | "deactivate";
@@ -88,7 +90,6 @@ interface SchoolRequest {
   type?: "school" | "campus";
   plan?: string;
   duration?: string;
-  is_demo?: boolean;
   status: "pending" | "approved" | "rejected";
   created: string;
 }
@@ -118,6 +119,49 @@ const formatToDateInput = (val?: string): string => {
   return "";
 };
 
+const getTrialDate = (): string => {
+  const d = new Date();
+  d.setDate(d.getDate() + 14);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const date = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${date}`;
+};
+
+const getDiffDays = (dateStr?: string): number => {
+  if (!dateStr || !dateStr.trim()) return 0;
+  const match = dateStr.trim().match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!match) return 0;
+  const target = new Date(parseInt(match[1], 10), parseInt(match[2], 10) - 1, parseInt(match[3], 10), 23, 59, 59);
+  const now = new Date();
+  return Math.ceil((target.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+};
+
+const formatDateIndo = (dateStr?: string): string => {
+  if (!dateStr || !dateStr.trim()) return "";
+  const match = dateStr.trim().match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!match) return dateStr;
+  const d = new Date(parseInt(match[1], 10), parseInt(match[2], 10) - 1, parseInt(match[3], 10));
+  return d.toLocaleDateString("id-ID", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric"
+  });
+};
+
+const formatDateShortIndo = (dateStr?: string): string => {
+  if (!dateStr || !dateStr.trim()) return "";
+  const match = dateStr.trim().match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!match) return dateStr;
+  const d = new Date(parseInt(match[1], 10), parseInt(match[2], 10) - 1, parseInt(match[3], 10));
+  return d.toLocaleDateString("id-ID", {
+    day: "numeric",
+    month: "short",
+    year: "numeric"
+  });
+};
+
 const getActiveUntilInfo = (dateStr?: string) => {
   if (!dateStr || !dateStr.trim()) {
     return { isExpired: false, label: "Masa aktif: permanen", isPermanent: true };
@@ -142,6 +186,9 @@ const getActiveUntilInfo = (dateStr?: string) => {
     if (isExpired) {
       return { isExpired: true, label: `Kadaluarsa (${formatted})`, isPermanent: false };
     }
+    if (diffDays === 0) {
+      return { isExpired: false, label: `Berakhir hari ini (${formatted})`, isPermanent: false };
+    }
     return { isExpired: false, label: `s/d ${formatted} (${diffDays} hr)`, isPermanent: false };
   } catch {
     return { isExpired: false, label: "Masa aktif: permanen", isPermanent: true };
@@ -160,6 +207,7 @@ const SuperAdminDashboard = () => {
   const [approvingRequestId, setApprovingRequestId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [sendingRenewalId, setSendingRenewalId] = useState<string | null>(null);
   const [confirmData, setConfirmData] = useState<{
     title: string;
     message: string;
@@ -223,6 +271,25 @@ const SuperAdminDashboard = () => {
     });
   };
 
+  const handleSendRenewalInvoice = async (school: SchoolRecord) => {
+    setSendingRenewalId(school.id);
+    try {
+      const res = await ensureRenewalInvoice(school, 12);
+      if (res.isNew) {
+        addLog("create", `Menerbitkan tagihan perpanjangan (${res.invoice.invoice_number})`, school.name);
+        refreshLogs();
+        alert(`Tagihan perpanjangan (${res.invoice.invoice_number}) untuk ${school.name} berhasil diterbitkan dengan harga resmi.`);
+      } else {
+        alert(`Tagihan perpanjangan (${res.invoice.invoice_number}) untuk ${school.name} sudah aktif dalam antrean belum bayar.`);
+      }
+    } catch (err: any) {
+      console.error("Gagal menerbitkan invoice perpanjangan:", err);
+      alert(err?.message || "Gagal menerbitkan invoice perpanjangan.");
+    } finally {
+      setSendingRenewalId(null);
+    }
+  };
+
   const deleteSchool = (school: SchoolRecord) => {
     setConfirmData({
       title: "Hapus Institusi Permanen?",
@@ -252,25 +319,23 @@ const SuperAdminDashboard = () => {
       let targetQuota = 250;
       let durationDays = 365;
 
-      if (req.is_demo || (req.plan && req.plan.toLowerCase().includes("demo"))) {
+      const p = (req.plan || "").toLowerCase();
+      if (p === "free" || p.includes("trial") || p.includes("demo")) {
         targetPlan = 'free';
         targetQuota = 50;
         durationDays = 14;
-      } else if (req.plan) {
-        const p = req.plan.toLowerCase();
-        if (p.includes("premium")) {
-          targetPlan = 'ultimate';
-          targetQuota = 1000;
-        } else if (p.includes("lanjutan")) {
-          targetPlan = 'pro';
-          targetQuota = 500;
-        } else if (p.includes("berkembang")) {
-          targetPlan = 'basic';
-          targetQuota = 250;
-        }
+      } else if (p.includes("premium") || p === "ultimate") {
+        targetPlan = 'ultimate';
+        targetQuota = 1000;
+      } else if (p.includes("lanjutan") || p === "pro") {
+        targetPlan = 'pro';
+        targetQuota = 500;
+      } else if (p.includes("berkembang") || p === "basic") {
+        targetPlan = 'basic';
+        targetQuota = 250;
       }
 
-      if (!req.is_demo && req.duration) {
+      if (targetPlan !== 'free' && req.duration) {
         const d = req.duration.toLowerCase();
         const monthMatch = d.match(/(\d+)\s*bulan/);
         if (monthMatch) {
@@ -752,6 +817,17 @@ const SuperAdminDashboard = () => {
                       </td>
                       <td className="px-5 py-4">
                         <div className="flex items-center justify-end gap-2">
+                          {school.active_until && getDiffDays(school.active_until) <= 14 && (
+                            <button
+                              onClick={() => handleSendRenewalInvoice(school)}
+                              disabled={sendingRenewalId === school.id}
+                              className="px-2.5 py-1.5 rounded-xl border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-900 transition-all flex items-center gap-1.5 text-xs font-bold shadow-xs hover:shadow-sm"
+                              title="Buat tagihan perpanjangan 1 tahun & siapkan invoice belum bayar"
+                            >
+                              <Clock size={12} className={sendingRenewalId === school.id ? "animate-spin text-amber-700" : "text-amber-700"} />
+                              <span>{sendingRenewalId === school.id ? "Memproses..." : "Kirim Tagihan"}</span>
+                            </button>
+                          )}
                           <button
                             onClick={() => { setEditSchool(school); setShowAddModal(true); }}
                             className="w-8 h-8 rounded-full border border-slate-200 bg-white text-slate-400 hover:text-blue-600 hover:border-blue-200 hover:shadow-md transition-all flex items-center justify-center group/btn"
@@ -861,6 +937,16 @@ const SuperAdminDashboard = () => {
                     )}
                   </div>
 
+                  {school.active_until && getDiffDays(school.active_until) <= 14 && (
+                    <button
+                      onClick={() => handleSendRenewalInvoice(school)}
+                      disabled={sendingRenewalId === school.id}
+                      className="w-full h-8 text-xs font-bold border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-900 rounded-lg flex items-center justify-center gap-1.5 transition-all shadow-xs"
+                    >
+                      <Clock size={13} className={sendingRenewalId === school.id ? "animate-spin text-amber-700" : "text-amber-700"} />
+                      {sendingRenewalId === school.id ? "Memproses..." : "Terbitkan Tagihan Perpanjangan"}
+                    </button>
+                  )}
                   <div className="flex items-center gap-2 pt-1">
                     <button
                       onClick={() => { setEditSchool(school); setShowAddModal(true); }}
@@ -952,17 +1038,17 @@ const SuperAdminDashboard = () => {
                       </td>
                       <td className="px-5 py-3.5">
                         <div className="flex flex-col gap-1 items-start">
-                          {req.is_demo ? (
+                          {req.plan === "free" || req.plan?.toLowerCase().includes("trial") || req.plan?.toLowerCase().includes("demo") ? (
                             <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
                               <Sparkles size={10} /> Free Trial
                             </span>
                           ) : (
                             <span className="inline-flex items-center text-[10px] font-bold uppercase px-2 py-0.5 rounded border bg-blue-50 text-blue-700 border-blue-200">
-                              {req.plan || "Paket"}
+                              {PLAN_CONFIG[req.plan || ""]?.label || req.plan || "Paket"}
                             </span>
                           )}
                           <span className="text-[11px] text-slate-500 font-medium">
-                            {req.duration || (req.is_demo ? "14 Hari" : "1 Tahun")}
+                            {req.duration || (req.plan === "free" ? "14 Hari" : "1 Tahun")}
                           </span>
                         </div>
                       </td>
@@ -1040,17 +1126,17 @@ const SuperAdminDashboard = () => {
                   </div>
 
                   <div className="flex items-center gap-2 flex-wrap">
-                    {req.is_demo ? (
+                    {req.plan === "free" || req.plan?.toLowerCase().includes("trial") || req.plan?.toLowerCase().includes("demo") ? (
                       <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
                         <Sparkles size={10} /> Free Trial
                       </span>
                     ) : (
                       <span className="inline-flex items-center text-[10px] font-bold uppercase px-2 py-0.5 rounded border bg-blue-50 text-blue-700 border-blue-200">
-                        {req.plan || "Paket"}
+                        {PLAN_CONFIG[req.plan || ""]?.label || req.plan || "Paket"}
                       </span>
                     )}
                     <span className="text-[10px] text-slate-500 font-medium bg-slate-50 border border-slate-200 px-1.5 py-0.5 rounded">
-                      Durasi: {req.duration || (req.is_demo ? "14 Hari" : "1 Tahun")}
+                      Durasi: {req.duration || (req.plan === "free" ? "14 Hari" : "1 Tahun")}
                     </span>
                   </div>
 
@@ -1348,6 +1434,16 @@ const AddEditSchoolModal = ({
   onSaved: () => void;
 }) => {
   const isEdit = !!(school?.id);
+  const initialDate = formatToDateInput(school?.active_until);
+
+  // Mode Masa Aktif: "subscription" (berbatas waktu) vs "permanent" (tanpa batas waktu)
+  const [expiryType, setExpiryType] = useState<"subscription" | "permanent">(
+    isEdit ? (initialDate ? "subscription" : "permanent") : "subscription"
+  );
+  const [savedDate, setSavedDate] = useState<string>(initialDate || (isEdit ? "" : getTrialDate()));
+  const [extendFromCurrent, setExtendFromCurrent] = useState<boolean>(false);
+  const [initialPaymentStatus, setInitialPaymentStatus] = useState<"unpaid" | "paid">("unpaid");
+
   const [form, setForm] = useState({
     name: school?.name || "",
     slug: school?.slug || "",
@@ -1357,14 +1453,22 @@ const AddEditSchoolModal = ({
     contact_email: school?.contact_email || "",
     student_quota: school?.student_quota || 50,
     plan: school?.plan || "free",
-    active_until: formatToDateInput(school?.active_until),
+    active_until: isEdit ? initialDate : getTrialDate(),
     is_active: school?.is_active ?? true,
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  const isSchoolCurrentlyActive = Boolean(
+    school?.active_until && getDiffDays(school.active_until) > 0
+  );
+
   useEffect(() => {
     if (school) {
+      const parsedDate = formatToDateInput(school.active_until);
+      const isSub = Boolean(parsedDate);
+      setExpiryType(isSub ? "subscription" : "permanent");
+      setSavedDate(parsedDate || "");
       setForm({
         name: school.name || "",
         slug: school.slug || "",
@@ -1374,19 +1478,86 @@ const AddEditSchoolModal = ({
         contact_email: school.contact_email || "",
         student_quota: school.student_quota || 50,
         plan: school.plan || "free",
-        active_until: formatToDateInput(school.active_until),
+        active_until: parsedDate,
         is_active: school.is_active ?? true,
+      });
+    } else {
+      setExpiryType("subscription");
+      const trial = getTrialDate();
+      setSavedDate(trial);
+      setForm({
+        name: "",
+        slug: "",
+        custom_domain: "",
+        pb_url: "",
+        type: "school",
+        contact_email: "",
+        student_quota: 50,
+        plan: "free",
+        active_until: trial,
+        is_active: true,
       });
     }
   }, [school]);
 
-  const handleAddDays = (days: number) => {
-    const d = new Date();
+  const handleToggleExpiryType = (type: "subscription" | "permanent") => {
+    setExpiryType(type);
+    if (type === "permanent") {
+      if (form.active_until) {
+        setSavedDate(form.active_until);
+      }
+      setForm(prev => ({ ...prev, active_until: "" }));
+    } else {
+      let targetDate = savedDate;
+      if (!targetDate) {
+        if (form.plan === "free") {
+          targetDate = getTrialDate();
+        } else {
+          const d = new Date();
+          d.setFullYear(d.getFullYear() + 1);
+          const y = d.getFullYear();
+          const m = String(d.getMonth() + 1).padStart(2, "0");
+          const day = String(d.getDate()).padStart(2, "0");
+          targetDate = `${y}-${m}-${day}`;
+        }
+      }
+      setForm(prev => ({ ...prev, active_until: targetDate }));
+    }
+  };
+
+  const handleApplyPreset = (days: number) => {
+    let baseDate = new Date();
+    if (extendFromCurrent && school?.active_until && isSchoolCurrentlyActive) {
+      const match = school.active_until.match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if (match) {
+        baseDate = new Date(parseInt(match[1], 10), parseInt(match[2], 10) - 1, parseInt(match[3], 10));
+      }
+    }
+    const d = new Date(baseDate);
     d.setDate(d.getDate() + days);
     const y = d.getFullYear();
     const m = String(d.getMonth() + 1).padStart(2, "0");
     const day = String(d.getDate()).padStart(2, "0");
-    setForm(prev => ({ ...prev, active_until: `${y}-${m}-${day}` }));
+    const newDateStr = `${y}-${m}-${day}`;
+    setForm(prev => ({ ...prev, active_until: newDateStr }));
+    setSavedDate(newDateStr);
+  };
+
+  const isPresetActive = (days: number) => {
+    if (expiryType !== "subscription" || !form.active_until) return false;
+    let baseDate = new Date();
+    if (extendFromCurrent && school?.active_until && isSchoolCurrentlyActive) {
+      const match = school.active_until.match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if (match) {
+        baseDate = new Date(parseInt(match[1], 10), parseInt(match[2], 10) - 1, parseInt(match[3], 10));
+      }
+    }
+    const d = new Date(baseDate);
+    d.setDate(d.getDate() + days);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return form.active_until === `${y}-${m}-${day}`;
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -1398,24 +1569,33 @@ const AddEditSchoolModal = ({
       else if (value === "pro") autoQuota = 500;
       else if (value === "ultimate") autoQuota = 1000;
 
-      // Free Trial selalu 14 hari — override tanggal apapun
-      let autoDate = form.active_until;
+      let nextActiveUntil = form.active_until;
+      let nextExpiryType = expiryType;
+
       if (value === "free") {
-        const d = new Date();
-        d.setDate(d.getDate() + 14);
-        const y = d.getFullYear();
-        const m = String(d.getMonth() + 1).padStart(2, "0");
-        const day = String(d.getDate()).padStart(2, "0");
-        autoDate = `${y}-${m}-${day}`;
-      } else if (!autoDate) {
-        const d = new Date();
-        d.setFullYear(d.getFullYear() + 1);
-        const y = d.getFullYear();
-        const m = String(d.getMonth() + 1).padStart(2, "0");
-        const day = String(d.getDate()).padStart(2, "0");
-        autoDate = `${y}-${m}-${day}`;
+        nextExpiryType = "subscription";
+        nextActiveUntil = getTrialDate();
+        setSavedDate(nextActiveUntil);
+      } else {
+        // Jika sebelumnya paket free atau kosong, otomatis berikan default 1 tahun
+        if (form.plan === "free" || !nextActiveUntil) {
+          const d = new Date();
+          d.setFullYear(d.getFullYear() + 1);
+          const y = d.getFullYear();
+          const m = String(d.getMonth() + 1).padStart(2, "0");
+          const day = String(d.getDate()).padStart(2, "0");
+          nextActiveUntil = `${y}-${m}-${day}`;
+          setSavedDate(nextActiveUntil);
+        }
       }
-      setForm(prev => ({ ...prev, plan: value, student_quota: autoQuota, active_until: autoDate }));
+
+      setExpiryType(nextExpiryType);
+      setForm(prev => ({
+        ...prev,
+        plan: value,
+        student_quota: autoQuota,
+        active_until: nextExpiryType === "permanent" ? "" : nextActiveUntil,
+      }));
       return;
     }
     setForm(prev => ({
@@ -1435,13 +1615,18 @@ const AddEditSchoolModal = ({
       setError("Nama institusi dan subdomain wajib diisi.");
       return;
     }
+    if (expiryType === "subscription" && (!form.active_until || !form.active_until.trim())) {
+      setError("Silakan tentukan batas tanggal kedaluwarsa atau pilih opsi Permanen.");
+      return;
+    }
+
     const autoPbUrl = getSchoolUrl(form.slug);
     const cleanCustomDomain = form.custom_domain
       ? form.custom_domain.toLowerCase().trim().replace(/^https?:\/\//, '').replace(/\/.*$/, '')
       : "";
 
     let finalActiveUntil = "";
-    if (form.active_until && form.active_until.trim()) {
+    if (expiryType === "subscription" && form.active_until && form.active_until.trim()) {
       finalActiveUntil = `${form.active_until.trim()} 23:59:59.000Z`;
     }
 
@@ -1457,20 +1642,44 @@ const AddEditSchoolModal = ({
       if (isEdit) {
         await masterPb.collection("schools").update(school!.id, finalForm);
       } else {
-        const createdSchool = await masterPb.collection("schools").create(finalForm);
-        
-        // Auto-generate invoice perdana untuk tenant baru
-        try {
-          const planKey = (form.plan || "free").toLowerCase();
-          const isDemo = planKey === "free";
-          const planRates: Record<string, { label: string; monthly: number }> = {
-            free: { label: "Free Trial", monthly: 0 },
-            basic: { label: "Berkembang", monthly: 149000 },
-            pro: { label: "Lanjutan", monthly: 299000 },
-            ultimate: { label: "Premium", monthly: 499000 },
-          };
-          const selectedRate = planRates[planKey] || { label: form.plan || "Standar", monthly: 149000 };
+        const targetPlanKey = normalizePlanKey(form.plan);
+        const isTrial = targetPlanKey === "free";
 
+        let durationMonths = 1;
+        if (expiryType === "permanent") {
+          durationMonths = 12;
+        } else if (form.active_until) {
+          const diffDays = getDiffDays(form.active_until);
+          durationMonths = Math.max(1, Math.round(diffDays / 30));
+        }
+
+        const planInfo = calculatePlanInvoice(targetPlanKey, durationMonths);
+
+        // Jika pendaftar mengambil paket berbayar (cth. Ultimate) tapi status awal belum bayar:
+        // Sekolah baru tetap aktif dalam mode Free Trial (50 siswa, 14 hari)
+        // sampai invoice resmi dibayarkan.
+        let schoolPayload = { ...finalForm };
+        if (!isTrial && initialPaymentStatus === "unpaid") {
+          const trialDate = getTrialDate();
+          schoolPayload = {
+            ...finalForm,
+            plan: "free",
+            student_quota: 50,
+            active_until: `${trialDate} 23:59:59.000Z`,
+          };
+        } else if (!isTrial && initialPaymentStatus === "paid") {
+          schoolPayload = {
+            ...finalForm,
+            plan: targetPlanKey,
+            student_quota: Number(form.student_quota) || planInfo.quota,
+            active_until: finalActiveUntil,
+          };
+        }
+
+        const createdSchool = await masterPb.collection("schools").create(schoolPayload);
+
+        // Terbitkan invoice perdana dengan tarif resmi landing page
+        try {
           const now = new Date();
           const yy = now.getFullYear().toString().slice(2);
           const mm = String(now.getMonth() + 1).padStart(2, "0");
@@ -1478,29 +1687,32 @@ const AddEditSchoolModal = ({
           const invNum = `INV-${yy}${mm}-${seq}`;
 
           const dueDate = new Date();
-          dueDate.setDate(dueDate.getDate() + (isDemo ? 14 : 7));
+          dueDate.setDate(dueDate.getDate() + 14);
+
+          const isInvoicePaid = isTrial || initialPaymentStatus === "paid";
 
           const newInvoice = {
-            id: Date.now().toString(),
             invoice_number: invNum,
             school_id: createdSchool?.id || "",
             school_name: form.name,
             school_slug: form.slug,
-            plan: planKey,
-            duration_months: 1,
-            amount: isDemo ? 0 : selectedRate.monthly,
-            status: isDemo ? "paid" : "unpaid",
+            contact_email: form.contact_email || "",
+            plan: targetPlanKey,
+            plan_label: planInfo.planLabel,
+            duration_months: planInfo.durationMonths,
+            period_label: planInfo.periodLabel,
+            amount: isTrial ? 0 : planInfo.amount,
+            status: isInvoicePaid ? "paid" : "unpaid",
             due_date: dueDate.toISOString().slice(0, 10),
-            paid_date: isDemo ? now.toISOString().slice(0, 10) : undefined,
-            notes: isDemo
-              ? "Akun Demo / Free Trial (Otomatis Aktif)"
-              : `Tagihan Perdana Paket ${selectedRate.label}`,
-            created: now.toISOString(),
-            updated: now.toISOString(),
+            paid_date: isInvoicePaid ? now.toISOString().slice(0, 10) : "",
+            notes: isTrial
+              ? "Akun Free Trial 14 Hari (Otomatis Aktif)"
+              : initialPaymentStatus === "paid"
+                ? `Tagihan Perdana Paket ${planInfo.planLabel} (${planInfo.periodLabel}) - Lunas`
+                : `Tagihan Perdana Paket ${planInfo.planLabel} (${planInfo.periodLabel}) - Menunggu Pembayaran untuk Aktivasi Penuh`,
           };
 
-          const stored = JSON.parse(localStorage.getItem("sa_invoices_v1") || "[]");
-          localStorage.setItem("sa_invoices_v1", JSON.stringify([newInvoice, ...stored]));
+          await masterPb.collection("invoices").create(newInvoice);
         } catch (invErr) {
           console.error("Gagal membuat auto invoice:", invErr);
         }
@@ -1512,6 +1724,14 @@ const AddEditSchoolModal = ({
       setLoading(false);
     }
   };
+
+  const PRESET_DURATIONS = [
+    { label: "14 Hari", sub: "Uji Coba", days: 14 },
+    { label: "1 Bulan", sub: "30 Hari", days: 30 },
+    { label: "3 Bulan", sub: "Triwulan", days: 90 },
+    { label: "1 Semester", sub: "6 Bulan", days: 180 },
+    { label: "1 Tahun", sub: "12 Bulan", days: 365 },
+  ];
 
   return (
     <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-sm" onClick={onClose}>
@@ -1635,120 +1855,331 @@ const AddEditSchoolModal = ({
             </div>
           </div>
 
-          {/* Masa Aktif Paket Section */}
-          <div className="bg-slate-50/70 border border-slate-200/80 rounded-2xl p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <label className="block text-xs font-bold text-slate-800">
-                  Masa Aktif Paket
+          {/* Status Pembayaran Awal Tagihan Perdana (Hanya saat buat tenant baru non-free) */}
+          {!isEdit && form.plan !== "free" && (
+            <div className="bg-amber-50/60 border border-amber-200/90 rounded-2xl p-4 space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <label className="block text-xs font-bold text-amber-950">
+                  Status Pembayaran Tagihan Perdana
                 </label>
-                <p className="text-[11px] text-slate-500 mt-0.5">
-                  Batas waktu operasional sistem untuk sekolah ini
-                </p>
+                <span className={cn(
+                  "text-[10px] font-bold px-2.5 py-0.5 rounded-full border flex items-center gap-1",
+                  initialPaymentStatus === "unpaid"
+                    ? "bg-amber-100 text-amber-900 border-amber-300"
+                    : "bg-emerald-100 text-emerald-900 border-emerald-300"
+                )}>
+                  {initialPaymentStatus === "unpaid" ? <Clock size={11} /> : <CheckCircle2 size={11} />}
+                  {initialPaymentStatus === "unpaid" ? "Menunggu Pembayaran" : "Sudah Dibayar"}
+                </span>
               </div>
-              {form.active_until ? (
-                <span className="text-[11px] font-semibold text-blue-700 bg-blue-100/70 px-2.5 py-0.5 rounded-full flex items-center gap-1">
-                  <Clock size={11} />
-                  Terjadwal
-                </span>
-              ) : (
-                <span className="text-[11px] font-semibold text-slate-600 bg-slate-200/70 px-2.5 py-0.5 rounded-full">
-                  Permanen
-                </span>
-              )}
-            </div>
 
-            {/* Quick Preset Chips */}
-            <div>
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1.5">
-                Pilihan Cepat (Preset Durasi)
-              </p>
-              <div className="flex flex-wrap gap-1.5">
-                {[
-                  { label: "14 Hari (Free Trial)", days: 14 },
-                  { label: "1 Bulan", days: 30 },
-                  { label: "2 Bulan", days: 60 },
-                  { label: "3 Bulan", days: 90 },
-                  { label: "6 Bulan", days: 180 },
-                  { label: "1 Tahun", days: 365 },
-                ].map(preset => (
-                  <button
-                    key={preset.label}
-                    type="button"
-                    onClick={() => handleAddDays(preset.days)}
-                    className="text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-white border border-slate-200/90 text-slate-700 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 transition-all shadow-xs active:scale-95"
-                  >
-                    {preset.label}
-                  </button>
-                ))}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 <button
                   type="button"
-                  onClick={() => setForm(prev => ({ ...prev, active_until: "" }))}
-                  className="text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-white border border-slate-200/90 text-slate-500 hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-all shadow-xs active:scale-95"
-                  title="Jadikan paket permanen tanpa batas waktu"
+                  onClick={() => setInitialPaymentStatus("unpaid")}
+                  className={cn(
+                    "p-3 rounded-xl border text-left transition-all",
+                    initialPaymentStatus === "unpaid"
+                      ? "bg-white border-amber-400 shadow-xs ring-2 ring-amber-400/20"
+                      : "bg-white/70 border-slate-200 text-slate-600 hover:border-slate-300"
+                  )}
                 >
-                  Tanpa Batas (Reset)
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-lg bg-amber-100 text-amber-800 flex items-center justify-center flex-shrink-0">
+                      <Clock size={13} />
+                    </div>
+                    <span className="text-xs font-bold text-slate-900">Belum Bayar (Free Trial)</span>
+                  </div>
+                  <p className="text-[11px] text-slate-600 mt-2 leading-relaxed">
+                    Tenant langsung aktif dengan paket <strong>Free Trial 14 hari (50 siswa)</strong>. Invoice tagihan perdana diterbitkan. Sekolah otomatis di-upgrade ke paket penuh setelah invoice dibayar.
+                  </p>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setInitialPaymentStatus("paid")}
+                  className={cn(
+                    "p-3 rounded-xl border text-left transition-all",
+                    initialPaymentStatus === "paid"
+                      ? "bg-white border-emerald-500 shadow-xs ring-2 ring-emerald-500/20"
+                      : "bg-white/70 border-slate-200 text-slate-600 hover:border-slate-300"
+                  )}
+                >
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center flex-shrink-0">
+                      <CheckCircle2 size={13} />
+                    </div>
+                    <span className="text-xs font-bold text-slate-900">Sudah Lunas (Paket Penuh)</span>
+                  </div>
+                  <p className="text-[11px] text-slate-600 mt-2 leading-relaxed">
+                    Pembayaran telah diverifikasi secara manual (transfer/tunai). Tenant langsung aktif dengan paket penuh, kuota {form.student_quota} siswa, dan masa aktif terpilih.
+                  </p>
                 </button>
               </div>
             </div>
+          )}
 
-            {/* Custom Date Input */}
+          {/* Masa Aktif & Lisensi Tenant */}
+          <div className="bg-slate-50/80 border border-slate-200/90 rounded-2xl p-4 space-y-4">
             <div>
-              <label className="block text-[11px] font-medium text-slate-600 mb-1">
-                Atur Tanggal Spesifik
-              </label>
-              <div className="relative">
-                <input
-                  type="date"
-                  name="active_until"
-                  value={form.active_until}
-                  onChange={handleChange}
-                  className="w-full h-10 border border-slate-200 rounded-xl px-3.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 shadow-sm bg-white cursor-pointer"
-                />
+              <div className="flex items-center justify-between gap-2">
+                <label className="block text-xs font-bold text-slate-800">
+                  Masa Aktif & Lisensi Tenant
+                </label>
+                <span className={cn(
+                  "text-[11px] font-bold px-2.5 py-0.5 rounded-full border flex items-center gap-1",
+                  expiryType === "subscription"
+                    ? "bg-blue-50 text-blue-800 border-blue-200"
+                    : "bg-emerald-50 text-emerald-800 border-emerald-200"
+                )}>
+                  {expiryType === "subscription" ? <Calendar size={11} className="text-blue-700" /> : <ShieldCheck size={11} className="text-emerald-700" />}
+                  {expiryType === "subscription" ? "Berbatas Waktu" : "Permanen"}
+                </span>
               </div>
+              <p className="text-[11px] text-slate-600 mt-0.5">
+                Pilih jenis lisensi dan batas waktu operasional ujian untuk institusi ini
+              </p>
             </div>
 
-            {/* Status Preview Card */}
-            {form.active_until ? (
-              <div className="bg-blue-50/80 border border-blue-200/70 rounded-xl p-3 flex items-start gap-2.5">
-                <div className="p-1 rounded-lg bg-blue-600 text-white mt-0.5 flex-shrink-0">
-                  <Clock size={13} />
-                </div>
-                <div className="text-xs space-y-0.5">
-                  <p className="font-semibold text-blue-950">
-                    Berlaku hingga: {(() => {
-                      const match = form.active_until.match(/^(\d{4})-(\d{2})-(\d{2})/);
-                      if (match) {
-                        const d = new Date(parseInt(match[1], 10), parseInt(match[2], 10) - 1, parseInt(match[3], 10));
-                        return d.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
-                      }
-                      return form.active_until;
-                    })()}
-                  </p>
-                  <p className="text-[11px] text-blue-700 font-medium">
-                    {(() => {
-                      const match = form.active_until.match(/^(\d{4})-(\d{2})-(\d{2})/);
-                      if (match) {
-                        const target = new Date(parseInt(match[1], 10), parseInt(match[2], 10) - 1, parseInt(match[3], 10), 23, 59, 59);
-                        const now = new Date();
-                        const diff = Math.ceil((target.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-                        if (diff > 0) return `Sistem akan aktif selama ${diff} hari lagi dari hari ini.`;
-                        if (diff === 0) return "Berakhir hari ini pada pukul 23:59 WIB.";
-                        return `Tanggal telah lewat (${Math.abs(diff)} hari yang lalu). Institusi akan langsung berstatus kadaluarsa.`;
-                      }
-                      return "";
-                    })()}
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <div className="bg-slate-100/70 border border-slate-200/70 rounded-xl p-3 flex items-center gap-2.5 text-xs text-slate-600">
-                <div className="p-1 rounded-lg bg-slate-300 text-slate-700 flex-shrink-0">
-                  <ShieldCheck size={13} />
+            {/* Pilihan Tipe: Berlangganan vs Permanen */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              <button
+                type="button"
+                onClick={() => handleToggleExpiryType("subscription")}
+                className={cn(
+                  "flex items-start gap-3 p-3 rounded-xl border text-left transition-all min-h-[58px] focus-visible:ring-2 focus-visible:ring-blue-500",
+                  expiryType === "subscription"
+                    ? "bg-blue-50/90 border-blue-400 text-blue-950 shadow-xs ring-1 ring-blue-400"
+                    : "bg-white border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-50/70"
+                )}
+              >
+                <div className={cn(
+                  "p-2 rounded-lg flex-shrink-0 mt-0.5",
+                  expiryType === "subscription" ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-500"
+                )}>
+                  <Calendar size={16} />
                 </div>
                 <div>
-                  <p className="font-semibold text-slate-800">Paket Tanpa Batas Waktu (Permanen)</p>
-                  <p className="text-[11px] text-slate-500">Akses tenant tidak akan kadaluarsa secara otomatis.</p>
+                  <p className="text-xs font-bold leading-tight">Berbatas Waktu (Langganan)</p>
+                  <p className={cn("text-[11px] mt-0.5 leading-snug", expiryType === "subscription" ? "text-blue-800" : "text-slate-500")}>
+                    Mempunyai tanggal kedaluwarsa operasional sistem
+                  </p>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleToggleExpiryType("permanent")}
+                className={cn(
+                  "flex items-start gap-3 p-3 rounded-xl border text-left transition-all min-h-[58px] focus-visible:ring-2 focus-visible:ring-emerald-500",
+                  expiryType === "permanent"
+                    ? "bg-emerald-50/90 border-emerald-500 text-emerald-950 shadow-xs ring-1 ring-emerald-500"
+                    : "bg-white border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-50/70"
+                )}
+              >
+                <div className={cn(
+                  "p-2 rounded-lg flex-shrink-0 mt-0.5",
+                  expiryType === "permanent" ? "bg-emerald-600 text-white" : "bg-slate-100 text-slate-500"
+                )}>
+                  <ShieldCheck size={16} />
+                </div>
+                <div>
+                  <p className="text-xs font-bold leading-tight">Permanen (Tanpa Batas)</p>
+                  <p className={cn("text-[11px] mt-0.5 leading-snug", expiryType === "permanent" ? "text-emerald-800" : "text-slate-500")}>
+                    Aktif terus tanpa tanggal kedaluwarsa
+                  </p>
+                </div>
+              </button>
+            </div>
+
+            {/* Jika Berbatas Waktu */}
+            {expiryType === "subscription" && (
+              <div className="space-y-3 pt-1">
+                {/* Opsi Perpanjang Jika Sedang Edit dan Masih Aktif */}
+                {isEdit && isSchoolCurrentlyActive && (
+                  <div className="flex items-center justify-between p-2.5 rounded-xl bg-white border border-slate-200/90 text-xs">
+                    <div className="flex items-center gap-2">
+                      <Clock size={14} className="text-blue-600 flex-shrink-0" />
+                      <span className="text-slate-700 font-medium">Perpanjang dari batas aktif saat ini</span>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={extendFromCurrent}
+                        onChange={e => setExtendFromCurrent(e.target.checked)}
+                        className="sr-only peer"
+                      />
+                      <div className="w-8 h-4 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-blue-600"></div>
+                    </label>
+                  </div>
+                )}
+
+                {/* Preset Durasi Cepat */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <p className="text-[11px] font-bold text-slate-700">
+                      Pilihan Durasi Cepat
+                    </p>
+                    <span className="text-[10px] text-slate-500">
+                      {extendFromCurrent && isEdit && isSchoolCurrentlyActive
+                        ? "Dihitung dari akhir masa aktif"
+                        : "Dihitung mulai hari ini"}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                    {PRESET_DURATIONS.map(preset => {
+                      const active = isPresetActive(preset.days);
+                      return (
+                        <button
+                          key={preset.label}
+                          type="button"
+                          onClick={() => handleApplyPreset(preset.days)}
+                          className={cn(
+                            "flex flex-col items-center justify-center p-2 rounded-xl border text-center transition-all min-h-[50px] focus-visible:ring-2 focus-visible:ring-blue-500",
+                            active
+                              ? "bg-blue-50/90 border-blue-400 text-blue-900 font-bold shadow-xs ring-1 ring-blue-400"
+                              : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300"
+                          )}
+                        >
+                          <span className="text-xs font-bold leading-tight">{preset.label}</span>
+                          <span className={cn("text-[10px] mt-0.5", active ? "text-blue-700 font-semibold" : "text-slate-500")}>
+                            {preset.sub}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Date Input */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label htmlFor="active_until_field" className="block text-[11px] font-bold text-slate-700">
+                      Atur Tanggal Kedaluwarsa Spesifik
+                    </label>
+                    <span className="text-[10px] text-slate-500">Berakhir pukul 23:59 WIB</span>
+                  </div>
+                  <div className="relative">
+                    <input
+                      id="active_until_field"
+                      type="date"
+                      name="active_until"
+                      value={form.active_until}
+                      onChange={e => {
+                        setForm(prev => ({ ...prev, active_until: e.target.value }));
+                        setSavedDate(e.target.value);
+                      }}
+                      className="w-full h-10 border border-slate-200 rounded-xl px-3.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 shadow-sm bg-white cursor-pointer"
+                    />
+                  </div>
+                </div>
+
+                {/* Visual Summary Card */}
+                {form.active_until ? (() => {
+                  const match = form.active_until.match(/^(\d{4})-(\d{2})-(\d{2})/);
+                  if (!match) return null;
+                  const d = new Date(parseInt(match[1], 10), parseInt(match[2], 10) - 1, parseInt(match[3], 10));
+                  const fullDateFormatted = d.toLocaleDateString("id-ID", {
+                    weekday: "long",
+                    day: "numeric",
+                    month: "long",
+                    year: "numeric"
+                  });
+                  const target = new Date(parseInt(match[1], 10), parseInt(match[2], 10) - 1, parseInt(match[3], 10), 23, 59, 59);
+                  const now = new Date();
+                  const diffDays = Math.ceil((target.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+
+                  let badgeVariant = "active";
+                  let badgeLabel = `Aktif (${diffDays} hari lagi)`;
+                  let statusDesc = "Layanan ujian dan sinkronisasi data aktif normal hingga tanggal di atas.";
+
+                  if (diffDays < 0) {
+                    badgeVariant = "expired";
+                    badgeLabel = `Kedaluwarsa (${Math.abs(diffDays)} hari lalu)`;
+                    statusDesc = "Tanggal telah lewat. Institusi akan langsung berstatus kedaluwarsa dan pengerjaan ujian dibatasi.";
+                  } else if (diffDays === 0) {
+                    badgeVariant = "today";
+                    badgeLabel = "Berakhir Hari Ini";
+                    statusDesc = "Akses operasional institusi akan berakhir malam ini pukul 23:59 WIB.";
+                  } else if (diffDays <= 14) {
+                    badgeVariant = "warning";
+                    badgeLabel = `Sisa ${diffDays} hari lagi`;
+                    statusDesc = "Masa aktif hampir habis. Disarankan menyiapkan perpanjangan periode.";
+                  }
+
+                  return (
+                    <div className="bg-white border border-slate-200/90 rounded-xl p-3.5 space-y-3 shadow-xs">
+                      <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
+                        <div className="flex items-center gap-2">
+                          <Clock size={15} className="text-slate-500" />
+                          <span className="text-xs font-bold text-slate-800">Ringkasan Masa Aktif</span>
+                        </div>
+                        <span className={cn(
+                          "text-[11px] font-bold px-2.5 py-0.5 rounded-full border flex items-center gap-1",
+                          badgeVariant === "active" && "bg-emerald-50 text-emerald-800 border-emerald-200",
+                          badgeVariant === "warning" && "bg-amber-50 text-amber-900 border-amber-200",
+                          badgeVariant === "today" && "bg-orange-50 text-orange-900 border-orange-200",
+                          badgeVariant === "expired" && "bg-rose-50 text-rose-900 border-rose-200"
+                        )}>
+                          {badgeVariant === "active" && <CheckCircle2 size={12} className="text-emerald-700" />}
+                          {badgeVariant === "warning" && <Clock size={12} className="text-amber-700" />}
+                          {badgeVariant === "today" && <AlertTriangle size={12} className="text-orange-700" />}
+                          {badgeVariant === "expired" && <XCircle size={12} className="text-rose-700" />}
+                          {badgeLabel}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                          <p className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Berlaku Hingga</p>
+                          <p className="font-bold text-slate-900 mt-0.5 leading-snug">{fullDateFormatted}</p>
+                          <p className="text-[11px] text-slate-600 mt-0.5">Pukul 23:59 WIB</p>
+                        </div>
+                        <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                          <p className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Durasi Waktu</p>
+                          <p className="font-bold text-slate-900 mt-0.5 leading-snug">
+                            {diffDays > 0 ? `${diffDays} Hari` : diffDays === 0 ? "Hari Terakhir" : "Sudah Berakhir"}
+                          </p>
+                          <p className="text-[11px] text-slate-600 mt-0.5">
+                            {diffDays === 14 ? "Periode Free Trial" : diffDays === 30 ? "Periode 1 Bulan" : diffDays === 180 ? "Periode 1 Semester" : diffDays === 365 ? "Periode 1 Tahun" : "Periode Kustom"}
+                          </p>
+                        </div>
+                      </div>
+
+                      <p className="text-[11px] text-slate-600 leading-relaxed bg-slate-50/60 p-2 rounded-lg border border-slate-100">
+                        {statusDesc}
+                      </p>
+                    </div>
+                  );
+                })() : (
+                  <div className="bg-amber-50/60 border border-amber-200/80 rounded-xl p-3 text-xs text-amber-900 flex items-start gap-2">
+                    <AlertTriangle size={15} className="text-amber-700 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-semibold">Tanggal Belum Ditentukan</p>
+                      <p className="text-[11px] text-amber-800 mt-0.5">Silakan pilih durasi cepat di atas atau tentukan tanggal berakhir lewat kalender.</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Jika Permanen */}
+            {expiryType === "permanent" && (
+              <div className="bg-white border border-slate-200/90 rounded-xl p-3.5 space-y-2.5 shadow-xs">
+                <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck size={16} className="text-emerald-700" />
+                    <span className="text-xs font-bold text-slate-900">Lisensi Permanen</span>
+                  </div>
+                  <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200">
+                    Aktif Selamanya
+                  </span>
+                </div>
+                <p className="text-xs text-slate-700 leading-relaxed">
+                  Tenant ini tidak memiliki tanggal kedaluwarsa. Layanan dan operasional ujian akan terus aktif tanpa batas waktu, kecuali dinonaktifkan secara manual oleh Superadmin melalui tombol sakelar aktivasi.
+                </p>
+                <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-100 text-[11px] text-slate-600">
+                  <strong className="text-slate-800 font-semibold">Rekomendasi penggunaan:</strong> Akun internal sekolah binaan, server yayasan, atau institusi mitra dengan kontrak kerja sama seumur hidup.
                 </div>
               </div>
             )}

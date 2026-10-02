@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Users,
@@ -52,13 +52,63 @@ const PANEL_STORAGE_KEY = "cbt_admin_dashboard_panel_order";
 const DashboardPage = () => {
   const navigate = useNavigate();
   const { teachers, classes, subjects, students, loading: contextLoading } = useExamData();
-  const { pb: tenantPb, school, terminology } = useTenant();
+  const { pb: tenantPb, school, terminology, subscriptionStatus } = useTenant();
   const { actualTheme } = useTheme();
   const isDark = actualTheme === "dark";
   const pb = tenantPb!;
 
   const planName = school?.plan ? school.plan.charAt(0).toUpperCase() + school.plan.slice(1) : "Free";
-  const quota = school?.student_quota || 250;
+  const quota = subscriptionStatus?.effectiveQuota || school?.student_quota || (school?.plan === "free" ? 50 : 250);
+
+  const activeUntilInfo = useMemo(() => {
+    if (!school?.active_until || !school.active_until.trim()) {
+      return {
+        isPermanent: true,
+        formatted: "Permanen",
+        daysRemaining: null as number | null,
+        isExpired: false,
+        isExpiringSoon: false,
+      };
+    }
+    const raw = school.active_until.trim();
+    const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    let targetDate: Date;
+    if (match) {
+      const year = parseInt(match[1], 10);
+      const month = parseInt(match[2], 10) - 1;
+      const day = parseInt(match[3], 10);
+      targetDate = new Date(year, month, day, 23, 59, 59);
+    } else {
+      targetDate = new Date(raw.replace(" ", "T"));
+    }
+
+    if (isNaN(targetDate.getTime())) {
+      return {
+        isPermanent: true,
+        formatted: "Permanen",
+        daysRemaining: null as number | null,
+        isExpired: false,
+        isExpiringSoon: false,
+      };
+    }
+
+    const now = new Date();
+    const diffTime = targetDate.getTime() - now.getTime();
+    const days = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    const formatted = targetDate.toLocaleDateString("id-ID", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+
+    return {
+      isPermanent: false,
+      formatted,
+      daysRemaining: days,
+      isExpired: days <= 0,
+      isExpiringSoon: days > 0 && days <= 14,
+    };
+  }, [school?.active_until]);
 
   const [exams, setExams] = useState<any[]>([]);
   const [rooms, setRooms] = useState<any[]>([]);
@@ -1254,9 +1304,10 @@ const DashboardPage = () => {
 
   return (
     <div className="space-y-4">
-      {/* ── Page Header: Simpel & Clean ── */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-4 sm:p-5 shadow-sm">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3.5">
+      {/* ── Page Header: Simpel, Bersih & Informatif ── */}
+      <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-4 sm:p-5 shadow-sm space-y-3">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3.5">
+          {/* Sisi Kiri: Judul & Tanggal */}
           <div className="flex items-center gap-2.5 flex-wrap">
             <h1 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white leading-tight tracking-tight">
               Dashboard
@@ -1267,9 +1318,10 @@ const DashboardPage = () => {
             </p>
           </div>
 
+          {/* Sisi Kanan: Status Realtime, Paket, dan Masa Aktif */}
           <div className="flex items-center gap-2 flex-wrap sm:justify-end">
-            {/* Realtime Pill */}
-            <div className="inline-flex items-center gap-1.5 text-xs font-bold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200/80 dark:border-emerald-800/40 px-2.5 py-1 rounded-lg shadow-sm">
+            {/* Realtime Status */}
+            <div className="inline-flex items-center gap-1.5 text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200/80 dark:border-emerald-800/40 px-2.5 py-1 rounded-lg">
               <span className="relative flex h-2 w-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
@@ -1278,11 +1330,50 @@ const DashboardPage = () => {
             </div>
 
             {/* Plan Badge */}
-            <div className="inline-flex items-center gap-1.5 text-xs font-semibold bg-slate-50 dark:bg-slate-800/80 border border-slate-200/70 dark:border-slate-700/60 text-slate-600 dark:text-slate-300 px-2.5 py-1 rounded-lg">
+            <div className="inline-flex items-center gap-2 text-xs font-semibold bg-slate-50 dark:bg-slate-800/80 border border-slate-200/70 dark:border-slate-700/60 text-slate-700 dark:text-slate-300 px-3 py-1 rounded-lg">
               <span className="font-bold text-blue-600 dark:text-blue-400">{planName}</span>
-              <span className="w-px h-3 bg-slate-300 dark:bg-slate-700" />
-              <span>{quota.toLocaleString("id-ID")} {terminology.student}</span>
+              <span className="text-slate-300 dark:text-slate-700">•</span>
+              <span className="text-slate-500 dark:text-slate-400 font-medium">
+                {quota.toLocaleString("id-ID")} {terminology.student}
+              </span>
             </div>
+
+            {/* Masa Aktif Badge */}
+            {activeUntilInfo.isPermanent ? (
+              <div className="inline-flex items-center gap-1.5 text-xs font-semibold bg-slate-50 dark:bg-slate-800/80 border border-slate-200/70 dark:border-slate-700/60 text-slate-600 dark:text-slate-300 px-3 py-1 rounded-lg">
+                <ShieldCheck size={13} className="text-emerald-500" />
+                <span>Akses Permanen</span>
+              </div>
+            ) : (
+              <div className={cn(
+                "inline-flex items-center gap-2 text-xs font-semibold px-3 py-1 rounded-lg border transition-colors",
+                activeUntilInfo.isExpired
+                  ? "bg-red-50 dark:bg-red-950/40 border-red-200 dark:border-red-900/60 text-red-700 dark:text-red-300"
+                  : activeUntilInfo.isExpiringSoon
+                    ? "bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-900/60 text-amber-800 dark:text-amber-300"
+                    : "bg-slate-50 dark:bg-slate-800/80 border-slate-200/70 dark:border-slate-700/60 text-slate-700 dark:text-slate-300"
+              )}>
+                <Clock size={13} className={cn(
+                  activeUntilInfo.isExpired
+                    ? "text-red-500"
+                    : activeUntilInfo.isExpiringSoon
+                      ? "text-amber-500"
+                      : "text-blue-500"
+                )} />
+                <span className="font-medium text-slate-500 dark:text-slate-400">Berlaku s/d</span>
+                <span className="font-bold text-slate-900 dark:text-white">{activeUntilInfo.formatted}</span>
+                <span className={cn(
+                  "text-[10px] px-1.5 py-0.5 rounded-full font-bold",
+                  activeUntilInfo.isExpired
+                    ? "bg-red-200 text-red-800 dark:bg-red-900 dark:text-red-200"
+                    : activeUntilInfo.isExpiringSoon
+                      ? "bg-amber-200 text-amber-900 dark:bg-amber-900 dark:text-amber-200"
+                      : "bg-blue-100 text-blue-700 dark:bg-blue-900/60 dark:text-blue-300"
+                )}>
+                  {activeUntilInfo.isExpired ? "Kedaluwarsa" : `${activeUntilInfo.daysRemaining} hari lagi`}
+                </span>
+              </div>
+            )}
 
             {/* Reset Panel Layout Button (if modified) */}
             {isCustomOrder && (
@@ -1297,6 +1388,80 @@ const DashboardPage = () => {
             )}
           </div>
         </div>
+
+        {/* Expiration Alert Notice if Expired / Grace Period / Suspended */}
+        {subscriptionStatus?.isSuspended && (
+          <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/60 rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-red-800 dark:text-red-200">
+            <div className="flex items-center gap-2.5">
+              <AlertTriangle size={18} className="text-red-600 dark:text-red-400 flex-shrink-0" />
+              <div>
+                <p className="font-bold">Layanan Institusi Ditangguhkan</p>
+                <p className="text-[11px] text-red-700 dark:text-red-300 mt-0.5">
+                  Masa tenggang pembayaran telah berakhir. Siswa tidak dapat mengakses sesi ujian. Segera lunasi tagihan perpanjangan untuk mengaktifkan kembali seluruh portal.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <button
+                onClick={() => navigate("/admin/invoice")}
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl transition shadow-xs text-center text-xs"
+              >
+                Bayar Tagihan Sekarang
+              </button>
+            </div>
+          </div>
+        )}
+
+        {!subscriptionStatus?.isSuspended && subscriptionStatus?.isGracePeriod && (
+          <div className="bg-amber-500/10 dark:bg-amber-500/15 border border-amber-300 dark:border-amber-800/80 rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-amber-900 dark:text-amber-200">
+            <div className="flex items-center gap-2.5">
+              <Clock size={18} className="text-amber-600 dark:text-amber-400 flex-shrink-0 animate-pulse" />
+              <div>
+                <p className="font-bold">
+                  Masa Aktif Berakhir: Dalam Masa Tenggang (Tersisa {subscriptionStatus.graceDaysRemaining} Hari)
+                </p>
+                <p className="text-[11px] text-amber-800 dark:text-amber-300 mt-0.5">
+                  Ujian siswa masih dapat berjalan, namun portal akan segera dibekukan jika tagihan belum diselesaikan sebelum masa tenggang berakhir.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <button
+                onClick={() => navigate("/admin/invoice")}
+                className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl transition shadow-xs text-center text-xs"
+              >
+                Selesaikan Tagihan
+              </button>
+            </div>
+          </div>
+        )}
+
+        {!subscriptionStatus?.isSuspended && !subscriptionStatus?.isGracePeriod && activeUntilInfo.isExpiringSoon && (
+          <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900/60 rounded-xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-blue-900 dark:text-blue-200">
+            <div className="flex items-center gap-2">
+              <Clock size={15} className="text-blue-600 dark:text-blue-400 flex-shrink-0" />
+              <span>
+                <strong>Pemberitahuan:</strong> Masa aktif paket tersisa <strong>{activeUntilInfo.daysRemaining} hari</strong> lagi (berlaku hingga {activeUntilInfo.formatted}).
+              </span>
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <button
+                onClick={() => navigate("/admin/invoice")}
+                className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg transition-colors text-center shadow-xs"
+              >
+                Lihat Tagihan & Perpanjang
+              </button>
+              <a
+                href="https://wa.me/6285359907696?text=Halo%20Admin%20Examku%2C%20saya%20ingin%20konfirmasi%20perpanjangan%20paket%20ujian%20sekolah"
+                target="_blank"
+                rel="noreferrer"
+                className="px-2.5 py-1.5 border border-amber-300 dark:border-amber-800 hover:bg-amber-100 dark:hover:bg-amber-900/40 text-amber-800 dark:text-amber-300 font-semibold rounded-lg transition-colors text-center"
+              >
+                Bantuan
+              </a>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ── Reorderable Panels (Drag and Drop) ── */}

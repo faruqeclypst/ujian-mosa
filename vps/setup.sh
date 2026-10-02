@@ -143,6 +143,239 @@ onRecordAfterDeleteSuccess((e) => {
 }, "schools");
 EOF
 
+cat > /opt/pocketbase/master/pb_hooks/notify_new_school_request.pb.js << 'EOF'
+// Kirim notifikasi email ke faruq.blogger@gmail.com saat ada pendaftaran institusi baru di school_requests.
+onRecordAfterCreateSuccess((e) => {
+    try {
+        const schoolName = e.record.get("school_name") || "-";
+        const slug = e.record.get("slug_request") || "-";
+        const email = e.record.get("contact_email") || "-";
+        const phone = e.record.get("contact_phone") || "-";
+        const address = e.record.get("address") || "-";
+        const plan = (e.record.get("plan") || "").trim();
+        const duration = e.record.get("duration") || "-";
+        const isTrial = plan === "free" || plan.toLowerCase().includes("trial") || plan.toLowerCase().includes("demo");
+        const institutionType = e.record.get("type") === "campus" ? "Universitas / Kampus" : "Sekolah";
+        const createdDate = new Date().toLocaleString("id-ID", { timeZone: "Asia/Jakarta" });
+
+        let planLabel = "Free Trial (50 Siswa)";
+        if (plan === "basic" || plan.toLowerCase().includes("berkembang")) planLabel = "Paket Berkembang (250 Siswa)";
+        else if (plan === "pro" || plan.toLowerCase().includes("lanjutan")) planLabel = "Paket Lanjutan (500 Siswa)";
+        else if (plan === "ultimate" || plan.toLowerCase().includes("premium")) planLabel = "Paket Premium (1000 Siswa)";
+        else if (plan) planLabel = plan;
+
+        const adminUrl = "https://examku.my.id/super_admin";
+        const schoolUrl = "https://" + slug + ".examku.my.id";
+
+        const subject = isTrial
+            ? "[Examku] Permintaan Free Trial: " + schoolName
+            : "[Examku] Pendaftaran Institusi Baru: " + schoolName + " (" + planLabel + " (" + duration + "))";
+
+        const html = `
+            <div style="font-family: Arial, sans-serif; color: #1e293b; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
+                <div style="background-color: ${isTrial ? '#059669' : '#2563eb'}; padding: 20px; color: #ffffff;">
+                    <h2 style="margin: 0; font-size: 20px;">${isTrial ? 'Permintaan Free Trial CBT' : 'Pendaftaran Institusi Baru'}</h2>
+                    <p style="margin: 6px 0 0; font-size: 14px; opacity: 0.9;">${isTrial ? 'Ada permintaan akun Free Trial CBT baru melalui examku.my.id' : 'Ada permohonan pendaftaran tenant baru melalui examku.my.id'}</p>
+                </div>
+                
+                <div style="padding: 24px;">
+                    <table style="width: 100%; border-collapse: collapse; font-size: 14px; margin-bottom: 24px;">
+                        <tr>
+                            <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; font-weight: bold; width: 160px; background-color: #f8fafc;">Jenis Permohonan</td>
+                            <td style="padding: 10px; border-bottom: 1px solid #e2e8f0;">
+                                <span style="display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; background-color: ${isTrial ? '#dcfce7; color: #15803d;' : '#dbeafe; color: #1d4ed8;'}">
+                                    ${isTrial ? 'Uji Coba Free Trial (14 Hari)' : 'Langganan Baru'}
+                                </span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; font-weight: bold; background-color: #f8fafc;">Nama Institusi</td>
+                            <td style="padding: 10px; border-bottom: 1px solid #e2e8f0;">${schoolName}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; font-weight: bold; background-color: #f8fafc;">Tipe Institusi</td>
+                            <td style="padding: 10px; border-bottom: 1px solid #e2e8f0;">${institutionType}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; font-weight: bold; background-color: #f8fafc;">Subdomain Permintaan</td>
+                            <td style="padding: 10px; border-bottom: 1px solid #e2e8f0;"><a href="${schoolUrl}" style="color: #2563eb; text-decoration: none; font-weight: bold;">${slug}.examku.my.id</a></td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; font-weight: bold; background-color: #f8fafc;">Paket Dipilih</td>
+                            <td style="padding: 10px; border-bottom: 1px solid #e2e8f0;">${planLabel}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; font-weight: bold; background-color: #f8fafc;">Durasi Layanan</td>
+                            <td style="padding: 10px; border-bottom: 1px solid #e2e8f0;">${duration}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; font-weight: bold; background-color: #f8fafc;">Email Kontak</td>
+                            <td style="padding: 10px; border-bottom: 1px solid #e2e8f0;"><a href="mailto:${email}" style="color: #2563eb;">${email}</a></td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; font-weight: bold; background-color: #f8fafc;">No. Telepon / WA</td>
+                            <td style="padding: 10px; border-bottom: 1px solid #e2e8f0;">${phone}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; font-weight: bold; background-color: #f8fafc;">Alamat</td>
+                            <td style="padding: 10px; border-bottom: 1px solid #e2e8f0;">${address}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; font-weight: bold; background-color: #f8fafc;">Waktu Registrasi</td>
+                            <td style="padding: 10px; border-bottom: 1px solid #e2e8f0;">${createdDate}</td>
+                        </tr>
+                    </table>
+
+                    <div style="text-align: center; margin: 30px 0;">
+                        <a href="${adminUrl}" style="background-color: #2563eb; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 6px; font-weight: bold; font-size: 14px; display: inline-block;">
+                            Buka Super Admin Dashboard
+                        </a>
+                    </div>
+
+                    <p style="font-size: 13px; color: #64748b; line-height: 1.5; margin: 0;">
+                        Silakan login ke Super Admin Dashboard untuk meninjau dan menyetujui pendaftaran ini.
+                    </p>
+                </div>
+
+                <div style="background-color: #f8fafc; padding: 14px 20px; border-top: 1px solid #e2e8f0; font-size: 12px; color: #94a3b8; text-align: center;">
+                    Notifikasi otomatis dari platform SaaS Examku.
+                </div>
+            </div>
+        `;
+
+        const message = new MailerMessage({
+            from: {
+                address: $app.settings().meta.senderAddress || "noreply@examku.my.id",
+                name: $app.settings().meta.senderName || "Examku System",
+            },
+            to: [{ address: "faruq.blogger@gmail.com" }],
+            subject: subject,
+            html: html,
+        });
+
+        $app.newMailClient().send(message);
+        console.log("[Notification] Email pendaftaran sekolah berhasil dikirim ke faruq.blogger@gmail.com untuk:", schoolName);
+    } catch (err) {
+        console.log("[Notification] Gagal mengirim notifikasi email:", err);
+    }
+
+    return e.next();
+}, "school_requests");
+EOF
+
+cat > /opt/pocketbase/master/pb_hooks/notify_school_activated.pb.js << 'EOF'
+// ============================================================
+// PB Hook: Kirim Email Notifikasi Aktivasi Layanan ke Pendaftar Tenant
+// Dipicu saat: Record baru dibuat di koleksi "schools"
+// ============================================================
+
+onRecordAfterCreateSuccess((e) => {
+    try {
+        const contactEmail = (e.record.get("contact_email") || "").trim();
+        if (!contactEmail || !contactEmail.includes("@")) {
+            console.log("[Activation Mail] Dilewati: contact_email kosong atau tidak valid.");
+            return e.next();
+        }
+
+        const schoolName = e.record.get("name") || "Institusi Anda";
+        const slug = e.record.get("slug") || "";
+        const customDomain = (e.record.get("custom_domain") || "").trim();
+        const plan = e.record.get("plan") || "free";
+        const quota = e.record.get("student_quota") || 50;
+        const activeUntil = (e.record.get("active_until") || "").trim();
+
+        const primaryDomain = customDomain ? customDomain : (slug + ".examku.my.id");
+        const adminUrl = "https://" + primaryDomain + "/admin";
+        const studentUrl = "https://" + primaryDomain;
+        const waNumber = "6285359907696";
+
+        let planLabel = "Free Trial (50 Siswa)";
+        if (plan === "basic") planLabel = "Paket Berkembang (250 Siswa)";
+        else if (plan === "pro") planLabel = "Paket Lanjutan (500 Siswa)";
+        else if (plan === "ultimate") planLabel = "Paket Premium (1000 Siswa)";
+
+        let masaAktifStr = "Akses Permanen (Tanpa Batas)";
+        if (activeUntil) {
+            try {
+                const match = activeUntil.match(/^(\d{4})-(\d{2})-(\d{2})/);
+                if (match) {
+                    const months = ["Januari","Februari","Maret","April","Mei","Juni","Juli","Agustus","September","Oktober","November","Desember"];
+                    const y = match[1];
+                    const m = months[parseInt(match[2], 10) - 1];
+                    const d = parseInt(match[3], 10);
+                    masaAktifStr = d + " " + m + " " + y;
+                }
+            } catch (err) {}
+        }
+
+        const waText = encodeURIComponent(
+            "Halo Admin Examku, saya dari " + schoolName + " (" + slug + ".examku.my.id) ingin konsultasi perpanjangan / upgrade paket ujian."
+        );
+        const waUrl = "https://wa.me/" + waNumber + "?text=" + waText;
+        const subject = "[Examku] Layanan CBT Aktif: " + schoolName;
+
+        const html = `
+            <div style="font-family:Arial,sans-serif;color:#1e293b;max-width:620px;margin:0 auto;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;background:#ffffff">
+                <div style="background:linear-gradient(135deg,#1e40af,#3b82f6);padding:28px 24px;color:#ffffff">
+                    <div style="display:inline-block;background:rgba(255,255,255,0.2);padding:4px 12px;border-radius:20px;font-size:11px;font-weight:bold;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">Layanan CBT Aktif</div>
+                    <h1 style="margin:0;font-size:22px;font-weight:bold;line-height:1.3">Selamat, Akun CBT Anda Siap Digunakan!</h1>
+                    <p style="margin:8px 0 0;font-size:14px;opacity:.95">Pendaftaran institusi <strong>${schoolName}</strong> telah disetujui dan sistem CBT Anda sudah aktif.</p>
+                </div>
+                <div style="padding:24px">
+                    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:18px;margin-bottom:20px">
+                        <h3 style="margin:0 0 12px;font-size:15px;color:#0f172a;font-weight:bold">Kredensial Login Administrator</h3>
+                        <table style="width:100%;border-collapse:collapse;font-size:13px">
+                            <tr><td style="padding:6px 0;color:#64748b;width:140px">URL Login Admin</td><td style="padding:6px 0;font-weight:bold"><a href="${adminUrl}" style="color:#2563eb;text-decoration:none">${adminUrl}</a></td></tr>
+                            <tr><td style="padding:6px 0;color:#64748b">Username</td><td style="padding:6px 0;font-weight:bold;font-family:monospace;font-size:14px;color:#0f172a">admin</td></tr>
+                            <tr><td style="padding:6px 0;color:#64748b">Password Default</td><td style="padding:6px 0;font-weight:bold;font-family:monospace;font-size:14px;color:#dc2626">sudahlupa</td></tr>
+                        </table>
+                        <div style="margin-top:10px;padding:8px 12px;background:#fef2f2;border-left:3px solid #ef4444;border-radius:4px;font-size:12px;color:#991b1b"><strong>Penting:</strong> Segera ubah password default ini setelah login pertama kali melalui menu <em>Pengaturan</em>.</div>
+                    </div>
+                    <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:16px;margin-bottom:20px">
+                        <h4 style="margin:0 0 8px;font-size:14px;color:#166534;font-weight:bold">Portal Login Siswa / Peserta Ujian</h4>
+                        <p style="margin:0 0 6px;font-size:13px;color:#15803d">Bagikan tautan ini kepada peserta ujian:</p>
+                        <a href="${studentUrl}" style="color:#15803d;font-weight:bold;font-size:14px;text-decoration:underline">${studentUrl}</a>
+                    </div>
+                    <table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:24px;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden">
+                        <tr style="background:#f8fafc"><td colspan="2" style="padding:10px 14px;font-weight:bold;color:#334155;border-bottom:1px solid #e2e8f0">Rincian Paket Layanan</td></tr>
+                        <tr><td style="padding:10px 14px;border-bottom:1px solid #f1f5f9;color:#64748b;width:140px">Paket</td><td style="padding:10px 14px;border-bottom:1px solid #f1f5f9;font-weight:bold;color:#0f172a">${planLabel}</td></tr>
+                        <tr><td style="padding:10px 14px;border-bottom:1px solid #f1f5f9;color:#64748b">Kuota Peserta</td><td style="padding:10px 14px;border-bottom:1px solid #f1f5f9;font-weight:bold;color:#0f172a">${quota} Siswa</td></tr>
+                        <tr><td style="padding:10px 14px;color:#64748b">Masa Aktif</td><td style="padding:10px 14px;font-weight:bold;color:#2563eb">${masaAktifStr}</td></tr>
+                    </table>
+                    <div style="text-align:center;margin:24px 0">
+                        <a href="${adminUrl}" style="background:#2563eb;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:bold;font-size:14px;display:inline-block">Buka Panel Admin CBT</a>
+                    </div>
+                    <div style="background:#eff6ff;border:1px dashed #93c5fd;border-radius:10px;padding:16px;text-align:center">
+                        <p style="margin:0 0 10px;font-size:13px;color:#1e40af;font-weight:500">Butuh penambahan kuota, perubahan paket, atau perpanjangan layanan?</p>
+                        <a href="${waUrl}" style="background:#16a34a;color:#ffffff;text-decoration:none;padding:10px 20px;border-radius:8px;font-weight:bold;font-size:13px;display:inline-block">Chat WhatsApp Admin (0853-5990-7696)</a>
+                    </div>
+                </div>
+                <div style="background:#f8fafc;padding:16px 20px;border-top:1px solid #e2e8f0;font-size:11px;color:#94a3b8;text-align:center">
+                    Email ini dikirimkan secara otomatis oleh sistem <strong>Examku CBT Online</strong>.<br/>Jika tidak merasa mendaftar, abaikan email ini.
+                </div>
+            </div>
+        `;
+
+        const message = new MailerMessage({
+            from: {
+                address: $app.settings().meta.senderAddress || "noreply@examku.my.id",
+                name: $app.settings().meta.senderName || "Examku System",
+            },
+            to: [{ address: contactEmail }],
+            subject: subject,
+            html: html,
+        });
+
+        $app.newMailClient().send(message);
+        console.log("[Activation Mail] Email aktivasi terkirim ke:", contactEmail, "untuk:", schoolName);
+    } catch (err) {
+        console.log("[Activation Mail] Gagal kirim email aktivasi:", err);
+    }
+
+    return e.next();
+}, "schools");
+EOF
+
 # ============================================================
 # 4. HELPER SCRIPTS
 # ============================================================

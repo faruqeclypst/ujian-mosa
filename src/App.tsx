@@ -54,6 +54,7 @@ import LandingPage from "./pages/landing/LandingPage";
 import RegisterSchoolPage from "./pages/landing/RegisterSchoolPage";
 import FeaturesPage from "./pages/landing/FeaturesPage";
 import SchoolNotFoundPage from "./pages/landing/SchoolNotFoundPage";
+import SchoolSuspendedPage from "./pages/landing/SchoolSuspendedPage";
 import SuperAdminLoginPage from "./pages/superadmin/SuperAdminLoginPage";
 import SuperAdminDashboard from "./pages/superadmin/SuperAdminDashboard";
 import SelectSchoolPage from "./pages/landing/SelectSchoolPage";
@@ -85,7 +86,7 @@ const AdminOnlyRoute = ({ children }: { children: React.ReactNode }) => {
 const SchoolAppContent = () => {
   const { user, loading: adminLoading } = useAuth();
   const { student, loading: studentLoading } = useStudentAuth();
-  const { school, notFound, inactive, loading: tenantLoading } = useTenant();
+  const { school, notFound, inactive, subscriptionStatus, loading: tenantLoading } = useTenant();
   const location = useLocation();
 
   useEffect(() => {
@@ -101,6 +102,13 @@ const SchoolAppContent = () => {
   if (notFound || inactive) return <SchoolNotFoundPage />;
 
   const isAdminRoute = location.pathname.startsWith("/admin");
+
+  // Jika sekolah dalam status ditangguhkan (> H+3 masa tenggang lewat atau dinonaktifkan):
+  // Rute siswa diarahkan ke SchoolSuspendedPage. Rute admin tetap terbuka agar admin bisa bayar invoice.
+  if (subscriptionStatus?.isSuspended && !isAdminRoute) {
+    return <SchoolSuspendedPage />;
+  }
+
   const isGlobalLoading = adminLoading || studentLoading;
 
   return (

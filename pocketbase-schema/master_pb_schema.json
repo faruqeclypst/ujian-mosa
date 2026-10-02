@@ -20,9 +20,10 @@
       { "id": "school_pb_url", "name": "pb_url", "type": "url", "required": true },
       { "id": "school_email", "name": "contact_email", "type": "email", "required": false },
       { "id": "school_active", "name": "is_active", "type": "bool", "required": false },
-      { "id": "school_plan", "name": "plan", "type": "select", "required": true, "values": ["free", "basic", "pro"] },
+      { "id": "school_plan", "name": "plan", "type": "select", "required": true, "values": ["free", "basic", "pro", "ultimate"] },
       { "id": "school_quota", "name": "student_quota", "type": "number", "required": false },
-      { "id": "school_custom_domain", "name": "custom_domain", "type": "text", "required": false }
+      { "id": "school_custom_domain", "name": "custom_domain", "type": "text", "required": false },
+      { "id": "school_active_until", "name": "active_until", "type": "date", "required": false }
     ],
     "listRule": "@request.auth.collectionName = 'super_admins'",
     "viewRule": "@request.auth.collectionName = 'super_admins'",
@@ -42,6 +43,9 @@
       { "id": "req_email", "name": "contact_email", "type": "email", "required": true },
       { "id": "req_phone", "name": "contact_phone", "type": "text", "required": false },
       { "id": "req_address", "name": "address", "type": "text", "required": false },
+      { "id": "req_type", "name": "type", "type": "text", "required": false },
+      { "id": "req_plan", "name": "plan", "type": "text", "required": false },
+      { "id": "req_duration", "name": "duration", "type": "text", "required": false },
       { "id": "req_status", "name": "status", "type": "select", "required": true, "values": ["pending", "approved", "rejected"] }
     ],
     "listRule": "@request.auth.collectionName = 'super_admins'",
@@ -66,5 +70,32 @@
     "createRule": "@request.auth.collectionName = 'super_admins'",
     "updateRule": "@request.auth.collectionName = 'super_admins'",
     "deleteRule": "@request.auth.collectionName = 'super_admins'"
+  },
+  {
+    "name": "invoices",
+    "type": "base",
+    "fields": [
+      { "id": "inv_number", "name": "invoice_number", "type": "text", "required": true, "presentable": true },
+      { "id": "inv_school_id", "name": "school_id", "type": "text", "required": true },
+      { "id": "inv_school_name", "name": "school_name", "type": "text", "required": true },
+      { "id": "inv_school_slug", "name": "school_slug", "type": "text", "required": false },
+      { "id": "inv_email", "name": "contact_email", "type": "email", "required": false },
+      { "id": "inv_amount", "name": "amount", "type": "number", "required": true },
+      { "id": "inv_period", "name": "period_label", "type": "text", "required": false },
+      { "id": "inv_plan_label", "name": "plan_label", "type": "text", "required": false },
+      { "id": "inv_plan", "name": "plan", "type": "text", "required": false },
+      { "id": "inv_duration", "name": "duration_months", "type": "number", "required": false },
+      { "id": "inv_status", "name": "status", "type": "select", "required": true, "values": ["unpaid", "paid", "cancelled", "overdue"] },
+      { "id": "inv_due_date", "name": "due_date", "type": "text", "required": false },
+      { "id": "inv_paid_date", "name": "paid_date", "type": "text", "required": false },
+      { "id": "inv_notes", "name": "notes", "type": "text", "required": false },
+      { "id": "inv_proof", "name": "payment_proof", "type": "file", "required": false }
+    ],
+    "listRule": "",
+    "viewRule": "",
+    "createRule": "",
+    "updateRule": "",
+    "deleteRule": "@request.auth.collectionName = 'super_admins'"
   }
 ]
+

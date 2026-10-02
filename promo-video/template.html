@@ -1,0 +1,2358 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>EXAM AA : Video Promosi Aplikasi CBT Sekolah</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Outfit:wght@600;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root {
+  --primary: #2563eb;
+  --primary-dark: #1d4ed8;
+  --primary-light: #3b82f6;
+  --primary-subtle: #eff6ff;
+  --emerald: #10b981;
+  --emerald-dark: #059669;
+  --emerald-subtle: #ecfdf5;
+  --amber: #f59e0b;
+  --amber-dark: #d97706;
+  --amber-subtle: #fffbeb;
+  --crimson: #ef4444;
+  --crimson-dark: #dc2626;
+  --crimson-subtle: #fef2f2;
+  --slate-950: #080d1a;
+  --slate-900: #0f172a;
+  --slate-800: #1e293b;
+  --slate-700: #334155;
+  --slate-600: #475569;
+  --slate-400: #94a3b8;
+  --slate-200: #e2e8f0;
+  --slate-100: #f1f5f9;
+  --phone-bg: #f8fafc;
+  --text-main: #0f172a;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+  width: 100%;
+  height: 100%;
+  background: #060913;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  overflow: hidden;
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+#wrap {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 1080x1920 Stage (9:16 Vertical Video) */
+#stage {
+  width: 1080px;
+  height: 1920px;
+  position: relative;
+  overflow: hidden;
+  flex: none;
+  background: radial-gradient(circle at 50% 25%, #1d4ed8 0%, #0f172a 52%, #080d1a 100%);
+  color: #fff;
+  transform-origin: center center;
+}
+
+/* Background Atmosphere Blobs & Chevrons */
+#bgs {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+.bg-glow-1 {
+  position: absolute;
+  width: 1000px;
+  height: 1000px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(37, 99, 235, 0.35) 0%, rgba(37, 99, 235, 0) 70%);
+  top: -150px;
+  left: -250px;
+}
+.bg-glow-2 {
+  position: absolute;
+  width: 1100px;
+  height: 1100px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(16, 185, 129, 0.18) 0%, rgba(16, 185, 129, 0) 70%);
+  bottom: -200px;
+  right: -300px;
+}
+.bg-glow-3 {
+  position: absolute;
+  width: 800px;
+  height: 800px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(245, 158, 11, 0.15) 0%, rgba(245, 158, 11, 0) 70%);
+  top: 40%;
+  left: 30%;
+}
+#bgs svg {
+  position: absolute;
+  fill: none;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.d1 {
+  width: 1200px;
+  left: -200px;
+  top: -150px;
+  stroke: rgba(59, 130, 246, 0.22);
+  stroke-width: 60;
+  filter: drop-shadow(0 0 40px rgba(37, 99, 235, 0.3));
+}
+.d2 {
+  width: 1000px;
+  right: -250px;
+  bottom: -150px;
+  stroke: rgba(255, 255, 255, 0.12);
+  stroke-width: 50;
+}
+
+/* Floating Grid Dots Motif */
+.grid-motif {
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.08) 2px, transparent 2px);
+  background-size: 52px 52px;
+  opacity: 0.65;
+}
+
+/* Floating Hook Captions at Top */
+#cap {
+  position: absolute;
+  left: 90px;
+  right: 90px;
+  top: 130px;
+  font-family: 'Outfit', sans-serif;
+  font-size: 82px;
+  line-height: 1.06;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  z-index: 10;
+  text-shadow: 0 12px 30px rgba(0, 0, 0, 0.5);
+}
+#cap .l {
+  display: block;
+  overflow: hidden;
+  padding-bottom: 8px;
+}
+#cap .l > span {
+  display: block;
+  transform: translateY(115%);
+  transition: transform 0.55s cubic-bezier(0.16, 1, 0.3, 1);
+}
+#cap .l.show > span {
+  transform: translateY(0%);
+}
+#cap em {
+  font-style: normal;
+  color: #38bdf8;
+  background: linear-gradient(135deg, #ffffff 0%, #bae6fd 40%, #38bdf8 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 4px 12px rgba(56, 189, 248, 0.4));
+}
+#cap em.amber {
+  background: linear-gradient(135deg, #ffffff 0%, #fef08a 40%, #fbbf24 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 4px 12px rgba(251, 191, 36, 0.4));
+}
+#cap em.red {
+  background: linear-gradient(135deg, #ffffff 0%, #fecaca 40%, #f87171 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 4px 12px rgba(248, 113, 113, 0.4));
+}
+#cap em.green {
+  background: linear-gradient(135deg, #ffffff 0%, #a7f3d0 40%, #34d399 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 4px 12px rgba(52, 211, 153, 0.4));
+}
+
+/* Smartphone Mockup Container */
+#ph {
+  position: absolute;
+  left: 170px;
+  top: 410px;
+  width: 740px;
+  height: 1470px;
+  border-radius: 80px;
+  background: #0f172a;
+  padding: 16px;
+  box-shadow: 0 50px 100px -20px rgba(8, 13, 26, 0.9),
+              0 30px 60px -30px rgba(37, 99, 235, 0.4),
+              inset 0 0 0 3px rgba(255, 255, 255, 0.16),
+              inset 0 0 0 6px rgba(15, 23, 42, 0.9);
+  transform: translateY(115%) scale(0.95);
+  transition: transform 0.85s cubic-bezier(0.16, 1, 0.3, 1);
+  z-index: 5;
+}
+#ph.in {
+  transform: translateY(0%) scale(1);
+}
+
+/* Smartphone Dynamic Island */
+#ph:before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 32px;
+  width: 170px;
+  height: 38px;
+  margin-left: -85px;
+  background: #080d1a;
+  border-radius: 20px;
+  z-index: 25;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+}
+
+/* Smartphone Screen Inner */
+#scr {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 66px;
+  overflow: hidden;
+  background: var(--phone-bg);
+  color: var(--text-main);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.05);
+}
+
+/* Status Bar */
+.status-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 60px;
+  padding: 18px 48px 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 22px;
+  font-weight: 700;
+  color: #1e293b;
+  z-index: 20;
+}
+.status-icons {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.status-icons svg {
+  width: 22px;
+  height: 22px;
+  fill: currentColor;
+}
+
+/* Screens Base */
+.sc {
+  position: absolute;
+  inset: 0;
+  padding: 85px 44px 44px;
+  display: flex;
+  flex-direction: column;
+  background: var(--phone-bg);
+  transform: translateX(105%);
+  opacity: 0;
+  transition: transform 0.45s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.35s ease;
+  z-index: 10;
+}
+.sc.on {
+  transform: translateX(0%);
+  opacity: 1;
+}
+.sc.off {
+  transform: translateX(-30%);
+  opacity: 0;
+}
+
+/* Screen 1: Login */
+.login-header {
+  text-align: center;
+  margin-top: 20px;
+  margin-bottom: 34px;
+}
+.school-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: #ffffff;
+  border: 2px solid var(--slate-200);
+  border-radius: 999px;
+  padding: 8px 22px;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--primary);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+  margin-bottom: 18px;
+}
+.school-badge svg {
+  width: 22px;
+  height: 22px;
+  fill: var(--primary);
+}
+.login-logo {
+  width: 130px;
+  height: 130px;
+  object-fit: contain;
+  margin: 0 auto 16px;
+  display: block;
+  filter: drop-shadow(0 10px 20px rgba(37, 99, 235, 0.2));
+}
+.login-title {
+  font-family: 'Outfit', sans-serif;
+  font-size: 44px;
+  font-weight: 800;
+  color: var(--slate-900);
+  letter-spacing: -0.02em;
+}
+.login-subtitle {
+  font-size: 24px;
+  color: var(--slate-600);
+  margin-top: 6px;
+  font-weight: 500;
+}
+
+.form-group {
+  margin-bottom: 24px;
+}
+.form-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 20px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--slate-600);
+  margin-bottom: 10px;
+}
+.input-box {
+  height: 82px;
+  background: #ffffff;
+  border: 2px solid var(--slate-200);
+  border-radius: 22px;
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--slate-900);
+  box-shadow: 0 4px 10px rgba(0,0,0,0.02);
+  transition: all 0.2s ease;
+  position: relative;
+}
+.input-box.act {
+  border-color: var(--primary);
+  background: #ffffff;
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.15);
+}
+.input-box:after {
+  content: "";
+  display: inline-block;
+  width: 3px;
+  height: 34px;
+  background: var(--primary);
+  margin-left: 4px;
+  opacity: 0;
+}
+.input-box.act:after {
+  animation: blink 0.8s infinite;
+}
+@keyframes blink { 0%,100% { opacity: 0; } 50% { opacity: 1; } }
+
+.btn-primary {
+  height: 84px;
+  background: var(--primary);
+  color: #ffffff;
+  border: none;
+  border-radius: 24px;
+  font-family: 'Outfit', sans-serif;
+  font-size: 28px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  box-shadow: 0 10px 24px rgba(37, 99, 235, 0.35);
+  margin-top: 14px;
+  transition: all 0.2s ease;
+}
+.btn-primary.btn-active {
+  transform: scale(0.97);
+  background: var(--primary-dark);
+}
+
+/* Screen 2: Dashboard */
+.dash-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 22px;
+  border-bottom: 2px solid var(--slate-200);
+}
+.dash-brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.dash-logo-mini {
+  width: 50px;
+  height: 50px;
+  object-fit: contain;
+}
+.dash-brand-title {
+  font-family: 'Outfit', sans-serif;
+  font-size: 32px;
+  font-weight: 800;
+  color: var(--primary);
+}
+.user-avatar {
+  width: 60px;
+  height: 60px;
+  border-radius: 20px;
+  background: #dbeafe;
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 28px;
+}
+.dash-welcome {
+  margin-top: 30px;
+}
+.dash-hello {
+  font-family: 'Outfit', sans-serif;
+  font-size: 54px;
+  font-weight: 800;
+  color: var(--slate-900);
+  letter-spacing: -0.02em;
+}
+.dash-class {
+  font-size: 24px;
+  color: var(--slate-600);
+  font-weight: 600;
+  margin-top: 4px;
+}
+.verified-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--emerald-subtle);
+  color: var(--emerald-dark);
+  border: 2px solid #a7f3d0;
+  border-radius: 999px;
+  padding: 8px 20px;
+  font-size: 20px;
+  font-weight: 700;
+  margin-top: 14px;
+}
+.verified-tag svg {
+  width: 18px;
+  height: 18px;
+  fill: var(--emerald);
+}
+.exam-agenda-card {
+  margin-top: 36px;
+  background: #ffffff;
+  border-radius: 36px;
+  border: 2px solid var(--slate-200);
+  padding: 34px;
+  box-shadow: 0 16px 36px rgba(0,0,0,0.05);
+  position: relative;
+  overflow: hidden;
+}
+.exam-agenda-card:before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 10px;
+  height: 100%;
+  background: var(--primary);
+}
+.agenda-category {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.category-pill {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--primary);
+  background: var(--primary-subtle);
+  padding: 6px 16px;
+  border-radius: 12px;
+  letter-spacing: 0.05em;
+}
+.agenda-subject {
+  font-family: 'Outfit', sans-serif;
+  font-size: 48px;
+  font-weight: 800;
+  color: var(--slate-900);
+  margin: 16px 0 20px;
+  letter-spacing: -0.02em;
+}
+.agenda-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--slate-600);
+}
+.meta-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.meta-item svg {
+  width: 24px;
+  height: 24px;
+  fill: var(--slate-400);
+  flex: none;
+}
+.btn-open-room {
+  margin-top: 28px;
+  height: 74px;
+  width: 100%;
+  background: var(--primary);
+  color: #ffffff;
+  border-radius: 20px;
+  font-family: 'Outfit', sans-serif;
+  font-size: 26px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border: none;
+  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.3);
+  transition: all 0.2s ease;
+}
+.btn-open-room.btn-active {
+  transform: scale(0.97);
+  background: var(--primary-dark);
+}
+
+/* Screen 3: Token Verification Page */
+#s-token {
+  justify-content: center;
+}
+.token-card {
+  background: #ffffff;
+  border-radius: 36px;
+  border: 2px solid var(--slate-200);
+  padding: 40px 36px;
+  box-shadow: 0 20px 45px rgba(0,0,0,0.06);
+  position: relative;
+}
+.token-room-header {
+  border-bottom: 2px solid var(--slate-100);
+  padding-bottom: 22px;
+  margin-bottom: 26px;
+}
+.token-room-row1 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+.token-room-title {
+  font-family: 'Outfit', sans-serif;
+  font-size: 32px;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: var(--slate-900);
+}
+.token-subject-badge {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--emerald-dark);
+  background: var(--emerald-subtle);
+  border: 2px solid #a7f3d0;
+  padding: 6px 16px;
+  border-radius: 12px;
+  letter-spacing: 0.04em;
+}
+.token-room-row2 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 10px;
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--slate-600);
+}
+.token-room-row2 .duration {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  color: var(--slate-700);
+}
+.token-room-row2 svg {
+  width: 20px;
+  height: 20px;
+  fill: var(--emerald);
+}
+.token-form-label {
+  font-size: 20px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--slate-600);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.token-form-label svg {
+  width: 22px;
+  height: 22px;
+  fill: var(--emerald);
+}
+.token-input-box {
+  width: 100%;
+  height: 96px;
+  background: var(--slate-100);
+  border: 3px solid var(--slate-200);
+  border-radius: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: monospace;
+  font-size: 46px;
+  font-weight: 900;
+  letter-spacing: 0.35em;
+  color: var(--slate-900);
+  transition: all 0.25s ease;
+}
+.token-input-box.typing {
+  border-color: var(--emerald);
+  background: #ffffff;
+  box-shadow: 0 0 0 5px rgba(16, 185, 129, 0.15);
+}
+.token-status-pill {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 14px;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--emerald-dark);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+.token-status-pill.show {
+  opacity: 1;
+}
+.btn-start-exam {
+  width: 100%;
+  height: 84px;
+  background: var(--emerald-dark);
+  color: #ffffff;
+  border-radius: 22px;
+  font-family: 'Outfit', sans-serif;
+  font-size: 26px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  border: none;
+  box-shadow: 0 10px 24px rgba(5, 150, 105, 0.3);
+  margin-top: 24px;
+  transition: all 0.2s ease;
+}
+.btn-start-exam.btn-active {
+  transform: scale(0.97);
+  background: #047857;
+}
+
+/* Screen 4: CBT Exam Workspace */
+.cbt-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 18px;
+  border-bottom: 2px solid var(--slate-200);
+}
+.cbt-timer {
+  background: var(--primary-subtle);
+  border: 2px solid #bfdbfe;
+  color: var(--primary);
+  border-radius: 999px;
+  padding: 8px 22px;
+  font-size: 26px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-variant-numeric: tabular-nums;
+}
+.cbt-timer svg {
+  width: 22px;
+  height: 22px;
+  fill: var(--primary);
+}
+.cbt-subject {
+  font-family: 'Outfit', sans-serif;
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--slate-800);
+}
+.cbt-sub-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 28px;
+}
+.cbt-q-number {
+  background: var(--primary);
+  color: #ffffff;
+  padding: 8px 22px;
+  border-radius: 16px;
+  font-size: 26px;
+  font-weight: 800;
+  font-family: 'Outfit', sans-serif;
+}
+.ragu-btn {
+  height: 58px;
+  padding: 0 22px;
+  border-radius: 16px;
+  border: 2px solid var(--slate-200);
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--slate-600);
+  transition: all 0.2s ease;
+}
+.ragu-btn svg {
+  width: 22px;
+  height: 22px;
+  fill: var(--slate-400);
+  transition: fill 0.2s ease;
+}
+.ragu-btn.fl {
+  background: var(--amber-subtle);
+  border-color: var(--amber);
+  color: #92400e;
+  transform: scale(1.04);
+}
+.ragu-btn.fl svg {
+  fill: var(--amber);
+}
+.cbt-question-text {
+  font-size: 34px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--slate-900);
+  margin: 26px 0 22px;
+  letter-spacing: -0.01em;
+}
+.cbt-options-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.option-item {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  border: 2px solid var(--slate-200);
+  background: #ffffff;
+  border-radius: 24px;
+  padding: 18px 22px;
+  font-size: 30px;
+  font-weight: 700;
+  color: var(--slate-800);
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.02);
+}
+.option-item .badge-abc {
+  width: 54px;
+  height: 54px;
+  border-radius: 14px;
+  background: var(--slate-100);
+  color: var(--slate-600);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+  font-weight: 800;
+  font-family: 'Outfit', sans-serif;
+  flex: none;
+  transition: all 0.2s ease;
+}
+.option-item.sl {
+  border-color: var(--primary);
+  background: var(--primary-subtle);
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.15);
+}
+.option-item.sl .badge-abc {
+  background: var(--primary);
+  color: #ffffff;
+}
+
+/* Bottom Navigation Bar */
+.cbt-bottom-bar {
+  margin-top: auto;
+  padding-top: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 2px solid var(--slate-200);
+}
+.nav-counter-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: 'Outfit', sans-serif;
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--primary);
+  background: var(--primary-subtle);
+  padding: 14px 24px;
+  border-radius: 20px;
+  border: 2px solid #bfdbfe;
+}
+.nav-counter-btn svg {
+  width: 24px;
+  height: 24px;
+  fill: var(--primary);
+}
+.btn-nav-next {
+  height: 76px;
+  padding: 0 24px;
+  border-radius: 22px;
+  background: var(--primary);
+  color: #ffffff;
+  font-size: 24px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: none;
+  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.25);
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+.btn-nav-next.btn-finish {
+  background: var(--emerald-dark);
+  box-shadow: 0 8px 20px rgba(5, 150, 105, 0.3);
+}
+
+/* Anti-Cheat Violation Dialog (#dlg-cheat) */
+#dlg-cheat {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  z-index: 45;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+  backdrop-filter: blur(4px);
+}
+#dlg-cheat.on {
+  opacity: 1;
+  pointer-events: auto;
+}
+.cheat-modal-content {
+  background: #ffffff;
+  border-radius: 36px;
+  padding: 40px 32px;
+  text-align: center;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.3);
+  width: 100%;
+  transform: scale(0.9);
+  transition: transform 0.3s cubic-bezier(0.16, 1.2, 0.3, 1);
+}
+#dlg-cheat.on .cheat-modal-content {
+  transform: scale(1);
+}
+.cheat-icon-wrap {
+  width: 110px;
+  height: 110px;
+  border-radius: 32px;
+  background: var(--crimson-subtle);
+  border: 3px solid #fecaca;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 20px;
+}
+.cheat-icon-wrap svg {
+  width: 60px;
+  height: 60px;
+  fill: var(--crimson);
+}
+.cheat-modal-title {
+  font-family: 'Outfit', sans-serif;
+  font-size: 38px;
+  font-weight: 900;
+  color: var(--crimson);
+  text-transform: uppercase;
+  letter-spacing: -0.01em;
+}
+.cheat-modal-desc {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--slate-600);
+  line-height: 1.35;
+  margin: 14px 0 20px;
+}
+.cheat-count-box {
+  background: var(--crimson-subtle);
+  border: 2px solid #fecaca;
+  border-radius: 20px;
+  padding: 16px;
+  margin-bottom: 24px;
+}
+.cheat-count-label {
+  font-size: 18px;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: var(--crimson);
+  letter-spacing: 0.08em;
+  display: block;
+}
+.cheat-count-number {
+  font-family: 'Outfit', sans-serif;
+  font-size: 44px;
+  font-weight: 900;
+  color: var(--crimson);
+}
+.btn-cheat-dismiss {
+  width: 100%;
+  height: 72px;
+  background: var(--emerald-dark);
+  color: #ffffff;
+  border-radius: 20px;
+  font-family: 'Outfit', sans-serif;
+  font-size: 24px;
+  font-weight: 800;
+  border: none;
+  box-shadow: 0 8px 20px rgba(5, 150, 105, 0.3);
+}
+
+/* Screen Locked / Freeze Penalty Screen (#sc-locked) */
+#sc-locked {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 50% 30%, #450a0a 0%, #1e1b4b 60%, #080d1a 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 50px 40px;
+  text-align: center;
+  z-index: 48;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.35s ease;
+}
+#sc-locked.on {
+  opacity: 1;
+  pointer-events: auto;
+}
+.lock-shield-wrap {
+  width: 140px;
+  height: 140px;
+  border-radius: 40px;
+  background: rgba(239, 68, 68, 0.2);
+  border: 3px solid rgba(239, 68, 68, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 28px;
+  box-shadow: 0 0 50px rgba(239, 68, 68, 0.4);
+}
+.lock-shield-wrap svg {
+  width: 74px;
+  height: 74px;
+  fill: #f87171;
+}
+.lock-title {
+  font-family: 'Outfit', sans-serif;
+  font-size: 50px;
+  font-weight: 900;
+  color: #ffffff;
+  letter-spacing: -0.02em;
+}
+.lock-subtitle {
+  font-size: 24px;
+  font-weight: 600;
+  color: #fca5a5;
+  line-height: 1.35;
+  margin: 14px 0 28px;
+}
+.lock-penalty-box {
+  background: rgba(0, 0, 0, 0.4);
+  border: 2px solid rgba(239, 68, 68, 0.4);
+  border-radius: 24px;
+  padding: 20px 30px;
+  width: 100%;
+  margin-bottom: 24px;
+}
+.lock-penalty-label {
+  font-size: 20px;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: #f87171;
+  letter-spacing: 0.08em;
+}
+.lock-penalty-timer {
+  font-family: monospace;
+  font-size: 52px;
+  font-weight: 900;
+  color: #ffffff;
+  margin-top: 4px;
+}
+.proctor-unlock-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(16, 185, 129, 0.2);
+  border: 2px solid rgba(16, 185, 129, 0.6);
+  color: #6ee7b7;
+  border-radius: 999px;
+  padding: 12px 24px;
+  font-size: 22px;
+  font-weight: 700;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+.proctor-unlock-badge.show {
+  opacity: 1;
+}
+
+/* Modals & Bottom Sheets */
+.modal-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.65);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.35s ease;
+  z-index: 30;
+  backdrop-filter: blur(2px);
+}
+.modal-overlay.on {
+  opacity: 1;
+  pointer-events: auto;
+}
+.bottom-sheet {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: #ffffff;
+  border-radius: 48px 48px 0 0;
+  padding: 40px 36px 54px;
+  transform: translateY(105%);
+  transition: transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+  z-index: 35;
+  box-shadow: 0 -20px 50px rgba(0, 0, 0, 0.25);
+}
+.bottom-sheet.up {
+  transform: translateY(0%);
+}
+.sheet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+.sheet-title {
+  font-family: 'Outfit', sans-serif;
+  font-size: 38px;
+  font-weight: 800;
+  color: var(--slate-900);
+}
+.questions-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 12px;
+  margin-bottom: 24px;
+}
+.grid-cell {
+  aspect-ratio: 1;
+  border-radius: 18px;
+  background: var(--slate-100);
+  border: 2px solid var(--slate-200);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Outfit', sans-serif;
+  font-size: 30px;
+  font-weight: 800;
+  color: var(--slate-600);
+  transition: all 0.2s ease;
+}
+.grid-cell.green {
+  background: var(--emerald);
+  border-color: var(--emerald-dark);
+  color: #ffffff;
+}
+.grid-cell.yellow {
+  background: var(--amber);
+  border-color: var(--amber-dark);
+  color: #ffffff;
+  transform: scale(1.05);
+}
+.grid-legend {
+  display: flex;
+  gap: 20px;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--slate-600);
+}
+.legend-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.legend-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+}
+
+/* Warning Sheet Content */
+.warning-icon-box {
+  width: 96px;
+  height: 96px;
+  border-radius: 30px;
+  background: var(--amber-subtle);
+  border: 3px solid #fde68a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 18px;
+}
+.warning-icon-box svg {
+  width: 52px;
+  height: 52px;
+  fill: var(--amber-dark);
+}
+.warning-box-card {
+  background: var(--amber-subtle);
+  border: 2px solid #fde68a;
+  border-radius: 24px;
+  padding: 22px;
+  margin: 20px 0 28px;
+  font-size: 26px;
+  font-weight: 700;
+  color: #92400e;
+  line-height: 1.35;
+}
+.btn-warning-action {
+  height: 84px;
+  border-radius: 24px;
+  background: linear-gradient(135deg, var(--amber) 0%, var(--amber-dark) 100%);
+  color: #ffffff;
+  font-family: 'Outfit', sans-serif;
+  font-size: 24px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border: none;
+  box-shadow: 0 10px 24px rgba(217, 119, 6, 0.35);
+  width: 100%;
+}
+
+/* Screen 5: Exam Finished Success (#s5) */
+#s5 {
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 60px 48px;
+}
+.success-check-wrap {
+  width: 200px;
+  height: 200px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--emerald) 0%, var(--emerald-dark) 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 36px;
+  box-shadow: 0 20px 40px rgba(16, 185, 129, 0.35);
+  transform: scale(0);
+  transition: transform 0.6s cubic-bezier(0.16, 1.4, 0.3, 1);
+}
+.sc.on .success-check-wrap {
+  transform: scale(1);
+}
+.success-check-wrap svg {
+  width: 110px;
+  height: 110px;
+  fill: none;
+  stroke: #ffffff;
+  stroke-width: 14;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 160;
+  stroke-dashoffset: 160;
+  transition: stroke-dashoffset 0.6s ease 0.3s;
+}
+.sc.on .success-check-wrap svg {
+  stroke-dashoffset: 0;
+}
+.success-title {
+  font-family: 'Outfit', sans-serif;
+  font-size: 48px;
+  font-weight: 800;
+  color: var(--slate-900);
+  letter-spacing: -0.02em;
+  margin-bottom: 12px;
+}
+.success-desc {
+  font-size: 26px;
+  color: var(--slate-600);
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+/* Confetti particles */
+.confetti-piece {
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  z-index: 50;
+  pointer-events: none;
+  border-radius: 6px;
+}
+
+/* Fullscreen Overlays: Intro & Outro */
+.full-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  background: radial-gradient(circle at 50% 30%, #1d4ed8 0%, #0f172a 58%, #080d1a 100%);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 0 90px;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.6s ease, visibility 0.6s ease;
+}
+.full-overlay.on {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* Intro Styles */
+.intro-logo {
+  width: 260px;
+  height: 260px;
+  object-fit: contain;
+  margin-bottom: 36px;
+  filter: drop-shadow(0 20px 40px rgba(37, 99, 235, 0.5));
+  transform: scale(0.6);
+  opacity: 0;
+  transition: transform 0.8s cubic-bezier(0.16, 1.4, 0.3, 1), opacity 0.8s ease;
+}
+.full-overlay.on .intro-logo {
+  transform: scale(1);
+  opacity: 1;
+}
+.intro-brand-title {
+  font-family: 'Outfit', sans-serif;
+  font-size: 130px;
+  font-weight: 900;
+  letter-spacing: -0.04em;
+  line-height: 0.95;
+  color: #ffffff;
+  text-shadow: 0 10px 30px rgba(0,0,0,0.5);
+}
+.intro-tagline {
+  font-family: 'Outfit', sans-serif;
+  font-size: 46px;
+  font-weight: 700;
+  color: #93c5fd;
+  margin-top: 22px;
+  line-height: 1.25;
+}
+.intro-sub-badge {
+  align-self: flex-start;
+  margin-top: 36px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 2px solid rgba(255, 255, 255, 0.22);
+  color: #ffffff;
+  padding: 14px 34px;
+  border-radius: 999px;
+  font-size: 28px;
+  font-weight: 700;
+  backdrop-filter: blur(8px);
+}
+
+/* Outro Styles */
+.outro-header {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  margin-bottom: 32px;
+}
+.outro-logo-mini {
+  width: 90px;
+  height: 90px;
+  object-fit: contain;
+}
+.outro-title {
+  font-family: 'Outfit', sans-serif;
+  font-size: 88px;
+  line-height: 1.02;
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  color: #ffffff;
+}
+.outro-subtitle {
+  font-size: 32px;
+  font-weight: 600;
+  color: #93c5fd;
+  margin-top: 8px;
+}
+.outro-benefits {
+  list-style: none;
+  margin-top: 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+.outro-benefits li {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 24px;
+  padding: 18px 24px;
+  font-size: 32px;
+  font-weight: 700;
+  color: #f8fafc;
+  backdrop-filter: blur(8px);
+}
+.outro-check-icon {
+  width: 54px;
+  height: 54px;
+  border-radius: 16px;
+  background: var(--primary);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  font-size: 32px;
+  font-weight: 900;
+}
+.outro-cta-wrap {
+  margin-top: 46px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.outro-url-box {
+  align-self: flex-start;
+  background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+  color: #ffffff;
+  border-radius: 999px;
+  padding: 22px 56px;
+  font-family: 'Outfit', sans-serif;
+  font-size: 46px;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  box-shadow: 0 16px 36px rgba(37, 99, 235, 0.4);
+}
+.outro-meta-info {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  font-size: 26px;
+  font-weight: 600;
+  color: #94a3b8;
+}
+
+/* Top Global Progress Bar */
+#progress-bar {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 10px;
+  background: linear-gradient(90deg, #38bdf8 0%, var(--primary) 50%, var(--emerald) 100%);
+  width: 0%;
+  z-index: 60;
+}
+
+/* Render Mode (for headless video export: removes preview buttons & forces deterministic instant styling) */
+body.render-mode #preview-ctrl {
+  display: none !important;
+}
+body.render-mode #stage {
+  transform: none !important;
+}
+body.render-mode *,
+body.render-mode *:before,
+body.render-mode *:after {
+  transition-duration: 0s !important;
+  transition-delay: 0s !important;
+}
+
+/* Manual Preview Controls Bar */
+#preview-ctrl {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 20px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+  z-index: 100;
+}
+#preview-ctrl button {
+  font-family: 'Outfit', sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  padding: 12px 28px;
+  border-radius: 999px;
+  border: none;
+  background: #ffffff;
+  color: var(--slate-900);
+  cursor: pointer;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+  transition: transform 0.15s ease;
+}
+#preview-ctrl button:active {
+  transform: scale(0.95);
+}
+#time-display {
+  font-family: 'Inter', monospace;
+  font-size: 16px;
+  font-weight: 700;
+  color: #ffffff;
+  background: rgba(15, 23, 42, 0.85);
+  padding: 10px 20px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+</style>
+</head>
+<body>
+
+<div id="wrap">
+  <div id="stage">
+    <!-- Background Decor -->
+    <div id="bgs">
+      <div class="bg-glow-1"></div>
+      <div class="bg-glow-2"></div>
+      <div class="bg-glow-3"></div>
+      <div class="grid-motif"></div>
+      <!-- Logo AA Chevrons -->
+      <svg class="d1" viewBox="0 0 600 500">
+        <polyline points="30,480 300,40 570,480"/>
+        <polyline points="140,480 300,230 460,480"/>
+      </svg>
+      <svg class="d2" viewBox="0 0 600 500">
+        <polyline points="30,480 300,40 570,480"/>
+      </svg>
+    </div>
+
+    <!-- Top Headline / Hook Caption -->
+    <div id="cap">
+      <span class="l"><span id="cap1"></span></span>
+      <span class="l"><span id="cap2"></span></span>
+    </div>
+
+    <!-- Smartphone Mockup -->
+    <div id="ph">
+      <div id="scr">
+        <!-- Status Bar -->
+        <div class="status-bar">
+          <span>08:00</span>
+          <div class="status-icons">
+            <svg viewBox="0 0 24 24"><path d="M12 3c-4.97 0-9 4.03-9 9 0 2.12.74 4.07 1.97 5.61L12 22l7.03-4.39C20.26 16.07 21 14.12 21 12c0-4.97-4.03-9-9-9zm0 16.5l-5.26-3.29C5.74 15.02 5 13.58 5 12c0-3.86 3.14-7 7-7s7 3.14 7 7c0 1.58-.74 3.02-1.74 4.21L12 19.5z"/></svg>
+            <svg viewBox="0 0 24 24"><path d="M12 4C7.31 4 3.07 5.9 0 8.98L12 21 24 8.98C20.93 5.9 16.69 4 12 4zm0 3.5c3.55 0 6.78 1.37 9.21 3.63L12 18.3 2.79 11.13C5.22 8.87 8.45 7.5 12 7.5z"/></svg>
+            <svg viewBox="0 0 24 24"><path d="M15.67 4H14V2h-4v2H8.33C7.6 4 7 4.6 7 5.33v15.33C7 21.4 7.6 22 8.33 22h7.33c.74 0 1.34-.6 1.34-1.33V5.33C17 4.6 16.4 4 15.67 4z"/></svg>
+          </div>
+        </div>
+
+        <!-- Screen 1: Student Login -->
+        <div class="sc on" id="s1">
+          <div class="login-header">
+            <div class="school-badge">
+              <svg viewBox="0 0 24 24"><path d="M12 3L1 9l11 6 9-4.91V17h2V9L12 3zm0 13.5l-8-4.36V16l8 4.36 8-4.36v-3.86l-8 4.36z"/></svg>
+              <span>SMAN Modal Bangsa Aceh</span>
+            </div>
+            <img class="login-logo" src="__LOGO_DATA_URI__" alt="Logo EXAM AA">
+            <h1 class="login-title">Portal Ujian Siswa</h1>
+            <p class="login-subtitle">Masuk untuk memulai agenda ujian hari ini</p>
+          </div>
+
+          <div class="form-group">
+            <div class="form-label">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+              <span>NISN / Username</span>
+            </div>
+            <div class="input-box" id="f1"><span id="t1"></span></div>
+          </div>
+
+          <div class="form-group">
+            <div class="form-label">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
+              <span>Password Ujian</span>
+            </div>
+            <div class="input-box" id="f2"><span id="t2"></span></div>
+          </div>
+
+          <button class="btn-primary" id="bLogin">
+            <span>Masuk Sekarang</span>
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z"/></svg>
+          </button>
+        </div>
+
+        <!-- Screen 2: Dashboard -->
+        <div class="sc" id="s2">
+          <div class="dash-top">
+            <div class="dash-brand">
+              <img class="dash-logo-mini" src="__LOGO_DATA_URI__" alt="">
+              <span class="dash-brand-title">EXAM AA</span>
+            </div>
+            <div class="user-avatar">F</div>
+          </div>
+
+          <div class="dash-welcome">
+            <h2 class="dash-hello">Halo, Faruq</h2>
+            <p class="dash-class">Kelas XII MIPA 1 (NISN: 2412345678)</p>
+            <div class="verified-tag">
+              <svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+              <span>Akun Siswa Terverifikasi</span>
+            </div>
+          </div>
+
+          <div class="exam-agenda-card">
+            <div class="agenda-category">
+              <span class="category-pill">PAS SEMESTER GENAP 2026</span>
+              <span style="font-size:20px; font-weight:700; color:var(--emerald-dark)">● AKTIF</span>
+            </div>
+            <h3 class="agenda-subject">GEOGRAFI</h3>
+            <div class="agenda-meta">
+              <div class="meta-item">
+                <svg viewBox="0 0 24 24"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/></svg>
+                <span>Durasi: 90 Menit</span>
+              </div>
+              <div class="meta-item">
+                <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>
+                <span>Jumlah: 25 Butir Soal</span>
+              </div>
+              <div class="meta-item">
+                <svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z"/></svg>
+                <span>Mode: Kiosk Layar Penuh Terkunci</span>
+              </div>
+            </div>
+
+            <button class="btn-open-room" id="bOpenRoom">
+              <span>Buka Ruang Ujian</span>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Screen 3: Token Verification Page -->
+        <div class="sc" id="s-token">
+          <div class="dash-top" style="margin-bottom: 24px;">
+            <div class="dash-brand">
+              <img class="dash-logo-mini" src="__LOGO_DATA_URI__" alt="">
+              <span class="dash-brand-title">EXAM AA</span>
+            </div>
+            <div class="user-avatar" style="font-size:24px; width:54px; height:54px;">F</div>
+          </div>
+          <div style="margin-bottom: 24px;">
+            <h2 style="font-family:'Outfit', sans-serif; font-size:42px; font-weight:800; color:var(--slate-900);">Verifikasi Token</h2>
+            <p style="font-size:22px; color:var(--slate-600); font-weight:500; margin-top:4px;">Masukkan 6 digit kode token dari pengawas</p>
+          </div>
+          <div class="token-card">
+            <div class="token-room-header">
+              <div class="token-room-row1">
+                <h2 class="token-room-title">RUANG UJIAN PAS 2026</h2>
+                <span class="token-subject-badge">GEOGRAFI</span>
+              </div>
+              <div class="token-room-row2">
+                <span>Faruq (XII MIPA 1)</span>
+                <span class="duration">
+                  <svg viewBox="0 0 24 24"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/></svg>
+                  90 Menit
+                </span>
+              </div>
+            </div>
+
+            <div class="token-form-label">
+              <svg viewBox="0 0 24 24"><path d="M12.65 10C11.83 7.67 9.61 6 7 6c-3.31 0-6 2.69-6 6s2.69 6 6 6c2.61 0 4.83-1.67 5.65-4H17v4h4v-4h2v-4H12.65zM7 14c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"/></svg>
+              <span>Token Ujian (6 Digit)</span>
+            </div>
+
+            <div class="token-input-box" id="tBox">
+              <span id="tVal"></span>
+            </div>
+
+            <div class="token-status-pill" id="tStatus">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+              <span>Token Valid dari Proktor Ruangan</span>
+            </div>
+
+            <button class="btn-start-exam" id="bStartExam">
+              <span id="bStartText">Mulai Ujian</span>
+              <svg id="bStartIcon" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Screen 4: CBT Exam Workspace -->
+        <div class="sc" id="s3">
+          <div class="cbt-top">
+            <div class="cbt-timer">
+              <svg viewBox="0 0 24 24"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/></svg>
+              <span id="tm-val">01:29:45</span>
+            </div>
+            <div class="cbt-subject">GEOGRAFI</div>
+          </div>
+
+          <div class="cbt-sub-bar">
+            <div class="cbt-q-number" id="qn">Soal No. 1</div>
+            <button class="ragu-btn" id="bm">
+              <svg viewBox="0 0 24 24"><path d="M17 3H7c-1.1 0-1.99.9-1.99 2L5 21l7-3 7 3V5c0-1.1-.9-2-2-2z"/></svg>
+              <span>Ragu-Ragu</span>
+            </button>
+          </div>
+
+          <div class="cbt-question-text" id="qt">
+            Ibu kota Provinsi Aceh yang menjadi pusat pemerintahan dan kebudayaan adalah...
+          </div>
+
+          <div class="cbt-options-list" id="ops">
+            <!-- Rendered by JS -->
+          </div>
+
+          <div class="cbt-bottom-bar">
+            <div class="nav-counter-btn" id="bNavSheet">
+              <svg viewBox="0 0 24 24"><path d="M4 11h5V5H4v6zm0 7h5v-6H4v6zm6 0h5v-6h-5v6zm6 0h5v-6h-5v6zm-6-7h5V5h-5v6zm6-6v6h5V5h-5z"/></svg>
+              <span id="cn-text">1 / 25</span>
+            </div>
+            <button class="btn-nav-next" id="bNext">
+              <span>Selanjutnya</span>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Dialog Pelanggaran Anti-Curang (#dlg-cheat) -->
+        <div id="dlg-cheat">
+          <div class="cheat-modal-content">
+            <div class="cheat-icon-wrap">
+              <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+            </div>
+            <h3 class="cheat-modal-title">PELANGGARAN!</h3>
+            <p class="cheat-modal-desc">
+              DILARANG pindah aplikasi atau membuka tab lain selama ujian berlangsung!
+            </p>
+            <div class="cheat-count-box">
+              <span class="cheat-count-label">Pelanggaran Terdeteksi</span>
+              <span class="cheat-count-number">1 / 2</span>
+            </div>
+            <button class="btn-cheat-dismiss">SAYA MENGERTI</button>
+          </div>
+        </div>
+
+        <!-- Ujian Terkunci / Pembekuan Sesi (#sc-locked) -->
+        <div id="sc-locked">
+          <div class="lock-shield-wrap">
+            <svg viewBox="0 0 24 24"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
+          </div>
+          <h2 class="lock-title">UJIAN TERKUNCI!</h2>
+          <p class="lock-subtitle">
+            Batas toleransi pelanggaran terlampaui (2/2).<br>
+            Sesi ujian otomatis dibekukan demi menjaga integritas sekolah.
+          </p>
+          <div class="lock-penalty-box">
+            <span class="lock-penalty-label">Penalti Keamanan</span>
+            <div class="lock-penalty-timer" id="penaltyTimer">00:15</div>
+          </div>
+          <div class="proctor-unlock-badge" id="bUnlock">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+            <span>Diverifikasi Pengawas: Sesi Dibuka Kembali</span>
+          </div>
+        </div>
+
+        <!-- Question Navigator Sheet (#nv) -->
+        <div class="modal-overlay" id="ov"></div>
+        <div class="bottom-sheet" id="nv">
+          <div class="sheet-head">
+            <div class="sheet-title">Daftar Nomor Soal</div>
+          </div>
+          <div class="questions-grid" id="grid">
+            <!-- 25 Cells generated by JS -->
+          </div>
+          <div class="grid-legend">
+            <div class="legend-pill">
+              <div class="legend-dot" style="background:var(--emerald);"></div>
+              <span>Sudah Dijawab</span>
+            </div>
+            <div class="legend-pill">
+              <div class="legend-dot" style="background:var(--amber);"></div>
+              <span>Ragu-Ragu</span>
+            </div>
+            <div class="legend-pill">
+              <div class="legend-dot" style="background:var(--slate-400);"></div>
+              <span>Belum</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Warning Incomplete / Ragu-ragu Sheet (#wn) -->
+        <div class="bottom-sheet" id="wn">
+          <div class="warning-icon-box">
+            <svg viewBox="0 0 24 24"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>
+          </div>
+          <div class="sheet-title" style="color:#92400e;">Peringatan Kelengkapan</div>
+          <div class="warning-box-card">
+            Ada butir soal yang masih ditandai <strong>Ragu-Ragu (Soal No. 2)</strong>. Mohon lengkapi terlebih dahulu sebelum menyelesaikan ujian.
+          </div>
+          <button class="btn-warning-action" id="bFixQ">
+            <span>Lengkapi Soal Sekarang</span>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z"/></svg>
+          </button>
+        </div>
+
+        <!-- Screen 5: Exam Finished Success (#s5) -->
+        <div class="sc" id="s5">
+          <div class="success-check-wrap">
+            <svg viewBox="0 0 100 100">
+              <polyline points="24,54 44,72 78,30" />
+            </svg>
+          </div>
+          <h2 class="success-title">Ujian Selesai!</h2>
+          <p class="success-desc">
+            Semua lembar jawaban Anda telah tersimpan secara otomatis dan aman ke server cloud sekolah.
+          </p>
+          <div id="confetti-wrap">
+            <!-- Confetti injected via JS -->
+          </div>
+        </div>
+
+      </div><!-- /#scr -->
+    </div><!-- /#ph -->
+
+    <!-- Fullscreen Intro Overlay -->
+    <div class="full-overlay on" id="intro">
+      <img class="intro-logo" src="__LOGO_DATA_URI__" alt="Logo EXAM AA">
+      <h1 class="intro-brand-title">EXAM AA</h1>
+      <p class="intro-tagline">Platform CBT Sekolah Terpercaya & Bebas Curang</p>
+      <div class="intro-sub-badge">
+        <span>Teknologi Ujian Modern untuk Sekolah Maju</span>
+      </div>
+    </div>
+
+    <!-- Fullscreen Outro Overlay -->
+    <div class="full-overlay" id="outro">
+      <div class="outro-header">
+        <img class="outro-logo-mini" src="__LOGO_DATA_URI__" alt="Logo EXAM AA">
+        <div>
+          <h2 class="outro-title">EXAM AA</h2>
+          <p class="outro-subtitle">Keunggulan Nyata untuk Ujian Sekolah Anda</p>
+        </div>
+      </div>
+
+      <ul class="outro-benefits">
+        <li>
+          <div class="outro-check-icon">✓</div>
+          <span>Anti-Curang Native: APK Android Kiosk & iOS Safe Exam Browser</span>
+        </li>
+        <li>
+          <div class="outro-check-icon">✓</div>
+          <span>Verifikasi Token Proktor 6 Digit Real-Time</span>
+        </li>
+        <li>
+          <div class="outro-check-icon">✓</div>
+          <span>Server Akselerasi Cloudflare Edge Anti-Lag Ribuan Siswa</span>
+        </li>
+        <li>
+          <div class="outro-check-icon">✓</div>
+          <span>Auto-Save Jawaban ke Cloud per Detik Tanpa Antrean</span>
+        </li>
+        <li>
+          <div class="outro-check-icon">✓</div>
+          <span>Ekspor Nilai Otomatis ke Format Excel Siap Cetak e-Rapor</span>
+        </li>
+      </ul>
+
+      <div class="outro-cta-wrap">
+        <div class="outro-url-box">sekolahanda.examku.my.id</div>
+        <div class="outro-meta-info">
+          <span>WhatsApp Pendampingan Proktor: 0853 5990 7696</span>
+          <span>•</span>
+          <span>Siap Digunakan dalam Hitungan Menit</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Global Progress Bar -->
+    <div id="progress-bar"></div>
+
+  </div><!-- /#stage -->
+</div><!-- /#wrap -->
+
+<!-- Manual Playback Controls Bar -->
+<div id="preview-ctrl">
+  <button id="pp">Jeda</button>
+  <button id="rs">Ulangi</button>
+  <span id="time-display">00:00 / 00:46</span>
+</div>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const stage = $('#stage');
+const TOTAL_DURATION = 46.5;
+
+// Sample Questions
+const QUESTIONS = {
+  1: {
+    t: "Ibu kota Provinsi Aceh yang menjadi pusat pemerintahan dan kebudayaan adalah...",
+    o: ["Sabang", "Banda Aceh", "Lhokseumawe", "Langsa"]
+  },
+  2: {
+    t: "Gunung berapi aktif tertinggi di Pulau Sumatera adalah...",
+    o: ["Gunung Kerinci", "Gunung Marapi", "Gunung Sinabung", "Gunung Leuser"]
+  },
+  25: {
+    t: "Zona pembagian waktu untuk wilayah Pulau Sumatera dan Jawa termasuk dalam...",
+    o: ["Waktu Indonesia Barat (WIB)", "Waktu Indonesia Tengah (WITA)", "Waktu Indonesia Timur (WIT)", "Greenwich Mean Time (GMT)"]
+  }
+};
+
+// Generate 25 Grid Cells for Question Navigator
+const gridEl = $('#grid');
+gridEl.innerHTML = Array.from({ length: 25 }, (_, i) => `<div class="grid-cell" id="c${i+1}">${i+1}</div>`).join('');
+
+// Generate Confetti Pieces for Screen 5
+const cfWrap = $('#confetti-wrap');
+const cfColors = ['#2563eb', '#10b981', '#f59e0b', '#38bdf8', '#a855f7', '#ec4899'];
+cfWrap.innerHTML = Array.from({ length: 36 }, (_, i) => {
+  const col = cfColors[i % cfColors.length];
+  return `<div class="confetti-piece cf-p" style="background:${col};"></div>`;
+}).join('');
+
+// App Interactive States
+const AppState = {
+  curQ: 1,
+  answers: { 1: null, 2: null, 25: null },
+  flagged: {},
+  isDone: false
+};
+
+function renderQuestion() {
+  const q = QUESTIONS[AppState.curQ];
+  if (!q) return;
+  $('#qn').textContent = 'Soal No. ' + AppState.curQ;
+  $('#qt').textContent = q.t;
+  
+  const selectedIdx = AppState.answers[AppState.curQ];
+  $('#ops').innerHTML = q.o.map((optText, i) => {
+    const isSelected = selectedIdx === i;
+    return `<div class="option-item${isSelected ? ' sl' : ''}" id="o${i}">
+      <span class="badge-abc">${'ABCD'[i]}</span>
+      <span>${optText}</span>
+    </div>`;
+  }).join('');
+
+  $('#bm').classList.toggle('fl', !!AppState.flagged[AppState.curQ]);
+  $('#cn-text').textContent = AppState.curQ + ' / 25';
+
+  const nextBtn = $('#bNext');
+  if (AppState.curQ === 25 || AppState.isDone) {
+    nextBtn.innerHTML = `<span>Selesai Ujian</span> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>`;
+    nextBtn.classList.add('btn-finish');
+  } else {
+    nextBtn.innerHTML = `<span>Selanjutnya</span> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/></svg>`;
+    nextBtn.classList.remove('btn-finish');
+  }
+}
+
+function setScreen(id) {
+  document.querySelectorAll('.sc').forEach(s => {
+    s.style.display = 'none';
+    s.classList.remove('on');
+    s.classList.add('off');
+  });
+  const activeSc = $(id);
+  if (activeSc) {
+    activeSc.style.display = 'flex';
+    activeSc.classList.remove('off');
+    activeSc.classList.add('on');
+  }
+}
+
+function setSheet(id, isOpen) {
+  $(id).classList.toggle('up', isOpen);
+  $('#ov').classList.toggle('on', isOpen);
+}
+
+function setCaption(line1, line2, highlightColor) {
+  const c1 = $('#cap1'), c2 = $('#cap2');
+  const l1 = c1.parentElement, l2 = c2.parentElement;
+  
+  if (!line1 && !line2) {
+    l1.classList.remove('show');
+    l2.classList.remove('show');
+    return;
+  }
+  
+  c1.innerHTML = line1 || '';
+  c2.innerHTML = line2 || '';
+  if (highlightColor) {
+    const em = c2.querySelector('em');
+    if (em) em.className = highlightColor;
+  }
+  l1.classList.add('show');
+  l2.classList.add('show');
+}
+
+// Deterministic Time Seeker
+function seek(t) {
+  t = Math.max(0, Math.min(t, TOTAL_DURATION));
+
+  // Reset core state
+  AppState.curQ = 1;
+  AppState.answers = { 1: null, 2: null, 25: null };
+  AppState.flagged = {};
+  AppState.isDone = false;
+
+  // Intro
+  if (t < 3.2) {
+    $('#intro').style.display = 'flex';
+    $('#intro').classList.add('on');
+    $('#ph').classList.remove('in');
+    setCaption('', '');
+  } else {
+    $('#intro').style.display = 'none';
+    $('#intro').classList.remove('on');
+    if (t < 39.5) {
+      $('#ph').classList.add('in');
+    } else {
+      $('#ph').classList.remove('in');
+    }
+  }
+
+  // Outro
+  if (t >= 39.8) {
+    $('#outro').style.display = 'flex';
+    $('#outro').classList.add('on');
+    setCaption('', '');
+  } else {
+    $('#outro').style.display = 'none';
+    $('#outro').classList.remove('on');
+  }
+
+  // Timeline Variables
+  let activeScreenId = '#s1';
+  let activeSheet = null; // null, '#nv', '#wn'
+  let isCheatOpen = false;
+  let isLockedOpen = false;
+  let cap1 = '', cap2 = '', capHighlight = '';
+  let f1Active = false, f2Active = false;
+  let t1Text = '', t2Text = '';
+  let tokenVal = '', tokenValid = false, tokenChecking = false;
+  let penaltySeconds = 15;
+  let isProctorUnlocked = false;
+
+  // Button active press states
+  let bLoginActive = false;
+  let bOpenRoomActive = false;
+  let bStartExamActive = false;
+
+  // 1. LOGIN SCENE (t: 3.2 - 8.2)
+  if (t >= 3.2 && t < 8.2) {
+    activeScreenId = '#s1';
+    cap1 = 'Masuk Praktis';
+    cap2 = '<em>Pakai Akun & NISN Siswa.</em>';
+
+    // NISN Typing: 2412345678 (t: 4.0 - 5.3)
+    if (t >= 4.0 && t < 5.4) {
+      f1Active = true;
+      const progress = Math.min(Math.floor((t - 4.0) / 0.12), 10);
+      t1Text = '2412345678'.slice(0, progress);
+    } else if (t >= 5.4) {
+      t1Text = '2412345678';
+    }
+
+    // Password Typing: 8 chars (t: 5.6 - 6.8)
+    if (t >= 5.6 && t < 6.9) {
+      f2Active = true;
+      const progress = Math.min(Math.floor((t - 5.6) / 0.14), 8);
+      t2Text = '••••••••'.slice(0, progress);
+    } else if (t >= 6.9) {
+      t2Text = '••••••••';
+    }
+
+    // Button click (t: 7.2 - 7.6)
+    if (t >= 7.2 && t < 7.6) {
+      bLoginActive = true;
+    }
+  }
+
+  // 2. DASHBOARD SCENE (t: 8.2 - 12.0)
+  else if (t >= 8.2 && t < 12.0) {
+    activeScreenId = '#s2';
+    cap1 = 'Agenda Ujian Aktif';
+    cap2 = '<em>Langsung Siap di Beranda.</em>';
+
+    if (t >= 11.2 && t < 11.6) {
+      bOpenRoomActive = true;
+    }
+  }
+
+  // 3. TOKEN VERIFICATION SCENE (t: 12.0 - 17.0)
+  else if (t >= 12.0 && t < 17.0) {
+    activeScreenId = '#s-token';
+    cap1 = 'Proteksi Ujian';
+    cap2 = '<em class="green">Verifikasi Token 6 Digit Proktor.</em>';
+    capHighlight = 'green';
+
+    // Token typing: P - A - S - 2 - 0 - 2 - 6 (t: 12.8 - 14.2)
+    const fullToken = 'PAS2026';
+    if (t >= 12.8 && t < 14.3) {
+      const charCount = Math.min(Math.floor((t - 12.8) / 0.2), fullToken.length);
+      tokenVal = fullToken.slice(0, charCount);
+    } else if (t >= 14.3) {
+      tokenVal = fullToken;
+      tokenValid = true;
+    }
+
+    // Checking token spinner (t: 15.6 - 16.6)
+    if (t >= 15.6 && t < 16.6) {
+      bStartExamActive = true;
+      tokenChecking = true;
+    }
+  }
+
+  // 4. CBT EXAM WORKSPACE (t: 17.0 - 22.5)
+  else if (t >= 17.0 && t < 22.5) {
+    activeScreenId = '#s3';
+    cap1 = 'Pengerjaan CBT';
+    cap2 = '<em>Timer Siaga & Auto-Save Detik.</em>';
+
+    if (t < 20.0) {
+      AppState.curQ = 1;
+      // Answering Q1 Option B (Banda Aceh) at t >= 18.5
+      if (t >= 18.5) {
+        AppState.answers[1] = 1; // Option B
+      }
+    } else {
+      AppState.curQ = 2;
+      AppState.answers[1] = 1;
+      // Flagging Question 2 as Ragu-Ragu at t >= 21.2
+      if (t >= 21.2) {
+        AppState.flagged[2] = true;
+      }
+    }
+  }
+
+  // 5. ANTI-CHEAT DETECTION & LOCKOUT (t: 22.5 - 29.5)
+  else if (t >= 22.5 && t < 29.5) {
+    activeScreenId = '#s3';
+    AppState.curQ = 2;
+    AppState.answers[1] = 1;
+    AppState.flagged[2] = true;
+
+    // Sub-scene A: Violation 1/2 warning modal (t: 22.5 - 25.5)
+    if (t < 25.5) {
+      cap1 = 'Anti-Curang Native';
+      cap2 = '<em class="amber">Peringatan Deteksi Pindah Tab.</em>';
+      capHighlight = 'amber';
+      isCheatOpen = true;
+    }
+    // Sub-scene B: Freeze / Locked Screen (t: 25.5 - 29.5)
+    else {
+      cap1 = 'Ujian Terkunci!';
+      cap2 = '<em class="red">Sesi Dibekukan Jika Curang.</em>';
+      capHighlight = 'red';
+      isLockedOpen = true;
+
+      // Penalty countdown from 15s to 8s
+      const elapsedPenalty = Math.floor((t - 25.5) * 2.5);
+      penaltySeconds = Math.max(15 - elapsedPenalty, 5);
+
+      // Proctor unfreezes session at t >= 28.0
+      if (t >= 28.0) {
+        isProctorUnlocked = true;
+      }
+    }
+  }
+
+  // 6. QUESTION NAVIGATOR & VALIDATION (t: 29.5 - 35.5)
+  else if (t >= 29.5 && t < 35.5) {
+    activeScreenId = '#s3';
+    AppState.answers[1] = 1;
+
+    // Sub-scene A: Question navigator grid (t: 29.5 - 31.8)
+    if (t < 31.8) {
+      cap1 = 'Lompat Bebas';
+      cap2 = '<em>Ke Nomor Mana Saja.</em>';
+      activeSheet = '#nv';
+      AppState.curQ = 2;
+      AppState.flagged[2] = true;
+    }
+    // Sub-scene B: Answer Q25 & tap finish (t: 31.8 - 33.2)
+    else if (t >= 31.8 && t < 33.2) {
+      cap1 = 'Cek Kelengkapan';
+      cap2 = '<em class="amber">Sistem Cegah Ada Soal Terlewat.</em>';
+      capHighlight = 'amber';
+      AppState.curQ = 25;
+      AppState.flagged[2] = true;
+      AppState.answers[25] = 0; // WIB selected
+
+      // Tap Selesai -> Warning sheet pops up at t >= 32.6
+      if (t >= 32.6) {
+        activeSheet = '#wn';
+      }
+    }
+    // Sub-scene C: Resolve ragu-ragu on Q2 & complete (t: 33.2 - 35.5)
+    else {
+      cap1 = 'Lengkapi Jawaban';
+      cap2 = '<em class="green">Hilangkan Ragu & Selesai.</em>';
+      capHighlight = 'green';
+      AppState.curQ = 2;
+      AppState.answers[25] = 0;
+
+      if (t >= 34.0) {
+        AppState.answers[2] = 0; // Kerinci selected
+        AppState.flagged[2] = false; // Ragu cleared!
+        AppState.isDone = true;
+      }
+    }
+  }
+
+  // 7. SUCCESS SCREEN (t: 35.5 - 39.5)
+  else if (t >= 35.5 && t < 39.8) {
+    activeScreenId = '#s5';
+    cap1 = 'Ujian Selesai!';
+    cap2 = '<em class="green">Jawaban Tersimpan Aman di Cloud.</em>';
+    capHighlight = 'green';
+  }
+
+  // Apply Screen transitions
+  setScreen(activeScreenId);
+
+  // Apply Bottom Sheet
+  if (activeSheet === '#nv') {
+    $('#nv').style.display = 'block';
+    $('#nv').classList.add('up');
+    $('#wn').style.display = 'none';
+    $('#wn').classList.remove('up');
+    $('#ov').style.display = 'block';
+    $('#ov').classList.add('on');
+    for (let i = 1; i <= 25; i++) {
+      const cell = $('#c' + i);
+      cell.className = 'grid-cell';
+      if (i === 1) cell.classList.add('green');
+      else if (i === 2) cell.classList.add('yellow');
+      else if (i === 25 && AppState.answers[25] !== null) cell.classList.add('green');
+    }
+  } else if (activeSheet === '#wn') {
+    $('#wn').style.display = 'block';
+    $('#wn').classList.add('up');
+    $('#nv').style.display = 'none';
+    $('#nv').classList.remove('up');
+    $('#ov').style.display = 'block';
+    $('#ov').classList.add('on');
+  } else {
+    $('#nv').style.display = 'none';
+    $('#nv').classList.remove('up');
+    $('#wn').style.display = 'none';
+    $('#wn').classList.remove('up');
+    $('#ov').style.display = 'none';
+    $('#ov').classList.remove('on');
+  }
+
+  // Apply Anti-Cheat Dialogs
+  if (isCheatOpen) {
+    $('#dlg-cheat').style.display = 'flex';
+    $('#dlg-cheat').classList.add('on');
+  } else {
+    $('#dlg-cheat').style.display = 'none';
+    $('#dlg-cheat').classList.remove('on');
+  }
+
+  if (isLockedOpen) {
+    $('#sc-locked').style.display = 'flex';
+    $('#sc-locked').classList.add('on');
+  } else {
+    $('#sc-locked').style.display = 'none';
+    $('#sc-locked').classList.remove('on');
+  }
+  $('#penaltyTimer').textContent = `00:${String(penaltySeconds).padStart(2, '0')}`;
+  $('#bUnlock').classList.toggle('show', isProctorUnlocked);
+
+  // Apply Form Input Text
+  $('#f1').classList.toggle('act', f1Active);
+  $('#f2').classList.toggle('act', f2Active);
+  $('#t1').textContent = t1Text;
+  $('#t2').textContent = t2Text;
+
+  // Apply Token Inputs
+  $('#tVal').textContent = tokenVal;
+  $('#tBox').classList.toggle('typing', tokenVal.length > 0 && !tokenValid);
+  $('#tStatus').classList.toggle('show', tokenValid);
+  if (tokenChecking) {
+    $('#bStartText').textContent = 'Memeriksa Token...';
+    $('#bStartIcon').style.display = 'none';
+  } else {
+    $('#bStartText').textContent = 'Mulai Ujian';
+    $('#bStartIcon').style.display = 'inline-block';
+  }
+
+  // Button Active Animations
+  $('#bLogin').classList.toggle('btn-active', bLoginActive);
+  $('#bOpenRoom').classList.toggle('btn-active', bOpenRoomActive);
+  $('#bStartExam').classList.toggle('btn-active', bStartExamActive);
+
+  // Render CBT Question
+  renderQuestion();
+
+  // CBT Live Timer (counts down from 01:29:45)
+  if (t >= 17.0 && t < 35.5) {
+    const elapsedSec = Math.floor((t - 17.0) * 45);
+    const rem = Math.max(5385 - elapsedSec, 0);
+    const m = Math.floor(rem / 60);
+    const s = rem % 60;
+    $('#tm-val').textContent = `01:${String(m % 60).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  }
+
+  // Confetti in Screen 5
+  if (activeScreenId === '#s5') {
+    cfWrap.style.display = 'block';
+    const cTime = Math.max(0, t - 35.5);
+    const pieces = cfWrap.querySelectorAll('.cf-p');
+    pieces.forEach((p, idx) => {
+      const angle = (idx / pieces.length) * 2 * Math.PI;
+      const speed = 250 + (idx % 6) * 50;
+      const dist = Math.min(cTime * speed, 430);
+      const x = Math.cos(angle) * dist;
+      const y = Math.sin(angle) * dist + (cTime * cTime * 90);
+      const rot = cTime * 480 + idx * 40;
+      const op = cTime < 2.2 ? 1 : Math.max(0, 1 - (cTime - 2.2));
+      p.style.transform = `translate(${x}px, ${y}px) rotate(${rot}deg)`;
+      p.style.opacity = op;
+    });
+  } else {
+    cfWrap.style.display = 'none';
+  }
+
+  // Apply Captions
+  setCaption(cap1, cap2, capHighlight);
+
+  // Progress Bar
+  const progPercent = (t / TOTAL_DURATION) * 100;
+  $('#progress-bar').style.width = progPercent + '%';
+
+  // Preview Time Display
+  const curMin = Math.floor(t / 60);
+  const curSec = Math.floor(t % 60);
+  const totMin = Math.floor(TOTAL_DURATION / 60);
+  const totSec = Math.floor(TOTAL_DURATION % 60);
+  $('#time-display').textContent = 
+    `${String(curMin).padStart(2, '0')}:${String(curSec).padStart(2, '0')} / ${String(totMin).padStart(2, '0')}:${String(totSec).padStart(2, '0')}`;
+}
+
+// Window resize autofit
+function fitStage() {
+  if (document.body.classList.contains('render-mode')) {
+    stage.style.transform = 'none';
+    return;
+  }
+  const scale = Math.min(window.innerWidth / 1080, (window.innerHeight - 80) / 1920);
+  stage.style.transform = 'scale(' + scale + ')';
+}
+window.addEventListener('resize', fitStage);
+fitStage();
+
+// Interactive Playback loop
+let isPlaying = true;
+let currentTime = 0;
+let lastTimestamp = 0;
+
+function animationLoop(timestamp) {
+  if (document.body.classList.contains('render-mode')) return;
+  if (!lastTimestamp) lastTimestamp = timestamp;
+  const delta = (timestamp - lastTimestamp) / 1000;
+  lastTimestamp = timestamp;
+
+  if (isPlaying) {
+    currentTime += Math.min(delta, 0.1);
+    seek(currentTime);
+    if (currentTime >= TOTAL_DURATION) {
+      isPlaying = false;
+      $('#pp').textContent = 'Putar';
+    }
+  }
+  requestAnimationFrame(animationLoop);
+}
+
+// Control buttons
+$('#pp').onclick = () => {
+  if (!isPlaying) {
+    if (currentTime >= TOTAL_DURATION) currentTime = 0;
+    isPlaying = true;
+    $('#pp').textContent = 'Jeda';
+  } else {
+    isPlaying = false;
+    $('#pp').textContent = 'Putar';
+  }
+};
+
+$('#rs').onclick = () => {
+  currentTime = 0;
+  isPlaying = true;
+  $('#pp').textContent = 'Jeda';
+  seek(0);
+};
+
+// Initial frame
+seek(0);
+requestAnimationFrame(animationLoop);
+
+// Expose API for headless renderer
+window.seek = seek;
+window.TOTAL_DURATION = TOTAL_DURATION;
+</script>
+</body>
+</html>

@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { Skeleton } from "../components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
@@ -45,9 +46,16 @@ import ResetStudentPasswordDialog from "../components/dialogs/ResetStudentPasswo
 import BatchProgressDialog from "../components/dialogs/BatchProgressDialog";
 
 const StudentsPage = () => {
+  const navigate = useNavigate();
   const { role } = useAuth();
-  const { school, terminology, pb } = useTenant();
+  const { school, terminology, pb, subscriptionStatus } = useTenant();
   const { students, classes, loading, createStudent, updateStudent, deleteStudent, resetStudentPassword, resetStudentPasswordBatch } = useExamData();
+
+  const quota = subscriptionStatus?.effectiveQuota || school?.student_quota || (school?.plan === "free" ? 50 : 250);
+  const planName = school?.plan ? school.plan.charAt(0).toUpperCase() + school.plan.slice(1) : "Free";
+  const quotaUsedPercent = Math.min(100, Math.round((students.length / Math.max(1, quota)) * 100));
+  const isQuotaFull = students.length >= quota;
+  const isQuotaWarning = quotaUsedPercent >= 80;
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [dialogMode, setDialogMode] = useState<"create" | "edit">("create");
@@ -144,7 +152,14 @@ const StudentsPage = () => {
     // Cek Batasan Kuota Hanya Jika Menambah Siswa Baru
     if (dialogMode === "create") {
       if (students.length >= quota) {
-        return showAlert("Batas Kuota Tercapai", `Maaf, penambahan gagal. ${terminology.school} Anda hanya memiliki kapasitas kuota untuk Maksimal ${quota} ${terminology.student} sesuai paket berlangganan ${planName}. Silakan hubungi tim helpdesk EXAM AA untuk melakukan Upgrade Kuota.`, "warning");
+        return showAlert(
+          "Batas Kuota Tercapai",
+          `Penambahan tidak dapat diproses. ${terminology.school} Anda telah mencapai batas maksimal kuota (${students.length}/${quota} ${terminology.student}) pada paket ${planName}. Silakan tingkatkan paket langganan Anda untuk menambah kapasitas.`,
+          "warning",
+          () => navigate("/admin/invoice"),
+          true,
+          "Upgrade Paket Sekarang"
+        );
       }
     }
 
@@ -341,13 +356,14 @@ const StudentsPage = () => {
       }
 
       // Validasi Kapasitas Kuota SaaS
-      const quota = school?.student_quota || 250;
-      const planName = school?.plan ? school.plan.charAt(0).toUpperCase() + school.plan.slice(1) : "Free";
       if (students.length + newEntries.length > quota) {
         return showAlert(
           "Melebihi Kuota Langganan",
-          `Gagal mengimpor data. Anda mencoba menambahkan ${newEntries.length} ${terminology.student.toLowerCase()} baru, tapi sisa kuota paket ${planName} Anda tinggal ${Math.max(0, quota - students.length)} ${terminology.student.toLowerCase()} (Batas maksimal: ${quota}). Harap sesuaikan file Excel Anda atau hubungi admin platform untuk Upgrade Kuota.`,
-          "danger"
+          `Gagal mengimpor data. Anda mencoba menambahkan ${newEntries.length} ${terminology.student.toLowerCase()} baru, tapi sisa kuota paket ${planName} Anda tinggal ${Math.max(0, quota - students.length)} ${terminology.student.toLowerCase()} (Batas maksimal: ${quota}). Silakan sesuaikan file Excel Anda atau tingkatkan paket langganan institusi.`,
+          "danger",
+          () => navigate("/admin/invoice"),
+          true,
+          "Upgrade Paket Sekarang"
         );
       }
 
@@ -818,7 +834,64 @@ const StudentsPage = () => {
         </div>
       </div>
 
+      {/* ── Indikator Kuota Siswa ── */}
+      <div className={cn(
+        "flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-2xl border transition-all text-xs shadow-xs",
+        isQuotaFull
+          ? "bg-rose-50 dark:bg-rose-950/20 border-rose-200 dark:border-rose-900/50 text-rose-900 dark:text-rose-200"
+          : isQuotaWarning
+            ? "bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-900/50 text-amber-900 dark:text-amber-200"
+            : "bg-card border-slate-200/60 dark:border-slate-800/40 text-slate-700 dark:text-slate-300"
+      )}>
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-bold text-slate-900 dark:text-white">
+                Kapasitas Kuota {terminology.student}: {students.length} / {quota} Terdaftar
+              </span>
+              <span className={cn(
+                "px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border",
+                isQuotaFull
+                  ? "bg-rose-200/80 border-rose-300 text-rose-800 dark:bg-rose-900/60 dark:border-rose-800 dark:text-rose-200"
+                  : isQuotaWarning
+                    ? "bg-amber-200/80 border-amber-300 text-amber-800 dark:bg-amber-900/60 dark:border-amber-800 dark:text-amber-200"
+                    : "bg-blue-100 border-blue-200 text-blue-700 dark:bg-blue-900/40 dark:border-blue-800 dark:text-blue-300"
+              )}>
+                {quotaUsedPercent}% Terpakai
+              </span>
+              {school?.plan === "free" && (
+                <span className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-2 py-0.5 rounded-md font-semibold">
+                  Free Trial (Maks. 50)
+                </span>
+              )}
+            </div>
+            <div className="w-56 sm:w-80 h-2 bg-slate-200/80 dark:bg-slate-800 rounded-full overflow-hidden">
+              <div
+                className={cn(
+                  "h-full transition-all duration-500 rounded-full",
+                  isQuotaFull ? "bg-rose-600" : isQuotaWarning ? "bg-amber-500" : "bg-blue-600"
+                )}
+                style={{ width: `${quotaUsedPercent}%` }}
+              />
+            </div>
+          </div>
+        </div>
 
+        {role === "admin" && (
+          <button
+            onClick={() => navigate("/admin/invoice")}
+            className={cn(
+              "px-3.5 py-1.5 rounded-xl font-bold text-xs transition shadow-xs self-start sm:self-auto flex items-center gap-1.5 flex-shrink-0",
+              isQuotaFull || isQuotaWarning
+                ? "bg-blue-600 hover:bg-blue-700 text-white"
+                : "bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200/80 dark:border-slate-700"
+            )}
+          >
+            <Sparkles size={13} />
+            <span>{isQuotaFull ? "Upgrade Kuota Sekarang" : "Tingkatkan Kuota"}</span>
+          </button>
+        )}
+      </div>
 
       {loading ? (
         <Card>

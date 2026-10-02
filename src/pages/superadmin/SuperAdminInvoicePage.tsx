@@ -4,10 +4,19 @@ import {
   CheckCircle2, Clock, XCircle, Upload, X, ChevronDown,
   Building2, Calendar, CreditCard, Printer, RefreshCw,
   AlertTriangle, Paperclip, ExternalLink, Trash2, Edit,
+  Receipt,
 } from "lucide-react";
 import { masterPb } from "../../lib/pocketbase";
 import SuperAdminLayout from "../../components/layout/SuperAdminLayout";
 import { cn } from "../../lib/utils";
+import {
+  calculatePlanInvoice,
+  normalizePlanKey,
+  PLAN_PRICING,
+  PlanKey,
+} from "../../utils/pricingHelper";
+import { upgradeSchoolFromInvoice } from "../../utils/subscriptionHelper";
+import { printOfficialReceipt } from "../../utils/receiptHelper";
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -19,8 +28,11 @@ interface Invoice {
   school_id: string;
   school_name: string;
   school_slug: string;
+  contact_email?: string;
   plan: string;
+  plan_label?: string;
   duration_months: number;
+  period_label?: string;
   amount: number;
   status: PaymentStatus;
   due_date: string;
@@ -36,15 +48,16 @@ interface SchoolRecord {
   name: string;
   slug: string;
   plan?: string;
+  contact_email?: string;
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 const PLAN_PRICES: Record<string, { label: string; monthly: number }> = {
-  free:     { label: "Free Trial",  monthly: 0 },
-  basic:    { label: "Berkembang",  monthly: 149000 },
-  pro:      { label: "Lanjutan",    monthly: 299000 },
-  ultimate: { label: "Premium",     monthly: 499000 },
+  free:     { label: PLAN_PRICING.free.label,     monthly: PLAN_PRICING.free.monthlyRate },
+  basic:    { label: PLAN_PRICING.basic.label,    monthly: PLAN_PRICING.basic.monthlyRate },
+  pro:      { label: PLAN_PRICING.pro.label,      monthly: PLAN_PRICING.pro.monthlyRate },
+  ultimate: { label: PLAN_PRICING.ultimate.label, monthly: PLAN_PRICING.ultimate.monthlyRate },
 };
 
 const STATUS_CONFIG: Record<PaymentStatus, {
@@ -58,16 +71,6 @@ const STATUS_CONFIG: Record<PaymentStatus, {
   paid:      { label: "Lunas",       color: "text-emerald-700", bg: "bg-emerald-50", border: "border-emerald-200", icon: CheckCircle2 },
   overdue:   { label: "Terlambat",   color: "text-red-700",     bg: "bg-red-50",     border: "border-red-200",    icon: AlertTriangle },
   cancelled: { label: "Dibatalkan",  color: "text-slate-500",   bg: "bg-slate-100",  border: "border-slate-200",  icon: XCircle },
-};
-
-const STORAGE_KEY = "sa_invoices_v1";
-
-const loadInvoices = (): Invoice[] => {
-  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"); } catch { return []; }
-};
-
-const saveInvoices = (list: Invoice[]) => {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(list)); } catch {}
 };
 
 const generateInvoiceNumber = (): string => {
@@ -88,25 +91,51 @@ const formatDate = (iso: string): string => {
 
 const isOverdue = (invoice: Invoice): boolean => {
   if (invoice.status !== "unpaid") return false;
+  if (!invoice.due_date) return false;
   return new Date(invoice.due_date) < new Date();
+};
+
+const getInvoiceStatus = (invoice: Invoice): PaymentStatus => {
+  if (invoice.status === "unpaid" && isOverdue(invoice)) {
+    return "overdue";
+  }
+  return invoice.status;
+};
+
+const getProofUrl = (inv: Invoice): string => {
+  if (!inv.payment_proof) return "";
+  if (inv.payment_proof.startsWith("data:") || inv.payment_proof.startsWith("http")) {
+    return inv.payment_proof;
+  }
+  return `${masterPb.baseUrl}/api/files/invoices/${inv.id}/${inv.payment_proof}`;
+};
+
+const isImageProof = (proofUrl: string): boolean => {
+  if (!proofUrl) return false;
+  if (proofUrl.startsWith("data:image")) return true;
+  return /\.(jpg|jpeg|png|webp|gif|svg)($|\?)/i.test(proofUrl);
 };
 
 // ─── Blank form ─────────────────────────────────────────────────────────────
 
-const blankForm = (): Omit<Invoice, "id" | "created" | "updated"> => ({
-  invoice_number: generateInvoiceNumber(),
-  school_id: "",
-  school_name: "",
-  school_slug: "",
-  plan: "basic",
-  duration_months: 12,
-  amount: PLAN_PRICES.basic.monthly * 12,
-  status: "unpaid",
-  due_date: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10),
-  notes: "",
-  payment_proof: "",
-  paid_date: "",
-});
+const blankForm = (): Omit<Invoice, "id" | "created" | "updated"> => {
+  const defaultPlan = calculatePlanInvoice("basic", 12);
+  return {
+    invoice_number: generateInvoiceNumber(),
+    school_id: "",
+    school_name: "",
+    school_slug: "",
+    contact_email: "",
+    plan: "basic",
+    duration_months: 12,
+    amount: defaultPlan.amount,
+    status: "unpaid",
+    due_date: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10),
+    notes: "",
+    payment_proof: "",
+    paid_date: "",
+  };
+};
 
 // ─── Invoice Print Template ─────────────────────────────────────────────────
 
@@ -226,6 +255,7 @@ const SuperAdminInvoicePage = () => {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [schools, setSchools] = useState<SchoolRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState<PaymentStatus | "all">("all");
   const [showModal, setShowModal] = useState(false);
@@ -234,41 +264,105 @@ const SuperAdminInvoicePage = () => {
   const [form, setForm] = useState(blankForm());
   const [saving, setSaving] = useState(false);
   const [uploadingProof, setUploadingProof] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const proofFileRef = useRef<HTMLInputElement>(null);
 
-  // Load schools from PocketBase
   const loadSchools = useCallback(async () => {
     try {
       const list = await masterPb.collection("schools").getFullList<SchoolRecord>({ sort: "name" });
       setSchools(list);
-    } catch {
+    } catch (err) {
+      console.error("Gagal memuat daftar sekolah:", err);
       setSchools([]);
+    }
+  }, []);
+
+  const loadInvoices = useCallback(async () => {
+    setLoadError("");
+    try {
+      const result = await masterPb.collection("invoices").getList<Invoice>(1, 20);
+      const mapped = result.items.map(r => ({
+        ...r,
+        invoice_number: r.invoice_number || "-",
+        school_name: r.school_name || "Institusi tidak bernama",
+        school_slug: r.school_slug || "-",
+        plan: r.plan || (r.plan_label ? Object.keys(PLAN_PRICES).find(k => PLAN_PRICES[k].label === r.plan_label) : "basic") || "basic",
+        duration_months: Number(r.duration_months) || 1,
+        amount: Number(r.amount) || 0,
+      }));
+      setInvoices(mapped);
+    } catch (err: any) {
+      console.error("Gagal memuat invoice dari PocketBase:", err);
+      setLoadError(err?.data?.message || err?.message || "Gagal memuat data invoice.");
+      setInvoices([]);
     } finally {
       setLoading(false);
     }
   }, []);
 
-  useEffect(() => {
-    loadSchools();
-    setInvoices(loadInvoices());
-  }, [loadSchools]);
+  // One-time migration of any legacy localStorage invoices to master PocketBase
+  const migrateLocalInvoices = useCallback(async () => {
+    try {
+      const raw = localStorage.getItem("sa_invoices_v1");
+      if (!raw) return;
+      const localList: Invoice[] = JSON.parse(raw);
+      if (!Array.isArray(localList) || localList.length === 0) return;
 
-  // Auto-mark overdue
-  useEffect(() => {
-    const updated = invoices.map(inv =>
-      isOverdue(inv) && inv.status === "unpaid" ? { ...inv, status: "overdue" as PaymentStatus } : inv
-    );
-    if (updated.some((u, i) => u.status !== invoices[i]?.status)) {
-      setInvoices(updated);
-      saveInvoices(updated);
+      const existing = await masterPb.collection("invoices").getFullList<{ invoice_number: string }>({
+        fields: "invoice_number",
+      });
+      const existingNumbers = new Set(existing.map(e => e.invoice_number));
+
+      for (const item of localList) {
+        if (item.invoice_number && !existingNumbers.has(item.invoice_number) && item.school_name) {
+          try {
+            await masterPb.collection("invoices").create({
+              invoice_number: item.invoice_number,
+              school_id: item.school_id || "",
+              school_name: item.school_name,
+              school_slug: item.school_slug || "",
+              contact_email: item.contact_email || "",
+              plan: item.plan || "basic",
+              plan_label: PLAN_PRICES[item.plan]?.label || item.plan || "Berkembang",
+              duration_months: Number(item.duration_months) || 1,
+              period_label: `${item.duration_months || 1} bulan`,
+              amount: Number(item.amount) || 0,
+              status: item.status || "unpaid",
+              due_date: item.due_date || "",
+              paid_date: item.paid_date || "",
+              notes: item.notes || "",
+            });
+          } catch (e) {
+            console.warn("Skip migrating local invoice:", item.invoice_number, e);
+          }
+        }
+      }
+      localStorage.removeItem("sa_invoices_v1");
+    } catch (err) {
+      console.warn("Migration check error:", err);
     }
-  }, [invoices]);
+  }, []);
+
+  useEffect(() => {
+    const init = async () => {
+      setLoading(true);
+      try {
+        if (masterPb.authStore.isValid) {
+          await masterPb.collection("super_admins").authRefresh();
+        }
+      } catch (err) {
+        console.warn("Sesi superadmin belum bisa diperbarui:", err);
+      }
+      await loadSchools();
+      await migrateLocalInvoices();
+      await loadInvoices();
+    };
+    init();
+  }, [loadSchools, migrateLocalInvoices, loadInvoices]);
 
   const filtered = invoices.filter(inv => {
+    const effectiveStatus = getInvoiceStatus(inv);
     const matchSearch = inv.school_name.toLowerCase().includes(search.toLowerCase()) ||
       inv.invoice_number.toLowerCase().includes(search.toLowerCase());
-    const matchStatus = filterStatus === "all" || inv.status === filterStatus;
+    const matchStatus = filterStatus === "all" || effectiveStatus === filterStatus;
     return matchSearch && matchStatus;
   });
 
@@ -285,6 +379,7 @@ const SuperAdminInvoicePage = () => {
       school_id: inv.school_id,
       school_name: inv.school_name,
       school_slug: inv.school_slug,
+      contact_email: inv.contact_email || "",
       plan: inv.plan,
       duration_months: inv.duration_months,
       amount: inv.amount,
@@ -298,123 +393,168 @@ const SuperAdminInvoicePage = () => {
   };
 
   const handleSchoolSelect = (id: string) => {
+    if (!id) {
+      setForm(f => ({
+        ...f,
+        school_id: "",
+        school_name: "",
+        school_slug: "",
+        contact_email: "",
+      }));
+      return;
+    }
     const school = schools.find(s => s.id === id);
     if (!school) return;
-    const price = PLAN_PRICES[school.plan || "basic"]?.monthly || PLAN_PRICES.basic.monthly;
+    const planKey = normalizePlanKey(school.plan || "basic");
+    const planInfo = calculatePlanInvoice(planKey, form.duration_months);
     setForm(f => ({
       ...f,
       school_id: school.id,
       school_name: school.name,
       school_slug: school.slug,
-      plan: school.plan || "basic",
-      amount: price * f.duration_months,
+      contact_email: school.contact_email || f.contact_email || "",
+      plan: planKey,
+      amount: planInfo.amount,
     }));
   };
 
   const handlePlanChange = (plan: string) => {
-    const price = PLAN_PRICES[plan]?.monthly || 0;
-    setForm(f => ({ ...f, plan, amount: price * f.duration_months }));
+    const planInfo = calculatePlanInvoice(plan, form.duration_months);
+    setForm(f => ({ ...f, plan: planInfo.planKey, amount: planInfo.amount }));
   };
 
   const handleDurationChange = (months: number) => {
-    const price = PLAN_PRICES[form.plan]?.monthly || 0;
-    setForm(f => ({ ...f, duration_months: months, amount: price * months }));
+    const planInfo = calculatePlanInvoice(form.plan, months);
+    setForm(f => ({ ...f, duration_months: months, amount: planInfo.amount }));
   };
 
   const handleSave = async () => {
-    if (!form.school_name.trim()) return alert("Pilih institusi terlebih dahulu.");
+    const schoolId = form.school_id.trim();
+    const schoolName = form.school_name.trim();
+    if (!schoolId || !schoolName) {
+      return alert("Pilih institusi terlebih dahulu.");
+    }
+
     setSaving(true);
     try {
-      const now = new Date().toISOString();
+      const planInfo = calculatePlanInvoice(form.plan, Number(form.duration_months) || 1);
+      const payload: Record<string, unknown> = {
+        invoice_number: form.invoice_number.trim() || generateInvoiceNumber(),
+        school_id: schoolId,
+        school_name: schoolName,
+        school_slug: form.school_slug.trim(),
+        plan: planInfo.planKey,
+        plan_label: planInfo.planLabel,
+        duration_months: planInfo.durationMonths,
+        period_label: planInfo.periodLabel,
+        amount: Number(form.amount) || planInfo.amount,
+        status: form.status,
+        due_date: form.due_date || undefined,
+        paid_date: form.status === "paid"
+          ? (form.paid_date || new Date().toISOString().slice(0, 10))
+          : undefined,
+        notes: form.notes?.trim() || undefined,
+      };
+
+      const contactEmail = form.contact_email?.trim();
+      if (contactEmail) payload.contact_email = contactEmail;
+
+      let saved: any;
       if (editingInvoice) {
-        const updated: Invoice = {
-          ...editingInvoice,
-          ...form,
-          updated: now,
-        };
-        const list = invoices.map(inv => inv.id === editingInvoice.id ? updated : inv);
-        setInvoices(list);
-        saveInvoices(list);
+        saved = await masterPb.collection("invoices").update(editingInvoice.id, payload);
       } else {
-        const newInv: Invoice = {
-          id: Date.now().toString(),
-          ...form,
-          created: now,
-          updated: now,
-        };
-        const list = [newInv, ...invoices];
-        setInvoices(list);
-        saveInvoices(list);
+        saved = await masterPb.collection("invoices").create(payload);
       }
+
+      // Jika ditandai paid, otomatis upgrade paket dan masa aktif sekolah
+      if (form.status === "paid") {
+        await upgradeSchoolFromInvoice(saved);
+      }
+
+      await loadInvoices();
       setShowModal(false);
+    } catch (err: any) {
+      console.error("Gagal menyimpan invoice:", err);
+      const fieldErrors = err?.data?.data as Record<string, { message?: string }> | undefined;
+      const fieldMessage = fieldErrors
+        ? Object.entries(fieldErrors)
+          .map(([field, detail]) => `${field}: ${detail?.message || "nilai tidak valid"}`)
+          .join("; ")
+        : "";
+      const msg = fieldMessage || err?.data?.message || err?.message || "Gagal menyimpan invoice ke database master.";
+      alert(`Gagal menyimpan invoice: ${msg}`);
     } finally {
       setSaving(false);
     }
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (!confirm("Hapus invoice ini? Tindakan tidak bisa dibatalkan.")) return;
-    const list = invoices.filter(inv => inv.id !== id);
-    setInvoices(list);
-    saveInvoices(list);
-    if (detailInvoice?.id === id) setDetailInvoice(null);
-  };
-
-  const handleMarkPaid = (id: string) => {
-    const list = invoices.map(inv =>
-      inv.id === id
-        ? { ...inv, status: "paid" as PaymentStatus, paid_date: new Date().toISOString().slice(0, 10), updated: new Date().toISOString() }
-        : inv
-    );
-    setInvoices(list);
-    saveInvoices(list);
-    if (detailInvoice?.id === id) {
-      setDetailInvoice(list.find(i => i.id === id) || null);
+    try {
+      await masterPb.collection("invoices").delete(id);
+      await loadInvoices();
+      if (detailInvoice?.id === id) setDetailInvoice(null);
+    } catch (err: any) {
+      alert(err.message || "Gagal menghapus invoice.");
     }
   };
 
-  // Upload payment proof as base64
+  const handleMarkPaid = async (id: string) => {
+    try {
+      const today = new Date().toISOString().slice(0, 10);
+      const updated = await masterPb.collection("invoices").update<Invoice>(id, {
+        status: "paid",
+        paid_date: today,
+      });
+      // Otomatis upgrade paket dan masa aktif sekolah saat ditandai lunas
+      await upgradeSchoolFromInvoice(updated);
+      await loadInvoices();
+      if (detailInvoice?.id === id) {
+        setDetailInvoice(updated);
+      }
+    } catch (err: any) {
+      alert(err.message || "Gagal memperbarui status invoice.");
+    }
+  };
+
+  // Upload payment proof via PocketBase file upload
   const handleProofUpload = async (invoiceId: string, file: File) => {
     if (file.size > 5 * 1024 * 1024) return alert("Ukuran file maksimal 5 MB.");
     setUploadingProof(invoiceId);
     try {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const dataUrl = e.target?.result as string;
-        const list = invoices.map(inv =>
-          inv.id === invoiceId
-            ? { ...inv, payment_proof: dataUrl, updated: new Date().toISOString() }
-            : inv
-        );
-        setInvoices(list);
-        saveInvoices(list);
-        if (detailInvoice?.id === invoiceId) {
-          setDetailInvoice(list.find(i => i.id === invoiceId) || null);
-        }
-        setUploadingProof(null);
-      };
-      reader.readAsDataURL(file);
-    } catch {
+      const fd = new FormData();
+      fd.append("payment_proof", file);
+      await masterPb.collection("invoices").update(invoiceId, fd);
+      await loadInvoices();
+      if (detailInvoice?.id === invoiceId) {
+        const updated = await masterPb.collection("invoices").getOne<Invoice>(invoiceId);
+        setDetailInvoice(updated);
+      }
+    } catch (err: any) {
+      alert(err.message || "Gagal mengunggah bukti pembayaran.");
+    } finally {
       setUploadingProof(null);
     }
   };
 
-  const removeProof = (invoiceId: string) => {
-    const list = invoices.map(inv =>
-      inv.id === invoiceId ? { ...inv, payment_proof: "", updated: new Date().toISOString() } : inv
-    );
-    setInvoices(list);
-    saveInvoices(list);
-    if (detailInvoice?.id === invoiceId) {
-      setDetailInvoice(list.find(i => i.id === invoiceId) || null);
+  const removeProof = async (invoiceId: string) => {
+    try {
+      await masterPb.collection("invoices").update(invoiceId, { payment_proof: null });
+      await loadInvoices();
+      if (detailInvoice?.id === invoiceId) {
+        const updated = await masterPb.collection("invoices").getOne<Invoice>(invoiceId);
+        setDetailInvoice(updated);
+      }
+    } catch (err: any) {
+      alert(err.message || "Gagal menghapus bukti pembayaran.");
     }
   };
 
   // Stats
   const totalAmount = invoices.reduce((sum, inv) => sum + inv.amount, 0);
   const paidAmount = invoices.filter(i => i.status === "paid").reduce((sum, i) => sum + i.amount, 0);
-  const unpaidCount = invoices.filter(i => i.status === "unpaid" || i.status === "overdue").length;
-  const overdueCount = invoices.filter(i => i.status === "overdue").length;
+  const unpaidCount = invoices.filter(i => getInvoiceStatus(i) === "unpaid" || getInvoiceStatus(i) === "overdue").length;
+  const overdueCount = invoices.filter(i => getInvoiceStatus(i) === "overdue").length;
 
   return (
     <SuperAdminLayout>
@@ -479,7 +619,7 @@ const SuperAdminInvoicePage = () => {
             <ChevronDown size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
           </div>
           <button
-            onClick={() => { loadSchools(); setInvoices(loadInvoices()); }}
+            onClick={() => { loadSchools(); loadInvoices(); }}
             className="p-2.5 border border-slate-200 rounded-xl bg-white hover:bg-slate-50 text-slate-500 transition"
             title="Refresh"
           >
@@ -523,7 +663,8 @@ const SuperAdminInvoicePage = () => {
                 </thead>
                 <tbody className="divide-y divide-slate-50">
                   {filtered.map(inv => {
-                    const cfg = STATUS_CONFIG[inv.status];
+                    const effectiveStatus = getInvoiceStatus(inv);
+                    const cfg = STATUS_CONFIG[effectiveStatus] || STATUS_CONFIG.unpaid;
                     const StatusIcon = cfg.icon;
                     return (
                       <tr key={inv.id} className="hover:bg-slate-50 transition-colors">
@@ -537,9 +678,9 @@ const SuperAdminInvoicePage = () => {
                         </td>
                         <td className="px-4 py-3">
                           <span className="text-xs text-slate-600 font-medium">
-                            {PLAN_PRICES[inv.plan]?.label || inv.plan}
+                            {inv.plan_label || PLAN_PRICES[inv.plan]?.label || inv.plan}
                           </span>
-                          <p className="text-[10px] text-slate-400">{inv.duration_months} bulan</p>
+                          <p className="text-[10px] text-slate-400">{inv.period_label || `${inv.duration_months} bulan`}</p>
                         </td>
                         <td className="px-4 py-3 text-right">
                           <span className="font-semibold text-slate-900 text-xs">{formatRupiah(inv.amount)}</span>
@@ -561,10 +702,16 @@ const SuperAdminInvoicePage = () => {
                         </td>
                         <td className="px-4 py-3">
                           {inv.payment_proof ? (
-                            <span className="inline-flex items-center gap-1 text-[11px] text-blue-600 font-medium">
+                            <a
+                              href={getProofUrl(inv)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-[11px] text-blue-600 font-medium hover:underline"
+                              title="Lihat bukti pembayaran"
+                            >
                               <Paperclip size={11} />
                               Ada
-                            </span>
+                            </a>
                           ) : (
                             <span className="text-[11px] text-slate-400">-</span>
                           )}
@@ -581,16 +728,32 @@ const SuperAdminInvoicePage = () => {
                             <button
                               onClick={() => printInvoice(inv)}
                               className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition"
-                              title="Cetak"
+                              title="Cetak Invoice"
                             >
                               <Printer size={14} />
                             </button>
+                            {inv.status === "paid" && (
+                              <button
+                                onClick={() => printOfficialReceipt(inv, { name: inv.school_name, slug: inv.school_slug })}
+                                className="p-1.5 rounded-lg hover:bg-emerald-50 text-emerald-600 hover:text-emerald-700 transition"
+                                title="Cetak Kwitansi Resmi (SPJ)"
+                              >
+                                <Receipt size={14} />
+                              </button>
+                            )}
                             <button
                               onClick={() => openEdit(inv)}
                               className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition"
                               title="Edit"
                             >
                               <Edit size={14} />
+                            </button>
+                            <button
+                              onClick={() => handleDelete(inv.id)}
+                              className="p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-600 transition"
+                              title="Hapus"
+                            >
+                              <Trash2 size={14} />
                             </button>
                           </div>
                         </td>
@@ -619,6 +782,19 @@ const SuperAdminInvoicePage = () => {
             </div>
 
             <div className="p-5 space-y-4">
+              {/* Invoice Number */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1.5">Nomor Invoice</label>
+                <input
+                  type="text"
+                  value={form.invoice_number}
+                  onChange={e => setForm(f => ({ ...f, invoice_number: e.target.value }))}
+                  className="w-full px-3.5 py-2.5 text-sm font-mono border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition"
+                  placeholder="INV-XXXX-XXXX"
+                  required
+                />
+              </div>
+
               {/* School selector */}
               <div>
                 <label className="block text-xs font-semibold text-slate-600 mb-1.5">Institusi</label>
@@ -636,6 +812,18 @@ const SuperAdminInvoicePage = () => {
                   </select>
                   <ChevronDown size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                 </div>
+              </div>
+
+              {/* Contact Email */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1.5">Email Kontak (opsional)</label>
+                <input
+                  type="email"
+                  value={form.contact_email || ""}
+                  onChange={e => setForm(f => ({ ...f, contact_email: e.target.value }))}
+                  className="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition"
+                  placeholder="admin@sekolah.sch.id"
+                />
               </div>
 
               {/* Plan & Duration */}
@@ -665,8 +853,10 @@ const SuperAdminInvoicePage = () => {
                       onChange={e => handleDurationChange(Number(e.target.value))}
                       className="w-full pl-8 pr-4 py-2.5 text-sm border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 appearance-none transition"
                     >
-                      {[1, 3, 6, 12].map(m => (
-                        <option key={m} value={m}>{m} bulan</option>
+                      {[1, 2, 3, 6, 12].map(m => (
+                        <option key={m} value={m}>
+                          {m === 12 ? "1 tahun (12 bulan)" : m === 6 ? "1 semester (6 bulan)" : `${m} bulan`}
+                        </option>
                       ))}
                     </select>
                     <ChevronDown size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
@@ -784,12 +974,22 @@ const SuperAdminInvoicePage = () => {
                 <p className="text-xs text-slate-400 mt-0.5">Dibuat {formatDate(detailInvoice.created)}</p>
               </div>
               <div className="flex items-center gap-2">
+                {detailInvoice.status === "paid" && (
+                  <button
+                    onClick={() => printOfficialReceipt(detailInvoice, { name: detailInvoice.school_name, slug: detailInvoice.school_slug })}
+                    className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl hover:bg-emerald-100 transition"
+                    title="Cetak Kwitansi Pembayaran Resmi (SPJ)"
+                  >
+                    <Receipt size={13} />
+                    Kwitansi (SPJ)
+                  </button>
+                )}
                 <button
                   onClick={() => printInvoice(detailInvoice)}
                   className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-slate-600 border border-slate-200 rounded-xl hover:bg-slate-50 transition"
                 >
                   <Printer size={13} />
-                  Cetak
+                  Cetak Invoice
                 </button>
                 <button onClick={() => setDetailInvoice(null)} className="p-2 rounded-xl hover:bg-slate-100 text-slate-400 transition">
                   <X size={18} />
@@ -854,7 +1054,6 @@ const SuperAdminInvoicePage = () => {
                     <Upload size={12} />
                     {uploadingProof === detailInvoice.id ? "Mengupload..." : "Upload"}
                     <input
-                      ref={proofFileRef}
                       type="file"
                       accept="image/*,.pdf"
                       className="hidden"
@@ -871,16 +1070,16 @@ const SuperAdminInvoicePage = () => {
                 <div className="p-4">
                   {detailInvoice.payment_proof ? (
                     <div className="space-y-3">
-                      {detailInvoice.payment_proof.startsWith("data:image") ? (
+                      {isImageProof(getProofUrl(detailInvoice)) ? (
                         <div className="relative group">
                           <img
-                            src={detailInvoice.payment_proof}
+                            src={getProofUrl(detailInvoice)}
                             alt="Bukti pembayaran"
                             className="w-full max-h-64 object-contain rounded-lg border border-slate-100 bg-slate-50"
                           />
                           <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 rounded-lg transition flex items-center justify-center">
                             <a
-                              href={detailInvoice.payment_proof}
+                              href={getProofUrl(detailInvoice)}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="opacity-0 group-hover:opacity-100 transition flex items-center gap-1.5 px-3 py-1.5 bg-white rounded-lg shadow text-xs font-semibold text-slate-700"
@@ -894,11 +1093,11 @@ const SuperAdminInvoicePage = () => {
                         <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
                           <FileText size={24} className="text-blue-500 flex-shrink-0" />
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-slate-700">Dokumen PDF</p>
-                            <p className="text-xs text-slate-400">Klik untuk melihat</p>
+                            <p className="text-sm font-medium text-slate-700">Dokumen Lampiran</p>
+                            <p className="text-xs text-slate-400">Klik untuk melihat file</p>
                           </div>
                           <a
-                            href={detailInvoice.payment_proof}
+                            href={getProofUrl(detailInvoice)}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition"

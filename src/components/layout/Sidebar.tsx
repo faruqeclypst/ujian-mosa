@@ -15,7 +15,10 @@ import {
   Award,
   ChevronDown,
   BarChart2,
-  FileText
+  FileText,
+  AlertCircle,
+  CheckCircle2,
+  Sparkles,
 } from "lucide-react";
 import * as React from "react";
 
@@ -27,6 +30,7 @@ import { useAuth } from "../../context/AuthContext";
 import { useSidebar } from "../../context/SidebarContext";
 import { useTenant } from "../../context/TenantContext";
 import { useExamData } from "../../context/ExamDataContext";
+import { masterPb } from "../../lib/pocketbase";
 import { Skeleton } from "../ui/skeleton";
 
 
@@ -71,8 +75,104 @@ const SidebarSkeleton = ({ isCollapsed }: { isCollapsed: boolean }) => {
 const Sidebar = () => {
   const { role, loading } = useAuth();
   const { isCollapsed, isMobileOpen, toggleCollapsed, closeMobile } = useSidebar();
-  const { terminology } = useTenant();
+  const { terminology, school } = useTenant();
   const examData = useExamData();
+  const [unpaidCount, setUnpaidCount] = React.useState<number>(0);
+  const [accountStatus, setAccountStatus] = React.useState<{
+    type: "trial" | "unpaid" | "paid" | "overdue";
+    label: string;
+    sublabel: string;
+    badgeColor: string;
+    badgeBg: string;
+    badgeBorder: string;
+  }>({
+    type: "trial",
+    label: "Demo / Trial",
+    sublabel: "Akses Uji Coba",
+    badgeColor: "text-blue-700 dark:text-blue-300",
+    badgeBg: "bg-blue-50 dark:bg-blue-950/40",
+    badgeBorder: "border-blue-200 dark:border-blue-800/60",
+  });
+
+  React.useEffect(() => {
+    if (!school) return;
+    let isMounted = true;
+
+    const checkInvoices = async () => {
+      try {
+        const schoolId = String(school.id || "").trim();
+        const schoolSlug = String(school.slug || "").trim().toLowerCase();
+        const result = await masterPb.collection("invoices").getList<any>(1, 20);
+        const records = result.items.filter((r: any) => {
+          const rId = String(r.school_id || "").trim();
+          const rSlug = String(r.school_slug || "").trim().toLowerCase();
+          return rId === schoolId || rSlug === schoolSlug;
+        });
+
+        if (!isMounted) return;
+
+        const isOverdue = (inv: any) => {
+          if (inv.status !== "unpaid") return false;
+          if (!inv.due_date) return false;
+          return new Date(inv.due_date) < new Date();
+        };
+
+        const unpaid = records.filter((i: any) => i.status === "unpaid" && !isOverdue(i));
+        const overdue = records.filter((i: any) => i.status === "overdue" || (i.status === "unpaid" && isOverdue(i)));
+        const paid = records.filter((i: any) => i.status === "paid");
+
+        const totalUnpaid = unpaid.length + overdue.length;
+        setUnpaidCount(totalUnpaid);
+
+        const planName = school.plan 
+          ? (school.plan.charAt(0).toUpperCase() + school.plan.slice(1))
+          : "Trial";
+
+        if (overdue.length > 0) {
+          setAccountStatus({
+            type: "overdue",
+            label: "Jatuh Tempo",
+            sublabel: `${overdue.length} tagihan belum dibayar`,
+            badgeColor: "text-red-700 dark:text-red-300",
+            badgeBg: "bg-red-50 dark:bg-red-950/40",
+            badgeBorder: "border-red-200 dark:border-red-800/60",
+          });
+        } else if (unpaid.length > 0) {
+          setAccountStatus({
+            type: "unpaid",
+            label: "Belum Bayar",
+            sublabel: `${unpaid.length} tagihan aktif`,
+            badgeColor: "text-amber-800 dark:text-amber-300",
+            badgeBg: "bg-amber-50 dark:bg-amber-950/40",
+            badgeBorder: "border-amber-200 dark:border-amber-800/60",
+          });
+        } else if (paid.length > 0) {
+          setAccountStatus({
+            type: "paid",
+            label: "Lunas / Aktif",
+            sublabel: `Paket ${planName}`,
+            badgeColor: "text-emerald-700 dark:text-emerald-300",
+            badgeBg: "bg-emerald-50 dark:bg-emerald-950/40",
+            badgeBorder: "border-emerald-200 dark:border-emerald-800/60",
+          });
+        } else {
+          setAccountStatus({
+            type: "trial",
+            label: school.plan && school.plan !== "free" && school.plan !== "trial" ? `Paket ${planName}` : "Demo / Trial",
+            sublabel: "Akses Uji Coba",
+            badgeColor: "text-blue-700 dark:text-blue-300",
+            badgeBg: "bg-blue-50 dark:bg-blue-950/40",
+            badgeBorder: "border-blue-200 dark:border-blue-800/60",
+          });
+        }
+      } catch (err) {
+        console.error("Gagal memeriksa status akun:", err);
+      }
+    };
+
+    checkInvoices();
+    return () => { isMounted = false; };
+  }, [school]);
 
   const navigation = React.useMemo(() => [
     { to: "/admin", label: "Dashboard", icon: Home, badge: null },
@@ -101,15 +201,15 @@ const Sidebar = () => {
     { 
       label: "Sistem", 
       icon: Settings, 
-      badge: null,
+      badge: unpaidCount > 0 ? `${unpaidCount}` : null,
       children: [
-        { to: "/admin/invoice", label: "Invoice", icon: FileText },
+        { to: "/admin/invoice", label: "Invoice", icon: FileText, badge: unpaidCount > 0 ? "Belum Bayar" : null },
         { to: "/admin/kelola-akun", label: "Kelola Akun", icon: ShieldAlert },
         { to: "/admin/pengaturan", label: "Pengaturan", icon: Settings }
       ]
     },
     { to: "/admin/panduan", label: "Panduan", icon: HelpCircle, badge: null }
-  ], [terminology]);
+  ], [terminology, unpaidCount]);
   
   const [expandedMenus, setExpandedMenus] = React.useState<Record<string, boolean>>(() => 
     navigation.reduce((acc, item) => {
@@ -219,6 +319,9 @@ const Sidebar = () => {
                         )}
                       >
                         <item.icon className="h-5 w-5 transition-transform group-hover:scale-110" />
+                        {item.badge && (
+                          <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-amber-500 ring-2 ring-white dark:ring-[#0B1120]" />
+                        )}
                       </div>
                     ) : (
                       <NavLink to={item.to ?? "#"} end>
@@ -294,10 +397,16 @@ const Sidebar = () => {
                                   <div className="absolute -left-[15px] top-1/2 -translate-y-1/2 w-[3px] h-4 bg-blue-600 rounded-full" />
                                 )}
                                 <span className="truncate flex-1">{child.label}</span>
-                                {count !== null && !isCollapsed && (
-                                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 group-hover:bg-blue-100 group-hover:text-blue-600 transition-colors">
-                                    {count}
+                                {child.label === "Invoice" && unpaidCount > 0 ? (
+                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-950/70 dark:text-amber-300 border border-amber-200 dark:border-amber-800/50">
+                                    Belum Bayar
                                   </span>
+                                ) : (
+                                  count !== null && !isCollapsed && (
+                                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 group-hover:bg-blue-100 group-hover:text-blue-600 transition-colors">
+                                      {count}
+                                    </span>
+                                  )
                                 )}
                               </div>
                             )}
@@ -347,6 +456,73 @@ const Sidebar = () => {
             );
           })}
         </nav>
+
+        {/* Desktop Sidebar Footer: Account Status */}
+        {isCollapsed ? (
+          <div className="p-2 border-t border-slate-200/70 dark:border-slate-800 flex justify-center">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <NavLink
+                  to="/admin/invoice"
+                  className={cn(
+                    "w-10 h-10 rounded-xl flex items-center justify-center transition border shadow-xs",
+                    accountStatus.badgeBg, accountStatus.badgeBorder, accountStatus.badgeColor
+                  )}
+                >
+                  {accountStatus.type === "paid" ? (
+                    <CheckCircle2 size={16} />
+                  ) : accountStatus.type === "unpaid" || accountStatus.type === "overdue" ? (
+                    <AlertCircle size={16} />
+                  ) : (
+                    <Sparkles size={16} />
+                  )}
+                </NavLink>
+              </TooltipTrigger>
+              <TooltipContent side="right">
+                <p className="font-semibold text-xs">{accountStatus.label}</p>
+                <p className="text-[11px] text-slate-400">{accountStatus.sublabel}</p>
+              </TooltipContent>
+            </Tooltip>
+          </div>
+        ) : (
+          <div className="p-3 border-t border-slate-200/70 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/40">
+            <div className="rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-[#0E1526] p-3 shadow-xs">
+              <div className="flex items-center justify-between gap-2 mb-1.5">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Status Akun</span>
+                <span className={cn(
+                  "inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border",
+                  accountStatus.badgeBg, accountStatus.badgeColor, accountStatus.badgeBorder
+                )}>
+                  {accountStatus.label}
+                </span>
+              </div>
+              <p className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">
+                {school?.name || "Institusi"}
+              </p>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                {accountStatus.sublabel}
+              </p>
+
+              {unpaidCount > 0 ? (
+                <NavLink
+                  to="/admin/invoice"
+                  className="mt-2.5 flex items-center justify-center gap-1.5 w-full py-1.5 px-3 rounded-lg text-xs font-bold text-amber-900 dark:text-amber-200 bg-amber-100 hover:bg-amber-200 dark:bg-amber-950/70 dark:hover:bg-amber-900/80 transition"
+                >
+                  <span>Bayar Tagihan ({unpaidCount})</span>
+                  <ChevronRight size={13} />
+                </NavLink>
+              ) : (
+                <NavLink
+                  to="/admin/invoice"
+                  className="mt-2.5 flex items-center justify-between w-full py-1 px-1 rounded-md text-[11px] font-medium text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 transition"
+                >
+                  <span>Lihat Riwayat Tagihan</span>
+                  <ChevronRight size={12} />
+                </NavLink>
+              )}
+            </div>
+          </div>
+        )}
       </aside>
 
       {/* Mobile/Tablet Sidebar */}
@@ -415,7 +591,12 @@ const Sidebar = () => {
                                 {isActive && (
                                   <div className="absolute -left-[15px] top-1/2 -translate-y-1/2 w-[3px] h-4 bg-blue-600 rounded-full" />
                                 )}
-                                <span className="truncate">{child.label}</span>
+                                <span className="truncate flex-1">{child.label}</span>
+                                {child.label === "Invoice" && unpaidCount > 0 && (
+                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-950/70 dark:text-amber-300 border border-amber-200 dark:border-amber-800/50">
+                                    Belum Bayar
+                                  </span>
+                                )}
                               </div>
                             )}
                           </NavLink>
@@ -450,6 +631,47 @@ const Sidebar = () => {
               );
             })}
           </nav>
+
+          {/* Mobile Sidebar Footer: Account Status */}
+          <div className="p-3 border-t border-slate-200/70 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/40">
+            <div className="rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-[#0E1526] p-3 shadow-xs">
+              <div className="flex items-center justify-between gap-2 mb-1.5">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Status Akun</span>
+                <span className={cn(
+                  "inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border",
+                  accountStatus.badgeBg, accountStatus.badgeColor, accountStatus.badgeBorder
+                )}>
+                  {accountStatus.label}
+                </span>
+              </div>
+              <p className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">
+                {school?.name || "Institusi"}
+              </p>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                {accountStatus.sublabel}
+              </p>
+
+              {unpaidCount > 0 ? (
+                <NavLink
+                  to="/admin/invoice"
+                  onClick={closeMobile}
+                  className="mt-2.5 flex items-center justify-center gap-1.5 w-full py-1.5 px-3 rounded-lg text-xs font-bold text-amber-900 dark:text-amber-200 bg-amber-100 hover:bg-amber-200 dark:bg-amber-950/70 dark:hover:bg-amber-900/80 transition"
+                >
+                  <span>Bayar Tagihan ({unpaidCount})</span>
+                  <ChevronRight size={13} />
+                </NavLink>
+              ) : (
+                <NavLink
+                  to="/admin/invoice"
+                  onClick={closeMobile}
+                  className="mt-2.5 flex items-center justify-between w-full py-1 px-1 rounded-md text-[11px] font-medium text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 transition"
+                >
+                  <span>Lihat Riwayat Tagihan</span>
+                  <ChevronRight size={12} />
+                </NavLink>
+              )}
+            </div>
+          </div>
         </aside>
       )}
     </TooltipProvider>

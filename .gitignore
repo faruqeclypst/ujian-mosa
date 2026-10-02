@@ -21,3 +21,7 @@ release-key.*
 # CATATAN: JANGAN pakai pola global *.db / pb_data/ — akan memblokir
 # vps/template_school/pb_data/data.db yang DIBUTUHKAN setup-school.sh
 # untuk provisioning tenant baru.
+
+# File testing sementara / scratch
+scratch/
+

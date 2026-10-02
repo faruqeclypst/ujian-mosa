@@ -18,7 +18,7 @@ const LandingPage = () => {
   const [activeFaqCategory, setActiveFaqCategory] = useState<string>("semua");
   const [faqSearchQuery, setFaqSearchQuery] = useState<string>("");
   const [showAllFaqs, setShowAllFaqs] = useState(false);
-  const [billingCycle, setBillingCycle] = useState<"bulanan" | "semester" | "tahunan">("bulanan");
+  const [billingCycle, setBillingCycle] = useState<"1bulan" | "2bulan" | "3bulan" | "semester" | "tahunan">("1bulan");
 
   // Luxury Interactive Gallery State
   const [activeSlide, setActiveSlide] = useState(0);
@@ -312,12 +312,26 @@ const LandingPage = () => {
       highlight: false,
       cta: "Pilih Paket Berkembang",
       pricing: {
-        bulanan: {
+        "1bulan": {
           price: "380.000",
           oldPrice: "400.000",
           period: "/ bulan",
-          discountBadge: "Diskon 5%",
+          discountBadge: "1 Bulan",
           subtext: "Dibayar bulanan fleksibel"
+        },
+        "2bulan": {
+          price: "760.000",
+          oldPrice: "800.000",
+          period: "/ 2 bulan",
+          discountBadge: "Kustom 2 Bulan",
+          subtext: "2 × Rp 380.000 / bulan"
+        },
+        "3bulan": {
+          price: "1.140.000",
+          oldPrice: "1.200.000",
+          period: "/ 3 bulan",
+          discountBadge: "Kustom 3 Bulan",
+          subtext: "3 × Rp 380.000 / bulan"
         },
         semester: {
           price: "2.100.000",
@@ -350,12 +364,26 @@ const LandingPage = () => {
       highlight: true,
       cta: "Pilih Paket Lanjutan",
       pricing: {
-        bulanan: {
+        "1bulan": {
           price: "760.000",
           oldPrice: "800.000",
           period: "/ bulan",
-          discountBadge: "Diskon 5%",
+          discountBadge: "1 Bulan",
           subtext: "Dibayar bulanan fleksibel"
+        },
+        "2bulan": {
+          price: "1.520.000",
+          oldPrice: "1.600.000",
+          period: "/ 2 bulan",
+          discountBadge: "Kustom 2 Bulan",
+          subtext: "2 × Rp 760.000 / bulan"
+        },
+        "3bulan": {
+          price: "2.280.000",
+          oldPrice: "2.400.000",
+          period: "/ 3 bulan",
+          discountBadge: "Kustom 3 Bulan",
+          subtext: "3 × Rp 760.000 / bulan"
         },
         semester: {
           price: "4.200.000",
@@ -388,12 +416,26 @@ const LandingPage = () => {
       highlight: false,
       cta: "Pilih Paket Premium",
       pricing: {
-        bulanan: {
+        "1bulan": {
           price: "1.235.000",
           oldPrice: "1.300.000",
           period: "/ bulan",
-          discountBadge: "Diskon 5%",
+          discountBadge: "1 Bulan",
           subtext: "Dibayar bulanan fleksibel"
+        },
+        "2bulan": {
+          price: "2.470.000",
+          oldPrice: "2.600.000",
+          period: "/ 2 bulan",
+          discountBadge: "Kustom 2 Bulan",
+          subtext: "2 × Rp 1.235.000 / bulan"
+        },
+        "3bulan": {
+          price: "3.705.000",
+          oldPrice: "3.900.000",
+          period: "/ 3 bulan",
+          discountBadge: "Kustom 3 Bulan",
+          subtext: "3 × Rp 1.235.000 / bulan"
         },
         semester: {
           price: "6.840.000",
@@ -1161,65 +1203,52 @@ const LandingPage = () => {
             </p>
           </div>
 
-          {/* Billing Cycle Selector (Bulanan / Semester / 1 Tahun) */}
-          <div className="flex justify-center mb-8 sm:mb-14 px-2 w-full">
+          {/* Billing Cycle Selector (1 Bulan, Semester, 1 Tahun) */}
+          <div className="flex flex-col items-center justify-center mb-8 sm:mb-12 px-2 w-full">
             <div className="w-full max-w-xl grid grid-cols-3 p-1 sm:p-1.5 bg-slate-200/80 backdrop-blur-xs rounded-2xl border border-slate-300/80 shadow-inner gap-1">
-              <button
-                type="button"
-                onClick={() => setBillingCycle("bulanan")}
-                className={cn(
-                  "py-2 sm:py-2.5 px-1 sm:px-4 rounded-xl text-center font-bold transition-all cursor-pointer flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1.5 min-h-[44px]",
-                  billingCycle === "bulanan"
-                    ? "bg-white text-slate-900 shadow-xs border border-slate-200/80"
-                    : "text-slate-600 hover:text-slate-900"
-                )}
-              >
-                <span className="text-xs sm:text-sm font-extrabold">Bulanan</span>
-                <span className="text-[10px] sm:text-xs text-slate-400 font-normal sm:font-medium whitespace-nowrap">(1 Bulan)</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setBillingCycle("semester")}
-                className={cn(
-                  "py-2 sm:py-2.5 px-1 sm:px-4 rounded-xl text-center font-bold transition-all cursor-pointer flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1.5 min-h-[44px]",
-                  billingCycle === "semester"
-                    ? "bg-white text-slate-900 shadow-xs border border-slate-200/80"
-                    : "text-slate-600 hover:text-slate-900"
-                )}
-              >
-                <div className="flex items-center gap-1">
-                  <span className="text-xs sm:text-sm font-extrabold">Semester</span>
-                  <span className="text-[10px] text-slate-400 font-normal hidden sm:inline">(6 Bln)</span>
-                </div>
-                <span className="text-[9px] sm:text-[10px] bg-emerald-100 text-emerald-800 font-extrabold px-1.5 py-0.5 rounded-full whitespace-nowrap shadow-2xs">
-                  Hemat 12%
-                </span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setBillingCycle("tahunan")}
-                className={cn(
-                  "py-2 sm:py-2.5 px-1 sm:px-4 rounded-xl text-center font-bold transition-all cursor-pointer flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1.5 min-h-[44px]",
-                  billingCycle === "tahunan"
-                    ? "bg-white text-slate-900 shadow-xs border border-slate-200/80"
-                    : "text-slate-600 hover:text-slate-900"
-                )}
-              >
-                <div className="flex items-center gap-1">
-                  <span className="text-xs sm:text-sm font-extrabold">1 Tahun</span>
-                  <span className="text-[10px] text-slate-400 font-normal hidden sm:inline">(12 Bln)</span>
-                </div>
-                <span className="text-[9px] sm:text-[10px] bg-blue-600 text-white font-extrabold px-1.5 py-0.5 rounded-full whitespace-nowrap shadow-2xs">
-                  Hemat 20%
-                </span>
-              </button>
+              {[
+                { id: "1bulan", label: "1 Bulan", sub: "Fleksibel" },
+                { id: "semester", label: "6 Bulan", sub: "1 Semester", badge: "Hemat 12%" },
+                { id: "tahunan", label: "1 Tahun", sub: "12 Bulan", badge: "Hemat 20%" },
+              ].map(tab => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setBillingCycle(tab.id as any)}
+                  className={cn(
+                    "py-2 sm:py-2.5 px-2 sm:px-4 rounded-xl text-center font-bold transition-all cursor-pointer flex flex-col items-center justify-center min-h-[50px] relative",
+                    billingCycle === tab.id
+                      ? "bg-white text-slate-900 shadow-xs border border-slate-200/80"
+                      : "text-slate-600 hover:text-slate-900"
+                  )}
+                >
+                  {tab.badge && (
+                    <span className="hidden sm:inline-block text-[8px] bg-emerald-600 text-white font-extrabold px-1.5 py-0.2 rounded-full mb-0.5">
+                      {tab.badge}
+                    </span>
+                  )}
+                  <span className="text-xs sm:text-sm font-extrabold whitespace-nowrap">{tab.label}</span>
+                  <span className="text-[10px] text-slate-400 font-medium whitespace-nowrap">{tab.sub}</span>
+                </button>
+              ))}
             </div>
+
+            <p className="text-xs text-slate-500 font-medium mt-3 text-center">
+              Butuh durasi fleksibel lainnya (2 bulan, 3 bulan, dll)? Atur durasi kustom langsung di{" "}
+              <button
+                type="button"
+                onClick={() => navigate("/daftar")}
+                className="text-blue-600 font-bold hover:underline cursor-pointer"
+              >
+                formulir pendaftaran
+              </button>.
+            </p>
           </div>
 
           {/* Pricing Cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
             {plans.map((plan, i) => {
-              const currentPricing = plan.pricing[billingCycle];
+              const currentPricing = plan.pricing[billingCycle] || plan.pricing["1bulan"];
               return (
                 <div
                   key={i}
@@ -1283,11 +1312,11 @@ const LandingPage = () => {
                   <button
                     onClick={() => {
                       const cycleLabel =
-                        billingCycle === "bulanan"
+                        billingCycle === "1bulan"
                           ? "1 Bulan"
                           : billingCycle === "semester"
-                            ? "Semester (6 Bulan)"
-                            : "1 Tahun (12 Bulan)";
+                            ? "6 Bulan"
+                            : "1 Tahun";
                       navigate("/daftar", {
                         state: { selectedPlan: `${plan.name} (${cycleLabel})` },
                       });
