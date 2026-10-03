@@ -5,7 +5,7 @@ import { OfflineActivationGate } from "./OfflineActivationGate";
 import LoadingScreen from "../layout/LoadingScreen";
 
 export const OfflineServerGuard: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { school, pb, refreshSchool } = useTenant();
+  const { school, pb, loading, refreshSchool } = useTenant();
   const [checking, setChecking] = useState(true);
   const [verification, setVerification] = useState<VerificationResult | null>(null);
   const [licenseCode, setLicenseCode] = useState<string | null>(null);
@@ -18,9 +18,24 @@ export const OfflineServerGuard: React.FC<{ children: React.ReactNode }> = ({ ch
     }
 
     setChecking(true);
-    let code = typeof window !== "undefined" ? localStorage.getItem("exam_offline_license") : null;
+    let code = school?.offline_license || null;
 
-    // Cek dari database server (selalu prioritaskan database server agar berlaku untuk semua browser & komputer lab)
+    // 1. Coba baca dari dedicated endpoint /api/offline-license jika belum ada
+    if (!code) {
+      try {
+        const resp = await fetch(`${window.location.origin}/api/offline-license`);
+        if (resp.ok) {
+          const data = await resp.json();
+          if (data.license) {
+            code = data.license;
+          }
+        }
+      } catch (err) {
+        console.warn("Gagal membaca dari /api/offline-license:", err);
+      }
+    }
+
+    // 2. Coba baca dari tabel settings database server secara langsung
     if (!code) {
       try {
         const resp = await fetch(`${window.location.origin}/api/collections/settings/records?limit=1`);
@@ -28,9 +43,6 @@ export const OfflineServerGuard: React.FC<{ children: React.ReactNode }> = ({ ch
           const data = await resp.json();
           if (data.items && data.items.length > 0 && data.items[0].offline_license) {
             code = data.items[0].offline_license;
-            if (code) {
-              localStorage.setItem("exam_offline_license", code);
-            }
           }
         }
       } catch (err) {
@@ -38,18 +50,21 @@ export const OfflineServerGuard: React.FC<{ children: React.ReactNode }> = ({ ch
       }
     }
 
+    // 3. Coba baca via SDK PocketBase
     if (!code && pb) {
       try {
         const res = await pb.collection("settings").getList(1, 1);
         if (res.items.length > 0 && (res.items[0] as any).offline_license) {
           code = (res.items[0] as any).offline_license;
-          if (code) {
-            localStorage.setItem("exam_offline_license", code);
-          }
         }
       } catch (err) {
         console.warn("Gagal membaca offline_license dari settings lokal:", err);
       }
+    }
+
+    // 4. Fallback ke localStorage browser
+    if (!code && typeof window !== "undefined") {
+      code = localStorage.getItem("exam_offline_license");
     }
 
     if (!code) {
@@ -63,14 +78,27 @@ export const OfflineServerGuard: React.FC<{ children: React.ReactNode }> = ({ ch
     }
 
     const res = await verifyOfflineLicense(code);
+    if (res.valid) {
+      if (typeof window !== "undefined") {
+        try { localStorage.setItem("exam_offline_license", code); } catch {}
+      }
+    } else {
+      // Jika kode dari localStorage ternyata tidak valid, bersihkan cache lokal
+      if (typeof window !== "undefined") {
+        try { localStorage.removeItem("exam_offline_license"); } catch {}
+      }
+    }
+
     setVerification(res);
     setLicenseCode(code);
     setChecking(false);
   };
 
   useEffect(() => {
-    checkLicense();
-  }, [school?.id]);
+    if (!loading) {
+      checkLicense();
+    }
+  }, [school?.id, school?.offline_license, loading]);
 
   // Jika bukan server lokal offline mandiri, langsung lewati tanpa proteksi offline
   if (school?.id !== "local_server") {

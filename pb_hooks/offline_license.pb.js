@@ -46,3 +46,37 @@ routerAdd("POST", "/api/offline-activate", (c) => {
         return c.json(500, { error: err.message || "Gagal menyimpan lisensi server offline" });
     }
 });
+
+// Endpoint baca status lisensi offline untuk client LAN / HP siswa / laptop pengawas
+routerAdd("OPTIONS", "/api/offline-license", (c) => {
+    try { c.setResponseHeader("Access-Control-Allow-Origin", "*"); } catch (e) { }
+    try { c.setResponseHeader("Access-Control-Allow-Methods", "GET, OPTIONS"); } catch (e) { }
+    try { c.setResponseHeader("Access-Control-Allow-Headers", "*"); } catch (e) { }
+    return c.noContent(204);
+});
+
+routerAdd("GET", "/api/offline-license", (c) => {
+    try {
+        try { c.setResponseHeader("Access-Control-Allow-Origin", "*"); } catch (e) { }
+        try { c.setResponseHeader("Access-Control-Allow-Methods", "GET, OPTIONS"); } catch (e) { }
+        try { c.setResponseHeader("Access-Control-Allow-Headers", "*"); } catch (e) { }
+
+        let license = "";
+        let schoolName = "";
+        try {
+            const list = $app.findRecordsByFilter("settings", "1=1", "+created", 1);
+            if (list && list.length > 0) {
+                license = list[0].get("offline_license") || "";
+                schoolName = list[0].get("name") || "";
+            }
+        } catch (e) {}
+
+        return c.json(200, {
+            active: Boolean(license),
+            license: license,
+            school_name: schoolName
+        });
+    } catch (err) {
+        return c.json(500, { error: err.message });
+    }
+});
