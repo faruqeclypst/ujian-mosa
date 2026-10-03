@@ -240,3 +240,173 @@ routerAdd("POST", "/api/fast-restore", (c) => {
         });
     }
 });
+
+// ============================================================
+// FAST RESET - Server-Side Bulk Database Reset (Format Sistem)
+// - Menghapus seluruh record data sekolah (ujian, soal, siswa, guru, dll)
+// - Mengeksekusi dalam transaksi atomik $app.runInTransaction()
+// - Mempertahankan 'settings' (nama sekolah, logo, token universal, dll)
+// - Mempertahankan akun login admin aktif
+// ============================================================
+
+routerAdd("OPTIONS", "/api/fast-reset", (c) => {
+    try { c.setResponseHeader("Access-Control-Allow-Origin", "*"); } catch (e) {}
+    try { c.setResponseHeader("Access-Control-Allow-Methods", "POST, OPTIONS"); } catch (e) {}
+    try { c.setResponseHeader("Access-Control-Allow-Headers", "Content-Type, X-Token, Authorization"); } catch (e) {}
+    return c.noContent(204);
+});
+
+routerAdd("POST", "/api/fast-reset", (c) => {
+    function setCors(cc) {
+        try { cc.setResponseHeader("Access-Control-Allow-Origin", "*"); } catch (e) {}
+        try { cc.setResponseHeader("Access-Control-Allow-Methods", "POST, OPTIONS"); } catch (e) {}
+        try { cc.setResponseHeader("Access-Control-Allow-Headers", "Content-Type, X-Token, Authorization"); } catch (e) {}
+    }
+
+    setCors(c);
+
+    function getAuth(info) {
+        try {
+            if (info && info.auth) return info.auth;
+            const headers = info ? (info.headers || {}) : {};
+            let token = headers["authorization"] || headers["x-token"] || "";
+            if (typeof token === "string" && token.indexOf("Bearer ") === 0) {
+                token = token.substring(7).trim();
+            }
+            if (token) {
+                return $app.findAuthRecordByToken(token);
+            }
+        } catch (e) {}
+        return null;
+    }
+
+    const info = c.requestInfo();
+    const auth = getAuth(info);
+
+    if (!auth) {
+        return c.json(401, { error: "Autentikasi diperlukan." });
+    }
+
+    let authCol = "";
+    try {
+        if (auth.collection) authCol = auth.collection().name;
+    } catch (e) {}
+
+    if (authCol !== "_superusers" && authCol !== "users") {
+        return c.json(403, { error: "Akses ditolak. Hanya administrator yang dapat mereset database." });
+    }
+
+    const startTime = Date.now();
+    const currentAdminId = auth.id;
+
+    // Koleksi yang diprioritaskan untuk dihapus terlebih dahulu (dari relasi anak ke induk)
+    const priorityOrder = [
+        "attempts",
+        "leaderboards",
+        "exam_rooms",
+        "questions",
+        "exams",
+        "student_interests",
+        "students",
+        "teachers",
+        "subjects",
+        "classes"
+    ];
+
+    let totalDeleted = 0;
+    const details = {};
+
+    try {
+        $app.runInTransaction((txApp) => {
+            // Ambil semua tabel non-sistem yang ada di database saat ini
+            const colRows = arrayOf(new DynamicModel({ name: "" }));
+            try {
+                txApp.db().newQuery("SELECT name FROM _collections WHERE name NOT LIKE '\\_%' ESCAPE '\\' AND name != 'settings' AND name != 'users'").all(colRows);
+            } catch (qErr) {
+                console.warn("[FAST-RESET] Gagal query _collections: " + qErr);
+            }
+
+            const existingCols = colRows.map(r => r.name);
+
+            // Urutkan: priorityOrder terlebih dahulu, lalu koleksi lainnya jika ada
+            const collectionsToDelete = [];
+            for (let i = 0; i < priorityOrder.length; i++) {
+                if (existingCols.indexOf(priorityOrder[i]) !== -1) {
+                    collectionsToDelete.push(priorityOrder[i]);
+                }
+            }
+            for (let i = 0; i < existingCols.length; i++) {
+                if (collectionsToDelete.indexOf(existingCols[i]) === -1) {
+                    collectionsToDelete.push(existingCols[i]);
+                }
+            }
+
+            // Hapus isi masing-masing tabel
+            for (let i = 0; i < collectionsToDelete.length; i++) {
+                const colName = collectionsToDelete[i];
+                let count = 0;
+                try {
+                    const countRow = new DynamicModel({ total: 0 });
+                    try {
+                        txApp.db().newQuery("SELECT COUNT(*) AS total FROM " + colName).one(countRow);
+                        count = countRow.total || 0;
+                    } catch (e) {}
+
+                    txApp.db().newQuery("DELETE FROM " + colName).execute();
+                    details[colName] = count;
+                    totalDeleted += count;
+                } catch (delErr) {
+                    console.warn("[FAST-RESET] Gagal bersihkan " + colName + ": " + delErr);
+                }
+            }
+
+            // Hapus akun di users selain akun admin yang sedang login
+            try {
+                let userCount = 0;
+                const userCountRow = new DynamicModel({ total: 0 });
+
+                if (authCol === "users" && currentAdminId) {
+                    try {
+                        txApp.db().newQuery("SELECT COUNT(*) AS total FROM users WHERE id != {:adminId}")
+                            .bind({ adminId: currentAdminId })
+                            .one(userCountRow);
+                        userCount = userCountRow.total || 0;
+                    } catch (e) {}
+
+                    txApp.db().newQuery("DELETE FROM users WHERE id != {:adminId}")
+                        .bind({ adminId: currentAdminId })
+                        .execute();
+                } else {
+                    try {
+                        txApp.db().newQuery("SELECT COUNT(*) AS total FROM users WHERE role != 'admin'")
+                            .one(userCountRow);
+                        userCount = userCountRow.total || 0;
+                    } catch (e) {}
+
+                    txApp.db().newQuery("DELETE FROM users WHERE role != 'admin'").execute();
+                }
+
+                details["users"] = userCount;
+                totalDeleted += userCount;
+            } catch (uErr) {
+                console.warn("[FAST-RESET] Gagal bersihkan users: " + uErr);
+            }
+        });
+
+        const elapsedMs = Date.now() - startTime;
+        console.log("[FAST-RESET] Berhasil reset database (" + totalDeleted + " records dihapus) dalam " + elapsedMs + "ms");
+
+        return c.json(200, {
+            success: true,
+            total_deleted: totalDeleted,
+            elapsed_ms: elapsedMs,
+            details: details
+        });
+    } catch (txErr) {
+        console.error("[FAST-RESET TX ERROR]: " + txErr);
+        return c.json(500, {
+            error: "Gagal memproses transaksi reset database: " + txErr
+        });
+    }
+});
+

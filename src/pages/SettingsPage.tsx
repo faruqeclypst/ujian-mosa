@@ -792,39 +792,79 @@ const SettingsPage = () => {
     }
 
     setIsBackupLoading(true);
-    setImportProgress(0);
-    setImportStatus("Mulai Pembersihan...");
+    setImportProgress(15);
+    setImportStatus("Menyiapkan pembersihan...");
 
     try {
-      const REVERSE_COLLECTIONS = [...COLLECTIONS].reverse();
-      const totalCollections = REVERSE_COLLECTIONS.length;
-      let processed = 0;
+      // 1. Coba Fast Reset (Transaksi Server-Side Bulk via PocketBase hook)
+      let fastResetSuccess = false;
+      try {
+        setImportProgress(45);
+        setImportStatus("Memproses reset kilat di server...");
 
-      for (const colName of REVERSE_COLLECTIONS) {
-        setImportStatus(`Membersihkan: ${colName}...`);
+        const res: any = await pb.send("/api/fast-reset", {
+          method: "POST"
+        });
 
-        const records = await pb.collection(colName).getFullList({ fields: 'id' });
-
-        for (const r of records) {
-          const currentAdminId = pb.authStore.model?.id;
-          if (colName === "users" && r.id === currentAdminId) continue;
-
-          try {
-            await pb.collection(colName).delete(r.id);
-          } catch (e) {
-            console.warn(`Gagal hapus ${r.id} di ${colName}`);
-          }
+        if (res && res.success) {
+          fastResetSuccess = true;
+          setImportProgress(100);
+          setImportStatus("Selesai!");
+          const duration = ((res.elapsed_ms || 0) / 1000).toFixed(1);
+          addToast({
+            title: "Format Berhasil",
+            description: `${res.total_deleted || 0} data berhasil dibersihkan dalam ${duration} detik.`,
+            type: "success"
+          });
+          setTimeout(() => {
+            window.location.reload();
+          }, 1200);
+          return;
         }
-
-        processed++;
-        setImportProgress(Math.round((processed / totalCollections) * 100));
+      } catch (fastErr: any) {
+        if (fastErr.status === 404) {
+          console.warn("Fast reset hook belum tersedia di instance ini, beralih ke mode klien.");
+        } else {
+          console.error("Fast reset gagal:", fastErr);
+        }
       }
 
-      setImportStatus("Selesai!");
-      addToast({ title: "Berhasil!", description: "Seluruh data telah dihapus.", type: "success" });
-      setTimeout(() => {
-        window.location.reload();
-      }, 1500);
+      // 2. Fallback: Pembersihan bertahap klien jika hook belum terpasang
+      if (!fastResetSuccess) {
+        const REVERSE_COLLECTIONS = [...COLLECTIONS].reverse();
+        const totalCollections = REVERSE_COLLECTIONS.length;
+        let processed = 0;
+
+        for (const colName of REVERSE_COLLECTIONS) {
+          if (colName === "settings") {
+            processed++;
+            continue;
+          }
+          setImportStatus(`Membersihkan: ${colName}...`);
+
+          const records = await pb.collection(colName).getFullList({ fields: 'id' });
+
+          for (const r of records) {
+            const currentAdminId = pb.authStore.model?.id;
+            if (colName === "users" && r.id === currentAdminId) continue;
+
+            try {
+              await pb.collection(colName).delete(r.id);
+            } catch (e) {
+              console.warn(`Gagal hapus ${r.id} di ${colName}`);
+            }
+          }
+
+          processed++;
+          setImportProgress(Math.round((processed / totalCollections) * 100));
+        }
+
+        setImportStatus("Selesai!");
+        addToast({ title: "Berhasil", description: "Seluruh data telah dihapus.", type: "success" });
+        setTimeout(() => {
+          window.location.reload();
+        }, 1500);
+      }
     } catch (err: any) {
       addToast({ title: "Gagal Reset", description: err.message, type: "error" });
     } finally {
