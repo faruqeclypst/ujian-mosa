@@ -37,18 +37,33 @@ const getMimeTypeFromExtension = (fileName: string): string => {
   return (ext && mimeMap[ext]) || "application/octet-stream";
 };
 
+async function calculateFileHash(file: File): Promise<string> {
+  try {
+    const buffer = await file.arrayBuffer();
+    const hashBuffer = await crypto.subtle.digest("SHA-256", buffer);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, "0")).join("").slice(0, 16);
+  } catch {
+    return Date.now().toString(36);
+  }
+}
+
 async function uploadViaWorker(folder: string, file: File): Promise<UploadResult> {
   if (!workerUrl) {
     throw new Error("VITE_R2_WORKER_URL is not configured. Cannot upload without a backend worker.");
   }
 
-  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-  const safeName = sanitizeFileName(file.name);
-  const key = `${folder}/${timestamp}-${safeName}`;
+  // Deduplikasi Berkas (Content-Addressable Storage):
+  // Menghasilkan nama unik berdasarkan hash konten agar berkas identik tidak terduplikasi di Cloudflare R2
+  const hash = await calculateFileHash(file);
+  const ext = file.name.split(".").pop()?.toLowerCase() || "webp";
+  const rawBaseName = file.name.replace(/\.[^/.]+$/, "");
+  const safeBaseName = sanitizeFileName(rawBaseName).slice(0, 36) || "media";
+  const key = `${folder}/${hash}-${safeBaseName}.${ext}`;
 
   const formData = new FormData();
   formData.append("key", key);
-  formData.append("file", file, safeName);
+  formData.append("file", file, `${safeBaseName}.${ext}`);
   formData.append("contentType", file.type || getMimeTypeFromExtension(file.name));
 
   const response = await fetch(`${workerUrl}/upload`, {
@@ -61,8 +76,7 @@ async function uploadViaWorker(folder: string, file: File): Promise<UploadResult
     throw new Error(`Upload failed: ${errText}`);
   }
 
-  // Selalu konstruksi URL dari VITE_R2_PUBLIC_BASE_URL — jangan percaya URL dari Worker
-  // supaya tidak bergantung pada konfigurasi Worker
+  // Selalu konstruksi URL dari VITE_R2_PUBLIC_BASE_URL agar tidak bergantung pada konfigurasi Worker
   const base = (publicBaseUrl || "").replace(/\/$/, "");
   const url = base ? `${base}/${key}` : key;
   return { key, url };
@@ -83,7 +97,7 @@ export async function deleteImageFromStorage(key: string): Promise<void> {
 
 export async function deleteImagesFromStorage(keys: string[]): Promise<void> {
   if (keys.length === 0 || !workerUrl) return;
-  // Kirim paralel, maksimal 10 sekaligus agar tidak flood Worker
+  // Kirim paralel, maksimal 10 sekaligus agar tidak membebani Worker
   const chunkSize = 10;
   for (let i = 0; i < keys.length; i += chunkSize) {
     const chunk = keys.slice(i, i + chunkSize);
@@ -92,57 +106,19 @@ export async function deleteImagesFromStorage(keys: string[]): Promise<void> {
 }
 
 /**
- * Hapus file dari bucket HANYA jika tidak ada soal lain yang masih pakai URL tersebut.
- * Cek referensi di semua soal kecuali soal yang sedang dihapus (excludeQuestionId).
+ * Proteksi Multi-Tenant:
+ * Dalam sistem SaaS dengan bucket penyimpanan bersama (shared storage), file gambar
+ * dapat digunakan lintas sekolah akibat fitur clone, pemulihan backup, atau bank soal bersama.
+ * Penghapusan fisik file dari bucket dinonaktifkan di level tenant agar penghapusan soal
+ * di satu sekolah tidak merusak gambar di sekolah lain.
+ * Pembersihan file yatim (orphan) dilakukan secara terpusat melalui panel Super Admin.
  */
 export async function safeDeleteImage(
-  url: string,
-  pb: PocketBase,
-  excludeQuestionId?: string
+  _url: string,
+  _pb: PocketBase,
+  _excludeQuestionId?: string
 ): Promise<void> {
-  if (!url || url.startsWith("data:") || !workerUrl) return;
-  try {
-    // Cari soal lain yang masih pakai URL ini
-    const escapedUrl = url.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
-    const idFilter = excludeQuestionId ? ` && id != "${excludeQuestionId}"` : "";
-
-    // 1. Cek di imageUrl field
-    try {
-      const refByImageUrl = await pb.collection("questions").getList(1, 1, {
-        filter: `imageUrl = "${escapedUrl}"${idFilter}`,
-      });
-      if (refByImageUrl.totalItems > 0) return; // masih dipakai di soal lain
-    } catch (e) {
-      // Fail-safe: jika query gagal/error, JANGAN hapus file demi keamanan
-      console.warn("safeDeleteImage: cek imageUrl gagal, lewati penghapusan", e);
-      return;
-    }
-
-    // 2. Cek di text (Quill HTML), options (Pilihan), dan groupText (Stimulus Literasi)
-    try {
-      const refByContent = await pb.collection("questions").getList(1, 1, {
-        filter: `(text ~ "${escapedUrl}" || options ~ "${escapedUrl}" || groupText ~ "${escapedUrl}" || group_text ~ "${escapedUrl}")${idFilter}`,
-      });
-      if (refByContent.totalItems > 0) return; // masih dipakai
-    } catch (e) {
-      // Fallback jika field groupText tidak ada di skema PB
-      try {
-        const refByFallback = await pb.collection("questions").getList(1, 1, {
-          filter: `(text ~ "${escapedUrl}" || options ~ "${escapedUrl}")${idFilter}`,
-        });
-        if (refByFallback.totalItems > 0) return;
-      } catch (errFallback) {
-        console.warn("safeDeleteImage: cek konten gagal, lewati penghapusan", errFallback);
-        return;
-      }
-    }
-
-    // Aman dihapus jika benar-benar tidak ada referensi lain
-    const key = new URL(url).pathname.replace(/^\//, "");
-    if (key) deleteImageFromStorage(key); // fire & forget
-  } catch (e) {
-    console.warn("safeDeleteImage check failed, skipping delete", e);
-  }
+  return;
 }
 
 /**

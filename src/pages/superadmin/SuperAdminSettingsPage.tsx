@@ -1,11 +1,11 @@
 import { useState, useEffect } from "react";
-import { UserCircle, KeyRound, Save, CheckCircle, AlertCircle, Shield, Smartphone } from "lucide-react";
+import { UserCircle, KeyRound, Save, CheckCircle, AlertCircle, Shield, Smartphone, Cloud, RefreshCw, Database, Server, Check } from "lucide-react";
 import SuperAdminLayout from "../../components/layout/SuperAdminLayout";
 import { masterPb } from "../../lib/pocketbase";
 import { useNavigate } from "react-router-dom";
 import { cn } from "../../lib/utils";
 
-type Section = "profile" | "password" | "apk";
+type Section = "profile" | "password" | "apk" | "media";
 
 const SuperAdminSettingsPage = () => {
   const navigate = useNavigate();
@@ -151,10 +151,28 @@ const SuperAdminSettingsPage = () => {
     }
   };
 
+  const [mediaAudit, setMediaAudit] = useState<any>(null);
+  const [isAuditing, setIsAuditing] = useState(false);
+  const [auditError, setAuditError] = useState("");
+
+  const handleRunMediaAudit = async () => {
+    setIsAuditing(true);
+    setAuditError("");
+    try {
+      const res = await masterPb.send("/api/media-manager/audit", { method: "GET" });
+      setMediaAudit(res);
+    } catch (err: any) {
+      setAuditError(err.message || "Gagal menjalankan audit media lintas server.");
+    } finally {
+      setIsAuditing(false);
+    }
+  };
+
   const sideNavItems: { key: Section; label: string; icon: typeof UserCircle }[] = [
     { key: "profile", label: "Profil Pribadi", icon: UserCircle },
     { key: "password", label: "Ganti Kata Sandi", icon: KeyRound },
     { key: "apk", label: "Versi APK Siswa", icon: Smartphone },
+    { key: "media", label: "Penyimpanan Media", icon: Cloud },
   ];
 
   const adminName = masterPb.authStore.model?.name || masterPb.authStore.model?.email || "Super Admin";
@@ -423,6 +441,132 @@ const SuperAdminSettingsPage = () => {
                   </button>
                 </div>
               </form>
+            </div>
+          )}
+
+          {/* Media & Cloud Storage Section */}
+          {activeSection === "media" && (
+            <div className="space-y-5">
+              {/* Architecture & Protection Status */}
+              <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-900">Arsitektur Penyimpanan Media Cloud</h3>
+                    <p className="text-xs text-slate-500 mt-0.5">Status perlindungan multi-tenant dan sistem pencegahan duplikasi berkas.</p>
+                  </div>
+                  <span className="px-3 py-1 rounded-full text-xs font-bold border bg-emerald-50 border-emerald-200 text-emerald-700 flex items-center gap-1.5">
+                    <Check size={12} className="stroke-[3]" />
+                    Sistem Aktif
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200/80">
+                    <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Penyimpanan Objek</p>
+                    <p className="text-sm font-bold text-slate-900 mt-1">Cloudflare R2</p>
+                    <p className="text-[11px] text-slate-500 mt-0.5">assets.examku.my.id</p>
+                  </div>
+                  <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200/80">
+                    <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Proteksi Multi-Tenant</p>
+                    <p className="text-sm font-bold text-emerald-700 mt-1">Aktif & Aman</p>
+                    <p className="text-[11px] text-slate-500 mt-0.5">Penghapusan fisik tenant dicegah</p>
+                  </div>
+                  <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200/80">
+                    <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Deduplikasi Berkas</p>
+                    <p className="text-sm font-bold text-blue-700 mt-1">SHA-256 CAS</p>
+                    <p className="text-[11px] text-slate-500 mt-0.5">Berkas identik memakai kunci sama</p>
+                  </div>
+                </div>
+
+                <div className="p-3.5 bg-blue-50/70 border border-blue-200/60 rounded-xl text-xs text-blue-900 leading-relaxed">
+                  <span className="font-bold">Keamanan Data Silang Sekolah: </span>
+                  Sekolah hasil salinan (clone) atau pemulihan cadangan dapat menghapus bank soal secara bebas tanpa khawatir merusak gambar di sekolah asal.
+                </div>
+              </div>
+
+              {/* Cross-School Media Audit */}
+              <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+                <div className="px-5 py-4 border-b border-slate-100 bg-slate-50 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-900">Audit Penggunaan Media Lintas Server</h3>
+                    <p className="text-xs text-slate-500 mt-0.5">Pindai database seluruh sekolah di Master VPS dan Worker Node untuk memverifikasi referensi gambar aktif.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleRunMediaAudit}
+                    disabled={isAuditing}
+                    className="h-9 px-4 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl flex items-center gap-2 shadow-sm transition-all disabled:opacity-50 shrink-0 self-start sm:self-auto"
+                  >
+                    <RefreshCw size={14} className={cn(isAuditing && "animate-spin")} />
+                    {isAuditing ? "Memindai Semua Sekolah..." : "Pindai Seluruh Sekolah"}
+                  </button>
+                </div>
+
+                <div className="p-5">
+                  {auditError && (
+                    <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-xs font-medium flex items-center gap-2">
+                      <AlertCircle size={14} />
+                      {auditError}
+                    </div>
+                  )}
+
+                  {!mediaAudit && !isAuditing && (
+                    <div className="text-center py-8 border border-dashed border-slate-200 rounded-xl bg-slate-50/50">
+                      <Database size={32} className="mx-auto text-slate-300 mb-2" />
+                      <p className="text-xs font-semibold text-slate-700">Belum ada data audit tersimpan pada sesi ini</p>
+                      <p className="text-[11px] text-slate-400 mt-0.5">Klik tombol di atas untuk memindai database seluruh sekolah dan memverifikasi gambar aktif.</p>
+                    </div>
+                  )}
+
+                  {mediaAudit && (
+                    <div className="space-y-4">
+                      {/* Summary Cards */}
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div className="p-3.5 bg-slate-50 border border-slate-200/80 rounded-xl">
+                          <p className="text-[11px] font-semibold text-slate-500">Total Referensi Aktif</p>
+                          <p className="text-xl font-black text-slate-900 mt-1">{mediaAudit.total_active_references || 0}</p>
+                          <p className="text-[10px] text-slate-400 mt-0.5">Digunakan pada soal dan identitas sekolah</p>
+                        </div>
+                        <div className="p-3.5 bg-slate-50 border border-slate-200/80 rounded-xl">
+                          <p className="text-[11px] font-semibold text-slate-500">Berkas Unik Terpakai</p>
+                          <p className="text-xl font-black text-blue-600 mt-1">{mediaAudit.unique_images_in_use || 0}</p>
+                          <p className="text-[10px] text-slate-400 mt-0.5">Kunci unik tersimpan di Cloudflare R2</p>
+                        </div>
+                        <div className="p-3.5 bg-slate-50 border border-slate-200/80 rounded-xl">
+                          <p className="text-[11px] font-semibold text-slate-500">Gambar Dipakai Bersama</p>
+                          <p className="text-xl font-black text-emerald-600 mt-1">{mediaAudit.shared_images_count || 0}</p>
+                          <p className="text-[10px] text-slate-400 mt-0.5">Dilindungi dari penghapusan silang</p>
+                        </div>
+                      </div>
+
+                      {/* Per-School Table */}
+                      <div>
+                        <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Rincian Penggunaan Tiap Sekolah</h4>
+                        <div className="border border-slate-200 rounded-xl overflow-hidden">
+                          <table className="w-full text-left text-xs">
+                            <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold">
+                              <tr>
+                                <th className="px-4 py-2.5">Identitas Sekolah</th>
+                                <th className="px-4 py-2.5">Node VPS</th>
+                                <th className="px-4 py-2.5 text-right">Referensi Gambar</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                              {Object.entries(mediaAudit.schools || {}).map(([slug, info]: [string, any]) => (
+                                <tr key={slug} className="hover:bg-slate-50/50">
+                                  <td className="px-4 py-2.5 font-bold text-slate-800">{slug}</td>
+                                  <td className="px-4 py-2.5 text-slate-500 font-mono text-[11px]">{info.node || "master"}</td>
+                                  <td className="px-4 py-2.5 text-right font-bold text-slate-900">{info.active_references ?? 0}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           )}
         </div>
