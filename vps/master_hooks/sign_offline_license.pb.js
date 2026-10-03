@@ -39,6 +39,34 @@ routerAdd("POST", "/api/multi-vps/sign-offline-license", (c) => {
         console.log("[SignOfflineLicense] Step 5: Raw JSON:", rawJson);
 
         const result = JSON.parse(rawJson);
+
+        if (result.success && result.license) {
+            try {
+                let rec = null;
+                const existing = $app.findRecordsByFilter("offline_licenses", "slug = '" + slug.replace(/'/g, "") + "'", "-created", 1);
+                if (existing && existing.length > 0) {
+                    rec = existing[0];
+                } else {
+                    const col = $app.findCollectionByNameOrId("offline_licenses");
+                    rec = new Record(col);
+                    rec.set("slug", slug);
+                }
+                rec.set("school_name", schoolName);
+                rec.set("npsn", npsn !== "-" ? npsn : "");
+                rec.set("license_code", result.license);
+                rec.set("version", "v2");
+                rec.set("valid_until", validUntil);
+                rec.set("max_students", maxStudents);
+                rec.set("issued_at", (result.payload && result.payload.issued_at) || new Date().toISOString());
+                rec.set("notes", notes);
+                rec.set("status", "active");
+                $app.save(rec);
+                console.log("[SignOfflineLicense] Lisensi berhasil dicatat di offline_licenses:", rec.id);
+            } catch (eRecord) {
+                console.warn("[SignOfflineLicense] Gagal merekam ke offline_licenses:", eRecord);
+            }
+        }
+
         return c.json(result.success ? 200 : 400, result);
     } catch (err) {
         console.error("[SignOfflineLicense] Error:", err, err.stack);

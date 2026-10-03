@@ -1,11 +1,11 @@
 import { useState, useEffect, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import {
   Plus, Check, X, Edit, Power, PowerOff,
   School, Clock, Users, RefreshCw,
   Search, Trash2, Monitor, Zap, Server, ChevronDown,
   Building2, Globe, Sparkles, ShieldCheck, Calendar, Cpu, BookOpen,
-  Activity, CheckCircle2, XCircle, AlertTriangle, Info, KeyRound
+  Activity, CheckCircle2, XCircle, AlertTriangle, Info, KeyRound, ChevronRight
 } from "lucide-react";
 import { masterPb } from "../../lib/pocketbase";
 import SuperAdminLayout from "../../components/layout/SuperAdminLayout";
@@ -563,6 +563,33 @@ const SuperAdminDashboard = () => {
           <span className="break-all text-right opacity-70">{masterPb.baseUrl.replace('https://', '')}</span>
           <span className="mt-1 font-bold text-slate-400">{schools.length} Records</span>
         </div>
+      </div>
+
+      {/* Banner Akses Cepat Lisensi Offline */}
+      <div className="mb-6 p-4 rounded-2xl bg-gradient-to-r from-purple-50 via-indigo-50/40 to-white border border-purple-200/80 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-purple-600 flex items-center justify-center text-white flex-shrink-0 shadow-sm shadow-purple-600/20">
+            <KeyRound size={20} />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h3 className="font-bold text-slate-900 text-sm">Lisensi Server Mandiri (Offline CBT)</h3>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-700 border border-purple-200">
+                RSA-2048
+              </span>
+            </div>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Kelola izin operasional CBT lokal proktor tanpa internet: pantau tanggal penerbitan key, sisa masa aktif, dan kirim lisensi ke WhatsApp proktor.
+            </p>
+          </div>
+        </div>
+        <Link
+          to="/superadmin/offline-licenses"
+          className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-purple-600 hover:bg-purple-700 text-white shadow-sm transition-all whitespace-nowrap self-start sm:self-auto"
+        >
+          <span>Kelola Lisensi Offline</span>
+          <ChevronRight size={14} />
+        </Link>
       </div>
 
       {/* Stats Cards */}

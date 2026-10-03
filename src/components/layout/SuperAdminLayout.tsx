@@ -11,6 +11,7 @@ import {
   ChevronRight,
   FileText,
   BookOpen,
+  KeyRound,
 } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { masterPb } from "../../lib/pocketbase";
@@ -22,6 +23,7 @@ interface SuperAdminLayoutProps {
 
 const navItems = [
   { label: "Dashboard", sublabel: "Seluruh Tenant", icon: LayoutDashboard, path: "/superadmin" },
+  { label: "Lisensi Offline", sublabel: "Server Mandiri CBT", icon: KeyRound, path: "/superadmin/offline-licenses" },
   { label: "Infrastruktur", sublabel: "Status & Latensi", icon: Database, path: "/superadmin/infra" },
   { label: "Panduan Multi-VPS", sublabel: "Manual Worker Node", icon: BookOpen, path: "/superadmin/multi-vps-docs" },
   { label: "Statistik", sublabel: "Analitik Server", icon: Globe, path: "/superadmin/analytics" },

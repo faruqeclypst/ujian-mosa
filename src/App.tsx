@@ -213,6 +213,7 @@ import SuperAdminAnalyticsPage from "./pages/superadmin/SuperAdminAnalyticsPage"
 import SuperAdminSettingsPage from "./pages/superadmin/SuperAdminSettingsPage";
 import SuperAdminInvoicePage from "./pages/superadmin/SuperAdminInvoicePage";
 import SuperAdminMultiVpsDocsPage from "./pages/superadmin/SuperAdminMultiVpsDocsPage";
+import SuperAdminOfflineLicensesPage from "./pages/superadmin/SuperAdminOfflineLicensesPage";
 
 const LandingContent = () => {
   useEffect(() => {
@@ -231,6 +232,9 @@ const LandingContent = () => {
         <Route path="/superadmin" element={<SuperAdminDashboard />} />
         <Route path="/super_admin" element={<Navigate to="/superadmin" replace />} />
         <Route path="/super_admin/*" element={<Navigate to="/superadmin" replace />} />
+        <Route path="/superadmin/offline-licenses" element={<SuperAdminOfflineLicensesPage />} />
+        <Route path="/superadmin/offline_licenses" element={<Navigate to="/superadmin/offline-licenses" replace />} />
+        <Route path="/superadmin/offline" element={<Navigate to="/superadmin/offline-licenses" replace />} />
         <Route path="/superadmin/infra" element={<SuperAdminInfraPage />} />
         <Route path="/superadmin/analytics" element={<SuperAdminAnalyticsPage />} />
         <Route path="/superadmin/settings" element={<SuperAdminSettingsPage />} />
