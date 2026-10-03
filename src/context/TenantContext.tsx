@@ -92,9 +92,10 @@ function resolveSlugFromUrl(): { slug: string | null; customDomain: string | nul
     return { slug: devSlug, customDomain: null, isLanding: false };
   }
 
-  // Cek apakah hostname adalah IP address lokal / LAN (Server Offline CBT)
+  // Cek apakah hostname adalah IP address lokal / LAN atau localhost non-dev (Server Offline CBT)
   const isPrivateIp = /^(192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+)$/.test(hostname);
-  if (isPrivateIp) {
+  const isLocalOfflinePort = (hostname === 'localhost' || hostname === '127.0.0.1') && window.location.port !== '5173';
+  if (isPrivateIp || isLocalOfflinePort) {
     return { slug: 'local', customDomain: hostname, isLanding: false };
   }
 
@@ -375,6 +376,21 @@ export const TenantProvider = ({ children }: { children: ReactNode }) => {
 
   const refreshSchool = async () => {
     if (!school?.id) return;
+    if (school.id === 'local_server') {
+      try {
+        const localPb = getSchoolPb(window.location.origin);
+        const settingsRes = await localPb.collection('settings').getList(1, 1);
+        const sData = settingsRes.items[0];
+        setSchool(prev => prev ? ({
+          ...prev,
+          name: sData?.name || prev.name,
+          logo_url: sData?.logoUrl || sData?.logo || prev.logo_url
+        }) : prev);
+      } catch (e) {
+        console.warn('Gagal refresh local server settings:', e);
+      }
+      return;
+    }
     try {
       const updated = await masterPb.collection('schools').getOne<SchoolRecord>(school.id);
       setSchool(updated);
