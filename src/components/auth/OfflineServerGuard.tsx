@@ -20,7 +20,24 @@ export const OfflineServerGuard: React.FC<{ children: React.ReactNode }> = ({ ch
     setChecking(true);
     let code = typeof window !== "undefined" ? localStorage.getItem("exam_offline_license") : null;
 
-    // Jika belum ada di localStorage, cek dari tabel settings di PocketBase lokal
+    // Cek dari database server (selalu prioritaskan database server agar berlaku untuk semua browser & komputer lab)
+    if (!code) {
+      try {
+        const resp = await fetch(`${window.location.origin}/api/collections/settings/records?limit=1`);
+        if (resp.ok) {
+          const data = await resp.json();
+          if (data.items && data.items.length > 0 && data.items[0].offline_license) {
+            code = data.items[0].offline_license;
+            if (code) {
+              localStorage.setItem("exam_offline_license", code);
+            }
+          }
+        }
+      } catch (err) {
+        console.warn("Gagal membaca offline_license via direct server fetch:", err);
+      }
+    }
+
     if (!code && pb) {
       try {
         const res = await pb.collection("settings").getList(1, 1);

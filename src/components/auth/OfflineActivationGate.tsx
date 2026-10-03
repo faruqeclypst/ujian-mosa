@@ -55,18 +55,36 @@ export const OfflineActivationGate: React.FC<OfflineActivationGateProps> = ({
 
     setVerifiedPayload(res.payload!);
 
-    // Simpan lisensi ke PocketBase settings lokal jika tersedia
+    // Simpan lisensi ke server PocketBase (database server) agar permanen untuk semua browser & komputer peserta di LAN
+    const cleanLicense = licenseInput.trim();
+    const schoolName = res.payload?.school_name || "";
+
+    // 1. Coba via hook /api/offline-activate
+    try {
+      await fetch(`${window.location.origin}/api/offline-activate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          license: cleanLicense,
+          school_name: schoolName
+        })
+      });
+    } catch (e) {
+      console.warn("Hook /api/offline-activate tidak tersedia, mencoba direct settings update:", e);
+    }
+
+    // 2. Coba via direct PB settings update
     if (pb) {
       try {
         const settingsList = await pb.collection("settings").getList(1, 1);
         if (settingsList.items.length > 0) {
           await pb.collection("settings").update(settingsList.items[0].id, {
-            offline_license: licenseInput.trim(),
-            name: res.payload?.school_name || settingsList.items[0].name
+            offline_license: cleanLicense,
+            name: schoolName || settingsList.items[0].name
           });
         }
       } catch (err) {
-        console.warn("Gagal menyimpan ke pb settings lokal, menyimpan ke localStorage:", err);
+        console.warn("Gagal update pb settings lokal:", err);
       }
     }
 
