@@ -30,6 +30,7 @@ import {
 import { useTenant } from "../context/TenantContext";
 import { useTheme } from "../context/ThemeContext";
 import { useExamData } from "../context/ExamDataContext";
+import { OfflineLicenseStatusCard } from "../components/admin/OfflineLicenseStatusCard";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
   AreaChart, Area, PieChart, Pie, Cell,
@@ -1331,10 +1332,16 @@ const DashboardPage = () => {
 
             {/* Plan Badge */}
             <div className="inline-flex items-center gap-2 text-xs font-semibold bg-slate-50 dark:bg-slate-800/80 border border-slate-200/70 dark:border-slate-700/60 text-slate-700 dark:text-slate-300 px-3 py-1 rounded-lg">
-              <span className="font-bold text-blue-600 dark:text-blue-400">{planName}</span>
+              <span className="font-bold text-blue-600 dark:text-blue-400">
+                {school?.plan === "offline" || school?.id === "local_server" ? "Offline Mandiri" : planName}
+              </span>
               <span className="text-slate-300 dark:text-slate-700">•</span>
               <span className="text-slate-500 dark:text-slate-400 font-medium">
-                {quota.toLocaleString("id-ID")} {terminology.student}
+                {school?.plan === "offline" || school?.id === "local_server" ? (
+                  <span className="text-emerald-600 dark:text-emerald-400 font-semibold">Tanpa Batas Kuota</span>
+                ) : (
+                  `${quota.toLocaleString("id-ID")} ${terminology.student}`
+                )}
               </span>
             </div>
 
@@ -1436,7 +1443,7 @@ const DashboardPage = () => {
           </div>
         )}
 
-        {!subscriptionStatus?.isSuspended && !subscriptionStatus?.isGracePeriod && activeUntilInfo.isExpiringSoon && (
+        {!subscriptionStatus?.isSuspended && !subscriptionStatus?.isGracePeriod && activeUntilInfo.isExpiringSoon && school?.id !== "local_server" && school?.plan !== "offline" && (
           <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900/60 rounded-xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-blue-900 dark:text-blue-200">
             <div className="flex items-center gap-2">
               <Clock size={15} className="text-blue-600 dark:text-blue-400 flex-shrink-0" />
@@ -1462,6 +1469,9 @@ const DashboardPage = () => {
             </div>
           </div>
         )}
+
+        {/* Kartu Informasi Lisensi Server Offline Mandiri & Aktivator */}
+        <OfflineLicenseStatusCard />
       </div>
 
       {/* ── Reorderable Panels (Drag and Drop) ── */}

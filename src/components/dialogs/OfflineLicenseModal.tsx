@@ -45,7 +45,6 @@ export const OfflineLicenseModal: React.FC<OfflineLicenseModalProps> = ({
 }) => {
   const { addToast } = useToast();
   const [validUntil, setValidUntil] = useState("");
-  const [maxStudents, setMaxStudents] = useState<number>(300);
   const [npsn, setNpsn] = useState("");
   const [notes, setNotes] = useState("Izin Ujian Laboratorium Sekolah");
   const [generatedLicense, setGeneratedLicense] = useState<string | null>(null);
@@ -62,7 +61,6 @@ export const OfflineLicenseModal: React.FC<OfflineLicenseModalProps> = ({
         nextSixMonths.setMonth(nextSixMonths.getMonth() + 6);
         setValidUntil(nextSixMonths.toISOString().split("T")[0]);
       }
-      setMaxStudents(school.student_quota || 300);
       setGeneratedLicense(null);
     }
   }, [school, open]);
@@ -80,7 +78,7 @@ export const OfflineLicenseModal: React.FC<OfflineLicenseModalProps> = ({
       slug: school.slug,
       npsn: npsn.trim() || undefined,
       valid_until: validUntil,
-      max_students: Number(maxStudents) || 300,
+      max_students: 0, // 0 = tanpa batas kuota untuk server offline
       issued_at: new Date().toISOString(),
       notes: notes.trim()
     };
@@ -117,7 +115,7 @@ export const OfflineLicenseModal: React.FC<OfflineLicenseModalProps> = ({
 
   const handleSendWA = () => {
     if (!generatedLicense) return;
-    const text = `Halo Admin/Proktor *${school.name}*,\n\nBerikut adalah *Kode Lisensi Izin Server Offline (EXAM AA)* Anda:\n\n*Batas Masa Aktif:* ${validUntil}\n*Maksimal Siswa:* ${maxStudents} Siswa\n*Kode Lisensi:*\n\`\`\`${generatedLicense}\`\`\`\n\nSilakan masukkan kode ini di halaman aktivasi server lokal PC proktor Anda.`;
+    const text = `Halo Admin/Proktor *${school.name}*,\n\nBerikut adalah *Kode Lisensi Izin Server Offline (EXAM AA)* Anda:\n\n*Batas Masa Aktif:* ${validUntil}\n*Kapasitas Siswa:* Tanpa Batas Kuota (Mandiri)\n*Kode Lisensi:*\n\`\`\`${generatedLicense}\`\`\`\n\nSilakan masukkan kode ini di halaman aktivasi server lokal PC proktor Anda.`;
     const waUrl = `https://wa.me/?text=${encodeURIComponent(text)}`;
     window.open(waUrl, "_blank");
   };
@@ -168,21 +166,6 @@ export const OfflineLicenseModal: React.FC<OfflineLicenseModalProps> = ({
             </div>
 
             <div>
-              <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
-                Batas Kuota Siswa Offline
-              </label>
-              <Input
-                type="number"
-                min={10}
-                max={5000}
-                value={maxStudents}
-                onChange={(e) => setMaxStudents(parseInt(e.target.value) || 0)}
-                placeholder="300"
-                className="h-10 rounded-xl text-xs"
-              />
-            </div>
-
-            <div>
               <div className="flex items-center justify-between mb-1">
                 <label className="font-bold text-slate-700 dark:text-slate-300">
                   NPSN Sekolah (Opsional / Custom)
@@ -225,7 +208,7 @@ export const OfflineLicenseModal: React.FC<OfflineLicenseModalProps> = ({
               />
             </div>
 
-            <div>
+            <div className="col-span-1 sm:col-span-2">
               <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
                 Keterangan / Keperluan
               </label>
@@ -233,7 +216,7 @@ export const OfflineLicenseModal: React.FC<OfflineLicenseModalProps> = ({
                 type="text"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                placeholder="Misal: Ujian Semester Ganjil"
+                placeholder="Misal: Izin Ujian Laboratorium Sekolah"
                 className="h-10 rounded-xl text-xs"
               />
             </div>

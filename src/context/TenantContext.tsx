@@ -8,7 +8,7 @@ import {
 } from 'react';
 import PocketBase from 'pocketbase';
 import { masterPb, getSchoolPb } from '../lib/pocketbase';
-import { verifyOfflineLicense } from '../utils/offlineLicenseHelper';
+import { verifyOfflineLicense, OfflineLicensePayload } from '../utils/offlineLicenseHelper';
 
 // ============================================================
 // Types
@@ -59,6 +59,9 @@ export interface SchoolRecord {
   active_until?: string;
   server_host?: string;
   created?: string;
+  npsn?: string;
+  offline_license?: string;
+  offline_license_payload?: OfflineLicensePayload;
 }
 
 import { getSubscriptionStatus, SubscriptionStatusInfo } from '../utils/subscriptionHelper';
@@ -220,29 +223,45 @@ export const TenantProvider = ({ children }: { children: ReactNode }) => {
           let schoolName = 'EXAM AA - Server Lokal';
           let logoUrl = '';
 
-          // 1. Cek apakah ada lisensi offline tersimpan di browser untuk nama resmi sekolah
-          const savedLicense = typeof window !== 'undefined' ? localStorage.getItem('exam_offline_license') : null;
-          if (savedLicense) {
-            try {
-              const res = await verifyOfflineLicense(savedLicense);
-              if (res.payload?.school_name) {
-                schoolName = res.payload.school_name;
-              }
-            } catch {}
-          }
+          let activeLicenseCode = '';
+          let licensePayload: OfflineLicensePayload | undefined = undefined;
 
-          // 2. Cek database tabel settings lokal
+          // 1. Cek database tabel settings server lokal terlebih dahulu
           try {
             const settingsRes = await localPb.collection('settings').getList(1, 1);
             if (settingsRes.items.length > 0) {
               const sData = settingsRes.items[0];
-              if (!savedLicense && sData.name) {
+              if ((sData as any).offline_license) {
+                activeLicenseCode = (sData as any).offline_license;
+              }
+              if (sData.name) {
                 schoolName = sData.name;
               }
               logoUrl = sData.logoUrl || sData.logo || '';
             }
           } catch (e) {
             console.warn('[TenantContext] Settings lokal belum terbaca:', e);
+          }
+
+          // 2. Cek localStorage browser jika database belum ada
+          if (!activeLicenseCode && typeof window !== 'undefined') {
+            activeLicenseCode = localStorage.getItem('exam_offline_license') || '';
+          }
+
+          // 3. Verifikasi lisensi dan ambil detail izin
+          if (activeLicenseCode) {
+            try {
+              const res = await verifyOfflineLicense(activeLicenseCode);
+              if (res.payload) {
+                licensePayload = res.payload;
+                if (res.payload.school_name) {
+                  schoolName = res.payload.school_name;
+                }
+                if (typeof window !== 'undefined') {
+                  localStorage.setItem('exam_offline_license', activeLicenseCode);
+                }
+              }
+            } catch {}
           }
 
           const localSchool: SchoolRecord = {
@@ -253,6 +272,11 @@ export const TenantProvider = ({ children }: { children: ReactNode }) => {
             type: 'school',
             is_active: true,
             logo_url: logoUrl,
+            plan: 'offline',
+            active_until: licensePayload?.valid_until || '',
+            npsn: licensePayload?.npsn || '',
+            offline_license: activeLicenseCode,
+            offline_license_payload: licensePayload,
           };
 
           setCachedSchool(cacheKey, localSchool);
@@ -434,22 +458,49 @@ export const TenantProvider = ({ children }: { children: ReactNode }) => {
     if (school.id === 'local_server' || slug === 'local') {
       try {
         let schoolName = school.name;
-        const savedLicense = typeof window !== 'undefined' ? localStorage.getItem('exam_offline_license') : null;
-        if (savedLicense) {
-          try {
-            const res = await verifyOfflineLicense(savedLicense);
-            if (res.payload?.school_name) {
-              schoolName = res.payload.school_name;
-            }
-          } catch {}
-        }
+        let activeLicenseCode = '';
+        let licensePayload: OfflineLicensePayload | undefined = undefined;
+
         const localPb = getSchoolPb(window.location.origin);
         const settingsRes = await localPb.collection('settings').getList(1, 1);
         const sData = settingsRes.items[0];
+        if (sData) {
+          if ((sData as any).offline_license) {
+            activeLicenseCode = (sData as any).offline_license;
+          }
+          if (sData.name) {
+            schoolName = sData.name;
+          }
+        }
+
+        if (!activeLicenseCode && typeof window !== 'undefined') {
+          activeLicenseCode = localStorage.getItem('exam_offline_license') || '';
+        }
+
+        if (activeLicenseCode) {
+          try {
+            const res = await verifyOfflineLicense(activeLicenseCode);
+            if (res.payload) {
+              licensePayload = res.payload;
+              if (res.payload.school_name) {
+                schoolName = res.payload.school_name;
+              }
+              if (typeof window !== 'undefined') {
+                localStorage.setItem('exam_offline_license', activeLicenseCode);
+              }
+            }
+          } catch {}
+        }
+
         setSchool(prev => prev ? ({
           ...prev,
           name: schoolName || sData?.name || prev.name,
-          logo_url: sData?.logoUrl || sData?.logo || prev.logo_url
+          logo_url: sData?.logoUrl || sData?.logo || prev.logo_url,
+          plan: 'offline',
+          active_until: licensePayload?.valid_until || prev.active_until || '',
+          npsn: licensePayload?.npsn || prev.npsn || '',
+          offline_license: activeLicenseCode || prev.offline_license,
+          offline_license_payload: licensePayload || prev.offline_license_payload,
         }) : prev);
       } catch (e) {
         console.warn('Gagal refresh local server settings:', e);
