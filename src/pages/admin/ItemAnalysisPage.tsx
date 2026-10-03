@@ -1278,7 +1278,7 @@ export const ItemAnalysisPage: React.FC = () => {
 
     const mainRows: any[][] = [
       [{ v: `LAPORAN ANALISIS BUTIR SOAL & DAYA PEMBEDA (CLASSICAL TEST THEORY): ${examMeta.title}`, s: STYLES.title }],
-      [{ v: `Sekolah: ${school?.name || "SMA Negeri Modal Bangsa"} | Ruangan: ${examMeta.roomName}`, s: { font: { bold: true, sz: 10 } } }],
+      [{ v: `Sekolah: ${school?.name || "Sekolah"} | Ruangan: ${examMeta.roomName}`, s: { font: { bold: true, sz: 10 } } }],
       [{ v: `Mata Pelajaran: ${examMeta.subjectName} | Guru Pengampu: ${examMeta.teacherName}`, s: { font: { italic: true, sz: 10 } } }],
       [{ v: `Total Peserta: ${examMeta.totalParticipants} Siswa | Kelompok Atas (27%): ${examMeta.upperCount} Siswa | Kelompok Bawah (27%): ${examMeta.lowerCount} Siswa`, s: { font: { italic: true, sz: 10 } } }],
       [{ v: `Standar Psikometri: Classical Test Theory (CTT), Kelley's 27% Rule, Robert L. Ebel, & Point-Biserial Correlation`, s: { font: { italic: true, sz: 9, color: { rgb: "64748B" } } } }],
@@ -1443,7 +1443,7 @@ export const ItemAnalysisPage: React.FC = () => {
     // Sheet 3: Rekapitulasi & Statistik Ujian (3-Layer CTT)
     const recapRows: any[][] = [
       [{ v: `REKAPITULASI LAPORAN ANALISIS BUTIR SOAL (CLASSICAL TEST THEORY)`, s: STYLES.title }],
-      [{ v: `Sekolah: ${school?.name || "SMA Negeri Modal Bangsa"}`, s: { font: { bold: true, sz: 11 } } }],
+      [{ v: `Sekolah: ${school?.name || "Sekolah"}`, s: { font: { bold: true, sz: 11 } } }],
       [{ v: `Ujian: ${examMeta.title} | Mata Pelajaran: ${examMeta.subjectName} | Guru Pengampu: ${examMeta.teacherName}`, s: { font: { italic: true, sz: 10 } } }],
       [{ v: `Ruangan: ${examMeta.roomName} | Tanggal Ekspor: ${new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}`, s: { font: { italic: true, sz: 9, color: { rgb: "64748B" } } } }],
       [],
@@ -1452,7 +1452,7 @@ export const ItemAnalysisPage: React.FC = () => {
       [{ v: "Ukuran Sampel Kelompok Ekstrem (n)", s: STYLES.cell }, { v: `${examMeta.upperCount} Siswa`, s: STYLES.cellCenter }, { v: "Proporsi 27% Atas dan 27% Bawah (Kelley's Rule)", s: STYLES.cell }],
       [{ v: "Total Butir Soal Teranalisis", s: STYLES.cell }, { v: `${analyzedQuestions.length} Butir`, s: STYLES.cellCenter }, { v: "Seluruh butir soal dalam paket ujian", s: STYLES.cell }],
       [{ v: "Rata-rata Tingkat Kesukaran (P)", s: STYLES.cell }, { v: stats.avgP, s: STYLES.cellCenter }, { v: `${getDifficultyCategory(stats.avgP)} (Distribusi: ${stats.pDist.mudah} Mudah, ${stats.pDist.sedang} Sedang, ${stats.pDist.sukar} Sukar)`, s: STYLES.cell }],
-      [{ v: "Rata-rata Daya Pembeda (D)", s: STYLES.cell }, { v: stats.avgD >= 0 ? `+${stats.avgD}` : stats.avgD, s: STYLES.cellCenter }, { v: `${getDiscriminationCategory(stats.avgD)} (Pedoman Robert L. Ebel)`, s: STYLES.cell }],
+      [{ v: "Rata-rata Daya Pembeda (D)", s: STYLES.cell }, { v: stats.avgD >= 0 ? `+${stats.avgD}` : stats.avgD, s: STYLES.cellCenter }, { v: `${getDifficultyCategory(stats.avgD)} (Pedoman Robert L. Ebel)`, s: STYLES.cell }],
       [{ v: "Rata-rata Point-Biserial (r_pb)", s: STYLES.cell }, { v: stats.avgRpb >= 0 ? `+${stats.avgRpb}` : stats.avgRpb, s: STYLES.cellCenter }, { v: `${getPointBiserialCategory(stats.avgRpb)} (Corrected Item-Total Correlation)`, s: STYLES.cell }],
       [{ v: "Rata-rata Efektivitas Pengecoh (DE%)", s: STYLES.cell }, { v: `${stats.avgDE}%`, s: STYLES.cellCenter }, { v: "Persentase pengecoh berfungsi memenuhi syarat psikometri", s: STYLES.cell }],
       [],
@@ -1505,7 +1505,7 @@ export const ItemAnalysisPage: React.FC = () => {
         <div className="flex items-center justify-between gap-4 pb-3 border-b border-slate-300">
           <div>
             <h2 className="text-base font-black uppercase tracking-wider text-slate-900">
-              {school?.name || "SMA NEGERI MODAL BANGSA"}
+              {school?.name || "SEKOLAH INDEPENDEN"}
             </h2>
             <p className="text-xs text-slate-600">
               Sistem Penjaminan Mutu &amp; Analisis Psikometri Classical Test Theory (CTT)

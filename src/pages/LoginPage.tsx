@@ -44,6 +44,9 @@ const LoginPage = () => {
 
   useEffect(() => {
     const fetchSettings = async () => {
+      if (school?.name) {
+        setSchoolName(school.name);
+      }
       if (!pb) { setLogoLoading(false); return; }
       try {
         setLogoLoading(true);
@@ -61,9 +64,12 @@ const LoginPage = () => {
             logoUrl = pb.files.getUrl(data, logoUrl);
           }
           setSchoolLogo(logoUrl);
+        } else if (school?.name) {
+          setSchoolName(school.name);
         }
       } catch (err) {
         console.error("Gagal memuat logo (Cek API Rules koleksi settings di PocketBase):", err);
+        if (school?.name) setSchoolName(school.name);
         setLogoError(true);
       } finally {
         setLogoLoading(false);
@@ -71,7 +77,7 @@ const LoginPage = () => {
     };
 
     fetchSettings();
-  }, []);
+  }, [pb, school?.name]);
 
   const {
     register,
@@ -248,8 +254,11 @@ const LoginPage = () => {
               <CardTitle className="text-xl sm:text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent dark:from-white dark:to-gray-300">
                 Selamat Datang Kembali
               </CardTitle>
-              <CardDescription className="mt-1 sm:mt-2 text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-                Masuk ke dashboard dengan akun admin Anda
+              <p className="text-xs sm:text-sm font-semibold text-blue-600 dark:text-blue-400 mt-1">
+                {schoolName || school?.name || "Portal Administrasi CBT"}
+              </p>
+              <CardDescription className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                Masuk ke dashboard dengan akun admin / proktor Anda
               </CardDescription>
             </motion.div>
           </CardHeader>
@@ -268,12 +277,12 @@ const LoginPage = () => {
                 animate={{ x: 0, opacity: 1 }}
                 transition={{ delay: 0.5 }}
               >
-                <FormField id="username" label="Username" error={errors.username}>
+                <FormField id="username" label="Email atau Username" error={errors.username}>
                   <div className="relative">
                     <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
                     <Input
                       id="username"
-                      placeholder="Masukkan username admin"
+                      placeholder="proktor@exam.local atau admin"
                       autoComplete="username"
                       className="pl-10 rounded-xl border-gray-200 bg-gray-50/50 transition-all focus:bg-white focus:ring-2 focus:ring-blue-500/20 dark:border-gray-700 dark:bg-gray-800/50 dark:focus:bg-gray-800"
                       {...register("username")}

@@ -83,10 +83,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signInWithUsername = useCallback(
     async (username: string, password: string) => {
       if (!pb) throw new Error("Koneksi ke sekolah belum tersedia.");
+      const identity = username.trim();
       try {
-        await pb.collection("users").authWithPassword(username, password);
+        try {
+          await pb.collection("users").authWithPassword(identity, password);
+        } catch (firstErr: any) {
+          if (!identity.includes("@")) {
+            // Coba dengan format email proktor / admin offline
+            await pb.collection("users").authWithPassword(`${identity}@exam.local`, password);
+          } else {
+            throw firstErr;
+          }
+        }
       } catch (err: any) {
-        throw new Error(err.message || "Email atau Password Admin salah!");
+        throw new Error(err.message || "Email/Username atau Password Admin salah!");
       }
     },
     [pb]

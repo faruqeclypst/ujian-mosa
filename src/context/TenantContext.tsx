@@ -8,6 +8,7 @@ import {
 } from 'react';
 import PocketBase from 'pocketbase';
 import { masterPb, getSchoolPb } from '../lib/pocketbase';
+import { verifyOfflineLicense } from '../utils/offlineLicenseHelper';
 
 // ============================================================
 // Types
@@ -212,6 +213,60 @@ export const TenantProvider = ({ children }: { children: ReactNode }) => {
     }
 
     const resolveSchool = async () => {
+      // 0. Mode Server Mandiri / Standalone Offline CBT
+      if (slug === 'local') {
+        try {
+          const localPb = getSchoolPb(window.location.origin);
+          let schoolName = 'EXAM AA - Server Lokal';
+          let logoUrl = '';
+
+          // 1. Cek apakah ada lisensi offline tersimpan di browser untuk nama resmi sekolah
+          const savedLicense = typeof window !== 'undefined' ? localStorage.getItem('exam_offline_license') : null;
+          if (savedLicense) {
+            try {
+              const res = await verifyOfflineLicense(savedLicense);
+              if (res.payload?.school_name) {
+                schoolName = res.payload.school_name;
+              }
+            } catch {}
+          }
+
+          // 2. Cek database tabel settings lokal
+          try {
+            const settingsRes = await localPb.collection('settings').getList(1, 1);
+            if (settingsRes.items.length > 0) {
+              const sData = settingsRes.items[0];
+              if (!savedLicense && sData.name) {
+                schoolName = sData.name;
+              }
+              logoUrl = sData.logoUrl || sData.logo || '';
+            }
+          } catch (e) {
+            console.warn('[TenantContext] Settings lokal belum terbaca:', e);
+          }
+
+          const localSchool: SchoolRecord = {
+            id: 'local_server',
+            name: schoolName,
+            slug: 'local',
+            pb_url: window.location.origin,
+            type: 'school',
+            is_active: true,
+            logo_url: logoUrl,
+          };
+
+          setCachedSchool(cacheKey, localSchool);
+          setSchool(localSchool);
+          setPb(localPb);
+          setNotFound(false);
+          setInactive(false);
+          setLoading(false);
+          return;
+        } catch (err) {
+          console.error('[TenantContext] Gagal inisialisasi server lokal offline:', err);
+        }
+      }
+
       const devSlug = import.meta.env.VITE_DEV_SCHOOL_SLUG;
       const isDev = import.meta.env.DEV;
 
@@ -376,14 +431,24 @@ export const TenantProvider = ({ children }: { children: ReactNode }) => {
 
   const refreshSchool = async () => {
     if (!school?.id) return;
-    if (school.id === 'local_server') {
+    if (school.id === 'local_server' || slug === 'local') {
       try {
+        let schoolName = school.name;
+        const savedLicense = typeof window !== 'undefined' ? localStorage.getItem('exam_offline_license') : null;
+        if (savedLicense) {
+          try {
+            const res = await verifyOfflineLicense(savedLicense);
+            if (res.payload?.school_name) {
+              schoolName = res.payload.school_name;
+            }
+          } catch {}
+        }
         const localPb = getSchoolPb(window.location.origin);
         const settingsRes = await localPb.collection('settings').getList(1, 1);
         const sData = settingsRes.items[0];
         setSchool(prev => prev ? ({
           ...prev,
-          name: sData?.name || prev.name,
+          name: schoolName || sData?.name || prev.name,
           logo_url: sData?.logoUrl || sData?.logo || prev.logo_url
         }) : prev);
       } catch (e) {

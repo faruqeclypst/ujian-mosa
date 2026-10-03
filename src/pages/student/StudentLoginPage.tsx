@@ -35,6 +35,9 @@ const StudentLoginPage = () => {
 
   useEffect(() => {
     const fetchSettings = async () => {
+      if (school?.name) {
+        setSchoolName(school.name);
+      }
       if (!pb) { setLogoLoading(false); return; }
       try {
         setLogoLoading(true);
@@ -54,9 +57,12 @@ const StudentLoginPage = () => {
 
           setSchoolLogo(logoUrl);
           setLogoError(false);
+        } else if (school?.name) {
+          setSchoolName(school.name);
         }
       } catch (err) {
         console.error(`Gagal memuat logo ${terminology.student.toLowerCase()} (Cek API Rules koleksi settings di PocketBase):`, err);
+        if (school?.name) setSchoolName(school.name);
         setLogoError(true);
       } finally {
         setLogoLoading(false);
@@ -64,7 +70,7 @@ const StudentLoginPage = () => {
     };
 
     fetchSettings();
-  }, []);
+  }, [pb, school?.name]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -181,7 +187,7 @@ const StudentLoginPage = () => {
           <div className="flex items-center justify-center gap-2">
             <GraduationCap size={18} className="text-emerald-600" />
             <p className="text-slate-500 dark:text-slate-400 font-medium text-sm md:text-base">
-              {schoolName || "SMAN Modal Bangsa Aceh"}
+              {schoolName || school?.name || "Portal Ujian Siswa"}
             </p>
           </div>
         </div>
