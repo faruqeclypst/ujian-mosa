@@ -18,18 +18,18 @@ err()  { echo -e "${RED}[✗]${NC} $1"; exit 1; }
 PB_VERSION="0.36.9"
 PB_URL="https://github.com/pocketbase/pocketbase/releases/download/v${PB_VERSION}/pocketbase_${PB_VERSION}_linux_amd64.zip"
 
-MASTER_DOMAIN="db.alfaruqasri.my.id"          # Master PocketBase (registry)
-SCHOOL1_DOMAIN="db-sman.alfaruqasri.my.id"    # PocketBase SMAN Modal Bangsa
-SCHOOL1_SLUG="sman-modalbangsa"
+MASTER_DOMAIN="examku.my.id"                 # Master PocketBase (registry)
+SCHOOL1_DOMAIN="modalbangsa.examku.my.id"     # PocketBase SMAN Modal Bangsa
+SCHOOL1_SLUG="modalbangsa"
 
-FRONTEND_DOMAIN="*.alfaruqasri.my.id"        # Wildcard untuk sekolah
-LANDING_DOMAIN="examku.my.id"           # Landing & super admin
-ROOT_DOMAIN="alfaruqasri.my.id"              # Root domain
+FRONTEND_DOMAIN="*.examku.my.id"              # Wildcard untuk sekolah
+LANDING_DOMAIN="examku.my.id"                 # Landing & super admin
+ROOT_DOMAIN="examku.my.id"                    # Root domain
 
 # KONFIGURASI TEMPLATE
 TEMPLATE_DIR="/opt/pocketbase/schools/template"
 
-EMAIL="admin@alfaruqasri.my.id"               # Email untuk SSL otomatis
+EMAIL="admin@examku.my.id"                    # Email untuk SSL otomatis
 
 MASTER_PORT=8090
 SCHOOL1_PORT=8091
