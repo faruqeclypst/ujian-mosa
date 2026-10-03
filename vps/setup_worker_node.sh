@@ -40,7 +40,8 @@ fi
 
 # 3. Buka port firewall jika UFW aktif
 if command -v ufw >/dev/null 2>&1; then
-  ufw allow proto tcp from 64.235.41.108 to any port 8091:8150 >/dev/null 2>&1 || true
+  ufw allow proto tcp from 64.235.41.108 to any port 8090:8200 >/dev/null 2>&1 || true
+  ufw allow 8791/tcp >/dev/null 2>&1 || true
 fi
 
 # 2. Siapkan folder PocketBase template
