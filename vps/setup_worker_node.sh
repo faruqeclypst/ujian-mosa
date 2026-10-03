@@ -139,6 +139,11 @@ echo "[worker-remove-school] Tenant $SLUG berhasil dihapus dari Worker Node."
 EOF
 chmod +x /usr/local/bin/remove-school.sh
 
+# 6. Pasang script monitoring kesehatan VPS (vps-health.py)
+info "Memasang tool monitoring vps-health.py..."
+curl -sSL https://raw.githubusercontent.com/faruqeclypst/ujian-mosa/feature/saas-v2/scripts/vps_health.py -o /usr/local/bin/vps-health.py 2>/dev/null || true
+chmod +x /usr/local/bin/vps-health.py 2>/dev/null || true
+
 log "Worker Node berhasil disiapkan!"
 echo ""
 echo "============================================================"

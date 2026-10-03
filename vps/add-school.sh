@@ -71,6 +71,8 @@ CADDY
   # Otomasi via SSH jika key sudah terpasang
   if ssh -o BatchMode=yes -o ConnectTimeout=3 -o StrictHostKeyChecking=no root@"$SERVER_HOST" "true" 2>/dev/null; then
     echo "[add-school] SSH aktif ke $SERVER_HOST, sinkronisasi master template..."
+    scp -o StrictHostKeyChecking=no /usr/local/bin/vps-health.py root@"$SERVER_HOST":/usr/local/bin/vps-health.py 2>/dev/null || true
+    ssh -o BatchMode=yes root@"$SERVER_HOST" "chmod +x /usr/local/bin/vps-health.py 2>/dev/null || true"
     rsync -az --delete /opt/pocketbase/schools/template/ root@"$SERVER_HOST":/opt/pocketbase/schools/template/ 2>/dev/null || true
     
     # Jika data sekolah sudah ada di Master VPS (misal edit atau migrasi), salin ke Worker
