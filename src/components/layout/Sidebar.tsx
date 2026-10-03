@@ -19,6 +19,7 @@ import {
   AlertCircle,
   CheckCircle2,
   Sparkles,
+  Activity,
 } from "lucide-react";
 import * as React from "react";
 
@@ -205,6 +206,7 @@ const Sidebar = () => {
       children: [
         { to: "/admin/invoice", label: "Invoice", icon: FileText, badge: unpaidCount > 0 ? "Belum Bayar" : null },
         { to: "/admin/kelola-akun", label: "Kelola Akun", icon: ShieldAlert },
+        { to: "/admin/status-server", label: "Status Server", icon: Activity },
         { to: "/admin/pengaturan", label: "Pengaturan", icon: Settings }
       ]
     },

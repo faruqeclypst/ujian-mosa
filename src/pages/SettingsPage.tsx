@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { useTenant } from "../context/TenantContext";
 import { masterPb } from "../lib/pocketbase";
 import { uploadInventoryImage, deleteImageFromStorage } from "../lib/storage";
@@ -41,7 +42,9 @@ import {
   Info,
   ChevronDown,
   ChevronUp,
-  Server
+  Server,
+  Activity,
+  ArrowRight
 } from "lucide-react";
 import { getSchoolDomain, getSchoolUrl } from "../utils/domainHelper";
 
@@ -59,6 +62,7 @@ const COLLECTIONS = [
 ];
 
 const SettingsPage = () => {
+  const navigate = useNavigate();
   const { pb, school, terminology } = useTenant();
 
   const [settingsId, setSettingsId] = useState<string | null>(null);
@@ -1457,6 +1461,33 @@ const SettingsPage = () => {
                 <ThemeToggle />
               </div>
             </CardContent>
+          </Card>
+
+          {/* ── Status Server & VPS Card ── */}
+          <Card className="rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900 p-5 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400">
+                  <Activity size={16} />
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-slate-900 dark:text-white">Status Server & VPS</h4>
+                  <p className="text-[10px] text-slate-400">Monitor CPU, RAM, & Uptime</p>
+                </div>
+              </div>
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+            </div>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+              Pantau performa real-time server sekolah Anda saat ujian online serentak berlangsung.
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => navigate("/admin/status-server")}
+              className="w-full h-9 rounded-xl text-xs font-bold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 border-blue-200 dark:border-blue-800"
+            >
+              Buka Status Server <ArrowRight size={13} className="ml-1" />
+            </Button>
           </Card>
 
           {/* ── Active AI Status Card ── */}

@@ -48,6 +48,7 @@ const ItemAnalysisPage = lazy(() => import("./pages/admin/ItemAnalysisPage"));
 const TokenViewPage = lazy(() => import("./pages/TokenViewPage"));
 const LiveScoreViewPage = lazy(() => import("./pages/LiveScoreViewPage"));
 const SchoolInvoicePage = lazy(() => import("./pages/admin/SchoolInvoicePage"));
+const ServerStatusPage = lazy(() => import("./pages/admin/ServerStatusPage"));
 
 // Landing & SaaS pages
 import LandingPage from "./pages/landing/LandingPage";
@@ -187,6 +188,7 @@ const SchoolAppContent = () => {
               <Route path="panduan" element={<GuidePage />} />
               <Route path="analisis-butir-soal" element={<ItemAnalysisPage />} />
               <Route path="pengaturan" element={<SettingsPage />} />
+              <Route path="status-server" element={<ServerStatusPage />} />
               <Route path="invoice" element={<SchoolInvoicePage />} />
             </Route>
 
