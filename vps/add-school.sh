@@ -68,11 +68,23 @@ $DOMAINS {
 CADDY
   systemctl reload caddy
 
+  # Pastikan IP worker terdaftar di NO_PROXY Caddy Master VPS agar tidak terlempar ke SOCKS proxy
+  CADDY_OVERRIDE="/etc/systemd/system/caddy.service.d/override.conf"
+  if [ -f "$CADDY_OVERRIDE" ]; then
+    if ! grep -q "$SERVER_HOST" "$CADDY_OVERRIDE"; then
+      echo "[add-school] Menambahkan $SERVER_HOST ke NO_PROXY Caddy Master..."
+      sed -i "s|NO_PROXY=\"|NO_PROXY=\"$SERVER_HOST,|g" "$CADDY_OVERRIDE"
+      systemctl daemon-reload
+      systemctl restart caddy
+    fi
+  fi
+
   # Otomasi via SSH jika key sudah terpasang
   if ssh -o BatchMode=yes -o ConnectTimeout=3 -o StrictHostKeyChecking=no root@"$SERVER_HOST" "true" 2>/dev/null; then
-    echo "[add-school] SSH aktif ke $SERVER_HOST, sinkronisasi master template..."
+    echo "[add-school] SSH aktif ke $SERVER_HOST, sinkronisasi master template & skrip..."
     scp -o StrictHostKeyChecking=no /usr/local/bin/vps-health.py root@"$SERVER_HOST":/usr/local/bin/vps-health.py 2>/dev/null || true
-    ssh -o BatchMode=yes root@"$SERVER_HOST" "chmod +x /usr/local/bin/vps-health.py 2>/dev/null || true"
+    scp -o StrictHostKeyChecking=no /usr/local/bin/add-school.sh root@"$SERVER_HOST":/usr/local/bin/add-school.sh 2>/dev/null || true
+    ssh -o BatchMode=yes root@"$SERVER_HOST" "chmod +x /usr/local/bin/vps-health.py /usr/local/bin/add-school.sh 2>/dev/null || true"
     rsync -az --delete /opt/pocketbase/schools/template/ root@"$SERVER_HOST":/opt/pocketbase/schools/template/ 2>/dev/null || true
     
     # Jika data sekolah sudah ada di Master VPS (misal edit atau migrasi), salin ke Worker
@@ -149,7 +161,7 @@ MemorySwapMax=0
 OOMScoreAdjust=-100
 TasksMax=4096
 WorkingDirectory=$TARGET_DIR
-ExecStart=$TARGET_DIR/pocketbase serve --http="127.0.0.1:${PORT}" --dir=$TARGET_DIR/pb_data --hooksDir=$TARGET_DIR/pb_hooks
+ExecStart=$TARGET_DIR/pocketbase serve --http="0.0.0.0:${PORT}" --dir=$TARGET_DIR/pb_data --hooksDir=$TARGET_DIR/pb_hooks
 
 [Install]
 WantedBy=multi-user.target
@@ -159,7 +171,8 @@ systemctl daemon-reload
 systemctl enable "pb-${SLUG}.service" >/dev/null 2>&1
 systemctl restart "pb-${SLUG}.service"
 
-# ---------- 5. Caddy ----------
+# ---------- 5. Caddy (hanya jika Caddy terpasang di host ini) ----------
+if [ -d "/etc/caddy/conf.d" ]; then
 cat > "/etc/caddy/conf.d/${SLUG}.caddy" << CADDY
 $DOMAINS {
     root * /opt/frontend/ujian/dist
@@ -175,7 +188,8 @@ $DOMAINS {
     }
 }
 CADDY
-systemctl reload caddy
+systemctl reload caddy 2>/dev/null || true
+fi
 
 # ---------- 6. Daftarkan kuota -> alokasi DINAMIS untuk SEMUA tenant ----------
 python3 - "$SLUG" "$QUOTA" "$QUOTA_REGISTRY" << 'PYREG'
