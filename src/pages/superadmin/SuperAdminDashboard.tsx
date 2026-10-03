@@ -15,6 +15,8 @@ import { calculatePlanInvoice, PLAN_PRICING, normalizePlanKey } from "../../util
 import { ensureRenewalInvoice } from "../../utils/subscriptionHelper";
 import { OneClickMigrationModal } from "./OneClickMigrationModal";
 import { OfflineLicenseModal } from "../../components/dialogs/OfflineLicenseModal";
+import { SchoolNpsnSearch } from "../../components/common/SchoolNpsnSearch";
+import { generateSlugFromName } from "../../utils/sekolahApiHelper";
 
 // ── Activity Log ──────────────────────────────────────────────
 type LogType = "create" | "update" | "delete" | "approve" | "reject" | "activate" | "deactivate";
@@ -2084,14 +2086,37 @@ const AddEditSchoolModal = ({
             </div>
           )}
 
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1.5">Nama Institusi <span className="text-blue-600">*</span></label>
-            <input
-              type="text" name="name" value={form.name} onChange={handleChange}
-              placeholder="cth. SMP Negeri 1 Jakarta atau Univ. Gajah Mada" required
-              className="w-full h-10 border border-slate-200 rounded-xl px-3.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 shadow-sm bg-white"
+          {/* Pencarian Database Kemdikbud / Input Nama Institusi */}
+          {!isEdit ? (
+            <SchoolNpsnSearch
+              valueSchoolName={form.name}
+              initialCustomMode={form.type === "campus"}
+              onSelectSchool={(s) => {
+                setForm(prev => ({
+                  ...prev,
+                  name: s.nama,
+                  slug: prev.slug || generateSlugFromName(s.nama),
+                  contact_email: prev.contact_email || s.kontak?.email || "",
+                }));
+              }}
+              onManualChange={(name) => {
+                setForm(prev => ({
+                  ...prev,
+                  name,
+                  slug: prev.slug || generateSlugFromName(name),
+                }));
+              }}
             />
-          </div>
+          ) : (
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5">Nama Institusi <span className="text-blue-600">*</span></label>
+              <input
+                type="text" name="name" value={form.name} onChange={handleChange}
+                placeholder="cth. SMP Negeri 1 Jakarta atau Univ. Gajah Mada" required
+                className="w-full h-10 border border-slate-200 rounded-xl px-3.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 shadow-sm bg-white"
+              />
+            </div>
+          )}
 
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1.5">Varian Sistem</label>

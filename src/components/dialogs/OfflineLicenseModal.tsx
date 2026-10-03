@@ -16,12 +16,15 @@ import {
   Download,
   MessageCircle,
   Sparkles,
-  Server
+  Server,
+  Search,
+  Loader2
 } from "lucide-react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { useToast } from "../ui/toast";
 import { generateOfflineLicense, OfflineLicensePayload } from "../../utils/offlineLicenseHelper";
+import { searchSekolah } from "../../utils/sekolahApiHelper";
 
 interface OfflineLicenseModalProps {
   open: boolean;
@@ -47,6 +50,7 @@ export const OfflineLicenseModal: React.FC<OfflineLicenseModalProps> = ({
   const [notes, setNotes] = useState("Izin Ujian Laboratorium Sekolah");
   const [generatedLicense, setGeneratedLicense] = useState<string | null>(null);
   const [isCopied, setIsCopied] = useState(false);
+  const [isSearchingNpsn, setIsSearchingNpsn] = useState(false);
 
   useEffect(() => {
     if (school) {
@@ -179,14 +183,44 @@ export const OfflineLicenseModal: React.FC<OfflineLicenseModalProps> = ({
             </div>
 
             <div>
-              <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
-                NPSN Sekolah (Opsional)
-              </label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="font-bold text-slate-700 dark:text-slate-300">
+                  NPSN Sekolah (Opsional / Custom)
+                </label>
+                <button
+                  type="button"
+                  disabled={isSearchingNpsn}
+                  onClick={async () => {
+                    if (!school?.name) return;
+                    setIsSearchingNpsn(true);
+                    const items = await searchSekolah(school.name, 3);
+                    setIsSearchingNpsn(false);
+                    if (items.length > 0 && items[0].npsn) {
+                      setNpsn(items[0].npsn);
+                      addToast({
+                        title: "NPSN Ditemukan",
+                        description: `${items[0].nama} (${items[0].npsn})`,
+                        type: "success"
+                      });
+                    } else {
+                      addToast({
+                        title: "Tidak Ditemukan",
+                        description: "NPSN tidak ditemukan di database Kemdikbud. Anda dapat mengisi manual (custom).",
+                        type: "warning"
+                      });
+                    }
+                  }}
+                  className="text-[10px] text-purple-600 dark:text-purple-400 font-bold hover:underline cursor-pointer flex items-center gap-1"
+                >
+                  {isSearchingNpsn ? <Loader2 size={10} className="animate-spin" /> : <Search size={10} />}
+                  <span>{isSearchingNpsn ? "Mencari..." : "Cari di Kemdikbud"}</span>
+                </button>
+              </div>
               <Input
                 type="text"
                 value={npsn}
                 onChange={(e) => setNpsn(e.target.value)}
-                placeholder="Contoh: 10203040"
+                placeholder="Contoh: 10203040 atau ketik custom"
                 className="h-10 rounded-xl text-xs"
               />
             </div>

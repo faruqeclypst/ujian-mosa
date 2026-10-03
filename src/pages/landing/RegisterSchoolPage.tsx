@@ -23,6 +23,8 @@ import {
 import { masterPb } from "../../lib/pocketbase";
 import { cn } from "../../lib/utils";
 import { getSchoolDomain, getDomainSuffix } from "../../utils/domainHelper";
+import { SchoolNpsnSearch } from "../../components/common/SchoolNpsnSearch";
+import { formatSchoolAddress, generateSlugFromName } from "../../utils/sekolahApiHelper";
 
 const formatRupiah = (num: number) => {
   return "Rp " + num.toLocaleString("id-ID");
@@ -156,6 +158,7 @@ const RegisterSchoolPage = () => {
 
   const [form, setForm] = useState({
     school_name: "",
+    npsn: "",
     slug_request: "",
     contact_email: "",
     contact_phone: "",
@@ -271,7 +274,16 @@ const RegisterSchoolPage = () => {
     }
     setLoading(true);
     try {
-      await masterPb.collection("school_requests").create({ ...form, status: "pending" });
+      const { npsn, ...payload } = form;
+      const formattedAddress = npsn
+        ? `[NPSN: ${npsn}] ${payload.address || ""}`.trim()
+        : payload.address;
+
+      await masterPb.collection("school_requests").create({
+        ...payload,
+        address: formattedAddress,
+        status: "pending"
+      });
       setStep("success");
     } catch (err: any) {
       if (err.message?.includes("slug_request")) {
@@ -716,25 +728,36 @@ const RegisterSchoolPage = () => {
                     </button>
                   </div>
 
-                  {/* School Name & Slug */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 sm:gap-6">
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-2">
-                        Nama {form.type === "school" ? "Sekolah" : "Universitas"} <span className="text-blue-600">*</span>
-                      </label>
-                      <div className="relative">
-                        <GraduationCap size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                        <input
-                          type="text"
-                          name="school_name"
-                          value={form.school_name}
-                          onChange={handleChange}
-                          placeholder={form.type === "school" ? "SMPN 1 Kota Contoh" : "Universitas Contoh Indonesia"}
-                          required
-                          className="w-full h-12 border border-slate-200 rounded-xl pl-10 pr-4 text-xs sm:text-sm text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 shadow-2xs transition-all"
-                        />
-                      </div>
-                    </div>
+                  {/* School / NPSN Search & Subdomain */}
+                  <div className="space-y-4">
+                    <SchoolNpsnSearch
+                      valueSchoolName={form.school_name}
+                      valueNpsn={form.npsn}
+                      initialCustomMode={form.type === "campus"}
+                      onSelectSchool={(school) => {
+                        const autoSlug = generateSlugFromName(school.nama);
+                        const autoAddress = formatSchoolAddress(school);
+                        setForm(prev => ({
+                          ...prev,
+                          school_name: school.nama,
+                          npsn: school.npsn,
+                          slug_request: prev.slug_request || autoSlug,
+                          address: prev.address || autoAddress,
+                          contact_phone: prev.contact_phone || school.kontak?.nomor_telepon || "",
+                          contact_email: prev.contact_email || school.kontak?.email || "",
+                          type: "school",
+                        }));
+                      }}
+                      onManualChange={(schoolName, npsn) => {
+                        setForm(prev => ({
+                          ...prev,
+                          school_name: schoolName,
+                          npsn: npsn,
+                          slug_request: prev.slug_request || generateSlugFromName(schoolName),
+                        }));
+                      }}
+                    />
+
                     <div>
                       <label className="block text-xs font-bold text-slate-700 mb-2">
                         Subdomain Permintaan <span className="text-blue-600">*</span>
