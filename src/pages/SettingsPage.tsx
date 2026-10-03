@@ -661,68 +661,119 @@ const SettingsPage = () => {
   const executeImport = async () => {
     if (!importFile || !pb) return;
     setIsBackupLoading(true);
-    setImportProgress(0);
-    setImportStatus("Membaca File...");
+    setImportProgress(10);
+    setImportStatus("Membaca berkas backup...");
 
     try {
       const text = await importFile.text();
       const data = JSON.parse(text);
 
-      const totalCollections = Object.keys(data).length;
-      let processed = 0;
+      let totalItems = 0;
+      Object.keys(data).forEach(k => {
+        if (Array.isArray(data[k])) totalItems += data[k].length;
+      });
 
-      for (const collectionName of COLLECTIONS) {
-        if (!data[collectionName]) continue;
+      setImportProgress(30);
+      setImportStatus(`Mengirim ${totalItems} data ke server...`);
 
-        setImportStatus(`Mengimpor: ${collectionName}...`);
-        const records = data[collectionName];
+      // Coba Fast Restore (Cara 2: Bulk Server Transaction via PocketBase hook)
+      let fastRestoreSuccess = false;
+      try {
+        setImportProgress(60);
+        setImportStatus("Memproses transaksi database di server...");
 
-        for (const recordData of records) {
-          const {
-            id, created, updated,
-            collectionId, collectionName: _unusedName, expand,
-            ...cleanData
-          } = recordData;
+        const res: any = await pb.send("/api/fast-restore", {
+          method: "POST",
+          body: data
+        });
 
-          Object.keys(cleanData).forEach(key => {
-            if (key.startsWith("@")) delete (cleanData as any)[key];
+        if (res && res.success) {
+          fastRestoreSuccess = true;
+          setImportProgress(100);
+          setImportStatus("Selesai!");
+          const duration = ((res.elapsed_ms || 0) / 1000).toFixed(1);
+          addToast({
+            title: "Impor Berhasil",
+            description: `${res.total || totalItems} data berhasil dipulihkan dalam ${duration} detik.`,
+            type: "success"
           });
-
-          try {
-            try {
-              await pb.collection(collectionName).update(id, cleanData);
-            } catch (e: any) {
-              if (e.status === 404) {
-                const createData: any = { id, ...cleanData };
-
-                const isAuthCollection = ["students", "users"].includes(collectionName);
-                if (isAuthCollection) {
-                  const defaultPass = "12345678";
-                  createData.password = defaultPass;
-                  createData.passwordConfirm = defaultPass;
-                }
-
-                await pb.collection(collectionName).create(createData);
-              } else {
-                throw e;
-              }
-            }
-          } catch (e: any) {
-            console.error(`Gagal impor record ${id} di ${collectionName}`);
-          }
+          setTimeout(() => {
+            window.location.reload();
+          }, 1500);
+          return;
         }
-
-        processed++;
-        setImportProgress(Math.round((processed / totalCollections) * 100));
+      } catch (fastErr: any) {
+        // Jika endpoint tidak tersedia (404), fallback ke restore bertahap klien
+        if (fastErr.status === 404) {
+          console.warn("Fast restore hook belum tersedia di instance ini, beralih ke mode klien.");
+        } else {
+          console.error("Fast restore gagal:", fastErr);
+          throw fastErr;
+        }
       }
 
-      setImportStatus("Selesai!");
-      addToast({ title: "Impor Berhasil", description: "Semua data telah dipulihkan.", type: "success" });
-      setTimeout(() => {
-        window.location.reload();
-      }, 1500);
+      // Fallback: Mode klien bertahap jika hook 404
+      if (!fastRestoreSuccess) {
+        const totalCollections = Object.keys(data).length;
+        let processed = 0;
+
+        for (const collectionName of COLLECTIONS) {
+          if (!data[collectionName]) continue;
+
+          setImportStatus(`Mengimpor: ${collectionName}...`);
+          const records = data[collectionName];
+
+          for (const recordData of records) {
+            const {
+              id, created, updated,
+              collectionId, collectionName: _unusedName, expand,
+              ...cleanData
+            } = recordData;
+
+            Object.keys(cleanData).forEach(key => {
+              if (key.startsWith("@")) delete (cleanData as any)[key];
+            });
+
+            try {
+              try {
+                await pb.collection(collectionName).update(id, cleanData);
+              } catch (e: any) {
+                if (e.status === 404) {
+                  const createData: any = { id, ...cleanData };
+
+                  const isAuthCollection = ["students", "users"].includes(collectionName);
+                  if (isAuthCollection) {
+                    const defaultPass = "12345678";
+                    createData.password = defaultPass;
+                    createData.passwordConfirm = defaultPass;
+                  }
+
+                  await pb.collection(collectionName).create(createData);
+                } else {
+                  throw e;
+                }
+              }
+            } catch (e: any) {
+              console.error(`Gagal impor record ${id} di ${collectionName}`);
+            }
+          }
+
+          processed++;
+          setImportProgress(Math.round((processed / totalCollections) * 100));
+        }
+
+        setImportStatus("Selesai!");
+        addToast({ title: "Impor Berhasil", description: "Semua data telah dipulihkan.", type: "success" });
+        setTimeout(() => {
+          window.location.reload();
+        }, 1500);
+      }
     } catch (err: any) {
-      addToast({ title: "Gagal Impor", description: "File tidak valid atau rusak.", type: "error" });
+      addToast({
+        title: "Gagal Impor",
+        description: err.message || "File tidak valid atau rusak.",
+        type: "error"
+      });
     } finally {
       setIsBackupLoading(false);
       setIsImportConfirmOpen(false);
