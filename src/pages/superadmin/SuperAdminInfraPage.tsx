@@ -16,12 +16,14 @@ import {
   Clock,
   ExternalLink,
   ShieldCheck,
-  ChevronRight
+  ChevronRight,
+  Zap
 } from "lucide-react";
 import SuperAdminLayout from "../../components/layout/SuperAdminLayout";
 import { masterPb } from "../../lib/pocketbase";
 import { cn } from "../../lib/utils";
 import { getSchoolDomain } from "../../utils/domainHelper";
+import { SyncAllTenantsModal } from "./SyncAllTenantsModal";
 
 interface VpsNodeMetrics {
   status: "healthy" | "warning" | "error" | "offline";
@@ -85,6 +87,7 @@ const SuperAdminInfraPage = () => {
   const [loading, setLoading] = useState(true);
   const [globalStats, setGlobalStats] = useState({ online: 0, offline: 0, avgLatency: 0 });
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+  const [isSyncModalOpen, setIsSyncModalOpen] = useState(false);
 
   const fetchInfrastructure = useCallback(async () => {
     setLoading(true);
@@ -202,6 +205,14 @@ const SuperAdminInfraPage = () => {
             <BookOpen size={14} className="text-purple-600" />
             <span>Panduan Multi-VPS</span>
           </a>
+          <button
+            type="button"
+            onClick={() => setIsSyncModalOpen(true)}
+            className="flex items-center gap-1.5 h-9 px-3.5 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white text-xs font-bold rounded-xl shadow-xs transition-all w-fit cursor-pointer"
+          >
+            <Zap size={14} />
+            <span>Sinkronkan Semua Tenant</span>
+          </button>
           <button
             type="button"
             onClick={fetchInfrastructure}
@@ -614,6 +625,17 @@ const SuperAdminInfraPage = () => {
           ))}
         </div>
       </div>
+
+      {/* Modal 1-Click Sync Seluruh Tenant */}
+      <SyncAllTenantsModal
+        isOpen={isSyncModalOpen}
+        onClose={() => setIsSyncModalOpen(false)}
+        onSuccess={() => {
+          setIsSyncModalOpen(false);
+          fetchInfrastructure();
+        }}
+        tenantCount={nodes.length || 10}
+      />
     </SuperAdminLayout>
   );
 };
