@@ -25,3 +25,7 @@ release-key.*
 # File testing sementara / scratch
 scratch/
 
+# APK binaries
+*.apk
+public/*.apk
+
