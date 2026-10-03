@@ -89,7 +89,7 @@ interface SchoolRequest {
   contact_email: string;
   contact_phone?: string;
   address?: string;
-  type?: "school" | "campus";
+  type?: "school" | "campus" | "renewal" | string;
   plan?: string;
   duration?: string;
   status: "pending" | "approved" | "rejected";
@@ -312,7 +312,66 @@ const SuperAdminDashboard = () => {
     });
   };
 
+  const handleApproveRenewalRequest = async (req: SchoolRequest) => {
+    try {
+      const matchedSchool = schools.find(s => s.slug === req.slug_request || s.name.toLowerCase() === req.school_name.toLowerCase());
+      if (!matchedSchool) {
+        alert(`Sekolah "${req.school_name}" (${req.slug_request}) tidak ditemukan di database.`);
+        return;
+      }
+
+      let months = 12;
+      if (req.duration) {
+        const match = req.duration.match(/(\d+)/);
+        if (match) months = parseInt(match[1], 10);
+      }
+
+      const targetPlan = normalizePlanKey(req.plan || matchedSchool.plan || "basic");
+      const planInfo = calculatePlanInvoice(targetPlan, months);
+
+      const now = new Date();
+      const yy = now.getFullYear().toString().slice(2);
+      const mm = String(now.getMonth() + 1).padStart(2, "0");
+      const seq = String(Math.floor(Math.random() * 9000) + 1000);
+      const invNum = `INV-${yy}${mm}-${seq}`;
+
+      const dueDate = matchedSchool.active_until
+        ? matchedSchool.active_until.slice(0, 10)
+        : new Date(now.getTime() + 14 * 86400000).toISOString().slice(0, 10);
+
+      const newInvoice = {
+        invoice_number: invNum,
+        school_id: matchedSchool.id,
+        school_name: matchedSchool.name,
+        school_slug: matchedSchool.slug,
+        contact_email: req.contact_email || matchedSchool.contact_email || "",
+        plan: targetPlan,
+        plan_label: planInfo.planLabel,
+        duration_months: planInfo.durationMonths,
+        period_label: planInfo.periodLabel,
+        amount: planInfo.amount,
+        status: "unpaid",
+        due_date: dueDate,
+        notes: req.address ? `Permintaan Perpanjangan: ${req.address}` : `Tagihan Perpanjangan Layanan ${planInfo.planLabel} (${planInfo.periodLabel})`,
+      };
+
+      const createdInv = await masterPb.collection("invoices").create(newInvoice);
+      await masterPb.collection("school_requests").update(req.id, { status: "approved" });
+
+      addLog("approve", `Menerbitkan tagihan perpanjangan (${createdInv.invoice_number})`, matchedSchool.name);
+      refreshLogs();
+      loadData();
+      alert(`Tagihan perpanjangan (${createdInv.invoice_number}) senilai Rp ${planInfo.amount.toLocaleString("id-ID")} untuk ${matchedSchool.name} berhasil diterbitkan.`);
+    } catch (err: any) {
+      console.error("Gagal menyetujui perpanjangan:", err);
+      alert(err?.message || "Gagal menerbitkan tagihan perpanjangan.");
+    }
+  };
+
   const approveRequest = (req: SchoolRequest) => {
+    if (req.type === "renewal") {
+      return handleApproveRenewalRequest(req);
+    }
     try {
       let targetPlan: 'free' | 'basic' | 'pro' | 'ultimate' = 'basic';
       let targetQuota = 250;
@@ -360,7 +419,7 @@ const SuperAdminDashboard = () => {
         is_active: true,
         contact_email: req.contact_email,
         created: new Date().toISOString(),
-        type: req.type || 'school',
+        type: req.type === 'campus' ? 'campus' : 'school',
         plan: targetPlan,
         student_quota: targetQuota,
         active_until: expDate.toISOString(),
@@ -858,17 +917,35 @@ const SuperAdminDashboard = () => {
                       </td>
                       <td className="px-5 py-4">
                         <div className="flex items-center justify-end gap-2">
-                          {school.active_until && getDiffDays(school.active_until) <= 14 && (
-                            <button
-                              onClick={() => handleSendRenewalInvoice(school)}
-                              disabled={sendingRenewalId === school.id}
-                              className="px-2.5 py-1.5 rounded-xl border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-900 transition-all flex items-center gap-1.5 text-xs font-bold shadow-xs hover:shadow-sm"
-                              title="Buat tagihan perpanjangan 1 tahun & siapkan invoice belum bayar"
-                            >
-                              <Clock size={12} className={sendingRenewalId === school.id ? "animate-spin text-amber-700" : "text-amber-700"} />
-                              <span>{sendingRenewalId === school.id ? "Memproses..." : "Kirim Tagihan"}</span>
-                            </button>
-                          )}
+                          {(() => {
+                            const pendingRenewal = requests.find(r => (r.slug_request === school.slug || r.school_name?.toLowerCase() === school.name?.toLowerCase()) && r.type === "renewal" && r.status === "pending");
+                            if (pendingRenewal) {
+                              return (
+                                <button
+                                  onClick={() => handleApproveRenewalRequest(pendingRenewal)}
+                                  className="px-2.5 py-1.5 rounded-xl border border-purple-300 bg-purple-50 hover:bg-purple-100 text-purple-900 transition-all flex items-center gap-1.5 text-xs font-bold shadow-xs hover:shadow-sm animate-pulse whitespace-nowrap"
+                                  title={`Sekolah ini mengajukan perpanjangan (${pendingRenewal.duration || "1 Tahun"}). Klik untuk terbitkan invoice.`}
+                                >
+                                  <Clock size={12} className="text-purple-700" />
+                                  <span>Terbitkan Perpanjangan ({pendingRenewal.duration || "1 Tahun"})</span>
+                                </button>
+                              );
+                            }
+                            if (school.active_until && getDiffDays(school.active_until) <= 14) {
+                              return (
+                                <button
+                                  onClick={() => handleSendRenewalInvoice(school)}
+                                  disabled={sendingRenewalId === school.id}
+                                  className="px-2.5 py-1.5 rounded-xl border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-900 transition-all flex items-center gap-1.5 text-xs font-bold shadow-xs hover:shadow-sm"
+                                  title="Buat tagihan perpanjangan 1 tahun & siapkan invoice belum bayar"
+                                >
+                                  <Clock size={12} className={sendingRenewalId === school.id ? "animate-spin text-amber-700" : "text-amber-700"} />
+                                  <span>{sendingRenewalId === school.id ? "Memproses..." : "Kirim Tagihan"}</span>
+                                </button>
+                              );
+                            }
+                            return null;
+                          })()}
                           <button
                             onClick={() => setMigrationSchool(school)}
                             className="w-8 h-8 rounded-full border border-purple-200 bg-purple-50 text-purple-700 hover:bg-purple-100 hover:border-purple-300 hover:shadow-md transition-all flex items-center justify-center group/btn"
@@ -1006,16 +1083,33 @@ const SuperAdminDashboard = () => {
                       : "1-Klik Burst Mode (Pindah ke Worker)"}
                   </button>
 
-                  {school.active_until && getDiffDays(school.active_until) <= 14 && (
-                    <button
-                      onClick={() => handleSendRenewalInvoice(school)}
-                      disabled={sendingRenewalId === school.id}
-                      className="w-full h-8 text-xs font-bold border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-900 rounded-lg flex items-center justify-center gap-1.5 transition-all shadow-xs"
-                    >
-                      <Clock size={13} className={sendingRenewalId === school.id ? "animate-spin text-amber-700" : "text-amber-700"} />
-                      {sendingRenewalId === school.id ? "Memproses..." : "Terbitkan Tagihan Perpanjangan"}
-                    </button>
-                  )}
+                  {(() => {
+                    const pendingRenewal = requests.find(r => (r.slug_request === school.slug || r.school_name?.toLowerCase() === school.name?.toLowerCase()) && r.type === "renewal" && r.status === "pending");
+                    if (pendingRenewal) {
+                      return (
+                        <button
+                          onClick={() => handleApproveRenewalRequest(pendingRenewal)}
+                          className="w-full h-8 text-xs font-bold border border-purple-300 bg-purple-50 hover:bg-purple-100 text-purple-900 rounded-lg flex items-center justify-center gap-1.5 transition-all shadow-xs animate-pulse"
+                        >
+                          <Clock size={13} className="text-purple-700" />
+                          Terbitkan Tagihan Perpanjangan ({pendingRenewal.duration || "1 Tahun"})
+                        </button>
+                      );
+                    }
+                    if (school.active_until && getDiffDays(school.active_until) <= 14) {
+                      return (
+                        <button
+                          onClick={() => handleSendRenewalInvoice(school)}
+                          disabled={sendingRenewalId === school.id}
+                          className="w-full h-8 text-xs font-bold border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-900 rounded-lg flex items-center justify-center gap-1.5 transition-all shadow-xs"
+                        >
+                          <Clock size={13} className={sendingRenewalId === school.id ? "animate-spin text-amber-700" : "text-amber-700"} />
+                          {sendingRenewalId === school.id ? "Memproses..." : "Terbitkan Tagihan Perpanjangan"}
+                        </button>
+                      );
+                    }
+                    return null;
+                  })()}
                   <div className="flex items-center gap-2 pt-1">
                     <button
                       onClick={() => { setEditSchool(school); setShowAddModal(true); }}
@@ -1097,7 +1191,14 @@ const SuperAdminDashboard = () => {
                         />
                       </td>
                       <td className="px-2 py-3.5">
-                        <p className="font-semibold text-slate-900 text-sm">{req.school_name}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="font-semibold text-slate-900 text-sm">{req.school_name}</p>
+                          {req.type === "renewal" && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200 flex-shrink-0">
+                              <Clock size={10} /> Perpanjangan
+                            </span>
+                          )}
+                        </div>
                         <p className="text-xs text-slate-400">{new Date(req.created).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}</p>
                       </td>
                       <td className="px-5 py-3.5">
@@ -1107,7 +1208,11 @@ const SuperAdminDashboard = () => {
                       </td>
                       <td className="px-5 py-3.5">
                         <div className="flex flex-col gap-1 items-start">
-                          {req.plan === "free" || req.plan?.toLowerCase().includes("trial") || req.plan?.toLowerCase().includes("demo") ? (
+                          {req.type === "renewal" ? (
+                            <span className="inline-flex items-center text-[10px] font-bold uppercase px-2 py-0.5 rounded border bg-purple-50 text-purple-700 border-purple-200">
+                              {PLAN_CONFIG[req.plan || ""]?.label || req.plan || "Paket"}
+                            </span>
+                          ) : req.plan === "free" || req.plan?.toLowerCase().includes("trial") || req.plan?.toLowerCase().includes("demo") ? (
                             <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
                               <Sparkles size={10} /> Free Trial
                             </span>
@@ -1119,6 +1224,11 @@ const SuperAdminDashboard = () => {
                           <span className="text-[11px] text-slate-500 font-medium">
                             {req.duration || (req.plan === "free" ? "14 Hari" : "1 Tahun")}
                           </span>
+                          {req.address && req.type === "renewal" && (
+                            <span className="text-[10px] text-slate-400 italic max-w-xs truncate" title={req.address}>
+                              {req.address}
+                            </span>
+                          )}
                         </div>
                       </td>
                       <td className="px-5 py-3.5">
@@ -1144,9 +1254,13 @@ const SuperAdminDashboard = () => {
                             <>
                               <button
                                 onClick={() => approveRequest(req)}
-                                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition-all flex items-center gap-1 shadow-sm"
+                                className={cn(
+                                  "px-3 py-1.5 text-white text-xs font-bold rounded-lg transition-all flex items-center gap-1 shadow-sm whitespace-nowrap",
+                                  req.type === "renewal" ? "bg-purple-600 hover:bg-purple-700" : "bg-emerald-600 hover:bg-emerald-700"
+                                )}
+                                title={req.type === "renewal" ? "Terbitkan tagihan perpanjangan resmi" : "Buat institusi baru"}
                               >
-                                <Check size={13} /> Buat
+                                <Check size={13} /> {req.type === "renewal" ? "Terbitkan Tagihan" : "Buat"}
                               </button>
                               <button
                                 onClick={() => rejectRequest(req)}
@@ -1157,7 +1271,14 @@ const SuperAdminDashboard = () => {
                             </>
                           ) : (
                             <div className="flex items-center gap-1.5">
-                              {(() => {
+                              {req.type === "renewal" ? (
+                                <a
+                                  href="/superadmin/invoice"
+                                  className="px-2.5 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 text-xs font-semibold rounded-lg transition-all flex items-center gap-1 whitespace-nowrap"
+                                >
+                                  Lihat Invoice
+                                </a>
+                              ) : (() => {
                                 const existingSchool = schools.find(s => s.slug === req.slug_request);
                                 if (existingSchool) {
                                   return (
@@ -1213,8 +1334,15 @@ const SuperAdminDashboard = () => {
                 <div key={req.id} className="p-4 space-y-3">
                   <div className="flex items-start justify-between gap-2">
                     <div>
-                      <p className="font-semibold text-slate-900 text-sm">{req.school_name}</p>
-                      <p className="text-xs text-slate-400">{new Date(req.created).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}</p>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <p className="font-semibold text-slate-900 text-sm">{req.school_name}</p>
+                        {req.type === "renewal" && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
+                            <Clock size={10} /> Perpanjangan
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-slate-400 mt-0.5">{new Date(req.created).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}</p>
                     </div>
                     <span className={cn(
                       "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border flex-shrink-0",
@@ -1227,7 +1355,11 @@ const SuperAdminDashboard = () => {
                   </div>
 
                   <div className="flex items-center gap-2 flex-wrap">
-                    {req.plan === "free" || req.plan?.toLowerCase().includes("trial") || req.plan?.toLowerCase().includes("demo") ? (
+                    {req.type === "renewal" ? (
+                      <span className="inline-flex items-center text-[10px] font-bold uppercase px-2 py-0.5 rounded border bg-purple-50 text-purple-700 border-purple-200">
+                        {PLAN_CONFIG[req.plan || ""]?.label || req.plan || "Paket"}
+                      </span>
+                    ) : req.plan === "free" || req.plan?.toLowerCase().includes("trial") || req.plan?.toLowerCase().includes("demo") ? (
                       <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
                         <Sparkles size={10} /> Free Trial
                       </span>
@@ -1239,6 +1371,11 @@ const SuperAdminDashboard = () => {
                     <span className="text-[10px] text-slate-500 font-medium bg-slate-50 border border-slate-200 px-1.5 py-0.5 rounded">
                       Durasi: {req.duration || (req.plan === "free" ? "14 Hari" : "1 Tahun")}
                     </span>
+                    {req.address && req.type === "renewal" && (
+                      <span className="text-[10px] text-slate-400 italic block w-full">
+                        {req.address}
+                      </span>
+                    )}
                   </div>
 
                   <code className="text-xs font-mono px-2 py-1 bg-amber-50 text-amber-700 border border-amber-200 rounded-md block">
@@ -1248,16 +1385,29 @@ const SuperAdminDashboard = () => {
                   <div className="flex gap-2">
                     {req.status === "pending" ? (
                       <>
-                        <button onClick={() => approveRequest(req)} className="flex-1 h-8 bg-emerald-600 text-white text-xs font-bold rounded-lg flex items-center justify-center gap-1">
-                          <Check size={13} /> Buat Institusi
-                        </button>
+                        {req.type === "renewal" ? (
+                          <button onClick={() => approveRequest(req)} className="flex-1 h-8 bg-purple-600 text-white text-xs font-bold rounded-lg flex items-center justify-center gap-1 shadow-sm">
+                            <Check size={13} /> Terbitkan Tagihan
+                          </button>
+                        ) : (
+                          <button onClick={() => approveRequest(req)} className="flex-1 h-8 bg-emerald-600 text-white text-xs font-bold rounded-lg flex items-center justify-center gap-1">
+                            <Check size={13} /> Buat Institusi
+                          </button>
+                        )}
                         <button onClick={() => rejectRequest(req)} className="h-8 px-3 border border-slate-200 text-slate-600 text-xs font-semibold rounded-lg">
                           Tolak
                         </button>
                       </>
                     ) : (
                       <div className="flex-1 flex items-center gap-1.5">
-                        {(() => {
+                        {req.type === "renewal" ? (
+                          <a
+                            href="/superadmin/invoice"
+                            className="flex-1 h-8 bg-purple-50 text-purple-700 border border-purple-200 text-xs font-semibold rounded-lg flex items-center justify-center gap-1"
+                          >
+                            Lihat Invoice
+                          </a>
+                        ) : (() => {
                           const existingSchool = schools.find(s => s.slug === req.slug_request);
                           if (existingSchool) {
                             return (

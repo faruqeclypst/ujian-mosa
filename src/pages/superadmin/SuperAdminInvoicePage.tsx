@@ -4,7 +4,6 @@ import {
   CheckCircle2, Clock, XCircle, Upload, X, ChevronDown,
   Building2, Calendar, CreditCard, Printer, RefreshCw,
   AlertTriangle, Paperclip, ExternalLink, Trash2, Edit,
-  Receipt,
 } from "lucide-react";
 import { masterPb } from "../../lib/pocketbase";
 import SuperAdminLayout from "../../components/layout/SuperAdminLayout";
@@ -16,7 +15,7 @@ import {
   PlanKey,
 } from "../../utils/pricingHelper";
 import { upgradeSchoolFromInvoice } from "../../utils/subscriptionHelper";
-import { printOfficialReceipt } from "../../utils/receiptHelper";
+import { printDigitalInvoice } from "../../utils/invoicePdfHelper";
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -140,113 +139,7 @@ const blankForm = (): Omit<Invoice, "id" | "created" | "updated"> => {
 // ─── Invoice Print Template ─────────────────────────────────────────────────
 
 const printInvoice = (inv: Invoice) => {
-  const statusCfg = STATUS_CONFIG[inv.status];
-  const html = `
-    <!DOCTYPE html>
-    <html lang="id">
-    <head>
-      <meta charset="UTF-8"/>
-      <title>Invoice ${inv.invoice_number}</title>
-      <style>
-        * { margin:0; padding:0; box-sizing:border-box; }
-        body { font-family: 'Segoe UI', sans-serif; color:#1e293b; background:#fff; padding:40px; }
-        .header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:40px; }
-        .brand { display:flex; flex-direction:column; }
-        .brand-name { font-size:22px; font-weight:700; color:#1e293b; letter-spacing:-0.5px; }
-        .brand-sub { font-size:11px; color:#64748b; margin-top:2px; }
-        .invoice-meta { text-align:right; }
-        .invoice-label { font-size:11px; color:#94a3b8; text-transform:uppercase; letter-spacing:1px; }
-        .invoice-number { font-size:18px; font-weight:700; color:#2563eb; margin-top:2px; }
-        .divider { height:1px; background:#e2e8f0; margin:24px 0; }
-        .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:24px; margin-bottom:32px; }
-        .section-label { font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:1px; color:#94a3b8; margin-bottom:8px; }
-        .value-main { font-size:14px; font-weight:600; color:#1e293b; }
-        .value-sub { font-size:12px; color:#64748b; margin-top:2px; }
-        table { width:100%; border-collapse:collapse; margin-bottom:24px; }
-        th { background:#f8fafc; font-size:11px; font-weight:600; color:#64748b; text-transform:uppercase; letter-spacing:0.5px; padding:10px 12px; text-align:left; border-bottom:2px solid #e2e8f0; }
-        td { padding:12px; font-size:13px; border-bottom:1px solid #f1f5f9; }
-        .total-row td { font-weight:700; font-size:15px; color:#1e293b; border-top:2px solid #e2e8f0; border-bottom:none; padding-top:14px; }
-        .status-badge { display:inline-flex; align-items:center; gap:6px; padding:4px 12px; border-radius:100px; font-size:12px; font-weight:600; }
-        .status-paid { background:#dcfce7; color:#15803d; }
-        .status-unpaid { background:#fef3c7; color:#92400e; }
-        .status-overdue { background:#fee2e2; color:#991b1b; }
-        .status-cancelled { background:#f1f5f9; color:#64748b; }
-        .footer { margin-top:48px; padding-top:16px; border-top:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center; }
-        .footer-note { font-size:11px; color:#94a3b8; }
-        @media print { body { padding:20px; } }
-      </style>
-    </head>
-    <body>
-      <div class="header">
-        <div class="brand">
-          <span class="brand-name">EXAM AA</span>
-          <span class="brand-sub">Platform CBT Online untuk Sekolah</span>
-        </div>
-        <div class="invoice-meta">
-          <div class="invoice-label">Nomor Invoice</div>
-          <div class="invoice-number">${inv.invoice_number}</div>
-          <div style="margin-top:6px; font-size:12px; color:#64748b;">Dibuat: ${formatDate(inv.created)}</div>
-        </div>
-      </div>
-
-      <div class="divider"></div>
-
-      <div class="grid-2">
-        <div>
-          <div class="section-label">Ditagihkan Kepada</div>
-          <div class="value-main">${inv.school_name}</div>
-          <div class="value-sub">Kode: ${inv.school_slug}</div>
-        </div>
-        <div style="text-align:right">
-          <div class="section-label">Status</div>
-          <div>
-            <span class="status-badge status-${inv.status}">${statusCfg.label}</span>
-          </div>
-          ${inv.paid_date ? `<div style="font-size:11px;color:#64748b;margin-top:6px;">Dibayar: ${formatDate(inv.paid_date)}</div>` : `<div style="font-size:11px;color:#64748b;margin-top:6px;">Jatuh tempo: ${formatDate(inv.due_date)}</div>`}
-        </div>
-      </div>
-
-      <table>
-        <thead>
-          <tr>
-            <th>Deskripsi</th>
-            <th style="text-align:center">Durasi</th>
-            <th style="text-align:right">Total</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>
-              <div style="font-weight:600">${PLAN_PRICES[inv.plan]?.label || inv.plan} Plan</div>
-              <div style="font-size:12px;color:#64748b;">Langganan platform ujian digital CBT EXAM AA</div>
-            </td>
-            <td style="text-align:center">${inv.duration_months} bulan</td>
-            <td style="text-align:right;font-weight:600">${formatRupiah(inv.amount)}</td>
-          </tr>
-        </tbody>
-        <tfoot>
-          <tr class="total-row">
-            <td colspan="2">Total Pembayaran</td>
-            <td style="text-align:right">${formatRupiah(inv.amount)}</td>
-          </tr>
-        </tfoot>
-      </table>
-
-      ${inv.notes ? `<div style="background:#f8fafc;border-radius:8px;padding:14px;font-size:12px;color:#64748b;margin-bottom:24px;"><strong style="color:#475569">Catatan:</strong> ${inv.notes}</div>` : ""}
-
-      <div class="footer">
-        <div class="footer-note">Dokumen ini dibuat secara otomatis oleh sistem EXAM AA.</div>
-        <div class="footer-note">Pertanyaan: admin@examaa.id</div>
-      </div>
-    </body>
-    </html>
-  `;
-  const win = window.open("", "_blank");
-  if (!win) return;
-  win.document.write(html);
-  win.document.close();
-  win.focus();
-  setTimeout(() => win.print(), 500);
+  printDigitalInvoice(inv, { name: inv.school_name, slug: inv.school_slug });
 };
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -728,19 +621,10 @@ const SuperAdminInvoicePage = () => {
                             <button
                               onClick={() => printInvoice(inv)}
                               className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition"
-                              title="Cetak Invoice"
+                              title="Cetak Invoice Digital (PDF)"
                             >
                               <Printer size={14} />
                             </button>
-                            {inv.status === "paid" && (
-                              <button
-                                onClick={() => printOfficialReceipt(inv, { name: inv.school_name, slug: inv.school_slug })}
-                                className="p-1.5 rounded-lg hover:bg-emerald-50 text-emerald-600 hover:text-emerald-700 transition"
-                                title="Cetak Kwitansi Resmi (SPJ)"
-                              >
-                                <Receipt size={14} />
-                              </button>
-                            )}
                             <button
                               onClick={() => openEdit(inv)}
                               className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition"
@@ -974,22 +858,13 @@ const SuperAdminInvoicePage = () => {
                 <p className="text-xs text-slate-400 mt-0.5">Dibuat {formatDate(detailInvoice.created)}</p>
               </div>
               <div className="flex items-center gap-2">
-                {detailInvoice.status === "paid" && (
-                  <button
-                    onClick={() => printOfficialReceipt(detailInvoice, { name: detailInvoice.school_name, slug: detailInvoice.school_slug })}
-                    className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl hover:bg-emerald-100 transition"
-                    title="Cetak Kwitansi Pembayaran Resmi (SPJ)"
-                  >
-                    <Receipt size={13} />
-                    Kwitansi (SPJ)
-                  </button>
-                )}
                 <button
                   onClick={() => printInvoice(detailInvoice)}
-                  className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-slate-600 border border-slate-200 rounded-xl hover:bg-slate-50 transition"
+                  className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition shadow-xs"
+                  title="Cetak Invoice Digital Resmi (PDF)"
                 >
                   <Printer size={13} />
-                  Cetak Invoice
+                  <span>Cetak Invoice (PDF)</span>
                 </button>
                 <button onClick={() => setDetailInvoice(null)} className="p-2 rounded-xl hover:bg-slate-100 text-slate-400 transition">
                   <X size={18} />
