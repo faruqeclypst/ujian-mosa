@@ -205,7 +205,7 @@ const SchoolAppContent = () => {
 };
 
 // ============================================================
-// Landing / Super Admin Content (ujian.alfaruqasri.my.id)
+// Landing / Super Admin Content (examku.my.id)
 // ============================================================
 import SuperAdminInfraPage from "./pages/superadmin/SuperAdminInfraPage";
 import SuperAdminAnalyticsPage from "./pages/superadmin/SuperAdminAnalyticsPage";

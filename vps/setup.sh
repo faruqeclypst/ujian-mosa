@@ -23,7 +23,7 @@ SCHOOL1_DOMAIN="db-sman.alfaruqasri.my.id"    # PocketBase SMAN Modal Bangsa
 SCHOOL1_SLUG="sman-modalbangsa"
 
 FRONTEND_DOMAIN="*.alfaruqasri.my.id"        # Wildcard untuk sekolah
-LANDING_DOMAIN="ujian.alfaruqasri.my.id"     # Landing & super admin
+LANDING_DOMAIN="examku.my.id"           # Landing & super admin
 ROOT_DOMAIN="alfaruqasri.my.id"              # Root domain
 
 # KONFIGURASI TEMPLATE

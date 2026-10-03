@@ -66,7 +66,7 @@ interface TenantContextValue {
   school: SchoolRecord | null;
   pb: PocketBase | null;       // PocketBase instance untuk sekolah aktif
   slug: string | null;
-  isLandingDomain: boolean;    // true jika ini ujian.alfaruqasri.my.id
+  isLandingDomain: boolean;    // true jika ini examku.my.id
   loading: boolean;
   notFound: boolean;           // true jika slug ada tapi tidak di registry
   inactive: boolean;           // true jika sekolah is_active = false
