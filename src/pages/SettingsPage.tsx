@@ -47,6 +47,7 @@ import {
   ArrowRight
 } from "lucide-react";
 import { getSchoolDomain, getSchoolUrl } from "../utils/domainHelper";
+import { ExambroGuideModal } from "../components/dialogs/ExambroGuideModal";
 
 const COLLECTIONS = [
   "users",
@@ -79,6 +80,7 @@ const SettingsPage = () => {
   const [remoteModels, setRemoteModels] = useState<any[]>([]);
   const [isLoadingModels, setIsLoadingModels] = useState(false);
   const [isExambroEnabled, setIsExambroEnabled] = useState(false);
+  const [isExambroGuideOpen, setIsExambroGuideOpen] = useState(false);
   const [teacherFullAccess, setTeacherFullAccess] = useState(false);
   const [teacherAIAccess, setTeacherAIAccess] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -987,24 +989,34 @@ const SettingsPage = () => {
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-                  <div className="flex items-center justify-between p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40 hover:border-slate-300 dark:hover:border-slate-700 transition-colors group">
-                    <div className="flex items-start gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center shrink-0 text-orange-600 dark:text-orange-500">
-                        <Monitor size={16} />
+                  <div className="flex flex-col justify-between p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40 hover:border-slate-300 dark:hover:border-slate-700 transition-colors group gap-3">
+                    <div className="flex items-center justify-between w-full">
+                      <div className="flex items-start gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center shrink-0 text-orange-600 dark:text-orange-500">
+                          <Monitor size={16} />
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200 leading-none">Wajib Exambro</h4>
+                          <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 leading-tight pr-2">Blokir browser biasa, wajib pakai aplikasi resmi atau SEB.</p>
+                        </div>
                       </div>
-                      <div>
-                        <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200 leading-none">Wajib Exambro</h4>
-                        <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 leading-tight pr-4">Blokir browser biasa, wajib pakai aplikasi resmi.</p>
-                      </div>
+                      {loading ? (
+                        <Skeleton className="h-6 w-11 rounded-full shrink-0" />
+                      ) : (
+                        <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                          <input type="checkbox" className="sr-only peer" checked={isExambroEnabled} onChange={(e) => setIsExambroEnabled(e.target.checked)} />
+                          <div className="w-11 h-6 bg-slate-200 dark:bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-600"></div>
+                        </label>
+                      )}
                     </div>
-                    {loading ? (
-                      <Skeleton className="h-6 w-11 rounded-full shrink-0" />
-                    ) : (
-                      <label className="relative inline-flex items-center cursor-pointer shrink-0">
-                        <input type="checkbox" className="sr-only peer" checked={isExambroEnabled} onChange={(e) => setIsExambroEnabled(e.target.checked)} />
-                        <div className="w-11 h-6 bg-slate-200 dark:bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-600"></div>
-                      </label>
-                    )}
+
+                    <button
+                      type="button"
+                      onClick={() => setIsExambroGuideOpen(true)}
+                      className="w-full py-1.5 px-3 rounded-lg bg-orange-100/70 hover:bg-orange-100 dark:bg-orange-950/40 dark:hover:bg-orange-950/60 text-orange-700 dark:text-orange-300 text-[11px] font-bold flex items-center justify-center gap-1.5 transition-colors border border-orange-200/60 dark:border-orange-900/40"
+                    >
+                      <Download size={12} /> Unduh APK & Setup SEB (.seb)
+                    </button>
                   </div>
 
                   <div className="flex items-center justify-between p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40 hover:border-slate-300 dark:hover:border-slate-700 transition-colors group">
@@ -1715,6 +1727,13 @@ const SettingsPage = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      <ExambroGuideModal
+        open={isExambroGuideOpen}
+        onOpenChange={setIsExambroGuideOpen}
+        schoolSlug={school?.slug || ""}
+        schoolName={schoolName || school?.name || ""}
+      />
     </div>
   );
 };

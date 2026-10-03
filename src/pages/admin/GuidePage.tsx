@@ -9,7 +9,9 @@ import {
 } from "lucide-react";
 import { useTenant } from "../../context/TenantContext";
 import { Badge } from "../../components/ui/badge";
+import { Button } from "../../components/ui/button";
 import { cn } from "../../lib/utils";
+import { ExambroGuideModal } from "../../components/dialogs/ExambroGuideModal";
 
 // --- Advanced Documentation Components ---
 
@@ -111,6 +113,7 @@ const GuidePage = () => {
   const [showSearchResults, setShowSearchResults] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const searchResultsRef = useRef<HTMLDivElement>(null);
+  const [isExambroGuideOpen, setIsExambroGuideOpen] = useState(false);
 
   const NAV_ITEMS = [
     { id: "pendahuluan", label: "Overview Platform", icon: Home, keywords: "pengenalan cbt aplikasi" },
@@ -696,6 +699,46 @@ const GuidePage = () => {
                       </div>
                    </div>
                 </SubSection>
+
+                <SubSection title="Aplikasi Siswa: Android (APK), iPhone (SEB), Windows, & Browser" icon={ShieldCheck}>
+                   <div className="p-6 rounded-2xl border border-blue-100 dark:border-blue-900/40 bg-blue-50/30 dark:bg-blue-950/10 space-y-4">
+                      <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed font-medium">
+                        Ujian dapat diselenggarakan di berbagai jenis perangkat siswa dengan dukungan proteksi keamanan:
+                      </p>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                         <div className="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-1.5">
+                            <span className="text-xs font-bold text-blue-600 dark:text-blue-400 block">1. Android APK</span>
+                            <p className="text-[11px] text-slate-500 leading-relaxed">Kiosk mode, penguncian layar penuh, deteksi split-screen, dan sirine otomatis jika membuka aplikasi lain.</p>
+                         </div>
+                         <div className="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-1.5">
+                            <span className="text-xs font-bold text-purple-600 dark:text-purple-400 block">2. iPhone & iPad (SEB)</span>
+                            <p className="text-[11px] text-slate-500 leading-relaxed">Safe Exam Browser iOS dengan Apple Assessment Mode (AAC) mematikan notifikasi, Siri, dan screenshot.</p>
+                         </div>
+                         <div className="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-1.5">
+                            <span className="text-xs font-bold text-slate-700 dark:text-slate-300 block">3. Windows (SEB)</span>
+                            <p className="text-[11px] text-slate-500 leading-relaxed">Standar lab komputer dan laptop. Mengunci tombol Windows, Alt+Tab, Task Manager, dan multi-monitor.</p>
+                         </div>
+                         <div className="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-1.5">
+                            <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 block">4. Browser Biasa</span>
+                            <p className="text-[11px] text-slate-500 leading-relaxed">Wajib fullscreen, timer hitung mundur 5 detik jika focus loss, dan penguncian otomatis setelah batas toleransi.</p>
+                         </div>
+                      </div>
+
+                      <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-blue-100 dark:border-blue-900/40">
+                         <div className="text-xs text-slate-500">
+                           Unduh berkas APK Android atau unduh file config <code>.seb</code> otomatis untuk sekolah Anda.
+                         </div>
+                         <Button
+                           type="button"
+                           onClick={() => setIsExambroGuideOpen(true)}
+                           className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold h-9 px-4 shrink-0 shadow-sm flex items-center gap-2"
+                         >
+                           <Download size={13} /> Buka Panduan & Download Config SEB
+                         </Button>
+                      </div>
+                   </div>
+                </SubSection>
               </div>
             </DocSection>
 
@@ -918,6 +961,13 @@ const GuidePage = () => {
           </div>
         </div>
       </div>
+
+      <ExambroGuideModal
+        open={isExambroGuideOpen}
+        onOpenChange={setIsExambroGuideOpen}
+        schoolSlug={school?.slug || ""}
+        schoolName={school?.name || ""}
+      />
     </div>
   );
 };
