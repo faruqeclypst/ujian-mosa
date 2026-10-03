@@ -92,6 +92,12 @@ function resolveSlugFromUrl(): { slug: string | null; customDomain: string | nul
     return { slug: devSlug, customDomain: null, isLanding: false };
   }
 
+  // Cek apakah hostname adalah IP address lokal / LAN (Server Offline CBT)
+  const isPrivateIp = /^(192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+)$/.test(hostname);
+  if (isPrivateIp) {
+    return { slug: 'local', customDomain: hostname, isLanding: false };
+  }
+
   // Dev mode: localhost / 127.0.0.1 / root domain → tampilkan landing
   if (
     hostname === 'localhost' ||
@@ -296,7 +302,31 @@ export const TenantProvider = ({ children }: { children: ReactNode }) => {
         return;
       }
 
-      // If record could not be fetched from Master PB, inspect the error
+      // If record could not be fetched from Master PB, inspect fallback options
+      // 1. Fallback Server Mandiri / Offline CBT: Cek apakah instance ini memiliki database sekolah sendiri
+      try {
+        const localPb = getSchoolPb(window.location.origin);
+        const settingsRes = await localPb.collection('settings').getList(1, 1);
+        const sData = settingsRes.items[0];
+        const localSchool: SchoolRecord = {
+          id: 'local_server',
+          name: sData?.name || 'EXAM AA - Server Lokal',
+          slug: slug || 'local',
+          pb_url: window.location.origin,
+          type: 'school',
+          is_active: true,
+          logo_url: sData?.logoUrl || sData?.logo || '',
+        };
+        setSchool(localSchool);
+        setPb(localPb);
+        setNotFound(false);
+        setInactive(false);
+        setLoading(false);
+        return;
+      } catch {
+        // Bukan server lokal mandiri, lanjutkan pengecekan berikutnya
+      }
+
       const isGenuine404 = lastErr?.status === 404 || lastErr?.data?.code === 404;
 
       if (isGenuine404) {
@@ -309,7 +339,7 @@ export const TenantProvider = ({ children }: { children: ReactNode }) => {
         // Network failure, timeout, 502/504, or abort
         console.warn('[TenantContext] Koneksi ke Master PB terganggu, menggunakan fallback:', lastErr);
 
-        // Fallback 1: Use cached school profile if available
+        // Fallback 2: Use cached school profile if available
         const cached = getCachedSchool(cacheKey);
         if (cached) {
           setSchool(cached);
@@ -317,7 +347,7 @@ export const TenantProvider = ({ children }: { children: ReactNode }) => {
           setNotFound(false);
           setInactive(false);
         } else if (slug && typeof window !== 'undefined' && (currentHostname.endsWith('.examku.my.id') || currentHostname.endsWith('.alfaruqasri.my.id'))) {
-          // Fallback 2: We are on school subdomain (e.g. modalbangsa.examku.my.id)
+          // Fallback 3: We are on school subdomain (e.g. modalbangsa.examku.my.id)
           // The school database is directly reachable at current origin (/api/*)
           const fallbackPbUrl = window.location.origin;
           const fallbackRecord: SchoolRecord = {
