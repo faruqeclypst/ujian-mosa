@@ -70,7 +70,16 @@ CADDY
 
   # Otomasi via SSH jika key sudah terpasang
   if ssh -o BatchMode=yes -o ConnectTimeout=3 -o StrictHostKeyChecking=no root@"$SERVER_HOST" "true" 2>/dev/null; then
-    echo "[add-school] SSH aktif ke $SERVER_HOST, menjalankan remote auto-provisioning..."
+    echo "[add-school] SSH aktif ke $SERVER_HOST, sinkronisasi master template..."
+    rsync -az --delete /opt/pocketbase/schools/template/ root@"$SERVER_HOST":/opt/pocketbase/schools/template/ 2>/dev/null || true
+    
+    # Jika data sekolah sudah ada di Master VPS (misal edit atau migrasi), salin ke Worker
+    if [ -d "$TARGET_DIR" ]; then
+      echo "[add-school] Menyinkronkan data sekolah yang ada ke $SERVER_HOST..."
+      rsync -az "$TARGET_DIR/" root@"$SERVER_HOST":"$TARGET_DIR/" 2>/dev/null || true
+    fi
+
+    echo "[add-school] Menjalankan remote auto-provisioning di $SERVER_HOST..."
     ssh -o BatchMode=yes -o ConnectTimeout=5 root@"$SERVER_HOST" "/usr/local/bin/add-school.sh $SLUG $PORT '${CUSTOM_DOMAIN}' $QUOTA" 2>&1 || true
   else
     echo "[add-school] Info: Remote SSH belum dikonfigurasi, pastikan PocketBase pada $SERVER_HOST:$PORT sudah aktif."

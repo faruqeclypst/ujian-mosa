@@ -34,7 +34,13 @@ onRecordAfterUpdateSuccess(triggerProvisioning, "schools");
 
 onRecordAfterDeleteSuccess((e) => {
     const slug = e.record.get("slug");
-    console.log("[Provisioning] Cleaning up:", slug);
-    try { $os.cmd("bash", "-c", "/usr/local/bin/remove-school.sh " + slug).run(); } catch (err) {}
+    const serverHost = (e.record.get("server_host") || "127.0.0.1").trim();
+    console.log("[Provisioning] Cleaning up:", slug, "host:", serverHost);
+    try { 
+        const cmd = `/usr/local/bin/remove-school.sh "${slug}" "${serverHost}"`;
+        $os.cmd("bash", "-c", cmd).run(); 
+    } catch (err) {
+        console.log("[Provisioning] Cleanup Error:", err);
+    }
     return e.next();
 }, "schools");

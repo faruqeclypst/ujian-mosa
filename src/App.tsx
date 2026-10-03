@@ -234,6 +234,7 @@ const LandingContent = () => {
         <Route path="/superadmin/invoice" element={<SuperAdminInvoicePage />} />
         <Route path="/superadmin/multi-vps-docs" element={<SuperAdminMultiVpsDocsPage />} />
         <Route path="/superadmin/docs" element={<Navigate to="/superadmin/multi-vps-docs" replace />} />
+        <Route path="/docs" element={<SuperAdminMultiVpsDocsPage />} />
         <Route path="/superadmin/login" element={<SuperAdminLoginPage />} />
         <Route path="/pilih-sekolah" element={<SelectSchoolPage />} />
         <Route path="/pilih sekolah" element={<SelectSchoolPage />} />
