@@ -1,0 +1,271 @@
+import React, { useState, useEffect } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription
+} from "../ui/dialog";
+import {
+  KeyRound,
+  ShieldCheck,
+  Calendar,
+  Users,
+  Copy,
+  Check,
+  Download,
+  MessageCircle,
+  Sparkles,
+  Server
+} from "lucide-react";
+import { Button } from "../ui/button";
+import { Input } from "../ui/input";
+import { useToast } from "../ui/toast";
+import { generateOfflineLicense, OfflineLicensePayload } from "../../utils/offlineLicenseHelper";
+
+interface OfflineLicenseModalProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  school: {
+    name: string;
+    slug: string;
+    student_quota?: number;
+    active_until?: string;
+    contact_phone?: string;
+  } | null;
+}
+
+export const OfflineLicenseModal: React.FC<OfflineLicenseModalProps> = ({
+  open,
+  onOpenChange,
+  school
+}) => {
+  const { addToast } = useToast();
+  const [validUntil, setValidUntil] = useState("");
+  const [maxStudents, setMaxStudents] = useState<number>(300);
+  const [npsn, setNpsn] = useState("");
+  const [notes, setNotes] = useState("Izin Ujian Laboratorium Sekolah");
+  const [generatedLicense, setGeneratedLicense] = useState<string | null>(null);
+  const [isCopied, setIsCopied] = useState(false);
+
+  useEffect(() => {
+    if (school) {
+      // Default tanggal: 6 bulan dari sekarang atau active_until jika ada
+      if (school.active_until) {
+        setValidUntil(school.active_until.split("T")[0]);
+      } else {
+        const nextSixMonths = new Date();
+        nextSixMonths.setMonth(nextSixMonths.getMonth() + 6);
+        setValidUntil(nextSixMonths.toISOString().split("T")[0]);
+      }
+      setMaxStudents(school.student_quota || 300);
+      setGeneratedLicense(null);
+    }
+  }, [school, open]);
+
+  if (!school) return null;
+
+  const handleGenerate = async () => {
+    if (!validUntil) {
+      addToast({ title: "Gagal", description: "Tentukan batas tanggal lisensi.", type: "error" });
+      return;
+    }
+
+    const payload: OfflineLicensePayload = {
+      school_name: school.name,
+      slug: school.slug,
+      npsn: npsn.trim() || undefined,
+      valid_until: validUntil,
+      max_students: Number(maxStudents) || 300,
+      issued_at: new Date().toISOString(),
+      notes: notes.trim()
+    };
+
+    const code = await generateOfflineLicense(payload);
+    setGeneratedLicense(code);
+    addToast({
+      title: "Lisensi Berhasil Dibuat",
+      description: `Lisensi server offline untuk ${school.name} siap digunakan.`,
+      type: "success"
+    });
+  };
+
+  const handleCopy = () => {
+    if (!generatedLicense) return;
+    navigator.clipboard.writeText(generatedLicense);
+    setIsCopied(true);
+    addToast({ title: "Tersalin", description: "Kode lisensi disalin ke clipboard.", type: "success" });
+    setTimeout(() => setIsCopied(false), 2000);
+  };
+
+  const handleDownloadFile = () => {
+    if (!generatedLicense) return;
+    const blob = new Blob([generatedLicense], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `license_${school.slug}.key`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleSendWA = () => {
+    if (!generatedLicense) return;
+    const text = `Halo Admin/Proktor *${school.name}*,\n\nBerikut adalah *Kode Lisensi Izin Server Offline (EXAM AA)* Anda:\n\n*Batas Masa Aktif:* ${validUntil}\n*Maksimal Siswa:* ${maxStudents} Siswa\n*Kode Lisensi:*\n\`\`\`${generatedLicense}\`\`\`\n\nSilakan masukkan kode ini di halaman aktivasi server lokal PC proktor Anda.`;
+    const waUrl = `https://wa.me/?text=${encodeURIComponent(text)}`;
+    window.open(waUrl, "_blank");
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-xl rounded-[2rem] p-6 border border-slate-200 dark:border-slate-800 shadow-2xl bg-white dark:bg-slate-900">
+        <DialogHeader className="pb-3 border-b border-slate-100 dark:border-slate-800">
+          <DialogTitle className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+            <div className="w-8 h-8 rounded-xl bg-purple-600 flex items-center justify-center text-white shadow-sm">
+              <KeyRound size={16} />
+            </div>
+            Izin & Lisensi Server Offline (Proktor)
+          </DialogTitle>
+          <DialogDescription className="text-xs text-slate-500 mt-1">
+            Konfirmasi dan terbitkan lisensi terenkripsi agar sekolah dapat menjalankan CBT di PC lokal tanpa internet.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 pt-3">
+          {/* Identitas Sekolah */}
+          <div className="p-3 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs">
+            <div>
+              <span className="text-slate-400 block text-[10px] font-bold uppercase tracking-wider">Sekolah Terpilih</span>
+              <p className="font-bold text-slate-900 dark:text-white">{school.name}</p>
+              <code className="text-purple-600 dark:text-purple-400 font-mono text-[11px]">{school.slug}.examku.my.id</code>
+            </div>
+            <div className="text-right">
+              <span className="text-slate-400 block text-[10px] font-bold uppercase tracking-wider">Status Server</span>
+              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
+                <ShieldCheck size={12} /> Siap Diizinkan
+              </span>
+            </div>
+          </div>
+
+          {/* Form Konfigurasi Lisensi */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+            <div>
+              <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                Batas Masa Aktif Server Offline
+              </label>
+              <Input
+                type="date"
+                value={validUntil}
+                onChange={(e) => setValidUntil(e.target.value)}
+                className="h-10 rounded-xl text-xs"
+              />
+            </div>
+
+            <div>
+              <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                Batas Kuota Siswa Offline
+              </label>
+              <Input
+                type="number"
+                min={10}
+                max={5000}
+                value={maxStudents}
+                onChange={(e) => setMaxStudents(parseInt(e.target.value) || 0)}
+                placeholder="300"
+                className="h-10 rounded-xl text-xs"
+              />
+            </div>
+
+            <div>
+              <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                NPSN Sekolah (Opsional)
+              </label>
+              <Input
+                type="text"
+                value={npsn}
+                onChange={(e) => setNpsn(e.target.value)}
+                placeholder="Contoh: 10203040"
+                className="h-10 rounded-xl text-xs"
+              />
+            </div>
+
+            <div>
+              <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                Keterangan / Keperluan
+              </label>
+              <Input
+                type="text"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Misal: Ujian Semester Ganjil"
+                className="h-10 rounded-xl text-xs"
+              />
+            </div>
+          </div>
+
+          <Button
+            type="button"
+            onClick={handleGenerate}
+            className="w-full h-10 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold shadow-md flex items-center justify-center gap-2"
+          >
+            <Sparkles size={14} /> Terbitkan & Tandatangani Lisensi Offline
+          </Button>
+
+          {/* Kotak Hasil Kode Lisensi */}
+          {generatedLicense && (
+            <div className="p-4 bg-purple-50/50 dark:bg-purple-950/20 rounded-2xl border border-purple-200 dark:border-purple-800 space-y-3 animate-in fade-in">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-purple-900 dark:text-purple-300 uppercase tracking-wider flex items-center gap-1.5">
+                  <ShieldCheck size={14} /> Kode Lisensi Terenkripsi Super Admin
+                </span>
+                <span className="text-[10px] text-emerald-600 font-bold bg-emerald-100 dark:bg-emerald-950 px-2 py-0.5 rounded-full">
+                  Sah & Aktif
+                </span>
+              </div>
+
+              <textarea
+                readOnly
+                rows={3}
+                value={generatedLicense}
+                className="w-full p-2.5 rounded-xl border border-purple-200 dark:border-purple-800 bg-white dark:bg-slate-900 font-mono text-[11px] text-slate-700 dark:text-slate-300 select-all resize-none outline-none"
+              />
+
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={handleCopy}
+                  className="flex-1 h-9 rounded-xl text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white dark:bg-slate-100 dark:text-slate-900 flex items-center justify-center gap-1.5"
+                >
+                  {isCopied ? <Check size={13} className="text-emerald-400" /> : <Copy size={13} />}
+                  Salin Kode
+                </Button>
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleDownloadFile}
+                  className="h-9 px-3 rounded-xl text-xs font-bold border-purple-200 text-purple-700 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-950 flex items-center gap-1.5"
+                >
+                  <Download size={13} /> Unduh .key
+                </Button>
+
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={handleSendWA}
+                  className="h-9 px-3 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1.5"
+                >
+                  <MessageCircle size={13} /> Kirim WhatsApp
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+};

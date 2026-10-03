@@ -5,7 +5,7 @@ import {
   School, Clock, Users, RefreshCw,
   Search, Trash2, Monitor, Zap, Server, ChevronDown,
   Building2, Globe, Sparkles, ShieldCheck, Calendar, Cpu, BookOpen,
-  Activity, CheckCircle2, XCircle, AlertTriangle, Info
+  Activity, CheckCircle2, XCircle, AlertTriangle, Info, KeyRound
 } from "lucide-react";
 import { masterPb } from "../../lib/pocketbase";
 import SuperAdminLayout from "../../components/layout/SuperAdminLayout";
@@ -14,6 +14,7 @@ import { getSchoolUrl, getSchoolDomain, getDomainSuffix } from "../../utils/doma
 import { calculatePlanInvoice, PLAN_PRICING, normalizePlanKey } from "../../utils/pricingHelper";
 import { ensureRenewalInvoice } from "../../utils/subscriptionHelper";
 import { OneClickMigrationModal } from "./OneClickMigrationModal";
+import { OfflineLicenseModal } from "../../components/dialogs/OfflineLicenseModal";
 
 // ── Activity Log ──────────────────────────────────────────────
 type LogType = "create" | "update" | "delete" | "approve" | "reject" | "activate" | "deactivate";
@@ -207,6 +208,7 @@ const SuperAdminDashboard = () => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [editSchool, setEditSchool] = useState<SchoolRecord | null>(null);
   const [migrationSchool, setMigrationSchool] = useState<SchoolRecord | null>(null);
+  const [offlineLicenseSchool, setOfflineLicenseSchool] = useState<SchoolRecord | null>(null);
   const [approvingRequestId, setApprovingRequestId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -954,6 +956,13 @@ const SuperAdminDashboard = () => {
                             <Zap size={14} className="group-hover/btn:scale-110 text-purple-600 transition-transform" />
                           </button>
                           <button
+                            onClick={() => setOfflineLicenseSchool(school)}
+                            className="w-8 h-8 rounded-full border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 hover:border-indigo-300 hover:shadow-md transition-all flex items-center justify-center group/btn"
+                            title="Izin Server Offline CBT (Lisensi Lab / Proktor)"
+                          >
+                            <KeyRound size={14} className="group-hover/btn:scale-110 text-indigo-600 transition-transform" />
+                          </button>
+                          <button
                             onClick={() => { setEditSchool(school); setShowAddModal(true); }}
                             className="w-8 h-8 rounded-full border border-slate-200 bg-white text-slate-400 hover:text-blue-600 hover:border-blue-200 hover:shadow-md transition-all flex items-center justify-center group/btn"
                             title="Edit"
@@ -1081,6 +1090,14 @@ const SuperAdminDashboard = () => {
                     {school.server_host && school.server_host !== "127.0.0.1" && school.server_host !== "localhost"
                       ? "Migrasi / Tarik ke Master VPS"
                       : "1-Klik Burst Mode (Pindah ke Worker)"}
+                  </button>
+
+                  <button
+                    onClick={() => setOfflineLicenseSchool(school)}
+                    className="w-full h-8 text-xs font-bold border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-800 rounded-lg flex items-center justify-center gap-1.5 transition-all shadow-xs"
+                  >
+                    <KeyRound size={13} className="text-indigo-600" />
+                    Izin Server Offline CBT
                   </button>
 
                   {(() => {
@@ -1570,6 +1587,15 @@ const SuperAdminDashboard = () => {
             loadData();
             refreshLogs();
           }}
+        />
+      )}
+
+      {/* Offline License Authorization Modal */}
+      {offlineLicenseSchool && (
+        <OfflineLicenseModal
+          open={Boolean(offlineLicenseSchool)}
+          onOpenChange={(val) => !val && setOfflineLicenseSchool(null)}
+          school={offlineLicenseSchool}
         />
       )}
 

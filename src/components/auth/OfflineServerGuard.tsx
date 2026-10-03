@@ -1,0 +1,85 @@
+import React, { useState, useEffect } from "react";
+import { useTenant } from "../../context/TenantContext";
+import { verifyOfflineLicense, VerificationResult } from "../../utils/offlineLicenseHelper";
+import { OfflineActivationGate } from "./OfflineActivationGate";
+import LoadingScreen from "../layout/LoadingScreen";
+
+export const OfflineServerGuard: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { school, pb, refreshSchool } = useTenant();
+  const [checking, setChecking] = useState(true);
+  const [verification, setVerification] = useState<VerificationResult | null>(null);
+  const [licenseCode, setLicenseCode] = useState<string | null>(null);
+
+  const checkLicense = async () => {
+    // Hanya berlaku ketika sistem berjalan di server lokal mandiri (offline)
+    if (school?.id !== "local_server") {
+      setChecking(false);
+      return;
+    }
+
+    setChecking(true);
+    let code = typeof window !== "undefined" ? localStorage.getItem("exam_offline_license") : null;
+
+    // Jika belum ada di localStorage, cek dari tabel settings di PocketBase lokal
+    if (!code && pb) {
+      try {
+        const res = await pb.collection("settings").getList(1, 1);
+        if (res.items.length > 0 && (res.items[0] as any).offline_license) {
+          code = (res.items[0] as any).offline_license;
+          if (code) {
+            localStorage.setItem("exam_offline_license", code);
+          }
+        }
+      } catch (err) {
+        console.warn("Gagal membaca offline_license dari settings lokal:", err);
+      }
+    }
+
+    if (!code) {
+      setVerification({
+        valid: false,
+        message: "Server ini berjalan dalam mode offline lokal dan memerlukan konfirmasi izin resmi dari Super Admin."
+      });
+      setLicenseCode(null);
+      setChecking(false);
+      return;
+    }
+
+    const res = await verifyOfflineLicense(code);
+    setVerification(res);
+    setLicenseCode(code);
+    setChecking(false);
+  };
+
+  useEffect(() => {
+    checkLicense();
+  }, [school?.id]);
+
+  // Jika bukan server lokal offline mandiri, langsung lewati tanpa proteksi offline
+  if (school?.id !== "local_server") {
+    return <>{children}</>;
+  }
+
+  if (checking) {
+    return <LoadingScreen />;
+  }
+
+  // Jika lisensi belum ada, salah tanda tangan, atau sudah kadaluarsa
+  if (!verification?.valid) {
+    return (
+      <OfflineActivationGate
+        pb={pb}
+        currentLicense={licenseCode}
+        expiredReason={verification?.message}
+        onActivated={async () => {
+          await checkLicense();
+          await refreshSchool();
+        }}
+      />
+    );
+  }
+
+  return <>{children}</>;
+};
+
+export default OfflineServerGuard;

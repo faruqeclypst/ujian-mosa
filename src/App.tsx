@@ -18,6 +18,7 @@ import { StudentAuthProvider, useStudentAuth } from "./context/StudentAuthContex
 import { AuthProvider } from "./context/AuthContext";
 import ExambroGuard from "./components/auth/ExambroGuard";
 import AppVersionGuard from "./components/auth/AppVersionGuard";
+import OfflineServerGuard from "./components/auth/OfflineServerGuard";
 import StudentLoginPage from "./pages/student/StudentLoginPage";
 
 const StudentDashboardPage = lazy(() => import("./pages/student/StudentDashboardPage"));
@@ -113,7 +114,7 @@ const SchoolAppContent = () => {
   const isGlobalLoading = adminLoading || studentLoading;
 
   return (
-    <>
+    <OfflineServerGuard>
       {isGlobalLoading && !isAdminRoute ? (
         <LoadingScreen />
       ) : (
@@ -200,7 +201,7 @@ const SchoolAppContent = () => {
           </Routes>
         </Suspense>
       )}
-    </>
+    </OfflineServerGuard>
   );
 };
 
