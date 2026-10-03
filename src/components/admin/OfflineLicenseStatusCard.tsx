@@ -148,7 +148,7 @@ export const OfflineLicenseStatusCard: React.FC = () => {
                 </h2>
                 <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300">
                   <ShieldCheck size={12} />
-                  Resmi &amp; Sah
+                  {activeCode?.startsWith("EXAMKU-OFFLINE.v2") ? "RSA-2048 Asimetris" : "Resmi & Sah"}
                 </span>
               </div>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">

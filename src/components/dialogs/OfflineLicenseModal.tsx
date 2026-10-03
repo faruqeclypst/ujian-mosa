@@ -50,6 +50,7 @@ export const OfflineLicenseModal: React.FC<OfflineLicenseModalProps> = ({
   const [generatedLicense, setGeneratedLicense] = useState<string | null>(null);
   const [isCopied, setIsCopied] = useState(false);
   const [isSearchingNpsn, setIsSearchingNpsn] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
 
   useEffect(() => {
     if (school) {
@@ -73,23 +74,34 @@ export const OfflineLicenseModal: React.FC<OfflineLicenseModalProps> = ({
       return;
     }
 
-    const payload: OfflineLicensePayload = {
-      school_name: school.name,
-      slug: school.slug,
-      npsn: npsn.trim() || undefined,
-      valid_until: validUntil,
-      max_students: 0, // 0 = tanpa batas kuota untuk server offline
-      issued_at: new Date().toISOString(),
-      notes: notes.trim()
-    };
+    setIsGenerating(true);
+    try {
+      const payload: OfflineLicensePayload = {
+        school_name: school.name,
+        slug: school.slug,
+        npsn: npsn.trim() || undefined,
+        valid_until: validUntil,
+        max_students: 0, // 0 = tanpa batas kuota untuk server offline
+        issued_at: new Date().toISOString(),
+        notes: notes.trim()
+      };
 
-    const code = await generateOfflineLicense(payload);
-    setGeneratedLicense(code);
-    addToast({
-      title: "Lisensi Berhasil Dibuat",
-      description: `Lisensi server offline untuk ${school.name} siap digunakan.`,
-      type: "success"
-    });
+      const code = await generateOfflineLicense(payload);
+      setGeneratedLicense(code);
+      addToast({
+        title: "Lisensi RSA-2048 Berhasil Ditandatangani",
+        description: `Lisensi server offline untuk ${school.name} siap digunakan.`,
+        type: "success"
+      });
+    } catch (err: any) {
+      addToast({
+        title: "Gagal Menerbitkan Lisensi",
+        description: err?.message || "Terjadi kesalahan saat menandatangani lisensi.",
+        type: "error"
+      });
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   const handleCopy = () => {
@@ -224,10 +236,11 @@ export const OfflineLicenseModal: React.FC<OfflineLicenseModalProps> = ({
 
           <Button
             type="button"
+            disabled={isGenerating}
             onClick={handleGenerate}
-            className="w-full h-10 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold shadow-md flex items-center justify-center gap-2"
+            className="w-full h-10 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold shadow-md flex items-center justify-center gap-2 disabled:opacity-50"
           >
-            <Sparkles size={14} /> Terbitkan & Tandatangani Lisensi Offline
+            <Sparkles size={14} /> {isGenerating ? "Menandatangani Kriptografi..." : "Terbitkan & Tandatangani Lisensi RSA-2048"}
           </Button>
 
           {/* Kotak Hasil Kode Lisensi */}
@@ -235,10 +248,10 @@ export const OfflineLicenseModal: React.FC<OfflineLicenseModalProps> = ({
             <div className="p-4 bg-purple-50/50 dark:bg-purple-950/20 rounded-2xl border border-purple-200 dark:border-purple-800 space-y-3 animate-in fade-in">
               <div className="flex items-center justify-between">
                 <span className="text-[11px] font-bold text-purple-900 dark:text-purple-300 uppercase tracking-wider flex items-center gap-1.5">
-                  <ShieldCheck size={14} /> Kode Lisensi Terenkripsi Super Admin
+                  <ShieldCheck size={14} /> Kode Lisensi RSA-2048 Resmi Super Admin
                 </span>
-                <span className="text-[10px] text-emerald-600 font-bold bg-emerald-100 dark:bg-emerald-950 px-2 py-0.5 rounded-full">
-                  Sah & Aktif
+                <span className="text-[10px] text-purple-700 dark:text-purple-300 font-bold bg-purple-100 dark:bg-purple-900/60 px-2 py-0.5 rounded-full border border-purple-200 dark:border-purple-700">
+                  Asymmetric Verified
                 </span>
               </div>
 

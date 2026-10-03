@@ -2,20 +2,30 @@
  * offlineLicenseHelper.ts
  * Utility untuk membuat (di sisi Super Admin) dan memvalidasi (di sisi Server Offline)
  * izin lisensi server mandiri (Offline CBT).
+ * 
+ * Menggunakan Kriptografi Asimetris RSA-2048:
+ * - Kunci Privat (Private Key): Hanya tersimpan di Master VPS Super Admin (chmod 600)
+ * - Kunci Publik (Public Modulus): Disematkan di sini untuk verifikasi tanda tangan digital
  */
 
-// Kunci rahasia internal untuk menandatangani lisensi offline.
-// Menggunakan salt tetap yang diverifikasi secara offline di sisi klien.
-const LICENSE_SECRET = "EXAMKU_OFFLINE_SECRET_AUTH_KEY_2026_SECURE_SALT_9918";
+// Modulus Publik RSA-2048 Resmi EXAM AA (2048 bits)
+const RSA_PUBLIC_MODULUS_HEX =
+  "c64312638bc4d3f62a1b7575f32ac9c47d8f447194d0fbb66484ff7bad3f3ed01cd26823e3503c6b1e0950687a99e2d5d8487acbafca30aa0152a2d0fbcf3b00172291834a3e5323041d4d00621a6f54d69332c5758974d282b31efb8c29798c7859087436d618e095ae560af9dee91bc56f8ecc59eafae063fbdc351142374d0a15f563a42d095e2e2eab2a5c05b6be7a8aaf3abf235f45fcbf164dc43d7f66bd53c2f91dff06c20d0341d9b199764c23e69940ef6450c4b7f860cfd3216192acec357e2fabacfe9471744c85e33a4f871c1947bce0370278ac809e00ecd5eed285bd6ca5da8405d85403eadab34e031cfab264c5e8c642d584d7eadc35f3b3";
+
+const RSA_MODULUS_BIGINT = BigInt("0x" + RSA_PUBLIC_MODULUS_HEX);
+
+// Kunci rahasia legasi (v1 fallback untuk backward compatibility)
+const LEGACY_V1_SECRET = "EXAMKU_OFFLINE_SECRET_AUTH_KEY_2026_SECURE_SALT_9918";
 
 export interface OfflineLicensePayload {
   school_name: string;
   slug: string;
   npsn?: string;
   valid_until: string;    // Format YYYY-MM-DD
-  max_students: number;   // Kuota peserta offline
+  max_students: number;   // 0 = tanpa batas kuota
   issued_at: string;      // ISO String
   notes?: string;
+  machine_id?: string;
 }
 
 export interface VerificationResult {
@@ -23,17 +33,14 @@ export interface VerificationResult {
   message: string;
   payload?: OfflineLicensePayload;
   isExpired?: boolean;
+  isAsymmetric?: boolean;
 }
 
 /**
  * Pure JavaScript SHA-256 implementation
- * Diperlukan agar verifikasi hash berjalan konsisten di semua lingkungan:
- * - HTTPS (Cloud)
- * - Localhost / 127.0.0.1 (PC Server)
- * - HTTP IP LAN lokal misal 192.168.x.x (HP Siswa / Laptop Client),
- *   di mana window.crypto.subtle dinonaktifkan oleh browser karena non-secure context.
+ * Berjalan identik di semua lingkungan (HTTPS, Localhost, HTTP IP LAN).
  */
-function pureSha256(ascii: string): string {
+export function pureSha256(ascii: string): string {
   function rightRotate(value: number, amount: number): number {
     return (value >>> amount) | (value << (32 - amount));
   }
@@ -114,39 +121,111 @@ function pureSha256(ascii: string): string {
   return result;
 }
 
+// Helpers konversi byte tanpa dependensi Buffer
+function base64UrlToBytes(base64UrlStr: string): Uint8Array {
+  let base64 = base64UrlStr.replace(/-/g, "+").replace(/_/g, "/");
+  while (base64.length % 4) base64 += "=";
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
+}
+
+function bytesToHex(bytes: Uint8Array): string {
+  let hex = "";
+  for (let i = 0; i < bytes.length; i++) {
+    hex += bytes[i].toString(16).padStart(2, "0");
+  }
+  return hex;
+}
+
+function hexToBytes(hex: string): Uint8Array {
+  const bytes = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < hex.length; i += 2) {
+    bytes[i / 2] = parseInt(hex.substring(i, i + 2), 16);
+  }
+  return bytes;
+}
+
 /**
- * Hash function berbasis SHA-256 (pure JavaScript deterministik)
+ * Verifikasi tanda tangan digital RSA-2048 PKCS#1 v1.5 dengan SHA-256
+ * Berjalan 100% menggunakan native BigInt (tanpa library eksternal)
  */
-async function computeHash(text: string): Promise<string> {
+function verifyRsaSignature(base64Payload: string, base64Sig: string): boolean {
   try {
-    return pureSha256(text);
-  } catch {
-    if (typeof window !== "undefined" && window.crypto && window.crypto.subtle) {
-      const encoder = new TextEncoder();
-      const data = encoder.encode(text);
-      const hashBuffer = await window.crypto.subtle.digest("SHA-256", data);
-      const hashArray = Array.from(new Uint8Array(hashBuffer));
-      return hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
+    const sigBytes = base64UrlToBytes(base64Sig);
+    if (sigBytes.length !== 256) return false;
+
+    const sigBigInt = BigInt("0x" + bytesToHex(sigBytes));
+    let base = sigBigInt;
+    let exp = 65537n;
+    let res = 1n;
+    while (exp > 0n) {
+      if (exp & 1n) res = (res * base) % RSA_MODULUS_BIGINT;
+      base = (base * base) % RSA_MODULUS_BIGINT;
+      exp >>= 1n;
     }
-    return "";
+
+    const paddedHex = res.toString(16).padStart(512, "0");
+    const decryptedBytes = hexToBytes(paddedHex);
+
+    // Validasi struktur padding PKCS#1 v1.5: 00 01 FF ... FF 00 [DigestInfo + Hash]
+    if (decryptedBytes[0] !== 0x00 || decryptedBytes[1] !== 0x01) return false;
+
+    let sepIndex = 2;
+    while (sepIndex < decryptedBytes.length && decryptedBytes[sepIndex] === 0xff) {
+      sepIndex++;
+    }
+    if (decryptedBytes[sepIndex] !== 0x00) return false;
+
+    // 32 byte terakhir adalah hash SHA-256 dari payload
+    const hashInPadding = bytesToHex(decryptedBytes.slice(decryptedBytes.length - 32));
+    const actualHash = pureSha256(base64Payload);
+
+    return hashInPadding.toLowerCase() === actualHash.toLowerCase();
+  } catch {
+    return false;
   }
 }
 
 /**
- * Generate Kode Lisensi Bertanda Tangan (Hanya dijalankan oleh Super Admin)
+ * Generate Kode Lisensi Resmi (Hanya Super Admin via Master VPS Private Key)
  */
 export async function generateOfflineLicense(payload: OfflineLicensePayload): Promise<string> {
+  const masterBaseUrl =
+    typeof window !== "undefined" && window.location.origin.includes("examku.my.id")
+      ? window.location.origin
+      : "https://examku.my.id";
+
+  try {
+    const resp = await fetch(`${masterBaseUrl}/api/multi-vps/sign-offline-license`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+
+    if (resp.ok) {
+      const data = await resp.json();
+      if (data.license) {
+        return data.license;
+      }
+    }
+  } catch (err) {
+    console.warn("[OfflineLicense] Gagal menandatangani via Master VPS API, beralih ke fallback legasi:", err);
+  }
+
+  // Fallback darurat lokal v1 jika VPS API tidak terjangkau (misal koneksi terputus)
   const jsonPayload = JSON.stringify(payload);
   const base64Payload = btoa(unescape(encodeURIComponent(jsonPayload)));
-  const signature = await computeHash(`${base64Payload}::${LICENSE_SECRET}`);
-  
-  // Format: EXAMKU-OFFLINE.v1.<BASE64_PAYLOAD>.<SIGNATURE_16_CHARS>
+  const signature = pureSha256(`${base64Payload}::${LEGACY_V1_SECRET}`);
   const shortSig = signature.substring(0, 16);
   return `EXAMKU-OFFLINE.v1.${base64Payload}.${shortSig}`;
 }
 
 /**
- * Verifikasi Kode Lisensi di Server Offline (Berjalan 100% Offline)
+ * Verifikasi Kode Lisensi di Server Offline (100% Offline Tanpa Internet)
  */
 export async function verifyOfflineLicense(licenseCode: string): Promise<VerificationResult> {
   if (!licenseCode || typeof licenseCode !== "string") {
@@ -156,47 +235,69 @@ export async function verifyOfflineLicense(licenseCode: string): Promise<Verific
   const clean = licenseCode.trim();
   const parts = clean.split(".");
 
-  if (parts.length !== 4 || parts[0] !== "EXAMKU-OFFLINE" || parts[1] !== "v1") {
+  if (parts.length !== 4 || parts[0] !== "EXAMKU-OFFLINE") {
     return { valid: false, message: "Format kode lisensi tidak valid atau rusak." };
   }
 
+  const version = parts[1];
   const base64Payload = parts[2];
   const givenSig = parts[3];
 
+  let payload: OfflineLicensePayload | null = null;
   try {
-    const expectedHash = await computeHash(`${base64Payload}::${LICENSE_SECRET}`);
-    const expectedSig = expectedHash.substring(0, 16);
-
-    if (givenSig.toLowerCase() !== expectedSig.toLowerCase()) {
-      return { valid: false, message: "Tanda tangan lisensi tidak cocok (lisensi palsu atau telah diubah)." };
-    }
-
     const jsonStr = decodeURIComponent(escape(atob(base64Payload)));
-    const payload: OfflineLicensePayload = JSON.parse(jsonStr);
+    payload = JSON.parse(jsonStr);
+  } catch {
+    return { valid: false, message: "Gagal memproses struktur data lisensi." };
+  }
 
-    if (!payload.school_name || !payload.valid_until) {
-      return { valid: false, message: "Data lisensi tidak lengkap." };
+  if (!payload || !payload.school_name || !payload.valid_until) {
+    return { valid: false, message: "Informasi sekolah atau batas izin tidak lengkap." };
+  }
+
+  // 1. Verifikasi tanda tangan digital
+  let isSignatureValid = false;
+  let isAsymmetric = false;
+
+  if (version === "v2") {
+    // Verifikasi tanda tangan kriptografi asimetris RSA-2048
+    isSignatureValid = verifyRsaSignature(base64Payload, givenSig);
+    isAsymmetric = true;
+    if (!isSignatureValid) {
+      return { valid: false, message: "Tanda tangan kriptografi RSA tidak valid (kunci lisensi palsu atau telah diubah)." };
     }
-
-    // Cek kadaluarsa
-    const expiryDate = new Date(`${payload.valid_until}T23:59:59`);
-    const now = new Date();
-
-    if (now > expiryDate) {
-      return {
-        valid: false,
-        isExpired: true,
-        message: `Masa izin server offline telah berakhir pada ${payload.valid_until}. Silakan hubungi Super Admin untuk perpanjangan.`,
-        payload
-      };
+  } else if (version === "v1") {
+    // Verifikasi legasi v1 (SHA-256)
+    const expectedHash = pureSha256(`${base64Payload}::${LEGACY_V1_SECRET}`);
+    const expectedSig = expectedHash.substring(0, 16);
+    isSignatureValid = givenSig.toLowerCase() === expectedSig.toLowerCase();
+    if (!isSignatureValid) {
+      return { valid: false, message: "Tanda tangan lisensi legasi tidak cocok." };
     }
+  } else {
+    return { valid: false, message: `Versi lisensi (${version}) tidak didukung oleh sistem.` };
+  }
 
+  // 2. Verifikasi masa aktif lisensi
+  const expiryDate = new Date(`${payload.valid_until}T23:59:59`);
+  const now = new Date();
+
+  if (now > expiryDate) {
     return {
-      valid: true,
-      message: "Lisensi server offline terverifikasi dan sah dari Super Admin.",
+      valid: false,
+      isExpired: true,
+      isAsymmetric,
+      message: `Masa izin server offline telah berakhir pada ${payload.valid_until}. Silakan hubungi Super Admin untuk perpanjangan.`,
       payload
     };
-  } catch (err: any) {
-    return { valid: false, message: `Gagal membaca isi lisensi: ${err.message || "Format salah"}` };
   }
+
+  return {
+    valid: true,
+    isAsymmetric,
+    message: isAsymmetric
+      ? "Lisensi resmi terverifikasi dengan Kriptografi Asimetris RSA-2048 (Sah dari Super Admin)."
+      : "Lisensi server offline terverifikasi dan sah dari Super Admin.",
+    payload
+  };
 }

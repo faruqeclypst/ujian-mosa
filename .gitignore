@@ -13,6 +13,8 @@ keystore/
 *.jks
 *.keystore
 release-key.*
+*.pem
+license_private_key.*
 
 # Folder backup lokal (bukan template tenant).
 /backup pocketbase/
