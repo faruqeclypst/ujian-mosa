@@ -157,7 +157,7 @@ const FeaturesPage = () => {
             className="flex items-center gap-3 cursor-pointer group"
           >
             <div className="w-9 h-9 rounded-xl bg-white border border-slate-200 p-1 flex items-center justify-center shadow-2xs group-hover:scale-105 transition-transform">
-              <img src="/logo-exam-aa.png" alt="EXAM AA" className="w-full h-full object-contain" />
+              <img src="/logo-exam-aa.webp" alt="EXAM AA" className="w-full h-full object-contain" onError={(e) => { (e.target as HTMLImageElement).src = "/logo-exam-aa.png"; }} />
             </div>
             <div>
               <span className="font-extrabold text-slate-900 text-base sm:text-lg tracking-tight block leading-tight">
@@ -314,7 +314,7 @@ const FeaturesPage = () => {
         <div className="max-w-4xl mx-auto flex flex-col items-center gap-4">
           <div className="flex items-center gap-2.5">
             <div className="w-7 h-7 rounded-lg bg-white border border-slate-200 p-1 flex items-center justify-center shadow-2xs">
-              <img src="/logo-exam-aa.png" alt="EXAM AA" className="w-full h-full object-contain" />
+              <img src="/logo-exam-aa.webp" alt="EXAM AA" className="w-full h-full object-contain" onError={(e) => { (e.target as HTMLImageElement).src = "/logo-exam-aa.png"; }} />
             </div>
             <span className="font-extrabold text-slate-900 text-sm tracking-tight">EXAM AA</span>
           </div>

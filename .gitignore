@@ -31,3 +31,7 @@ scratch/
 *.apk
 public/*.apk
 
+# Offline and raw packaging assets
+offline_package/
+dist-shell/
+assets-raw/

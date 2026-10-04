@@ -42,15 +42,41 @@ const CapacitorOverlay = () => {
 
   useEffect(() => {
     // Only show on Android native platform
-    if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === "android") {
+    const isNativeAndroid =
+      (Capacitor.isNativePlatform() && Capacitor.getPlatform() === "android") ||
+      (typeof (window as any).AndroidExam !== "undefined");
+
+    if (isNativeAndroid) {
       setIsCapacitor(true);
+      (window as any).__EXAM_AA_CBT__ = true;
+
       try {
         CheatAlert.stopAlarm();
       } catch (e) {}
+
+      // Beritahu native Android untuk menyembunyikan tombol floating native agar tidak double button
+      try {
+        CheatAlert.notifyWebOverlayActive();
+      } catch (e) {}
+
+      try {
+        if (typeof (window as any).AndroidExam !== "undefined" && (window as any).AndroidExam.notifyWebOverlayActive) {
+          (window as any).AndroidExam.notifyWebOverlayActive();
+        }
+      } catch (e) {}
     }
 
-    // Block back button
-    const backListener = App.addListener("backButton", () => {});
+    // Handle back button: blokir saat ujian, buka modal keluar saat di luar ujian
+    const backListener = App.addListener("backButton", ({ canGoBack }) => {
+      if (window.location.pathname.includes("/cbt/")) {
+        return;
+      }
+      if (canGoBack && window.history.length > 1) {
+        window.history.back();
+      } else {
+        setDialogType("exit");
+      }
+    });
 
     // Sembunyikan FAB jika siswa di-kick karena double login
     const handleStudentKicked = () => {
@@ -68,8 +94,7 @@ const CapacitorOverlay = () => {
 
   const isExcludedRoute =
     window.location.pathname.startsWith("/admin") ||
-    window.location.pathname.startsWith("/superadmin") ||
-    window.location.pathname.startsWith("/browser");
+    window.location.pathname.startsWith("/superadmin");
 
   if (!isCapacitor || isExcludedRoute || isKickedOverlay) return null;
 
@@ -93,6 +118,13 @@ const CapacitorOverlay = () => {
         sessionStorage.removeItem("student_session_id");
         localStorage.removeItem("student_session_id");
       } catch (_) {}
+
+      if (typeof (window as any).AndroidExam !== "undefined" && (window as any).AndroidExam.exitApp) {
+        try {
+          (window as any).AndroidExam.exitApp();
+          return;
+        } catch (_) {}
+      }
 
       if (Capacitor.isNativePlatform()) {
         try {
@@ -121,6 +153,8 @@ const CapacitorOverlay = () => {
     <>
       {/* Draggable Menu Toggle */}
       <div
+        id="exam-aa-web-fab"
+        data-capacitor-overlay="true"
         ref={fabRef}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}

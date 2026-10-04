@@ -68,24 +68,10 @@ export const AppVersionGuard = ({ children }: AppVersionGuardProps) => {
             } catch (e) {
               console.warn("[AppVersionGuard] Gagal melepas lock task secara otomatis:", e);
             }
-          } else {
-            // Versi aplikasi up-to-date! Aktifkan mode kuncian ujian (Screen Pinning)
-            try {
-              await CheatAlert.enableLockMode();
-            } catch (e) {}
           }
-        } else {
-          // Tidak ada rule update, aktifkan mode kuncian
-          try {
-            await CheatAlert.enableLockMode();
-          } catch (e) {}
         }
       } catch (err) {
         console.warn("[AppVersionGuard] Gagal memeriksa versi dari Master PB:", err);
-        // Fallback jika offline, tetap aktifkan kuncian ujian
-        try {
-          await CheatAlert.enableLockMode();
-        } catch (e) {}
       } finally {
         setChecking(false);
       }

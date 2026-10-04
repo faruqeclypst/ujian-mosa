@@ -95,8 +95,8 @@ const SuperAdminAnalyticsPage = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
-          <h2 className="text-xl font-bold text-slate-900">Statistik Server</h2>
-          <p className="text-slate-500 text-sm mt-0.5">Analitik penggunaan sistem EXAM AA.</p>
+          <h2 className="text-xl font-bold text-slate-900 tracking-tight">Statistik Server</h2>
+          <p className="text-slate-500 text-sm mt-0.5">Analitik penggunaan sistem Examku CBT.</p>
         </div>
         <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-xl w-fit">
           <button className="px-4 py-2 text-sm font-semibold rounded-lg bg-white text-slate-800 shadow-sm">

@@ -4,7 +4,7 @@ import {
   Plus, Check, X, Edit, Power, PowerOff,
   School, Clock, Users, RefreshCw,
   Search, Trash2, Monitor, Zap, Server, ChevronDown,
-  Building2, Globe, Sparkles, ShieldCheck, Calendar, Cpu, BookOpen,
+  Building2, Globe, Sparkles, ShieldCheck, Calendar, Cpu, BookOpen, HardDrive,
   Activity, CheckCircle2, XCircle, AlertTriangle, Info, KeyRound, ChevronRight
 } from "lucide-react";
 import { masterPb } from "../../lib/pocketbase";
@@ -553,42 +553,45 @@ const SuperAdminDashboard = () => {
   return (
     <SuperAdminLayout>
       {/* Page Header */}
-      <div className="mb-6 flex justify-between items-start">
+      <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h2 className="text-xl font-bold text-slate-900">Dashboard</h2>
-          <p className="text-slate-500 text-sm mt-0.5">Manajemen tenant EXAM AA.</p>
+          <h2 className="text-xl font-bold text-slate-900 tracking-tight">Dashboard</h2>
+          <p className="text-slate-500 text-sm mt-0.5">Manajemen tenant Examku CBT.</p>
         </div>
-        <div className="text-[9px] text-slate-400 font-mono bg-slate-50/50 px-2 py-1.5 rounded-lg border border-slate-100 flex flex-col items-end max-w-[150px] leading-tight">
-          <span className="text-slate-300 mb-0.5">DB Connected</span>
-          <span className="break-all text-right opacity-70">{masterPb.baseUrl.replace('https://', '')}</span>
-          <span className="mt-1 font-bold text-slate-400">{schools.length} Records</span>
+        <div className="text-[10px] text-slate-500 font-mono bg-white px-3 py-1.5 rounded-xl border border-slate-200/80 flex items-center justify-between sm:justify-end gap-3 shadow-xs">
+          <div className="flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="text-slate-400">DB:</span>
+            <span className="font-semibold text-slate-700 truncate max-w-[160px] sm:max-w-[200px]">{masterPb.baseUrl.replace('https://', '')}</span>
+          </div>
+          <span className="font-bold text-blue-600 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-md">{schools.length} Tenant</span>
         </div>
       </div>
 
       {/* Banner Akses Cepat Lisensi Offline */}
-      <div className="mb-6 p-4 rounded-2xl bg-gradient-to-r from-purple-50 via-indigo-50/40 to-white border border-purple-200/80 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
+      <div className="mb-6 p-4 rounded-2xl bg-gradient-to-r from-purple-50 via-indigo-50/40 to-white border border-purple-200/80 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-start sm:items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-purple-600 flex items-center justify-center text-white flex-shrink-0 shadow-sm shadow-purple-600/20">
             <KeyRound size={20} />
           </div>
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <h3 className="font-bold text-slate-900 text-sm">Lisensi Server Mandiri (Offline CBT)</h3>
               <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-700 border border-purple-200">
                 RSA-2048
               </span>
             </div>
-            <p className="text-xs text-slate-500 mt-0.5">
+            <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">
               Kelola izin operasional CBT lokal proktor tanpa internet: pantau tanggal penerbitan key, sisa masa aktif, dan kirim lisensi ke WhatsApp proktor.
             </p>
           </div>
         </div>
         <Link
           to="/superadmin/offline-licenses"
-          className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-purple-600 hover:bg-purple-700 text-white shadow-sm transition-all whitespace-nowrap self-start sm:self-auto"
+          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 min-h-[44px] rounded-xl text-xs font-bold bg-purple-600 hover:bg-purple-700 active:bg-purple-800 text-white shadow-sm transition-all whitespace-nowrap self-stretch sm:self-auto flex-shrink-0"
         >
           <span>Kelola Lisensi Offline</span>
-          <ChevronRight size={14} />
+          <ChevronRight size={15} />
         </Link>
       </div>
 
@@ -878,7 +881,11 @@ const SuperAdminDashboard = () => {
                             <Server size={11} /> Database Engine
                           </a>
                           <div className="flex items-center gap-1.5 pl-3 pt-0.5">
-                            {school.server_host && school.server_host !== "127.0.0.1" && school.server_host !== "localhost" ? (
+                            {school.plan === "offline" ? (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200/80 px-2 py-0.5 rounded-md">
+                                <HardDrive size={10} className="text-emerald-600" /> Lokal Server (Offline)
+                              </span>
+                            ) : school.server_host && school.server_host !== "127.0.0.1" && school.server_host !== "localhost" ? (
                               <button
                                 type="button"
                                 onClick={() => setMigrationSchool(school)}
@@ -1099,7 +1106,11 @@ const SuperAdminDashboard = () => {
                       </a>
                     )}
                     <div className="flex items-center gap-1.5 pt-0.5">
-                      {school.server_host && school.server_host !== "127.0.0.1" && school.server_host !== "localhost" ? (
+                      {school.plan === "offline" ? (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200/80 px-2 py-0.5 rounded-md">
+                          <HardDrive size={11} className="text-emerald-600" /> Lokal Server (Offline)
+                        </span>
+                      ) : school.server_host && school.server_host !== "127.0.0.1" && school.server_host !== "localhost" ? (
                         <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-purple-700 bg-purple-50 border border-purple-200/70 px-2 py-0.5 rounded-md">
                           <Cpu size={11} className="text-purple-600" /> Worker Node: {school.server_host}
                         </span>
@@ -1111,23 +1122,27 @@ const SuperAdminDashboard = () => {
                     </div>
                   </div>
 
-                  <button
-                    onClick={() => setMigrationSchool(school)}
-                    className="w-full h-8 text-xs font-bold border border-purple-200 bg-purple-50 hover:bg-purple-100 text-purple-800 rounded-lg flex items-center justify-center gap-1.5 transition-all shadow-xs"
-                  >
-                    <Zap size={13} className="text-purple-600" />
-                    {school.server_host && school.server_host !== "127.0.0.1" && school.server_host !== "localhost"
-                      ? "Migrasi / Tarik ke Master VPS"
-                      : "1-Klik Burst Mode (Pindah ke Worker)"}
-                  </button>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                    <button
+                      onClick={() => setMigrationSchool(school)}
+                      className="min-h-[42px] px-3 py-2 text-xs font-bold border border-purple-200 bg-purple-50 hover:bg-purple-100 active:bg-purple-200 text-purple-800 rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-xs"
+                    >
+                      <Zap size={14} className="text-purple-600 flex-shrink-0" />
+                      <span className="truncate">
+                        {school.server_host && school.server_host !== "127.0.0.1" && school.server_host !== "localhost"
+                          ? "Migrasi ke Master"
+                          : "Burst Mode (Worker)"}
+                      </span>
+                    </button>
 
-                  <button
-                    onClick={() => setOfflineLicenseSchool(school)}
-                    className="w-full h-8 text-xs font-bold border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-800 rounded-lg flex items-center justify-center gap-1.5 transition-all shadow-xs"
-                  >
-                    <KeyRound size={13} className="text-indigo-600" />
-                    Izin Server Offline CBT
-                  </button>
+                    <button
+                      onClick={() => setOfflineLicenseSchool(school)}
+                      className="min-h-[42px] px-3 py-2 text-xs font-bold border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 active:bg-indigo-200 text-indigo-800 rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-xs"
+                    >
+                      <KeyRound size={14} className="text-indigo-600 flex-shrink-0" />
+                      <span className="truncate">Izin Offline CBT</span>
+                    </button>
+                  </div>
 
                   {(() => {
                     const pendingRenewal = requests.find(r => (r.slug_request === school.slug || r.school_name?.toLowerCase() === school.name?.toLowerCase()) && r.type === "renewal" && r.status === "pending");
@@ -1135,10 +1150,10 @@ const SuperAdminDashboard = () => {
                       return (
                         <button
                           onClick={() => handleApproveRenewalRequest(pendingRenewal)}
-                          className="w-full h-8 text-xs font-bold border border-purple-300 bg-purple-50 hover:bg-purple-100 text-purple-900 rounded-lg flex items-center justify-center gap-1.5 transition-all shadow-xs animate-pulse"
+                          className="w-full min-h-[42px] px-3 py-2 text-xs font-bold border border-purple-300 bg-purple-50 hover:bg-purple-100 active:bg-purple-200 text-purple-900 rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-xs animate-pulse"
                         >
-                          <Clock size={13} className="text-purple-700" />
-                          Terbitkan Tagihan Perpanjangan ({pendingRenewal.duration || "1 Tahun"})
+                          <Clock size={14} className="text-purple-700 flex-shrink-0" />
+                          <span>Terbitkan Tagihan Perpanjangan ({pendingRenewal.duration || "1 Tahun"})</span>
                         </button>
                       );
                     }
@@ -1147,38 +1162,40 @@ const SuperAdminDashboard = () => {
                         <button
                           onClick={() => handleSendRenewalInvoice(school)}
                           disabled={sendingRenewalId === school.id}
-                          className="w-full h-8 text-xs font-bold border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-900 rounded-lg flex items-center justify-center gap-1.5 transition-all shadow-xs"
+                          className="w-full min-h-[42px] px-3 py-2 text-xs font-bold border border-amber-300 bg-amber-50 hover:bg-amber-100 active:bg-amber-200 text-amber-900 rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-xs disabled:opacity-60"
                         >
-                          <Clock size={13} className={sendingRenewalId === school.id ? "animate-spin text-amber-700" : "text-amber-700"} />
-                          {sendingRenewalId === school.id ? "Memproses..." : "Terbitkan Tagihan Perpanjangan"}
+                          <Clock size={14} className={sendingRenewalId === school.id ? "animate-spin text-amber-700" : "text-amber-700"} />
+                          <span>{sendingRenewalId === school.id ? "Memproses..." : "Terbitkan Tagihan Perpanjangan"}</span>
                         </button>
                       );
                     }
                     return null;
                   })()}
+
                   <div className="flex items-center gap-2 pt-1">
                     <button
                       onClick={() => { setEditSchool(school); setShowAddModal(true); }}
-                      className="flex-1 h-8 text-xs font-semibold border border-slate-200 bg-white text-slate-700 rounded-lg flex items-center justify-center gap-1 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 transition-all"
+                      className="flex-1 min-h-[42px] text-xs font-bold border border-slate-200 bg-white text-slate-700 rounded-xl flex items-center justify-center gap-1.5 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 active:bg-blue-100 transition-all shadow-xs"
                     >
-                      <Edit size={13} /> Edit
+                      <Edit size={14} /> Edit
                     </button>
                     <button
                       onClick={() => toggleActive(school)}
                       className={cn(
-                        "flex-1 h-8 text-xs font-semibold border bg-white rounded-lg flex items-center justify-center gap-1 transition-all",
+                        "flex-1 min-h-[42px] text-xs font-bold border bg-white rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-xs",
                         school.is_active
-                          ? "border-amber-200 text-amber-600 hover:bg-amber-50"
-                          : "border-emerald-200 text-emerald-600 hover:bg-emerald-50"
+                          ? "border-amber-200 text-amber-700 hover:bg-amber-50 active:bg-amber-100"
+                          : "border-emerald-200 text-emerald-700 hover:bg-emerald-50 active:bg-emerald-100"
                       )}
                     >
-                      {school.is_active ? <><PowerOff size={13} /> Nonaktif</> : <><Power size={13} /> Aktifkan</>}
+                      {school.is_active ? <><PowerOff size={14} /> Nonaktif</> : <><Power size={14} /> Aktifkan</>}
                     </button>
                     <button
                       onClick={() => deleteSchool(school)}
-                      className="h-8 w-8 border border-red-200 bg-white text-red-500 rounded-lg flex items-center justify-center hover:bg-red-50 transition-all flex-shrink-0"
+                      className="min-h-[42px] min-w-[42px] border border-red-200 bg-white text-red-500 rounded-xl flex items-center justify-center hover:bg-red-50 active:bg-red-100 transition-all flex-shrink-0 shadow-xs"
+                      title="Hapus institusi"
                     >
-                      <Trash2 size={13} />
+                      <Trash2 size={15} />
                     </button>
                   </div>
                 </div>
@@ -1428,19 +1445,28 @@ const SuperAdminDashboard = () => {
                     {getSchoolDomain(req.slug_request)}
                   </code>
                   <p className="text-xs text-slate-600">{req.contact_email}</p>
-                  <div className="flex gap-2">
+                  <div className="flex items-center gap-2 pt-1">
                     {req.status === "pending" ? (
                       <>
                         {req.type === "renewal" ? (
-                          <button onClick={() => approveRequest(req)} className="flex-1 h-8 bg-purple-600 text-white text-xs font-bold rounded-lg flex items-center justify-center gap-1 shadow-sm">
-                            <Check size={13} /> Terbitkan Tagihan
+                          <button
+                            onClick={() => approveRequest(req)}
+                            className="flex-1 min-h-[42px] px-3 py-2 bg-purple-600 hover:bg-purple-700 active:bg-purple-800 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 shadow-sm transition-all"
+                          >
+                            <Check size={14} /> Terbitkan Tagihan
                           </button>
                         ) : (
-                          <button onClick={() => approveRequest(req)} className="flex-1 h-8 bg-emerald-600 text-white text-xs font-bold rounded-lg flex items-center justify-center gap-1">
-                            <Check size={13} /> Buat Institusi
+                          <button
+                            onClick={() => approveRequest(req)}
+                            className="flex-1 min-h-[42px] px-3 py-2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 shadow-sm transition-all"
+                          >
+                            <Check size={14} /> Buat Institusi
                           </button>
                         )}
-                        <button onClick={() => rejectRequest(req)} className="h-8 px-3 border border-slate-200 text-slate-600 text-xs font-semibold rounded-lg">
+                        <button
+                          onClick={() => rejectRequest(req)}
+                          className="min-h-[42px] px-3.5 border border-slate-200 bg-white hover:bg-red-50 hover:text-red-600 text-slate-700 text-xs font-bold rounded-xl transition-all shadow-xs"
+                        >
                           Tolak
                         </button>
                       </>
@@ -1449,7 +1475,7 @@ const SuperAdminDashboard = () => {
                         {req.type === "renewal" ? (
                           <a
                             href="/superadmin/invoice"
-                            className="flex-1 h-8 bg-purple-50 text-purple-700 border border-purple-200 text-xs font-semibold rounded-lg flex items-center justify-center gap-1"
+                            className="flex-1 min-h-[42px] px-3 py-2 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 shadow-xs transition-all"
                           >
                             Lihat Invoice
                           </a>
@@ -1459,33 +1485,37 @@ const SuperAdminDashboard = () => {
                             return (
                               <button
                                 onClick={() => { setEditSchool(existingSchool); setShowAddModal(true); }}
-                                className="flex-1 h-8 bg-blue-50 text-blue-700 border border-blue-200 text-xs font-semibold rounded-lg flex items-center justify-center gap-1"
+                                className="flex-1 min-h-[42px] px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 shadow-xs transition-all"
                               >
-                                <Edit size={12} /> Edit Tenant
+                                <Edit size={13} /> Edit Tenant
                               </button>
                             );
                           } else {
                             return (
                               <button
                                 onClick={() => approveRequest(req)}
-                                className="flex-1 h-8 bg-emerald-600 text-white text-xs font-bold rounded-lg flex items-center justify-center gap-1"
+                                className="flex-1 min-h-[42px] px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 shadow-sm transition-all"
                               >
-                                <Plus size={12} /> Buat Tenant
+                                <Plus size={13} /> Buat Tenant
                               </button>
                             );
                           }
                         })()}
                         <button
                           onClick={() => resetRequestStatus(req, "pending")}
-                          className="h-8 px-2.5 text-xs font-semibold text-slate-600 border border-slate-200 rounded-lg hover:bg-amber-50 hover:text-amber-700"
+                          className="min-h-[42px] px-3 text-xs font-semibold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-amber-50 hover:text-amber-700 transition-all shadow-xs"
                           title="Kembalikan status pendaftaran ke Menunggu / Pending"
                         >
                           Reset
                         </button>
                       </div>
                     )}
-                    <button onClick={() => deleteRequest(req)} className="h-8 w-8 border border-slate-200 text-slate-400 rounded-lg flex items-center justify-center hover:text-red-600">
-                      <Trash2 size={13} />
+                    <button
+                      onClick={() => deleteRequest(req)}
+                      className="min-h-[42px] min-w-[42px] border border-slate-200 bg-white text-slate-400 hover:text-red-600 hover:bg-red-50 hover:border-red-200 rounded-xl flex items-center justify-center transition-all flex-shrink-0 shadow-xs"
+                      title="Hapus pendaftaran"
+                    >
+                      <Trash2 size={15} />
                     </button>
                   </div>
                 </div>
@@ -2219,6 +2249,7 @@ const AddEditSchoolModal = ({
                   <option value="basic">Paket Berkembang (250 Siswa)</option>
                   <option value="pro">Paket Lanjutan (500 Siswa)</option>
                   <option value="ultimate">Paket Premium (1000 Siswa)</option>
+                  <option value="offline">Lokal Server / Mandiri (Offline CBT)</option>
                 </select>
                 <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
               </div>

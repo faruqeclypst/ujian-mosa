@@ -454,7 +454,7 @@ const StudentDashboardPage = () => {
             {schoolLogo ? (
               <img src={schoolLogo} className="h-6 w-6 sm:h-9 sm:w-9 object-contain" alt="Logo" />
             ) : (
-              <img src="/logo-default.png" className="h-6 w-6 sm:h-9 sm:w-9 object-contain opacity-50" alt="Default Logo" />
+              <img src="/logo-default.webp" className="h-6 w-6 sm:h-9 sm:w-9 object-contain opacity-50" alt="Default Logo" onError={(e) => { (e.target as HTMLImageElement).src = "/logo-default.png"; }} />
             )}
           </div>
           <div className="flex flex-col -space-y-0.5 sm:-space-y-1 sm:max-w-none justify-center">

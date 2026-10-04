@@ -219,21 +219,26 @@ export const SuperAdminMultiVpsDocsPage: React.FC = () => {
             {mobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
           </button>
 
-          <Link to="/docs" className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-700 rounded-xl flex items-center justify-center shadow-md shadow-blue-500/20">
-              <ShieldCheck size={18} className="text-white" />
+          <Link to="/docs" className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-slate-50 border border-slate-200 p-0.5 flex items-center justify-center shadow-2xs shrink-0">
+              <img
+                src="/logo-default.webp"
+                onError={(e) => { (e.target as HTMLImageElement).src = "/logo-default.png"; }}
+                alt="Examku Logo"
+                className="w-full h-full object-contain"
+              />
             </div>
             <div className="flex flex-col">
               <div className="flex items-center gap-1.5">
                 <span className="text-sm font-bold text-slate-900 tracking-tight leading-none">
-                  EXAM AA
+                  EXAMKU
                 </span>
                 <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 leading-none">
                   Docs
                 </span>
               </div>
               <span className="text-[10px] font-semibold text-slate-400 tracking-widest uppercase mt-0.5">
-                Dokumentasi Sistem
+                Dokumentasi Multi-VPS
               </span>
             </div>
           </Link>

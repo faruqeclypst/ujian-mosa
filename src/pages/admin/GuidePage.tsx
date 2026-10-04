@@ -16,31 +16,31 @@ import { ExambroGuideModal } from "../../components/dialogs/ExambroGuideModal";
 // --- Advanced Documentation Components ---
 
 const DocSection = ({ id, title, icon: Icon, children }: any) => (
-  <section id={id} className="scroll-mt-28 space-y-8 py-12 border-t border-slate-200 dark:border-slate-800 first:border-0 first:pt-0">
-    <div className="flex items-center gap-4">
-      <div className="w-12 h-12 bg-blue-600/10 dark:bg-blue-400/10 rounded-2xl flex items-center justify-center flex-shrink-0 text-blue-600 dark:text-blue-400 shadow-sm border border-blue-100 dark:border-blue-900/30">
-        <Icon size={24} strokeWidth={2.5} />
+  <section id={id} className="scroll-mt-20 sm:scroll-mt-28 space-y-6 sm:space-y-8 py-8 sm:py-12 border-t border-slate-200 dark:border-slate-800 first:border-0 first:pt-0">
+    <div className="flex items-center gap-3 sm:gap-4">
+      <div className="w-10 h-10 sm:w-12 sm:h-12 bg-blue-600/10 dark:bg-blue-400/10 rounded-xl sm:rounded-2xl flex items-center justify-center shrink-0 text-blue-600 dark:text-blue-400 shadow-sm border border-blue-100 dark:border-blue-900/30">
+        <Icon size={20} className="sm:w-6 sm:h-6" strokeWidth={2.5} />
       </div>
       <div>
-        <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight">
+        <h2 className="text-xl sm:text-2xl md:text-3xl font-black text-slate-900 dark:text-white tracking-tight">
           {title}
         </h2>
-        <div className="h-1 w-12 bg-blue-600 rounded-full mt-2" />
+        <div className="h-1 w-10 sm:w-12 bg-blue-600 rounded-full mt-1.5 sm:mt-2" />
       </div>
     </div>
-    <div className="text-slate-600 dark:text-slate-400 leading-relaxed space-y-8">
+    <div className="text-slate-600 dark:text-slate-400 leading-relaxed space-y-6 sm:space-y-8 text-xs sm:text-sm md:text-base">
       {children}
     </div>
   </section>
 );
 
 const SubSection = ({ title, children, icon: Icon }: any) => (
-  <div className="space-y-4">
-    <h3 className="text-lg font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2.5">
-      {Icon && <Icon size={18} className="text-blue-500" />}
-      {title}
+  <div className="space-y-3 sm:space-y-4">
+    <h3 className="text-base sm:text-lg font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+      {Icon && <Icon size={18} className="text-blue-500 shrink-0" />}
+      <span>{title}</span>
     </h3>
-    <div className="pl-0 sm:pl-7 space-y-4 text-sm sm:text-base">
+    <div className="pl-0 sm:pl-7 space-y-3 sm:space-y-4 text-xs sm:text-sm md:text-base leading-relaxed">
       {children}
     </div>
   </div>
@@ -48,37 +48,37 @@ const SubSection = ({ title, children, icon: Icon }: any) => (
 
 const AlertBox = ({ type = "info", title, children }: any) => {
   const styles = {
-    info: "bg-blue-50/40 dark:bg-blue-950/20 border-blue-200/60 dark:border-blue-800/60 text-blue-800 dark:text-blue-300",
-    warning: "bg-amber-50/40 dark:bg-amber-900/20 border-amber-200/60 dark:border-amber-800/60 text-amber-800 dark:text-amber-300",
-    success: "bg-emerald-50/40 dark:bg-emerald-900/20 border-emerald-200/60 dark:border-emerald-800/60 text-emerald-800 dark:text-emerald-300",
-    danger: "bg-rose-50/40 dark:bg-rose-950/20 border-rose-200/60 dark:border-rose-800/60 text-rose-800 dark:text-rose-300"
+    info: "bg-blue-50/50 dark:bg-blue-950/20 border-blue-200/60 dark:border-blue-800/60 text-blue-800 dark:text-blue-300",
+    warning: "bg-amber-50/50 dark:bg-amber-900/20 border-amber-200/60 dark:border-amber-800/60 text-amber-800 dark:text-amber-300",
+    success: "bg-emerald-50/50 dark:bg-emerald-900/20 border-emerald-200/60 dark:border-emerald-800/60 text-emerald-800 dark:text-emerald-300",
+    danger: "bg-rose-50/50 dark:bg-rose-950/20 border-rose-200/60 dark:border-rose-800/60 text-rose-800 dark:text-rose-300"
   };
   const icons = {
-    info: <Info size={18} className="shrink-0 mt-0.5" />,
-    warning: <AlertCircle size={18} className="shrink-0 mt-0.5" />,
-    success: <CheckCircle2 size={18} className="shrink-0 mt-0.5" />,
-    danger: <ShieldAlert size={18} className="shrink-0 mt-0.5" />
+    info: <Info size={18} className="shrink-0 mt-0.5 text-blue-600 dark:text-blue-400" />,
+    warning: <AlertCircle size={18} className="shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />,
+    success: <CheckCircle2 size={18} className="shrink-0 mt-0.5 text-emerald-600 dark:text-emerald-400" />,
+    danger: <ShieldAlert size={18} className="shrink-0 mt-0.5 text-rose-600 dark:text-rose-400" />
   };
   return (
-    <div className={cn("p-6 rounded-2xl border flex gap-4 my-6 shadow-sm", styles[type as keyof typeof styles])}>
+    <div className={cn("p-4 sm:p-5 rounded-xl sm:rounded-2xl border flex gap-3 sm:gap-4 my-4 sm:my-6 shadow-sm", styles[type as keyof typeof styles])}>
       {icons[type as keyof typeof icons]}
-      <div className="flex-1">
-        {title && <h4 className="font-bold text-sm mb-1.5 uppercase tracking-wider">{title}</h4>}
-        <div className="text-[13px] sm:text-sm leading-relaxed opacity-90">{children}</div>
+      <div className="flex-1 min-w-0">
+        {title && <h4 className="font-bold text-xs sm:text-sm mb-1 uppercase tracking-wider">{title}</h4>}
+        <div className="text-xs sm:text-sm leading-relaxed opacity-95 break-words">{children}</div>
       </div>
     </div>
   );
 };
 
 const Step = ({ number, title, children }: any) => (
-  <div className="flex gap-6 items-start relative group">
-    <div className="absolute left-[19px] top-10 bottom-[-16px] w-px bg-slate-200 dark:bg-slate-800 group-last:hidden" />
-    <div className="w-10 h-10 rounded-xl bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 flex items-center justify-center font-black text-sm shrink-0 z-10 border border-slate-200 dark:border-slate-800 shadow-sm transition-all group-hover:scale-110 group-hover:border-blue-500 group-hover:text-blue-600">
+  <div className="flex gap-3 sm:gap-5 items-start relative group">
+    <div className="absolute left-[15px] sm:left-[19px] top-9 sm:top-10 bottom-[-16px] w-px bg-slate-200 dark:bg-slate-800 group-last:hidden" />
+    <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 flex items-center justify-center font-black text-xs sm:text-sm shrink-0 z-10 border border-slate-200 dark:border-slate-800 shadow-sm transition-all group-hover:scale-105 group-hover:border-blue-500 group-hover:text-blue-600">
       {number}
     </div>
-    <div className="pt-2 pb-8 flex-1">
-      <h4 className="text-base font-bold text-slate-900 dark:text-white mb-2 tracking-tight group-hover:text-blue-600 transition-colors">{title}</h4>
-      <div className="text-[13px] sm:text-sm text-slate-500 dark:text-slate-400 leading-relaxed font-medium">
+    <div className="pt-1 sm:pt-1.5 pb-6 sm:pb-8 flex-1 min-w-0">
+      <h4 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white mb-1.5 tracking-tight group-hover:text-blue-600 transition-colors">{title}</h4>
+      <div className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 leading-relaxed font-medium">
         {children}
       </div>
     </div>
@@ -86,15 +86,15 @@ const Step = ({ number, title, children }: any) => (
 );
 
 const FeatureGrid = ({ items }: { items: { icon: any, label: string, desc: string, color: string }[] }) => (
-  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mt-4">
     {items.map((item, idx) => (
-      <div key={idx} className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800/60 shadow-sm flex gap-4 transition-all hover:shadow-md hover:border-slate-200 dark:hover:border-slate-700">
-        <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-sm", item.color)}>
-          <item.icon size={20} />
+      <div key={idx} className="p-4 sm:p-5 rounded-xl sm:rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800/60 shadow-sm flex gap-3.5 sm:gap-4 transition-all hover:shadow-md hover:border-slate-200 dark:hover:border-slate-700">
+        <div className={cn("w-9 h-9 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl flex items-center justify-center shrink-0 shadow-sm", item.color)}>
+          <item.icon size={18} className="sm:w-5 sm:h-5" />
         </div>
-        <div>
-          <h5 className="text-sm font-bold text-slate-900 dark:text-white mb-1">{item.label}</h5>
-          <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed font-medium">{item.desc}</p>
+        <div className="min-w-0">
+          <h5 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white mb-1 truncate">{item.label}</h5>
+          <p className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 leading-relaxed font-medium">{item.desc}</p>
         </div>
       </div>
     ))}
@@ -191,143 +191,191 @@ const GuidePage = () => {
   };
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8 pb-24 animate-in fade-in duration-700">
+    <div className="max-w-7xl mx-auto space-y-6 sm:space-y-8 pb-24 animate-in fade-in duration-700">
       
       {/* ── Page Hero Header ── */}
-      <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-xl relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-blue-500/10 dark:bg-blue-400/5 rounded-full blur-[100px] -mr-40 -mt-40 pointer-events-none" />
-        <div className="absolute bottom-0 left-0 w-64 h-64 bg-indigo-500/10 dark:bg-indigo-400/5 rounded-full blur-[80px] -ml-20 -mb-20 pointer-events-none" />
+      <div className="bg-white dark:bg-slate-900 rounded-2xl sm:rounded-3xl border border-slate-200 dark:border-slate-800 shadow-md relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-80 h-80 sm:w-96 sm:h-96 bg-blue-500/10 dark:bg-blue-400/5 rounded-full blur-[90px] -mr-32 -mt-32 pointer-events-none" />
+        <div className="absolute bottom-0 left-0 w-60 h-60 sm:w-64 sm:h-64 bg-indigo-500/10 dark:bg-indigo-400/5 rounded-full blur-[70px] -ml-20 -mb-20 pointer-events-none" />
         
-        <div className="p-8 sm:p-12 relative z-10 flex flex-col md:flex-row items-center md:items-start justify-between gap-8">
-          <div className="flex flex-col md:flex-row items-center md:items-start gap-6 text-center md:text-left">
-            <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-3xl bg-blue-600 flex items-center justify-center shadow-2xl shadow-blue-500/40 shrink-0 border-4 border-white dark:border-slate-800 rotate-3 transform transition-transform hover:rotate-0 duration-500">
-              <BookOpen size={40} className="text-white" strokeWidth={2.5} />
+        <div className="p-4 sm:p-7 md:p-10 relative z-10 space-y-6">
+          <div className="flex flex-col md:flex-row items-center md:items-start gap-4 sm:gap-6 text-center md:text-left">
+            <div className="w-14 h-14 sm:w-20 sm:h-20 rounded-2xl sm:rounded-3xl bg-blue-600 flex items-center justify-center shadow-xl shadow-blue-500/30 shrink-0 border-2 sm:border-4 border-white dark:border-slate-800 rotate-2 sm:rotate-3 transform transition-transform hover:rotate-0 duration-500">
+              <BookOpen size={28} className="sm:w-10 sm:h-10 text-white" strokeWidth={2.5} />
             </div>
-            <div className="space-y-4">
-              <div className="flex flex-wrap items-center justify-center md:justify-start gap-2">
-                <Badge className="bg-blue-600 text-white border-0 font-black uppercase tracking-widest text-[10px] px-3 py-1">Documentation Hub</Badge>
-                <Badge variant="outline" className="text-slate-400 border-slate-200 dark:border-slate-800 font-black uppercase tracking-widest text-[10px] px-3 py-1 shadow-sm">Version 2.5.4</Badge>
-                <Badge className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-800/50 font-black uppercase tracking-widest text-[10px] px-3 py-1">Online</Badge>
+            <div className="space-y-2.5 sm:space-y-3 flex-1 min-w-0">
+              <div className="flex flex-wrap items-center justify-center md:justify-start gap-1.5 sm:gap-2">
+                <Badge className="bg-blue-600 text-white border-0 font-black uppercase tracking-widest text-[9px] sm:text-[10px] px-2.5 sm:px-3 py-0.5 sm:py-1">Documentation Hub</Badge>
+                <Badge variant="outline" className="text-slate-400 border-slate-200 dark:border-slate-800 font-black uppercase tracking-widest text-[9px] sm:text-[10px] px-2.5 sm:px-3 py-0.5 sm:py-1 shadow-sm">Version 2.5.4</Badge>
+                <Badge className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-800/50 font-black uppercase tracking-widest text-[9px] sm:text-[10px] px-2.5 sm:px-3 py-0.5 sm:py-1">Online</Badge>
               </div>
               <div>
-                <h1 className="text-3xl sm:text-5xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">
+                <h1 className="text-2xl sm:text-4xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">
                   EXAM AA <span className="text-blue-600">Full Guide</span>
                 </h1>
-                <p className="text-base sm:text-xl font-medium text-slate-500 dark:text-slate-400 mt-4 max-w-2xl leading-relaxed">
+                <p className="text-xs sm:text-base md:text-lg font-medium text-slate-500 dark:text-slate-400 mt-2 sm:mt-3 max-w-2xl leading-relaxed">
                   Pelajari setiap sudut aplikasi EXAM AA mulai dari pengelolaan data master yang mendasar hingga pemanfaatan Kecerdasan Buatan (AI) yang canggih.
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="flex flex-col gap-3 w-full md:w-auto relative">
-            <button
-              className="lg:hidden flex items-center justify-between px-6 py-4 bg-slate-100 dark:bg-slate-800 rounded-2xl text-sm font-black uppercase tracking-widest text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 transition-all active:scale-95 shadow-sm"
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            >
-              <span className="flex items-center gap-3">
-                {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
-                Explore Chapters
-              </span>
-            </button>
-            <div className="hidden lg:flex items-center gap-2 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800">
-               <Search size={16} className="text-slate-400 ml-2" />
-               <input 
-                 ref={searchInputRef}
-                 type="text" 
-                 value={searchQuery}
-                 onChange={(e) => {
-                   setSearchQuery(e.target.value);
-                   setShowSearchResults(true);
-                 }}
-                 onFocus={() => setShowSearchResults(true)}
-                 placeholder="Cepat cari panduan..." 
-                 className="bg-transparent border-0 outline-none text-xs font-bold text-slate-600 dark:text-slate-300 w-40 placeholder:text-slate-400" 
-               />
-               <Kbd>Ctrl</Kbd> <Kbd>K</Kbd>
-            </div>
-
-            {/* Floating Search Results */}
-            {showSearchResults && searchQuery.length > 0 && (
-              <div 
-                ref={searchResultsRef}
-                className="absolute top-full mt-2 left-0 right-0 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl z-[60] overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200"
-              >
-                <div className="p-3 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50">
-                  <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Hasil Pencarian ({searchResults.length})</h4>
-                </div>
-                <div className="max-h-[300px] overflow-y-auto p-2 space-y-1">
-                  {searchResults.length > 0 ? (
-                    searchResults.map((item) => (
-                      <button
-                        key={item.id}
-                        onClick={() => handleNavClick(item.id)}
-                        className="w-full text-left flex items-center gap-4 px-4 py-3 rounded-xl hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all group"
-                      >
-                        <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 group-hover:text-blue-600 group-hover:bg-blue-100 dark:group-hover:bg-blue-900/40 transition-colors">
-                          <item.icon size={16} />
-                        </div>
-                        <div>
-                          <p className="text-xs font-bold text-slate-900 dark:text-white">{item.label}</p>
-                          <p className="text-[10px] text-slate-500 dark:text-slate-400 line-clamp-1">{item.keywords}</p>
-                        </div>
-                      </button>
-                    ))
-                  ) : (
-                    <div className="p-8 text-center">
-                      <p className="text-xs font-bold text-slate-400">Tidak ada hasil ditemukan.</p>
-                    </div>
+          {/* Search bar & quick action */}
+          <div className="pt-2 sm:pt-4 border-t border-slate-100 dark:border-slate-800 relative">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+              <div className="relative flex-1">
+                <div className="flex items-center gap-2 px-3 py-2.5 sm:py-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl sm:rounded-2xl border border-slate-200/80 dark:border-slate-700/60 transition-all focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500">
+                  <Search size={16} className="text-slate-400 shrink-0" />
+                  <input 
+                    ref={searchInputRef}
+                    type="text" 
+                    value={searchQuery}
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value);
+                      setShowSearchResults(true);
+                    }}
+                    onFocus={() => setShowSearchResults(true)}
+                    placeholder="Cari bab, topik, atau fitur panduan..." 
+                    className="bg-transparent border-0 outline-none text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-200 w-full placeholder:text-slate-400" 
+                  />
+                  {searchQuery && (
+                    <button 
+                      onClick={() => { setSearchQuery(""); setShowSearchResults(false); }}
+                      className="p-1 text-slate-400 hover:text-slate-600"
+                    >
+                      <X size={14} />
+                    </button>
                   )}
+                  <span className="hidden sm:inline-flex items-center gap-1">
+                    <Kbd>Ctrl</Kbd> <Kbd>K</Kbd>
+                  </span>
                 </div>
+
+                {/* Floating Search Results */}
+                {showSearchResults && searchQuery.length > 0 && (
+                  <div 
+                    ref={searchResultsRef}
+                    className="absolute top-full mt-2 left-0 right-0 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200"
+                  >
+                    <div className="p-3 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 flex items-center justify-between">
+                      <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Hasil Pencarian ({searchResults.length})</h4>
+                      <button onClick={() => setShowSearchResults(false)} className="text-slate-400 hover:text-slate-600">
+                        <X size={14} />
+                      </button>
+                    </div>
+                    <div className="max-h-[280px] overflow-y-auto p-2 space-y-1">
+                      {searchResults.length > 0 ? (
+                        searchResults.map((item) => (
+                          <button
+                            key={item.id}
+                            onClick={() => handleNavClick(item.id)}
+                            className="w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all group"
+                          >
+                            <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 group-hover:text-blue-600 group-hover:bg-blue-100 dark:group-hover:bg-blue-900/40 transition-colors shrink-0">
+                              <item.icon size={16} />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="text-xs font-bold text-slate-900 dark:text-white truncate">{item.label}</p>
+                              <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">{item.keywords}</p>
+                            </div>
+                          </button>
+                        ))
+                      ) : (
+                        <div className="p-6 text-center">
+                          <p className="text-xs font-bold text-slate-400">Tidak ada topik panduan ditemukan.</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
-            )}
+
+              <div className="flex items-center gap-2 shrink-0">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsExambroGuideOpen(true)}
+                  className="rounded-xl text-xs font-bold h-10 px-3.5 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 flex items-center gap-2 shrink-0 w-full sm:w-auto justify-center"
+                >
+                  <Download size={14} />
+                  <span>Panduan SEB / APK</span>
+                </Button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
+      {/* ── Mobile Sticky Chapter Pill Bar (Swipable) ── */}
+      <div className="lg:hidden sticky top-2 z-30 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md p-1.5 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-md">
+        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar scroll-smooth">
+          {NAV_ITEMS.map((item) => (
+            <button
+              key={item.id}
+              onClick={() => handleNavClick(item.id)}
+              className={cn(
+                "flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all shrink-0 active:scale-95",
+                activeSection === item.id
+                  ? "bg-blue-600 text-white shadow-md shadow-blue-500/25"
+                  : "bg-slate-50 dark:bg-slate-800/80 border border-slate-200/60 dark:border-slate-700/60 text-slate-600 dark:text-slate-300 hover:bg-slate-100"
+              )}
+            >
+              <item.icon size={13} className="shrink-0" />
+              <span>{item.label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         
-        {/* ── Sticky Navigation Sidebar ── */}
+        {/* ── Sticky Navigation Sidebar (Desktop) ── */}
         <div className={cn(
-          "lg:col-span-3 lg:sticky lg:top-6 h-fit z-40 transition-all",
+          "lg:col-span-3 lg:sticky lg:top-6 h-fit z-20 transition-all",
           mobileMenuOpen ? "block" : "hidden lg:block"
         )}>
-          <div className="bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-xl overflow-hidden">
-            <div className="p-6 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 flex items-center justify-between">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl sm:rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+            <div className="p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 flex items-center justify-between">
               <h3 className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-400 flex items-center gap-2">
                 <Terminal size={14} /> Knowledge Base
               </h3>
+              <span className="text-[10px] font-bold text-slate-400">{NAV_ITEMS.length} Bab</span>
             </div>
-            <nav className="p-3 space-y-1.5 overflow-y-auto max-h-[70vh] custom-scrollbar">
+            <nav className="p-2.5 space-y-1 overflow-y-auto max-h-[70vh] custom-scrollbar">
               {NAV_ITEMS.map((item) => (
                 <button
                   key={item.id}
                   onClick={() => handleNavClick(item.id)}
                   className={cn(
-                    "w-full text-left flex items-center justify-between px-5 py-3.5 rounded-2xl text-[13px] font-bold transition-all group",
+                    "w-full text-left flex items-center justify-between px-4 py-3 rounded-xl text-xs sm:text-[13px] font-bold transition-all group",
                     activeSection === item.id
-                      ? "bg-blue-600 text-white shadow-xl shadow-blue-500/30 scale-[1.02]"
+                      ? "bg-blue-600 text-white shadow-md shadow-blue-500/25 scale-[1.01]"
                       : "text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-slate-200"
                   )}
                 >
-                  <span className="flex items-center gap-4">
-                    <div className={cn("w-2 h-2 rounded-full transition-all", activeSection === item.id ? "bg-white scale-125" : "bg-slate-300 dark:bg-slate-700 group-hover:bg-blue-400")} />
-                    {item.label}
+                  <span className="flex items-center gap-3 min-w-0">
+                    <div className={cn("w-2 h-2 rounded-full transition-all shrink-0", activeSection === item.id ? "bg-white scale-125" : "bg-slate-300 dark:bg-slate-700 group-hover:bg-blue-400")} />
+                    <span className="truncate">{item.label}</span>
                   </span>
-                  <item.icon size={16} className={cn("transition-all", activeSection === item.id ? "text-white opacity-100 rotate-0" : "text-slate-300 dark:text-slate-700 opacity-0 group-hover:opacity-100 -rotate-12")} />
+                  <item.icon size={15} className={cn("transition-all shrink-0 ml-2", activeSection === item.id ? "text-white opacity-100 rotate-0" : "text-slate-300 dark:text-slate-700 opacity-0 group-hover:opacity-100 -rotate-12")} />
                 </button>
               ))}
             </nav>
-            <div className="p-4 bg-slate-50 dark:bg-slate-950/50 border-t border-slate-100 dark:border-slate-800 flex justify-center">
-               <button className="text-[10px] font-black uppercase tracking-widest text-blue-600 hover:underline">Download PDF Manual</button>
+            <div className="p-3 bg-slate-50 dark:bg-slate-950/50 border-t border-slate-100 dark:border-slate-800 flex justify-center">
+              <button 
+                onClick={() => setIsExambroGuideOpen(true)}
+                className="text-[10px] font-black uppercase tracking-widest text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1.5"
+              >
+                <Download size={12} /> Panduan & Config Siswa
+              </button>
             </div>
           </div>
         </div>
 
         {/* ── Documentation Deep Dive Content ── */}
         <div className="lg:col-span-9 space-y-4">
-          <div className="bg-white dark:bg-slate-900 rounded-[3rem] border border-slate-200 dark:border-slate-800 shadow-sm p-8 sm:p-14 lg:p-20 relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-blue-600 via-indigo-600 to-emerald-600" />
+          <div className="bg-white dark:bg-slate-900 rounded-2xl sm:rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm p-4 sm:p-8 lg:p-12 relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-emerald-600" />
             
             {/* 1. Overview */}
             <DocSection id="pendahuluan" title="Overview Platform" icon={Home}>
@@ -907,8 +955,8 @@ const GuidePage = () => {
 
             {/* 10. Pengembang */}
             <DocSection id="pengembang" title="Tim Pengembang" icon={User}>
-              <div className="bg-slate-50 dark:bg-slate-800/30 p-8 sm:p-12 rounded-[3rem] border border-slate-200 dark:border-slate-800 flex flex-col md:flex-row items-center gap-10">
-                <div className="w-32 h-44 sm:w-40 sm:h-52 rounded-[2rem] overflow-hidden shadow-2xl border-4 border-white dark:border-slate-700 shrink-0 relative group">
+              <div className="bg-slate-50/70 dark:bg-slate-800/30 p-5 sm:p-8 md:p-10 rounded-2xl sm:rounded-3xl border border-slate-200 dark:border-slate-800 flex flex-col md:flex-row items-center gap-6 sm:gap-8">
+                <div className="w-28 h-36 sm:w-36 sm:h-48 rounded-2xl overflow-hidden shadow-xl border-2 sm:border-4 border-white dark:border-slate-700 shrink-0 relative group">
                   <img
                     src="https://www.sman-modalbangsa.sch.id/wp-content/uploads/2021/09/alfaruqasri-300x400.jpeg"
                     alt="Alfaruq Asri"
@@ -916,30 +964,30 @@ const GuidePage = () => {
                   />
                   <div className="absolute inset-0 bg-blue-600/20 mix-blend-overlay opacity-0 group-hover:opacity-100 transition-opacity" />
                 </div>
-                <div className="text-center md:text-left space-y-5">
+                <div className="text-center md:text-left space-y-4">
                   <div>
-                    <Badge className="bg-blue-600 text-white border-0 font-black uppercase tracking-widest text-[9px] px-3 mb-4">Master Developer</Badge>
-                    <h3 className="text-2xl sm:text-4xl font-black text-slate-900 dark:text-white tracking-tight">Alfaruq Asri, S.Pd., Gr.</h3>
-                    <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 mt-2">
+                    <Badge className="bg-blue-600 text-white border-0 font-black uppercase tracking-widest text-[9px] px-2.5 py-0.5 mb-2.5">Master Developer</Badge>
+                    <h3 className="text-xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight">Alfaruq Asri, S.Pd., Gr.</h3>
+                    <div className="flex flex-wrap items-center justify-center md:justify-start gap-1.5 sm:gap-2 mt-2">
                        <Badge variant="outline" className="text-slate-400 border-slate-200 dark:border-slate-800 font-bold text-[9px] px-2 py-0.5 uppercase tracking-tighter">Informatics Engineer</Badge>
                        <Badge variant="outline" className="text-slate-400 border-slate-200 dark:border-slate-800 font-bold text-[9px] px-2 py-0.5 uppercase tracking-tighter">Tim IT {terminology.school}</Badge>
                     </div>
                   </div>
-                  <p className="text-sm sm:text-base text-slate-600 dark:text-slate-400 font-medium leading-relaxed max-w-xl">
+                  <p className="text-xs sm:text-sm md:text-base text-slate-600 dark:text-slate-400 font-medium leading-relaxed max-w-xl">
                     "EXAM AA hadir untuk mendefinisikan ulang standar ujian sekolah yang modern. Kami mengintegrasikan teknologi AI terbaik untuk memastikan proses evaluasi pendidikan berjalan lebih efektif dan bermartabat."
                   </p>
-                  <div className="flex flex-wrap items-center justify-center md:justify-start gap-3">
-                    <a href="https://wa.me/6285359907696" target="_blank" rel="noopener noreferrer" className="px-6 py-3 bg-emerald-500 hover:bg-emerald-600 text-white text-[11px] font-black uppercase tracking-widest rounded-2xl transition-all shadow-lg shadow-emerald-500/30 flex items-center gap-2">
-                       <MessageCircle size={16} /> WhatsApp IT Support
+                  <div className="flex flex-col sm:flex-row items-center justify-center md:justify-start gap-2.5 pt-1">
+                    <a href="https://wa.me/6285359907696" target="_blank" rel="noopener noreferrer" className="w-full sm:w-auto px-5 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white text-[11px] font-black uppercase tracking-widest rounded-xl transition-all shadow-md shadow-emerald-500/20 flex items-center justify-center gap-2">
+                       <MessageCircle size={15} /> WhatsApp IT Support
                     </a>
-                    <a href="https://www.alfaruqasri.my.id/" target="_blank" rel="noopener noreferrer" className="px-6 py-3 bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 text-slate-900 dark:text-white text-[11px] font-black uppercase tracking-widest rounded-2xl transition-all border border-slate-200 dark:border-slate-600 shadow-sm flex items-center gap-2">
-                       <Globe size={16} /> Portofolio
+                    <a href="https://www.alfaruqasri.my.id/" target="_blank" rel="noopener noreferrer" className="w-full sm:w-auto px-5 py-2.5 bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 text-slate-900 dark:text-white text-[11px] font-black uppercase tracking-widest rounded-xl transition-all border border-slate-200 dark:border-slate-600 shadow-sm flex items-center justify-center gap-2">
+                       <Globe size={15} /> Portofolio
                     </a>
                   </div>
                 </div>
               </div>
 
-              <div className="mt-16 pt-10 border-t border-slate-200 dark:border-slate-800 text-center space-y-4">
+              <div className="mt-12 sm:mt-16 pt-8 sm:pt-10 border-t border-slate-200 dark:border-slate-800 text-center space-y-3">
                 <div className="flex items-center justify-center gap-3">
                    <div className="w-12 h-[1px] bg-slate-200 dark:bg-slate-800" />
                    <Badge variant="outline" className="text-slate-400 border-slate-200 dark:border-slate-800 font-black uppercase tracking-[0.2em] px-5 py-2 text-[10px]">

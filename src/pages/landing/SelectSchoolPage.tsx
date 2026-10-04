@@ -1,10 +1,45 @@
 import { useState, useEffect } from "react";
 import { masterPb } from "../../lib/pocketbase";
 import { SchoolRecord, useTenant } from "../../context/TenantContext";
-import { Search, ChevronRight, Loader2, Sparkles, RefreshCw, LogOut } from "lucide-react";
+import { Search, ChevronRight, Loader2, Sparkles, RefreshCw, LogOut, HardDrive, Server } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Capacitor } from "@capacitor/core";
 import { App } from "@capacitor/app";
+
+export const isLocalServer = (school: SchoolRecord): boolean => {
+  if (!school) return false;
+  if (school.slug === "local" || school.id === "local_server" || school.id === "local_server_detected") return true;
+
+  const plan = (school.plan || "").toLowerCase();
+  if (plan === "offline" || plan === "local" || plan === "lokal" || plan === "mandiri") return true;
+
+  const serverType = ((school as any).server_type || "").toLowerCase();
+  if (serverType === "local" || serverType === "lokal" || serverType === "offline") return true;
+
+  const status = ((school as any).status || "").toLowerCase();
+  if (status === "lokal" || status === "local" || status === "offline") return true;
+
+  const pbUrl = (school.pb_url || "").toLowerCase();
+  if (
+    pbUrl.includes("localhost") ||
+    pbUrl.includes("127.0.0.1") ||
+    /https?:\/\/(192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+)/.test(pbUrl)
+  ) {
+    return true;
+  }
+
+  const host = (school.server_host || "").trim().toLowerCase();
+  if (/^(192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+)$/.test(host)) {
+    return true;
+  }
+
+  const name = (school.name || "").toLowerCase();
+  if (name.includes("(lokal server)") || name.includes("(server lokal)") || name.includes("(offline)")) {
+    return true;
+  }
+
+  return false;
+};
 
 const SelectSchoolPage = () => {
   const [schools, setSchools] = useState<SchoolRecord[]>([]);
@@ -13,30 +48,150 @@ const SelectSchoolPage = () => {
   const { setManualSchool } = useTenant();
 
   useEffect(() => {
+    let isMounted = true;
+
     const fetchSchools = async () => {
+      let masterRecords: SchoolRecord[] = [];
       try {
-        const records = await masterPb.collection("schools").getFullList<SchoolRecord>({
+        masterRecords = await masterPb.collection("schools").getFullList<SchoolRecord>({
           filter: "is_active = true",
           sort: "name",
         });
-        setSchools(records);
       } catch (err) {
-        console.error("Failed to fetch schools:", err);
-      } finally {
+        console.warn("Master PB fetch error (mungkin mode offline):", err);
+      }
+
+      // Deteksi otomatis jika ada server lokal mandiri (Offline CBT) yang sedang berjalan
+      // PENTING: Jangan pernah memanggil fetch ke http://localhost:8090 jika dibuka dari domain publik (seperti examku.my.id)
+      // karena browser Chromium akan memunculkan popup Private Network Access (PNA):
+      // "examku.my.id ingin mengakses aplikasi dan layanan lain di perangkat ini".
+      const isLocalEnvironment =
+        typeof window !== "undefined" &&
+        (window.location.hostname === "localhost" ||
+          window.location.hostname === "127.0.0.1" ||
+          /^(192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+)$/.test(
+            window.location.hostname
+          ) ||
+          Capacitor.isNativePlatform());
+
+      if (isLocalEnvironment) {
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 1000);
+
+          const localOrigin =
+            window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
+              ? (window.location.port === "8090" ? window.location.origin : "http://localhost:8090")
+              : (Capacitor.isNativePlatform() ? "http://localhost:8090" : window.location.origin);
+
+          const probeRes = await fetch(`${localOrigin}/api/collections/settings/records?perPage=1`, {
+            signal: controller.signal,
+          });
+          clearTimeout(timeoutId);
+
+          if (probeRes.ok) {
+            const probeData = await probeRes.json();
+            let localSchoolName = "Server CBT Mandiri (Lokal)";
+            let localLogo = "";
+
+            if (probeData?.items && probeData.items.length > 0) {
+              const s = probeData.items[0];
+              if (s.name) localSchoolName = s.name;
+              if (s.logoUrl || s.logo) localLogo = s.logoUrl || s.logo;
+            }
+
+            const alreadyExists = masterRecords.some(
+              (r) => r.slug === "local" || isLocalServer(r)
+            );
+
+            if (!alreadyExists) {
+              const localRecord: SchoolRecord = {
+                id: "local_server_detected",
+                name: localSchoolName,
+                slug: "local",
+                pb_url: localOrigin,
+                type: "school",
+                is_active: true,
+                logo_url: localLogo || "/logo-default.png",
+                plan: "offline",
+              };
+              masterRecords = [localRecord, ...masterRecords];
+            }
+          }
+        } catch (_) {}
+      }
+
+      // Filter sekolah berstatus Lokal Server:
+      // Hanya tampilkan jika server lokal tersebut AKTIF dan BISA DIHUBUNGI dari perangkat saat ini.
+      // Jika siswa memakai paket data (tidak terkoneksi ke jaringan server lokal tersebut), sekolah lokal tidak akan dimunculkan!
+      const verifiedSchools: SchoolRecord[] = [];
+      for (const record of masterRecords) {
+        if (isLocalServer(record)) {
+          // Jika server lokal terdeteksi di localhost/LAN atau memiliki pb_url lokal
+          if (record.id === "local_server_detected") {
+            verifiedSchools.push(record);
+          } else if (record.pb_url) {
+            try {
+              const probeCtrl = new AbortController();
+              const probeTimeout = setTimeout(() => probeCtrl.abort(), 800);
+              const res = await fetch(`${record.pb_url}/api/collections/settings/records?perPage=1`, {
+                signal: probeCtrl.signal,
+              });
+              clearTimeout(probeTimeout);
+              if (res.ok) {
+                verifiedSchools.push(record);
+              }
+            } catch {
+              // Server lokal tidak terjangkau (misal siswa pakai paket data atau server mati) -> JANGAN TAMPILKAN
+            }
+          }
+        } else {
+          // Sekolah online selalu ditampilkan
+          verifiedSchools.push(record);
+        }
+      }
+
+      if (isMounted) {
+        setSchools(verifiedSchools);
         setLoading(false);
       }
     };
 
     fetchSchools();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
-  const filteredSchools = schools.filter((s) =>
-    s.name.toLowerCase().includes(search.toLowerCase()) ||
-    s.slug.toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredSchools = schools.filter((s) => {
+    const q = search.toLowerCase();
+    const isLocal = isLocalServer(s);
+    return (
+      s.name.toLowerCase().includes(q) ||
+      s.slug.toLowerCase().includes(q) ||
+      (isLocal && (q.includes("lokal") || q.includes("local") || q.includes("offline") || q.includes("mandiri"))) ||
+      (!isLocal && (q.includes("online") || q.includes("vps") || q.includes("cloud")))
+    );
+  });
 
-  const handleSelect = (slug: string) => {
-    setManualSchool(slug);
+  const handleSelect = (school: SchoolRecord) => {
+    if (Capacitor.isNativePlatform()) {
+      if (isLocalServer(school) && school.pb_url) {
+        localStorage.setItem("local_server_url", school.pb_url);
+      }
+      setManualSchool(school);
+    } else {
+      // Pada Web Browser:
+      if (isLocalServer(school) && school.pb_url) {
+        localStorage.setItem("local_server_url", school.pb_url);
+        window.location.href = `${school.pb_url}/exam`;
+      } else {
+        const mainDomain = (import.meta.env.VITE_MAIN_DOMAIN || "examku.my.id").toLowerCase();
+        localStorage.removeItem("selected_school_slug");
+        window.location.href = `https://${school.slug}.${mainDomain}/exam`;
+      }
+    }
   };
 
   return (
@@ -66,7 +221,7 @@ const SelectSchoolPage = () => {
             className="relative"
           >
             <div className="absolute inset-0 bg-blue-500/10 blur-xl rounded-full scale-150" />
-            <img src="/logo-default.png" alt="Logo" className="w-16 h-16 sm:w-20 sm:h-20 object-contain relative z-10 drop-shadow-sm" />
+            <img src="/logo-default.webp" alt="Logo" className="w-16 h-16 sm:w-20 sm:h-20 object-contain relative z-10 drop-shadow-sm" onError={(e) => { (e.target as HTMLImageElement).src = "/logo-default.png"; }} />
           </motion.div>
 
           <motion.div
@@ -104,7 +259,7 @@ const SelectSchoolPage = () => {
           <input
             type="text"
             className="block w-full pl-14 pr-6 py-4 rounded-full bg-white/60 backdrop-blur-2xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] outline-none text-slate-800 font-bold placeholder:text-slate-400 focus:ring-2 focus:ring-blue-500/20 border border-white/80 transition-all z-10 relative"
-            placeholder="Cari nama sekolah..."
+            placeholder="Cari nama sekolah atau status (online / lokal)..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -126,53 +281,99 @@ const SelectSchoolPage = () => {
         ) : filteredSchools.length > 0 ? (
           <div className="flex flex-col gap-4">
             <AnimatePresence>
-              {filteredSchools.map((school, index) => (
-                <motion.button
-                  key={school.id}
-                  initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                  animate={{ opacity: 1, scale: 1, y: 0 }}
-                  transition={{
-                    delay: index * 0.05,
-                    type: "spring",
-                    stiffness: 260,
-                    damping: 20
-                  }}
-                  whileTap={{ scale: 0.96 }}
-                  onClick={() => handleSelect(school.slug)}
-                  className="w-full bg-white/70 backdrop-blur-2xl border border-white rounded-[1.75rem] p-4 flex items-center justify-between shadow-[0_8px_30px_rgb(0,0,0,0.03)] hover:shadow-[0_15px_35px_rgb(0,0,0,0.06)] transition-all duration-300 text-left group"
-                >
-                  <div className="flex items-center gap-4 flex-1 min-w-0">
-                    {/* Brand Image (No Wrapper) */}
-                    <img
-                      src={school.logo_url ? (school.logo_url.startsWith('http') ? school.logo_url : masterPb.files.getUrl(school as any, school.logo_url)) : "/logo-default.png"}
-                      alt={school.name}
-                      className="w-14 h-14 shrink-0 object-contain relative z-10 group-hover:scale-110 transition-transform duration-300 drop-shadow-sm"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src = "/logo-default.png";
-                      }}
-                    />
-                    {/* Brand Text Wrapper */}
-                    <div className="flex-1 min-w-0 pr-2">
-                      <div className="font-bold text-slate-800 text-[0.95rem] leading-snug line-clamp-2 px-1 group-hover:text-blue-600 transition-colors">
-                        {school.name}
-                      </div>
-                      <div className="flex items-center gap-2 mt-1.5 px-1">
-                        <span className="relative flex h-2.5 w-2.5">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                          <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-blue-500"></span>
-                        </span>
-                        <span className="text-[0.7rem] text-slate-500 font-bold tracking-widest uppercase">
-                          Online Server
-                        </span>
+              {filteredSchools.map((school, index) => {
+                const isLocal = isLocalServer(school);
+                return (
+                  <motion.button
+                    key={school.id}
+                    initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    transition={{
+                      delay: index * 0.05,
+                      type: "spring",
+                      stiffness: 260,
+                      damping: 20,
+                    }}
+                    whileTap={{ scale: 0.96 }}
+                    onClick={() => handleSelect(school)}
+                    className={
+                      isLocal
+                        ? "w-full bg-gradient-to-r from-emerald-50/60 via-white/90 to-emerald-50/20 backdrop-blur-2xl border border-emerald-200/90 hover:border-emerald-400 rounded-[1.75rem] p-4 flex items-center justify-between shadow-[0_8px_30px_rgba(16,185,129,0.06)] hover:shadow-[0_15px_35px_rgba(16,185,129,0.14)] transition-all duration-300 text-left group"
+                        : "w-full bg-white/70 backdrop-blur-2xl border border-white hover:border-blue-200 rounded-[1.75rem] p-4 flex items-center justify-between shadow-[0_8px_30px_rgb(0,0,0,0.03)] hover:shadow-[0_15px_35px_rgba(37,99,235,0.08)] transition-all duration-300 text-left group"
+                    }
+                  >
+                    <div className="flex items-center gap-4 flex-1 min-w-0">
+                      {/* Brand Image (No Wrapper) */}
+                      <img
+                        src={
+                          school.logo_url
+                            ? school.logo_url.startsWith("http")
+                              ? school.logo_url
+                              : masterPb.files.getUrl(school as any, school.logo_url)
+                            : "/logo-default.webp"
+                        }
+                        alt={school.name}
+                        className="w-14 h-14 shrink-0 object-contain relative z-10 group-hover:scale-110 transition-transform duration-300 drop-shadow-sm"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = "/logo-default.png";
+                        }}
+                      />
+                      {/* Brand Text Wrapper */}
+                      <div className="flex-1 min-w-0 pr-2">
+                        <div
+                          className={`font-bold text-slate-800 text-[0.95rem] leading-snug line-clamp-2 px-1 transition-colors ${
+                            isLocal ? "group-hover:text-emerald-700" : "group-hover:text-blue-600"
+                          }`}
+                        >
+                          {school.name}
+                        </div>
+                        <div className="flex items-center gap-2 mt-1.5 px-1">
+                          <span className="relative flex h-2.5 w-2.5">
+                            <span
+                              className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
+                                isLocal ? "bg-emerald-400" : "bg-blue-400"
+                              }`}
+                            ></span>
+                            <span
+                              className={`relative inline-flex rounded-full h-2.5 w-2.5 ${
+                                isLocal ? "bg-emerald-500" : "bg-blue-500"
+                              }`}
+                            ></span>
+                          </span>
+                          {isLocal ? (
+                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[0.68rem] font-black tracking-wider uppercase bg-emerald-100/90 text-emerald-800 border border-emerald-300/70 shadow-xs">
+                              <HardDrive className="w-3 h-3 text-emerald-600" />
+                              Lokal Server
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[0.68rem] font-bold tracking-wider uppercase bg-blue-50/80 text-blue-700 border border-blue-200/60">
+                              <Server className="w-3 h-3 text-blue-500" />
+                              Online Server
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  {/* Action Button Indicator */}
-                  <div className="w-12 h-12 shrink-0 rounded-full bg-slate-50/80 flex items-center justify-center group-hover:bg-blue-600 group-hover:shadow-[0_0_20px_rgba(37,99,235,0.3)] transition-all duration-300 ring-1 ring-black/5">
-                    <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-white transition-colors" strokeWidth={3} />
-                  </div>
-                </motion.button>
-              ))}
+                    {/* Action Button Indicator */}
+                    <div
+                      className={`w-12 h-12 shrink-0 rounded-full flex items-center justify-center transition-all duration-300 ring-1 ${
+                        isLocal
+                          ? "bg-emerald-100/70 group-hover:bg-emerald-600 group-hover:shadow-[0_0_20px_rgba(16,185,129,0.4)] ring-emerald-500/20"
+                          : "bg-slate-50/80 group-hover:bg-blue-600 group-hover:shadow-[0_0_20px_rgba(37,99,235,0.3)] ring-black/5"
+                      }`}
+                    >
+                      <ChevronRight
+                        className={`w-5 h-5 transition-colors ${
+                          isLocal
+                            ? "text-emerald-600 group-hover:text-white"
+                            : "text-slate-400 group-hover:text-white"
+                        }`}
+                        strokeWidth={3}
+                      />
+                    </div>
+                  </motion.button>
+                );
+              })}
             </AnimatePresence>
           </div>
         ) : (

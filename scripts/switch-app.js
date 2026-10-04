@@ -73,9 +73,17 @@ const gradlePath = path.join(__dirname, '..', 'android', 'app', 'build.gradle');
 let gradle = fs.readFileSync(gradlePath, 'utf8');
 gradle = gradle.replace(/applicationId\s+".*"/, `applicationId "${appConfig.id}"`);
 fs.writeFileSync(gradlePath, gradle);
-console.log('✅ [3/3] android build.gradle diperbarui.');
+console.log('✅ [3/4] android build.gradle diperbarui.');
 
-// 4. Sinkronisasi Capacitor
+// 4. Update App Icons & Splash Screen sesuai profil
+const iconPresetDir = path.join(__dirname, '..', 'configs', 'app-icons', appKey);
+const androidResDir = path.join(__dirname, '..', 'android', 'app', 'src', 'main', 'res');
+if (fs.existsSync(iconPresetDir)) {
+  fs.cpSync(iconPresetDir, androidResDir, { recursive: true, force: true });
+  console.log(`✅ [4/4] Ikon aplikasi & splash screen (${appKey}) diperbarui.`);
+}
+
+// 5. Sinkronisasi Capacitor
 console.log('\n🔄 Menjalankan npx cap sync android...');
 execSync('npx cap sync android', { stdio: 'inherit' });
 console.log(`\n🎉 Profil ${appConfig.name} aktif & siap di-build!\n`);

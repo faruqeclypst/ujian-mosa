@@ -302,6 +302,9 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
         if (!isUpdating) {
           isUpdating = true;
           try {
+            // Trigger rotasi token server secara otomatis jika waktu telah habis
+            fetch(`${pb.baseUrl}/api/rotate-token`, { method: "POST" }).catch(() => {});
+
             const records = await pb.collection('settings').getFullList({ limit: 1, sort: 'created' });
             if (records.length > 0) {
               setUniversalToken(records[0].universal_token || "");

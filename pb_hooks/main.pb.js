@@ -216,15 +216,24 @@ cronAdd("autoFinishAndScore", "* * * * *", () => {
     }
 });
 
-// 🕒 3. ROTASI TOKEN UNIVERSAL (Setiap 5 Menit - HANYA jika ada ruangan ujian yang sedang aktif)
+// 🕒 3. ROTASI TOKEN UNIVERSAL (Setiap 5 Menit)
 cronAdd("rotateUniversalToken", "*/5 * * * *", () => {
     try {
-        // Cek apakah ada ruangan ujian yang sedang AKTIF menggunakan findRecordsByFilter
-        const activeRooms = $app.findRecordsByFilter("exam_rooms", "isActive = true && status != 'archive'", "", 1, 0);
-        if (activeRooms.length === 0) return;
-
         const settings = $app.findFirstRecordByFilter("settings", "1=1");
         if (!settings) return;
+
+        // Cek apakah ada ruangan ujian yang sedang aktif
+        let hasActiveRooms = false;
+        try {
+            const activeRooms = $app.findRecordsByFilter("exam_rooms", "status != 'archive' && isActive != false", "", 1, 0);
+            hasActiveRooms = activeRooms && activeRooms.length > 0;
+        } catch (re) {}
+
+        const currentToken = settings.getString("universal_token");
+        // Jika tidak ada ujian aktif dan sudah ada token, lewati agar hemat disk I/O
+        if (!hasActiveRooms && currentToken && currentToken.length === 6) {
+            return;
+        }
 
         const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
         let token = "";
@@ -234,9 +243,54 @@ cronAdd("rotateUniversalToken", "*/5 * * * *", () => {
         settings.set("universal_token_updated_at", new Date().toISOString());
         $app.save(settings);
 
-        console.log("[CRON TOKEN] Token universal berhasil dirotasi.");
+        console.log("[CRON TOKEN] Token universal berhasil dirotasi:", token);
     } catch (e) {
         console.error("[CRON TOKEN ROTATION ERROR]:", e);
+    }
+});
+
+// 🔄 ENDPOINT ROTASI TOKEN UNIVERSAL ON-DEMAND
+routerAdd("POST", "/api/rotate-token", (c) => {
+    try {
+        const settings = $app.findFirstRecordByFilter("settings", "1=1");
+        if (!settings) {
+            return c.json(404, { ok: false, error: "Settings tidak ditemukan" });
+        }
+
+        const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+        let token = "";
+        for (let i = 0; i < 6; i++) token += chars.charAt(Math.floor(Math.random() * chars.length));
+
+        const now = new Date().toISOString();
+        settings.set("universal_token", token);
+        settings.set("universal_token_updated_at", now);
+        $app.save(settings);
+
+        return c.json(200, { ok: true, token: token, updated_at: now });
+    } catch (err) {
+        return c.json(500, { ok: false, error: String((err && err.message) || err) });
+    }
+});
+
+routerAdd("GET", "/api/rotate-token", (c) => {
+    try {
+        const settings = $app.findFirstRecordByFilter("settings", "1=1");
+        if (!settings) {
+            return c.json(404, { ok: false, error: "Settings tidak ditemukan" });
+        }
+
+        const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+        let token = "";
+        for (let i = 0; i < 6; i++) token += chars.charAt(Math.floor(Math.random() * chars.length));
+
+        const now = new Date().toISOString();
+        settings.set("universal_token", token);
+        settings.set("universal_token_updated_at", now);
+        $app.save(settings);
+
+        return c.json(200, { ok: true, token: token, updated_at: now });
+    } catch (err) {
+        return c.json(500, { ok: false, error: String((err && err.message) || err) });
     }
 });
 

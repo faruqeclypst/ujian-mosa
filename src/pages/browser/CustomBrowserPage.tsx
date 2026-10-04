@@ -26,7 +26,6 @@ const PRESETS = [
 
 export const CustomBrowserPage: React.FC = () => {
   const [url, setUrl] = useState("");
-  const [pin, setPin] = useState("1234");
   const [history, setHistory] = useState<string[]>([]);
   const [isScanning, setIsScanning] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
@@ -40,10 +39,6 @@ export const CustomBrowserPage: React.FC = () => {
       const saved = localStorage.getItem("exam_browser_history");
       if (saved) {
         setHistory(JSON.parse(saved));
-      }
-      const savedPin = localStorage.getItem("exam_browser_pin");
-      if (savedPin) {
-        setPin(savedPin);
       }
     } catch {
       // ignore
@@ -75,9 +70,6 @@ export const CustomBrowserPage: React.FC = () => {
     }
 
     saveToHistory(finalUrl);
-    try {
-      localStorage.setItem("exam_browser_pin", pin);
-    } catch {}
 
     setIsLoading(true);
 
@@ -85,7 +77,7 @@ export const CustomBrowserPage: React.FC = () => {
       try {
         await CheatAlert.startCustomExam({
           url: finalUrl,
-          pin: pin.trim() || "1234"
+          pin: "1234"
         });
       } catch (err) {
         console.error("Failed to start native custom exam:", err);
@@ -292,30 +284,6 @@ export const CustomBrowserPage: React.FC = () => {
               </div>
             </div>
           )}
-
-          {/* Exit PIN field */}
-          <div className="space-y-1.5 pt-1 border-t border-slate-800/60">
-            <div className="flex items-center justify-between">
-              <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
-                <Lock size={13} className="text-amber-400" />
-                <span>PIN Keluar Pengawas</span>
-              </label>
-              <span className="text-[10px] text-slate-500">Default: 1234</span>
-            </div>
-            <input
-              type="text"
-              pattern="[0-9]*"
-              inputMode="numeric"
-              maxLength={6}
-              value={pin}
-              onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))}
-              placeholder="1234"
-              className="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 rounded-2xl px-3.5 py-2.5 text-sm text-white placeholder-slate-500 outline-none transition font-mono tracking-widest text-center"
-            />
-            <p className="text-[10px] text-slate-500 leading-tight">
-              PIN ini wajib dimasukkan oleh pengawas saat ujian selesai untuk membuka kuncian layar.
-            </p>
-          </div>
 
           {/* Submit / Start Button */}
           <button

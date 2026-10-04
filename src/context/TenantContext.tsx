@@ -7,6 +7,7 @@ import {
   useMemo,
 } from 'react';
 import PocketBase from 'pocketbase';
+import { Capacitor } from '@capacitor/core';
 import { masterPb, getSchoolPb } from '../lib/pocketbase';
 import { verifyOfflineLicense, OfflineLicensePayload } from '../utils/offlineLicenseHelper';
 
@@ -76,7 +77,7 @@ interface TenantContextValue {
   inactive: boolean;           // true jika sekolah is_active = false
   terminology: Terminology;     // Helper untuk label dinamis
   subscriptionStatus: SubscriptionStatusInfo; // Status masa aktif, grace period, dan suspensi
-  setManualSchool: (slug: string | null) => void;
+  setManualSchool: (school: string | SchoolRecord | null) => void;
   refreshSchool: () => Promise<void>;
 }
 
@@ -180,14 +181,28 @@ const setCachedSchool = (key: string | null, record: SchoolRecord | null) => {
 // ============================================================
 export const TenantProvider = ({ children }: { children: ReactNode }) => {
   const [manualSlug, setManualSlug] = useState<string | null>(() => {
-    return typeof window !== 'undefined' ? localStorage.getItem('selected_school_slug') : null;
+    if (typeof window !== 'undefined') {
+      const isApp = Capacitor.isNativePlatform();
+      const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+      if (isApp || isLocalhost) {
+        return localStorage.getItem('selected_school_slug');
+      } else {
+        // Hapus residual selected_school_slug di domain publik agar tidak mengganggu landing page
+        localStorage.removeItem('selected_school_slug');
+      }
+    }
+    return null;
   });
 
   const { slug: urlSlug, customDomain, isLanding: isUrlLanding } = useMemo(() => resolveSlugFromUrl(), []);
 
+  const isApp = Capacitor.isNativePlatform();
+  const isLocalhost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+  const allowManualSlug = isApp || isLocalhost;
+
   // Effective slug: URL slug takes priority on web, manual slug for native/override
-  const slug = urlSlug || manualSlug;
-  const isLanding = isUrlLanding && !manualSlug;
+  const slug = urlSlug || (allowManualSlug ? manualSlug : null);
+  const isLanding = isUrlLanding && (!allowManualSlug || !manualSlug);
 
   const cacheKey = useMemo(() => getTenantCacheKey(slug, customDomain), [slug, customDomain]);
 
@@ -200,13 +215,56 @@ export const TenantProvider = ({ children }: { children: ReactNode }) => {
   const [notFound, setNotFound] = useState(false);
   const [inactive, setInactive] = useState(false);
 
-  const setManualSchool = (newSlug: string | null) => {
-    if (newSlug) {
-      localStorage.setItem('selected_school_slug', newSlug);
-    } else {
+  const setManualSchool = (newSlugOrSchool: string | SchoolRecord | null) => {
+    if (!newSlugOrSchool) {
       localStorage.removeItem('selected_school_slug');
+      localStorage.removeItem('local_server_url');
+      setManualSlug(null);
+      setSchool(null);
+      setPb(null);
+      setLoading(false);
+      setNotFound(false);
+      setInactive(false);
+      return;
     }
+
+    if (typeof newSlugOrSchool === 'object') {
+      const schoolRec = newSlugOrSchool;
+      localStorage.setItem('selected_school_slug', schoolRec.slug);
+      if (schoolRec.pb_url) {
+        localStorage.setItem('local_server_url', schoolRec.pb_url);
+      }
+      const schoolCacheKey = getTenantCacheKey(schoolRec.slug, null);
+      setCachedSchool(schoolCacheKey, schoolRec);
+
+      // LANGSUNG update state secara sinkron (0ms delay)!
+      setManualSlug(schoolRec.slug);
+      setSchool(schoolRec);
+      setPb(getSchoolPb(schoolRec.pb_url));
+      setNotFound(false);
+      setInactive(false);
+      setLoading(false);
+      return;
+    }
+
+    const newSlug = newSlugOrSchool;
+    localStorage.setItem('selected_school_slug', newSlug);
+    const newCacheKey = getTenantCacheKey(newSlug, null);
+    const cached = getCachedSchool(newCacheKey);
+
     setManualSlug(newSlug);
+    if (cached) {
+      setSchool(cached);
+      setPb(getSchoolPb(cached.pb_url));
+      setNotFound(false);
+      setInactive(false);
+      setLoading(false);
+    } else {
+      // PENTING: Bersihkan data sekolah lama agar tidak ada flash sekolah sebelumnya!
+      setSchool(null);
+      setPb(null);
+      setLoading(true);
+    }
   };
 
   useEffect(() => {
@@ -216,10 +274,23 @@ export const TenantProvider = ({ children }: { children: ReactNode }) => {
     }
 
     const resolveSchool = async () => {
+      // Jika data sekolah sudah cocok dengan slug dan pb sudah siap, tidak perlu fetch blocking
+      if (school && school.slug === slug && pb) {
+        setLoading(false);
+        return;
+      }
       // 0. Mode Server Mandiri / Standalone Offline CBT
       if (slug === 'local') {
         try {
-          const localPb = getSchoolPb(window.location.origin);
+          const isPrivateIp = /^(192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+)$/.test(window.location.hostname);
+          const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+          const savedLocalUrl = typeof window !== 'undefined' ? localStorage.getItem('local_server_url') : null;
+
+          const targetOrigin = (isLocalhost || isPrivateIp)
+            ? window.location.origin
+            : (savedLocalUrl || 'http://localhost:8090');
+
+          const localPb = getSchoolPb(targetOrigin);
           let schoolName = 'EXAM AA - Server Lokal';
           let logoUrl = '';
 
@@ -268,7 +339,7 @@ export const TenantProvider = ({ children }: { children: ReactNode }) => {
             id: 'local_server',
             name: schoolName,
             slug: 'local',
-            pb_url: window.location.origin,
+            pb_url: targetOrigin,
             type: 'school',
             is_active: true,
             logo_url: logoUrl,

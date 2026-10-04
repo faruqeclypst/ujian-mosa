@@ -236,9 +236,10 @@ const LoginPage = () => {
                   ) : (
                     <div className="h-14 w-14 sm:h-20 sm:w-20 md:h-24 md:w-24 flex items-center justify-center p-1">
                       <img
-                        src="/logo-default.png"
+                        src="/logo-default.webp"
                         alt="Logo Default"
                         className="h-full w-full object-contain"
+                        onError={(e) => { (e.target as HTMLImageElement).src = "/logo-default.png"; }}
                       />
                     </div>
                   )}

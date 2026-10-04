@@ -539,8 +539,9 @@ const SuperAdminInvoicePage = () => {
             )}
           </div>
         ) : (
-          <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-            <div className="overflow-x-auto">
+          <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+            {/* Desktop Table View */}
+            <div className="hidden md:block overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-slate-100 bg-slate-50">
@@ -646,6 +647,101 @@ const SuperAdminInvoicePage = () => {
                   })}
                 </tbody>
               </table>
+            </div>
+
+            {/* Mobile Card List View */}
+            <div className="md:hidden divide-y divide-slate-100">
+              {filtered.map(inv => {
+                const effectiveStatus = getInvoiceStatus(inv);
+                const cfg = STATUS_CONFIG[effectiveStatus] || STATUS_CONFIG.unpaid;
+                const StatusIcon = cfg.icon;
+                return (
+                  <div key={inv.id} className="p-4 space-y-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <span className="font-mono text-xs font-bold text-slate-800 block">{inv.invoice_number}</span>
+                        <span className="text-[10px] text-slate-400 mt-0.5 block">{formatDate(inv.created)}</span>
+                      </div>
+                      <span className={cn(
+                        "inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold border flex-shrink-0",
+                        cfg.color, cfg.bg, cfg.border
+                      )}>
+                        <StatusIcon size={11} />
+                        {cfg.label}
+                      </span>
+                    </div>
+
+                    <div>
+                      <p className="font-bold text-slate-900 text-sm">{inv.school_name}</p>
+                      <p className="text-xs text-slate-400 mt-0.5">{inv.school_slug}</p>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-50">
+                      <div>
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Paket & Durasi</span>
+                        <span className="text-xs font-semibold text-slate-700">
+                          {inv.plan_label || PLAN_PRICES[inv.plan]?.label || inv.plan} • {inv.period_label || `${inv.duration_months} bulan`}
+                        </span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Total Tagihan</span>
+                        <span className="text-sm font-extrabold text-blue-700">{formatRupiah(inv.amount)}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between text-xs pt-1 text-slate-500">
+                      <span>
+                        Jatuh Tempo:{" "}
+                        <strong className="text-slate-700">
+                          {inv.status === "paid" && inv.paid_date ? `Lunas (${formatDate(inv.paid_date)})` : formatDate(inv.due_date)}
+                        </strong>
+                      </span>
+                      {inv.payment_proof && (
+                        <a
+                          href={getProofUrl(inv)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-xs text-blue-600 font-bold hover:underline"
+                        >
+                          <Paperclip size={12} />
+                          Bukti Bayar
+                        </a>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-4 gap-2 pt-1">
+                      <button
+                        onClick={() => setDetailInvoice(inv)}
+                        className="min-h-[40px] col-span-1 border border-slate-200 bg-white hover:bg-blue-50 text-slate-700 text-xs font-bold rounded-xl flex items-center justify-center gap-1 transition-all shadow-xs"
+                      >
+                        <Eye size={13} />
+                        <span>Detail</span>
+                      </button>
+                      <button
+                        onClick={() => printInvoice(inv)}
+                        className="min-h-[40px] col-span-1 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl flex items-center justify-center gap-1 transition-all shadow-xs"
+                      >
+                        <Printer size={13} />
+                        <span>PDF</span>
+                      </button>
+                      <button
+                        onClick={() => openEdit(inv)}
+                        className="min-h-[40px] col-span-1 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl flex items-center justify-center gap-1 transition-all shadow-xs"
+                      >
+                        <Edit size={13} />
+                        <span>Edit</span>
+                      </button>
+                      <button
+                        onClick={() => handleDelete(inv.id)}
+                        className="min-h-[40px] col-span-1 border border-red-200 bg-white hover:bg-red-50 text-red-500 text-xs font-bold rounded-xl flex items-center justify-center gap-1 transition-all shadow-xs"
+                      >
+                        <Trash2 size={13} />
+                        <span>Hapus</span>
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}

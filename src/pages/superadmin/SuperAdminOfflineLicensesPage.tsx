@@ -432,13 +432,13 @@ export default function SuperAdminOfflineLicensesPage() {
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Button
               variant="outline"
               size="sm"
               onClick={() => fetchLicenses(true)}
               disabled={isRefreshing || isLoading}
-              className="h-10 px-3 rounded-xl border-slate-200 text-slate-700 hover:bg-slate-100 font-semibold text-xs flex items-center gap-1.5"
+              className="min-h-[42px] px-3.5 rounded-xl border-slate-200 text-slate-700 hover:bg-slate-100 font-bold text-xs flex items-center gap-1.5"
             >
               <RefreshCw size={14} className={cn(isRefreshing && "animate-spin")} />
               <span>Segarkan</span>
@@ -446,7 +446,7 @@ export default function SuperAdminOfflineLicensesPage() {
 
             <Button
               onClick={handleOpenCreateNewModal}
-              className="h-10 px-4 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-md shadow-purple-600/20 flex items-center gap-2 transition-all"
+              className="min-h-[42px] px-4 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-md shadow-purple-600/20 flex items-center gap-2 transition-all"
             >
               <Plus size={16} />
               <span>Terbitkan Lisensi Baru</span>
@@ -856,37 +856,40 @@ export default function SuperAdminOfflineLicensesPage() {
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2">
+                      <div className="grid grid-cols-2 gap-2 pt-1">
                         <Button
                           size="sm"
                           variant="outline"
                           onClick={() => handleCopyCode(lic.id, lic.license_code)}
-                          className="flex-1 h-8 rounded-xl text-xs font-bold flex items-center justify-center gap-1"
+                          className="min-h-[42px] rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs"
                         >
-                          {isCopied ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
-                          Salin Key
+                          {isCopied ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
+                          <span>{isCopied ? "Tersalin" : "Salin Key"}</span>
                         </Button>
                         <Button
                           size="sm"
                           variant="outline"
                           onClick={() => handleOpenDetailModal(lic)}
-                          className="h-8 px-2.5 rounded-xl text-xs font-bold text-purple-600 border-purple-200"
+                          className="min-h-[42px] rounded-xl text-xs font-bold text-purple-700 border-purple-200 hover:bg-purple-50 flex items-center justify-center gap-1.5 shadow-xs"
                         >
-                          Detail
+                          <Eye size={14} />
+                          <span>Detail</span>
                         </Button>
                         <Button
                           size="sm"
                           onClick={() => handleSendWA(lic)}
-                          className="h-8 px-2.5 rounded-xl text-xs font-bold bg-emerald-600 text-white"
+                          className="min-h-[42px] rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white flex items-center justify-center gap-1.5 shadow-xs"
                         >
-                          <MessageCircle size={14} />
+                          <MessageCircle size={15} />
+                          <span>Kirim WA</span>
                         </Button>
                         <Button
                           size="sm"
                           onClick={() => handleOpenRenewModal(lic)}
-                          className="h-8 px-3 rounded-xl text-xs font-bold bg-purple-600 text-white"
+                          className="min-h-[42px] rounded-xl text-xs font-bold bg-purple-600 hover:bg-purple-700 active:bg-purple-800 text-white flex items-center justify-center gap-1.5 shadow-xs"
                         >
-                          Perpanjang
+                          <Clock size={14} />
+                          <span>Perpanjang</span>
                         </Button>
                       </div>
                     </div>

@@ -197,10 +197,10 @@ const SuperAdminInfraPage = () => {
             Monitoring performa real-time seluruh node VPS dan alokasi tenant sekolah.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <a
             href="/superadmin/multi-vps-docs"
-            className="flex items-center gap-1.5 h-9 px-3.5 bg-purple-50 border border-purple-200 text-purple-700 text-xs font-semibold rounded-xl hover:bg-purple-100 shadow-xs transition-all w-fit"
+            className="flex items-center gap-1.5 min-h-[42px] px-3.5 bg-purple-50 border border-purple-200 text-purple-700 text-xs font-bold rounded-xl hover:bg-purple-100 shadow-xs transition-all w-fit"
           >
             <BookOpen size={14} className="text-purple-600" />
             <span>Panduan Multi-VPS</span>
@@ -208,7 +208,7 @@ const SuperAdminInfraPage = () => {
           <button
             type="button"
             onClick={() => setIsSyncModalOpen(true)}
-            className="flex items-center gap-1.5 h-9 px-3.5 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white text-xs font-bold rounded-xl shadow-xs transition-all w-fit cursor-pointer"
+            className="flex items-center gap-1.5 min-h-[42px] px-4 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white text-xs font-bold rounded-xl shadow-xs transition-all w-fit cursor-pointer"
           >
             <Zap size={14} />
             <span>Sinkronkan Semua Tenant</span>
@@ -217,10 +217,10 @@ const SuperAdminInfraPage = () => {
             type="button"
             onClick={fetchInfrastructure}
             disabled={loading}
-            className="flex items-center gap-2 h-9 px-4 bg-white border border-slate-200 text-slate-700 text-sm font-semibold rounded-xl hover:bg-slate-50 shadow-sm transition-all disabled:opacity-50 w-fit"
+            className="flex items-center gap-2 min-h-[42px] px-4 bg-white border border-slate-200 text-slate-700 text-xs font-bold rounded-xl hover:bg-slate-50 shadow-sm transition-all disabled:opacity-50 w-fit"
           >
             <RefreshCw size={14} className={cn(loading && "animate-spin")} />
-            Segarkan
+            <span>Segarkan</span>
           </button>
         </div>
       </div>

@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import { RefreshCw } from "lucide-react";
 import { useTenant } from "../context/TenantContext";
 import PinGate from "../components/ui/PinGate";
 
@@ -31,11 +32,49 @@ const TokenViewPage = () => {
   const [timeLeft, setTimeLeft] = useState<string>("--:--");
   const [tokenUpdatedAt, setTokenUpdatedAt] = useState<string>("");
   const [loading, setLoading] = useState(true);
+  const [rotating, setRotating] = useState(false);
 
   // Locked students state
   const [lockedStudents, setLockedStudents] = useState<LockedStudent[]>([]);
   const [unlocking, setUnlocking] = useState<string | null>(null);
   const [unlockSuccess, setUnlockSuccess] = useState<string | null>(null);
+
+  // Rotate token function
+  const rotateToken = useCallback(async () => {
+    if (!pb || rotating) return;
+    setRotating(true);
+    try {
+      const res = await fetch(`${pb.baseUrl}/api/rotate-token`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.token) {
+          setToken(data.token);
+          setTokenUpdatedAt(data.updated_at || new Date().toISOString());
+        }
+      } else {
+        const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+        let newToken = "";
+        for (let i = 0; i < 6; i++) newToken += chars.charAt(Math.floor(Math.random() * chars.length));
+        const now = new Date().toISOString();
+        const records = await pb.collection("settings").getFullList({ limit: 1 });
+        if (records.length > 0) {
+          await pb.collection("settings").update(records[0].id, {
+            universal_token: newToken,
+            universal_token_updated_at: now
+          });
+          setToken(newToken);
+          setTokenUpdatedAt(now);
+        }
+      }
+    } catch (e) {
+      // silently fail
+    } finally {
+      setRotating(false);
+    }
+  }, [pb, rotating]);
 
   // Fetch token from settings
   useEffect(() => {
@@ -96,7 +135,7 @@ const TokenViewPage = () => {
         attempts.map((a: any) => a.expand?.examRoomId?.examId).filter(Boolean)
       )];
 
-      // Fetch classes & question counts secara paralel — filter hanya yang relevan
+      // Fetch classes & question counts secara paralel
       const [classes, questionCounts] = await Promise.all([
         classIds.length > 0
           ? pb.collection("classes").getFullList({
@@ -162,13 +201,22 @@ const TokenViewPage = () => {
     return () => { unsub.then(fn => fn()).catch(() => {}); };
   }, [pb, fetchLockedStudents]);
 
-  // Countdown timer
+  // Countdown timer with auto-rotation when expired
   useEffect(() => {
     if (!tokenUpdatedAt) return;
     const INTERVAL_MS = 5 * 60 * 1000;
+    let didAutoRotate = false;
+
     const tick = () => {
       const diff = new Date(tokenUpdatedAt).getTime() + INTERVAL_MS - Date.now();
-      if (diff <= 0) { setTimeLeft("00:00"); return; }
+      if (diff <= 0) {
+        setTimeLeft("00:00");
+        if (!didAutoRotate) {
+          didAutoRotate = true;
+          rotateToken();
+        }
+        return;
+      }
       const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
       const s = Math.floor((diff % (1000 * 60)) / 1000);
       setTimeLeft(`${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`);
@@ -176,7 +224,7 @@ const TokenViewPage = () => {
     tick();
     const timer = setInterval(tick, 1000);
     return () => clearInterval(timer);
-  }, [tokenUpdatedAt]);
+  }, [tokenUpdatedAt, rotateToken]);
 
   // Unlock student
   const handleUnlock = async (attId: string) => {
@@ -249,14 +297,23 @@ const TokenViewPage = () => {
           </div>
 
           {token && (
-            <div className="mt-8 flex items-center gap-2 px-4 py-2 rounded-full bg-slate-900 border border-slate-800">
-              <span className="text-slate-500 text-xs font-bold uppercase tracking-widest">Berlaku</span>
-              <span className="text-amber-400 text-sm font-black font-mono tabular-nums">{timeLeft}</span>
+            <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+              <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-slate-900 border border-slate-800 shadow-inner">
+                <span className="text-slate-500 text-xs font-bold uppercase tracking-widest">Berlaku</span>
+                <span className="text-amber-400 text-sm font-black font-mono tabular-nums">{timeLeft}</span>
+              </div>
+              <button
+                type="button"
+                onClick={rotateToken}
+                disabled={rotating}
+                className="flex items-center gap-2 px-4 py-2 rounded-full bg-slate-900 hover:bg-slate-800 border border-amber-500/30 hover:border-amber-500 text-amber-400 text-xs font-bold transition-all active:scale-95 disabled:opacity-50 cursor-pointer shadow-sm"
+                title="Putar token universal sekarang"
+              >
+                <RefreshCw size={13} className={rotating ? "animate-spin" : ""} />
+                <span>{rotating ? "Memutar..." : "Putar Token"}</span>
+              </button>
             </div>
           )}
-          <p className="mt-4 text-slate-700 text-[10px] font-medium uppercase tracking-widest">
-            Token diperbarui otomatis setiap 5 menit
-          </p>
         </div>
 
         {/* RIGHT — Locked Students */}

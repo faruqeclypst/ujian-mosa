@@ -147,6 +147,16 @@ public class CheatAlert extends Plugin {
     }
 
     @PluginMethod
+    public void notifyWebOverlayActive(PluginCall call) {
+        Log.d(TAG, "notifyWebOverlayActive: Web CBT overlay aktif, sembunyikan tombol floating native");
+        MainActivity act = getMainActivity();
+        if (act != null) {
+            act.hideFloatingExamButton();
+        }
+        call.resolve();
+    }
+
+    @PluginMethod
     public void unlockScreen(PluginCall call) {
         Log.d(TAG, "unlockScreen called from JS");
         MainActivity act = getMainActivity();

@@ -1,38 +1,65 @@
+// ============================================================
+// AI Proxy Gateway — SECURED (2026-09-29)
+// - API key, model, & base URL diambil dari settings di
+//   SERVER, tidak lagi dari body request client.
+// - Wajib login dan hanya untuk superuser/users
+//   (guru/admin); students ditolak.
+// - Tidak lagi meneruskan ke URL bebas (open proxy ditutup).
+//
+// CATATAN FRONTEND: berhenti kirim apiKey & baseUrl di body.
+//   Cukup kirim { messages, max_tokens?, temperature? }.
+// CATATAN TEKNIS: helper harus inline di tiap handler
+//   (binding top-level tidak terlihat di callback).
+// ============================================================
+
 routerAdd("POST", "/api/ai-proxy", (c) => {
-    try {
-        try { c.setResponseHeader("Access-Control-Allow-Origin", "*"); } catch (e) { }
-        try { c.setResponseHeader("Access-Control-Allow-Methods", "POST, OPTIONS"); } catch (e) { }
-        try { c.setResponseHeader("Access-Control-Allow-Headers", "Content-Type, X-Token, Authorization"); } catch (e) { }
-
-        const info = c.requestInfo();
-        const apiKey = (info.body["apiKey"] || "").toString();
-        const baseUrl = (info.body["baseUrl"] || "").toString();
-        const bodyData = info.body["body"];
-
-        if (!apiKey || apiKey === "undefined" || apiKey === "") {
-            return c.json(400, { error: "Missing API Key" });
-        }
-        if (!baseUrl || baseUrl === "") {
-            return c.json(400, { error: "Missing Base URL" });
-        }
-
-        const model = (bodyData["model"] || "").toString();
-        const msgs = bodyData["messages"];
-        const msgArray = [];
-        if (msgs) {
-            for (let i = 0; i < msgs.length; i++) {
-                msgArray.push({
-                    role: (msgs[i]["role"] || "user").toString(),
-                    content: (msgs[i]["content"] || "").toString()
-                });
-            }
-        }
-
-        let finalUrl = baseUrl;
+    function setCors(cc) {
+        try { cc.setResponseHeader("Access-Control-Allow-Origin", "*"); } catch (e) {}
+        try { cc.setResponseHeader("Access-Control-Allow-Methods", "POST, OPTIONS"); } catch (e) {}
+        try { cc.setResponseHeader("Access-Control-Allow-Headers", "Content-Type, X-Token, Authorization"); } catch (e) {}
+    }
+    function allowed(info) {
+        try {
+            const auth = info.auth;
+            if (!auth) return false;
+            const n = auth.collection().name;
+            return n === "_superusers" || n === "users";
+        } catch (e) { return false; }
+    }
+    function chatUrl(baseUrl) {
         if (baseUrl.includes("ollama.com") || baseUrl.includes(":11434")) {
-            finalUrl = baseUrl.endsWith("/api/chat") ? baseUrl : baseUrl.replace(/\/$/, "") + "/api/chat";
-        } else if (!baseUrl.includes("/chat/completions") && !baseUrl.includes("/api/chat") && !baseUrl.includes("/v1/engines")) {
-            finalUrl = baseUrl.replace(/\/$/, "") + "/chat/completions";
+            return baseUrl.endsWith("/api/chat") ? baseUrl : baseUrl.replace(/\/$/, "") + "/api/chat";
+        }
+        if (!baseUrl.includes("/chat/completions") && !baseUrl.includes("/api/chat") && !baseUrl.includes("/v1/engines")) {
+            return baseUrl.replace(/\/$/, "") + "/chat/completions";
+        }
+        return baseUrl;
+    }
+    try {
+        setCors(c);
+        const info = c.requestInfo();
+        if (!allowed(info)) {
+            return c.json(403, { error: "Akses ditolak" });
+        }
+
+        const settings = $app.findFirstRecordByFilter("settings", "id != ''");
+        if (!settings) return c.json(500, { error: "Settings tidak ditemukan" });
+        const apiKey = settings.getString("ai_gateway_key") || settings.getString("groq_api_key");
+        const baseUrl = settings.getString("ai_gateway_url") || "https://api.groq.com";
+        const model = settings.getString("ai_model") || "llama-3.1-8b-instant";
+        if (!apiKey) return c.json(500, { error: "AI belum dikonfigurasi di server" });
+
+        const bodyData = info.body || {};
+        const msgs = bodyData["messages"] || [];
+        const msgArray = [];
+        for (let i = 0; i < msgs.length; i++) {
+            msgArray.push({
+                role: (msgs[i]["role"] || "user").toString(),
+                content: (msgs[i]["content"] || "").toString()
+            });
+        }
+        if (msgArray.length === 0) {
+            return c.json(400, { error: "Messages kosong" });
         }
 
         const maxTokens = bodyData["max_tokens"] ? parseInt(bodyData["max_tokens"]) : 4000;
@@ -43,9 +70,9 @@ routerAdd("POST", "/api/ai-proxy", (c) => {
             max_tokens: maxTokens
         };
         if (bodyData["temperature"]) reqBody["temperature"] = bodyData["temperature"];
-        if (bodyData["response_format"]) reqBody["response_format"] = bodyData["response_format"];
 
-        console.log("[PROXY] forwarding to " + finalUrl + " model " + model + " max_tokens " + maxTokens);
+        const finalUrl = chatUrl(baseUrl);
+        console.log("[PROXY] forwarding to " + finalUrl + " model " + model);
 
         const res = $http.send({
             url: finalUrl,
@@ -57,15 +84,12 @@ routerAdd("POST", "/api/ai-proxy", (c) => {
             body: JSON.stringify(reqBody)
         });
 
-        console.log("[PROXY] responded: " + res.statusCode);
-
         let result = {};
         try {
             result = JSON.parse(res.raw || "{}");
         } catch (e) {
             result = { error: "Parse failed", raw: res.raw };
         }
-
         return c.json(res.statusCode, result);
     } catch (e) {
         console.log("[PROXY] CRASH: " + e.message);
@@ -74,46 +98,59 @@ routerAdd("POST", "/api/ai-proxy", (c) => {
 });
 
 routerAdd("OPTIONS", "/api/ai-proxy", (c) => {
-    try {
-        c.setResponseHeader("Access-Control-Allow-Origin", "*");
-        c.setResponseHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-        c.setResponseHeader("Access-Control-Allow-Headers", "Content-Type, X-Token, Authorization");
-    } catch (e) { }
+    try { c.setResponseHeader("Access-Control-Allow-Origin", "*"); } catch (e) {}
+    try { c.setResponseHeader("Access-Control-Allow-Methods", "POST, OPTIONS"); } catch (e) {}
+    try { c.setResponseHeader("Access-Control-Allow-Headers", "Content-Type, X-Token, Authorization"); } catch (e) {}
     return c.noContent(204);
 });
 
-
 // ============================================================
-// AI Proxy - Models List (anti-CORS for /models endpoint)
+// AI Proxy - Models List (secured, pakai konfigurasi server)
 // ============================================================
 routerAdd("POST", "/api/ai-proxy-models", (c) => {
+    function setCors(cc) {
+        try { cc.setResponseHeader("Access-Control-Allow-Origin", "*"); } catch (e) {}
+        try { cc.setResponseHeader("Access-Control-Allow-Methods", "POST, OPTIONS"); } catch (e) {}
+        try { cc.setResponseHeader("Access-Control-Allow-Headers", "Content-Type, X-Token, Authorization"); } catch (e) {}
+    }
+    function allowed(info) {
+        try {
+            const auth = info.auth;
+            if (!auth) return false;
+            const n = auth.collection().name;
+            return n === "_superusers" || n === "users";
+        } catch (e) { return false; }
+    }
     try {
-        try { c.setResponseHeader("Access-Control-Allow-Origin", "*"); } catch (e) { }
-        try { c.setResponseHeader("Access-Control-Allow-Methods", "POST, OPTIONS"); } catch (e) { }
-        try { c.setResponseHeader("Access-Control-Allow-Headers", "Content-Type, X-Token, Authorization"); } catch (e) { }
-
+        setCors(c);
         const info = c.requestInfo();
-        const apiKey = (info.body["apiKey"] || "").toString();
-        const baseUrl = (info.body["baseUrl"] || "").toString();
-
-        if (!baseUrl) {
-            return c.json(400, { error: "Missing Base URL" });
+        if (!allowed(info)) {
+            return c.json(403, { error: "Akses ditolak" });
         }
 
-        const headers = { "Content-Type": "application/json" };
-        if (apiKey && apiKey !== "undefined") {
-            headers["Authorization"] = "Bearer " + apiKey;
+        const settings = $app.findFirstRecordByFilter("settings", "id != ''");
+        if (!settings) return c.json(500, { error: "Settings tidak ditemukan" });
+        const apiKey = settings.getString("ai_gateway_key") || settings.getString("groq_api_key");
+        const baseUrl = settings.getString("ai_gateway_url") || "https://api.groq.com";
+        if (!apiKey) return c.json(500, { error: "AI belum dikonfigurasi di server" });
+
+        let modelsUrl = baseUrl.replace(/\/$/, "");
+        if (baseUrl.includes("ollama.com") || baseUrl.includes(":11434")) {
+            modelsUrl = modelsUrl + "/api/tags";
+        } else {
+            modelsUrl = modelsUrl + "/models";
         }
 
-        console.log("[PROXY-MODELS] fetching: " + baseUrl);
+        console.log("[PROXY-MODELS] fetching: " + modelsUrl);
 
         const res = $http.send({
-            url: baseUrl,
+            url: modelsUrl,
             method: "GET",
-            headers: headers
+            headers: {
+                "Authorization": "Bearer " + apiKey,
+                "Content-Type": "application/json"
+            }
         });
-
-        console.log("[PROXY-MODELS] responded: " + res.statusCode);
 
         let result = {};
         try {
@@ -121,7 +158,6 @@ routerAdd("POST", "/api/ai-proxy-models", (c) => {
         } catch (e) {
             result = { error: "Parse failed", raw: res.raw };
         }
-
         return c.json(res.statusCode, result);
     } catch (e) {
         console.log("[PROXY-MODELS] CRASH: " + e.message);
@@ -130,10 +166,8 @@ routerAdd("POST", "/api/ai-proxy-models", (c) => {
 });
 
 routerAdd("OPTIONS", "/api/ai-proxy-models", (c) => {
-    try {
-        c.setResponseHeader("Access-Control-Allow-Origin", "*");
-        c.setResponseHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-        c.setResponseHeader("Access-Control-Allow-Headers", "Content-Type, X-Token, Authorization");
-    } catch (e) { }
+    try { c.setResponseHeader("Access-Control-Allow-Origin", "*"); } catch (e) {}
+    try { c.setResponseHeader("Access-Control-Allow-Methods", "POST, OPTIONS"); } catch (e) {}
+    try { c.setResponseHeader("Access-Control-Allow-Headers", "Content-Type, X-Token, Authorization"); } catch (e) {}
     return c.noContent(204);
 });

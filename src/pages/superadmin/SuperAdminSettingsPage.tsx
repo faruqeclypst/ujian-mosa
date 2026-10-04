@@ -24,7 +24,7 @@ const SuperAdminSettingsPage = () => {
 
   const [apkRecordId, setApkRecordId] = useState<string | null>(null);
   const [apkData, setApkData] = useState({
-    app_name: "EXAM AA",
+    app_name: "Examku CBT",
     min_version_code: 1,
     min_version_name: "1.0.0",
     apk_url: "",
@@ -182,19 +182,38 @@ const SuperAdminSettingsPage = () => {
     <SuperAdminLayout>
       {/* Header */}
       <div className="mb-6">
-        <h2 className="text-xl font-bold text-slate-900">Setelan Akun</h2>
+        <h2 className="text-xl font-bold text-slate-900 tracking-tight">Setelan Akun</h2>
         <p className="text-slate-500 text-sm mt-0.5">Kelola profil dan keamanan akun Super Admin.</p>
       </div>
 
+      {/* Mobile Horizontal Section Tabs */}
+      <div className="lg:hidden flex items-center gap-2 overflow-x-auto pb-2 mb-4 scrollbar-none">
+        {sideNavItems.map(item => (
+          <button
+            key={item.key}
+            onClick={() => { setActiveSection(item.key); clearMessages(); }}
+            className={cn(
+              "flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap min-h-[42px] transition-all flex-shrink-0 shadow-xs",
+              activeSection === item.key
+                ? "bg-blue-600 text-white shadow-blue-500/20"
+                : "bg-white border border-slate-200 text-slate-700 hover:bg-slate-50"
+            )}
+          >
+            <item.icon size={15} />
+            <span>{item.label}</span>
+          </button>
+        ))}
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* Sidebar Nav */}
+        {/* Sidebar Nav (Desktop) & Admin Info */}
         <div className="lg:col-span-1">
           {/* Admin Avatar Card */}
-          <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm mb-4 text-center">
+          <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm mb-4 text-center">
             <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-bold text-2xl mx-auto mb-3 shadow-md shadow-blue-500/30">
               {adminInitial}
             </div>
-            <p className="font-semibold text-slate-900 text-sm">{formData.name || "–"}</p>
+            <p className="font-bold text-slate-900 text-sm">{formData.name || "–"}</p>
             <p className="text-xs text-slate-400 mt-0.5 truncate">{formData.email}</p>
             <div className="mt-3 inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 text-xs font-semibold px-3 py-1.5 rounded-full border border-blue-200">
               <Shield size={12} />
@@ -202,8 +221,8 @@ const SuperAdminSettingsPage = () => {
             </div>
           </div>
 
-          {/* Nav buttons */}
-          <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+          {/* Desktop Nav buttons */}
+          <div className="hidden lg:block bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
             {sideNavItems.map(item => (
               <button
                 key={item.key}
@@ -211,7 +230,7 @@ const SuperAdminSettingsPage = () => {
                 className={cn(
                   "w-full flex items-center gap-3 px-4 py-3 text-sm font-semibold transition-all text-left border-b border-slate-100 last:border-0",
                   activeSection === item.key
-                    ? "bg-blue-50 text-blue-700"
+                    ? "bg-blue-50 text-blue-700 font-bold"
                     : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
                 )}
               >

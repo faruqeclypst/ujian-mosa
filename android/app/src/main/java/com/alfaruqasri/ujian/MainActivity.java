@@ -21,6 +21,7 @@ public class MainActivity extends BridgeActivity {
     private boolean isExiting = false;
     public boolean isLockEnabled = false;
     private boolean isMenuDialogOpen = false;
+    private long backPressedTime = 0;
     private Runnable fallbackEnableLockRunnable;
     private int currentThemeColor = android.graphics.Color.WHITE;
     private int currentNavColor = android.graphics.Color.WHITE;
@@ -65,6 +66,17 @@ public class MainActivity extends BridgeActivity {
         }
 
         @android.webkit.JavascriptInterface
+        public void notifyWebOverlayActive() {
+            Log.d(TAG, "NativeExamBridge.notifyWebOverlayActive: Web CBT overlay aktif, sembunyikan tombol floating native");
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    hideFloatingExamButton();
+                }
+            });
+        }
+
+        @android.webkit.JavascriptInterface
         public boolean isNative() {
             return true;
         }
@@ -78,9 +90,11 @@ public class MainActivity extends BridgeActivity {
     private Runnable alarmRunnable = new Runnable() {
         @Override
         public void run() {
-            if (isAlarmPlaying) {
+            if (isAlarmPlaying && isLockEnabled && !isFinishing() && !isExiting) {
                 playTone();
                 alarmHandler.postDelayed(this, 600);
+            } else {
+                isAlarmPlaying = false;
             }
         }
     };
@@ -185,20 +199,6 @@ public class MainActivity extends BridgeActivity {
         
         // 4. Inisialisasi Layar Blokir (Layout)
         createBlockingLayout();
-        
-        // 5. Safety Fallback: Tunggu respon dari React (AppVersionGuard).
-        // Jika dalam 2.5 detik tidak ada sinyal dari JS (misal offline atau JS crash),
-        // otomatis aktifkan kuncian ujian demi keamanan.
-        fallbackEnableLockRunnable = new Runnable() {
-            @Override
-            public void run() {
-                if (!isLockEnabled && !isExiting) {
-                    Log.d(TAG, "Fallback timeout (2.5s): Mengaktifkan kuncian ujian secara otomatis");
-                    enableLockModeInternal();
-                }
-            }
-        };
-        handler.postDelayed(fallbackEnableLockRunnable, 2500);
     }
 
     public void setThemeModeInternal(final String theme, final String colorHex) {
@@ -459,6 +459,8 @@ public class MainActivity extends BridgeActivity {
                     if (getBridge() != null && getBridge().getWebView() != null) {
                         getBridge().getWebView().loadUrl(url);
                     }
+                    // Cek jika halaman yang dimuat adalah web Exam AA CBT yang sudah punya overlay sendiri
+                    scheduleWebOverlayCheck();
                 } catch (Exception e) {
                     Log.e(TAG, "startCustomExamInternal failed", e);
                 }
@@ -509,109 +511,242 @@ public class MainActivity extends BridgeActivity {
         });
     }
 
+    private int dpToPx(int dp) {
+        return Math.round(dp * getResources().getDisplayMetrics().density);
+    }
+
+    private static class IconView extends android.view.View {
+        private final String iconType;
+        private final int iconColor;
+
+        public IconView(Context context, String iconType, int iconColor) {
+            super(context);
+            this.iconType = iconType;
+            this.iconColor = iconColor;
+        }
+
+        @Override
+        protected void onDraw(android.graphics.Canvas canvas) {
+            super.onDraw(canvas);
+            float w = getWidth();
+            float h = getHeight();
+            if (w == 0 || h == 0) return;
+
+            android.graphics.Paint paint = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+            paint.setColor(iconColor);
+            paint.setStrokeCap(android.graphics.Paint.Cap.ROUND);
+            paint.setStrokeJoin(android.graphics.Paint.Join.ROUND);
+
+            float scale = Math.min(w, h) / 24f;
+            paint.setStrokeWidth(2.2f * scale);
+
+            if ("refresh".equals(iconType)) {
+                paint.setStyle(android.graphics.Paint.Style.STROKE);
+                android.graphics.RectF rect = new android.graphics.RectF(4f * scale, 4f * scale, 20f * scale, 20f * scale);
+                canvas.drawArc(rect, 40, 100, false, paint);
+                canvas.drawArc(rect, 220, 100, false, paint);
+
+                paint.setStyle(android.graphics.Paint.Style.FILL);
+                android.graphics.Path p1 = new android.graphics.Path();
+                p1.moveTo(21f * scale, 9f * scale);
+                p1.lineTo(21f * scale, 4f * scale);
+                p1.lineTo(16f * scale, 4f * scale);
+                p1.close();
+                canvas.drawPath(p1, paint);
+
+                android.graphics.Path p2 = new android.graphics.Path();
+                p2.moveTo(3f * scale, 15f * scale);
+                p2.lineTo(3f * scale, 20f * scale);
+                p2.lineTo(8f * scale, 20f * scale);
+                p2.close();
+                canvas.drawPath(p2, paint);
+            } else if ("logout".equals(iconType)) {
+                paint.setStyle(android.graphics.Paint.Style.STROKE);
+                android.graphics.Path door = new android.graphics.Path();
+                door.moveTo(9f * scale, 21f * scale);
+                door.lineTo(5f * scale, 21f * scale);
+                door.lineTo(5f * scale, 3f * scale);
+                door.lineTo(9f * scale, 3f * scale);
+                canvas.drawPath(door, paint);
+
+                canvas.drawLine(9f * scale, 12f * scale, 21f * scale, 12f * scale, paint);
+                android.graphics.Path arrow = new android.graphics.Path();
+                arrow.moveTo(16f * scale, 7f * scale);
+                arrow.lineTo(21f * scale, 12f * scale);
+                arrow.lineTo(16f * scale, 17f * scale);
+                canvas.drawPath(arrow, paint);
+            } else if ("dots".equals(iconType)) {
+                paint.setStyle(android.graphics.Paint.Style.FILL);
+                float r = 2.0f * scale;
+                canvas.drawCircle(5f * scale, 12f * scale, r, paint);
+                canvas.drawCircle(12f * scale, 12f * scale, r, paint);
+                canvas.drawCircle(19f * scale, 12f * scale, r, paint);
+            } else if ("close".equals(iconType)) {
+                paint.setStyle(android.graphics.Paint.Style.STROKE);
+                canvas.drawLine(6f * scale, 6f * scale, 18f * scale, 18f * scale, paint);
+                canvas.drawLine(18f * scale, 6f * scale, 6f * scale, 18f * scale, paint);
+            } else if ("shield".equals(iconType)) {
+                paint.setStyle(android.graphics.Paint.Style.STROKE);
+                android.graphics.Path shield = new android.graphics.Path();
+                shield.moveTo(12f * scale, 22f * scale);
+                shield.cubicTo(12f * scale, 22f * scale, 20f * scale, 18f * scale, 20f * scale, 12f * scale);
+                shield.lineTo(20f * scale, 5f * scale);
+                shield.lineTo(12f * scale, 2f * scale);
+                shield.lineTo(4f * scale, 5f * scale);
+                shield.lineTo(4f * scale, 12f * scale);
+                shield.cubicTo(4f * scale, 18f * scale, 12f * scale, 22f * scale, 12f * scale, 22f * scale);
+                canvas.drawPath(shield, paint);
+
+                canvas.drawLine(12f * scale, 7f * scale, 12f * scale, 13f * scale, paint);
+                paint.setStyle(android.graphics.Paint.Style.FILL);
+                canvas.drawCircle(12f * scale, 16.5f * scale, 1.4f * scale, paint);
+            }
+        }
+    }
+
     private void showFloatingExamButton() {
         if (floatingExamButton != null) {
             hideFloatingExamButton();
         }
 
+        final int fabSize = dpToPx(48);
+        final int subFabSize = dpToPx(40);
+        final int iconSizeSub = dpToPx(18);
+        final int iconSizeMain = dpToPx(20);
+        final int spacing = dpToPx(10);
+
         final android.widget.LinearLayout container = new android.widget.LinearLayout(this);
-        container.setOrientation(android.widget.LinearLayout.HORIZONTAL);
-        container.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        container.setOrientation(android.widget.LinearLayout.VERTICAL);
+        container.setGravity(android.view.Gravity.CENTER_HORIZONTAL);
+        container.setClipChildren(false);
+        container.setClipToPadding(false);
 
-        // 1. Tombol Muat Ulang / Reload (Langsung refresh seketika tanpa PIN)
-        final android.widget.TextView btnReload = new android.widget.TextView(this);
-        btnReload.setText("🔄 RELOAD");
-        btnReload.setTextColor(android.graphics.Color.WHITE);
-        btnReload.setTextSize(12);
-        btnReload.setTypeface(null, android.graphics.Typeface.BOLD);
-        btnReload.setGravity(android.view.Gravity.CENTER);
-        btnReload.setPadding(26, 16, 26, 16);
+        // Sub-Actions Layout (Refresh & Exit yang muncul ke atas saat dibuka)
+        final android.widget.LinearLayout actionsLayout = new android.widget.LinearLayout(this);
+        actionsLayout.setOrientation(android.widget.LinearLayout.VERTICAL);
+        actionsLayout.setGravity(android.view.Gravity.CENTER_HORIZONTAL);
+        actionsLayout.setVisibility(View.GONE);
+        actionsLayout.setClipChildren(false);
+        actionsLayout.setClipToPadding(false);
 
-        android.graphics.drawable.GradientDrawable bgReload = new android.graphics.drawable.GradientDrawable();
-        bgReload.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
-        bgReload.setColor(android.graphics.Color.parseColor("#1E293B"));
-        bgReload.setStroke(3, android.graphics.Color.parseColor("#10B981")); // Emerald border
-        bgReload.setCornerRadius(40f);
-        btnReload.setBackground(bgReload);
-
-        // 2. Tombol Menu Pengawas (Kembali ke launcher / Keluar aplikasi dengan PIN)
-        final android.widget.TextView btnMenu = new android.widget.TextView(this);
-        btnMenu.setText("🔒 MENU");
-        btnMenu.setTextColor(android.graphics.Color.WHITE);
-        btnMenu.setTextSize(12);
-        btnMenu.setTypeface(null, android.graphics.Typeface.BOLD);
-        btnMenu.setGravity(android.view.Gravity.CENTER);
-        btnMenu.setPadding(28, 16, 28, 16);
-
-        android.graphics.drawable.GradientDrawable bgMenu = new android.graphics.drawable.GradientDrawable();
-        bgMenu.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
-        bgMenu.setColor(android.graphics.Color.parseColor("#1E293B"));
-        bgMenu.setStroke(3, android.graphics.Color.parseColor("#3B82F6")); // Blue border
-        bgMenu.setCornerRadius(40f);
-        btnMenu.setBackground(bgMenu);
-
-        android.widget.LinearLayout.LayoutParams reloadParams = new android.widget.LinearLayout.LayoutParams(
-            android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
-            android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
-        );
-        reloadParams.rightMargin = 16;
-        container.addView(btnReload, reloadParams);
-        container.addView(btnMenu);
-
+        // 1. Sub-Button Refresh (Emerald Circle)
+        final android.widget.FrameLayout btnRefresh = new android.widget.FrameLayout(this);
+        android.graphics.drawable.GradientDrawable bgRefresh = new android.graphics.drawable.GradientDrawable();
+        bgRefresh.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+        bgRefresh.setColor(android.graphics.Color.parseColor("#10B981")); // Emerald 500
+        bgRefresh.setStroke(dpToPx(1), android.graphics.Color.parseColor("#34D399")); // Emerald 400
+        btnRefresh.setBackground(bgRefresh);
         if (android.os.Build.VERSION.SDK_INT >= 21) {
-            container.setElevation(25f);
+            btnRefresh.setElevation(dpToPx(6));
         }
 
+        IconView iconRefresh = new IconView(this, "refresh", android.graphics.Color.WHITE);
+        android.widget.FrameLayout.LayoutParams iconRefreshParams = new android.widget.FrameLayout.LayoutParams(
+            iconSizeSub, iconSizeSub, android.view.Gravity.CENTER
+        );
+        btnRefresh.addView(iconRefresh, iconRefreshParams);
+
+        android.widget.LinearLayout.LayoutParams refreshParams = new android.widget.LinearLayout.LayoutParams(subFabSize, subFabSize);
+        refreshParams.bottomMargin = spacing;
+        actionsLayout.addView(btnRefresh, refreshParams);
+
+        // 2. Sub-Button Exit (Rose Circle)
+        final android.widget.FrameLayout btnExit = new android.widget.FrameLayout(this);
+        android.graphics.drawable.GradientDrawable bgExit = new android.graphics.drawable.GradientDrawable();
+        bgExit.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+        bgExit.setColor(android.graphics.Color.parseColor("#EF4444")); // Rose 500
+        bgExit.setStroke(dpToPx(1), android.graphics.Color.parseColor("#F87171")); // Rose 400
+        btnExit.setBackground(bgExit);
+        if (android.os.Build.VERSION.SDK_INT >= 21) {
+            btnExit.setElevation(dpToPx(6));
+        }
+
+        IconView iconExit = new IconView(this, "logout", android.graphics.Color.WHITE);
+        android.widget.FrameLayout.LayoutParams iconExitParams = new android.widget.FrameLayout.LayoutParams(
+            iconSizeSub, iconSizeSub, android.view.Gravity.CENTER
+        );
+        btnExit.addView(iconExit, iconExitParams);
+
+        android.widget.LinearLayout.LayoutParams exitParams = new android.widget.LinearLayout.LayoutParams(subFabSize, subFabSize);
+        exitParams.bottomMargin = spacing;
+        actionsLayout.addView(btnExit, exitParams);
+
+        // 3. Main Toggle Button (Emerald Closed, Slate Open)
+        final android.widget.FrameLayout btnToggle = new android.widget.FrameLayout(this);
+        final android.graphics.drawable.GradientDrawable bgToggleClosed = new android.graphics.drawable.GradientDrawable();
+        bgToggleClosed.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+        bgToggleClosed.setColor(android.graphics.Color.parseColor("#10B981")); // Emerald 500
+        bgToggleClosed.setStroke(dpToPx(1), android.graphics.Color.parseColor("#34D399")); // Emerald 400
+
+        final android.graphics.drawable.GradientDrawable bgToggleOpen = new android.graphics.drawable.GradientDrawable();
+        bgToggleOpen.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+        bgToggleOpen.setColor(android.graphics.Color.parseColor("#0F172A")); // Slate 900
+        bgToggleOpen.setStroke(dpToPx(1), android.graphics.Color.parseColor("#334155")); // Slate 700
+
+        btnToggle.setBackground(bgToggleClosed);
+        if (android.os.Build.VERSION.SDK_INT >= 21) {
+            btnToggle.setElevation(dpToPx(8));
+        }
+
+        final IconView iconDots = new IconView(this, "dots", android.graphics.Color.WHITE);
+        final IconView iconClose = new IconView(this, "close", android.graphics.Color.WHITE);
+        iconClose.setVisibility(View.GONE);
+
+        android.widget.FrameLayout.LayoutParams toggleIconParams = new android.widget.FrameLayout.LayoutParams(
+            iconSizeMain, iconSizeMain, android.view.Gravity.CENTER
+        );
+        btnToggle.addView(iconDots, toggleIconParams);
+        btnToggle.addView(iconClose, toggleIconParams);
+
+        container.addView(actionsLayout);
+        container.addView(btnToggle, new android.widget.LinearLayout.LayoutParams(fabSize, fabSize));
+
+        // Letakkan di kanan bawah (identik dengan CapacitorOverlay Exam AA Utama)
         android.widget.FrameLayout.LayoutParams params = new android.widget.FrameLayout.LayoutParams(
             android.widget.FrameLayout.LayoutParams.WRAP_CONTENT,
             android.widget.FrameLayout.LayoutParams.WRAP_CONTENT
         );
-        params.gravity = android.view.Gravity.TOP | android.view.Gravity.END;
-        params.topMargin = getTopCutoutHeight() + 20;
-        params.rightMargin = 30;
+        params.gravity = android.view.Gravity.BOTTOM | android.view.Gravity.END;
+        params.bottomMargin = dpToPx(88);
+        params.rightMargin = dpToPx(20);
 
-        // Touch Listener untuk Reload (bisa tap dan bisa drag container)
-        btnReload.setOnTouchListener(new android.view.View.OnTouchListener() {
-            private int initialX, initialY;
-            private float initialTouchX, initialTouchY;
-            private boolean isClick = false;
-
+        final boolean[] isMenuOpen = new boolean[]{false};
+        final Runnable updateToggleState = new Runnable() {
             @Override
-            public boolean onTouch(android.view.View v, android.view.MotionEvent event) {
-                switch (event.getAction()) {
-                    case android.view.MotionEvent.ACTION_DOWN:
-                        initialX = (int) container.getX();
-                        initialY = (int) container.getY();
-                        initialTouchX = event.getRawX();
-                        initialTouchY = event.getRawY();
-                        isClick = true;
-                        return true;
-
-                    case android.view.MotionEvent.ACTION_MOVE:
-                        float dx = event.getRawX() - initialTouchX;
-                        float dy = event.getRawY() - initialTouchY;
-                        if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
-                            isClick = false;
-                            container.setX(initialX + dx);
-                            container.setY(initialY + dy);
-                        }
-                        return true;
-
-                    case android.view.MotionEvent.ACTION_UP:
-                        if (isClick) {
-                            if (getBridge() != null && getBridge().getWebView() != null) {
-                                getBridge().getWebView().reload();
-                                android.widget.Toast.makeText(MainActivity.this, "Memuat ulang halaman...", android.widget.Toast.LENGTH_SHORT).show();
-                            }
-                        }
-                        return true;
+            public void run() {
+                if (isMenuOpen[0]) {
+                    actionsLayout.setVisibility(View.VISIBLE);
+                    btnToggle.setBackground(bgToggleOpen);
+                    iconDots.setVisibility(View.GONE);
+                    iconClose.setVisibility(View.VISIBLE);
+                } else {
+                    actionsLayout.setVisibility(View.GONE);
+                    btnToggle.setBackground(bgToggleClosed);
+                    iconDots.setVisibility(View.VISIBLE);
+                    iconClose.setVisibility(View.GONE);
                 }
-                return false;
+            }
+        };
+
+        btnRefresh.setOnClickListener(new android.view.View.OnClickListener() {
+            @Override
+            public void onClick(android.view.View v) {
+                isMenuOpen[0] = false;
+                updateToggleState.run();
+                showExamConfirmDialog("refresh");
             }
         });
 
-        // Touch Listener untuk Menu Pengawas (bisa tap dan bisa drag container)
-        btnMenu.setOnTouchListener(new android.view.View.OnTouchListener() {
+        btnExit.setOnClickListener(new android.view.View.OnClickListener() {
+            @Override
+            public void onClick(android.view.View v) {
+                isMenuOpen[0] = false;
+                updateToggleState.run();
+                showExamConfirmDialog("exit");
+            }
+        });
+
+        btnToggle.setOnTouchListener(new android.view.View.OnTouchListener() {
             private int initialX, initialY;
             private float initialTouchX, initialTouchY;
             private boolean isClick = false;
@@ -630,7 +765,7 @@ public class MainActivity extends BridgeActivity {
                     case android.view.MotionEvent.ACTION_MOVE:
                         float dx = event.getRawX() - initialTouchX;
                         float dy = event.getRawY() - initialTouchY;
-                        if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
+                        if (Math.abs(dx) > dpToPx(8) || Math.abs(dy) > dpToPx(8)) {
                             isClick = false;
                             container.setX(initialX + dx);
                             container.setY(initialY + dy);
@@ -639,7 +774,8 @@ public class MainActivity extends BridgeActivity {
 
                     case android.view.MotionEvent.ACTION_UP:
                         if (isClick) {
-                            showExamMenuDialog();
+                            isMenuOpen[0] = !isMenuOpen[0];
+                            updateToggleState.run();
                         }
                         return true;
                 }
@@ -651,73 +787,230 @@ public class MainActivity extends BridgeActivity {
         addContentView(floatingExamButton, params);
     }
 
-    private void hideFloatingExamButton() {
-        if (floatingExamButton != null) {
-            try {
-                if (floatingExamButton.getParent() instanceof android.view.ViewGroup) {
-                    ((android.view.ViewGroup) floatingExamButton.getParent()).removeView(floatingExamButton);
+    public void hideFloatingExamButton() {
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                if (floatingExamButton != null) {
+                    try {
+                        if (floatingExamButton.getParent() instanceof android.view.ViewGroup) {
+                            ((android.view.ViewGroup) floatingExamButton.getParent()).removeView(floatingExamButton);
+                        }
+                    } catch (Exception e) {
+                        Log.e(TAG, "hideFloatingExamButton error", e);
+                    }
+                    floatingExamButton = null;
                 }
-            } catch (Exception e) {}
-            floatingExamButton = null;
+            }
+        });
+    }
+
+    public void checkAndHideNativeFloatingIfWebHasOverlay() {
+        if (floatingExamButton == null) return;
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                if (floatingExamButton == null) return;
+                if (getBridge() != null && getBridge().getWebView() != null) {
+                    getBridge().getWebView().evaluateJavascript(
+                        "(function() { return !!(window.__EXAM_AA_CBT__ || document.querySelector('[data-capacitor-overlay]') || document.getElementById('exam-aa-web-fab')); })()",
+                        new android.webkit.ValueCallback<String>() {
+                            @Override
+                            public void onReceiveValue(String value) {
+                                if ("true".equalsIgnoreCase(value)) {
+                                    Log.d(TAG, "Deteksi web CBT overlay terpasang, menyembunyikan floating button native");
+                                    hideFloatingExamButton();
+                                }
+                            }
+                        }
+                    );
+                }
+            }
+        });
+    }
+
+    private void scheduleWebOverlayCheck() {
+        long[] delays = new long[]{300, 800, 1500, 3000};
+        for (final long delay : delays) {
+            handler.postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    checkAndHideNativeFloatingIfWebHasOverlay();
+                }
+            }, delay);
         }
     }
 
-    private void showExamMenuDialog() {
+    private void showExamConfirmDialog(final String type) {
+        final boolean isRefresh = "refresh".equals(type);
         isMenuDialogOpen = true;
-        android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(this);
-        builder.setTitle("Menu Pengawas Ujian");
 
-        android.widget.LinearLayout layout = new android.widget.LinearLayout(this);
-        layout.setOrientation(android.widget.LinearLayout.VERTICAL);
-        layout.setPadding(60, 30, 60, 30);
+        final android.app.Dialog dialog = new android.app.Dialog(this);
+        dialog.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE);
 
-        final android.widget.EditText inputPin = new android.widget.EditText(this);
-        inputPin.setHint("Masukkan PIN Pengawas");
-        inputPin.setInputType(android.text.InputType.TYPE_CLASS_NUMBER | android.text.InputType.TYPE_NUMBER_VARIATION_PASSWORD);
-        inputPin.setGravity(android.view.Gravity.CENTER);
-        inputPin.setTextSize(18);
-        layout.addView(inputPin);
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));
+            dialog.getWindow().setDimAmount(0.6f);
+        }
 
-        builder.setView(layout);
+        final int pad24 = dpToPx(24);
+        final int pad16 = dpToPx(16);
+        final int pad12 = dpToPx(12);
 
-        builder.setNegativeButton("Kembali ke Menu", new android.content.DialogInterface.OnClickListener() {
+        android.widget.LinearLayout card = new android.widget.LinearLayout(this);
+        card.setOrientation(android.widget.LinearLayout.VERTICAL);
+        card.setGravity(android.view.Gravity.CENTER_HORIZONTAL);
+        card.setPadding(pad24, pad24, pad24, pad24);
+
+        android.graphics.drawable.GradientDrawable cardBg = new android.graphics.drawable.GradientDrawable();
+        cardBg.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
+        cardBg.setColor(android.graphics.Color.parseColor("#0F172A")); // Slate 900
+        cardBg.setStroke(dpToPx(1), android.graphics.Color.parseColor("#1E293B")); // Slate 800
+        cardBg.setCornerRadius(dpToPx(20));
+        card.setBackground(cardBg);
+
+        // Icon Box (w-14 h-14 = 56dp, rounded-2xl = 16dp)
+        final int iconBoxSize = dpToPx(56);
+        android.widget.FrameLayout iconBox = new android.widget.FrameLayout(this);
+
+        android.graphics.drawable.GradientDrawable iconBoxBg = new android.graphics.drawable.GradientDrawable();
+        iconBoxBg.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
+        iconBoxBg.setColor(android.graphics.Color.parseColor("#1E293B")); // Slate 800
+        iconBoxBg.setCornerRadius(dpToPx(16));
+        iconBox.setBackground(iconBoxBg);
+
+        IconView modalIcon = new IconView(
+            this,
+            isRefresh ? "refresh" : "shield",
+            isRefresh ? android.graphics.Color.parseColor("#3B82F6") : android.graphics.Color.parseColor("#EF4444")
+        );
+        android.widget.FrameLayout.LayoutParams modalIconParams = new android.widget.FrameLayout.LayoutParams(
+            dpToPx(24), dpToPx(24), android.view.Gravity.CENTER
+        );
+        iconBox.addView(modalIcon, modalIconParams);
+
+        android.widget.LinearLayout.LayoutParams iconBoxParams = new android.widget.LinearLayout.LayoutParams(iconBoxSize, iconBoxSize);
+        iconBoxParams.bottomMargin = pad16;
+        card.addView(iconBox, iconBoxParams);
+
+        // Title
+        android.widget.TextView tvTitle = new android.widget.TextView(this);
+        tvTitle.setText(isRefresh ? "Muat Ulang Halaman?" : "Keluar Dari Aplikasi?");
+        tvTitle.setTextColor(android.graphics.Color.WHITE);
+        tvTitle.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 17);
+        tvTitle.setTypeface(null, android.graphics.Typeface.BOLD);
+        tvTitle.setGravity(android.view.Gravity.CENTER);
+
+        android.widget.LinearLayout.LayoutParams titleParams = new android.widget.LinearLayout.LayoutParams(
+            android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+            android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
+        );
+        titleParams.bottomMargin = dpToPx(6);
+        card.addView(tvTitle, titleParams);
+
+        // Subtitle / Description
+        android.widget.TextView tvDesc = new android.widget.TextView(this);
+        tvDesc.setText(isRefresh 
+            ? "Seluruh progres jawaban yang belum tersimpan mungkin akan hilang."
+            : "Apakah Anda yakin ingin keluar dari aplikasi ujian?");
+        tvDesc.setTextColor(android.graphics.Color.parseColor("#94A3B8")); // Slate 400
+        tvDesc.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 12);
+        tvDesc.setGravity(android.view.Gravity.CENTER);
+        tvDesc.setLineSpacing(0, 1.25f);
+
+        android.widget.LinearLayout.LayoutParams descParams = new android.widget.LinearLayout.LayoutParams(
+            android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+            android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
+        );
+        descParams.bottomMargin = dpToPx(20);
+        card.addView(tvDesc, descParams);
+
+        // Button Grid (Horizontal 2 Columns)
+        android.widget.LinearLayout btnRow = new android.widget.LinearLayout(this);
+        btnRow.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+        btnRow.setGravity(android.view.Gravity.CENTER);
+
+        // Button "Tidak"
+        final android.widget.TextView btnCancel = new android.widget.TextView(this);
+        btnCancel.setText("Tidak");
+        btnCancel.setTextColor(android.graphics.Color.parseColor("#E2E8F0")); // Slate 200
+        btnCancel.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 14);
+        btnCancel.setTypeface(null, android.graphics.Typeface.BOLD);
+        btnCancel.setGravity(android.view.Gravity.CENTER);
+        btnCancel.setPadding(0, pad12, 0, pad12);
+
+        android.graphics.drawable.GradientDrawable bgCancel = new android.graphics.drawable.GradientDrawable();
+        bgCancel.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
+        bgCancel.setColor(android.graphics.Color.parseColor("#1E293B")); // Slate 800
+        bgCancel.setCornerRadius(dpToPx(12));
+        btnCancel.setBackground(bgCancel);
+
+        btnCancel.setOnClickListener(new android.view.View.OnClickListener() {
             @Override
-            public void onClick(android.content.DialogInterface dialog, int which) {
-                String typed = inputPin.getText().toString().trim();
-                if (typed.equals(customExamPin)) {
-                    stopCustomExamInternal();
-                } else {
-                    android.widget.Toast.makeText(MainActivity.this, "PIN Salah! Akses ditolak.", android.widget.Toast.LENGTH_SHORT).show();
-                }
-            }
-        });
-
-        builder.setPositiveButton("Keluar Aplikasi", new android.content.DialogInterface.OnClickListener() {
-            @Override
-            public void onClick(android.content.DialogInterface dialog, int which) {
-                String typed = inputPin.getText().toString().trim();
-                if (typed.equals(customExamPin)) {
-                    exitAppInternal();
-                } else {
-                    android.widget.Toast.makeText(MainActivity.this, "PIN Salah! Akses ditolak.", android.widget.Toast.LENGTH_SHORT).show();
-                }
-            }
-        });
-
-        builder.setNeutralButton("Batal", new android.content.DialogInterface.OnClickListener() {
-            @Override
-            public void onClick(android.content.DialogInterface dialog, int which) {
+            public void onClick(android.view.View v) {
                 dialog.dismiss();
             }
         });
 
-        android.app.AlertDialog dialog = builder.create();
+        // Button "Ya"
+        final android.widget.TextView btnConfirm = new android.widget.TextView(this);
+        btnConfirm.setText("Ya");
+        btnConfirm.setTextColor(android.graphics.Color.WHITE);
+        btnConfirm.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 14);
+        btnConfirm.setTypeface(null, android.graphics.Typeface.BOLD);
+        btnConfirm.setGravity(android.view.Gravity.CENTER);
+        btnConfirm.setPadding(0, pad12, 0, pad12);
+
+        android.graphics.drawable.GradientDrawable bgConfirm = new android.graphics.drawable.GradientDrawable();
+        bgConfirm.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
+        bgConfirm.setColor(isRefresh 
+            ? android.graphics.Color.parseColor("#2563EB")  // Blue 600
+            : android.graphics.Color.parseColor("#E11D48")  // Rose 600
+        );
+        bgConfirm.setCornerRadius(dpToPx(12));
+        btnConfirm.setBackground(bgConfirm);
+
+        btnConfirm.setOnClickListener(new android.view.View.OnClickListener() {
+            @Override
+            public void onClick(android.view.View v) {
+                dialog.dismiss();
+                if (isRefresh) {
+                    if (getBridge() != null && getBridge().getWebView() != null) {
+                        getBridge().getWebView().reload();
+                        android.widget.Toast.makeText(MainActivity.this, "Memuat ulang halaman...", android.widget.Toast.LENGTH_SHORT).show();
+                    }
+                } else {
+                    exitAppInternal();
+                }
+            }
+        });
+
+        android.widget.LinearLayout.LayoutParams cancelParams = new android.widget.LinearLayout.LayoutParams(0, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f);
+        cancelParams.rightMargin = dpToPx(6);
+
+        android.widget.LinearLayout.LayoutParams confirmParams = new android.widget.LinearLayout.LayoutParams(0, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f);
+        confirmParams.leftMargin = dpToPx(6);
+
+        btnRow.addView(btnCancel, cancelParams);
+        btnRow.addView(btnConfirm, confirmParams);
+
+        card.addView(btnRow, new android.widget.LinearLayout.LayoutParams(
+            android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+            android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
+        ));
+
+        dialog.setContentView(card, new android.view.ViewGroup.LayoutParams(
+            dpToPx(300),
+            android.view.ViewGroup.LayoutParams.WRAP_CONTENT
+        ));
+
         dialog.setOnDismissListener(new android.content.DialogInterface.OnDismissListener() {
             @Override
             public void onDismiss(android.content.DialogInterface d) {
                 isMenuDialogOpen = false;
             }
         });
+
         dialog.show();
     }
 
@@ -739,7 +1032,7 @@ public class MainActivity extends BridgeActivity {
         title.setPadding(0, 0, 0, 40);
 
         android.widget.TextView desc = new android.widget.TextView(this);
-        desc.setText("Demi keamanan ujian, aplikasi ini wajib menggunakan mode 'Sematkan Layar'.\n\nSilakan klik tombol di bawah untuk mengaktifkan kuncian.\n\nUntuk keluar ujian, gunakan tombol '🔒 MENU' dan masukkan PIN pengawas.");
+        desc.setText("Demi keamanan ujian, aplikasi ini wajib menggunakan mode 'Sematkan Layar'.\n\nSilakan klik tombol di bawah untuk mengaktifkan kuncian.\n\nUntuk keluar ujian, gunakan tombol menu di pojok kanan bawah.");
         desc.setTextColor(android.graphics.Color.WHITE);
         desc.setTextSize(16);
         desc.setGravity(android.view.Gravity.CENTER);
@@ -895,18 +1188,14 @@ public class MainActivity extends BridgeActivity {
             }
         } else {
             try {
-                if (!isExiting) {
+                if (!isExiting && isLockEnabled) {
                     sendBroadcast(new android.content.Intent(android.content.Intent.ACTION_CLOSE_SYSTEM_DIALOGS));
                 }
             } catch (Exception e) {}
 
             if (isLockEnabled && !isExiting && !isMenuDialogOpen) {
-                // Deteksi floating apps atau overlay yang menutupi ujian: segera picu blur & alarm jika kehilangan fokus
-                Log.w(TAG, "onWindowFocusChanged(false): Fokus jendela hilang saat ujian!");
-                playRingtone();
-                if (blockingLayout != null) {
-                    blockingLayout.setVisibility(View.VISIBLE);
-                }
+                // Beri tahu WebView bahwa fokus jendela hilang (CBTPage menangani countdown 5s & cek layar mati)
+                Log.d(TAG, "onWindowFocusChanged(false): Fokus jendela hilang saat ujian");
                 runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
@@ -960,6 +1249,7 @@ public class MainActivity extends BridgeActivity {
     }
 
     public void playRingtone() {
+        if (!isLockEnabled || isFinishing() || isExiting) return;
         if (isAlarmPlaying) return; 
         isAlarmPlaying = true;
         alarmHandler.post(alarmRunnable);
@@ -971,6 +1261,8 @@ public class MainActivity extends BridgeActivity {
         try {
             if (toneGenerator != null) {
                 toneGenerator.stopTone();
+                toneGenerator.release();
+                toneGenerator = null;
             }
             android.os.Vibrator v = (android.os.Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
             if (v != null) {
@@ -980,6 +1272,7 @@ public class MainActivity extends BridgeActivity {
     }
 
     private void playTone() {
+        if (!isLockEnabled || isFinishing() || isExiting) return;
         try {
             android.media.AudioManager am = (android.media.AudioManager) getSystemService(Context.AUDIO_SERVICE);
             if (am != null) {
@@ -1122,7 +1415,7 @@ public class MainActivity extends BridgeActivity {
                     // Cegah mundur ke launcher lokal jika sedang ujian
                     if (prevUrl != null && (prevUrl.contains("localhost") || prevUrl.equals(customLauncherUrl))) {
                         Log.d(TAG, "Mencegah back ke launcher ujian saat mode terkunci aktif");
-                        android.widget.Toast.makeText(this, "Gunakan tombol MENU pengawas untuk keluar ujian", android.widget.Toast.LENGTH_SHORT).show();
+                        android.widget.Toast.makeText(this, "Gunakan tombol menu di pojok kanan bawah untuk keluar ujian", android.widget.Toast.LENGTH_SHORT).show();
                         return;
                     }
                     getBridge().getWebView().goBack();
@@ -1133,19 +1426,25 @@ public class MainActivity extends BridgeActivity {
             return;
         }
 
-        // 2. Jika di luar mode ujian (launcher)
+        // 2. Jika di luar mode ujian (launcher / portal / login)
         if (getBridge() != null && getBridge().getWebView() != null && getBridge().getWebView().canGoBack()) {
             getBridge().getWebView().goBack();
             return;
         }
 
-        // DILARANG KERAS panggil super.onBackPressed() atau finish() agar aplikasi tidak pernah tertutup via tombol back!
-        android.widget.Toast.makeText(this, "Tombol Kembali dinonaktifkan demi keamanan ujian", android.widget.Toast.LENGTH_SHORT).show();
+        // Di luar ujian: konfirmasi keluar dengan menekan kembali sekali lagi (double back to exit)
+        if (System.currentTimeMillis() - backPressedTime < 2000) {
+            exitAppInternal();
+        } else {
+            backPressedTime = System.currentTimeMillis();
+            android.widget.Toast.makeText(this, "Tekan sekali lagi untuk keluar aplikasi", android.widget.Toast.LENGTH_SHORT).show();
+        }
     }
 
     @Override
     public void finish() {
         isExiting = true;
+        isLockEnabled = false;
         stopRepeatingCheck();
         try {
             handler.removeCallbacksAndMessages(null);

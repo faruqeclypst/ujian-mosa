@@ -598,9 +598,10 @@ const LandingPage = () => {
           >
             <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-white border border-slate-200/80 p-1 flex items-center justify-center shadow-xs group-hover:scale-105 group-hover:shadow-md transition-all duration-300">
               <img
-                src="/logo-exam-aa.png"
+                src="/logo-exam-aa.webp"
                 alt="Logo EXAM AA"
                 className="w-full h-full object-contain"
+                onError={(e) => { (e.target as HTMLImageElement).src = "/logo-exam-aa.png"; }}
               />
             </div>
             <div>
@@ -1922,7 +1923,7 @@ const LandingPage = () => {
             className="flex items-center gap-2.5 cursor-pointer group"
           >
             <div className="w-8 h-8 rounded-lg bg-white border border-slate-200 p-1 flex items-center justify-center shadow-2xs group-hover:scale-105 transition-transform">
-              <img src="/logo-exam-aa.png" alt="EXAM AA" className="w-full h-full object-contain" />
+              <img src="/logo-exam-aa.webp" alt="EXAM AA" className="w-full h-full object-contain" onError={(e) => { (e.target as HTMLImageElement).src = "/logo-exam-aa.png"; }} />
             </div>
             <span className="font-extrabold text-slate-900 text-base tracking-tight">EXAM AA</span>
           </div>

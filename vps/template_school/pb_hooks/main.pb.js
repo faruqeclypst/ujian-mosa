@@ -1,158 +1,310 @@
 /* =========================================================
-   🚀 SYSTEM MASTER MAINTENANCE (CLEAN VERSION)
-   Fungsi: Auto-Score, Offline Cleanup, & Token Universal
+   🚀 SYSTEM MASTER MAINTENANCE (OPTIMIZED & BULLETPROOF)
+   Fungsi: Auto-Finish & Score, Offline Cleanup, & Token Universal
    ========================================================= */
 
 // 🕒 1. PEMBERSIHAN STATUS OFFLINE (Setiap 2 Menit)
 cronAdd("cleanupOfflineStudents", "*/2 * * * *", () => {
-  const expiredTime = new Date(Date.now() - 3 * 60000).toISOString();
-  try {
-    const records = $app.findRecordsByFilter("attempts", `status = "ongoing" && lastHeartbeat < "${expiredTime}"`);
-    records.forEach(r => {
-      r.set("isOnline", false);
-      $app.save(r);
-    });
-  } catch (e) { }
+    try {
+        const expiredTime = new Date(Date.now() - 5 * 60000).toISOString();
+        $app.db().newQuery("UPDATE attempts SET isOnline = 0 WHERE status = 'ongoing' AND lastHeartbeat < {:expiredTime}")
+            .bind({ expiredTime: expiredTime })
+            .execute();
+    } catch (e) {
+        console.error("[CRON OFFLINE CLEANUP ERROR]:", e);
+    }
 });
 
-// 🕒 2. AUTO-FINISH & AUTO-SCORE (Setiap 1 Menit)
+// 🕒 2. AUTO-FINISH & AUTO-SCORE KETIKA TIMER HABIS (Setiap 1 Menit)
 cronAdd("autoFinishAndScore", "* * * * *", () => {
-  try {
-    const now = new Date();
-    const ongoing = $app.findRecordsByFilter("attempts", 'status = "ongoing" || status = "LOCKED"');
-
-    ongoing.forEach(att => {
-      const room = $app.findRecordById("exam_rooms", att.get("examRoomId"));
-      if (!room || room.get("isActive") === false) return;
-
-      const start = new Date(att.get("startedAt") || att.get("created"));
-      const duration = (room.get("duration") || 60) * 60000;
-      const expiredAt = new Date(start.getTime() + duration);
-
-      if (expiredAt < now) {
-        const answers = att.get("answers") || {};
-        const questions = $app.findRecordsByFilter("questions", `examId = "${room.get("examId")}"`);
-
-        let correctCount = 0;
-        questions.forEach(q => {
-          const studentAns = answers[q.id];
-          if (!studentAns) return;
-          const type = q.get("type") || "pilihan_ganda";
-          const options = q.get("options") || {};
-
-          if (type === "pilihan_ganda" || type === "benar_salah") {
-            if (options[studentAns] && options[studentAns].isCorrect === true) correctCount++;
-          }
-          else if (type === "pilihan_ganda_kompleks") {
-            const correctKeys = Object.keys(options).filter(k => options[k].isCorrect).sort();
-            if (Array.isArray(studentAns)) {
-              const sortedStudent = studentAns.sort();
-              if (JSON.stringify(sortedStudent) === JSON.stringify(correctKeys)) correctCount++;
-            }
-          }
-          else if (type === "isian_singkat") {
-            const key = (q.get("answerKey") || "").toLowerCase().trim();
-            if (String(studentAns).toLowerCase().trim() === key) correctCount++;
-          }
+    try {
+        // PocketBase JS VM membutuhkan DynamicModel pointer untuk query.all()
+        const expiredRow = new DynamicModel({
+            id: "",
+            examRoomId: "",
+            status: "",
+            startedAt: "",
+            created: "",
+            duration: 0
         });
+        const expired = arrayOf(expiredRow);
 
-        const score = Math.round((correctCount / (questions.length || 1)) * 100);
+        $app.db().newQuery(`
+            SELECT a.id, a.examRoomId, a.status, a.startedAt, a.created, COALESCE(r.duration, 60) as duration
+            FROM attempts a
+            LEFT JOIN exam_rooms r ON a.examRoomId = r.id
+            WHERE (a.status = 'ongoing' OR a.status = 'LOCKED')
+              AND (
+                -- 1. Attempt tanpa ruangan / ruangan dihapus (kadaluarsa > 1 jam)
+                (r.id IS NULL AND datetime(COALESCE(NULLIF(a.startedAt, ''), a.created), '+60 minutes') < datetime('now'))
+                -- 2. Timer durasi pengerjaan siswa habis
+                OR (r.id IS NOT NULL AND datetime(COALESCE(NULLIF(a.startedAt, ''), a.created), '+' || COALESCE(r.duration, 60) || ' minutes') < datetime('now'))
+                -- 3. Ruangan telah dinonaktifkan atau diarsipkan
+                OR r.status = 'archive'
+                OR r.isActive = 0
+              )
+        `).all(expired);
 
-        att.set("status", "finished");
-        att.set("score", score);
-        att.set("correct", correctCount);
-        att.set("total", questions.length);
-        att.set("submittedAt", now.toISOString());
-        att.set("isOnline", false);
-        $app.save(att);
-      }
-    });
-  } catch (e) { }
-});
+        if (expired.length === 0) return;
 
-// 🕒 3. ROTASI TOKEN UNIVERSAL (Setiap 5 Menit - HANYA jika ada ruangan ujian yang sedang aktif)
-cronAdd("rotateUniversalToken", "*/5 * * * *", () => {
-  try {
-    // 🔒 Cek apakah ada ruang ujian yang sedang AKTIF
-    const activeRooms = [];
-    $app.db().newQuery("SELECT id FROM exam_rooms WHERE isActive = 1 LIMIT 1").all(activeRooms);
-    if (activeRooms.length === 0) return; // Hemat disk I/O & cegah korupsi jika tidak ada ujian aktif
+        console.log("[AUTO-FINISH] Menemukan " + expired.length + " ujian siswa yang waktunya habis. Memproses...");
 
-    const settings = $app.findFirstRecordByFilter("settings", "1=1");
-    if (!settings) return;
-    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-    let token = "";
-    for (let i = 0; i < 6; i++) token += chars.charAt(Math.floor(Math.random() * chars.length));
-    settings.set("universal_token", token);
-    settings.set("universal_token_updated_at", new Date().toISOString());
-    $app.save(settings);
-  } catch (e) { }
-});
-
-// 🕒 4. AUTO-ARCHIVE RUANGAN (Jam 03:00 Pagi)
-cronAdd("autoArchive", "0 3 * * *", () => {
-  try {
-    const yesterday = new Date(Date.now() - 24 * 60 * 60000).toISOString();
-    const oldRooms = $app.findRecordsByFilter("exam_rooms", `status != "archive" && end_time < "${yesterday}"`);
-    oldRooms.forEach(room => {
-      room.set("status", "archive");
-      $app.save(room);
-    });
-  } catch (e) { }
-});
-
-
-// 🕒 5. AUTO-CALCULATE RANKINGS (Setiap 10 Menit)
-cronAdd("calculateRankings", "* * * * *", () => {
-  try {
-    console.log("Ranking: Memulai proses...");
-    const rooms = $app.findRecordsByFilter("exam_rooms", "status != 'archive'");
-    rooms.forEach(room => {
-      const roomId = room.id;
-      const attempts = $app.findRecordsByFilter("attempts", "examRoomId = '" + roomId + "' && status = 'finished'");
-
-      if (!attempts || attempts.length === 0) return;
-      // Sorting Tanpa .get()
-      const sorted = attempts.sort((a, b) => {
-        const scoreA = parseFloat(a.get("score")) || 0;
-        const scoreB = parseFloat(b.get("score")) || 0;
-        if (scoreB !== scoreA) return scoreB - scoreA;
-
-        const timeA = parseInt(a.get("usedTime")) || 0;
-        const timeB = parseInt(b.get("usedTime")) || 0;
-        return timeA - timeB;
-      });
-      const rankingData = sorted.map((att, index) => {
-        let sName = "Anonim";
-        try {
-          const student = $app.findRecordById("students", att.get("studentId"));
-          if (student) sName = student.get("name");
-        } catch (e) { }
-        return {
-          rank: index + 1,
-          name: sName,
-          score: parseFloat(att.get("score")) || 0,
-          usedTime: parseInt(att.get("usedTime")) || 0,
-          finishedAt: att.get("submittedAt")
+        const typeMap = {
+            "multiple_choice": "pilihan_ganda",
+            "pilihan_ganda": "pilihan_ganda",
+            "complex_multiple_choice": "pilihan_ganda_kompleks",
+            "complex_choice": "pilihan_ganda_kompleks",
+            "pilihan_ganda_kompleks": "pilihan_ganda_kompleks",
+            "short_answer": "isian_singkat",
+            "isian_singkat": "isian_singkat",
+            "essay": "uraian",
+            "uraian": "uraian",
+            "true_false": "benar_salah",
+            "benar_salah": "benar_salah",
+            "matching": "menjodohkan",
+            "menjodohkan": "menjodohkan",
+            "ordering": "urutkan",
+            "sequence": "urutkan",
+            "urutkan": "urutkan"
         };
-      });
-      let lb;
-      try {
-        lb = $app.findFirstRecordByFilter("leaderboards", "examRoomId = '" + roomId + "'");
-      } catch (e) {
-        // Cara paling aman buat record di v0.22:
-        const collection = $app.findCollectionByNameOrId("leaderboards");
-        lb = new Record(collection);
-        lb.set("examRoomId", roomId);
-      }
 
-      lb.set("data", rankingData);
-      $app.save(lb);
-    });
-    console.log("✅ Ranking Selesai!");
-  } catch (e) {
-    console.log("❌ Ranking Error: " + e.toString()); // Gunakan .toString() agar pesan lengkap
-  }
+        const roomsCache = {};
+        const questionsCache = {};
+
+        expired.forEach(row => {
+            try {
+                const att = $app.findRecordById("attempts", row.id);
+                if (!att) return;
+
+                const roomId = row.examRoomId;
+                let room = null;
+                if (roomId) {
+                    room = roomsCache[roomId];
+                    if (room === undefined) {
+                        try {
+                            room = $app.findRecordById("exam_rooms", roomId);
+                            roomsCache[roomId] = room;
+                        } catch (e) {
+                            roomsCache[roomId] = null;
+                        }
+                    }
+                }
+
+                let questions = [];
+                if (room) {
+                    const examId = room.getString("examId");
+                    questions = questionsCache[examId];
+                    if (questions === undefined) {
+                        try {
+                            questions = $app.findRecordsByFilter("questions", "examId = '" + examId + "'", "order,created", 0, 0);
+                            questionsCache[examId] = questions;
+                        } catch (e) {
+                            questionsCache[examId] = [];
+                        }
+                    }
+                }
+
+                // Parse jawaban siswa dari JSON string
+                let answers = {};
+                try {
+                    const rawAnswers = att.getString("answers");
+                    if (rawAnswers) answers = JSON.parse(rawAnswers);
+                } catch (pe) {
+                    answers = {};
+                }
+
+                let objectiveCorrect = 0;
+                let objectiveTotal = 0;
+                let essayTotal = 0;
+
+                questions.forEach(q => {
+                    const rawField = q.getString("field") || q.getString("type") || "multiple_choice";
+                    const t = typeMap[rawField] || "pilihan_ganda";
+
+                    if (t === "isian_singkat" || t === "uraian") {
+                        essayTotal++;
+                        return;
+                    }
+                    objectiveTotal++;
+
+                    const studentAns = answers[q.id];
+                    if (!studentAns) return;
+
+                    let options = {};
+                    try {
+                        const rawOpt = q.getString("options");
+                        if (rawOpt) options = JSON.parse(rawOpt);
+                    } catch (oe) {
+                        options = {};
+                    }
+
+                    if (t === "pilihan_ganda") {
+                        if (options[studentAns] && options[studentAns].isCorrect === true) {
+                            objectiveCorrect++;
+                        }
+                    } else if (t === "benar_salah") {
+                        if (options.statements && Array.isArray(options.statements)) {
+                            let stCount = 0;
+                            let stCorr = 0;
+                            for (let si = 0; si < options.statements.length; si++) {
+                                const st = options.statements[si] || {};
+                                const sid = String(st.id != null ? st.id : "");
+                                if (!sid) continue;
+                                stCount++;
+                                const expected = String(st.answer || "").toLowerCase();
+                                const given = String((typeof studentAns === "object" && studentAns !== null ? studentAns[sid] : "") || "").toLowerCase();
+                                if (given === expected) stCorr++;
+                            }
+                            if (stCount > 0) objectiveCorrect += (stCorr / stCount);
+                        } else if (typeof studentAns === "object" && studentAns !== null) {
+                            let stCount = 0;
+                            let stCorr = 0;
+                            Object.keys(options).forEach(k => {
+                                stCount++;
+                                const expected = (options[k].answer || options[k].isCorrect ? "benar" : "salah").toLowerCase();
+                                const given = String(studentAns[k] || "").toLowerCase();
+                                if (given === expected) stCorr++;
+                            });
+                            if (stCount > 0) objectiveCorrect += (stCorr / stCount);
+                        } else if (options[studentAns] && options[studentAns].isCorrect === true) {
+                            objectiveCorrect++;
+                        }
+                    } else if (t === "pilihan_ganda_kompleks") {
+                        const correctKeys = Object.keys(options)
+                            .filter(k => options[k] && options[k].isCorrect === true)
+                            .map(k => String(k).toLowerCase());
+                        const chosenKeys = Array.isArray(studentAns)
+                            ? studentAns.map(k => String(k).toLowerCase())
+                            : [String(studentAns).toLowerCase()];
+
+                        const correctChosen = chosenKeys.filter(k => correctKeys.includes(k));
+                        const wrongChosen = chosenKeys.filter(k => !correctKeys.includes(k));
+                        if (correctKeys.length > 0) {
+                            const itemScore = Math.max(0, correctChosen.length - wrongChosen.length) / correctKeys.length;
+                            objectiveCorrect += itemScore;
+                        }
+                    }
+                });
+
+                const totalQuestions = objectiveTotal + essayTotal;
+                const score = objectiveTotal > 0 ? Math.round((objectiveCorrect / objectiveTotal) * 100) : 0;
+
+                // Hitung usedTime berdasarkan startedAt
+                let usedTime = row.duration * 60;
+                const startStr = att.getString("startedAt") || att.getString("created");
+                if (startStr) {
+                    const diffSec = Math.floor((Date.now() - new Date(startStr).getTime()) / 1000);
+                    if (diffSec > 0) usedTime = Math.min(diffSec, row.duration * 60);
+                }
+
+                att.set("status", "finished");
+                att.set("score", score);
+                att.set("correct", Math.floor(objectiveCorrect));
+                att.set("total", totalQuestions);
+                att.set("usedTime", usedTime);
+                att.set("submittedAt", new Date().toISOString());
+                att.set("isOnline", false);
+                $app.save(att);
+
+                console.log("[AUTO-FINISH] Selesai: Attempt ID " + row.id + " | Nilai: " + score + " (" + Math.floor(objectiveCorrect) + "/" + totalQuestions + ")");
+            } catch (rowErr) {
+                console.error("[AUTO-FINISH ROW ERROR] ID " + row.id + ":", rowErr);
+            }
+        });
+    } catch (e) {
+        console.error("[AUTO-FINISH CRON ERROR]:", e);
+    }
 });
 
-console.log("🚀 System Master Maintenance Optimized!");
+// 🕒 3. ROTASI TOKEN UNIVERSAL (Setiap 5 Menit)
+cronAdd("rotateUniversalToken", "*/5 * * * *", () => {
+    try {
+        const settings = $app.findFirstRecordByFilter("settings", "1=1");
+        if (!settings) return;
+
+        // Cek apakah ada ruangan ujian yang sedang aktif
+        let hasActiveRooms = false;
+        try {
+            const activeRooms = $app.findRecordsByFilter("exam_rooms", "status != 'archive' && isActive != false", "", 1, 0);
+            hasActiveRooms = activeRooms && activeRooms.length > 0;
+        } catch (re) {}
+
+        const currentToken = settings.getString("universal_token");
+        // Jika tidak ada ujian aktif dan sudah ada token, lewati agar hemat disk I/O
+        if (!hasActiveRooms && currentToken && currentToken.length === 6) {
+            return;
+        }
+
+        const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+        let token = "";
+        for (let i = 0; i < 6; i++) token += chars.charAt(Math.floor(Math.random() * chars.length));
+
+        settings.set("universal_token", token);
+        settings.set("universal_token_updated_at", new Date().toISOString());
+        $app.save(settings);
+
+        console.log("[CRON TOKEN] Token universal berhasil dirotasi:", token);
+    } catch (e) {
+        console.error("[CRON TOKEN ROTATION ERROR]:", e);
+    }
+});
+
+// 🔄 ENDPOINT ROTASI TOKEN UNIVERSAL ON-DEMAND
+routerAdd("POST", "/api/rotate-token", (c) => {
+    try {
+        const settings = $app.findFirstRecordByFilter("settings", "1=1");
+        if (!settings) {
+            return c.json(404, { ok: false, error: "Settings tidak ditemukan" });
+        }
+
+        const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+        let token = "";
+        for (let i = 0; i < 6; i++) token += chars.charAt(Math.floor(Math.random() * chars.length));
+
+        const now = new Date().toISOString();
+        settings.set("universal_token", token);
+        settings.set("universal_token_updated_at", now);
+        $app.save(settings);
+
+        return c.json(200, { ok: true, token: token, updated_at: now });
+    } catch (err) {
+        return c.json(500, { ok: false, error: String((err && err.message) || err) });
+    }
+});
+
+routerAdd("GET", "/api/rotate-token", (c) => {
+    try {
+        const settings = $app.findFirstRecordByFilter("settings", "1=1");
+        if (!settings) {
+            return c.json(404, { ok: false, error: "Settings tidak ditemukan" });
+        }
+
+        const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+        let token = "";
+        for (let i = 0; i < 6; i++) token += chars.charAt(Math.floor(Math.random() * chars.length));
+
+        const now = new Date().toISOString();
+        settings.set("universal_token", token);
+        settings.set("universal_token_updated_at", now);
+        $app.save(settings);
+
+        return c.json(200, { ok: true, token: token, updated_at: now });
+    } catch (err) {
+        return c.json(500, { ok: false, error: String((err && err.message) || err) });
+    }
+});
+
+// 🕒 4. PENGARSIPAN OTOMATIS (Setiap jam 3 pagi)
+cronAdd("autoArchive", "0 3 * * *", () => {
+    try {
+        const yesterday = new Date(Date.now() - 24 * 60 * 60000).toISOString();
+        $app.db().newQuery("UPDATE exam_rooms SET status = 'archive' WHERE status != 'archive' AND (endTime < {:yesterday} OR end_time < {:yesterday})")
+            .bind({ yesterday: yesterday })
+            .execute();
+        console.log("[CRON AUTO-ARCHIVE] Pengarsipan otomatis ruangan kadaluarsa selesai.");
+    } catch (e) {
+        console.error("[CRON AUTO-ARCHIVE ERROR]:", e);
+    }
+});
+
+console.log("🚀 System Master Maintenance Optimized & Verified!");

@@ -45,6 +45,7 @@ export const StudentAuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     if (tenantLoading || !pb) {
+      setstudent(null);
       if (!tenantLoading) setLoading(false);
       return;
     }
@@ -115,6 +116,8 @@ export const StudentAuthProvider = ({ children }: { children: ReactNode }) => {
           }
           console.warn("Background sync failed:", err);
         }
+      } else {
+        setstudent(null);
       }
       setLoading(false);
     };

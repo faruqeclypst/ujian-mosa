@@ -17,6 +17,12 @@ Platform modern berbasis web untuk menyelenggarakan ujian sekolah (Computer Base
 
 ---
 
+> 📖 **PANDUAN LENGKAP PERINTAH OPERASIONAL & DEPLOYMENT**:
+> Untuk daftar lengkap perintah harian (deploy frontend, push template hooks, sync tenant, build APK, dan manajemen server), silakan baca:
+> 👉 **[`COMMANDS.md`](file:///d:/PROJECT/ujian/COMMANDS.md)**
+
+---
+
 ## 🚀 Fitur Utama
 
 ### 🏢 **SaaS Multi-Tenant Architecture**

@@ -90,9 +90,9 @@ export const SyncAllTenantsModal: React.FC<SyncAllTenantsModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
-      <div className="relative w-full max-w-lg bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+      <div className="relative w-full max-w-lg max-h-[90vh] flex flex-col bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between p-5 border-b border-slate-100 dark:border-slate-800">
+        <div className="flex items-center justify-between p-5 border-b border-slate-100 dark:border-slate-800 shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200/60 dark:border-indigo-900/40 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
               <Zap size={20} />
@@ -117,7 +117,7 @@ export const SyncAllTenantsModal: React.FC<SyncAllTenantsModalProps> = ({
         </div>
 
         {/* Content */}
-        <div className="p-5 space-y-4 text-xs">
+        <div className="p-5 space-y-4 text-xs overflow-y-auto flex-1">
           {/* Info Banner */}
           <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/70 dark:border-slate-800 space-y-2">
             <div className="flex items-center gap-2 font-bold text-slate-800 dark:text-slate-200">

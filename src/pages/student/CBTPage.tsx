@@ -607,9 +607,18 @@ const CBTPage = () => {
   const answersRef = useRef<Record<string, any>>({});
   const isNavigatingOrReloadingRef = useRef<boolean>(false);
 
-  // Stop alarm on CBT mount just in case
+  // Kunci layar saat ujian aktif, dan lepas saat lembar ujian CBT ditutup / selesai
   useEffect(() => {
-    try { CheatAlert.stopAlarm(); } catch (err) { }
+    if (Capacitor.isNativePlatform()) {
+      try { CheatAlert.enableLockMode(); } catch (err) { }
+      try { CheatAlert.stopAlarm(); } catch (err) { }
+    }
+    return () => {
+      if (Capacitor.isNativePlatform()) {
+        try { CheatAlert.unlockScreen(); } catch (err) { }
+        try { CheatAlert.stopAlarm(); } catch (err) { }
+      }
+    };
   }, []);
 
   // Jika siswa terdeteksi double login (isKicked), segera tutup semua modal lembar ujian & hentikan penalti
@@ -632,6 +641,7 @@ const CBTPage = () => {
         penaltyCountdownIntervalRef.current = null;
       }
       if (Capacitor.isNativePlatform()) {
+        try { CheatAlert.unlockScreen(); } catch (_) {}
         try { CheatAlert.stopAlarm(); } catch (_) {}
       }
     }

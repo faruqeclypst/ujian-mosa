@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTenant } from "../context/TenantContext";
 import { masterPb } from "../lib/pocketbase";
@@ -64,7 +64,7 @@ const COLLECTIONS = [
 
 const SettingsPage = () => {
   const navigate = useNavigate();
-  const { pb, school, terminology } = useTenant();
+  const { pb, school, terminology, loading: tenantLoading } = useTenant();
 
   const [settingsId, setSettingsId] = useState<string | null>(null);
   const [schoolName, setSchoolName] = useState("");
@@ -148,6 +148,85 @@ const SettingsPage = () => {
     uraian: true,
   });
 
+  // 🔄 Offline 1-Click Update States
+  const isOfflineServer = school?.plan === "offline" || school?.id === "local_server" || (typeof window !== "undefined" && (/^(localhost|127\.|0\.0\.0\.0$|\[::1\])/.test(window.location.hostname) || /^(192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.)/.test(window.location.hostname)));
+  const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
+  const [isApplyingUpdate, setIsApplyingUpdate] = useState(false);
+  const [updateAvailable, setUpdateAvailable] = useState<{ version: string; release_date?: string; notes?: string } | null>(null);
+
+  const handleCheckUpdate = async () => {
+    setIsCheckingUpdate(true);
+    try {
+      let data: any = null;
+      if (pb) {
+        try {
+          const res = await pb.send("/api/offline-update-check", { method: "GET" });
+          data = res?.data;
+        } catch {
+          // fallback to fetch directly
+        }
+      }
+      if (!data) {
+        const res = await fetch("https://examku.my.id/downloads/version.json", { cache: "no-store" });
+        if (res.ok) data = await res.json();
+      }
+
+      if (data && data.version) {
+        setUpdateAvailable(data);
+        addToast({
+          title: "Pembaruan Tersedia!",
+          description: `Versi terbaru v${data.version} (${data.release_date || "Terbaru"}) siap dipasang.`,
+          type: "info"
+        });
+      } else {
+        addToast({
+          title: "Sistem Mutakhir",
+          description: "Aplikasi CBT Anda sudah menggunakan versi paling mutakhir.",
+          type: "success"
+        });
+      }
+    } catch (err: any) {
+      addToast({
+        title: "Pemeriksaan Gagal",
+        description: "Tidak dapat menghubungi server pusat. Pastikan laptop terhubung internet.",
+        type: "error"
+      });
+    } finally {
+      setIsCheckingUpdate(false);
+    }
+  };
+
+  const handleApplyUpdate = async () => {
+    if (!pb) {
+      addToast({ title: "Koneksi Database Tidak Siap", type: "error" });
+      return;
+    }
+    setIsApplyingUpdate(true);
+    try {
+      const res = await pb.send("/api/offline-update-apply", { method: "POST" });
+      if (res?.ok || res?.message) {
+        addToast({
+          title: "Pembaruan Berhasil!",
+          description: "Sistem telah diperbarui. Memuat ulang halaman...",
+          type: "success"
+        });
+        setTimeout(() => {
+          window.location.reload();
+        }, 2000);
+      } else {
+        throw new Error(res?.error || "Gagal menerapkan pembaruan.");
+      }
+    } catch (err: any) {
+      addToast({
+        title: "Gagal Memperbarui",
+        description: err.message || "Pastikan komputer terhubung ke internet saat proses pembaruan.",
+        type: "error"
+      });
+      setIsApplyingUpdate(false);
+    }
+  };
+
+
   const questionTypes = [
     { id: "pilihan_ganda", label: "Pilihan Ganda (Single)" },
     { id: "pilihan_ganda_kompleks", label: "Pilihan Ganda Kompleks" },
@@ -159,7 +238,7 @@ const SettingsPage = () => {
     { id: "uraian", label: "Uraian / Essay" },
   ];
 
-  const fetchSettings = async () => {
+  const fetchSettings = useCallback(async () => {
     if (!pb) return;
     try {
       setLoading(true);
@@ -193,12 +272,12 @@ const SettingsPage = () => {
         // Tenant baru: belum ada record settings, pakai nama dari registry
         setSchoolName(school?.name || "EXAM AA");
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error("Settings fetch err", e);
     } finally {
       setLoading(false);
     }
-  };
+  }, [pb, school?.name]);
 
   const handleTestAI = async () => {
     const targetKey = aiProvider === "puter" ? "puter-no-key" : (aiProvider === "groq" ? groqApiKey : aiGatewayKey);
@@ -309,7 +388,19 @@ const SettingsPage = () => {
   };
 
   useEffect(() => {
-    fetchSettings();
+    if (pb) {
+      fetchSettings();
+    } else if (!tenantLoading) {
+      setLoading(false);
+    }
+  }, [pb, tenantLoading, fetchSettings]);
+
+  useEffect(() => {
+    // Safety fallback: pastikan loading tidak pernah macet
+    const timer = setTimeout(() => {
+      setLoading(false);
+    }, 3500);
+    return () => clearTimeout(timer);
   }, []);
 
   useEffect(() => {
@@ -1474,6 +1565,82 @@ const SettingsPage = () => {
               </div>
             </CardContent>
           </Card>
+
+          {/* ── Pembaruan Sistem (1-Click Update untuk Offline Server) ── */}
+          {isOfflineServer && (
+            <Card className="rounded-2xl border border-blue-200 dark:border-blue-900/50 shadow-sm bg-gradient-to-br from-blue-50/60 to-indigo-50/40 dark:from-slate-900 dark:to-blue-950/20 p-5 space-y-3 relative overflow-hidden">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-md shadow-blue-500/20">
+                    <RefreshCw size={16} className={isApplyingUpdate ? "animate-spin" : ""} />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                      Pembaruan 1-Click
+                      <Badge variant="outline" className="text-[9px] font-black uppercase px-1.5 py-0 border-blue-300 dark:border-blue-800 text-blue-700 dark:text-blue-300">
+                        Offline Server
+                      </Badge>
+                    </h4>
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400">Update modul & web tanpa ubah database</p>
+                  </div>
+                </div>
+              </div>
+
+              <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
+                Perbarui tampilan dan fitur CBT offline Anda ke versi cloud terbaru secara otomatis dengan 1 klik.
+              </p>
+
+              {updateAvailable && (
+                <div className="p-3 rounded-xl bg-white dark:bg-slate-800/80 border border-blue-200 dark:border-blue-800 text-[11px] space-y-1">
+                  <div className="font-bold text-blue-700 dark:text-blue-300 flex items-center gap-1.5">
+                    <CheckCircle2 size={13} className="text-emerald-500" />
+                    Versi Rilis: v{updateAvailable.version} ({updateAvailable.release_date})
+                  </div>
+                  {updateAvailable.notes && (
+                    <p className="text-slate-500 dark:text-slate-400 text-[10px]">
+                      {updateAvailable.notes}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              <div className="flex flex-col gap-2 pt-1">
+                {updateAvailable ? (
+                  <Button
+                    type="button"
+                    disabled={isApplyingUpdate}
+                    onClick={handleApplyUpdate}
+                    className="w-full h-9 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-sm shadow-blue-500/20"
+                  >
+                    {isApplyingUpdate ? (
+                      <><RefreshCw size={13} className="animate-spin mr-1.5" /> Sedang Mengunduh & Memperbarui...</>
+                    ) : (
+                      <><Download size={13} className="mr-1.5" /> Pasang Pembaruan Sekarang</>
+                    )}
+                  </Button>
+                ) : (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={isCheckingUpdate}
+                    onClick={handleCheckUpdate}
+                    className="w-full h-9 rounded-xl text-xs font-bold text-blue-600 dark:text-blue-400 hover:bg-blue-100/60 dark:hover:bg-blue-950/40 border-blue-200 dark:border-blue-800 bg-white dark:bg-slate-800"
+                  >
+                    {isCheckingUpdate ? (
+                      <><RefreshCw size={13} className="animate-spin mr-1.5" /> Memeriksa ke Server Pusat...</>
+                    ) : (
+                      <><RefreshCw size={13} className="mr-1.5" /> Cek Pembaruan Sistem</>
+                    )}
+                  </Button>
+                )}
+              </div>
+
+              <div className="pt-2 border-t border-blue-100 dark:border-slate-800 flex items-start gap-1.5 text-[10px] text-slate-500 dark:text-slate-400">
+                <ShieldCheck size={13} className="text-emerald-500 shrink-0 mt-0.5" />
+                <span>Database bank soal & siswa (<code className="font-mono text-slate-700 dark:text-slate-300">data.db</code>) dijamin 100% aman dan tidak terhapus.</span>
+              </div>
+            </Card>
+          )}
 
           {/* ── Status Server & VPS Card ── */}
           <Card className="rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900 p-5 space-y-3">

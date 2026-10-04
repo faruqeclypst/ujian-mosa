@@ -74,9 +74,10 @@ const Logo = () => {
             />
           ) : (
             <img
-              src="/logo-default.png"
+              src="/logo-default.webp"
               alt="Logo Default"
               className="h-full w-full object-contain"
+              onError={(e) => { (e.target as HTMLImageElement).src = "/logo-default.png"; }}
             />
           )}
         </div>

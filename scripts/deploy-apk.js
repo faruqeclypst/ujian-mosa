@@ -36,7 +36,23 @@ try {
 const apkFileName = `exam-aa_${dateStr}-${nextBuildNum}.apk`;
 console.log(`Target nama APK: ${apkFileName}\n`);
 
-// 3. Sync Capacitor
+// 3. Bersihkan APK sampah di public, dist, dan assets Android agar tidak ikut terbungkus ke APK
+const cleanDirs = [
+  path.join(process.cwd(), 'public'),
+  path.join(process.cwd(), 'dist'),
+  path.join(process.cwd(), 'android', 'app', 'src', 'main', 'assets', 'public')
+];
+for (const dir of cleanDirs) {
+  if (fs.existsSync(dir)) {
+    for (const f of fs.readdirSync(dir)) {
+      if (f.endsWith('.apk')) {
+        try { fs.unlinkSync(path.join(dir, f)); } catch {}
+      }
+    }
+  }
+}
+
+// 4. Sync Capacitor
 console.log(`[1/4] Sinkronisasi web assets ke Android...`);
 execSync(`npx cap sync android`, { stdio: 'inherit' });
 

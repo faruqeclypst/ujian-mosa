@@ -26,18 +26,22 @@ const StudentLoginPage = () => {
   const [changePassError, setChangePassError] = useState("");
   const [isChangingPass, setIsChangingPass] = useState(false);
 
-  const [schoolName, setSchoolName] = useState("");
-  const [schoolLogo, setSchoolLogo] = useState("");
+  const [schoolName, setSchoolName] = useState(school?.name || "");
+  const [schoolLogo, setSchoolLogo] = useState(school?.logo_url || "");
   const [logoLoading, setLogoLoading] = useState(true);
   const [logoError, setLogoError] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
 
   useEffect(() => {
+    if (school?.name) {
+      setSchoolName(school.name);
+    }
+    if (school?.logo_url) {
+      setSchoolLogo(school.logo_url);
+    }
+
     const fetchSettings = async () => {
-      if (school?.name) {
-        setSchoolName(school.name);
-      }
       if (!pb) { setLogoLoading(false); return; }
       try {
         setLogoLoading(true);
@@ -170,9 +174,10 @@ const StudentLoginPage = () => {
               ) : (
                 <div className="relative w-16 h-16 sm:w-24 sm:h-24 md:w-32 md:h-32 flex items-center justify-center overflow-hidden">
                   <img
-                    src="/logo-default.png"
+                    src="/logo-default.webp"
                     alt="Logo Default"
                     className="w-full h-full object-contain filter drop-shadow-sm"
+                    onError={(e) => { (e.target as HTMLImageElement).src = "/logo-default.png"; }}
                   />
                 </div>
               )}

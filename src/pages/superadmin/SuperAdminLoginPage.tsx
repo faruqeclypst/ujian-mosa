@@ -54,22 +54,30 @@ const SuperAdminLoginPage = () => {
 
       <div className="w-full max-w-[420px] relative z-10">
         {/* Branding Area */}
-        <div className="text-center mb-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
-          <div className="inline-flex items-center justify-center w-20 h-20 bg-white rounded-[2.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.08)] mb-6 group hover:scale-105 transition-transform duration-500">
-            <div className="w-14 h-14 bg-blue-600 rounded-[1.8rem] flex items-center justify-center shadow-lg shadow-blue-200">
-              <ShieldCheck size={32} className="text-white" />
-            </div>
+        <div className="text-center mb-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+          <div className="inline-flex items-center justify-center w-20 h-20 sm:w-24 sm:h-24 bg-white rounded-3xl p-3 shadow-xl mb-4 group hover:scale-105 transition-transform duration-500 border border-slate-100">
+            <img
+              src="/logo-default.webp"
+              onError={(e) => { (e.target as HTMLImageElement).src = "/logo-default.png"; }}
+              alt="Examku CBT Logo"
+              className="w-full h-full object-contain drop-shadow-md"
+            />
           </div>
-          <h1 className="text-3xl font-black text-slate-900 tracking-tight mb-2">
-            Super Admin
-          </h1>
-          <p className="text-slate-400 font-medium text-sm px-8 leading-relaxed">
-            Portal Manajemen Infrastruktur & Distribusi Layanan EXAM AA
+          <div className="flex items-center justify-center gap-2 mb-1.5 flex-wrap">
+            <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+              Examku CBT
+            </h1>
+            <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 border border-blue-200">
+              Super Admin
+            </span>
+          </div>
+          <p className="text-slate-500 font-medium text-xs sm:text-sm px-4 leading-relaxed">
+            Portal Manajemen Infrastruktur, Multi-VPS, dan Lisensi Sekolah
           </p>
         </div>
 
         {/* Login Card */}
-        <div className="bg-white rounded-[2.5rem] shadow-[0_30px_100px_rgba(0,0,0,0.06)] border border-white p-8 md:p-10 animate-in fade-in slide-in-from-bottom-8 duration-700 delay-150">
+        <div className="bg-white rounded-3xl shadow-[0_20px_60px_rgba(0,0,0,0.06)] border border-slate-100 p-6 sm:p-8 animate-in fade-in slide-in-from-bottom-8 duration-700 delay-150">
           <form onSubmit={handleLogin} className="space-y-6">
             {/* Error Message */}
             {error && (
