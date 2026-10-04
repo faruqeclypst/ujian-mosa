@@ -164,11 +164,31 @@ public class MainActivity extends BridgeActivity {
             Log.e(TAG, "Failed to register screenReceiver", e);
         }
 
-        // Notch / Display Cutout: Cegah header tertutup notch / punch-hole kamera HP
+        // Notch / Display Cutout: Izinkan window menggambar hingga area cutout (short edges),
+        // lalu atur margin WebView tepat di bawah batas fisik notch tanpa dobel padding.
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
             WindowManager.LayoutParams lp = getWindow().getAttributes();
-            lp.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_NEVER;
+            lp.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
             getWindow().setAttributes(lp);
+
+            androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(
+                getWindow().getDecorView(),
+                new androidx.core.view.OnApplyWindowInsetsListener() {
+                    @Override
+                    public androidx.core.view.WindowInsetsCompat onApplyWindowInsets(
+                        android.view.View v, 
+                        androidx.core.view.WindowInsetsCompat insets
+                    ) {
+                        androidx.core.view.DisplayCutoutCompat cutout = insets.getDisplayCutout();
+                        int safeTop = (cutout != null) ? cutout.getSafeInsetTop() : 0;
+                        if (safeTop != cachedCutoutTop) {
+                            cachedCutoutTop = safeTop;
+                            applyNotchToWebView();
+                        }
+                        return insets;
+                    }
+                }
+            );
         }
 
         // Inisialisasi tema notch / status bar berdasarkan cache atau preferensi sistem
@@ -1298,7 +1318,12 @@ public class MainActivity extends BridgeActivity {
         }
     }
 
+    private int cachedCutoutTop = -1;
+
     public int getTopCutoutHeight() {
+        if (cachedCutoutTop >= 0) {
+            return cachedCutoutTop;
+        }
         int top = 0;
         try {
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
@@ -1308,12 +1333,6 @@ public class MainActivity extends BridgeActivity {
                     if (cutout != null) {
                         top = cutout.getSafeInsetTop();
                     }
-                }
-            }
-            if (top == 0) {
-                int resourceId = getResources().getIdentifier("status_bar_height", "dimen", "android");
-                if (resourceId > 0) {
-                    top = getResources().getDimensionPixelSize(resourceId);
                 }
             }
         } catch (Exception e) {}
@@ -1327,16 +1346,14 @@ public class MainActivity extends BridgeActivity {
                 try {
                     if (getBridge() == null || getBridge().getWebView() == null) return;
                     View webView = getBridge().getWebView();
-                    int top = getTopCutoutHeight();
-                    if (top > 0) {
-                        android.view.ViewGroup.LayoutParams lp = webView.getLayoutParams();
-                        if (lp instanceof android.view.ViewGroup.MarginLayoutParams) {
-                            android.view.ViewGroup.MarginLayoutParams mlp = (android.view.ViewGroup.MarginLayoutParams) lp;
-                            if (mlp.topMargin != top) {
-                                mlp.topMargin = top;
-                                webView.setLayoutParams(mlp);
-                                Log.d(TAG, "Applied top margin " + top + "px to WebView to stay below camera notch");
-                            }
+                    int top = Math.max(0, getTopCutoutHeight());
+                    android.view.ViewGroup.LayoutParams lp = webView.getLayoutParams();
+                    if (lp instanceof android.view.ViewGroup.MarginLayoutParams) {
+                        android.view.ViewGroup.MarginLayoutParams mlp = (android.view.ViewGroup.MarginLayoutParams) lp;
+                        if (mlp.topMargin != top) {
+                            mlp.topMargin = top;
+                            webView.setLayoutParams(mlp);
+                            Log.d(TAG, "Applied top margin " + top + "px to WebView to stay exactly below camera notch");
                         }
                     }
                 } catch (Exception e) {
@@ -1357,8 +1374,8 @@ public class MainActivity extends BridgeActivity {
         try {
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
                 WindowManager.LayoutParams lp = getWindow().getAttributes();
-                if (lp.layoutInDisplayCutoutMode != WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_NEVER) {
-                    lp.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_NEVER;
+                if (lp.layoutInDisplayCutoutMode != WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES) {
+                    lp.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
                     getWindow().setAttributes(lp);
                 }
             }
