@@ -639,17 +639,17 @@ export default function SuperAdminOfflineLicensesPage() {
           ) : (
             <>
               {/* Desktop Table View */}
-              <div className="hidden md:block overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-50/80 border-b border-slate-200 text-slate-500 uppercase font-bold text-[10px] tracking-wider">
+              <div className="hidden md:block overflow-x-auto scrollbar-thin">
+                <table className="w-full text-left text-xs border-collapse min-w-[960px]">
+                  <thead className="bg-slate-50/90 border-b border-slate-200 text-slate-500 uppercase font-bold text-[10px] tracking-wider">
                     <tr>
-                      <th className="py-3.5 px-4">Sekolah & Subdomain</th>
-                      <th className="py-3.5 px-4">Status & Keamanan</th>
-                      <th className="py-3.5 px-4">Key Terakhir Diterbitkan</th>
-                      <th className="py-3.5 px-4">Aktif Sampai Kapan</th>
-                      <th className="py-3.5 px-4">Kode Lisensi</th>
-                      <th className="py-3.5 px-4">Keperluan</th>
-                      <th className="py-3.5 px-4 text-right">Aksi</th>
+                      <th className="py-3.5 px-4 min-w-[210px]">Sekolah & Subdomain</th>
+                      <th className="py-3.5 px-4 min-w-[150px]">Status & Keamanan</th>
+                      <th className="py-3.5 px-4 min-w-[170px]">Key Diterbitkan</th>
+                      <th className="py-3.5 px-4 min-w-[150px]">Aktif Sampai</th>
+                      <th className="py-3.5 px-4 min-w-[180px]">Kode Lisensi</th>
+                      <th className="py-3.5 px-4 min-w-[140px]">Keperluan</th>
+                      <th className="py-3.5 px-4 text-right min-w-[130px]">Aksi</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">

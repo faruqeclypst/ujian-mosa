@@ -763,15 +763,15 @@ const SuperAdminDashboard = () => {
       </div>
 
       {/* Table */}
-      <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+      <div className="bg-white border border-slate-200/90 rounded-2xl shadow-xs overflow-hidden">
         {tab !== "requests" ? (
           <>
             {/* Desktop Table */}
-            <div className="hidden md:block overflow-x-auto">
-              <table className="w-full text-left">
+            <div className="hidden md:block overflow-x-auto scrollbar-thin">
+              <table className="w-full text-left border-collapse min-w-[980px]">
                 <thead>
-                  <tr className="bg-slate-50 border-b border-slate-200">
-                    <th className="px-5 py-3 w-10">
+                  <tr className="bg-slate-50/90 border-b border-slate-200 text-slate-500 uppercase text-[11px] font-bold tracking-wider">
+                    <th className="px-4 py-3.5 w-12 text-center">
                       <input
                         type="checkbox"
                         className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
@@ -785,11 +785,11 @@ const SuperAdminDashboard = () => {
                         }}
                       />
                     </th>
-                    <th className="px-2 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Institusi</th>
-                    <th className="px-5 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Alamat Sistem</th>
-                    <th className="px-5 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Paket</th>
-                    <th className="px-5 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Status</th>
-                    <th className="px-5 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider text-right">Aksi</th>
+                    <th className="px-4 py-3.5 min-w-[240px]">Institusi</th>
+                    <th className="px-4 py-3.5 min-w-[210px]">Alamat & Engine</th>
+                    <th className="px-4 py-3.5 min-w-[170px]">Paket & Kuota</th>
+                    <th className="px-4 py-3.5 min-w-[130px]">Status</th>
+                    <th className="px-4 py-3.5 text-right min-w-[220px]">Aksi</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -984,46 +984,48 @@ const SuperAdminDashboard = () => {
                             }
                             return null;
                           })()}
-                          <button
-                            onClick={() => setMigrationSchool(school)}
-                            className="w-8 h-8 rounded-full border border-purple-200 bg-purple-50 text-purple-700 hover:bg-purple-100 hover:border-purple-300 hover:shadow-md transition-all flex items-center justify-center group/btn"
-                            title={school.server_host && school.server_host !== "127.0.0.1" && school.server_host !== "localhost" ? "Migrasi Server / Tarik ke Master" : "1-Klik Burst Mode (Pindah ke Worker)"}
-                          >
-                            <Zap size={14} className="group-hover/btn:scale-110 text-purple-600 transition-transform" />
-                          </button>
-                          <button
-                            onClick={() => setOfflineLicenseSchool(school)}
-                            className="w-8 h-8 rounded-full border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 hover:border-indigo-300 hover:shadow-md transition-all flex items-center justify-center group/btn"
-                            title="Izin Server Offline CBT (Lisensi Lab / Proktor)"
-                          >
-                            <KeyRound size={14} className="group-hover/btn:scale-110 text-indigo-600 transition-transform" />
-                          </button>
-                          <button
-                            onClick={() => { setEditSchool(school); setShowAddModal(true); }}
-                            className="w-8 h-8 rounded-full border border-slate-200 bg-white text-slate-400 hover:text-blue-600 hover:border-blue-200 hover:shadow-md transition-all flex items-center justify-center group/btn"
-                            title="Edit"
-                          >
-                            <Edit size={14} className="group-hover/btn:scale-110 transition-transform" />
-                          </button>
-                          <button
-                            onClick={() => toggleActive(school)}
-                            className={cn(
-                              "w-8 h-8 rounded-full border border-slate-200 bg-white transition-all flex items-center justify-center hover:shadow-md group/btn",
-                              school.is_active
-                                ? "text-slate-400 hover:text-amber-500 hover:border-amber-200"
-                                : "text-slate-400 hover:text-emerald-500 hover:border-emerald-200"
-                            )}
-                            title={school.is_active ? "Nonaktifkan" : "Aktifkan"}
-                          >
-                            {school.is_active ? <PowerOff size={14} className="group-hover/btn:scale-110 transition-transform" /> : <Power size={14} className="group-hover/btn:scale-110 transition-transform" />}
-                          </button>
-                          <button
-                            onClick={() => deleteSchool(school)}
-                            className="w-8 h-8 rounded-full border border-slate-200 bg-white text-slate-400 hover:text-red-500 hover:border-red-200 hover:shadow-md transition-all flex items-center justify-center group/btn"
-                            title="Hapus"
-                          >
-                            <Trash2 size={14} className="group-hover/btn:rotate-12 transition-transform" />
-                          </button>
+                          <div className="inline-flex items-center p-1 bg-slate-100/70 border border-slate-200/80 rounded-xl shadow-2xs gap-0.5">
+                            <button
+                              onClick={() => setMigrationSchool(school)}
+                              className="w-8 h-8 rounded-lg flex items-center justify-center text-purple-700 hover:bg-white hover:text-purple-900 hover:shadow-2xs transition-all"
+                              title={school.server_host && school.server_host !== "127.0.0.1" && school.server_host !== "localhost" ? "Migrasi Server / Tarik ke Master" : "1-Klik Burst Mode (Pindah ke Worker)"}
+                            >
+                              <Zap size={14} className="text-purple-600" />
+                            </button>
+                            <button
+                              onClick={() => setOfflineLicenseSchool(school)}
+                              className="w-8 h-8 rounded-lg flex items-center justify-center text-indigo-700 hover:bg-white hover:text-indigo-900 hover:shadow-2xs transition-all"
+                              title="Izin Server Offline CBT (Lisensi Lab / Proktor)"
+                            >
+                              <KeyRound size={14} className="text-indigo-600" />
+                            </button>
+                            <button
+                              onClick={() => { setEditSchool(school); setShowAddModal(true); }}
+                              className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-600 hover:bg-white hover:text-blue-600 hover:shadow-2xs transition-all"
+                              title="Edit Konfigurasi Tenant"
+                            >
+                              <Edit size={14} />
+                            </button>
+                            <button
+                              onClick={() => toggleActive(school)}
+                              className={cn(
+                                "w-8 h-8 rounded-lg flex items-center justify-center transition-all",
+                                school.is_active
+                                  ? "text-slate-600 hover:bg-white hover:text-amber-600 hover:shadow-2xs"
+                                  : "text-slate-600 hover:bg-white hover:text-emerald-600 hover:shadow-2xs"
+                              )}
+                              title={school.is_active ? "Nonaktifkan Sistem" : "Aktifkan Sistem"}
+                            >
+                              {school.is_active ? <PowerOff size={14} /> : <Power size={14} />}
+                            </button>
+                            <button
+                              onClick={() => deleteSchool(school)}
+                              className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:bg-white hover:text-red-600 hover:shadow-2xs transition-all"
+                              title="Hapus Tenant"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
                         </div>
                       </td>
                     </tr>
@@ -1205,11 +1207,11 @@ const SuperAdminDashboard = () => {
         ) : (
           <>
             {/* Requests Desktop */}
-            <div className="hidden md:block overflow-x-auto">
-              <table className="w-full text-left">
+            <div className="hidden md:block overflow-x-auto scrollbar-thin">
+              <table className="w-full text-left border-collapse min-w-[940px]">
                 <thead>
-                  <tr className="bg-slate-50 border-b border-slate-200">
-                    <th className="px-5 py-3 w-10">
+                  <tr className="bg-slate-50/90 border-b border-slate-200 text-slate-500 uppercase text-[11px] font-bold tracking-wider">
+                    <th className="px-4 py-3.5 w-12 text-center">
                       <input
                         type="checkbox"
                         className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
@@ -1223,12 +1225,12 @@ const SuperAdminDashboard = () => {
                         }}
                       />
                     </th>
-                    <th className="px-2 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Nama Institusi</th>
-                    <th className="px-5 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Domain</th>
-                    <th className="px-5 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Paket & Durasi</th>
-                    <th className="px-5 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Kontak</th>
-                    <th className="px-5 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Status</th>
-                    <th className="px-5 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider text-right">Aksi</th>
+                    <th className="px-4 py-3.5 min-w-[220px]">Nama Institusi</th>
+                    <th className="px-4 py-3.5 min-w-[190px]">Domain</th>
+                    <th className="px-4 py-3.5 min-w-[160px]">Paket & Durasi</th>
+                    <th className="px-4 py-3.5 min-w-[160px]">Kontak</th>
+                    <th className="px-4 py-3.5 min-w-[120px]">Status</th>
+                    <th className="px-4 py-3.5 text-right min-w-[180px]">Aksi</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">

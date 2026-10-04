@@ -541,18 +541,18 @@ const SuperAdminInvoicePage = () => {
         ) : (
           <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
             {/* Desktop Table View */}
-            <div className="hidden md:block overflow-x-auto">
-              <table className="w-full text-sm">
+            <div className="hidden md:block overflow-x-auto scrollbar-thin">
+              <table className="w-full text-left border-collapse min-w-[920px]">
                 <thead>
-                  <tr className="border-b border-slate-100 bg-slate-50">
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Invoice</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Institusi</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Plan</th>
-                    <th className="text-right px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Jumlah</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Jatuh Tempo</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Bukti</th>
-                    <th className="px-4 py-3"></th>
+                  <tr className="bg-slate-50/90 border-b border-slate-200 text-slate-500 uppercase text-[11px] font-bold tracking-wider">
+                    <th className="px-4 py-3.5 min-w-[150px]">Invoice</th>
+                    <th className="px-4 py-3.5 min-w-[200px]">Institusi</th>
+                    <th className="px-4 py-3.5 min-w-[130px]">Paket</th>
+                    <th className="px-4 py-3.5 min-w-[130px] text-right">Jumlah</th>
+                    <th className="px-4 py-3.5 min-w-[120px]">Status</th>
+                    <th className="px-4 py-3.5 min-w-[140px]">Jatuh Tempo</th>
+                    <th className="px-4 py-3.5 min-w-[90px]">Bukti</th>
+                    <th className="px-4 py-3.5 text-right min-w-[140px]">Aksi</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
@@ -610,33 +610,33 @@ const SuperAdminInvoicePage = () => {
                             <span className="text-[11px] text-slate-400">-</span>
                           )}
                         </td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-1 justify-end">
+                        <td className="px-4 py-3 text-right">
+                          <div className="inline-flex items-center p-0.5 bg-slate-100/70 border border-slate-200/80 rounded-xl shadow-2xs gap-0.5">
                             <button
                               onClick={() => setDetailInvoice(inv)}
-                              className="p-1.5 rounded-lg hover:bg-blue-50 text-slate-400 hover:text-blue-600 transition"
-                              title="Detail"
+                              className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:bg-white hover:text-blue-600 hover:shadow-2xs transition-all"
+                              title="Lihat Detail Invoice"
                             >
                               <Eye size={14} />
                             </button>
                             <button
                               onClick={() => printInvoice(inv)}
-                              className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition"
+                              className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:bg-white hover:text-slate-800 hover:shadow-2xs transition-all"
                               title="Cetak Invoice Digital (PDF)"
                             >
                               <Printer size={14} />
                             </button>
                             <button
                               onClick={() => openEdit(inv)}
-                              className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition"
-                              title="Edit"
+                              className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:bg-white hover:text-blue-600 hover:shadow-2xs transition-all"
+                              title="Edit Data Invoice"
                             >
                               <Edit size={14} />
                             </button>
                             <button
                               onClick={() => handleDelete(inv.id)}
-                              className="p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-600 transition"
-                              title="Hapus"
+                              className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:bg-white hover:text-red-600 hover:shadow-2xs transition-all"
+                              title="Hapus Invoice"
                             >
                               <Trash2 size={14} />
                             </button>

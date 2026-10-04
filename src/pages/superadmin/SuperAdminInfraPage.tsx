@@ -466,16 +466,16 @@ const SuperAdminInfraPage = () => {
         </div>
 
         {/* Desktop Table */}
-        <div className="hidden md:block overflow-x-auto">
-          <table className="w-full text-left">
+        <div className="hidden md:block overflow-x-auto scrollbar-thin">
+          <table className="w-full text-left border-collapse min-w-[880px]">
             <thead>
-              <tr className="border-b border-slate-100 bg-slate-50/50">
-                <th className="px-5 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Tenant Sekolah</th>
-                <th className="px-5 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Node Penempatan</th>
-                <th className="px-5 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Database</th>
-                <th className="px-5 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Latensi</th>
-                <th className="px-5 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Kondisi</th>
-                <th className="px-5 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider text-right">Aksi</th>
+              <tr className="bg-slate-50/90 border-b border-slate-200 text-slate-500 uppercase text-[11px] font-bold tracking-wider">
+                <th className="px-4 py-3.5 min-w-[220px]">Tenant Sekolah</th>
+                <th className="px-4 py-3.5 min-w-[200px]">Node Penempatan</th>
+                <th className="px-4 py-3.5 min-w-[120px]">Database</th>
+                <th className="px-4 py-3.5 min-w-[150px]">Latensi</th>
+                <th className="px-4 py-3.5 min-w-[130px]">Kondisi</th>
+                <th className="px-4 py-3.5 text-right min-w-[120px]">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
