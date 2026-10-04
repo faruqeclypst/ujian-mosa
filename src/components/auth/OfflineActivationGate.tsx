@@ -59,9 +59,9 @@ export const OfflineActivationGate: React.FC<OfflineActivationGateProps> = ({
     const cleanLicense = licenseInput.trim();
     const schoolName = res.payload?.school_name || "";
 
-    // 1. Coba via hook /api/offline-activate
+    // 1. Coba via hook /api/offline-activate (dengan penguncian Hardware ID otomatis)
     try {
-      await fetch(`${window.location.origin}/api/offline-activate`, {
+      const actRes = await fetch(`${window.location.origin}/api/offline-activate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -69,7 +69,14 @@ export const OfflineActivationGate: React.FC<OfflineActivationGateProps> = ({
           school_name: schoolName
         })
       });
-    } catch (e) {
+      const actData = await actRes.json();
+      if (!actRes.ok) {
+        setIsVerifying(false);
+        setErrorMsg(actData.error || "Gagal aktivasi lisensi di perangkat ini.");
+        addToast({ title: "Aktivasi Gagal", description: actData.error, type: "error" });
+        return;
+      }
+    } catch (e: any) {
       console.warn("Hook /api/offline-activate tidak tersedia, mencoba direct settings update:", e);
     }
 
@@ -88,9 +95,23 @@ export const OfflineActivationGate: React.FC<OfflineActivationGateProps> = ({
       }
     }
 
-    // Simpan juga di localStorage sebagai backup cepat
+    // 3. Laporkan aktivasi ke Master Cloud Registry agar Super Admin dapat memantau status lisensi
     try {
-      localStorage.setItem("exam_offline_license", licenseInput.trim());
+      const masterBaseUrl = import.meta.env.VITE_MASTER_PB_URL || "https://examku.my.id";
+      fetch(`${masterBaseUrl}/api/multi-vps/activate-offline-license`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          license: cleanLicense,
+          school_name: schoolName,
+          machine_info: typeof window !== "undefined" ? `${window.location.hostname}:${window.location.port || '80'}` : "offline_node"
+        })
+      }).catch(() => {});
+    } catch (_) {}
+
+    // Simpan juga di localStorage sebagai cache sesi saat ini
+    try {
+      localStorage.setItem("exam_offline_license", cleanLicense);
     } catch {}
 
     setIsVerifying(false);
@@ -106,7 +127,7 @@ export const OfflineActivationGate: React.FC<OfflineActivationGateProps> = ({
   };
 
   const handleContactSuperAdmin = () => {
-    const text = "Halo Super Admin EXAM AA, kami ingin mengajukan aktivasi / perpanjangan Izin Lisensi Server Offline CBT untuk sekolah kami. Mohon bantuannya.";
+    const text = "Halo Super Admin EXAMKU, kami ingin mengajukan aktivasi / perpanjangan Izin Lisensi Server Offline CBT untuk sekolah kami. Mohon bantuannya.";
     window.open(`https://wa.me/6285359907696?text=${encodeURIComponent(text)}`, "_blank");
   };
 

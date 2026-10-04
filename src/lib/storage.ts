@@ -82,8 +82,20 @@ async function uploadViaWorker(folder: string, file: File): Promise<UploadResult
   return { key, url };
 }
 
+export const isOfflineEnvironment = (): boolean => {
+  if (typeof window === "undefined") return false;
+  const host = window.location.hostname;
+  return (
+    /^(localhost|127\.|0\.0\.0\.0$|\[::1\])/.test(host) ||
+    /^(192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.)/.test(host) ||
+    window.location.port === "8090" ||
+    localStorage.getItem("tenant_school_plan") === "offline"
+  );
+};
+
 export async function deleteImageFromStorage(key: string): Promise<void> {
-  if (!workerUrl || !key) return;
+  if (isOfflineEnvironment() || !key || key.startsWith("offline-") || key.startsWith("data:")) return;
+  if (!workerUrl) return;
   try {
     await fetch(workerUrl, {
       method: "POST",
@@ -96,11 +108,13 @@ export async function deleteImageFromStorage(key: string): Promise<void> {
 }
 
 export async function deleteImagesFromStorage(keys: string[]): Promise<void> {
-  if (keys.length === 0 || !workerUrl) return;
+  if (isOfflineEnvironment() || keys.length === 0 || !workerUrl) return;
+  const filteredKeys = keys.filter(k => k && !k.startsWith("offline-") && !k.startsWith("data:"));
+  if (filteredKeys.length === 0) return;
   // Kirim paralel, maksimal 10 sekaligus agar tidak membebani Worker
   const chunkSize = 10;
-  for (let i = 0; i < keys.length; i += chunkSize) {
-    const chunk = keys.slice(i, i + chunkSize);
+  for (let i = 0; i < filteredKeys.length; i += chunkSize) {
+    const chunk = filteredKeys.slice(i, i + chunkSize);
     await Promise.allSettled(chunk.map(key => deleteImageFromStorage(key)));
   }
 }
@@ -142,6 +156,24 @@ export async function uploadInventoryImage(folder: string, file: File): Promise<
       fileToUpload = file;
     }
   }
+
+  // 🛑 MODE OFFLINE: JANGAN PERNAH MASUK KE CLOUDFLARE R2!
+  // Gambar disimpan sebagai WebP Data URL terkompresi langsung di database lokal SQLite,
+  // sehingga server mandiri dan lab LAN tetap dapat membuka gambar tanpa internet sama sekali.
+  if (isOfflineEnvironment()) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        resolve({
+          key: `offline-${Date.now()}`,
+          url: reader.result as string
+        });
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(fileToUpload);
+    });
+  }
+
   return uploadViaWorker(folder, fileToUpload);
 }
 
@@ -154,5 +186,20 @@ export async function uploadFixedAssetImage(folder: string, file: File): Promise
       fileToUpload = file;
     }
   }
+
+  if (isOfflineEnvironment()) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        resolve({
+          key: `offline-${Date.now()}`,
+          url: reader.result as string
+        });
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(fileToUpload);
+    });
+  }
+
   return uploadViaWorker(folder, fileToUpload);
 }

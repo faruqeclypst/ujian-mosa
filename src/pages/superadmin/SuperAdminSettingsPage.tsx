@@ -51,7 +51,7 @@ const SuperAdminSettingsPage = () => {
           const rec = records[0];
           setApkRecordId(rec.id);
           setApkData({
-            app_name: rec.app_name || "EXAM AA",
+            app_name: rec.app_name || "EXAMKU",
             min_version_code: rec.min_version_code ?? 1,
             min_version_name: rec.min_version_name || "1.0.0",
             apk_url: rec.apk_url || "",
@@ -348,7 +348,7 @@ const SuperAdminSettingsPage = () => {
             <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
               <div className="px-5 py-4 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
                 <div>
-                  <h3 className="text-sm font-bold text-slate-900">Manajemen Versi APK EXAM AA</h3>
+                  <h3 className="text-sm font-bold text-slate-900">Manajemen Versi APK EXAMKU</h3>
                   <p className="text-xs text-slate-400 mt-0.5">Kontrol versi minimum APK Android siswa yang diizinkan mengakses ujian.</p>
                 </div>
                 <span className={cn(
@@ -368,7 +368,7 @@ const SuperAdminSettingsPage = () => {
                       type="text"
                       value={apkData.app_name}
                       onChange={(e) => setApkData(p => ({ ...p, app_name: e.target.value }))}
-                      placeholder="EXAM AA"
+                      placeholder="EXAMKU"
                       className="w-full h-10 border border-slate-200 rounded-xl px-3.5 text-sm text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 shadow-sm"
                     />
                   </div>

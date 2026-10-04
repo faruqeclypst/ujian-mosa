@@ -93,7 +93,7 @@ const SchoolAppContent = () => {
 
   useEffect(() => {
     if (school) {
-      document.title = `EXAM AA - ${school.name}`;
+      document.title = `EXAMKU - ${school.name}`;
     }
     if (Capacitor.isNativePlatform()) {
       SplashScreen.hide().catch(err => console.warn("Splash hide error:", err));
@@ -214,10 +214,11 @@ import SuperAdminSettingsPage from "./pages/superadmin/SuperAdminSettingsPage";
 import SuperAdminInvoicePage from "./pages/superadmin/SuperAdminInvoicePage";
 import SuperAdminMultiVpsDocsPage from "./pages/superadmin/SuperAdminMultiVpsDocsPage";
 import SuperAdminOfflineLicensesPage from "./pages/superadmin/SuperAdminOfflineLicensesPage";
+import PublicDocsPage from "./pages/docs/PublicDocsPage";
 
 const LandingContent = () => {
   useEffect(() => {
-    document.title = "EXAM AA: Platform CBT Online untuk Sekolah";
+    document.title = "EXAMKU: Platform CBT Online & Mandiri untuk Sekolah";
     if (Capacitor.isNativePlatform()) {
       SplashScreen.hide().catch(() => { });
     }
@@ -241,7 +242,7 @@ const LandingContent = () => {
         <Route path="/superadmin/invoice" element={<SuperAdminInvoicePage />} />
         <Route path="/superadmin/multi-vps-docs" element={<SuperAdminMultiVpsDocsPage />} />
         <Route path="/superadmin/docs" element={<Navigate to="/superadmin/multi-vps-docs" replace />} />
-        <Route path="/docs" element={<SuperAdminMultiVpsDocsPage />} />
+        <Route path="/docs" element={<PublicDocsPage />} />
         <Route path="/superadmin/login" element={<SuperAdminLoginPage />} />
         <Route path="/pilih-sekolah" element={<SelectSchoolPage />} />
         <Route path="/pilih sekolah" element={<SelectSchoolPage />} />

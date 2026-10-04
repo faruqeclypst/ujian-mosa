@@ -26,6 +26,7 @@ import {
 import { Button } from "../ui/button";
 import { cn } from "../../lib/utils";
 import { useToast } from "../ui/toast";
+import { APP_DISPLAY_VERSION } from "../../utils/version";
 
 const AppleIcon = ({ className = "", size = 16 }: { className?: string; size?: number }) => (
   <svg
@@ -201,7 +202,7 @@ export const ExambroGuideModal = ({
               <div className="bg-blue-50/60 dark:bg-blue-950/20 p-4 rounded-2xl border border-blue-100 dark:border-blue-900/50 flex items-start gap-3">
                 <Smartphone className="w-5 h-5 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
                 <div className="text-xs text-blue-950 dark:text-blue-200 space-y-1">
-                  <p className="font-bold">Aplikasi Resmi Android (EXAM AA APK)</p>
+                  <p className="font-bold">Aplikasi Resmi Android (EXAMKU APK)</p>
                   <p className="text-blue-800/80 dark:text-blue-300 leading-relaxed font-medium">
                     Aplikasi Android native yang dilengkapi proteksi Kiosk: layar penuh otomatis, penguncian tombol Home/Back/Recent Apps, deteksi split-screen, dan sirine alarm keras jika mencoba curang.
                   </p>
@@ -219,8 +220,8 @@ export const ExambroGuideModal = ({
                   <div className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 space-y-3">
                     <div>
                       <div className="flex items-center justify-between">
-                        <h4 className="text-xs font-bold text-slate-900 dark:text-white">EXAM AA APK (Rekomendasi)</h4>
-                        <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-[10px] font-bold rounded-full">v2.0</span>
+                        <h4 className="text-xs font-bold text-slate-900 dark:text-white">EXAMKU APK (Rekomendasi)</h4>
+                        <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-[10px] font-bold rounded-full">{APP_DISPLAY_VERSION}</span>
                       </div>
                       <p className="text-[11px] text-slate-500 mt-1">Aplikasi ujian utama dengan fitur penguncian layar penuh dan deteksi multi-window.</p>
                     </div>
@@ -248,7 +249,7 @@ export const ExambroGuideModal = ({
                   <div className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 space-y-3">
                     <div>
                       <div className="flex items-center justify-between">
-                        <h4 className="text-xs font-bold text-slate-900 dark:text-white">EXAM AA Browser Kiosk</h4>
+                        <h4 className="text-xs font-bold text-slate-900 dark:text-white">EXAMKU Browser Kiosk</h4>
                         <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-[10px] font-bold rounded-full">Alternatif</span>
                       </div>
                       <p className="text-[11px] text-slate-500 mt-1">Versi ringan khusus perangkat Android dengan RAM terbatas.</p>
@@ -282,7 +283,7 @@ export const ExambroGuideModal = ({
                 </h4>
                 <ol className="list-decimal pl-4 text-xs text-slate-600 dark:text-slate-400 space-y-1.5 leading-relaxed">
                   <li>Unduh berkas APK di atas dan izinkan pemasangan dari <i>Sumber Tidak Dikenal</i> jika diminta.</li>
-                  <li>Buka aplikasi <strong>EXAM AA</strong>, sistem akan otomatis mengunci layar.</li>
+                  <li>Buka aplikasi <strong>EXAMKU</strong>, sistem akan otomatis mengunci layar.</li>
                   <li>Masukkan NISN / Username dan Password siswa untuk memulai ujian.</li>
                 </ol>
               </div>

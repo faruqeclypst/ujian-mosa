@@ -1,6 +1,6 @@
 // ============================================================
 // Sumber Tunggal Kebenaran (Single Source of Truth)
-// Harga Paket, Kuota Siswa, dan Kalkulasi Invoice EXAM AA
+// Harga Paket, Kuota Siswa, dan Kalkulasi Invoice EXAMKU
 // Sesuai dengan harga yang tertera di Landing Page & Pendaftaran
 // ============================================================
 

@@ -115,7 +115,21 @@ export const OfflineLicenseStatusCard: React.FC = () => {
       }
     }
 
-    // 3. Simpan di localStorage
+    // 3. Laporkan aktivasi/perpanjangan ke Master Cloud Registry jika online
+    try {
+      const masterBaseUrl = import.meta.env.VITE_MASTER_PB_URL || "https://examku.my.id";
+      fetch(`${masterBaseUrl}/api/multi-vps/activate-offline-license`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          license: clean,
+          school_name: schoolName,
+          machine_info: typeof window !== "undefined" ? `${window.location.hostname}:${window.location.port || '80'}` : "offline_node"
+        })
+      }).catch(() => {});
+    } catch (_) {}
+
+    // 4. Simpan di localStorage
     try {
       localStorage.setItem("exam_offline_license", clean);
     } catch {}

@@ -211,10 +211,10 @@ const GuidePage = () => {
               </div>
               <div>
                 <h1 className="text-2xl sm:text-4xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">
-                  EXAM AA <span className="text-blue-600">Full Guide</span>
+                  EXAMKU <span className="text-blue-600">Full Guide</span>
                 </h1>
                 <p className="text-xs sm:text-base md:text-lg font-medium text-slate-500 dark:text-slate-400 mt-2 sm:mt-3 max-w-2xl leading-relaxed">
-                  Pelajari setiap sudut aplikasi EXAM AA mulai dari pengelolaan data master yang mendasar hingga pemanfaatan Kecerdasan Buatan (AI) yang canggih.
+                  Pelajari setiap sudut aplikasi EXAMKU mulai dari pengelolaan data master yang mendasar hingga pemanfaatan Kecerdasan Buatan (AI) yang canggih.
                 </p>
               </div>
             </div>
@@ -384,7 +384,7 @@ const GuidePage = () => {
                   "Satu ekosistem terintegrasi untuk segala kebutuhan evaluasi digital."
                 </p>
                 <p>
-                  EXAM AA bukan sekadar aplikasi ujian online. Ini adalah solusi <strong>End-to-End</strong> yang mengotomatisasi seluruh siklus ujian, mulai dari registrasi peserta, pembuatan bank soal cerdas, monitoring anti-contek, hingga analisis nilai otomatis. 
+                  EXAMKU bukan sekadar aplikasi ujian online. Ini adalah solusi <strong>End-to-End</strong> yang mengotomatisasi seluruh siklus ujian, mulai dari registrasi peserta, pembuatan bank soal cerdas, monitoring anti-contek, hingga analisis nilai otomatis. 
                 </p>
                 
                 <FeatureGrid items={[
@@ -461,7 +461,7 @@ const GuidePage = () => {
             {/* 4. Bank Soal */}
             <DocSection id="bank-soal" title="Pengelolaan Bank Soal" icon={BookOpen}>
               <div className="space-y-8">
-                <p>Sistem Bank Soal EXAM AA mendukung fleksibilitas konten yang sangat tinggi, mulai dari teks sederhana hingga multimedia kompleks.</p>
+                <p>Sistem Bank Soal EXAMKU mendukung fleksibilitas konten yang sangat tinggi, mulai dari teks sederhana hingga multimedia kompleks.</p>
 
                 <div className="space-y-2">
                   <Step number="1" title="Konfigurasi Paket">Tentukan Mata Pelajaran dan target Kelas. Paket yang sudah dibuat dapat di-duplikasi (copy) ke tahun ajaran berikutnya.</Step>
@@ -512,7 +512,7 @@ const GuidePage = () => {
                 </SubSection>
 
                 <SubSection title="Panduan Lengkap Rumus Matematika & Trigonometri" icon={Sparkles}>
-                   <p className="text-sm mb-4">EXAM AA mendukung penulisan rumus matematika menggunakan format <strong>LaTeX/KaTeX</strong>. Sistem akan otomatis mendeteksi dan merender rumus dengan indah.</p>
+                   <p className="text-sm mb-4">EXAMKU mendukung penulisan rumus matematika menggunakan format <strong>LaTeX/KaTeX</strong>. Sistem akan otomatis mendeteksi dan merender rumus dengan indah.</p>
                    
                    <AlertBox type="info" title="Format Penulisan">
                       Gunakan delimiter berikut untuk menulis rumus:<br/>
@@ -623,7 +623,7 @@ const GuidePage = () => {
                    </div>
 
                    <AlertBox type="success" title="Auto-Fix Cerdas">
-                      Sistem EXAM AA memiliki fitur <strong>auto-fix</strong> yang otomatis menambahkan backslash (\) pada kata-kata matematika yang lupa ditulis. Jadi Anda bisa menulis <code className="px-2 py-0.5 bg-slate-200 dark:bg-slate-700 rounded text-xs">$sin(x) + cos(x)$</code> dan sistem akan otomatis memperbaikinya menjadi <code className="px-2 py-0.5 bg-slate-200 dark:bg-slate-700 rounded text-xs">$\sin(x) + \cos(x)$</code>
+                      Sistem EXAMKU memiliki fitur <strong>auto-fix</strong> yang otomatis menambahkan backslash (\) pada kata-kata matematika yang lupa ditulis. Jadi Anda bisa menulis <code className="px-2 py-0.5 bg-slate-200 dark:bg-slate-700 rounded text-xs">$sin(x) + cos(x)$</code> dan sistem akan otomatis memperbaikinya menjadi <code className="px-2 py-0.5 bg-slate-200 dark:bg-slate-700 rounded text-xs">$\sin(x) + \cos(x)$</code>
                    </AlertBox>
 
                    <AlertBox type="warning" title="Import dari Word">
@@ -636,7 +636,7 @@ const GuidePage = () => {
             {/* 5. AI Magic */}
             <DocSection id="ai-magic" title="Teknologi AI & Import" icon={Bot}>
               <div className="space-y-10">
-                <p className="text-base font-medium">EXAM AA menggunakan integrasi <strong>Large Language Models (LLM)</strong> mutakhir untuk mengotomatisasi pembuatan soal dari sumber manapun.</p>
+                <p className="text-base font-medium">EXAMKU menggunakan integrasi <strong>Large Language Models (LLM)</strong> mutakhir untuk mengotomatisasi pembuatan soal dari sumber manapun.</p>
 
                 <div className="space-y-6">
                    <h4 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
@@ -711,7 +711,7 @@ const GuidePage = () => {
             {/* 7. Monitoring & Anti-Cheat */}
             <DocSection id="monitoring" title="Anti-Cheat & Pengawasan" icon={Monitor}>
               <div className="space-y-8">
-                <p className="text-base font-medium">Sistem Keamanan EXAM AA bekerja di level browser untuk mendeteksi segala bentuk aktivitas mencurigakan.</p>
+                <p className="text-base font-medium">Sistem Keamanan EXAMKU bekerja di level browser untuk mendeteksi segala bentuk aktivitas mencurigakan.</p>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                    <div className="p-6 bg-rose-50/50 dark:bg-rose-950/20 border border-rose-100 dark:border-rose-900/50 rounded-2xl space-y-4">
@@ -794,7 +794,7 @@ const GuidePage = () => {
             <DocSection id="nilai" title="Laporan & Sistem Analisis Butir Soal" icon={PieChart}>
               <div className="space-y-10">
                 <p className="text-base font-medium">
-                  EXAM AA dilengkapi dengan modul analitik asesmen tingkat lanjut yang mengintegrasikan <strong>Teori Tes Klasik (Classical Test Theory / CTT)</strong> dengan paradigma <strong>Kurikulum Merdeka &amp; Pembelajaran Mendalam (Deep Learning: Mindful, Meaningful, &amp; Joyful Learning)</strong> dari <strong>Kemendikdasmen RI</strong>.
+                  EXAMKU dilengkapi dengan modul analitik asesmen tingkat lanjut yang mengintegrasikan <strong>Teori Tes Klasik (Classical Test Theory / CTT)</strong> dengan paradigma <strong>Kurikulum Merdeka &amp; Pembelajaran Mendalam (Deep Learning: Mindful, Meaningful, &amp; Joyful Learning)</strong> dari <strong>Kemendikdasmen RI</strong>.
                 </p>
 
                 {/* SubSection 1: Metode & Formula */}
@@ -923,7 +923,7 @@ const GuidePage = () => {
                    <div className="p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl space-y-4">
                       <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center"><Laptop size={20} /></div>
                       <h6 className="font-bold text-slate-900 dark:text-white">Wajib Exambro (Native App)</h6>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Aktifkan fitur ini jika Anda ingin memaksa siswa hanya bisa login melalui Aplikasi Android/Windows resmi EXAM AA. Login via Chrome/Safari biasa akan diblokir.</p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Aktifkan fitur ini jika Anda ingin memaksa siswa hanya bisa login melalui Aplikasi Android/Windows resmi EXAMKU. Login via Chrome/Safari biasa akan diblokir.</p>
                    </div>
                 </div>
 
@@ -974,7 +974,7 @@ const GuidePage = () => {
                     </div>
                   </div>
                   <p className="text-xs sm:text-sm md:text-base text-slate-600 dark:text-slate-400 font-medium leading-relaxed max-w-xl">
-                    "EXAM AA hadir untuk mendefinisikan ulang standar ujian sekolah yang modern. Kami mengintegrasikan teknologi AI terbaik untuk memastikan proses evaluasi pendidikan berjalan lebih efektif dan bermartabat."
+                    "EXAMKU hadir untuk mendefinisikan ulang standar ujian sekolah yang modern. Kami mengintegrasikan teknologi AI terbaik untuk memastikan proses evaluasi pendidikan berjalan lebih efektif dan bermartabat."
                   </p>
                   <div className="flex flex-col sm:flex-row items-center justify-center md:justify-start gap-2.5 pt-1">
                     <a href="https://wa.me/6285359907696" target="_blank" rel="noopener noreferrer" className="w-full sm:w-auto px-5 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white text-[11px] font-black uppercase tracking-widest rounded-xl transition-all shadow-md shadow-emerald-500/20 flex items-center justify-center gap-2">
@@ -991,7 +991,7 @@ const GuidePage = () => {
                 <div className="flex items-center justify-center gap-3">
                    <div className="w-12 h-[1px] bg-slate-200 dark:bg-slate-800" />
                    <Badge variant="outline" className="text-slate-400 border-slate-200 dark:border-slate-800 font-black uppercase tracking-[0.2em] px-5 py-2 text-[10px]">
-                     EXAM AA Platform Hub
+                     EXAMKU Platform Hub
                    </Badge>
                    <div className="w-12 h-[1px] bg-slate-200 dark:bg-slate-800" />
                 </div>

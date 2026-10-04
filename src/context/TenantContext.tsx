@@ -75,6 +75,8 @@ interface TenantContextValue {
   loading: boolean;
   notFound: boolean;           // true jika slug ada tapi tidak di registry
   inactive: boolean;           // true jika sekolah is_active = false
+  inactiveReason?: string | null;
+  isDeviceMismatch?: boolean;
   terminology: Terminology;     // Helper untuk label dinamis
   subscriptionStatus: SubscriptionStatusInfo; // Status masa aktif, grace period, dan suspensi
   setManualSchool: (school: string | SchoolRecord | null) => void;
@@ -214,6 +216,8 @@ export const TenantProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState<boolean>(() => !initialCached && !isLanding && Boolean(slug || customDomain));
   const [notFound, setNotFound] = useState(false);
   const [inactive, setInactive] = useState(false);
+  const [inactiveReason, setInactiveReason] = useState<string | null>(null);
+  const [isDeviceMismatch, setIsDeviceMismatch] = useState(false);
 
   const setManualSchool = (newSlugOrSchool: string | SchoolRecord | null) => {
     if (!newSlugOrSchool) {
@@ -274,8 +278,8 @@ export const TenantProvider = ({ children }: { children: ReactNode }) => {
     }
 
     const resolveSchool = async () => {
-      // Jika data sekolah sudah cocok dengan slug dan pb sudah siap, tidak perlu fetch blocking
-      if (school && school.slug === slug && pb) {
+      // Jika data sekolah sudah cocok dengan slug dan pb sudah siap, tidak perlu fetch blocking (hanya untuk tenant cloud)
+      if (slug !== 'local' && school && school.slug === slug && pb) {
         setLoading(false);
         return;
       }
@@ -291,19 +295,23 @@ export const TenantProvider = ({ children }: { children: ReactNode }) => {
             : (savedLocalUrl || 'http://localhost:8090');
 
           const localPb = getSchoolPb(targetOrigin);
-          let schoolName = 'EXAM AA - Server Lokal';
+          let schoolName = 'EXAMKU - Server Lokal';
           let logoUrl = '';
 
           let activeLicenseCode = '';
           let licensePayload: OfflineLicensePayload | undefined = undefined;
 
           // 1. Cek database tabel settings server lokal terlebih dahulu
+          let isRevoked = false;
           try {
             const settingsRes = await localPb.collection('settings').getList(1, 1);
             if (settingsRes.items.length > 0) {
               const sData = settingsRes.items[0];
               if ((sData as any).offline_license) {
                 activeLicenseCode = (sData as any).offline_license;
+              }
+              if ((sData as any).offline_license_status === 'revoked') {
+                isRevoked = true;
               }
               if (sData.name) {
                 schoolName = sData.name;
@@ -314,12 +322,21 @@ export const TenantProvider = ({ children }: { children: ReactNode }) => {
             console.warn('[TenantContext] Settings lokal belum terbaca:', e);
           }
 
-          // 2. Cek localStorage browser jika database belum ada
-          if (!activeLicenseCode && typeof window !== 'undefined') {
-            activeLicenseCode = localStorage.getItem('exam_offline_license') || '';
-          }
+          // Cek status lisensi terkini ke backend hook (termasuk Hardware ID check & kill-switch online)
+          let isDeviceMismatchDetected = false;
+          let mismatchMsg = '';
+          try {
+            const licStatusRes = await localPb.send('/api/offline-license', { method: 'GET' });
+            if (licStatusRes?.isRevoked) {
+              isRevoked = true;
+            }
+            if (licStatusRes?.isDeviceMismatch) {
+              isDeviceMismatchDetected = true;
+              mismatchMsg = licStatusRes?.revocation_message || '';
+            }
+          } catch {}
 
-          // 3. Verifikasi lisensi dan ambil detail izin
+          // 2. Verifikasi lisensi dan ambil detail izin (DATABASE ADALAH SINGLE SOURCE OF TRUTH)
           if (activeLicenseCode) {
             try {
               const res = await verifyOfflineLicense(activeLicenseCode);
@@ -333,6 +350,13 @@ export const TenantProvider = ({ children }: { children: ReactNode }) => {
                 }
               }
             } catch {}
+          } else {
+            // Jika server lokal saat ini belum memiliki lisensi di databasenya,
+            // bersihkan cache lokal agar tidak terjadi kebocoran identitas antar-instance PocketBase!
+            if (typeof window !== 'undefined') {
+              localStorage.removeItem('exam_offline_license');
+              localStorage.removeItem('tenant_school_cache_local');
+            }
           }
 
           const localSchool: SchoolRecord = {
@@ -341,7 +365,7 @@ export const TenantProvider = ({ children }: { children: ReactNode }) => {
             slug: 'local',
             pb_url: targetOrigin,
             type: 'school',
-            is_active: true,
+            is_active: !isRevoked && !isDeviceMismatchDetected,
             logo_url: logoUrl,
             plan: 'offline',
             active_until: licensePayload?.valid_until || '',
@@ -350,11 +374,30 @@ export const TenantProvider = ({ children }: { children: ReactNode }) => {
             offline_license_payload: licensePayload,
           };
 
-          setCachedSchool(cacheKey, localSchool);
+          if (isRevoked || isDeviceMismatchDetected) {
+            setSchool(localSchool);
+            setPb(localPb);
+            setNotFound(false);
+            setInactive(true);
+            setIsDeviceMismatch(isDeviceMismatchDetected);
+            setInactiveReason(
+              isDeviceMismatchDetected
+                ? (mismatchMsg || 'Terdeteksi duplikasi lisensi di komputer yang berbeda. Hubungi Super Admin.')
+                : 'Server CBT Offline ini telah dinonaktifkan oleh Administrator Pusat karena pelanggaran kebijakan penggunaan.'
+            );
+            setLoading(false);
+            return;
+          }
+
+          if (activeLicenseCode) {
+            setCachedSchool(cacheKey, localSchool);
+          }
           setSchool(localSchool);
           setPb(localPb);
           setNotFound(false);
           setInactive(false);
+          setIsDeviceMismatch(false);
+          setInactiveReason(null);
           setLoading(false);
           return;
         } catch (err) {
@@ -461,7 +504,7 @@ export const TenantProvider = ({ children }: { children: ReactNode }) => {
         const sData = settingsRes.items[0];
         const localSchool: SchoolRecord = {
           id: 'local_server',
-          name: sData?.name || 'EXAM AA - Server Lokal',
+          name: sData?.name || 'EXAMKU - Server Lokal',
           slug: slug || 'local',
           pb_url: window.location.origin,
           type: 'school',
@@ -528,7 +571,7 @@ export const TenantProvider = ({ children }: { children: ReactNode }) => {
     if (!school?.id) return;
     if (school.id === 'local_server' || slug === 'local') {
       try {
-        let schoolName = school.name;
+        let schoolName = 'EXAMKU - Server Lokal';
         let activeLicenseCode = '';
         let licensePayload: OfflineLicensePayload | undefined = undefined;
 
@@ -544,10 +587,6 @@ export const TenantProvider = ({ children }: { children: ReactNode }) => {
           }
         }
 
-        if (!activeLicenseCode && typeof window !== 'undefined') {
-          activeLicenseCode = localStorage.getItem('exam_offline_license') || '';
-        }
-
         if (activeLicenseCode) {
           try {
             const res = await verifyOfflineLicense(activeLicenseCode);
@@ -561,17 +600,22 @@ export const TenantProvider = ({ children }: { children: ReactNode }) => {
               }
             }
           } catch {}
+        } else {
+          if (typeof window !== 'undefined') {
+            localStorage.removeItem('exam_offline_license');
+            localStorage.removeItem('tenant_school_cache_local');
+          }
         }
 
         setSchool(prev => prev ? ({
           ...prev,
-          name: schoolName || sData?.name || prev.name,
+          name: schoolName,
           logo_url: sData?.logoUrl || sData?.logo || prev.logo_url,
           plan: 'offline',
-          active_until: licensePayload?.valid_until || prev.active_until || '',
-          npsn: licensePayload?.npsn || prev.npsn || '',
-          offline_license: activeLicenseCode || prev.offline_license,
-          offline_license_payload: licensePayload || prev.offline_license_payload,
+          active_until: licensePayload?.valid_until || '',
+          npsn: licensePayload?.npsn || '',
+          offline_license: activeLicenseCode,
+          offline_license_payload: licensePayload,
         }) : prev);
       } catch (e) {
         console.warn('Gagal refresh local server settings:', e);
@@ -604,12 +648,14 @@ export const TenantProvider = ({ children }: { children: ReactNode }) => {
       loading, 
       notFound, 
       inactive,
+      inactiveReason,
+      isDeviceMismatch,
       terminology: TERMINOLOGY[school?.type || 'school'],
       subscriptionStatus,
       setManualSchool,
       refreshSchool
     }),
-    [school, pb, slug, isLanding, loading, notFound, inactive, subscriptionStatus]
+    [school, pb, slug, isLanding, loading, notFound, inactive, inactiveReason, isDeviceMismatch, subscriptionStatus]
   );
 
   return <TenantContext.Provider value={value}>{children}</TenantContext.Provider>;

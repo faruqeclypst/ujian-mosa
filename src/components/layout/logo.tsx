@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { useTenant } from "../../context/TenantContext";
+import { APP_DISPLAY_VERSION } from "../../utils/version";
 
 const Logo = () => {
   const { pb, school } = useTenant();
-  const [profile, setProfile] = useState({ name: school?.name || "EXAM AA", logoUrl: "" });
+  const [profile, setProfile] = useState({ name: school?.name || "EXAMKU", logoUrl: "" });
   const [logoError, setLogoError] = useState(false);
 
   useEffect(() => {
@@ -26,7 +27,7 @@ const Logo = () => {
           }
 
           setProfile({
-            name: data.name && data.name !== "EXAM AA" ? data.name : (school?.name || "EXAM AA"),
+            name: data.name && data.name !== "EXAMKU" ? data.name : (school?.name || "EXAMKU"),
             logoUrl: logoUrl
           });
           setLogoError(false);
@@ -48,7 +49,7 @@ const Logo = () => {
         }
 
         setProfile({
-          name: e.record.name && e.record.name !== "EXAM AA" ? e.record.name : (school?.name || "EXAM AA"),
+          name: e.record.name && e.record.name !== "EXAMKU" ? e.record.name : (school?.name || "EXAMKU"),
           logoUrl: logoUrl
         });
         setLogoError(false);
@@ -89,10 +90,10 @@ const Logo = () => {
       <div className="flex flex-col min-w-0 justify-center flex-1">
         <div className="flex items-center gap-1.5 mb-0.5">
           <span className="text-[13px] font-black text-slate-800 dark:text-white tracking-widest uppercase opacity-90 shrink-0">
-            EXAM AA
+            EXAMKU
           </span>
           <span className="text-[9px] px-1.5 py-0.5 bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 font-black rounded-md border border-blue-100/50 dark:border-blue-500/20 shrink-0">
-            v3.2
+            {APP_DISPLAY_VERSION}
           </span>
         </div>
         <div className="min-w-0 pr-1">

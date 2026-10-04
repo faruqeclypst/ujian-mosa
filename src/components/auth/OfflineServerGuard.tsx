@@ -62,10 +62,8 @@ export const OfflineServerGuard: React.FC<{ children: React.ReactNode }> = ({ ch
       }
     }
 
-    // 4. Fallback ke localStorage browser
-    if (!code && typeof window !== "undefined") {
-      code = localStorage.getItem("exam_offline_license");
-    }
+    // Catatan: Jangan gunakan fallback localStorage global agar PocketBase yang berbeda
+    // pada port yang sama (localhost:8090) tidak saling tercemar lisensi/sekolah lama.
 
     if (!code) {
       setVerification({

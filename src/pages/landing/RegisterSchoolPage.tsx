@@ -314,12 +314,12 @@ const RegisterSchoolPage = () => {
           <p className="text-slate-500 text-xs sm:text-sm mb-6 leading-relaxed">
             {isTrial ? (
               <>
-                Terima kasih. Tim <span className="font-bold text-slate-800">EXAM AA</span> segera menyiapkan akses Free Trial 14 hari untuk{" "}
+                Terima kasih. Tim <span className="font-bold text-slate-800">EXAMKU</span> segera menyiapkan akses Free Trial 14 hari untuk{" "}
                 <span className="text-blue-600 font-bold">{form.school_name}</span>.
               </>
             ) : (
               <>
-                Terima kasih. Tim <span className="font-bold text-slate-800">EXAM AA</span> segera memvalidasi pendaftaran{" "}
+                Terima kasih. Tim <span className="font-bold text-slate-800">EXAMKU</span> segera memvalidasi pendaftaran{" "}
                 <span className="text-blue-600 font-bold">{form.school_name}</span>.
               </>
             )}
@@ -385,7 +385,7 @@ const RegisterSchoolPage = () => {
               <div className="w-7 h-7 bg-blue-600 rounded-lg flex items-center justify-center">
                 <GraduationCap size={15} className="text-white" />
               </div>
-              <span className="font-extrabold text-slate-900 text-sm tracking-tight">EXAM AA</span>
+              <span className="font-extrabold text-slate-900 text-sm tracking-tight">EXAMKU</span>
             </div>
             <span className="text-slate-300 text-sm hidden sm:inline">/</span>
             <span className="text-slate-600 text-sm font-medium hidden sm:inline">Daftar Institusi</span>
@@ -900,7 +900,7 @@ const RegisterSchoolPage = () => {
                   </button>
 
                   <p className="text-center text-slate-400 text-xs font-normal">
-                    Dengan mendaftar, Anda menyetujui Ketentuan Layanan dan Kebijakan Privasi EXAM AA.
+                    Dengan mendaftar, Anda menyetujui Ketentuan Layanan dan Kebijakan Privasi EXAMKU.
                   </p>
                 </div>
               </form>

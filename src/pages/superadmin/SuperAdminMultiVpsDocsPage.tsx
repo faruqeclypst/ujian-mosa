@@ -6,7 +6,7 @@ import {
   ExternalLink, ArrowRight, Menu, X, ArrowUpRight,
   BookOpen, Users, FileSpreadsheet, Lock, Clock,
   CreditCard, Terminal, HelpCircle, HardDrive, Zap,
-  Monitor, Smartphone, Layers, Activity
+  Monitor, Smartphone, Layers, Activity, KeyRound, Laptop, RotateCcw, Download
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { cn } from "../../lib/utils";
@@ -21,9 +21,15 @@ interface DocItem {
 
 const DOC_ITEMS: DocItem[] = [
   // Mulai
-  { id: "ringkasan", title: "Ringkasan Sistem", category: "Mulai", description: "Pengenalan arsitektur dan kapabilitas EXAM AA Multi-VPS.", keywords: ["arsitektur", "pengenalan", "ringkasan", "overview", "vps", "cbt"] },
+  { id: "ringkasan", title: "Ringkasan Sistem", category: "Mulai", description: "Pengenalan arsitektur dan kapabilitas EXAMKU Multi-VPS.", keywords: ["arsitektur", "pengenalan", "ringkasan", "overview", "vps", "cbt"] },
   { id: "mulai-cepat", title: "Mulai Cepat", category: "Mulai", description: "Langkah pertama menyiapkan sekolah dan server dalam 5 menit.", keywords: ["mulai cepat", "quickstart", "panduan", "awal", "langkah"] },
   { id: "arsitektur", title: "Arsitektur 3 Lapisan", category: "Mulai", description: "Pemisahan Edge CDN, Master Ingress Gateway, dan Worker Nodes.", keywords: ["cloudflare", "caddy", "ingress", "edge", "cdn", "ssl", "cors", "layer"] },
+
+  // Mode Offline & Lisensi
+  { id: "offline-arsitektur", title: "Arsitektur Server Offline", category: "Mode Offline & Lisensi", description: "Operasional server lokal LAN sekolah tanpa koneksi internet luar.", keywords: ["offline", "server", "lan", "local", "pocketbase", "tanpa internet", "proktor", "lab", "mandiri", "sqlite"] },
+  { id: "offline-serial-key", title: "Lisensi Serial Key RSA-2048", category: "Mode Offline & Lisensi", description: "Struktur kunci asimetris, validasi offline tanpa internet, dan aktivasi.", keywords: ["lisensi", "serial key", "rsa-2048", "asimetris", "tanda tangan", "aktivasi", "superadmin", "offline"] },
+  { id: "offline-hardware-binding", title: "Hardware ID & Anti-Duplikasi", category: "Mode Offline & Lisensi", description: "Penguncian sidik jari laptop, proteksi duplikasi, jaminan database, dan reset mesin.", keywords: ["hardware id", "hwid", "anti-duplikasi", "sidik jari", "machineguid", "reset perangkat", "kill-switch", "duplikat"] },
+  { id: "offline-update", title: "Pembaruan 1-Click Server", category: "Mode Offline & Lisensi", description: "Update berkas aplikasi dan modul tanpa mengubah database lokal data.db.", keywords: ["update", "1-click", "pembaruan", "offline update", "perbarui-server", "patch"] },
 
   // Infrastruktur & Node
   { id: "worker-setup", title: "Setup Worker Node", category: "Infrastruktur & Node", description: "Perintah satu baris otomatis dan pairing kunci SSH worker.", keywords: ["worker", "node", "setup", "install", "ssh", "authorized_keys", "onboarding"] },
@@ -219,7 +225,7 @@ export const SuperAdminMultiVpsDocsPage: React.FC = () => {
             {mobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
           </button>
 
-          <Link to="/docs" className="flex items-center gap-2.5">
+          <Link to="/superadmin/multi-vps-docs" className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-xl bg-slate-50 border border-slate-200 p-0.5 flex items-center justify-center shadow-2xs shrink-0">
               <img
                 src="/logo-default.webp"
@@ -345,13 +351,13 @@ export const SuperAdminMultiVpsDocsPage: React.FC = () => {
           <div className="space-y-3">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 border border-blue-200/60 text-blue-700 text-xs font-semibold">
               <ShieldCheck size={14} />
-              <span>Dokumentasi Resmi EXAM AA</span>
+              <span>Dokumentasi Resmi EXAMKU</span>
             </div>
             <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-slate-900">
-              Dokumentasi Sistem EXAM AA
+              Dokumentasi Sistem EXAMKU
             </h1>
             <p className="text-sm sm:text-base text-slate-600 leading-relaxed font-normal">
-              EXAM AA adalah platform Computer Based Test (CBT) multi-tenant dan manajemen sekolah dengan arsitektur Multi-VPS terdistribusi. Dokumentasi ini menjelaskan cara mengelola sistem, menyiapkan server worker ujian, alokasi memori dinamis, migrasi 1-klik, dan referensi API.
+              EXAMKU adalah platform Computer Based Test (CBT) multi-tenant dan manajemen sekolah dengan arsitektur Multi-VPS terdistribusi. Dokumentasi ini menjelaskan cara mengelola sistem, menyiapkan server worker ujian, alokasi memori dinamis, migrasi 1-klik, dan referensi API.
             </p>
           </div>
 
@@ -438,6 +444,37 @@ export const SuperAdminMultiVpsDocsPage: React.FC = () => {
               </ul>
             </div>
 
+            {/* Index: Mode Offline & Lisensi */}
+            <div className="space-y-2">
+              <h2 className="text-lg font-bold text-slate-900">Mode Offline & Lisensi</h2>
+              <ul className="space-y-1.5 text-xs text-slate-700">
+                <li>
+                  <button type="button" onClick={() => scrollToSection("offline-arsitektur")} className="text-blue-600 hover:text-blue-700 hover:underline font-semibold text-left cursor-pointer">
+                    Arsitektur server offline:
+                  </button>{" "}
+                  lab lokal LAN, database SQLite mandiri, dan media lokal bebas Cloudflare.
+                </li>
+                <li>
+                  <button type="button" onClick={() => scrollToSection("offline-serial-key")} className="text-blue-600 hover:text-blue-700 hover:underline font-semibold text-left cursor-pointer">
+                    Serial key RSA-2048:
+                  </button>{" "}
+                  tanda tangan digital asimetris, validasi tanpa internet, dan aktivasi proktor.
+                </li>
+                <li>
+                  <button type="button" onClick={() => scrollToSection("offline-hardware-binding")} className="text-blue-600 hover:text-blue-700 hover:underline font-semibold text-left cursor-pointer">
+                    Hardware ID & anti-duplikasi:
+                  </button>{" "}
+                  auto-lock sidik jari laptop, proteksi duplikasi, database aman, dan reset mesin.
+                </li>
+                <li>
+                  <button type="button" onClick={() => scrollToSection("offline-update")} className="text-blue-600 hover:text-blue-700 hover:underline font-semibold text-left cursor-pointer">
+                    Pembaruan 1-Click:
+                  </button>{" "}
+                  update modul dan aset web tanpa mengubah atau menimpa database lokal.
+                </li>
+              </ul>
+            </div>
+
             {/* Index: Referensi & Diagnostik */}
             <div className="space-y-2">
               <h2 className="text-lg font-bold text-slate-900">Referensi & Diagnostik</h2>
@@ -511,7 +548,7 @@ export const SuperAdminMultiVpsDocsPage: React.FC = () => {
           <section id="ringkasan" className="space-y-4 scroll-mt-24">
             <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Ringkasan Sistem</h2>
             <p className="text-sm text-slate-600 leading-relaxed">
-              EXAM AA dibangun untuk memecahkan dua tantangan terbesar pada aplikasi evaluasi sekolah: <strong>lonjakan beban serentak saat jam ujian</strong> dan <strong>efisiensi biaya operasional server</strong>.
+              EXAMKU dibangun untuk memecahkan dua tantangan terbesar pada aplikasi evaluasi sekolah: <strong>lonjakan beban serentak saat jam ujian</strong> dan <strong>efisiensi biaya operasional server</strong>.
             </p>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
@@ -757,7 +794,7 @@ Proxy ke localhost:PORT     Proxy ke http://IP_WORKER:PORT
           <section id="bank-soal" className="space-y-4 scroll-mt-24">
             <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Bank Soal & Import Excel</h2>
             <p className="text-sm text-slate-600 leading-relaxed">
-              EXAM AA mendukung beragam tipe soal ujian: Pilihan Ganda (PG), Pilihan Ganda Kompleks (PGK), Menjodohkan, Benar/Salah, dan Esai Uraian.
+              EXAMKU mendukung beragam tipe soal ujian: Pilihan Ganda (PG), Pilihan Ganda Kompleks (PGK), Menjodohkan, Benar/Salah, dan Esai Uraian.
             </p>
 
             <div className="space-y-3 text-xs text-slate-700">
@@ -876,7 +913,7 @@ Proxy ke localhost:PORT     Proxy ke http://IP_WORKER:PORT
           <section id="resiliensi-offline" className="space-y-4 scroll-mt-24">
             <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Resiliensi Jawaban Offline</h2>
             <p className="text-sm text-slate-600 leading-relaxed">
-              Jaringan Wi-Fi sekolah sering mengalami gangguan ketika ratusan siswa terhubung bersamaan. EXAM AA memiliki mekanisme ketahanan data:
+              Jaringan Wi-Fi sekolah sering mengalami gangguan ketika ratusan siswa terhubung bersamaan. EXAMKU memiliki mekanisme ketahanan data:
             </p>
 
             <div className="p-4 rounded-xl border border-slate-200 bg-white shadow-xs text-xs space-y-2 text-slate-700">
@@ -887,6 +924,162 @@ Proxy ke localhost:PORT     Proxy ke http://IP_WORKER:PORT
                 <li>Jika Wi-Fi putus sementara, siswa tetap bisa melanjutkan membaca soal dan memilih jawaban tanpa pop-up error.</li>
                 <li>Saat sinyal Wi-Fi tersambung kembali, seluruh antrean jawaban otomatis tersinkronisasi ke server.</li>
               </ul>
+            </div>
+          </section>
+
+          {/* ── SECTION: ARSITEKTUR SERVER OFFLINE ─────────────── */}
+          <section id="offline-arsitektur" className="space-y-4 scroll-mt-24">
+            <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Arsitektur Server Mandiri CBT Offline</h2>
+            <p className="text-sm text-slate-600 leading-relaxed">
+              Mode Offline EXAMKU dirancang untuk sekolah yang memiliki keterbatasan koneksi internet luar atau memilih menyelenggarakan ujian di jaringan intranet lab komputer sekolah.
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs text-slate-700">
+              <div className="p-4 rounded-xl border border-slate-200 bg-white shadow-xs space-y-2">
+                <p className="font-bold text-slate-900 text-sm flex items-center gap-1.5">
+                  <Server size={15} className="text-blue-600" /> PocketBase Engine & SQLite Mandiri
+                </p>
+                <p className="text-slate-600 leading-relaxed">
+                  Server berjalan menggunakan PocketBase binary mandiri di komputer proktor atau server lab. Seluruh konfigurasi, akun siswa, bank soal, dan hasil pengerjaan tersimpan di file database lokal <code className="font-mono text-slate-800 bg-slate-100 px-1 py-0.5 rounded">pb_data/data.db</code>.
+                </p>
+              </div>
+
+              <div className="p-4 rounded-xl border border-slate-200 bg-white shadow-xs space-y-2">
+                <p className="font-bold text-slate-900 text-sm flex items-center gap-1.5">
+                  <HardDrive size={15} className="text-emerald-600" /> Penyimpanan Gambar Bebas Cloudflare
+                </p>
+                <p className="text-slate-600 leading-relaxed">
+                  Pada mode offline, setiap gambar soal yang di-upload atau di-paste di editor soal dikonversi otomatis menjadi format WebP terkompresi dan disimpan langsung di database SQLite lokal. Berkas media tidak diunggah ke Cloudflare R2 sehingga server beroperasi 100% mandiri tanpa kuota internet.
+                </p>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-xl border border-slate-200 bg-white shadow-xs text-xs space-y-2 text-slate-700">
+              <p className="font-bold text-slate-900">Topologi Jaringan Lab Ujian:</p>
+              <ul className="list-disc list-inside space-y-1.5 text-slate-600 pl-1 leading-relaxed">
+                <li><strong>Komputer Server / Laptop Proktor:</strong> Menjalankan <code className="font-mono text-slate-800 bg-slate-100 px-1 py-0.5 rounded">pocketbase.exe</code> pada port default 8090. Komputer ini terhubung ke switch/hub lab atau router Wi-Fi lokal.</li>
+                <li><strong>Perangkat Siswa (Klien):</strong> Komputer lab, laptop, atau smartphone Android siswa cukup membuka browser atau aplikasi Exambro dengan memasukkan alamat IP server proktor di jaringan lokal (contoh: <code className="font-mono text-slate-800 bg-slate-100 px-1 py-0.5 rounded">http://192.168.1.100:8090</code>).</li>
+                <li><strong>Isolasi Total:</strong> Kabel internet luar (WAN) pada router dapat dicabut. Sistem ujian tetap berjalan normal tanpa gangguan putus jaringan luar.</li>
+              </ul>
+            </div>
+          </section>
+
+          {/* ── SECTION: SERIAL KEY & RSA-2048 ─────────────────── */}
+          <section id="offline-serial-key" className="space-y-4 scroll-mt-24">
+            <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Sistem Lisensi Serial Key & Kriptografi RSA-2048</h2>
+            <p className="text-sm text-slate-600 leading-relaxed">
+              Karena server offline tidak dapat menghubungi server pusat setiap kali ada siswa yang login, keabsahan lisensi diverifikasi menggunakan tanda tangan digital asimetris berstandar RSA-2048:
+            </p>
+
+            <div className="p-4 rounded-xl border border-slate-200 bg-white shadow-xs text-xs space-y-3 text-slate-700">
+              <div className="flex items-center gap-2 font-bold text-slate-900 text-sm">
+                <KeyRound size={16} className="text-purple-600" />
+                <span>Format Serial Key Resmi</span>
+              </div>
+              <p className="text-slate-600 leading-relaxed">
+                Serial key offline memiliki format terstruktur yang dipisahkan oleh tanda titik:
+              </p>
+              <div className="p-3 bg-slate-950 text-slate-100 rounded-lg font-mono text-[11px] overflow-x-auto select-all">
+                EXAMKU-v2.&lt;base64_payload&gt;.&lt;rsa2048_signature&gt;
+              </div>
+              <ul className="list-disc list-inside space-y-1 text-slate-600 pl-1 leading-relaxed">
+                <li><strong>Header:</strong> <code className="font-mono text-slate-800 bg-slate-100 px-1 py-0.5 rounded">EXAMKU-v2</code> menandakan skema kriptografi asimetris generasi kedua.</li>
+                <li><strong>Payload:</strong> Data terenkode Base64 berisi nama sekolah, NPSN, batas masa aktif (<code className="font-mono text-slate-800 bg-slate-100 px-1 py-0.5 rounded">valid_until</code>), kuota siswa, dan paket layanan.</li>
+                <li><strong>Signature:</strong> Tanda tangan digital RSA-2048 SHA-256 yang ditandatangani menggunakan Private Key rahasia Super Admin di Master Cloud VPS.</li>
+              </ul>
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-blue-900 leading-relaxed">
+                💡 <strong>Kekuatan Kriptografi Asimetris:</strong> Server offline hanya menyimpan Public Key RSA. Tanggal kadaluarsa dan data sekolah yang tercantum di serial key tidak dapat dimanipulasi oleh pihak mana pun. Jika ada karakter serial key yang diubah, tanda tangan digital seketika tidak cocok dan server menolak beroperasi.
+              </div>
+            </div>
+
+            <div className="space-y-2 text-xs text-slate-700">
+              <p className="font-bold text-slate-900 text-sm">Alur Penerbitan & Aktivasi Lisensi:</p>
+              <ol className="list-decimal list-inside space-y-1.5 text-slate-600 pl-1 leading-relaxed">
+                <li>Super Admin membuka panel <strong>Super Admin &rarr; Kelola Lisensi Offline</strong> di Master Cloud VPS (<code className="font-mono text-slate-800">https://examku.my.id</code>).</li>
+                <li>Super Admin mengisi nama sekolah, NPSN, dan tanggal berlaku, lalu menekan tombol <strong>"Terbitkan Lisensi Baru"</strong>. Sistem menandatangani payload menggunakan Private Key RSA-2048.</li>
+                <li>Super Admin menyalin Serial Key yang terbentuk dan mengirimkannya kepada pihak sekolah atau proktor.</li>
+                <li>Proktor memasukkan Serial Key tersebut di layar aktivasi server lokal saat pertama kali membuka aplikasi di komputer sekolah.</li>
+              </ol>
+            </div>
+          </section>
+
+          {/* ── SECTION: HARDWARE ID & ANTI-DUPLIKASI ─────────── */}
+          <section id="offline-hardware-binding" className="space-y-4 scroll-mt-24">
+            <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Hardware ID Binding & Kebijakan Anti-Duplikasi</h2>
+            <p className="text-sm text-slate-600 leading-relaxed">
+              Untuk mencegah pelanggaran lisensi berupa penyalinan folder aplikasi server ke flashdisk untuk digunakan di sekolah lain, EXAMKU menerapkan protokol penguncian sidik jari perangkat fisik (<em>Hardware ID Binding</em>).
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs text-slate-700">
+              <div className="p-4 rounded-xl border border-slate-200 bg-white shadow-xs space-y-2">
+                <p className="font-bold text-slate-900 text-sm flex items-center gap-1.5">
+                  <Laptop size={15} className="text-indigo-600" /> Auto-Lock Sidik Jari Mesin Server
+                </p>
+                <p className="text-slate-600 leading-relaxed">
+                  Saat lisensi pertama kali diinput di server sekolah, backend otomatis membaca sidik jari hardware fisik komputer (Windows Cryptography MachineGuid, Motherboard, dan UUID sistem). Serial key tersebut langsung dikunci permanen hanya untuk komputer server tersebut (<code className="font-mono text-slate-800 bg-slate-100 px-1 py-0.5 rounded">locked_device_id</code>).
+                </p>
+              </div>
+
+              <div className="p-4 rounded-xl border border-slate-200 bg-white shadow-xs space-y-2">
+                <p className="font-bold text-slate-900 text-sm flex items-center gap-1.5">
+                  <ShieldCheck size={15} className="text-rose-600" /> Deteksi Duplikasi (Device Mismatch)
+                </p>
+                <p className="text-slate-600 leading-relaxed">
+                  Jika folder aplikasi disalin ke komputer atau laptop lain, sistem mendeteksi ketidaksesuaian sidik jari hardware. Akses login siswa dan ujian otomatis terkunci dengan notifikasi "Aplikasi Terkunci: Duplikasi Perangkat".
+                </p>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-xl border border-emerald-200 bg-emerald-50/70 text-xs text-emerald-950 space-y-2 leading-relaxed">
+              <p className="font-bold flex items-center gap-1.5 text-sm text-emerald-900">
+                🛡️ Jaminan Integritas & Keamanan Database Lokal
+              </p>
+              <p>
+                Sistem penguncian EXAMKU dirancang adil dan bertanggung jawab. Jika terjadi ketidaksesuaian perangkat atau penonaktifan lisensi, <strong>file database lokal (<code className="font-mono bg-emerald-100 px-1 py-0.5 rounded text-emerald-900">pb_data/data.db</code>) tetap 100% utuh dan tidak pernah dihapus atau dirusak</strong>. Seluruh naskah soal bapak/ibu guru dan riwayat nilai siswa tetap aman di komputer sekolah.
+              </p>
+            </div>
+
+            <div className="p-4 rounded-xl border border-purple-200 bg-white shadow-xs text-xs space-y-2 text-slate-700">
+              <p className="font-bold text-slate-900 text-sm flex items-center gap-1.5">
+                <RotateCcw size={15} className="text-purple-600" /> Prosedur Pergantian Laptop Server Resmi
+              </p>
+              <p className="text-slate-600 leading-relaxed">
+                Jika laptop server utama sekolah mengalami kerusakan teknis, hilang, atau sedang diservis di masa ujian sehingga sekolah perlu memindahkan server ujian ke laptop pengganti:
+              </p>
+              <ol className="list-decimal list-inside space-y-1 text-slate-600 pl-1 leading-relaxed">
+                <li>Proktor menghubungi Super Admin dan menginformasikan pergantian komputer server resmi sekolah.</li>
+                <li>Super Admin membuka detail lisensi sekolah terkait di dashboard Master Cloud, lalu mengklik tombol <strong>"Reset Kunci Laptop"</strong>.</li>
+                <li>Ikatan perangkat lama seketika dihapus dari catatan lisensi.</li>
+                <li>Proktor dapat langsung menginput ulang serial key di laptop baru, dan sistem akan mengunci sidik jari perangkat laptop baru tersebut.</li>
+              </ol>
+            </div>
+          </section>
+
+          {/* ── SECTION: PEMBARUAN 1-CLICK SERVER OFFLINE ─────── */}
+          <section id="offline-update" className="space-y-4 scroll-mt-24">
+            <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Pembaruan 1-Click Server Offline</h2>
+            <p className="text-sm text-slate-600 leading-relaxed">
+              Server mandiri sekolah dapat diperbarui ke versi rilis terbaru tanpa perlu instalasi ulang dan tanpa risiko kehilangan data ujian:
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs text-slate-700">
+              <div className="p-4 rounded-xl border border-slate-200 bg-white shadow-xs space-y-2">
+                <p className="font-bold text-slate-900 text-sm flex items-center gap-1.5">
+                  <Download size={15} className="text-blue-600" /> Pembaruan via Menu Pengaturan Web
+                </p>
+                <p className="text-slate-600 leading-relaxed">
+                  Jika laptop proktor terhubung ke internet sebentar (misal via hotspot tethering), buka menu <strong>Pengaturan &rarr; Pembaruan 1-Click</strong>. Jika versi baru tersedia di CDN Examku, klik tombol <strong>"Pasang Pembaruan Sekarang"</strong>. Sistem mengunduh pembaruan dan merestart modul secara otomatis.
+                </p>
+              </div>
+
+              <div className="p-4 rounded-xl border border-slate-200 bg-white shadow-xs space-y-2">
+                <p className="font-bold text-slate-900 text-sm flex items-center gap-1.5">
+                  <Terminal size={15} className="text-slate-700" /> Pembaruan via Berkas Batch Script
+                </p>
+                <p className="text-slate-600 leading-relaxed">
+                  Proktor dapat mengunduh berkas pembaruan mandiri atau menjalankan skrip <code className="font-mono text-slate-800 bg-slate-100 px-1 py-0.5 rounded">perbarui-server.bat</code> di folder utama server. Skrip secara otomatis membuat cadangan berkas lama ke folder backup sebelum menimpa berkas web baru.
+                </p>
+              </div>
             </div>
           </section>
 

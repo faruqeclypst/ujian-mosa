@@ -209,7 +209,7 @@ export const StudentAuthProvider = ({ children }: { children: ReactNode }) => {
 
   const [isExiting, setIsExiting] = useState(false);
 
-  // Aksi keluar dari aplikasi EXAM AA saat tombol OK pada dialog Kicked ditekan
+  // Aksi keluar dari aplikasi EXAMKU saat tombol OK pada dialog Kicked ditekan
   const handleKickedExit = useCallback(async () => {
     if (isExiting) return;
     setIsExiting(true);

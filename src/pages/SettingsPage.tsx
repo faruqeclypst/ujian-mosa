@@ -15,6 +15,7 @@ import { useToast } from "../components/ui/toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "../components/ui/dialog";
 import { Badge } from "../components/ui/badge";
 import { cn } from "../lib/utils";
+import { APP_VERSION } from "../utils/version";
 import {
   Upload,
   Save,
@@ -158,32 +159,47 @@ const SettingsPage = () => {
     setIsCheckingUpdate(true);
     try {
       let data: any = null;
+      let hasUpdate = false;
+      let currentVer = APP_VERSION;
+
       if (pb) {
         try {
           const res = await pb.send("/api/offline-update-check", { method: "GET" });
-          data = res?.data;
+          if (res?.ok) {
+            data = res.data;
+            hasUpdate = Boolean(res.has_update);
+            if (res.current_version) currentVer = res.current_version;
+          }
         } catch {
           // fallback to fetch directly
         }
       }
       if (!data) {
         const res = await fetch("https://examku.my.id/downloads/version.json", { cache: "no-store" });
-        if (res.ok) data = await res.json();
+        if (res.ok) {
+          data = await res.json();
+          if (data && data.version && data.version !== currentVer) {
+            hasUpdate = true;
+          }
+        }
       }
 
-      if (data && data.version) {
+      if (data && data.version && hasUpdate) {
         setUpdateAvailable(data);
         addToast({
           title: "Pembaruan Tersedia!",
           description: `Versi terbaru v${data.version} (${data.release_date || "Terbaru"}) siap dipasang.`,
           type: "info"
         });
-      } else {
+      } else if (data && data.version) {
+        setUpdateAvailable(null);
         addToast({
           title: "Sistem Mutakhir",
-          description: "Aplikasi CBT Anda sudah menggunakan versi paling mutakhir.",
+          description: `Aplikasi CBT Anda sudah menggunakan versi paling mutakhir (v${currentVer}).`,
           type: "success"
         });
+      } else {
+        throw new Error("Gagal mengambil data versi dari server pusat.");
       }
     } catch (err: any) {
       addToast({
@@ -252,7 +268,7 @@ const SettingsPage = () => {
         setSettingsId(data.id);
         // Jika name belum pernah diubah dari default, pakai nama dari registry
         const savedName = data.name || "";
-        setSchoolName(savedName && savedName !== "EXAM AA" ? savedName : (school?.name || "EXAM AA"));
+        setSchoolName(savedName && savedName !== "EXAMKU" ? savedName : (school?.name || "EXAMKU"));
         setGroqApiKey(data.groq_api_key || "");
         setAiGatewayUrl(data.ai_gateway_url || "");
         setAiGatewayKey(data.ai_gateway_key || "");
@@ -270,7 +286,7 @@ const SettingsPage = () => {
         else if (data.allowed_question_types) setAllowedTypes(data.allowed_question_types);
       } else {
         // Tenant baru: belum ada record settings, pakai nama dari registry
-        setSchoolName(school?.name || "EXAM AA");
+        setSchoolName(school?.name || "EXAMKU");
       }
     } catch (e: any) {
       console.error("Settings fetch err", e);
@@ -596,14 +612,14 @@ const SettingsPage = () => {
         }
       }
 
-      if (finalLogoUrl.startsWith("data:")) {
+      if (!isOfflineServer && finalLogoUrl.startsWith("data:")) {
         addToast({ title: "Gagal Simpan", description: "Format gambar tidak didukung (DataURL).", type: "error" });
         setSaving(false);
         return;
       }
 
       const payload: any = {
-        name: schoolName || "EXAM AA",
+        name: schoolName || "EXAMKU",
         logo: finalLogoUrl || "",
         logoUrl: finalLogoUrl || "",
         allowed_types: allowedTypes || {},
@@ -1778,7 +1794,7 @@ const SettingsPage = () => {
               className="flex flex-col items-center justify-center p-6 bg-slate-50 dark:bg-slate-800 rounded-2xl hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300"
             >
               <FolderOpen size={24} className="mb-3 text-blue-500" />
-              <span className="text-xs font-bold text-center">Cloud Galeri<br />EXAM AA</span>
+              <span className="text-xs font-bold text-center">Cloud Galeri<br />EXAMKU</span>
             </button>
           </div>
         </DialogContent>

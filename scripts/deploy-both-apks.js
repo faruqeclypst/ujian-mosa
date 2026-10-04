@@ -46,8 +46,8 @@ for (const dir of cleanDirs) {
 }
 
 // 2. Build Web terlebih dahulu agar dist selalu versi terbaru
-console.log('📦 [Langkah 1/3] Membangun bundle web (bun run build)...');
-execSync('bun run build', { stdio: 'inherit' });
+console.log('📦 [Langkah 1/3] Membangun bundle web (npm run build)...');
+execSync('npm run build', { stdio: 'inherit' });
 
 // 2. Loop build masing-masing APK
 const gradlewCmd = process.platform === 'win32' 

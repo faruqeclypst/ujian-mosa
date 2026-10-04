@@ -79,7 +79,7 @@ const NotFoundPage = () => {
         >
           <div className="h-1 w-12 bg-gradient-to-r from-transparent via-slate-300 dark:via-slate-700 to-transparent rounded-full" />
           <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.4em]">
-            Portal EXAM AA &copy; {new Date().getFullYear()}
+            Portal EXAMKU &copy; {new Date().getFullYear()}
           </p>
         </motion.div>
       </div>

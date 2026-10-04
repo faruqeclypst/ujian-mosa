@@ -1513,7 +1513,7 @@ export const ItemAnalysisPage: React.FC = () => {
           </div>
           <div className="text-right text-[10px] text-slate-500">
             <div>Dicetak: {new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}</div>
-            <div>EXAM AA • Platform CBT Terstandar</div>
+            <div>EXAMKU • Platform CBT Terstandar</div>
           </div>
         </div>
 

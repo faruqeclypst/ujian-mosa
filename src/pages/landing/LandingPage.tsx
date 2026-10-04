@@ -6,7 +6,7 @@ import {
   FileSpreadsheet, Users, HelpCircle, Phone, Smartphone, Laptop,
   Lock, ArrowUpRight, Star, GraduationCap, ChevronDown, ChevronLeft, ChevronRight,
   Eye, Clock, AlertTriangle, Play, Pause, FileText, Search,
-  Server, XCircle, AlertCircle, Crown, CreditCard
+  Server, XCircle, AlertCircle, Crown, CreditCard, BookOpen
 } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { getDomainSuffix } from "../../utils/domainHelper";
@@ -199,7 +199,7 @@ const LandingPage = () => {
     {
       icon: Shield,
       title: "Anti-Curang Native: APK Android & iOS SEB",
-      desc: "Perangkat Android menggunakan aplikasi native APK EXAM AA dengan proteksi Kiosk, deteksi split-screen, dan sirine alarm volume kencang jika mencoba curang. Pengguna iPhone & iPad terintegrasi resmi dengan Safe Exam Browser (SEB). Keamanan selalu diperbarui secara berkala.",
+      desc: "Perangkat Android menggunakan aplikasi native APK EXAMKU dengan proteksi Kiosk, deteksi split-screen, dan sirine alarm volume kencang jika mencoba curang. Pengguna iPhone & iPad terintegrasi resmi dengan Safe Exam Browser (SEB). Keamanan selalu diperbarui secara berkala.",
       badge: "Android & iOS Terproteksi",
     },
     {
@@ -211,7 +211,7 @@ const LandingPage = () => {
     {
       icon: Wand2,
       title: "Pembuat Soal & Stimulus Otomatis dengan AI",
-      desc: "Cukup masukkan modul ajar atau dokumen materi, sistem AI cerdas EXAM AA akan otomatis merancang butir soal AKM/ANBK, bacaan stimulus literasi, kunci jawaban, dan rumus matematika KaTeX siap pakai dalam hitungan detik.",
+      desc: "Cukup masukkan modul ajar atau dokumen materi, sistem AI cerdas EXAMKU akan otomatis merancang butir soal AKM/ANBK, bacaan stimulus literasi, kunci jawaban, dan rumus matematika KaTeX siap pakai dalam hitungan detik.",
       badge: "Hemat Waktu Guru",
     },
     {
@@ -468,7 +468,7 @@ const LandingPage = () => {
       category: "server",
       shortBadge: "Tanpa Server Fisik",
       q: "Apakah sekolah kami harus punya server komputer sendiri?",
-      a: "Tidak perlu. EXAM AA berbasis cloud terkelola penuh. Sekolah cukup menyediakan koneksi internet atau WiFi tanpa perlu membeli server fisik maupun sewa VPS."
+      a: "Tidak perlu. EXAMKU berbasis cloud terkelola penuh. Sekolah cukup menyediakan koneksi internet atau WiFi tanpa perlu membeli server fisik maupun sewa VPS."
     },
     {
       category: "keamanan",
@@ -554,7 +554,7 @@ const LandingPage = () => {
           <span className="inline-flex items-center justify-center bg-white/20 text-white rounded-full px-2.5 py-0.5 text-[11px] font-bold shadow-2xs">
             Promo Ujian 2026
           </span>
-          <span className="relative z-10">Dapatkan potongan 5% untuk semua paket langganan bulanan EXAM AA.</span>
+          <span className="relative z-10">Dapatkan potongan 5% untuk semua paket langganan bulanan EXAMKU.</span>
           <button
             type="button"
             onClick={() => document.getElementById("pricing")?.scrollIntoView({ behavior: "smooth" })}
@@ -569,7 +569,7 @@ const LandingPage = () => {
         <div
           onClick={() => document.getElementById("pricing")?.scrollIntoView({ behavior: "smooth" })}
           className="sm:hidden flex overflow-hidden whitespace-nowrap cursor-pointer select-none py-0.5 relative z-10"
-          aria-label="Promo Ujian 2026: Dapatkan potongan 5% untuk semua paket langganan bulanan EXAM AA. Ketuk untuk melihat paket."
+          aria-label="Promo Ujian 2026: Dapatkan potongan 5% untuk semua paket langganan bulanan EXAMKU. Ketuk untuk melihat paket."
         >
           <div className="flex w-max animate-marquee items-center" style={{ animationDuration: "16s" }}>
             {[1, 2, 3, 4].map((k) => (
@@ -577,7 +577,7 @@ const LandingPage = () => {
                 <span className="inline-flex items-center justify-center bg-white/20 text-white rounded-full px-2 py-0.5 text-[10px] font-extrabold shadow-2xs">
                   Promo Ujian 2026
                 </span>
-                <span>Dapatkan potongan 5% untuk semua paket langganan bulanan EXAM AA.</span>
+                <span>Dapatkan potongan 5% untuk semua paket langganan bulanan EXAMKU.</span>
                 <span className="underline font-bold text-blue-100 flex items-center gap-0.5">
                   Lihat Paket &rarr;
                 </span>
@@ -599,14 +599,14 @@ const LandingPage = () => {
             <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-white border border-slate-200/80 p-1 flex items-center justify-center shadow-xs group-hover:scale-105 group-hover:shadow-md transition-all duration-300">
               <img
                 src="/logo-exam-aa.webp"
-                alt="Logo EXAM AA"
+                alt="Logo EXAMKU"
                 className="w-full h-full object-contain"
                 onError={(e) => { (e.target as HTMLImageElement).src = "/logo-exam-aa.png"; }}
               />
             </div>
             <div>
               <span className="font-extrabold text-slate-900 text-lg sm:text-xl tracking-tight block leading-tight">
-                EXAM AA
+                EXAMKU
               </span>
               <span className="text-[11px] font-semibold text-blue-600 block leading-none">
                 Platform CBT Sekolah
@@ -645,6 +645,13 @@ const LandingPage = () => {
               className="px-3.5 py-2 rounded-xl hover:text-blue-700 hover:bg-blue-50/60 transition-colors"
             >
               Tanya Jawab
+            </button>
+            <button
+              onClick={() => navigate("/docs")}
+              className="px-3.5 py-2 rounded-xl text-blue-600 hover:text-blue-700 hover:bg-blue-50/60 transition-colors font-bold flex items-center gap-1.5"
+            >
+              <BookOpen size={14} />
+              <span>Dokumentasi</span>
             </button>
           </div>
 
@@ -702,6 +709,13 @@ const LandingPage = () => {
             >
               Tanya Jawab
             </button>
+            <button
+              onClick={() => { navigate("/docs"); setMobileMenuOpen(false); }}
+              className="w-full text-left py-2.5 px-3 rounded-xl hover:bg-blue-50 font-bold text-blue-600 flex items-center justify-between"
+            >
+              <span>Dokumentasi & Mode Offline</span>
+              <BookOpen size={16} />
+            </button>
             <div className="pt-3 border-t border-slate-100 flex flex-col gap-2">
               <button
                 onClick={() => navigate("/daftar")}
@@ -741,7 +755,7 @@ const LandingPage = () => {
           </h1>
 
           <p className="text-base sm:text-lg md:text-xl text-slate-600 max-w-3xl mx-auto mb-10 leading-relaxed font-normal">
-            EXAM AA membantu <span className="text-blue-600 font-bold">sekolah / universitas (umum)</span> mengadakan pelaksanaan ujian online dengan lancar. Tidak ada lagi kendala teknis atau aplikasi down saat ujian berlangsung.
+            EXAMKU membantu <span className="text-blue-600 font-bold">sekolah / universitas (umum)</span> mengadakan pelaksanaan ujian online dengan lancar. Tidak ada lagi kendala teknis atau aplikasi down saat ujian berlangsung.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-3.5 justify-center items-center">
@@ -798,7 +812,7 @@ const LandingPage = () => {
           <div className="text-center max-w-3xl mx-auto mb-8">
             <div className="inline-flex items-center gap-2 bg-blue-50 border border-blue-200 px-3.5 py-1 rounded-full text-xs font-bold text-blue-700 uppercase tracking-wider mb-3">
               <Sparkles size={14} className="text-blue-600" />
-              Galeri Sistem Resmi EXAM AA · 14 Tampilan Nyata
+              Galeri Sistem Resmi EXAMKU · 14 Tampilan Nyata
             </div>
             <h2 className="text-2xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
               Tampilan Nyata Platform yang Elegan & Mudah Digunakan
@@ -1018,7 +1032,7 @@ const LandingPage = () => {
               Fitur Lengkap & Praktis
             </span>
             <h2 className="text-2xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
-              Mengapa Guru & Sekolah Memilih EXAM AA?
+              Mengapa Guru & Sekolah Memilih EXAMKU?
             </h2>
             <p className="text-slate-600 text-sm sm:text-base mt-3 leading-relaxed">
               Dirancang dari kebutuhan nyata guru di kelas dan panitia ujian di sekolah. Semua fitur praktis, siap pakai, dan mudah dipahami.
@@ -1096,7 +1110,7 @@ const LandingPage = () => {
             Arsitektur Teknologi Kelas Dunia
           </div>
           <h2 className="text-2xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
-            Teknologi Modern di Balik Keandalan <span className="text-blue-600">EXAM AA</span>
+            Teknologi Modern di Balik Keandalan <span className="text-blue-600">EXAMKU</span>
           </h2>
           <p className="mt-3 text-slate-600 text-sm max-w-xl mx-auto leading-relaxed">
             Demi ujian yang stabil tanpa downtime, kami membangun sistem CBT dengan stack teknologi terkini berkecepatan tinggi dan berstandar internasional.
@@ -1378,10 +1392,10 @@ const LandingPage = () => {
               Perbandingan Jelas & Transparan
             </span>
             <h3 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-              Kenapa Memilih Layanan Managed EXAM AA?
+              Kenapa Memilih Layanan Managed EXAMKU?
             </h3>
             <p className="text-slate-600 text-xs sm:text-sm mt-2 leading-relaxed">
-              Bandingkan antara sistem cloud siap pakai EXAM AA, SaaS biasa, dan script yang di-install sendiri di server sekolah.
+              Bandingkan antara sistem cloud siap pakai EXAMKU, SaaS biasa, dan script yang di-install sendiri di server sekolah.
             </p>
           </div>
 
@@ -1412,7 +1426,7 @@ const LandingPage = () => {
                         <span>Rekomendasi Utama</span>
                       </span>
                       <div className="text-sm font-black text-blue-950">
-                        EXAM AA (Siap Pakai)
+                        EXAMKU (Siap Pakai)
                       </div>
                       <span className="text-[11px] font-semibold text-blue-700 block">
                         Managed Cloud Terkelola
@@ -1923,9 +1937,9 @@ const LandingPage = () => {
             className="flex items-center gap-2.5 cursor-pointer group"
           >
             <div className="w-8 h-8 rounded-lg bg-white border border-slate-200 p-1 flex items-center justify-center shadow-2xs group-hover:scale-105 transition-transform">
-              <img src="/logo-exam-aa.webp" alt="EXAM AA" className="w-full h-full object-contain" onError={(e) => { (e.target as HTMLImageElement).src = "/logo-exam-aa.png"; }} />
+              <img src="/logo-exam-aa.webp" alt="EXAMKU" className="w-full h-full object-contain" onError={(e) => { (e.target as HTMLImageElement).src = "/logo-exam-aa.png"; }} />
             </div>
-            <span className="font-extrabold text-slate-900 text-base tracking-tight">EXAM AA</span>
+            <span className="font-extrabold text-slate-900 text-base tracking-tight">EXAMKU</span>
           </div>
 
           <div className="flex flex-wrap justify-center items-center gap-x-6 gap-y-2 text-xs sm:text-sm text-slate-600 font-medium">
@@ -1943,6 +1957,9 @@ const LandingPage = () => {
             </button>
             <button onClick={() => document.getElementById("faq")?.scrollIntoView({ behavior: "smooth" })} className="hover:text-blue-600 transition-colors">
               Tanya Jawab
+            </button>
+            <button onClick={() => navigate("/docs")} className="text-blue-600 font-bold hover:text-blue-700 transition-colors">
+              Dokumentasi & Mode Offline
             </button>
             <a href="/privacy-policy.html" className="hover:text-blue-600 transition-colors">
               Kebijakan Privasi
@@ -1962,7 +1979,7 @@ const LandingPage = () => {
           </div>
 
           <p className="text-xs text-slate-400 mt-1">
-            © {new Date().getFullYear()} EXAM AA · Platform CBT Sekolah Indonesia. Dikembangkan oleh Alfaruq Asri.
+            © {new Date().getFullYear()} EXAMKU · Platform CBT Sekolah Indonesia. Dikembangkan oleh Alfaruq Asri.
           </p>
         </div>
       </footer>

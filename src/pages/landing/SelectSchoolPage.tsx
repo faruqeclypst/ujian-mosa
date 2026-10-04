@@ -5,6 +5,7 @@ import { Search, ChevronRight, Loader2, Sparkles, RefreshCw, LogOut, HardDrive, 
 import { motion, AnimatePresence } from "framer-motion";
 import { Capacitor } from "@capacitor/core";
 import { App } from "@capacitor/app";
+import { APP_DISPLAY_VERSION } from "../../utils/version";
 
 export const isLocalServer = (school: SchoolRecord): boolean => {
   if (!school) return false;
@@ -399,7 +400,7 @@ const SelectSchoolPage = () => {
           CBT by Alfaruq Asri
         </p>
         <p className="text-[9px] font-bold text-slate-300 tracking-widest mt-1">
-          v2.0.0
+          {APP_DISPLAY_VERSION}
         </p>
       </div>
     </div>

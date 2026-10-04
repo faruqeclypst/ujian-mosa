@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { ReactNode } from "react";
 import { useTenant } from "../../context/TenantContext";
+import { APP_DISPLAY_VERSION } from "../../utils/version";
 
 // List of allowed user agents (case-insensitive substrings)
 const ALLOWED_USER_AGENTS = [
@@ -53,7 +54,7 @@ const ExambroGuard = ({ children }: ExambroGuardProps) => {
 
         // 0. Tolak secara spesifik APK purba bulan lalu (MosaExambro/1.0)
         if (ua.includes("mosaexambro/1.0")) {
-          setBlockedReason("Aplikasi EXAM AA Anda (versi 1.0) sudah tidak didukung. Silakan unduh dan pasang aplikasi APK versi terbaru (v2.0) untuk dapat mengakses ujian.");
+          setBlockedReason(`Aplikasi EXAMKU Anda (versi 1.0) sudah tidak didukung. Silakan unduh dan pasang aplikasi APK versi terbaru (${APP_DISPLAY_VERSION}) untuk dapat mengakses ujian.`);
           setIsExambro(false);
           return;
         }
@@ -107,7 +108,7 @@ const ExambroGuard = ({ children }: ExambroGuardProps) => {
             </p>
             <div className="p-3 bg-blue-50/50 rounded-xl border border-blue-100 text-[11px] text-blue-700 font-medium">
               {blockedReason
-                ? "Hubungi pengawas atau operator sekolah untuk mengunduh file APK versi terbaru (v2.0)."
+                ? `Hubungi pengawas atau operator sekolah untuk mengunduh file APK versi terbaru (${APP_DISPLAY_VERSION}).`
                 : "Pastikan Anda membuka link ini dari dalam aplikasi ujian yang telah ditentukan."}
             </div>
           </div>

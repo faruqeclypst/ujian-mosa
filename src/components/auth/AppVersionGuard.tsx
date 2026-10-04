@@ -141,7 +141,7 @@ export const AppVersionGuard = ({ children }: AppVersionGuardProps) => {
           </h2>
 
           <p className="text-slate-400 text-xs sm:text-sm leading-relaxed mb-5">
-            Aplikasi <span className="font-bold text-white">{requiredVersion.app_name || "EXAM AA"}</span> di perangkat Anda sudah usang. Anda wajib memperbarui aplikasi ke versi terbaru untuk dapat mengakses ujian.
+            Aplikasi <span className="font-bold text-white">{requiredVersion.app_name || "EXAMKU"}</span> di perangkat Anda sudah usang. Anda wajib memperbarui aplikasi ke versi terbaru untuk dapat mengakses ujian.
           </p>
 
           {/* Version Info Card */}

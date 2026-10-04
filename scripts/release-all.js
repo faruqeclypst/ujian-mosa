@@ -9,7 +9,7 @@ const REMOTE_TEMPLATE = '/opt/pocketbase/schools/template';
 
 const args = process.argv.slice(2);
 const skipApk = args.includes('--skip-apk') || args.includes('--quick');
-const buildBothApks = args.includes('--both-apks');
+const buildBothApks = !args.includes('--single-apk');
 
 const now = new Date();
 const dd = String(now.getDate()).padStart(2, '0');
@@ -57,39 +57,39 @@ try {
   // ── [5/6] PAKET & PUBLIKASIKAN OFFLINE UPDATE (1-CLICK UPDATE) ──
   console.log('\n💾 [5/6] Mengemas dan merilis berkas Offline 1-Click Update...');
   
-  // Sinkronkan dist ke offline_package/pb_public lokal
-  const offlinePublicDir = path.join(process.cwd(), 'offline_package', 'pb_public');
-  if (fs.existsSync(offlinePublicDir)) {
-    execSync(`powershell -Command "Copy-Item dist/* offline_package/pb_public/ -Recurse -Force"`, { stdio: 'inherit' });
-    // Hapus APK besar dari pb_public offline agar zip tetap ringan
-    const publicFiles = fs.readdirSync(offlinePublicDir);
-    for (const f of publicFiles) {
-      if (f.endsWith('.apk')) {
-        try { fs.unlinkSync(path.join(offlinePublicDir, f)); } catch {}
-      }
-    }
-  }
+  // offline_package/pb_public akan diperbarui melalui proses 1-Click Update dari offline-update.zip
+
+  // Bangun ulang database offline yang bersih (fresh clone dari template VPS)
+  console.log('  🔄 Membangun ulang database offline dari template VPS...');
+  execSync('python scripts/prepare_offline_db.py', { stdio: 'inherit' });
+  console.log('  ✅ Database offline package berhasil dibangun ulang dari template VPS.');
 
   // Tulis version.json
   const pkg = JSON.parse(fs.readFileSync('package.json', 'utf-8'));
   const versionData = {
-    version: pkg.version || '2.5.5',
+    version: pkg.version || '1.1.2',
     release_date: dateStr,
     timestamp: now.toISOString(),
-    notes: 'Pembaruan otomatis sistem CBT, perbaikan rotasi token, dan optimasi UI responsif.'
+    notes: 'Rilis Resmi v1.1.1: Pembaruan terpadu seluruh sistem (Web, APK Android, Template VPS, dan Paket Offline).'
   };
   fs.writeFileSync('version.json', JSON.stringify(versionData, null, 2), 'utf-8');
+  if (fs.existsSync('dist')) {
+    fs.copyFileSync('version.json', 'dist/version.json');
+  }
 
   // Siapkan folder staging untuk offline-update.zip
   const stagingDir = path.join(process.cwd(), '.temp_offline_update');
   if (fs.existsSync(stagingDir)) fs.rmSync(stagingDir, { recursive: true, force: true });
   fs.mkdirSync(stagingDir, { recursive: true });
 
-  execSync(`powershell -Command "Copy-Item offline_package/pb_public ${stagingDir}/pb_public -Recurse -Force"`, { stdio: 'inherit' });
-  execSync(`powershell -Command "Copy-Item offline_package/pb_hooks ${stagingDir}/pb_hooks -Recurse -Force"`, { stdio: 'inherit' });
+  execSync(`powershell -Command "Copy-Item dist ${stagingDir}/pb_public -Recurse -Force"`, { stdio: 'inherit' });
+  execSync(`powershell -Command "Copy-Item pb_hooks ${stagingDir}/pb_hooks -Recurse -Force"`, { stdio: 'inherit' });
   execSync(`powershell -Command "Copy-Item version.json ${stagingDir}/version.json -Force"`, { stdio: 'inherit' });
   if (fs.existsSync('offline_package/perbarui-server.bat')) {
     execSync(`powershell -Command "Copy-Item offline_package/perbarui-server.bat ${stagingDir}/perbarui-server.bat -Force"`, { stdio: 'inherit' });
+  }
+  if (fs.existsSync('offline_package/jalankan-server.bat')) {
+    execSync(`powershell -Command "Copy-Item offline_package/jalankan-server.bat ${stagingDir}/jalankan-server.bat -Force"`, { stdio: 'inherit' });
   }
 
   // Kompres ke offline-update.zip

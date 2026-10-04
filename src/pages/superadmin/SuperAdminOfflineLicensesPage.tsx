@@ -23,7 +23,8 @@ import {
   ChevronRight,
   Filter,
   Globe,
-  ChevronDown
+  ChevronDown,
+  ShieldAlert
 } from "lucide-react";
 import SuperAdminLayout from "../../components/layout/SuperAdminLayout";
 import { masterPb } from "../../lib/pocketbase";
@@ -39,6 +40,7 @@ import {
   DialogTitle,
   DialogDescription
 } from "../../components/ui/dialog";
+import { RotateCcw, Laptop } from "lucide-react";
 
 export interface OfflineLicenseRecord {
   id: string;
@@ -52,13 +54,17 @@ export interface OfflineLicenseRecord {
   issued_at?: string;
   notes?: string;
   status?: "active" | "revoked" | "expired" | string;
+  is_used?: boolean;
+  used_at?: string;
+  activation_count?: number;
+  activated_device?: string;
   contact_person?: string;
   contact_phone?: string;
   created: string;
   updated: string;
 }
 
-type FilterStatus = "all" | "active" | "expiring_soon" | "expired";
+type FilterStatus = "all" | "unused" | "used" | "active" | "expiring_soon" | "expired" | "revoked";
 type SortOption = "newest_issued" | "nearest_expiry" | "name_asc";
 
 const SchoolAvatar = ({ name, logoUrl, className }: { name: string; logoUrl?: string; className?: string }) => {
@@ -295,10 +301,15 @@ export default function SuperAdminOfflineLicensesPage() {
     let active = 0;
     let expiringSoon = 0;
     let expired = 0;
+    let used = 0;
+    let unused = 0;
+    let revoked = 0;
 
     licenses.forEach((lic) => {
       const exp = getExpiryDetails(lic.valid_until);
-      if (lic.status === "revoked" || exp.isExpired) {
+      if (lic.status === "revoked") {
+        revoked++;
+      } else if (exp.isExpired) {
         expired++;
       } else if (exp.isExpiringSoon) {
         expiringSoon++;
@@ -306,9 +317,15 @@ export default function SuperAdminOfflineLicensesPage() {
       } else {
         active++;
       }
+
+      if (lic.is_used) {
+        used++;
+      } else {
+        unused++;
+      }
     });
 
-    return { total, active, expiringSoon, expired };
+    return { total, active, expiringSoon, expired, used, unused, revoked };
   }, [licenses]);
 
   // Data Terfilter dan Terurut
@@ -328,16 +345,26 @@ export default function SuperAdminOfflineLicensesPage() {
 
         // Filter Status
         const exp = getExpiryDetails(item.valid_until);
-        const isItemExpired = item.status === "revoked" || exp.isExpired;
+        const isItemExpired = exp.isExpired;
+        const isItemRevoked = item.status === "revoked";
 
+        if (filterStatus === "revoked") {
+          return isItemRevoked;
+        }
         if (filterStatus === "active") {
-          return !isItemExpired;
+          return !isItemExpired && !isItemRevoked;
+        }
+        if (filterStatus === "used") {
+          return Boolean(item.is_used) && !isItemRevoked;
+        }
+        if (filterStatus === "unused") {
+          return !item.is_used && !isItemRevoked;
         }
         if (filterStatus === "expiring_soon") {
-          return !isItemExpired && exp.isExpiringSoon;
+          return !isItemExpired && !isItemRevoked && exp.isExpiringSoon;
         }
         if (filterStatus === "expired") {
-          return isItemExpired;
+          return isItemExpired && !isItemRevoked;
         }
         return true;
       })
@@ -358,6 +385,126 @@ export default function SuperAdminOfflineLicensesPage() {
         return 0;
       });
   }, [licenses, searchQuery, filterStatus, sortOption]);
+
+  // Aksi Toggle Status Penggunaan Lisensi (Digunakan / Belum Digunakan)
+  const [isTogglingUsed, setIsTogglingUsed] = useState(false);
+  const handleToggleUsed = async (lic: OfflineLicenseRecord, newUsed: boolean) => {
+    setIsTogglingUsed(true);
+    try {
+      const res = await fetch("https://examku.my.id/api/multi-vps/toggle-offline-license-used", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: lic.id, is_used: newUsed })
+      });
+      const data = await res.json();
+      if (data.success) {
+        addToast({
+          title: newUsed ? "Ditandai Digunakan" : "Status Direset",
+          description: data.message || "Status lisensi berhasil diperbarui.",
+          type: "success"
+        });
+        await fetchLicenses(true);
+        if (activeLicenseDetail && activeLicenseDetail.id === lic.id) {
+          setActiveLicenseDetail({
+            ...activeLicenseDetail,
+            is_used: newUsed,
+            used_at: newUsed ? (activeLicenseDetail.used_at || new Date().toISOString()) : "",
+            activation_count: newUsed ? (activeLicenseDetail.activation_count || 1) : 0
+          });
+        }
+      } else {
+        throw new Error(data.error || "Gagal mengubah status lisensi.");
+      }
+    } catch (err: any) {
+      addToast({
+        title: "Gagal Mengubah Status",
+        description: err.message || "Terjadi kesalahan saat menghubungi server pusat.",
+        type: "error"
+      });
+    } finally {
+      setIsTogglingUsed(false);
+    }
+  };
+
+  // Aksi Toggle Status Lisensi (Aktif <-> Dicabut / Dinonaktifkan Kill-Switch)
+  const [isTogglingStatus, setIsTogglingStatus] = useState(false);
+  const handleToggleStatus = async (lic: OfflineLicenseRecord, newStatus: "active" | "revoked", reason?: string) => {
+    setIsTogglingStatus(true);
+    try {
+      const res = await fetch("https://examku.my.id/api/multi-vps/toggle-offline-license-status", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: lic.id,
+          status: newStatus,
+          reason: reason || (newStatus === "revoked" ? "Pelanggaran kebijakan penggunaan lisensi offline CBT." : "Aktivasi ulang lisensi.")
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        addToast({
+          title: newStatus === "revoked" ? "Lisensi Dinonaktifkan (Diblokir)" : "Lisensi Diaktifkan Kembali",
+          description: data.message || "Status lisensi berhasil diperbarui.",
+          type: newStatus === "revoked" ? "error" : "success"
+        });
+        await fetchLicenses(true);
+        if (activeLicenseDetail && activeLicenseDetail.id === lic.id) {
+          setActiveLicenseDetail({
+            ...activeLicenseDetail,
+            status: newStatus
+          });
+        }
+      } else {
+        throw new Error(data.error || "Gagal mengubah status lisensi.");
+      }
+    } catch (err: any) {
+      addToast({
+        title: "Gagal Mengubah Status",
+        description: err.message || "Terjadi kesalahan saat menghubungi server pusat.",
+        type: "error"
+      });
+    } finally {
+      setIsTogglingStatus(false);
+    }
+  };
+
+  // Aksi Reset Kunci Perangkat (Hardware ID Binding)
+  const [isResettingDevice, setIsResettingDevice] = useState(false);
+  const handleResetDevice = async (lic: OfflineLicenseRecord) => {
+    setIsResettingDevice(true);
+    try {
+      const res = await fetch("https://examku.my.id/api/multi-vps/reset-offline-license-device", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: lic.id })
+      });
+      const data = await res.json();
+      if (data.success) {
+        addToast({
+          title: "Kunci Perangkat Direset",
+          description: data.message || "Sekolah kini dapat mengaktivasi server di perangkat laptop baru.",
+          type: "success"
+        });
+        await fetchLicenses(true);
+        if (activeLicenseDetail && activeLicenseDetail.id === lic.id) {
+          setActiveLicenseDetail({
+            ...activeLicenseDetail,
+            activated_device: ""
+          });
+        }
+      } else {
+        throw new Error(data.error || "Gagal mereset kunci perangkat.");
+      }
+    } catch (err: any) {
+      addToast({
+        title: "Gagal Mereset Perangkat",
+        description: err.message || "Terjadi kesalahan saat menghubungi server pusat.",
+        type: "error"
+      });
+    } finally {
+      setIsResettingDevice(false);
+    }
+  };
 
   // Aksi Salin Kode Lisensi
   const handleCopyCode = (id: string, code: string) => {
@@ -394,7 +541,7 @@ export default function SuperAdminOfflineLicensesPage() {
       phoneParam = phone.startsWith("0") ? `62${phone.slice(1)}` : phone;
     }
 
-    const text = `Halo Bapak/Ibu Proktor *${license.school_name}*,\n\nBerikut adalah *Kode Lisensi Izin Server Mandiri (EXAM AA Offline CBT)* resmi dari Super Admin:\n\n*Sekolah:* ${license.school_name}\n*Subdomain:* ${license.slug}.examku.my.id\n*Masa Aktif Server:* Sampai dengan ${license.valid_until}\n*Kapasitas Siswa:* Tanpa Batas Kuota (Mandiri)\n*Keperluan:* ${license.notes || "Izin Ujian Mandiri"}\n\n*Kode Lisensi Resmi (RSA-2048):*\n\`\`\`${license.license_code}\`\`\`\n\n*Langkah Aktivasi di Server Sekolah:*\n1. Buka browser pada komputer server lokal proktor.\n2. Buka menu Pengaturan atau halaman Aktivasi Izin Offline.\n3. Masukkan kode lisensi di atas dan simpan.\n\nSemoga kegiatan ujian berjalan tertib dan lancar.`;
+    const text = `Halo Bapak/Ibu Proktor *${license.school_name}*,\n\nBerikut adalah *Kode Lisensi Izin Server Mandiri (EXAMKU Offline CBT)* resmi dari Super Admin:\n\n*Sekolah:* ${license.school_name}\n*Subdomain:* ${license.slug}.examku.my.id\n*Masa Aktif Server:* Sampai dengan ${license.valid_until}\n*Kapasitas Siswa:* Tanpa Batas Kuota (Mandiri)\n*Keperluan:* ${license.notes || "Izin Ujian Mandiri"}\n\n*Kode Lisensi Resmi (RSA-2048):*\n\`\`\`${license.license_code}\`\`\`\n\n*Langkah Aktivasi di Server Sekolah:*\n1. Buka browser pada komputer server lokal proktor.\n2. Buka menu Pengaturan atau halaman Aktivasi Izin Offline.\n3. Masukkan kode lisensi di atas dan simpan.\n\nSemoga kegiatan ujian berjalan tertib dan lancar.`;
 
     const targetUrl = phoneParam
       ? `https://wa.me/${phoneParam}?text=${encodeURIComponent(text)}`
@@ -527,9 +674,9 @@ export default function SuperAdminOfflineLicensesPage() {
 
           <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
             <div>
-              <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Server Aktif</p>
-              <p className="text-2xl font-black text-emerald-600 mt-0.5">{stats.active}</p>
-              <p className="text-[11px] text-slate-400 mt-0.5">Izin masa berlaku sah</p>
+              <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Sudah Digunakan</p>
+              <p className="text-2xl font-black text-emerald-600 mt-0.5">{stats.used}</p>
+              <p className="text-[11px] text-slate-400 mt-0.5">Aktif di server sekolah</p>
             </div>
             <div className="w-11 h-11 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600">
               <CheckCircle2 size={20} />
@@ -538,20 +685,22 @@ export default function SuperAdminOfflineLicensesPage() {
 
           <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
             <div>
-              <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Mendekati Batas</p>
-              <p className="text-2xl font-black text-amber-600 mt-0.5">{stats.expiringSoon}</p>
-              <p className="text-[11px] text-slate-400 mt-0.5">Sisa 14 hari ke bawah</p>
+              <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Belum Digunakan</p>
+              <p className="text-2xl font-black text-amber-600 mt-0.5">{stats.unused}</p>
+              <p className="text-[11px] text-slate-400 mt-0.5">Siap diaktivasi</p>
             </div>
             <div className="w-11 h-11 rounded-2xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-600">
-              <AlertTriangle size={20} />
+              <Clock size={20} />
             </div>
           </div>
 
           <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
             <div>
               <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Kadaluarsa / Dicabut</p>
-              <p className="text-2xl font-black text-rose-600 mt-0.5">{stats.expired}</p>
-              <p className="text-[11px] text-slate-400 mt-0.5">Perlu perpanjangan</p>
+              <p className="text-2xl font-black text-rose-600 mt-0.5">{stats.expired + stats.revoked}</p>
+              <p className="text-[11px] text-slate-400 mt-0.5">
+                {stats.revoked > 0 ? `${stats.revoked} diblokir, ${stats.expired} habis` : "Perlu perpanjangan"}
+              </p>
             </div>
             <div className="w-11 h-11 rounded-2xl bg-rose-50 border border-rose-100 flex items-center justify-center text-rose-600">
               <XCircle size={20} />
@@ -575,26 +724,37 @@ export default function SuperAdminOfflineLicensesPage() {
               Semua ({stats.total})
             </button>
             <button
+              onClick={() => setFilterStatus("unused")}
+              className={cn(
+                "px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all",
+                filterStatus === "unused"
+                  ? "bg-white text-amber-700 shadow-2xs font-extrabold"
+                  : "text-slate-600 hover:text-slate-900"
+              )}
+            >
+              Belum Digunakan ({stats.unused})
+            </button>
+            <button
+              onClick={() => setFilterStatus("used")}
+              className={cn(
+                "px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all",
+                filterStatus === "used"
+                  ? "bg-white text-emerald-700 shadow-2xs font-extrabold"
+                  : "text-slate-600 hover:text-slate-900"
+              )}
+            >
+              Sudah Digunakan ({stats.used})
+            </button>
+            <button
               onClick={() => setFilterStatus("active")}
               className={cn(
                 "px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all",
                 filterStatus === "active"
-                  ? "bg-white text-emerald-700 shadow-2xs"
+                  ? "bg-white text-blue-700 shadow-2xs"
                   : "text-slate-600 hover:text-slate-900"
               )}
             >
-              Aktif ({stats.active})
-            </button>
-            <button
-              onClick={() => setFilterStatus("expiring_soon")}
-              className={cn(
-                "px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all",
-                filterStatus === "expiring_soon"
-                  ? "bg-white text-amber-700 shadow-2xs"
-                  : "text-slate-600 hover:text-slate-900"
-              )}
-            >
-              Segera Berakhir ({stats.expiringSoon})
+              Aktif Sah ({stats.active})
             </button>
             <button
               onClick={() => setFilterStatus("expired")}
@@ -606,6 +766,17 @@ export default function SuperAdminOfflineLicensesPage() {
               )}
             >
               Kadaluarsa ({stats.expired})
+            </button>
+            <button
+              onClick={() => setFilterStatus("revoked")}
+              className={cn(
+                "px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all",
+                filterStatus === "revoked"
+                  ? "bg-white text-rose-800 shadow-2xs font-extrabold"
+                  : "text-slate-600 hover:text-slate-900"
+              )}
+            >
+              Dinonaktifkan ({stats.revoked})
             </button>
           </div>
 
@@ -759,32 +930,62 @@ export default function SuperAdminOfflineLicensesPage() {
                             </div>
                           </td>
 
-                          {/* Status & Kriptografi */}
+                          {/* Status & Mesin */}
                           <td className="py-4 px-4">
                             <div className="space-y-1.5">
                               <div>
-                                {isExpired ? (
-                                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200 shadow-2xs">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
-                                    Kadaluarsa
+                                {lic.status === "revoked" ? (
+                                  <span
+                                    className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-100 text-rose-800 border border-rose-300 shadow-2xs"
+                                    title="Lisensi ini dinonaktifkan (diblokir) oleh Super Admin. Server offline otomatis terkunci saat terdeteksi online."
+                                  >
+                                    <ShieldAlert size={12} className="text-rose-600 shrink-0" />
+                                    Dinonaktifkan (Blokir)
                                   </span>
-                                ) : exp.isExpiringSoon ? (
-                                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200 shadow-2xs">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-                                    Segera Berakhir
+                                ) : lic.is_used ? (
+                                  <span
+                                    className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200/90 shadow-2xs"
+                                    title={lic.used_at ? `Diaktifkan pada ${formatDateTimeIndonesia(lic.used_at)}` : "Sudah diaktifkan di server"}
+                                  >
+                                    <CheckCircle2 size={12} className="text-emerald-600 shrink-0" />
+                                    Sudah Digunakan
                                   </span>
                                 ) : (
-                                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200/90 shadow-2xs">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                                    Aktif Sah
+                                  <span
+                                    className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200/90 shadow-2xs"
+                                    title="Serial key ini belum pernah diaktifkan di server offline mana pun"
+                                  >
+                                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                                    Belum Digunakan
                                   </span>
                                 )}
                               </div>
 
-                              <div className="flex items-center gap-1 text-[10px] font-semibold text-slate-500">
-                                <ShieldCheck size={12} className="text-purple-600 shrink-0" />
-                                <span>{lic.version === "v2" ? "RSA-2048 Asimetris" : "SHA-256 Legasi"}</span>
-                              </div>
+                              {lic.status === "revoked" ? (
+                                <p className="text-[10px] text-rose-600 font-semibold">
+                                  Kill-switch aktif (DB aman)
+                                </p>
+                              ) : lic.is_used && lic.used_at ? (
+                                <div className="space-y-0.5">
+                                  <p className="text-[10px] text-slate-500 font-medium">
+                                    Aktif: {formatDateIndonesia(lic.used_at)}
+                                  </p>
+                                  {lic.activated_device ? (
+                                    <div
+                                      className="inline-flex items-center gap-1 text-[10px] text-purple-700 font-bold bg-purple-50 px-1.5 py-0.5 rounded border border-purple-200/80 max-w-fit"
+                                      title={`Terkunci pada perangkat: ${lic.activated_device}`}
+                                    >
+                                      <Laptop size={10} className="shrink-0" />
+                                      <span className="truncate max-w-[130px]">{lic.activated_device}</span>
+                                    </div>
+                                  ) : null}
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-1 text-[10px] font-semibold text-slate-500">
+                                  <ShieldCheck size={12} className="text-purple-600 shrink-0" />
+                                  <span>{lic.version === "v2" ? "RSA-2048 Asimetris" : "SHA-256 Legasi"}</span>
+                                </div>
+                              )}
                             </div>
                           </td>
 
@@ -798,7 +999,9 @@ export default function SuperAdminOfflineLicensesPage() {
                                 <span
                                   className={cn(
                                     "inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold shadow-2xs",
-                                    isExpired
+                                    lic.status === "revoked"
+                                      ? "bg-rose-100 text-rose-800 border border-rose-300"
+                                      : isExpired
                                       ? "bg-rose-50 text-rose-700 border border-rose-200/80"
                                       : exp.isExpiringSoon
                                       ? "bg-amber-50 text-amber-800 border border-amber-200/80"
@@ -806,7 +1009,7 @@ export default function SuperAdminOfflineLicensesPage() {
                                   )}
                                 >
                                   <Clock size={10} className="shrink-0" />
-                                  <span>{exp.text}</span>
+                                  <span>{lic.status === "revoked" ? "Lisensi Dicabut" : exp.text}</span>
                                 </span>
                               </div>
                               <p className="text-[10px] text-slate-400 mt-1">
@@ -869,6 +1072,25 @@ export default function SuperAdminOfflineLicensesPage() {
                                 >
                                   <MessageCircle size={13} />
                                 </button>
+                                {lic.status === "revoked" ? (
+                                  <button
+                                    onClick={() => handleToggleStatus(lic, "active")}
+                                    disabled={isTogglingStatus}
+                                    className="w-7 h-7 rounded-lg flex items-center justify-center text-emerald-600 hover:text-emerald-700 hover:bg-white hover:shadow-2xs transition-all"
+                                    title="Aktifkan Kembali Lisensi (Cabut Pemblokiran)"
+                                  >
+                                    <ShieldCheck size={13} />
+                                  </button>
+                                ) : (
+                                  <button
+                                    onClick={() => handleToggleStatus(lic, "revoked")}
+                                    disabled={isTogglingStatus}
+                                    className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-rose-600 hover:bg-white hover:shadow-2xs transition-all"
+                                    title="Nonaktifkan Key (Blokir Akses Server Offline)"
+                                  >
+                                    <ShieldAlert size={13} />
+                                  </button>
+                                )}
                                 <button
                                   onClick={() => handleOpenDeleteConfirm(lic)}
                                   className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-rose-600 hover:bg-white hover:shadow-2xs transition-all"
@@ -904,19 +1126,26 @@ export default function SuperAdminOfflineLicensesPage() {
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center justify-between gap-2">
                             <h4 className="font-bold text-slate-900 text-sm truncate">{lic.school_name}</h4>
-                            {isExpired ? (
-                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200 shrink-0">
-                                Kadaluarsa
-                              </span>
-                            ) : exp.isExpiringSoon ? (
-                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200 shrink-0">
-                                Segera Berakhir
-                              </span>
-                            ) : (
-                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 shrink-0">
-                                Aktif Sah
-                              </span>
-                            )}
+                            <div className="flex items-center gap-1 shrink-0">
+                              {lic.status === "revoked" ? (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300">
+                                  Diblokir
+                                </span>
+                              ) : lic.is_used ? (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                                  Sudah Digunakan
+                                </span>
+                              ) : (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                                  Belum Digunakan
+                                </span>
+                              )}
+                              {lic.status !== "revoked" && isExpired ? (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                                  Kadaluarsa
+                                </span>
+                              ) : null}
+                            </div>
                           </div>
                           <p className="text-xs font-mono text-purple-600 mt-0.5 truncate">{lic.slug}.examku.my.id</p>
                           {lic.npsn && (
@@ -945,10 +1174,16 @@ export default function SuperAdminOfflineLicensesPage() {
                           <span
                             className={cn(
                               "text-[10px] font-bold block",
-                              isExpired ? "text-rose-600" : exp.isExpiringSoon ? "text-amber-600" : "text-emerald-600"
+                              lic.status === "revoked"
+                                ? "text-rose-600 font-extrabold"
+                                : isExpired
+                                ? "text-rose-600"
+                                : exp.isExpiringSoon
+                                ? "text-amber-600"
+                                : "text-emerald-600"
                             )}
                           >
-                            {exp.text}
+                            {lic.status === "revoked" ? "Lisensi Dicabut" : exp.text}
                           </span>
                         </div>
                       </div>
@@ -1060,6 +1295,148 @@ export default function SuperAdminOfflineLicensesPage() {
                     <ShieldCheck size={13} /> RSA-2048 Asimetris (v2)
                   </p>
                 </div>
+              </div>
+
+              {/* Status Aktivasi & Penggunaan Server */}
+              <div
+                className={cn(
+                  "p-3.5 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs",
+                  activeLicenseDetail.is_used
+                    ? "bg-emerald-50/70 border-emerald-200/90 text-emerald-900"
+                    : "bg-amber-50/70 border-amber-200/90 text-amber-900"
+                )}
+              >
+                <div className="space-y-0.5">
+                  <div className="flex items-center gap-1.5 font-bold text-xs">
+                    {activeLicenseDetail.is_used ? (
+                      <>
+                        <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+                        <span>Status: Sudah Digunakan di Server Offline</span>
+                      </>
+                    ) : (
+                      <>
+                        <Clock size={16} className="text-amber-600 shrink-0" />
+                        <span>Status: Belum Digunakan (Siap Diaktivasi)</span>
+                      </>
+                    )}
+                  </div>
+                  <p className="text-[11px] opacity-80 leading-relaxed">
+                    {activeLicenseDetail.is_used
+                      ? `Diaktifkan pada ${formatDateTimeIndonesia(activeLicenseDetail.used_at || activeLicenseDetail.updated)}${activeLicenseDetail.activated_device ? ` • Perangkat: ${activeLicenseDetail.activated_device}` : ""}${activeLicenseDetail.activation_count ? ` • Total: ${activeLicenseDetail.activation_count}x` : ""}`
+                      : "Kode lisensi ini belum pernah diinput di server offline mana pun."}
+                  </p>
+                </div>
+
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={isTogglingUsed}
+                  onClick={() => handleToggleUsed(activeLicenseDetail, !activeLicenseDetail.is_used)}
+                  className={cn(
+                    "h-8 px-3 rounded-xl text-xs font-bold shrink-0 transition-all shadow-2xs flex items-center gap-1.5 self-start sm:self-center",
+                    activeLicenseDetail.is_used
+                      ? "border-amber-300 text-amber-900 bg-white hover:bg-amber-100/70"
+                      : "border-emerald-300 text-emerald-900 bg-white hover:bg-emerald-100/70"
+                  )}
+                >
+                  <RotateCcw size={12} className={cn(isTogglingUsed && "animate-spin")} />
+                  <span>
+                    {activeLicenseDetail.is_used ? "Reset Jadi Belum Digunakan" : "Tandai Sudah Digunakan"}
+                  </span>
+                </Button>
+              </div>
+
+              {/* Kunci Perangkat Fisik (Hardware ID Binding) */}
+              <div className="p-3.5 rounded-2xl border border-purple-200/90 bg-purple-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+                <div className="space-y-0.5 min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5 font-bold text-xs text-purple-950">
+                    <Laptop size={16} className="text-purple-600 shrink-0" />
+                    <span>
+                      Kunci Perangkat:{" "}
+                      {activeLicenseDetail.activated_device || "Belum Terkunci (Siap Binding)"}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 leading-relaxed">
+                    {activeLicenseDetail.activated_device
+                      ? "Lisensi ini terkunci khusus pada laptop server di atas. Jika folder diduplikat ke laptop lain, aplikasi otomatis menolak jalan. Klik tombol di samping jika sekolah resmi mengganti laptop server."
+                      : "Lisensi ini belum terikat ke laptop mana pun. Begitu pertama kali diaktivasi di server sekolah, sistem akan otomatis mengunci ke laptop tersebut."}
+                  </p>
+                </div>
+
+                {activeLicenseDetail.activated_device && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={isResettingDevice}
+                    onClick={() => handleResetDevice(activeLicenseDetail)}
+                    className="h-8 px-3 rounded-xl text-xs font-bold shrink-0 transition-all shadow-2xs border-purple-300 text-purple-700 bg-white hover:bg-purple-100 flex items-center gap-1.5 self-start sm:self-center"
+                    title="Buka kunci perangkat agar sekolah dapat memasang di laptop baru"
+                  >
+                    <RotateCcw size={12} className={cn(isResettingDevice && "animate-spin")} />
+                    <span>Reset Kunci Laptop</span>
+                  </Button>
+                )}
+              </div>
+
+              {/* Kontrol Kill-Switch Remote & Status Pemblokiran */}
+              <div
+                className={cn(
+                  "p-3.5 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs",
+                  activeLicenseDetail.status === "revoked"
+                    ? "bg-rose-50/80 border-rose-200/90 text-rose-950"
+                    : "bg-slate-50/80 border-slate-200/90 text-slate-800"
+                )}
+              >
+                <div className="space-y-0.5 min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5 font-bold text-xs">
+                    {activeLicenseDetail.status === "revoked" ? (
+                      <>
+                        <ShieldAlert size={16} className="text-rose-600 shrink-0" />
+                        <span className="text-rose-800">Lisensi Dinonaktifkan (Kill-Switch Aktif)</span>
+                      </>
+                    ) : (
+                      <>
+                        <ShieldCheck size={16} className="text-emerald-600 shrink-0" />
+                        <span className="text-slate-900">Status Lisensi: Aktif Sah</span>
+                      </>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-slate-500 leading-relaxed">
+                    {activeLicenseDetail.status === "revoked"
+                      ? "Server lokal sekolah akan langsung terkunci begitu terdeteksi online saat cek update atau ping. Database lokal (data.db) sekolah tetap aman dan tidak dirusak."
+                      : "Jika sekolah melanggar kebijakan, nonaktifkan lisensi ini. Saat server lokal mereka terhubung internet, sistem otomatis menghentikan akses ujian tanpa menghapus data bank soal mereka."}
+                  </p>
+                </div>
+
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={isTogglingStatus}
+                  onClick={() =>
+                    handleToggleStatus(
+                      activeLicenseDetail,
+                      activeLicenseDetail.status === "revoked" ? "active" : "revoked"
+                    )
+                  }
+                  className={cn(
+                    "h-8 px-3 rounded-xl text-xs font-bold shrink-0 transition-all shadow-2xs flex items-center gap-1.5 self-start sm:self-center",
+                    activeLicenseDetail.status === "revoked"
+                      ? "border-emerald-300 text-emerald-900 bg-white hover:bg-emerald-50"
+                      : "border-rose-300 text-rose-700 bg-white hover:bg-rose-50"
+                  )}
+                >
+                  {activeLicenseDetail.status === "revoked" ? (
+                    <>
+                      <ShieldCheck size={12} className={cn(isTogglingStatus && "animate-spin")} />
+                      <span>Aktifkan Kembali</span>
+                    </>
+                  ) : (
+                    <>
+                      <ShieldAlert size={12} className={cn(isTogglingStatus && "animate-spin")} />
+                      <span>Nonaktifkan Key (Blokir)</span>
+                    </>
+                  )}
+                </Button>
               </div>
 
               <div>

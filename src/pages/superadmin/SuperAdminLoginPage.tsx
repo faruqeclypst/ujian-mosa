@@ -166,10 +166,10 @@ const SuperAdminLoginPage = () => {
         <div className="mt-12 flex flex-col items-center gap-4 animate-in fade-in duration-1000 delay-500">
           <div className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-100 rounded-full shadow-sm">
             <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Server Protected by EXAM AA Shield</span>
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Server Protected by EXAMKU Shield</span>
           </div>
           <p className="text-slate-400 text-xs font-semibold">
-            &copy; {new Date().getFullYear()} EXAM AA SaaS Infrastructure
+            &copy; {new Date().getFullYear()} EXAMKU SaaS Infrastructure
           </p>
         </div>
       </div>

@@ -11,7 +11,7 @@ export const allFeaturesData = [
     icon: Shield,
     badge: "Android & iOS Terproteksi",
     title: "Anti-Curang Native: APK Android & iOS SEB",
-    summary: "Perangkat Android menggunakan aplikasi native APK EXAM AA dengan proteksi Kiosk, deteksi split-screen, dan sirine alarm volume kencang jika mencoba curang. Pengguna iPhone & iPad terintegrasi resmi dengan Safe Exam Browser (SEB). Keamanan selalu diperbarui secara berkala.",
+    summary: "Perangkat Android menggunakan aplikasi native APK EXAMKU dengan proteksi Kiosk, deteksi split-screen, dan sirine alarm volume kencang jika mencoba curang. Pengguna iPhone & iPad terintegrasi resmi dengan Safe Exam Browser (SEB). Keamanan selalu diperbarui secara berkala.",
     points: [
       "Aplikasi Native APK Kiosk Android dengan penguncian layar penuh tanpa celah",
       "Deteksi otomatis multi-window, split-screen, dan floating apps terlarang",
@@ -45,7 +45,7 @@ export const allFeaturesData = [
     icon: Wand2,
     badge: "Hemat Waktu Guru",
     title: "Pembuat Soal & Stimulus Otomatis dengan AI",
-    summary: "Cukup masukkan modul ajar atau dokumen materi, sistem AI cerdas EXAM AA akan otomatis merancang butir soal AKM/ANBK, bacaan stimulus literasi, kunci jawaban, dan rumus matematika KaTeX siap pakai dalam hitungan detik.",
+    summary: "Cukup masukkan modul ajar atau dokumen materi, sistem AI cerdas EXAMKU akan otomatis merancang butir soal AKM/ANBK, bacaan stimulus literasi, kunci jawaban, dan rumus matematika KaTeX siap pakai dalam hitungan detik.",
     points: [
       "Ekstraksi materi pelajaran langsung dari file modul ajar atau ringkasan dokumen",
       "Generator otomatis butir soal AKM/ANBK, pilihan ganda biasa & pilihan ganda kompleks",
@@ -157,11 +157,11 @@ const FeaturesPage = () => {
             className="flex items-center gap-3 cursor-pointer group"
           >
             <div className="w-9 h-9 rounded-xl bg-white border border-slate-200 p-1 flex items-center justify-center shadow-2xs group-hover:scale-105 transition-transform">
-              <img src="/logo-exam-aa.webp" alt="EXAM AA" className="w-full h-full object-contain" onError={(e) => { (e.target as HTMLImageElement).src = "/logo-exam-aa.png"; }} />
+              <img src="/logo-exam-aa.webp" alt="EXAMKU" className="w-full h-full object-contain" onError={(e) => { (e.target as HTMLImageElement).src = "/logo-exam-aa.png"; }} />
             </div>
             <div>
               <span className="font-extrabold text-slate-900 text-base sm:text-lg tracking-tight block leading-tight">
-                EXAM AA
+                EXAMKU
               </span>
               <span className="text-[11px] font-semibold text-blue-600 block leading-none">
                 Platform CBT Sekolah
@@ -196,7 +196,7 @@ const FeaturesPage = () => {
         </div>
         <h1 className="text-3xl sm:text-5xl font-black text-slate-900 tracking-tight leading-tight mb-4">
           Mengapa Guru & Sekolah <br />
-          <span className="text-blue-600">Memilih EXAM AA?</span>
+          <span className="text-blue-600">Memilih EXAMKU?</span>
         </h1>
         <p className="text-slate-600 text-sm sm:text-base leading-relaxed max-w-2xl mx-auto font-normal">
           Dirancang dari kebutuhan nyata guru di kelas dan panitia ujian di sekolah. Semua fitur praktis, siap pakai, dan mudah dipahami tanpa perlu instalasi rumit.
@@ -282,7 +282,7 @@ const FeaturesPage = () => {
       <section className="py-16 px-4 sm:px-6 bg-white border-t border-slate-200">
         <div className="max-w-4xl mx-auto bg-gradient-to-r from-blue-700 to-blue-800 rounded-3xl p-8 sm:p-12 text-white text-center shadow-xl shadow-blue-700/20 relative overflow-hidden">
           <h2 className="text-2xl sm:text-3xl font-extrabold mb-3">
-            Siap Menguji Coba EXAM AA di Sekolah Anda?
+            Siap Menguji Coba EXAMKU di Sekolah Anda?
           </h2>
           <p className="text-blue-100 text-xs sm:text-sm max-w-xl mx-auto mb-8 leading-relaxed font-normal">
             Dapatkan akses simulasi gratis hingga 50 siswa. Uji proteksi APK Kiosk, import naskah Word, dan rasakan kemudahan evaluasi digital.
@@ -314,9 +314,9 @@ const FeaturesPage = () => {
         <div className="max-w-4xl mx-auto flex flex-col items-center gap-4">
           <div className="flex items-center gap-2.5">
             <div className="w-7 h-7 rounded-lg bg-white border border-slate-200 p-1 flex items-center justify-center shadow-2xs">
-              <img src="/logo-exam-aa.webp" alt="EXAM AA" className="w-full h-full object-contain" onError={(e) => { (e.target as HTMLImageElement).src = "/logo-exam-aa.png"; }} />
+              <img src="/logo-exam-aa.webp" alt="EXAMKU" className="w-full h-full object-contain" onError={(e) => { (e.target as HTMLImageElement).src = "/logo-exam-aa.png"; }} />
             </div>
-            <span className="font-extrabold text-slate-900 text-sm tracking-tight">EXAM AA</span>
+            <span className="font-extrabold text-slate-900 text-sm tracking-tight">EXAMKU</span>
           </div>
 
           <div className="flex flex-wrap justify-center items-center gap-x-5 gap-y-1.5 text-xs text-slate-600 font-medium">
@@ -343,7 +343,7 @@ const FeaturesPage = () => {
           </div>
 
           <p className="text-xs text-slate-400">
-            © {new Date().getFullYear()} EXAM AA · Platform CBT Sekolah Indonesia. Dikembangkan oleh Alfaruq Asri.
+            © {new Date().getFullYear()} EXAMKU · Platform CBT Sekolah Indonesia. Dikembangkan oleh Alfaruq Asri.
           </p>
         </div>
       </footer>

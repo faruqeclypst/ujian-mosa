@@ -57,7 +57,7 @@ const LoginPage = () => {
 
         if (records.length > 0) {
           const data = records[0];
-          setSchoolName(data.name && data.name !== "EXAM AA CBT" ? data.name : (school?.name || "EXAM AA CBT"));
+          setSchoolName(data.name && data.name !== "EXAMKU CBT" ? data.name : (school?.name || "EXAMKU CBT"));
 
           let logoUrl = data.logoUrl || data.logo || "";
           if (logoUrl && !logoUrl.startsWith('http') && !logoUrl.startsWith('data:')) {
@@ -379,7 +379,7 @@ const LoginPage = () => {
       </motion.div>
 
       {/* Mandatory Change Password Dialog for Teachers */}
-      <Dialog open={!!(user && !user.hasChangedPassword)} onOpenChange={() => { }}>
+      <Dialog open={!!(user && !user.hasChangedPassword && user.role !== 'admin')} onOpenChange={() => { }}>
         <DialogContent className="sm:max-w-md bg-white dark:bg-slate-900 rounded-[32px] p-8 border-none shadow-2xl" onPointerDownOutside={(e) => e.preventDefault()}>
           <DialogHeader className="mb-6">
             <div className="w-16 h-16 bg-blue-50 dark:bg-blue-900/20 rounded-2xl flex items-center justify-center mb-4 mx-auto">

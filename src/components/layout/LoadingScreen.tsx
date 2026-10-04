@@ -14,7 +14,7 @@ const LoadingScreen = () => {
         />
       </div>
       <div className="flex flex-col items-center gap-2 relative z-10">
-        <p className="text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-[0.5em] animate-pulse">EXAM AA System</p>
+        <p className="text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-[0.5em] animate-pulse">EXAMKU System</p>
         <p className="text-[12px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Menyiapkan Dashboard...</p>
       </div>
     </div>

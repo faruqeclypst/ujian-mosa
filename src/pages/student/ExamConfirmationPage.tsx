@@ -8,6 +8,10 @@ import {
 } from "lucide-react";
 import { useTenant } from "../../context/TenantContext";
 
+import { Capacitor, registerPlugin } from "@capacitor/core";
+
+const CheatAlert = registerPlugin<any>("CheatAlert");
+
 interface ExamConfirmationPageProps {
   room: any;
   student: any;
@@ -29,6 +33,15 @@ export const ExamConfirmationPage: React.FC<ExamConfirmationPageProps> = ({
   const [isValidating, setIsValidating] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const triggerLockMode = () => {
+    if ((window as any).AndroidExam && typeof (window as any).AndroidExam.enableLockMode === "function") {
+      try { (window as any).AndroidExam.enableLockMode(); } catch (_) {}
+    }
+    if (Capacitor.isNativePlatform()) {
+      try { CheatAlert.enableLockMode(); } catch (_) {}
+    }
+  };
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -60,6 +73,7 @@ export const ExamConfirmationPage: React.FC<ExamConfirmationPageProps> = ({
       // 1. FAST-PATH: Cek token ruangan di memori (0ms delay)
       const localRoomToken = (room.token || "").toString().trim().toUpperCase().replace(/\s/g, "");
       if (localRoomToken && input === localRoomToken) {
+        triggerLockMode();
         sessionStorage.setItem("activeCBTRoomId", room.id);
         document.documentElement.requestFullscreen?.().catch(() => {});
         navigate("/cbt");
@@ -69,6 +83,7 @@ export const ExamConfirmationPage: React.FC<ExamConfirmationPageProps> = ({
       // 2. FAST-PATH: Cek universal master token di memori (0ms delay)
       const localUniversal = (universalToken || "").toString().trim().toUpperCase().replace(/\s/g, "");
       if (localUniversal && input === localUniversal) {
+        triggerLockMode();
         sessionStorage.setItem("activeCBTRoomId", room.id);
         document.documentElement.requestFullscreen?.().catch(() => {});
         navigate("/cbt");
@@ -107,6 +122,7 @@ export const ExamConfirmationPage: React.FC<ExamConfirmationPageProps> = ({
         throw new Error("Token ujian tidak cocok. Silakan periksa kembali.");
       }
 
+      triggerLockMode();
       sessionStorage.setItem("activeCBTRoomId", room.id);
       document.documentElement.requestFullscreen?.().catch(() => {});
       navigate("/cbt");

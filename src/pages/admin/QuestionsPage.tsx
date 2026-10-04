@@ -2470,6 +2470,8 @@ const QuestionsPage = () => {
   const uploadInlineBase64Images = async (html: string): Promise<string> => {
     if (!html || !html.includes("data:image")) return html;
 
+    const isOffline = school?.plan === "offline" || school?.id === "local_server" || (typeof window !== "undefined" && (/^(localhost|127\.|0\.0\.0\.0$|\[::1\])/.test(window.location.hostname) || /^(192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.)/.test(window.location.hostname)));
+
     const imgRegex = /<img[^>]+src="(data:image\/[^;]+;base64,[^"]+)"[^>]*>/g;
     let result = html;
     let match;
@@ -2491,11 +2493,22 @@ const QuestionsPage = () => {
           try { file = await compressImage(file); } catch { /* keep original */ }
         }
 
+        // 🛑 MODE OFFLINE: Simpan sebagai WebP Data URL terkompresi langsung, jangan sentuh Cloudflare
+        if (isOffline) {
+          const reader = new FileReader();
+          return new Promise<{ base64: string; url: string }>((resolve) => {
+            reader.onloadend = () => {
+              resolve({ base64: m.base64, url: reader.result as string });
+            };
+            reader.readAsDataURL(file);
+          });
+        }
+
         const schoolFolder = school?.slug || "unknown";
         const uploaded = await uploadInventoryImage(`schools/${schoolFolder}/exams/${examId}`, file);
         return { base64: m.base64, url: uploaded.url };
       } catch (err) {
-        console.warn("Gagal upload inline image ke R2:", err);
+        console.warn("Gagal upload inline image:", err);
         return null;
       }
     }));
@@ -2512,6 +2525,11 @@ const QuestionsPage = () => {
   // Helper to localize a single image URL (remote or base64) to our Cloudflare R2 bucket
   const localizeImage = async (url: string, filenamePrefix: string): Promise<string> => {
     if (!url) return "";
+
+    const isOffline = school?.plan === "offline" || school?.id === "local_server" || (typeof window !== "undefined" && (/^(localhost|127\.|0\.0\.0\.0$|\[::1\])/.test(window.location.hostname) || /^(192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.)/.test(window.location.hostname)));
+    if (isOffline) {
+      return url; // Di mode offline, jangan kontak Cloudflare
+    }
 
     // 1. If base64
     if (url.startsWith("data:image/")) {
@@ -2567,6 +2585,11 @@ const QuestionsPage = () => {
   // Helper to localize all remote image URLs inside HTML content
   const localizeInlineImages = async (html: string): Promise<string> => {
     if (!html) return html;
+
+    const isOffline = school?.plan === "offline" || school?.id === "local_server" || (typeof window !== "undefined" && (/^(localhost|127\.|0\.0\.0\.0$|\[::1\])/.test(window.location.hostname) || /^(192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.)/.test(window.location.hostname)));
+    if (isOffline) {
+      return html; // Di mode offline, jangan kontak Cloudflare
+    }
 
     // Find all <img src="..."> tags
     const imgRegex = /<img[^>]+src="([^"]+)"[^>]*>/g;

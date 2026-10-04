@@ -58,7 +58,7 @@ masterPb.autoCancellation(false);
 
 // ============================================================
 // SCHOOL PocketBase — Per-School Instance (Data Plane)
-// Setiap sekolah punya PocketBase sendiri dengan schema EXAM AA
+// Setiap sekolah punya PocketBase sendiri dengan schema EXAMKU
 // ============================================================
 const schoolPbCache = new Map<string, PocketBase>();
 

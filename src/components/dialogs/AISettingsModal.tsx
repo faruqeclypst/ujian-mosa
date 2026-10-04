@@ -117,7 +117,7 @@ export const AISettingsModal = ({ isOpen, onClose }: AISettingsModalProps) => {
         if (config) {
           await pb.collection("settings").update(config.id, payload);
         } else {
-          await pb.collection("settings").create({ ...payload, name: "EXAM AA" });
+          await pb.collection("settings").create({ ...payload, name: "EXAMKU" });
         }
 
         addToast({

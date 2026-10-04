@@ -1,6 +1,6 @@
 /**
  * invoicePdfHelper.ts
- * Generator Invoice Digital Resmi EXAM AA (Format Cetak / Simpan PDF)
+ * Generator Invoice Digital Resmi EXAMKU (Format Cetak / Simpan PDF)
  * Didesain khusus untuk keperluan akuntansi sekolah, pelaporan SPJ, dan dana BOS.
  */
 
@@ -393,7 +393,7 @@ export function printDigitalInvoice(inv: InvoiceData, school?: SchoolMeta | null
           <div class="brand-box">
             <div class="brand-logo">AA</div>
             <div class="brand-text">
-              <h1>EXAM AA</h1>
+              <h1>EXAMKU</h1>
               <p>Platform CBT & Evaluasi Akademik Sekolah Terdistribusi</p>
               <p style="font-size:10px; color:#94a3b8; margin-top:2px;">https://examku.my.id · billing@examku.my.id · WA: 0853-5990-7696</p>
             </div>
@@ -449,7 +449,7 @@ export function printDigitalInvoice(inv: InvoiceData, school?: SchoolMeta | null
             <tr>
               <td>1</td>
               <td>
-                <div class="item-title">Lisensi Langganan Platform CBT EXAM AA (${planLabel})</div>
+                <div class="item-title">Lisensi Langganan Platform CBT EXAMKU (${planLabel})</div>
                 <div class="item-desc">
                   Mencakup modul Bank Soal, Dukungan Rumus KaTeX, Jadwal Ruang Ujian, Sesi Token Dinamis, Aplikasi Android Exambro Anti-Curang, Pemantauan Proktor Realtime, dan Analisis Butir Soal untuk ${quotaText}.
                 </div>
@@ -495,7 +495,7 @@ export function printDigitalInvoice(inv: InvoiceData, school?: SchoolMeta | null
         <div class="bottom-section">
           <div class="terms-box">
             <p><strong>Ketentuan & Keterangan Resmi:</strong></p>
-            <p>1. Dokumen invoice digital ini sah dan diterbitkan secara elektronik oleh sistem EXAM AA.</p>
+            <p>1. Dokumen invoice digital ini sah dan diterbitkan secara elektronik oleh sistem EXAMKU.</p>
             <p>2. Invoice ini dapat dilampirkan sebagai dokumen tanda bukti tagihan dan pengeluaran keuangan sekolah (SPJ / Dana BOS / Komite Yayasan).</p>
             <p>3. Konfirmasi pelunasan tagihan diproses secara instan oleh sistem pembayaran QRIS & Virtual Account.</p>
           </div>
@@ -503,14 +503,14 @@ export function printDigitalInvoice(inv: InvoiceData, school?: SchoolMeta | null
             <div class="signature-title">Banda Aceh, ${createdDate}</div>
             ${isPaid ? `<div class="stamp-mark">✓ LUNAS VERIFIED</div>` : `<div class="stamp-mark">UNPAID TAGIHAN</div>`}
             <div style="height: 38px;"></div>
-            <div class="signature-name">Tim Billing & Keuangan EXAM AA</div>
+            <div class="signature-name">Tim Billing & Keuangan EXAMKU</div>
             <div class="signature-role">Tervalidasi Sistem Digital Resmi</div>
           </div>
         </div>
 
         <!-- ── Footer ── -->
         <div class="doc-footer">
-          <div>ID Transaksi: ${inv.id} · Cetak Otomatis Sistem EXAM AA</div>
+          <div>ID Transaksi: ${inv.id} · Cetak Otomatis Sistem EXAMKU</div>
           <div>Halaman 1 dari 1 (Dokumen Sah Tanpa Tanda Tangan Basah)</div>
         </div>
       </div>

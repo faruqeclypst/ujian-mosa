@@ -221,7 +221,7 @@ export const OfflineLicenseModal: React.FC<OfflineLicenseModalProps> = ({
       phoneParam = cleanPhone.startsWith("0") ? `62${cleanPhone.slice(1)}` : cleanPhone;
     }
 
-    const text = `Halo Bapak/Ibu Proktor *${activeName}*,\n\nBerikut adalah *Kode Lisensi Izin Server Mandiri (EXAM AA Offline CBT)* resmi dari Super Admin:\n\n*Sekolah:* ${activeName}\n*Subdomain:* ${activeSlug}.examku.my.id\n*Masa Aktif Server:* Sampai dengan ${validUntil}\n*Kapasitas Siswa:* Tanpa Batas Kuota (Mandiri)\n*Keperluan:* ${notes}\n\n*Kode Lisensi Resmi (RSA-2048):*\n\`\`\`${generatedLicense}\`\`\`\n\n*Panduan Aktivasi:*\n1. Buka dashboard server CBT di komputer proktor laboratorium sekolah.\n2. Buka menu Pengaturan atau halaman Aktivasi Server Offline.\n3. Tempelkan kode lisensi di atas lalu klik Aktifkan.\n\nSelamat melaksanakan kegiatan ujian dengan lancar.`;
+    const text = `Halo Bapak/Ibu Proktor *${activeName}*,\n\nBerikut adalah *Kode Lisensi Izin Server Mandiri (EXAMKU Offline CBT)* resmi dari Super Admin:\n\n*Sekolah:* ${activeName}\n*Subdomain:* ${activeSlug}.examku.my.id\n*Masa Aktif Server:* Sampai dengan ${validUntil}\n*Kapasitas Siswa:* Tanpa Batas Kuota (Mandiri)\n*Keperluan:* ${notes}\n\n*Kode Lisensi Resmi (RSA-2048):*\n\`\`\`${generatedLicense}\`\`\`\n\n*Panduan Aktivasi:*\n1. Buka dashboard server CBT di komputer proktor laboratorium sekolah.\n2. Buka menu Pengaturan atau halaman Aktivasi Server Offline.\n3. Tempelkan kode lisensi di atas lalu klik Aktifkan.\n\nSelamat melaksanakan kegiatan ujian dengan lancar.`;
 
     const targetUrl = phoneParam
       ? `https://wa.me/${phoneParam}?text=${encodeURIComponent(text)}`

@@ -153,7 +153,7 @@ export const CustomBrowserPage: React.FC = () => {
             <Globe size={28} />
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-white">
-            EXAM AA Browser
+            EXAMKU Browser
           </h1>
           <p className="text-xs text-slate-400 max-w-xs mx-auto leading-relaxed">
             Kiosk browser ujian aman untuk Google Forms, Quizizz, dan CBT web dengan kuncian layar penuh.
