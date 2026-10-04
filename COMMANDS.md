@@ -4,6 +4,27 @@ Dokumen ini merangkum seluruh perintah operasional, otomatisasi build, deploy, s
 
 ---
 
+## 📌 Kontrol Versi 1 Gerbang (Single Gate Versioning)
+
+Untuk mengubah versi sistem di **SELURUH** komponen sekaligus dalam 1 perintah (`package.json`, badge UI Web, `build.gradle` APK Android, `version.json` CDN, dan hook offline update):
+
+```bash
+npm run version:set <versi_baru> [--notes "Catatan Rilis"]
+```
+
+Contoh:
+```bash
+npm run version:set 1.1.2
+# atau
+npm run version:set 1.2.0 --notes "Peningkatan stabilitas dan fitur baru"
+```
+
+Setelah gerbang versi di-set, cukup lanjutkan dengan rilis:
+- `npm run release:all` (Rilis penuh: Web + VPS + Tenants + Offline + APK)
+- `npm run release:quick` (Rilis cepat: Web + VPS + Tenants + Offline tanpa APK)
+
+---
+
 ## 🚀 0. Rilis Master Serentak (All-in-One Master Release)
 
 Jika Anda memiliki pembaruan dan ingin memperbarui **semua komponen sekaligus dalam 1 perintah** (Web frontend, VPS Master, Hooks backend, Sync seluruh tenant sekolah aktif, Paket Offline 1-Click Update, APK Android, dan Purge Cloudflare):

@@ -2,7 +2,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'com.alfaruqasri.ujian',
-  appName: 'EXAM AA',
+  appName: 'EXAMKU',
   webDir: 'dist-shell',
   server: {
     androidScheme: 'https',

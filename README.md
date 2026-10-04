@@ -90,8 +90,9 @@ Sistem ini didesain menggunakan ekosistem teknologi modern dengan efisiensi ting
 ├── android                 # Proyek Native Android (Capacitor wrapper)
 ├── configs                 # Konfigurasi tambahan deployment & build
 ├── pb_hooks                # Custom Go/JS hooks backend PocketBase
-├── pocketbase-schema       # Skema koleksi database PocketBase (JSON)
-├── public                  # Aset statis public (logo, favicon)
+├── vps                     # Template database sekolah, hook VPS multi-tenant, dan skrip provisioning
+├── offline_package         # Paket server CBT offline mandiri untuk lab sekolah
+├── public                  # Aset statis public (logo, favicon, template Word)
 ├── scripts                 # Script utilitas (e.g. switch environment)
 ├── src
 │   ├── components          # Komponen reusable (form, modal, UI shadcn, tabel)

@@ -1,6 +1,6 @@
 {
   "id": "com.alfaruqasri.ujian.browser",
-  "name": "EXAM AA Browser",
+  "name": "EXAMKU Browser",
   "webDir": "dist-browser",
   "targetApk": "exam-aa-browser-latest.apk",
   "vpsLink": "exam-aa-browser-latest"

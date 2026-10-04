@@ -91,19 +91,42 @@ public class MainActivity extends BridgeActivity {
         public boolean isNative() {
             return true;
         }
+
+        @android.webkit.JavascriptInterface
+        public String getDeviceIpAddress() {
+            try {
+                java.util.List<java.net.NetworkInterface> interfaces = java.util.Collections.list(java.net.NetworkInterface.getNetworkInterfaces());
+                for (java.net.NetworkInterface intf : interfaces) {
+                    if (intf.isLoopback() || !intf.isUp()) continue;
+                    java.util.List<java.net.InetAddress> addrs = java.util.Collections.list(intf.getInetAddresses());
+                    for (java.net.InetAddress addr : addrs) {
+                        if (!addr.isLoopbackAddress() && addr instanceof java.net.Inet4Address) {
+                            String sAddr = addr.getHostAddress();
+                            if (sAddr != null && !sAddr.isEmpty() && !sAddr.startsWith("127.")) {
+                                return sAddr;
+                            }
+                        }
+                    }
+                }
+            } catch (Exception ignored) {}
+            return "";
+        }
     }
 
     public static volatile boolean isScreenOff = false;
     public static volatile long lastScreenOffTime = 0;
     public static volatile long lastScreenOnTime = 0;
+    public static volatile boolean isPinningRequested = false;
+    public static volatile long pinningRequestTime = 0;
+    public static volatile boolean isManualAlarmActive = false;
     private android.content.BroadcastReceiver screenReceiver;
 
     private Runnable alarmRunnable = new Runnable() {
         @Override
         public void run() {
-            if (isAlarmPlaying && isLockEnabled && !isFinishing() && !isExiting) {
+            if (isAlarmPlaying && !isFinishing() && !isExiting) {
                 playTone();
-                alarmHandler.postDelayed(this, 600);
+                alarmHandler.postDelayed(this, 550);
             } else {
                 isAlarmPlaying = false;
             }
@@ -328,42 +351,26 @@ public class MainActivity extends BridgeActivity {
         return false;
     }
 
-    // Coba sematkan layar. Jika belum berhasil, retry setiap 2 detik (maks 5 kali).
+    // Coba sematkan layar sekali secara halus tanpa spam dialog sistem
     public void triggerKioskPinning() {
-        triggerKioskPinningWithRetry(0);
-    }
-
-    private static final int MAX_PINNING_RETRIES = 5;
-
-    private void triggerKioskPinningWithRetry(final int attempt) {
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
                 if (isFinishing() || isExiting) return;
                 if (isDevicePinned()) {
-                    Log.d(TAG, "triggerKioskPinning: sudah terkunci (attempt=" + attempt + ")");
+                    Log.d(TAG, "triggerKioskPinning: sudah terkunci");
                     return;
                 }
                 try {
                     ActivityManager am = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
                     if (am != null && am.getLockTaskModeState() == ActivityManager.LOCK_TASK_MODE_NONE) {
-                        Log.d(TAG, "Memicu startLockTask() (attempt=" + attempt + ")");
+                        Log.d(TAG, "Memicu startLockTask() sekali");
+                        isPinningRequested = true;
+                        pinningRequestTime = System.currentTimeMillis();
                         startLockTask();
                     }
                 } catch (Exception e) {
-                    Log.e(TAG, "startLockTask gagal (attempt=" + attempt + "): " + e.getMessage());
-                }
-                // Setelah 2 detik, cek apakah sudah ter-pin. Jika belum, retry.
-                if (attempt < MAX_PINNING_RETRIES) {
-                    handler.postDelayed(new Runnable() {
-                        @Override
-                        public void run() {
-                            if (!isFinishing() && !isExiting && !isDevicePinned()) {
-                                Log.w(TAG, "Belum terkunci setelah 2s, retry ke-" + (attempt + 1));
-                                triggerKioskPinningWithRetry(attempt + 1);
-                            }
-                        }
-                    }, 2000);
+                    Log.w(TAG, "startLockTask tidak tersedia atau ditolak sistem: " + e.getMessage());
                 }
             }
         });
@@ -388,11 +395,18 @@ public class MainActivity extends BridgeActivity {
             public void run() {
                 Log.d(TAG, "enableLockModeInternal: Kuncian diaktifkan");
                 triggerKioskPinning();
-                try {
-                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
-                        getWindow().setHideOverlayWindows(true);
-                    }
-                } catch (Exception e) {}
+                applyOverlayProtection();
+                if (isGameModeActive()) {
+                    Log.w(TAG, "PERINGATAN: Perangkat menjalankan Mode Game saat ujian!");
+                    try {
+                        if (getBridge() != null && getBridge().getWebView() != null) {
+                            getBridge().getWebView().evaluateJavascript(
+                                "window.dispatchEvent(new CustomEvent('appGameModeDetected', { detail: { active: true } }));",
+                                null
+                            );
+                        }
+                    } catch (Exception e) {}
+                }
                 startRepeatingCheck();
             }
         });
@@ -1124,20 +1138,20 @@ public class MainActivity extends BridgeActivity {
         android.widget.TextView title = new android.widget.TextView(this);
         title.setText("AKSES DIBLOKIR");
         title.setTextColor(android.graphics.Color.WHITE);
-        title.setTextSize(28);
+        title.setTextSize(26);
         title.setGravity(android.view.Gravity.CENTER);
         title.setTypeface(null, android.graphics.Typeface.BOLD);
-        title.setPadding(0, 0, 0, 40);
+        title.setPadding(0, 0, 0, 30);
 
         android.widget.TextView desc = new android.widget.TextView(this);
-        desc.setText("Demi keamanan ujian, aplikasi ini wajib menggunakan mode 'Sematkan Layar'.\n\nSilakan klik tombol di bawah untuk mengaktifkan kuncian.\n\nUntuk keluar ujian, gunakan tombol menu di pojok kanan bawah.");
+        desc.setText("Aplikasi terdeteksi beralih atau keluar dari layar ujian.\n\nSilakan klik tombol di bawah untuk kembali melanjutkan ujian.");
         desc.setTextColor(android.graphics.Color.WHITE);
-        desc.setTextSize(16);
+        desc.setTextSize(15);
         desc.setGravity(android.view.Gravity.CENTER);
-        desc.setPadding(0, 0, 0, 80);
+        desc.setPadding(0, 0, 0, 50);
 
         android.widget.Button btn = new android.widget.Button(this);
-        btn.setText("AKTIFKAN MODE KUNCI");
+        btn.setText("LANJUTKAN UJIAN");
         btn.setBackgroundColor(android.graphics.Color.WHITE);
         btn.setTextColor(android.graphics.Color.parseColor("#E11D48"));
         btn.setPadding(40, 20, 40, 20);
@@ -1145,13 +1159,12 @@ public class MainActivity extends BridgeActivity {
             @Override
             public void onClick(View v) {
                 try {
-                    startLockTask();
-                    handler.postDelayed(new Runnable() {
-                        @Override
-                        public void run() {
-                            checkLockTaskOnly();
-                        }
-                    }, 400);
+                    stopRingtone();
+                    if (blockingLayout != null) {
+                        blockingLayout.setVisibility(View.GONE);
+                    }
+                    makeFullScreen();
+                    triggerKioskPinning();
                 } catch (Exception e) {}
             }
         });
@@ -1264,7 +1277,7 @@ public class MainActivity extends BridgeActivity {
                         if (blockingLayout != null && blockingLayout.getVisibility() != View.GONE) {
                             blockingLayout.setVisibility(View.GONE);
                         }
-                        if (previousState == ActivityManager.LOCK_TASK_MODE_NONE) {
+                        if (previousState == ActivityManager.LOCK_TASK_MODE_NONE && !isManualAlarmActive) {
                             stopRingtone();
                         }
                     }
@@ -1277,23 +1290,6 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     public boolean dispatchTouchEvent(android.view.MotionEvent ev) {
-        if (isLockEnabled && !isExiting) {
-            int flags = ev.getFlags();
-            boolean isObscured = (flags & android.view.MotionEvent.FLAG_WINDOW_IS_OBSCURED) != 0;
-            boolean isPartiallyObscured = false;
-            if (android.os.Build.VERSION.SDK_INT >= 29) {
-                isPartiallyObscured = (flags & android.view.MotionEvent.FLAG_WINDOW_IS_PARTIALLY_OBSCURED) != 0;
-            }
-
-            if (isObscured || isPartiallyObscured) {
-                Log.w(TAG, "dispatchTouchEvent: Sentuhan dihalangi oleh floating app/overlay pihak ketiga! Memblokir...");
-                playRingtone();
-                if (blockingLayout != null) {
-                    blockingLayout.setVisibility(View.VISIBLE);
-                }
-                return true;
-            }
-        }
         return super.dispatchTouchEvent(ev);
     }
 
@@ -1358,29 +1354,12 @@ public class MainActivity extends BridgeActivity {
                 });
             }
         } else {
-            try {
-                if (!isExiting && isLockEnabled) {
-                    sendBroadcast(new android.content.Intent(android.content.Intent.ACTION_CLOSE_SYSTEM_DIALOGS));
-                }
-            } catch (Exception e) {}
-
             if (isLockEnabled && !isExiting && !isMenuDialogOpen) {
-                android.os.PowerManager pm = (android.os.PowerManager) getSystemService(Context.POWER_SERVICE);
-                boolean isInteractive = (pm != null) && pm.isInteractive();
-
-                if (isInteractive && !isScreenOff) {
-                    Log.w(TAG, "onWindowFocusChanged(false): Fokus jendela hilang saat layar aktif -> Floating app / Split screen / Notifikasi!");
-                    playRingtone();
-                    if (blockingLayout != null) {
-                        blockingLayout.setVisibility(View.VISIBLE);
-                    }
-                    try {
-                        android.content.Intent bringToFront = new android.content.Intent(this, MainActivity.class);
-                        bringToFront.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK | 
-                                               android.content.Intent.FLAG_ACTIVITY_REORDER_TO_FRONT | 
-                                               android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP);
-                        startActivity(bringToFront);
-                    } catch (Exception e) {}
+                // JIKA ini terjadi karena dialog sistem "Sematkan layar?" sedang muncul ke layar,
+                // JANGAN DIBLOKIR / JANGAN BRING TO FRONT / JANGAN CLOSE DIALOG / JANGAN BUNYIKAN ALARM!
+                if (isPinningRequested && (System.currentTimeMillis() - pinningRequestTime < 20000)) {
+                    Log.d(TAG, "onWindowFocusChanged(false): Dialog sistem Sematkan Layar sedang aktif, memberi ruang bagi siswa untuk memilih.");
+                    return;
                 }
 
                 // Beri tahu WebView bahwa fokus jendela hilang (CBTPage menangani countdown 5s & cek layar mati)
@@ -1438,14 +1417,16 @@ public class MainActivity extends BridgeActivity {
     }
 
     public void playRingtone() {
-        if (!isLockEnabled || isFinishing() || isExiting) return;
+        if (isFinishing() || isExiting) return;
         if (isAlarmPlaying) return; 
         isAlarmPlaying = true;
+        alarmHandler.removeCallbacks(alarmRunnable);
         alarmHandler.post(alarmRunnable);
     }
 
     public void stopRingtone() {
         isAlarmPlaying = false;
+        isManualAlarmActive = false;
         alarmHandler.removeCallbacks(alarmRunnable);
         try {
             if (toneGenerator != null) {
@@ -1461,7 +1442,7 @@ public class MainActivity extends BridgeActivity {
     }
 
     private void playTone() {
-        if (!isLockEnabled || isFinishing() || isExiting) return;
+        if (!isAlarmPlaying || isFinishing() || isExiting) return;
         try {
             android.media.AudioManager am = (android.media.AudioManager) getSystemService(Context.AUDIO_SERVICE);
             if (am != null) {
@@ -1472,14 +1453,15 @@ public class MainActivity extends BridgeActivity {
             if (toneGenerator == null) {
                 toneGenerator = new android.media.ToneGenerator(android.media.AudioManager.STREAM_ALARM, 100);
             }
-            toneGenerator.startTone(android.media.ToneGenerator.TONE_SUP_ERROR, 400);
+            // Suara alarm 1 jenis (TONE_SUP_ERROR) seperti awal
+            toneGenerator.startTone(android.media.ToneGenerator.TONE_SUP_ERROR, 350);
 
             android.os.Vibrator v = (android.os.Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
             if (v != null && v.hasVibrator()) {
                 if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                    v.vibrate(android.os.VibrationEffect.createOneShot(400, android.os.VibrationEffect.DEFAULT_AMPLITUDE));
+                    v.vibrate(android.os.VibrationEffect.createOneShot(350, android.os.VibrationEffect.DEFAULT_AMPLITUDE));
                 } else {
-                    v.vibrate(400);
+                    v.vibrate(350);
                 }
             }
         } catch (Exception e) {
@@ -1490,7 +1472,7 @@ public class MainActivity extends BridgeActivity {
     private int cachedCutoutTop = -1;
 
     public int getTopCutoutHeight() {
-        if (cachedCutoutTop > 0) {
+        if (cachedCutoutTop >= 0) {
             return cachedCutoutTop;
         }
         int top = 0;
@@ -1506,21 +1488,9 @@ public class MainActivity extends BridgeActivity {
             }
         } catch (Exception e) {}
 
-        // Fallback: Jika DisplayCutout bernilai 0 (misal di beberapa perangkat OEM atau status bar tersembunyi),
-        // gunakan tinggi fisik status bar agar web tetap pasti berada di bawah notch kamera
-        if (top <= 0) {
-            try {
-                int resourceId = getResources().getIdentifier("status_bar_height", "dimen", "android");
-                if (resourceId > 0) {
-                    top = getResources().getDimensionPixelSize(resourceId);
-                }
-            } catch (Exception e) {}
-        }
-
-        if (top > 0) {
-            cachedCutoutTop = top;
-        }
-        return top;
+        // Gunakan tinggi fisik cutout notch jika ada; jika tidak ada notch (top == 0), biarkan 0
+        cachedCutoutTop = Math.max(0, top);
+        return cachedCutoutTop;
     }
 
     public void applyNotchToWebView() {
@@ -1553,9 +1523,38 @@ public class MainActivity extends BridgeActivity {
         applyNotchToWebView();
     }
 
+    public void applyOverlayProtection() {
+        try {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                getWindow().setHideOverlayWindows(true);
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Gagal setHideOverlayWindows: " + e.getMessage());
+        }
+    }
+
+    public boolean isGameModeActive() {
+        try {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                android.app.GameManager gm = (android.app.GameManager) getSystemService(Context.GAME_SERVICE);
+                if (gm != null) {
+                    int mode = gm.getGameMode();
+                    if (mode != android.app.GameManager.GAME_MODE_UNSUPPORTED) {
+                        Log.w(TAG, "Game Mode terdeteksi aktif pada perangkat (mode=" + mode + ")");
+                        return true;
+                    }
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error checking Game Mode", e);
+        }
+        return false;
+    }
+
     private void makeFullScreen() {
         if (isFinishing() || isExiting) return;
         try {
+            applyOverlayProtection();
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
                 WindowManager.LayoutParams lp = getWindow().getAttributes();
                 if (lp.layoutInDisplayCutoutMode != WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES) {
@@ -1619,7 +1618,7 @@ public class MainActivity extends BridgeActivity {
         // BLOKIR TOTAL! SAMA SEKALI JANGAN panggil getWebView().goBack() atau finish()!
         if (isLockEnabled || isInCbt) {
             Log.d(TAG, "Mencegah tombol / gesture back saat ujian aktif (isLockEnabled=" + isLockEnabled + ", isInCbt=" + isInCbt + ")");
-            android.widget.Toast.makeText(this, "Tombol Kembali dinonaktifkan demi keamanan ujian", android.widget.Toast.LENGTH_SHORT).show();
+            // JANGAN tampilkan notifikasi toast apapun agar tidak mengganggu konsentrasi ujian siswa
             return;
         }
 

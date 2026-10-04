@@ -54,6 +54,17 @@ public class CheatAlert extends Plugin {
     }
 
     @PluginMethod
+    public void getLockState(PluginCall call) {
+        MainActivity act = getMainActivity();
+        int state = (act != null) ? act.getLockStateInternal() : 0;
+        JSObject ret = new JSObject();
+        // state: 0=none, 1=pinned, 2=locked
+        ret.put("state", state);
+        ret.put("isPinned", state != 0);
+        call.resolve(ret);
+    }
+
+    @PluginMethod
     public void disableLockForUpdate(PluginCall call) {
         Log.d(TAG, "disableLockForUpdate called from JS");
         MainActivity act = getMainActivity();
@@ -68,6 +79,7 @@ public class CheatAlert extends Plugin {
         Log.d(TAG, "startAlarm called from JS");
         MainActivity act = getMainActivity();
         if (act != null) {
+            MainActivity.isManualAlarmActive = true;
             act.playRingtone();
         }
         call.resolve();
@@ -78,9 +90,22 @@ public class CheatAlert extends Plugin {
         Log.d(TAG, "stopAlarm called from JS");
         MainActivity act = getMainActivity();
         if (act != null) {
+            MainActivity.isManualAlarmActive = false;
             act.stopRingtone();
         }
         call.resolve();
+    }
+
+    @PluginMethod
+    public void checkGameMode(PluginCall call) {
+        MainActivity act = getMainActivity();
+        JSObject ret = new JSObject();
+        boolean isGameMode = false;
+        if (act != null) {
+            isGameMode = act.isGameModeActive();
+        }
+        ret.put("isGameMode", isGameMode);
+        call.resolve(ret);
     }
 
     @PluginMethod

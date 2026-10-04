@@ -13,7 +13,27 @@ Before starting, ask the user when antislop applies: during the work, or after i
 ## Deployment & Operations Guidelines
 When deploying or syncing changes, always follow these rules and refer to [COMMANDS.md](file:///d:/PROJECT/ujian/COMMANDS.md):
 
-### 0. All-in-One Master Release
+### 0. Single-Gate Version Management (WAJIB DIIKUTI)
+- **JANGAN PERNAH** mengedit versi secara manual di file terpisah (`package.json`, `build.gradle`, `version.ts`, `version.json`, dll).
+- **Kapan AI Agent Harus Menaikkan Versi (*version bump*)**:
+  1. Pengguna meminta rilis/update baru (misal: "rilis versi baru", "build ulang semua", "update aplikasi", "naikkan ke versi x.x.x").
+  2. Ada fitur baru, perbaikan bug krusial, atau patch keamanan yang dirilis ke produksi dan membutuhkan pembaruan di sisi klien (Web, Android APK, atau Offline Server 1-Click Update).
+  3. Sebelum menjalankan `npm run release:all` atau `npm run release:quick` jika deployment tersebut diniatkan sebagai rilis versi baru.
+- **Perintah 1 Gerbang**:
+  ```bash
+  npm run version:set <versi_baru> [--notes "Catatan Rilis"]
+  ```
+  Contoh: `npm run version:set 1.1.2` atau `npm run version:set 1.2.0 --notes "Peningkatan stabilitas dan proteksi kiosk"`
+- **6 Gerbang yang Otomatis Disinkronkan**:
+  1. `package.json` (`"version"`)
+  2. `src/utils/version.ts` (`APP_VERSION` & `APP_DISPLAY_VERSION` untuk seluruh UI Web)
+  3. `android/app/build.gradle` (`versionName` disinkronkan & `versionCode` otomatis naik +1)
+  4. `public/version.json` & `offline_package/version.json` (metadata CDN & paket offline)
+  5. `pb_hooks/offline_update.pb.js` & template hooks sekolah (versi fallback backend)
+  6. `scripts/release-all.js` (konstanta fallback rilis)
+- Setelah versi di-set dengan `npm run version:set`, baru lanjutkan dengan alur rilis: `npm run release:all` atau `npm run release:quick`.
+
+### 1. All-in-One Master Release
 - Run `npm run release:all` to build and deploy everything in 1 single command:
   - Compiles frontend web (`dist/`)
   - Deploys web dist to Master VPS (`64.235.41.108`)

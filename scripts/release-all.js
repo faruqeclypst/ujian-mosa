@@ -67,7 +67,7 @@ try {
   // Tulis version.json
   const pkg = JSON.parse(fs.readFileSync('package.json', 'utf-8'));
   const versionData = {
-    version: pkg.version || '1.1.3',
+    version: pkg.version || '1.1.4',
     release_date: dateStr,
     timestamp: now.toISOString(),
     notes: 'Rilis Resmi v1.1.1: Pembaruan terpadu seluruh sistem (Web, APK Android, Template VPS, dan Paket Offline).'

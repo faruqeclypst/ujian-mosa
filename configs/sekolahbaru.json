@@ -1,6 +1,6 @@
 {
   "id": "com.sekolahbaru.ujian",
-  "name": "EXAM AA Sekolah Baru",
+  "name": "EXAMKU Sekolah Baru",
   "serverUrl": "https://ujian.sekolahbaru.sch.id",
   "vpsDir": "/home/ujian-sekolahbaru"
 }

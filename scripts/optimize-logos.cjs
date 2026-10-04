@@ -98,46 +98,13 @@ async function main() {
   const greenBannerWebp = await resizeImage(greenLogo, 800, 288, 'webp', 0.88);
   saveBase64(greenBannerWebp, path.join(publicDir, 'logo-cbt-browser.webp'));
 
-  console.log('\n📱 2. Menyiapkan Aset Ikon Android (Mipmap WebP)...');
-  const mipmaps = [
-    { dir: 'mipmap-mdpi', size: 48 },
-    { dir: 'mipmap-hdpi', size: 72 },
-    { dir: 'mipmap-xhdpi', size: 96 },
-    { dir: 'mipmap-xxhdpi', size: 144 },
-    { dir: 'mipmap-xxxhdpi', size: 192 },
-  ];
-
-  // Simpan preset ikon untuk EXAM AA (Blue) dan Browser (Green)
-  const androidResDir = path.join(__dirname, '..', 'android', 'app', 'src', 'main', 'res');
-  const presetsDir = path.join(__dirname, '..', 'configs', 'app-icons');
-
-  for (const m of mipmaps) {
-    // Generate Blue Icons (EXAM AA)
-    const blueIconWebp = await resizeImage(blueIcon, m.size, m.size, 'webp', 0.9);
-    saveBase64(blueIconWebp, path.join(presetsDir, 'examaa', m.dir, 'ic_launcher.webp'));
-    saveBase64(blueIconWebp, path.join(presetsDir, 'examaa', m.dir, 'ic_launcher_round.webp'));
-    saveBase64(blueIconWebp, path.join(presetsDir, 'examaa', m.dir, 'ic_launcher_foreground.webp'));
-
-    // Terapkan langsung ke android res saat ini (default examaa)
-    saveBase64(blueIconWebp, path.join(androidResDir, m.dir, 'ic_launcher.webp'));
-    saveBase64(blueIconWebp, path.join(androidResDir, m.dir, 'ic_launcher_round.webp'));
-    saveBase64(blueIconWebp, path.join(androidResDir, m.dir, 'ic_launcher_foreground.webp'));
-
-    // Generate Green Icons (Browser)
-    const greenIconWebp = await resizeImage(greenIcon, m.size, m.size, 'webp', 0.9);
-    saveBase64(greenIconWebp, path.join(presetsDir, 'browser', m.dir, 'ic_launcher.webp'));
-    saveBase64(greenIconWebp, path.join(presetsDir, 'browser', m.dir, 'ic_launcher_round.webp'));
-    saveBase64(greenIconWebp, path.join(presetsDir, 'browser', m.dir, 'ic_launcher_foreground.webp'));
-  }
-
-  // Splash screen drawable (512x512 PNG)
-  console.log('\n🎨 3. Menyiapkan Splash Screen Android...');
-  const splashPng = await resizeImage(blueIcon, 512, 512, 'png');
-  saveBase64(splashPng, path.join(androidResDir, 'drawable', 'splash.png'));
-  saveBase64(splashPng, path.join(presetsDir, 'examaa', 'splash.png'));
-
-  const splashGreenPng = await resizeImage(greenIcon, 512, 512, 'png');
-  saveBase64(splashGreenPng, path.join(presetsDir, 'browser', 'splash.png'));
+  console.log('\n📱 2. Menyiapkan Aset Ikon & Splash Screen Android (Adaptive 108dp & Legacy 48dp)...');
+  const { execSync } = require('child_process');
+  const pyScript = path.join(__dirname, 'generate-app-icons.py');
+  const pyExe = fs.existsSync('C:\\Users\\Admin\\AppData\\Local\\Programs\\Python\\Python313\\python.exe')
+    ? 'C:\\Users\\Admin\\AppData\\Local\\Programs\\Python\\Python313\\python.exe'
+    : 'python';
+  execSync(`"${pyExe}" "${pyScript}"`, { stdio: 'inherit' });
 
   // Hapus 6 file mentahan raksasa dari public/ agar tidak membengkakkan dist/
   console.log('\n🧹 4. Membersihkan file mentahan besar dari public/...');

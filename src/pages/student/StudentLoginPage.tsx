@@ -8,7 +8,8 @@ import { Card, CardContent } from "../../components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../../components/ui/dialog";
 import { useTenant } from "../../context/TenantContext";
 import { useTheme } from "../../context/ThemeContext";
-import { User, Lock, GraduationCap, School, Eye, EyeOff, Sun, Moon } from "lucide-react";
+import { User, Lock, GraduationCap, School, Eye, EyeOff, Sun, Moon, HardDrive, Globe } from "lucide-react";
+import { isLocalServer } from "../landing/SelectSchoolPage";
 
 const StudentLoginPage = () => {
   const { student, loginStudent, changePassword } = useStudentAuth();
@@ -118,14 +119,14 @@ const StudentLoginPage = () => {
 
   return (
     <div className="flex flex-col items-center justify-center min-h-[100dvh] overflow-y-auto bg-[#f8fafc] dark:bg-[#020617] relative font-sans leading-relaxed px-4 py-8">
-      {/* Floating Change School Button (Android Only) */}
-      {Capacitor.getPlatform() === 'android' && (
+      {/* Floating Change School Button */}
+      {(Capacitor.isNativePlatform() || window.location.hostname === 'localhost' || (school && isLocalServer(school)) || (typeof window !== 'undefined' && localStorage.getItem('selected_school_slug'))) && (
         <div className="absolute top-[max(1.5rem,calc(env(safe-area-inset-top,0px)+1rem))] left-6 z-50">
           <button
             onClick={() => setManualSchool(null)}
-            className="flex items-center gap-2 px-4 py-2 bg-white/90 border border-slate-200 rounded-full text-sm font-semibold text-slate-600 hover:text-emerald-600 hover:border-emerald-200 transition-colors shadow-sm"
+            className="flex items-center gap-2 px-3.5 py-1.5 bg-white/90 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-full text-xs font-bold text-slate-600 dark:text-slate-300 hover:text-emerald-600 hover:border-emerald-200 dark:hover:border-emerald-900 transition-colors shadow-sm"
           >
-            <School size={16} />
+            <School size={15} />
             <span>Ganti Unit</span>
           </button>
         </div>
@@ -189,11 +190,30 @@ const StudentLoginPage = () => {
           <h1 className="text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight mb-2">
             Portal Ujian {terminology.student}
           </h1>
-          <div className="flex items-center justify-center gap-2">
-            <GraduationCap size={18} className="text-emerald-600" />
-            <p className="text-slate-500 dark:text-slate-400 font-medium text-sm md:text-base">
-              {schoolName || school?.name || "Portal Ujian Siswa"}
-            </p>
+          <div className="flex flex-col items-center justify-center gap-1.5">
+            <div className="flex items-center justify-center gap-2">
+              <GraduationCap size={18} className="text-emerald-600" />
+              <p className="text-slate-500 dark:text-slate-400 font-medium text-sm md:text-base">
+                {schoolName || school?.name || "Portal Ujian Siswa"}
+              </p>
+            </div>
+            {school && (
+              <div className="flex items-center gap-1.5 mt-0.5">
+                {isLocalServer(school) ? (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 shadow-xs">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    <HardDrive size={12} className="text-emerald-600 dark:text-emerald-400" />
+                    <span>Server Lokal {school.pb_url ? `(${school.pb_url.replace(/^https?:\/\//, '')})` : ''}</span>
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-900/50 shadow-xs">
+                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+                    <Globe size={12} className="text-blue-600 dark:text-blue-400" />
+                    <span>Server Online</span>
+                  </span>
+                )}
+              </div>
+            )}
           </div>
         </div>
 

@@ -1,6 +1,6 @@
 {
   "id": "com.alfaruqasri.ujian",
-  "name": "EXAM AA",
+  "name": "EXAMKU",
   "webDir": "dist-shell",
   "serverUrl": "https://examku.my.id",
   "targetApk": "exam-aa-latest.apk",

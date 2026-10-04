@@ -26,7 +26,7 @@ routerAdd("GET", "/api/offline-update-check", (c) => {
         const data = JSON.parse(raw);
 
         // Baca versi lokal jika ada
-        let currentVersion = "1.1.3";
+        let currentVersion = "1.1.4";
         try {
             const rawLocal = $os.readFile("version.json");
             const localData = JSON.parse(rawLocal);
