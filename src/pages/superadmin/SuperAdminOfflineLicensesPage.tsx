@@ -21,7 +21,9 @@ import {
   Download,
   Eye,
   ChevronRight,
-  Filter
+  Filter,
+  Globe,
+  ChevronDown
 } from "lucide-react";
 import SuperAdminLayout from "../../components/layout/SuperAdminLayout";
 import { masterPb } from "../../lib/pocketbase";
@@ -58,6 +60,30 @@ export interface OfflineLicenseRecord {
 
 type FilterStatus = "all" | "active" | "expiring_soon" | "expired";
 type SortOption = "newest_issued" | "nearest_expiry" | "name_asc";
+
+const SchoolAvatar = ({ name, logoUrl, className }: { name: string; logoUrl?: string; className?: string }) => {
+  const [error, setError] = useState(false);
+  const initial = (name || "S").trim()[0]?.toUpperCase() || "S";
+
+  if (logoUrl && !error) {
+    return (
+      <div className={cn("w-10 h-10 rounded-xl bg-white border border-slate-200/90 flex items-center justify-center overflow-hidden shrink-0 shadow-2xs group-hover:scale-105 transition-transform duration-200", className)}>
+        <img
+          src={logoUrl}
+          alt=""
+          className="w-full h-full object-contain p-0.5"
+          onError={() => setError(true)}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className={cn("w-10 h-10 rounded-xl bg-purple-50 border border-purple-100 flex items-center justify-center text-purple-700 font-black text-xs uppercase shrink-0 shadow-2xs group-hover:scale-105 transition-transform duration-200", className)}>
+      {initial}
+    </div>
+  );
+};
 
 export default function SuperAdminOfflineLicensesPage() {
   const { addToast } = useToast();
@@ -117,14 +143,16 @@ export default function SuperAdminOfflineLicensesPage() {
     }
   }, [addToast]);
 
-  // Ambil daftar sekolah yang terdaftar di database untuk pilihan penerbitan
+  const [schoolLogoMap, setSchoolLogoMap] = useState<Record<string, string>>({});
+
+  // Ambil daftar sekolah yang terdaftar di database untuk pilihan penerbitan dan avatar
   const fetchSchools = useCallback(async () => {
     try {
       const records = await masterPb
         .collection("schools")
-        .getFullList<{ id: string; name: string; slug: string; contact_phone?: string; active_until?: string }>({
+        .getFullList<{ id: string; name: string; slug: string; contact_phone?: string; active_until?: string; logo?: string }>({
           sort: "name",
-          fields: "id,name,slug,contact_phone,active_until",
+          fields: "id,name,slug,contact_phone,active_until,logo",
           requestKey: null
         });
       const mapped: AvailableSchoolItem[] = records.map((r) => ({
@@ -135,6 +163,14 @@ export default function SuperAdminOfflineLicensesPage() {
         active_until: r.active_until
       }));
       setSchools(mapped);
+
+      const logoMap: Record<string, string> = {};
+      records.forEach((r) => {
+        if (r.slug && r.logo) {
+          logoMap[r.slug] = masterPb.files.getUrl(r, r.logo);
+        }
+      });
+      setSchoolLogoMap(logoMap);
     } catch (err) {
       console.warn("Gagal mengambil daftar sekolah pendukung:", err);
     }
@@ -501,45 +537,17 @@ export default function SuperAdminOfflineLicensesPage() {
           </div>
         </div>
 
-        {/* Filter Bar & Pencarian */}
-        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-            {/* Search Input */}
-            <div className="relative flex-1">
-              <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-              <input
-                type="text"
-                placeholder="Cari berdasarkan nama sekolah, NPSN, subdomain, atau keperluan..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full h-10 pl-10 pr-4 rounded-xl border border-slate-200 bg-slate-50/50 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:bg-white transition-all"
-              />
-            </div>
-
-            {/* Sort Dropdown */}
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-slate-500 whitespace-nowrap hidden sm:inline">Urutan:</span>
-              <select
-                value={sortOption}
-                onChange={(e) => setSortOption(e.target.value as SortOption)}
-                className="h-10 px-3 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500"
-              >
-                <option value="newest_issued">Penerbitan Terbaru</option>
-                <option value="nearest_expiry">Batas Waktu Terdekat</option>
-                <option value="name_asc">Nama Sekolah (A - Z)</option>
-              </select>
-            </div>
-          </div>
-
+        {/* Filter Bar & Pencarian Terpadu */}
+        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
           {/* Filter Status Tabs */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pt-1 pb-0.5 border-t border-slate-100">
+          <div className="flex items-center gap-1 bg-slate-100/80 p-1 rounded-xl overflow-x-auto scrollbar-none border border-slate-200/60 shadow-2xs">
             <button
               onClick={() => setFilterStatus("all")}
               className={cn(
-                "px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all",
+                "px-3.5 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all",
                 filterStatus === "all"
-                  ? "bg-slate-900 text-white shadow-sm"
-                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                  ? "bg-white text-slate-900 shadow-2xs"
+                  : "text-slate-600 hover:text-slate-900"
               )}
             >
               Semua ({stats.total})
@@ -547,10 +555,10 @@ export default function SuperAdminOfflineLicensesPage() {
             <button
               onClick={() => setFilterStatus("active")}
               className={cn(
-                "px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all",
+                "px-3.5 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all",
                 filterStatus === "active"
-                  ? "bg-emerald-600 text-white shadow-sm"
-                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                  ? "bg-white text-emerald-700 shadow-2xs"
+                  : "text-slate-600 hover:text-slate-900"
               )}
             >
               Aktif ({stats.active})
@@ -558,10 +566,10 @@ export default function SuperAdminOfflineLicensesPage() {
             <button
               onClick={() => setFilterStatus("expiring_soon")}
               className={cn(
-                "px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all",
+                "px-3.5 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all",
                 filterStatus === "expiring_soon"
-                  ? "bg-amber-600 text-white shadow-sm"
-                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                  ? "bg-white text-amber-700 shadow-2xs"
+                  : "text-slate-600 hover:text-slate-900"
               )}
             >
               Segera Berakhir ({stats.expiringSoon})
@@ -569,19 +577,69 @@ export default function SuperAdminOfflineLicensesPage() {
             <button
               onClick={() => setFilterStatus("expired")}
               className={cn(
-                "px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all",
+                "px-3.5 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all",
                 filterStatus === "expired"
-                  ? "bg-rose-600 text-white shadow-sm"
-                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                  ? "bg-white text-rose-700 shadow-2xs"
+                  : "text-slate-600 hover:text-slate-900"
               )}
             >
               Kadaluarsa ({stats.expired})
             </button>
           </div>
+
+          {/* Search, Sort, Refresh & Add */}
+          <div className="flex items-center gap-2 md:ml-auto">
+            {/* Search Input */}
+            <div className="relative flex-1 md:w-64">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              <input
+                type="text"
+                placeholder="Cari sekolah, NPSN, subdomain..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full h-9 pl-9 pr-3 rounded-xl border border-slate-200/90 bg-white text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-400 shadow-2xs transition-all"
+              />
+            </div>
+
+            {/* Sort Dropdown */}
+            <div className="relative">
+              <select
+                value={sortOption}
+                onChange={(e) => setSortOption(e.target.value as SortOption)}
+                className="h-9 pl-3 pr-8 rounded-xl border border-slate-200/90 bg-white text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-400 shadow-2xs appearance-none cursor-pointer"
+              >
+                <option value="newest_issued">Terbaru</option>
+                <option value="nearest_expiry">Batas Terdekat</option>
+                <option value="name_asc">Nama (A-Z)</option>
+              </select>
+              <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            </div>
+
+            {/* Refresh Button */}
+            <button
+              onClick={() => fetchLicenses(true)}
+              className={cn(
+                "h-9 w-9 flex items-center justify-center bg-white border border-slate-200/90 rounded-xl hover:bg-slate-50 shadow-2xs transition-all",
+                (isRefreshing || isLoading) && "opacity-60 pointer-events-none"
+              )}
+              title="Segarkan data lisensi"
+            >
+              <RefreshCw size={14} className={cn("text-slate-600", (isRefreshing || isLoading) && "animate-spin")} />
+            </button>
+
+            {/* Add Button */}
+            <button
+              onClick={handleOpenCreateNewModal}
+              className="h-9 px-3.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-sm shadow-purple-600/20 flex items-center gap-1.5 transition-all whitespace-nowrap"
+            >
+              <Plus size={14} />
+              <span className="hidden sm:inline">Terbitkan Lisensi</span>
+            </button>
+          </div>
         </div>
 
         {/* Tabel Data (Desktop) & Card List (Mobile) */}
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs overflow-hidden">
           {isLoading ? (
             <div className="py-20 text-center">
               <div className="w-10 h-10 border-3 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
@@ -640,16 +698,16 @@ export default function SuperAdminOfflineLicensesPage() {
             <>
               {/* Desktop Table View */}
               <div className="hidden md:block overflow-x-auto scrollbar-thin">
-                <table className="w-full text-left text-xs border-collapse min-w-[960px]">
-                  <thead className="bg-slate-50/90 border-b border-slate-200 text-slate-500 uppercase font-bold text-[10px] tracking-wider">
+                <table className="w-full text-left border-collapse min-w-[1060px]">
+                  <thead className="bg-slate-50/90 border-b border-slate-200 text-slate-500 uppercase font-bold text-[11px] tracking-wider">
                     <tr>
-                      <th className="py-3 px-4 min-w-[210px]">Sekolah & Subdomain</th>
-                      <th className="py-3 px-4 min-w-[140px]">Status & Mesin</th>
-                      <th className="py-3 px-4 min-w-[150px]">Diterbitkan</th>
-                      <th className="py-3 px-4 min-w-[140px]">Masa Berlaku</th>
-                      <th className="py-3 px-4 min-w-[220px]">Kode Lisensi</th>
-                      <th className="py-3 px-4 min-w-[140px]">Keperluan</th>
-                      <th className="py-3 px-4 text-right min-w-[140px]">Aksi</th>
+                      <th className="py-3.5 px-4 min-w-[260px]">Institusi & Domain</th>
+                      <th className="py-3.5 px-4 min-w-[150px]">Status & Mesin</th>
+                      <th className="py-3.5 px-4 min-w-[140px]">Diterbitkan</th>
+                      <th className="py-3.5 px-4 min-w-[160px]">Masa Berlaku</th>
+                      <th className="py-3.5 px-4 min-w-[210px]">Kode Lisensi</th>
+                      <th className="py-3.5 px-4 min-w-[160px]">Keperluan</th>
+                      <th className="py-3.5 px-4 text-right min-w-[200px]">Aksi</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -659,132 +717,165 @@ export default function SuperAdminOfflineLicensesPage() {
                       const isCopied = copiedId === lic.id;
 
                       return (
-                        <tr key={lic.id} className="hover:bg-slate-50/70 transition-colors">
-                          {/* Nama Sekolah & Subdomain */}
-                          <td className="py-3 px-4">
-                            <div className="font-bold text-slate-900 text-xs flex items-center gap-1.5">
-                              <Building2 size={13} className="text-slate-400 flex-shrink-0" />
-                              <span>{lic.school_name}</span>
-                            </div>
-                            <div className="text-[11px] font-mono text-purple-600 mt-0.5">
-                              {lic.slug}.examku.my.id
-                            </div>
-                            {lic.npsn && (
-                              <span className="inline-block mt-1 px-1.5 py-0.5 rounded bg-slate-100 text-[10px] font-mono text-slate-600 font-semibold">
-                                NPSN: {lic.npsn}
-                              </span>
-                            )}
-                          </td>
-
-                          {/* Status & Kriptografi */}
-                          <td className="py-3 px-4">
-                            <div className="space-y-1">
-                              {isExpired ? (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-700 border border-rose-200">
-                                  <XCircle size={11} /> Kadaluarsa
-                                </span>
-                              ) : exp.isExpiringSoon ? (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
-                                  <AlertTriangle size={11} /> Segera Berakhir
-                                </span>
-                              ) : (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
-                                  <CheckCircle2 size={11} /> Aktif Sah
-                                </span>
-                              )}
-
-                              <div>
-                                <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-500">
-                                  <ShieldCheck size={11} className="text-purple-600" />
-                                  {lic.version === "v2" ? "RSA-2048 Asimetris" : "SHA-256 Legasi"}
-                                </span>
+                        <tr key={lic.id} className="hover:bg-slate-50/80 transition-all group border-b border-slate-100/80 last:border-0">
+                          {/* Nama Sekolah, Avatar, & Subdomain */}
+                          <td className="py-3.5 px-4">
+                            <div className="flex items-center gap-3">
+                              <SchoolAvatar
+                                name={lic.school_name}
+                                logoUrl={schoolLogoMap[lic.slug]}
+                              />
+                              <div className="min-w-0">
+                                <h4 className="font-bold text-slate-900 text-xs sm:text-sm tracking-tight leading-snug group-hover:text-purple-700 transition-colors truncate max-w-[220px]">
+                                  {lic.school_name}
+                                </h4>
+                                <a
+                                  href={`https://${lic.slug}.examku.my.id`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-[11px] font-mono font-medium text-slate-500 hover:text-purple-600 transition-colors flex items-center gap-1 mt-0.5 w-fit"
+                                  title={`Buka https://${lic.slug}.examku.my.id`}
+                                >
+                                  <Globe size={11} className="text-slate-400 shrink-0" />
+                                  <span className="truncate max-w-[170px]">{lic.slug}.examku.my.id</span>
+                                  <ExternalLink size={10} className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                                </a>
+                                <div className="flex items-center gap-1.5 mt-1">
+                                  {lic.npsn && (
+                                    <span className="px-1.5 py-0.5 rounded bg-slate-100 text-[10px] font-mono text-slate-600 font-semibold border border-slate-200/60">
+                                      NPSN: {lic.npsn}
+                                    </span>
+                                  )}
+                                  {lic.contact_phone && (
+                                    <span className="text-[10px] text-slate-400 font-medium truncate max-w-[120px]" title={`Kontak: ${lic.contact_phone}`}>
+                                      {lic.contact_phone}
+                                    </span>
+                                  )}
+                                </div>
                               </div>
                             </div>
                           </td>
 
-                          {/* Key Terakhir Diterbitkan */}
-                          <td className="py-3 px-4">
-                            <div className="font-semibold text-slate-800 text-[11px]">
+                          {/* Status & Kriptografi */}
+                          <td className="py-3.5 px-4">
+                            <div className="space-y-1">
+                              {isExpired ? (
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200 shadow-2xs">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                                  Kadaluarsa
+                                </span>
+                              ) : exp.isExpiringSoon ? (
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200 shadow-2xs">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                                  Segera Berakhir
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 shadow-2xs">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                  Aktif Sah
+                                </span>
+                              )}
+
+                              <div className="flex items-center gap-1 text-[10px] font-semibold text-slate-500">
+                                <ShieldCheck size={11} className="text-purple-600 shrink-0" />
+                                <span>{lic.version === "v2" ? "RSA-2048 Asimetris" : "SHA-256 Legasi"}</span>
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* Diterbitkan */}
+                          <td className="py-3.5 px-4">
+                            <div className="font-semibold text-slate-800 text-xs">
                               {formatDateTimeIndonesia(lic.issued_at || lic.created)}
                             </div>
                             <div className="text-[10px] text-slate-400 mt-0.5 flex items-center gap-1">
-                              <Clock size={10} />
+                              <Clock size={10} className="shrink-0" />
                               <span>{getRelativeTime(lic.issued_at || lic.created)}</span>
                             </div>
                           </td>
 
-                          {/* Aktif Sampai Kapan */}
-                          <td className="py-3 px-4">
-                            <div className="font-bold text-slate-900 text-xs">
+                          {/* Masa Berlaku */}
+                          <td className="py-3.5 px-4">
+                            <div className="font-bold text-slate-900 text-xs sm:text-sm">
                               {formatDateIndonesia(lic.valid_until)}
                             </div>
-                            <div
-                              className={cn(
-                                "text-[10px] font-bold mt-0.5",
-                                isExpired
-                                  ? "text-rose-600"
-                                  : exp.isExpiringSoon
-                                  ? "text-amber-600"
-                                  : "text-emerald-600"
-                              )}
-                            >
-                              {exp.text}
+                            <div className={cn(
+                              "inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold mt-1 shadow-2xs",
+                              isExpired
+                                ? "bg-rose-50 text-rose-700 border border-rose-100"
+                                : exp.isExpiringSoon
+                                ? "bg-amber-50 text-amber-800 border border-amber-100"
+                                : "bg-emerald-50 text-emerald-800 border border-emerald-100"
+                            )}>
+                              <Clock size={10} className="shrink-0" />
+                              <span>{exp.text}</span>
                             </div>
                           </td>
 
                           {/* Potongan Kode Lisensi */}
-                          <td className="py-3 px-4">
-                            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200/80 px-2.5 py-1 rounded-xl w-fit">
+                          <td className="py-3.5 px-4">
+                            <div className="inline-flex items-center gap-1.5 bg-slate-50 border border-slate-200/90 px-2.5 py-1.5 rounded-xl shadow-2xs group-hover:border-purple-300 transition-colors">
                               <KeyRound size={12} className="text-purple-600 shrink-0" />
-                              <code className="text-[11px] font-mono font-bold text-slate-800 select-all max-w-[130px] truncate">
+                              <code className="text-xs font-mono font-bold text-slate-700 select-all truncate max-w-[105px]" title={lic.license_code}>
                                 {lic.license_code}
                               </code>
                               <button
                                 onClick={() => handleCopyCode(lic.id, lic.license_code)}
                                 title="Salin Kode Lisensi"
-                                className="p-1 rounded-lg hover:bg-white text-slate-500 hover:text-slate-900 transition-colors"
+                                className="p-1 rounded-md hover:bg-white text-slate-400 hover:text-slate-800 transition-colors shrink-0"
                               >
-                                {isCopied ? <Check size={13} className="text-emerald-500" /> : <Copy size={13} />}
+                                {isCopied ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} />}
                               </button>
                               <button
                                 onClick={() => handleOpenDetailModal(lic)}
-                                title="Lihat Kode Lengkap"
-                                className="p-1 rounded-lg hover:bg-white text-purple-600 transition-colors"
+                                title="Lihat Kode Lengkap & QR"
+                                className="p-1 rounded-md hover:bg-white text-slate-400 hover:text-purple-600 transition-colors shrink-0"
                               >
-                                <Eye size={13} />
+                                <Eye size={12} />
                               </button>
                             </div>
                           </td>
 
                           {/* Catatan / Keperluan */}
-                          <td className="py-3 px-4">
-                            <div className="text-slate-600 text-xs max-w-[180px] line-clamp-2" title={lic.notes || "Izin Resmi Ujian Offline CBT"}>
-                              {lic.notes || "Izin Resmi Ujian Offline CBT"}
+                          <td className="py-3.5 px-4">
+                            <div className="text-xs text-slate-600 max-w-[160px] line-clamp-2 leading-relaxed" title={lic.notes || "Izin Resmi Ujian Offline CBT"}>
+                              {lic.notes || <span className="text-slate-400 italic">Izin Resmi Ujian Offline CBT</span>}
                             </div>
                           </td>
 
                           {/* Tombol Aksi */}
-                          <td className="py-3 px-4 text-right">
+                          <td className="py-3.5 px-4 text-right">
                             <div className="flex items-center justify-end gap-1.5">
+                              {/* Tombol Perpanjang */}
                               <Button
                                 size="sm"
                                 variant="outline"
                                 onClick={() => handleOpenRenewModal(lic)}
-                                className="h-7 px-2.5 rounded-lg text-xs font-bold border-purple-200 text-purple-700 hover:bg-purple-50 transition-colors"
+                                className="h-8 px-2.5 rounded-xl text-xs font-bold border-purple-200 text-purple-700 bg-purple-50/70 hover:bg-purple-100 hover:text-purple-800 transition-all shadow-2xs whitespace-nowrap flex items-center gap-1.5 shrink-0"
                               >
-                                Perpanjang
+                                <Calendar size={12} />
+                                <span>Perpanjang</span>
                               </Button>
-                              <div className="inline-flex items-center p-0.5 bg-slate-100/80 border border-slate-200/90 rounded-lg shrink-0">
+
+                              {/* Toolbar Action Icons */}
+                              <div className="inline-flex items-center p-0.5 bg-slate-100/90 border border-slate-200/90 rounded-xl shrink-0">
+                                <button
+                                  onClick={() => handleOpenDetailModal(lic)}
+                                  className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-500 hover:text-purple-600 hover:bg-white transition-all shadow-2xs"
+                                  title="Detail Lisensi & QR"
+                                >
+                                  <Eye size={13} />
+                                </button>
                                 <button
                                   onClick={() => handleSendWA(lic)}
-                                  className="w-6 h-6 rounded flex items-center justify-center text-emerald-600 hover:bg-white transition-colors"
+                                  className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-500 hover:text-emerald-600 hover:bg-white transition-all shadow-2xs"
                                   title="Kirim ke WhatsApp Proktor"
                                 >
                                   <MessageCircle size={13} />
                                 </button>
                                 <button
                                   onClick={() => handleOpenDeleteConfirm(lic)}
-                                  className="w-6 h-6 rounded flex items-center justify-center text-slate-400 hover:bg-white hover:text-rose-600 transition-colors"
+                                  className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-rose-600 hover:bg-white transition-all shadow-2xs"
                                   title="Hapus Lisensi"
                                 >
                                   <Trash2 size={13} />
@@ -808,30 +899,42 @@ export default function SuperAdminOfflineLicensesPage() {
 
                   return (
                     <div key={lic.id} className="p-4 space-y-3">
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <h4 className="font-bold text-slate-900 text-sm">{lic.school_name}</h4>
-                          <p className="text-xs font-mono text-purple-600">{lic.slug}.examku.my.id</p>
+                      <div className="flex items-start gap-3">
+                        <SchoolAvatar
+                          name={lic.school_name}
+                          logoUrl={schoolLogoMap[lic.slug]}
+                          className="w-11 h-11 text-sm"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <h4 className="font-bold text-slate-900 text-sm truncate">{lic.school_name}</h4>
+                            {isExpired ? (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200 shrink-0">
+                                Kadaluarsa
+                              </span>
+                            ) : exp.isExpiringSoon ? (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200 shrink-0">
+                                Segera Berakhir
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 shrink-0">
+                                Aktif Sah
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs font-mono text-purple-600 mt-0.5 truncate">{lic.slug}.examku.my.id</p>
+                          {lic.npsn && (
+                            <span className="inline-block mt-1 px-1.5 py-0.2 rounded bg-slate-100 text-[10px] font-mono text-slate-600 font-semibold border border-slate-200/60">
+                              NPSN: {lic.npsn}
+                            </span>
+                          )}
                         </div>
-                        {isExpired ? (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-700">
-                            Kadaluarsa
-                          </span>
-                        ) : exp.isExpiringSoon ? (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">
-                            Segera Berakhir
-                          </span>
-                        ) : (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
-                            Aktif
-                          </span>
-                        )}
                       </div>
 
-                      <div className="grid grid-cols-2 gap-2 text-xs bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                      <div className="grid grid-cols-2 gap-2 text-xs bg-slate-50 p-3 rounded-xl border border-slate-100">
                         <div>
                           <span className="text-[10px] text-slate-400 uppercase font-bold block">Key Diterbitkan</span>
-                          <span className="font-semibold text-slate-700 text-[11px]">
+                          <span className="font-semibold text-slate-800 text-[11px] block mt-0.5">
                             {formatDateIndonesia(lic.issued_at || lic.created)}
                           </span>
                           <span className="text-[10px] text-slate-400 block">
@@ -840,7 +943,7 @@ export default function SuperAdminOfflineLicensesPage() {
                         </div>
                         <div>
                           <span className="text-[10px] text-slate-400 uppercase font-bold block">Aktif Sampai</span>
-                          <span className="font-bold text-slate-900 text-[11px]">
+                          <span className="font-bold text-slate-900 text-[11px] block mt-0.5">
                             {formatDateIndonesia(lic.valid_until)}
                           </span>
                           <span
@@ -854,39 +957,48 @@ export default function SuperAdminOfflineLicensesPage() {
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-2 pt-1">
-                        <Button
-                          size="sm"
-                          variant="outline"
+                      {/* License Token snippet on mobile */}
+                      <div className="flex items-center justify-between bg-slate-50 border border-slate-200/80 px-3 py-2 rounded-xl">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <KeyRound size={12} className="text-purple-600 shrink-0" />
+                          <code className="text-xs font-mono font-bold text-slate-700 truncate select-all">
+                            {lic.license_code}
+                          </code>
+                        </div>
+                        <button
                           onClick={() => handleCopyCode(lic.id, lic.license_code)}
-                          className="min-h-[42px] rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs"
+                          className="px-2 py-1 rounded-lg bg-white border border-slate-200 text-xs font-semibold text-slate-700 hover:text-purple-600 shrink-0 ml-2 shadow-2xs flex items-center gap-1"
                         >
-                          {isCopied ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
-                          <span>{isCopied ? "Tersalin" : "Salin Key"}</span>
-                        </Button>
+                          {isCopied ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} />}
+                          <span>{isCopied ? "Disalin" : "Salin"}</span>
+                        </button>
+                      </div>
+
+                      {/* Action buttons on mobile */}
+                      <div className="grid grid-cols-3 gap-2 pt-1">
                         <Button
                           size="sm"
                           variant="outline"
                           onClick={() => handleOpenDetailModal(lic)}
-                          className="min-h-[42px] rounded-xl text-xs font-bold text-purple-700 border-purple-200 hover:bg-purple-50 flex items-center justify-center gap-1.5 shadow-xs"
+                          className="min-h-[38px] rounded-xl text-xs font-bold text-purple-700 border-purple-200 hover:bg-purple-50 flex items-center justify-center gap-1.5 shadow-2xs"
                         >
-                          <Eye size={14} />
+                          <Eye size={13} />
                           <span>Detail</span>
                         </Button>
                         <Button
                           size="sm"
                           onClick={() => handleSendWA(lic)}
-                          className="min-h-[42px] rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white flex items-center justify-center gap-1.5 shadow-xs"
+                          className="min-h-[38px] rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white flex items-center justify-center gap-1.5 shadow-2xs"
                         >
-                          <MessageCircle size={15} />
+                          <MessageCircle size={13} />
                           <span>Kirim WA</span>
                         </Button>
                         <Button
                           size="sm"
                           onClick={() => handleOpenRenewModal(lic)}
-                          className="min-h-[42px] rounded-xl text-xs font-bold bg-purple-600 hover:bg-purple-700 active:bg-purple-800 text-white flex items-center justify-center gap-1.5 shadow-xs"
+                          className="min-h-[38px] rounded-xl text-xs font-bold bg-purple-600 hover:bg-purple-700 active:bg-purple-800 text-white flex items-center justify-center gap-1.5 shadow-2xs"
                         >
-                          <Clock size={14} />
+                          <Calendar size={13} />
                           <span>Perpanjang</span>
                         </Button>
                       </div>
