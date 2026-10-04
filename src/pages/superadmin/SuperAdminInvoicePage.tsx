@@ -539,107 +539,113 @@ const SuperAdminInvoicePage = () => {
             )}
           </div>
         ) : (
-          <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+          <div className="bg-white border border-slate-200/90 rounded-2xl overflow-hidden shadow-xs">
             {/* Desktop Table View */}
             <div className="hidden md:block overflow-x-auto scrollbar-thin">
-              <table className="w-full text-left border-collapse min-w-[920px]">
+              <table className="w-full text-left border-collapse min-w-[900px]">
                 <thead>
-                  <tr className="bg-slate-50/90 border-b border-slate-200 text-slate-500 uppercase text-[11px] font-bold tracking-wider">
-                    <th className="px-4 py-3.5 min-w-[150px]">Invoice</th>
-                    <th className="px-4 py-3.5 min-w-[200px]">Institusi</th>
-                    <th className="px-4 py-3.5 min-w-[130px]">Paket</th>
-                    <th className="px-4 py-3.5 min-w-[130px] text-right">Jumlah</th>
-                    <th className="px-4 py-3.5 min-w-[120px]">Status</th>
-                    <th className="px-4 py-3.5 min-w-[140px]">Jatuh Tempo</th>
-                    <th className="px-4 py-3.5 min-w-[90px]">Bukti</th>
-                    <th className="px-4 py-3.5 text-right min-w-[140px]">Aksi</th>
+                  <tr className="bg-slate-50/90 border-b border-slate-200 text-slate-500 uppercase text-[10px] font-bold tracking-wider">
+                    <th className="px-4 py-3 min-w-[140px]">Invoice</th>
+                    <th className="px-4 py-3 min-w-[190px]">Institusi</th>
+                    <th className="px-4 py-3 min-w-[140px]">Paket & Durasi</th>
+                    <th className="px-4 py-3 min-w-[130px] text-right">Total Tagihan</th>
+                    <th className="px-4 py-3 min-w-[140px]">Status & Bukti</th>
+                    <th className="px-4 py-3 min-w-[140px]">Jatuh Tempo</th>
+                    <th className="px-4 py-3 text-right min-w-[130px]">Aksi</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-50">
+                <tbody className="divide-y divide-slate-100">
                   {filtered.map(inv => {
                     const effectiveStatus = getInvoiceStatus(inv);
                     const cfg = STATUS_CONFIG[effectiveStatus] || STATUS_CONFIG.unpaid;
                     const StatusIcon = cfg.icon;
                     return (
-                      <tr key={inv.id} className="hover:bg-slate-50 transition-colors">
+                      <tr key={inv.id} className="hover:bg-slate-50/80 transition-colors">
                         <td className="px-4 py-3">
-                          <p className="font-mono text-xs font-semibold text-slate-700">{inv.invoice_number}</p>
+                          <p className="font-mono text-xs font-bold text-slate-800">{inv.invoice_number}</p>
                           <p className="text-[10px] text-slate-400 mt-0.5">{formatDate(inv.created)}</p>
                         </td>
                         <td className="px-4 py-3">
-                          <p className="font-semibold text-slate-800 text-xs">{inv.school_name}</p>
-                          <p className="text-[10px] text-slate-400">{inv.school_slug}</p>
+                          <p className="font-bold text-slate-900 text-xs truncate max-w-[180px]">{inv.school_name}</p>
+                          <p className="text-[10px] font-mono text-purple-600 mt-0.5">{inv.school_slug}.examku.my.id</p>
                         </td>
                         <td className="px-4 py-3">
-                          <span className="text-xs text-slate-600 font-medium">
+                          <span className="text-xs text-slate-700 font-semibold block">
                             {inv.plan_label || PLAN_PRICES[inv.plan]?.label || inv.plan}
                           </span>
-                          <p className="text-[10px] text-slate-400">{inv.period_label || `${inv.duration_months} bulan`}</p>
+                          <span className="text-[10px] text-slate-400">{inv.period_label || `${inv.duration_months} bulan`}</span>
                         </td>
                         <td className="px-4 py-3 text-right">
-                          <span className="font-semibold text-slate-900 text-xs">{formatRupiah(inv.amount)}</span>
+                          <span className="font-bold font-mono text-slate-900 text-xs">{formatRupiah(inv.amount)}</span>
                         </td>
                         <td className="px-4 py-3">
-                          <span className={cn(
-                            "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border",
-                            cfg.color, cfg.bg, cfg.border
-                          )}>
-                            <StatusIcon size={11} />
-                            {cfg.label}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-xs text-slate-600">
-                          {inv.status === "paid" && inv.paid_date
-                            ? <span className="text-emerald-600">Dibayar {formatDate(inv.paid_date)}</span>
-                            : formatDate(inv.due_date)
-                          }
+                          <div className="flex flex-col gap-1 items-start">
+                            <span className={cn(
+                              "inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold border",
+                              cfg.color, cfg.bg, cfg.border
+                            )}>
+                              <StatusIcon size={10} />
+                              {cfg.label}
+                            </span>
+                            {inv.payment_proof && (
+                              <a
+                                href={getProofUrl(inv)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-200/80 px-2 py-0.5 rounded-full hover:bg-blue-100 transition-colors"
+                                title="Lihat bukti pembayaran transfer"
+                              >
+                                <Paperclip size={10} /> Bukti Transfer
+                              </a>
+                            )}
+                          </div>
                         </td>
                         <td className="px-4 py-3">
-                          {inv.payment_proof ? (
-                            <a
-                              href={getProofUrl(inv)}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 text-[11px] text-blue-600 font-medium hover:underline"
-                              title="Lihat bukti pembayaran"
-                            >
-                              <Paperclip size={11} />
-                              Ada
-                            </a>
+                          {inv.status === "paid" && inv.paid_date ? (
+                            <span className="inline-flex items-center gap-1 text-emerald-700 bg-emerald-50 border border-emerald-200/80 px-2 py-0.5 rounded-md text-[11px] font-semibold">
+                              <CheckCircle2 size={11} /> Lunas ({formatDate(inv.paid_date)})
+                            </span>
                           ) : (
-                            <span className="text-[11px] text-slate-400">-</span>
+                            <span className={cn(
+                              "text-xs font-semibold",
+                              effectiveStatus === "overdue" ? "text-rose-600 font-bold" : "text-slate-600"
+                            )}>
+                              {formatDate(inv.due_date)}
+                            </span>
                           )}
                         </td>
                         <td className="px-4 py-3 text-right">
-                          <div className="inline-flex items-center p-0.5 bg-slate-100/70 border border-slate-200/80 rounded-xl shadow-2xs gap-0.5">
-                            <button
-                              onClick={() => setDetailInvoice(inv)}
-                              className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:bg-white hover:text-blue-600 hover:shadow-2xs transition-all"
-                              title="Lihat Detail Invoice"
-                            >
-                              <Eye size={14} />
-                            </button>
-                            <button
-                              onClick={() => printInvoice(inv)}
-                              className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:bg-white hover:text-slate-800 hover:shadow-2xs transition-all"
-                              title="Cetak Invoice Digital (PDF)"
-                            >
-                              <Printer size={14} />
-                            </button>
-                            <button
-                              onClick={() => openEdit(inv)}
-                              className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:bg-white hover:text-blue-600 hover:shadow-2xs transition-all"
-                              title="Edit Data Invoice"
-                            >
-                              <Edit size={14} />
-                            </button>
-                            <button
-                              onClick={() => handleDelete(inv.id)}
-                              className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:bg-white hover:text-red-600 hover:shadow-2xs transition-all"
-                              title="Hapus Invoice"
-                            >
-                              <Trash2 size={14} />
-                            </button>
+                          <div className="flex items-center justify-end">
+                            <div className="inline-flex items-center p-0.5 bg-slate-100/80 border border-slate-200/90 rounded-xl shadow-2xs">
+                              <button
+                                onClick={() => setDetailInvoice(inv)}
+                                className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-600 hover:bg-white hover:text-blue-600 hover:shadow-2xs transition-all"
+                                title="Lihat Detail Invoice"
+                              >
+                                <Eye size={13} />
+                              </button>
+                              <button
+                                onClick={() => printInvoice(inv)}
+                                className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-600 hover:bg-white hover:text-slate-900 hover:shadow-2xs transition-all"
+                                title="Cetak Invoice Digital (PDF)"
+                              >
+                                <Printer size={13} />
+                              </button>
+                              <button
+                                onClick={() => openEdit(inv)}
+                                className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-600 hover:bg-white hover:text-blue-600 hover:shadow-2xs transition-all"
+                                title="Edit Data Invoice"
+                              >
+                                <Edit size={13} />
+                              </button>
+                              <button
+                                onClick={() => handleDelete(inv.id)}
+                                className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:bg-white hover:text-rose-600 hover:shadow-2xs transition-all"
+                                title="Hapus Invoice"
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            </div>
                           </div>
                         </td>
                       </tr>

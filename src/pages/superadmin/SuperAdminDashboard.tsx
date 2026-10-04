@@ -5,7 +5,8 @@ import {
   School, Clock, Users, RefreshCw,
   Search, Trash2, Monitor, Zap, Server, ChevronDown,
   Building2, Globe, Sparkles, ShieldCheck, Calendar, Cpu, BookOpen, HardDrive,
-  Activity, CheckCircle2, XCircle, AlertTriangle, Info, KeyRound, ChevronRight
+  Activity, CheckCircle2, XCircle, AlertTriangle, Info, KeyRound, ChevronRight,
+  Database, ExternalLink
 } from "lucide-react";
 import { masterPb } from "../../lib/pocketbase";
 import SuperAdminLayout from "../../components/layout/SuperAdminLayout";
@@ -768,10 +769,10 @@ const SuperAdminDashboard = () => {
           <>
             {/* Desktop Table */}
             <div className="hidden md:block overflow-x-auto scrollbar-thin">
-              <table className="w-full text-left border-collapse min-w-[980px]">
+              <table className="w-full text-left border-collapse min-w-[940px]">
                 <thead>
                   <tr className="bg-slate-50/90 border-b border-slate-200 text-slate-500 uppercase text-[11px] font-bold tracking-wider">
-                    <th className="px-4 py-3.5 w-12 text-center">
+                    <th className="px-3.5 py-3 w-10 text-center">
                       <input
                         type="checkbox"
                         className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
@@ -785,11 +786,11 @@ const SuperAdminDashboard = () => {
                         }}
                       />
                     </th>
-                    <th className="px-4 py-3.5 min-w-[240px]">Institusi</th>
-                    <th className="px-4 py-3.5 min-w-[210px]">Alamat & Engine</th>
-                    <th className="px-4 py-3.5 min-w-[170px]">Paket & Kuota</th>
-                    <th className="px-4 py-3.5 min-w-[130px]">Status</th>
-                    <th className="px-4 py-3.5 text-right min-w-[220px]">Aksi</th>
+                    <th className="px-4 py-3 min-w-[240px]">Institusi & Akses</th>
+                    <th className="px-4 py-3 min-w-[170px]">Server Node</th>
+                    <th className="px-4 py-3 min-w-[160px]">Paket & Kuota</th>
+                    <th className="px-4 py-3 min-w-[110px]">Status</th>
+                    <th className="px-4 py-3 text-right min-w-[220px]">Aksi</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -801,7 +802,7 @@ const SuperAdminDashboard = () => {
                       </div>
                     </td></tr>
                   ) : filteredSchools.length === 0 ? (
-                    <tr><td colSpan={5} className="px-5 py-20 text-center">
+                    <tr><td colSpan={6} className="px-5 py-20 text-center">
                       <div className="flex flex-col items-center justify-center gap-2 text-slate-300">
                         <School size={40} strokeWidth={1.5} />
                         <p className="text-sm font-medium">Belum ada data institusi di sini.</p>
@@ -809,10 +810,10 @@ const SuperAdminDashboard = () => {
                     </td></tr>
                   ) : filteredSchools.map(school => (
                     <tr key={school.id} className={cn(
-                      "hover:bg-slate-50/80 transition-all group border-b border-slate-50 last:border-0",
+                      "hover:bg-slate-50/80 transition-all group border-b border-slate-100/80 last:border-0",
                       selectedIds.includes(school.id) && "bg-blue-50/40 hover:bg-blue-50/60"
                     )}>
-                      <td className="px-5 py-4">
+                      <td className="px-3.5 py-3 text-center">
                         <input
                           type="checkbox"
                           className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
@@ -826,108 +827,110 @@ const SuperAdminDashboard = () => {
                           }}
                         />
                       </td>
-                      <td className="px-2 py-4">
-                        <div className="flex items-center gap-4">
-                          <div className="w-11 h-11 rounded-2xl bg-white border border-slate-100 flex items-center justify-center overflow-hidden flex-shrink-0 shadow-sm group-hover:scale-105 transition-transform duration-300">
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 rounded-xl bg-white border border-slate-200/90 flex items-center justify-center overflow-hidden shrink-0 shadow-2xs group-hover:scale-105 transition-transform duration-200">
                             {school.logo_url ? (
-                              <img src={school.logo_url} alt={school.name} className="w-full h-full object-contain p-1" />
+                              <img src={school.logo_url} alt={school.name} className="w-full h-full object-contain p-0.5" />
                             ) : (
-                              <div className="w-full h-full bg-blue-50 flex items-center justify-center text-blue-600 font-black text-sm uppercase">
+                              <div className="w-full h-full bg-blue-50 flex items-center justify-center text-blue-600 font-black text-xs uppercase">
                                 {school.name[0]}
                               </div>
                             )}
                           </div>
                           <div className="min-w-0">
-                            <p className="font-bold text-slate-900 text-[14px] leading-tight mb-1 truncate group-hover:text-blue-600 transition-colors">
+                            <p className="font-bold text-slate-900 text-sm leading-tight group-hover:text-blue-600 transition-colors truncate max-w-[210px]">
                               {school.name}
                             </p>
-                            <div className="flex flex-col gap-1">
-                              <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider flex items-center gap-1">
-                                <Globe size={10} /> {school.contact_email || "no-email@exam.com"}
-                              </span>
-                              <span className="text-[9px] font-black text-blue-400/80 uppercase tracking-[0.15em] flex items-center gap-1">
-                                <span className="w-1 h-1 rounded-full bg-blue-300" /> Aktif Sejak {new Date(school.created).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}
-                              </span>
+                            <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                              <a
+                                href={getSchoolUrl(school.slug)}
+                                target="_blank" rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-600 hover:text-blue-600 font-mono transition-colors"
+                                title="Buka Website Tenant"
+                              >
+                                <Globe size={11} className="text-blue-500 shrink-0" />
+                                {getSchoolDomain(school.slug)}
+                              </a>
+                              {school.custom_domain && (
+                                <a
+                                  href={`https://${school.custom_domain}`}
+                                  target="_blank" rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200 hover:bg-emerald-100 transition-colors"
+                                  title="Custom Domain Aktif"
+                                >
+                                  <span className="w-1 h-1 rounded-full bg-emerald-500" />
+                                  <span className="truncate max-w-[130px]">{school.custom_domain}</span>
+                                </a>
+                              )}
                             </div>
+                            <span className="text-[10px] text-slate-400 font-medium truncate max-w-[200px] mt-0.5 block">
+                              {school.contact_email || "no-email@exam.com"}
+                            </span>
                           </div>
                         </div>
                       </td>
-                      <td className="px-5 py-4">
-                        <div className="flex flex-col gap-1.5">
-                          <a
-                            href={getSchoolUrl(school.slug)}
-                            target="_blank" rel="noopener noreferrer"
-                            className="flex items-center gap-2 text-[11px] font-bold bg-white text-slate-600 px-3 py-1.5 rounded-full w-fit border border-slate-200 hover:border-blue-300 hover:text-blue-600 hover:shadow-sm transition-all group/link"
-                          >
-                            <Monitor size={12} className="text-slate-400 group-hover/link:text-blue-500" />
-                            {getSchoolDomain(school.slug)}
-                          </a>
-                          {school.custom_domain && (
-                            <a
-                              href={`https://${school.custom_domain}`}
-                              target="_blank" rel="noopener noreferrer"
-                              className="flex items-center gap-1.5 text-[11px] font-bold bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-full w-fit border border-emerald-200 hover:border-emerald-300 hover:shadow-sm transition-all group/link"
-                              title="Custom Domain Aktif"
+                      <td className="px-4 py-3">
+                        <div className="flex flex-col gap-1 items-start">
+                          {school.plan === "offline" ? (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/80">
+                              <HardDrive size={11} className="text-emerald-600" /> Server Lokal (Offline)
+                            </span>
+                          ) : school.server_host && school.server_host !== "127.0.0.1" && school.server_host !== "localhost" ? (
+                            <button
+                              type="button"
+                              onClick={() => setMigrationSchool(school)}
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-purple-50 text-purple-700 border border-purple-200/80 hover:bg-purple-100 transition-colors shadow-2xs"
+                              title="Klik untuk atur / tarik kembali ke Master VPS"
                             >
-                              <Globe size={11} className="text-emerald-500 group-hover/link:scale-110 transition-transform" />
-                              <span className="truncate max-w-[170px]">{school.custom_domain}</span>
-                            </a>
+                              <Cpu size={11} className="text-purple-600" /> Worker: {school.server_host}
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => setMigrationSchool(school)}
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-slate-100/80 text-slate-700 border border-slate-200/80 hover:bg-slate-200 transition-colors shadow-2xs"
+                              title="Klik untuk burst mode ke Worker VPS"
+                            >
+                              <Server size={11} className="text-slate-500" /> Master Node (Lokal)
+                            </button>
                           )}
                           <a
                             href={`${school.pb_url}${school.pb_url.endsWith("/") ? "" : "/"}_/`}
                             target="_blank" rel="noopener noreferrer"
-                            className="flex items-center gap-1.5 pl-3 text-[10px] text-slate-400 hover:text-blue-500 transition-colors font-medium"
+                            className="inline-flex items-center gap-1 text-[10px] text-slate-400 hover:text-blue-600 font-medium transition-colors pl-0.5"
+                            title="Buka PocketBase Database Engine"
                           >
-                            <Server size={11} /> Database Engine
+                            <Database size={10} /> Database Engine <ExternalLink size={8} />
                           </a>
-                          <div className="flex items-center gap-1.5 pl-3 pt-0.5">
-                            {school.plan === "offline" ? (
-                              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200/80 px-2 py-0.5 rounded-md">
-                                <HardDrive size={10} className="text-emerald-600" /> Lokal Server (Offline)
-                              </span>
-                            ) : school.server_host && school.server_host !== "127.0.0.1" && school.server_host !== "localhost" ? (
-                              <button
-                                type="button"
-                                onClick={() => setMigrationSchool(school)}
-                                className="inline-flex items-center gap-1 text-[10px] font-semibold text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200/70 px-2 py-0.5 rounded-md transition-colors"
-                                title="Klik untuk atur / tarik kembali ke Master"
-                              >
-                                <Cpu size={10} className="text-purple-600" /> Worker: {school.server_host}
-                              </button>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => setMigrationSchool(school)}
-                                className="inline-flex items-center gap-1 text-[10px] font-medium text-slate-500 bg-slate-50 hover:bg-slate-100 border border-slate-200/60 px-2 py-0.5 rounded-md transition-colors"
-                                title="Klik untuk burst mode ke Worker VPS"
-                              >
-                                <Server size={10} className="text-slate-400" /> Master Node (Lokal)
-                              </button>
-                            )}
-                          </div>
                         </div>
                       </td>
-                      <td className="px-5 py-4">
-                        <div className="flex flex-col gap-1.5">
+                      <td className="px-4 py-3">
+                        <div className="flex flex-col gap-1 items-start">
                           <div className="flex items-center gap-1.5">
                             <span className={cn(
-                              "inline-flex items-center justify-center text-[10px] font-black uppercase px-2.5 py-1 rounded-lg border tracking-wide w-fit",
-                              school.plan === "pro" ? "bg-amber-50 text-amber-600 border-amber-100" :
-                                school.plan === "ultimate" ? "bg-purple-50 text-purple-600 border-purple-100" :
-                                  "bg-slate-50 text-slate-500 border-slate-100"
+                              "inline-flex items-center text-[10px] font-bold uppercase px-2 py-0.5 rounded-md border tracking-wide",
+                              school.plan === "pro" ? "bg-amber-50 text-amber-700 border-amber-200" :
+                              school.plan === "ultimate" ? "bg-purple-50 text-purple-700 border-purple-200" :
+                              school.plan === "offline" ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
+                              "bg-slate-100 text-slate-600 border-slate-200"
                             )}>
                               {PLAN_CONFIG[school.plan || "free"]?.label || school.plan || "Free"}
                             </span>
-                            <p className="text-[11px] text-slate-400 font-bold">{school.student_quota || 0} Siswa</p>
+                            <span className="text-[11px] font-bold text-slate-700">{school.student_quota || 0} Siswa</span>
                           </div>
                           {(() => {
                             const info = getActiveUntilInfo(school.active_until);
                             if (info.isPermanent) {
-                              return <span className="text-[10px] text-slate-400 italic">Masa aktif: permanen</span>;
+                              return (
+                                <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200/60 inline-flex items-center gap-1">
+                                  <ShieldCheck size={10} /> Permanen
+                                </span>
+                              );
                             }
                             return (
                               <span className={cn(
-                                "text-[10px] font-semibold flex items-center gap-1 px-2 py-0.5 rounded border w-fit",
+                                "text-[10px] font-semibold flex items-center gap-1 px-1.5 py-0.5 rounded border",
                                 info.isExpired
                                   ? "bg-rose-50 text-rose-700 border-rose-200"
                                   : "bg-blue-50 text-blue-700 border-blue-200/80"
@@ -939,33 +942,33 @@ const SuperAdminDashboard = () => {
                           })()}
                         </div>
                       </td>
-                      <td className="px-5 py-4">
-                        <div className={cn(
-                          "inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-[11px] font-bold border transition-colors",
+                      <td className="px-4 py-3">
+                        <span className={cn(
+                          "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border transition-colors",
                           school.is_active
-                            ? "bg-emerald-50/50 text-emerald-600 border-emerald-100"
-                            : "bg-red-50/50 text-red-500 border-red-100"
+                            ? "bg-emerald-50 text-emerald-700 border-emerald-200/80"
+                            : "bg-slate-100 text-slate-500 border-slate-200"
                         )}>
                           <span className={cn(
-                            "w-1.5 h-1.5 rounded-full animate-pulse",
-                            school.is_active ? "bg-emerald-500" : "bg-red-500"
+                            "w-1.5 h-1.5 rounded-full",
+                            school.is_active ? "bg-emerald-500 animate-pulse" : "bg-slate-400"
                           )} />
-                          {school.is_active ? "Sistem Aktif" : "Sistem Off"}
-                        </div>
+                          {school.is_active ? "Aktif" : "Nonaktif"}
+                        </span>
                       </td>
-                      <td className="px-5 py-4">
-                        <div className="flex items-center justify-end gap-2">
+                      <td className="px-4 py-3 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
                           {(() => {
                             const pendingRenewal = requests.find(r => (r.slug_request === school.slug || r.school_name?.toLowerCase() === school.name?.toLowerCase()) && r.type === "renewal" && r.status === "pending");
                             if (pendingRenewal) {
                               return (
                                 <button
                                   onClick={() => handleApproveRenewalRequest(pendingRenewal)}
-                                  className="px-2.5 py-1.5 rounded-xl border border-purple-300 bg-purple-50 hover:bg-purple-100 text-purple-900 transition-all flex items-center gap-1.5 text-xs font-bold shadow-xs hover:shadow-sm animate-pulse whitespace-nowrap"
+                                  className="px-2.5 py-1 rounded-lg border border-purple-300 bg-purple-50 hover:bg-purple-100 text-purple-900 transition-all flex items-center gap-1 text-[11px] font-bold shadow-2xs animate-pulse whitespace-nowrap"
                                   title={`Sekolah ini mengajukan perpanjangan (${pendingRenewal.duration || "1 Tahun"}). Klik untuk terbitkan invoice.`}
                                 >
-                                  <Clock size={12} className="text-purple-700" />
-                                  <span>Terbitkan Perpanjangan ({pendingRenewal.duration || "1 Tahun"})</span>
+                                  <Clock size={11} className="text-purple-700" />
+                                  <span>Terbitkan ({pendingRenewal.duration || "1 Th"})</span>
                                 </button>
                               );
                             }
@@ -974,56 +977,56 @@ const SuperAdminDashboard = () => {
                                 <button
                                   onClick={() => handleSendRenewalInvoice(school)}
                                   disabled={sendingRenewalId === school.id}
-                                  className="px-2.5 py-1.5 rounded-xl border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-900 transition-all flex items-center gap-1.5 text-xs font-bold shadow-xs hover:shadow-sm"
+                                  className="px-2 py-1 rounded-lg border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-900 transition-all flex items-center gap-1 text-[11px] font-bold shadow-2xs whitespace-nowrap"
                                   title="Buat tagihan perpanjangan 1 tahun & siapkan invoice belum bayar"
                                 >
-                                  <Clock size={12} className={sendingRenewalId === school.id ? "animate-spin text-amber-700" : "text-amber-700"} />
-                                  <span>{sendingRenewalId === school.id ? "Memproses..." : "Kirim Tagihan"}</span>
+                                  <Clock size={11} className={sendingRenewalId === school.id ? "animate-spin text-amber-700" : "text-amber-700"} />
+                                  <span>Tagihan</span>
                                 </button>
                               );
                             }
                             return null;
                           })()}
-                          <div className="inline-flex items-center p-1 bg-slate-100/70 border border-slate-200/80 rounded-xl shadow-2xs gap-0.5">
+                          <div className="inline-flex items-center p-0.5 bg-slate-100/80 border border-slate-200/90 rounded-xl shadow-2xs shrink-0">
                             <button
                               onClick={() => setMigrationSchool(school)}
-                              className="w-8 h-8 rounded-lg flex items-center justify-center text-purple-700 hover:bg-white hover:text-purple-900 hover:shadow-2xs transition-all"
+                              className="w-7 h-7 rounded-lg flex items-center justify-center text-purple-700 hover:bg-white hover:text-purple-900 hover:shadow-2xs transition-all"
                               title={school.server_host && school.server_host !== "127.0.0.1" && school.server_host !== "localhost" ? "Migrasi Server / Tarik ke Master" : "1-Klik Burst Mode (Pindah ke Worker)"}
                             >
-                              <Zap size={14} className="text-purple-600" />
+                              <Zap size={13} className="text-purple-600" />
                             </button>
                             <button
                               onClick={() => setOfflineLicenseSchool(school)}
-                              className="w-8 h-8 rounded-lg flex items-center justify-center text-indigo-700 hover:bg-white hover:text-indigo-900 hover:shadow-2xs transition-all"
+                              className="w-7 h-7 rounded-lg flex items-center justify-center text-indigo-700 hover:bg-white hover:text-indigo-900 hover:shadow-2xs transition-all"
                               title="Izin Server Offline CBT (Lisensi Lab / Proktor)"
                             >
-                              <KeyRound size={14} className="text-indigo-600" />
+                              <KeyRound size={13} className="text-indigo-600" />
                             </button>
                             <button
                               onClick={() => { setEditSchool(school); setShowAddModal(true); }}
-                              className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-600 hover:bg-white hover:text-blue-600 hover:shadow-2xs transition-all"
+                              className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-600 hover:bg-white hover:text-blue-600 hover:shadow-2xs transition-all"
                               title="Edit Konfigurasi Tenant"
                             >
-                              <Edit size={14} />
+                              <Edit size={13} />
                             </button>
                             <button
                               onClick={() => toggleActive(school)}
                               className={cn(
-                                "w-8 h-8 rounded-lg flex items-center justify-center transition-all",
+                                "w-7 h-7 rounded-lg flex items-center justify-center transition-all",
                                 school.is_active
                                   ? "text-slate-600 hover:bg-white hover:text-amber-600 hover:shadow-2xs"
                                   : "text-slate-600 hover:bg-white hover:text-emerald-600 hover:shadow-2xs"
                               )}
                               title={school.is_active ? "Nonaktifkan Sistem" : "Aktifkan Sistem"}
                             >
-                              {school.is_active ? <PowerOff size={14} /> : <Power size={14} />}
+                              {school.is_active ? <PowerOff size={13} /> : <Power size={13} />}
                             </button>
                             <button
                               onClick={() => deleteSchool(school)}
-                              className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:bg-white hover:text-red-600 hover:shadow-2xs transition-all"
+                              className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:bg-white hover:text-red-600 hover:shadow-2xs transition-all"
                               title="Hapus Tenant"
                             >
-                              <Trash2 size={14} />
+                              <Trash2 size={13} />
                             </button>
                           </div>
                         </div>
@@ -1211,7 +1214,7 @@ const SuperAdminDashboard = () => {
               <table className="w-full text-left border-collapse min-w-[940px]">
                 <thead>
                   <tr className="bg-slate-50/90 border-b border-slate-200 text-slate-500 uppercase text-[11px] font-bold tracking-wider">
-                    <th className="px-4 py-3.5 w-12 text-center">
+                    <th className="px-3.5 py-3 w-10 text-center">
                       <input
                         type="checkbox"
                         className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
@@ -1225,12 +1228,12 @@ const SuperAdminDashboard = () => {
                         }}
                       />
                     </th>
-                    <th className="px-4 py-3.5 min-w-[220px]">Nama Institusi</th>
-                    <th className="px-4 py-3.5 min-w-[190px]">Domain</th>
-                    <th className="px-4 py-3.5 min-w-[160px]">Paket & Durasi</th>
-                    <th className="px-4 py-3.5 min-w-[160px]">Kontak</th>
-                    <th className="px-4 py-3.5 min-w-[120px]">Status</th>
-                    <th className="px-4 py-3.5 text-right min-w-[180px]">Aksi</th>
+                    <th className="px-4 py-3 min-w-[220px]">Nama Institusi</th>
+                    <th className="px-4 py-3 min-w-[180px]">Subdomain</th>
+                    <th className="px-4 py-3 min-w-[160px]">Paket & Durasi</th>
+                    <th className="px-4 py-3 min-w-[170px]">Kontak</th>
+                    <th className="px-4 py-3 min-w-[110px]">Status</th>
+                    <th className="px-4 py-3 text-right min-w-[180px]">Aksi</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -1241,7 +1244,7 @@ const SuperAdminDashboard = () => {
                       "hover:bg-slate-50 transition-colors border-b border-slate-50 last:border-0",
                       selectedIds.includes(req.id) && "bg-blue-50/40"
                     )}>
-                      <td className="px-5 py-3.5">
+                      <td className="px-3.5 py-3 text-center">
                         <input
                           type="checkbox"
                           className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
@@ -1255,7 +1258,7 @@ const SuperAdminDashboard = () => {
                           }}
                         />
                       </td>
-                      <td className="px-2 py-3.5">
+                      <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
                           <p className="font-semibold text-slate-900 text-sm">{req.school_name}</p>
                           {req.type === "renewal" && (
@@ -1266,12 +1269,12 @@ const SuperAdminDashboard = () => {
                         </div>
                         <p className="text-xs text-slate-400">{new Date(req.created).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}</p>
                       </td>
-                      <td className="px-5 py-3.5">
+                      <td className="px-4 py-3">
                         <code className="text-xs font-mono px-2 py-1 bg-amber-50 text-amber-700 border border-amber-200 rounded-md">
                           {getSchoolDomain(req.slug_request)}
                         </code>
                       </td>
-                      <td className="px-5 py-3.5">
+                      <td className="px-4 py-3">
                         <div className="flex flex-col gap-1 items-start">
                           {req.type === "renewal" ? (
                             <span className="inline-flex items-center text-[10px] font-bold uppercase px-2 py-0.5 rounded border bg-purple-50 text-purple-700 border-purple-200">
@@ -1296,11 +1299,11 @@ const SuperAdminDashboard = () => {
                           )}
                         </div>
                       </td>
-                      <td className="px-5 py-3.5">
+                      <td className="px-4 py-3">
                         <p className="text-sm text-slate-800 font-medium">{req.contact_email}</p>
                         <p className="text-xs text-slate-400">{req.contact_phone || "–"}</p>
                       </td>
-                      <td className="px-5 py-3.5">
+                      <td className="px-4 py-3">
                         <span className={cn(
                           "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide border",
                           req.status === "pending" ? "bg-amber-50 text-amber-700 border-amber-200"
@@ -1313,7 +1316,7 @@ const SuperAdminDashboard = () => {
                           {req.status === "pending" ? "Menunggu" : req.status === "approved" ? "Disetujui" : "Ditolak"}
                         </span>
                       </td>
-                      <td className="px-5 py-3.5 text-right">
+                      <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-2">
                           {req.status === "pending" ? (
                             <>

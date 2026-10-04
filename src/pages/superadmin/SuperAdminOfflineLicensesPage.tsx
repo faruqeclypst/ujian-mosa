@@ -643,13 +643,13 @@ export default function SuperAdminOfflineLicensesPage() {
                 <table className="w-full text-left text-xs border-collapse min-w-[960px]">
                   <thead className="bg-slate-50/90 border-b border-slate-200 text-slate-500 uppercase font-bold text-[10px] tracking-wider">
                     <tr>
-                      <th className="py-3.5 px-4 min-w-[210px]">Sekolah & Subdomain</th>
-                      <th className="py-3.5 px-4 min-w-[150px]">Status & Keamanan</th>
-                      <th className="py-3.5 px-4 min-w-[170px]">Key Diterbitkan</th>
-                      <th className="py-3.5 px-4 min-w-[150px]">Aktif Sampai</th>
-                      <th className="py-3.5 px-4 min-w-[180px]">Kode Lisensi</th>
-                      <th className="py-3.5 px-4 min-w-[140px]">Keperluan</th>
-                      <th className="py-3.5 px-4 text-right min-w-[130px]">Aksi</th>
+                      <th className="py-3 px-4 min-w-[210px]">Sekolah & Subdomain</th>
+                      <th className="py-3 px-4 min-w-[140px]">Status & Mesin</th>
+                      <th className="py-3 px-4 min-w-[150px]">Diterbitkan</th>
+                      <th className="py-3 px-4 min-w-[140px]">Masa Berlaku</th>
+                      <th className="py-3 px-4 min-w-[220px]">Kode Lisensi</th>
+                      <th className="py-3 px-4 min-w-[140px]">Keperluan</th>
+                      <th className="py-3 px-4 text-right min-w-[140px]">Aksi</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -661,7 +661,7 @@ export default function SuperAdminOfflineLicensesPage() {
                       return (
                         <tr key={lic.id} className="hover:bg-slate-50/70 transition-colors">
                           {/* Nama Sekolah & Subdomain */}
-                          <td className="py-3.5 px-4">
+                          <td className="py-3 px-4">
                             <div className="font-bold text-slate-900 text-xs flex items-center gap-1.5">
                               <Building2 size={13} className="text-slate-400 flex-shrink-0" />
                               <span>{lic.school_name}</span>
@@ -677,7 +677,7 @@ export default function SuperAdminOfflineLicensesPage() {
                           </td>
 
                           {/* Status & Kriptografi */}
-                          <td className="py-3.5 px-4">
+                          <td className="py-3 px-4">
                             <div className="space-y-1">
                               {isExpired ? (
                                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-700 border border-rose-200">
@@ -703,7 +703,7 @@ export default function SuperAdminOfflineLicensesPage() {
                           </td>
 
                           {/* Key Terakhir Diterbitkan */}
-                          <td className="py-3.5 px-4">
+                          <td className="py-3 px-4">
                             <div className="font-semibold text-slate-800 text-[11px]">
                               {formatDateTimeIndonesia(lic.issued_at || lic.created)}
                             </div>
@@ -714,7 +714,7 @@ export default function SuperAdminOfflineLicensesPage() {
                           </td>
 
                           {/* Aktif Sampai Kapan */}
-                          <td className="py-3.5 px-4">
+                          <td className="py-3 px-4">
                             <div className="font-bold text-slate-900 text-xs">
                               {formatDateIndonesia(lic.valid_until)}
                             </div>
@@ -733,65 +733,63 @@ export default function SuperAdminOfflineLicensesPage() {
                           </td>
 
                           {/* Potongan Kode Lisensi */}
-                          <td className="py-3.5 px-4">
-                            <div className="flex items-center gap-1.5">
-                              <code className="px-2 py-1 rounded bg-slate-100 text-[11px] font-mono text-slate-700 select-all max-w-[120px] truncate">
-                                {lic.license_code.substring(0, 18)}...
+                          <td className="py-3 px-4">
+                            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200/80 px-2.5 py-1 rounded-xl w-fit">
+                              <KeyRound size={12} className="text-purple-600 shrink-0" />
+                              <code className="text-[11px] font-mono font-bold text-slate-800 select-all max-w-[130px] truncate">
+                                {lic.license_code}
                               </code>
                               <button
                                 onClick={() => handleCopyCode(lic.id, lic.license_code)}
                                 title="Salin Kode Lisensi"
-                                className="p-1 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-900 transition-colors"
+                                className="p-1 rounded-lg hover:bg-white text-slate-500 hover:text-slate-900 transition-colors"
                               >
-                                {isCopied ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
+                                {isCopied ? <Check size={13} className="text-emerald-500" /> : <Copy size={13} />}
                               </button>
                               <button
                                 onClick={() => handleOpenDetailModal(lic)}
                                 title="Lihat Kode Lengkap"
-                                className="p-1 rounded-lg hover:bg-purple-50 text-purple-600 transition-colors"
+                                className="p-1 rounded-lg hover:bg-white text-purple-600 transition-colors"
                               >
-                                <Eye size={14} />
+                                <Eye size={13} />
                               </button>
                             </div>
                           </td>
 
                           {/* Catatan / Keperluan */}
-                          <td className="py-3.5 px-4">
-                            <div className="text-slate-600 text-[11px] max-w-[180px] line-clamp-2">
+                          <td className="py-3 px-4">
+                            <div className="text-slate-600 text-xs max-w-[180px] line-clamp-2" title={lic.notes || "Izin Resmi Ujian Offline CBT"}>
                               {lic.notes || "Izin Resmi Ujian Offline CBT"}
                             </div>
                           </td>
 
                           {/* Tombol Aksi */}
-                          <td className="py-3.5 px-4 text-right">
+                          <td className="py-3 px-4 text-right">
                             <div className="flex items-center justify-end gap-1.5">
                               <Button
                                 size="sm"
                                 variant="outline"
                                 onClick={() => handleOpenRenewModal(lic)}
-                                className="h-8 px-2.5 rounded-lg text-[11px] font-bold border-purple-200 text-purple-700 hover:bg-purple-50"
+                                className="h-7 px-2.5 rounded-lg text-xs font-bold border-purple-200 text-purple-700 hover:bg-purple-50 transition-colors"
                               >
                                 Perpanjang
                               </Button>
-
-                              <Button
-                                size="sm"
-                                onClick={() => handleSendWA(lic)}
-                                className="h-8 w-8 p-0 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white"
-                                title="Kirim ke WhatsApp Proktor"
-                              >
-                                <MessageCircle size={14} />
-                              </Button>
-
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleOpenDeleteConfirm(lic)}
-                                className="h-8 w-8 p-0 rounded-lg border-slate-200 hover:border-rose-300 hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition-colors"
-                                title="Hapus Lisensi"
-                              >
-                                <Trash2 size={13} />
-                              </Button>
+                              <div className="inline-flex items-center p-0.5 bg-slate-100/80 border border-slate-200/90 rounded-lg shrink-0">
+                                <button
+                                  onClick={() => handleSendWA(lic)}
+                                  className="w-6 h-6 rounded flex items-center justify-center text-emerald-600 hover:bg-white transition-colors"
+                                  title="Kirim ke WhatsApp Proktor"
+                                >
+                                  <MessageCircle size={13} />
+                                </button>
+                                <button
+                                  onClick={() => handleOpenDeleteConfirm(lic)}
+                                  className="w-6 h-6 rounded flex items-center justify-center text-slate-400 hover:bg-white hover:text-rose-600 transition-colors"
+                                  title="Hapus Lisensi"
+                                >
+                                  <Trash2 size={13} />
+                                </button>
+                              </div>
                             </div>
                           </td>
                         </tr>

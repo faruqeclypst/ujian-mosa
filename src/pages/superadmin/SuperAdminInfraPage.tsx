@@ -469,63 +469,63 @@ const SuperAdminInfraPage = () => {
         <div className="hidden md:block overflow-x-auto scrollbar-thin">
           <table className="w-full text-left border-collapse min-w-[880px]">
             <thead>
-              <tr className="bg-slate-50/90 border-b border-slate-200 text-slate-500 uppercase text-[11px] font-bold tracking-wider">
-                <th className="px-4 py-3.5 min-w-[220px]">Tenant Sekolah</th>
-                <th className="px-4 py-3.5 min-w-[200px]">Node Penempatan</th>
-                <th className="px-4 py-3.5 min-w-[120px]">Database</th>
-                <th className="px-4 py-3.5 min-w-[150px]">Latensi</th>
-                <th className="px-4 py-3.5 min-w-[130px]">Kondisi</th>
-                <th className="px-4 py-3.5 text-right min-w-[120px]">Aksi</th>
+              <tr className="bg-slate-50/90 border-b border-slate-200 text-slate-500 uppercase text-[10px] font-bold tracking-wider">
+                <th className="px-4 py-3 min-w-[220px]">Tenant Sekolah</th>
+                <th className="px-4 py-3 min-w-[200px]">Node Penempatan</th>
+                <th className="px-4 py-3 min-w-[120px]">Database</th>
+                <th className="px-4 py-3 min-w-[150px]">Latensi</th>
+                <th className="px-4 py-3 min-w-[130px]">Kondisi</th>
+                <th className="px-4 py-3 text-right min-w-[120px]">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {nodes.length === 0 && !loading && (
                 <tr>
-                  <td colSpan={6} className="px-5 py-10 text-center text-slate-400 text-sm">
+                  <td colSpan={6} className="px-4 py-10 text-center text-slate-400 text-sm">
                     Tidak ada tenant terdaftar.
                   </td>
                 </tr>
               )}
               {nodes.map((node) => (
-                <tr key={node.id} className="hover:bg-slate-50/60 transition-colors">
-                  <td className="px-5 py-3.5">
-                    <p className="font-semibold text-slate-900 text-sm">{node.name}</p>
-                    <p className="text-xs text-slate-400">{getSchoolDomain(node.slug)}</p>
-                    <span className="inline-block mt-1 text-[10px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded capitalize">
+                <tr key={node.id} className="hover:bg-slate-50/70 transition-colors">
+                  <td className="px-4 py-3">
+                    <p className="font-bold text-slate-900 text-xs sm:text-sm leading-tight">{node.name}</p>
+                    <p className="text-[11px] font-mono text-purple-600 mt-0.5">{getSchoolDomain(node.slug)}</p>
+                    <span className="inline-block mt-1 text-[10px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md capitalize">
                       {node.plan || "Free"} • Kuota {node.student_quota || 50} Siswa
                     </span>
                   </td>
-                  <td className="px-5 py-3.5">
+                  <td className="px-4 py-3">
                     <div>
                       {node.server_host && node.server_host !== "127.0.0.1" && node.server_host !== "localhost" ? (
-                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-purple-700 bg-purple-50 border border-purple-200/70 px-2 py-0.5 rounded">
+                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-purple-700 bg-purple-50 border border-purple-200/70 px-2 py-0.5 rounded-md">
                           Worker: {node.server_host}
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-700 bg-blue-50 border border-blue-200/70 px-2 py-0.5 rounded">
+                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-700 bg-blue-50 border border-blue-200/70 px-2 py-0.5 rounded-md">
                           Master Singapore (64.235.41.108)
                         </span>
                       )}
                     </div>
-                    <p className="text-[11px] font-mono text-slate-400 mt-1">Port: {node.port || "–"}</p>
+                    <p className="text-[10px] font-mono text-slate-400 mt-1">Port: {node.port || "–"}</p>
                   </td>
-                  <td className="px-5 py-3.5">
+                  <td className="px-4 py-3">
                     <div className="flex items-center gap-1.5 font-mono text-xs font-bold text-slate-700">
                       <Database size={13} className="text-emerald-500" />
                       {node.db_size_formatted || "–"}
                     </div>
                     <span className="text-[10px] text-slate-400">SQLite WAL</span>
                   </td>
-                  <td className="px-5 py-3.5">
+                  <td className="px-4 py-3">
                     {node.status === "checking" ? (
                       <div className="flex items-center gap-1.5 text-slate-400 text-xs font-medium">
-                        <RefreshCw size={12} className="animate-spin" /> Ping...
+                        <RefreshCw size={12} className="animate-spin text-blue-500" /> Ping...
                       </div>
                     ) : node.status === "offline" ? (
                       <span className="text-xs font-bold text-red-500 tracking-wider">TIMEOUT</span>
                     ) : (
                       <div className="flex items-center gap-3">
-                        <span className={cn("text-sm font-bold", node.latency > 500 ? "text-amber-600" : "text-slate-800")}>
+                        <span className={cn("text-xs font-bold font-mono", node.latency > 500 ? "text-amber-600" : "text-slate-800")}>
                           {node.latency} ms
                         </span>
                         <div className="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden">
@@ -537,31 +537,31 @@ const SuperAdminInfraPage = () => {
                       </div>
                     )}
                   </td>
-                  <td className="px-5 py-3.5">
+                  <td className="px-4 py-3">
                     {node.status === "checking" ? (
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 text-slate-500 rounded-full text-[10px] font-bold border border-slate-200">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-slate-100 text-slate-500 rounded-full text-[10px] font-bold border border-slate-200">
                         <Wifi size={11} className="opacity-50" /> Menghubungkan
                       </span>
                     ) : node.is_active === false ? (
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 text-slate-400 rounded-full text-[10px] font-bold border border-slate-200">
-                        <PowerOff size={11} /> Sistem Nonaktif
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-slate-100 text-slate-400 rounded-full text-[10px] font-bold border border-slate-200">
+                        <PowerOff size={11} /> Nonaktif
                       </span>
                     ) : node.status === "offline" ? (
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-red-50 text-red-700 rounded-full text-[10px] font-bold border border-red-200">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-red-50 text-red-700 rounded-full text-[10px] font-bold border border-red-200">
                         <AlertCircle size={11} /> Gagal Terhubung
                       </span>
                     ) : (
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 text-emerald-700 rounded-full text-[10px] font-bold border border-emerald-200">
-                        <CheckCircle size={11} /> Server Berjalan
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-emerald-50 text-emerald-700 rounded-full text-[10px] font-bold border border-emerald-200">
+                        <CheckCircle size={11} /> Berjalan
                       </span>
                     )}
                   </td>
-                  <td className="px-5 py-3.5 text-right">
+                  <td className="px-4 py-3 text-right">
                     <a
                       href={`${node.pb_url}/admin`}
                       target="_blank"
                       rel="noreferrer"
-                      className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 font-semibold hover:underline"
+                      className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 font-bold hover:underline"
                     >
                       Buka Panel <ExternalLink size={12} />
                     </a>
