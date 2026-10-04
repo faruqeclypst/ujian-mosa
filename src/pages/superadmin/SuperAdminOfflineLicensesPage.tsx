@@ -480,6 +480,17 @@ export default function SuperAdminOfflineLicensesPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            <a
+              href="https://examku.my.id/downloads/offline-update.zip"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="min-h-[42px] px-3.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs flex items-center gap-2 transition-all shadow-2xs"
+              title="Unduh berkas pembaruan server offline proktor (offline-update.zip)"
+            >
+              <Download size={14} className="text-purple-600" />
+              <span>Unduh Berkas Offline</span>
+            </a>
+
             <Button
               variant="outline"
               size="sm"
@@ -1061,6 +1072,23 @@ export default function SuperAdminOfflineLicensesPage() {
                   value={activeLicenseDetail.license_code}
                   className="w-full p-2.5 rounded-xl border border-purple-200 bg-purple-50/30 font-mono text-[11px] text-slate-800 select-all resize-none outline-none focus:ring-1 focus:ring-purple-500"
                 />
+              </div>
+
+              {/* Box Download Paket Offline CDN */}
+              <div className="p-3 bg-purple-50/60 rounded-xl border border-purple-200/80 flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-[11px] font-bold text-purple-900">Tautan Berkas Pembaruan Server Offline</p>
+                  <p className="text-[10px] text-purple-700/80 truncate font-mono mt-0.5">https://examku.my.id/downloads/offline-update.zip</p>
+                </div>
+                <a
+                  href="https://examku.my.id/downloads/offline-update.zip"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-2.5 py-1.5 rounded-lg bg-white border border-purple-200 text-purple-700 hover:bg-purple-100 text-xs font-bold flex items-center gap-1 shadow-2xs shrink-0 transition-colors"
+                >
+                  <Download size={12} />
+                  <span>Unduh ZIP</span>
+                </a>
               </div>
 
               <div className="flex flex-wrap gap-2 pt-1">
