@@ -201,6 +201,30 @@ const getActiveUntilInfo = (dateStr?: string) => {
   }
 };
 
+const SchoolAvatar = ({ name, logoUrl, className }: { name: string; logoUrl?: string; className?: string }) => {
+  const [error, setError] = useState(false);
+  const initial = (name || "S").trim()[0]?.toUpperCase() || "S";
+
+  if (logoUrl && !error) {
+    return (
+      <div className={cn("w-9 h-9 rounded-xl bg-white border border-slate-200/90 flex items-center justify-center overflow-hidden shrink-0 shadow-2xs group-hover:scale-105 transition-transform duration-200", className)}>
+        <img
+          src={logoUrl}
+          alt=""
+          className="w-full h-full object-contain p-0.5"
+          onError={() => setError(true)}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className={cn("w-9 h-9 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 font-black text-xs uppercase shrink-0 shadow-2xs", className)}>
+      {initial}
+    </div>
+  );
+};
+
 const SuperAdminDashboard = () => {
   const navigate = useNavigate();
   const [tab, setTab] = useState<"all" | "active" | "inactive" | "requests" | "logs">("all");
@@ -829,15 +853,7 @@ const SuperAdminDashboard = () => {
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-xl bg-white border border-slate-200/90 flex items-center justify-center overflow-hidden shrink-0 shadow-2xs group-hover:scale-105 transition-transform duration-200">
-                            {school.logo_url ? (
-                              <img src={school.logo_url} alt={school.name} className="w-full h-full object-contain p-0.5" />
-                            ) : (
-                              <div className="w-full h-full bg-blue-50 flex items-center justify-center text-blue-600 font-black text-xs uppercase">
-                                {school.name[0]}
-                              </div>
-                            )}
-                          </div>
+                          <SchoolAvatar name={school.name} logoUrl={school.logo_url} />
                           <div className="min-w-0">
                             <p className="font-bold text-slate-900 text-sm leading-tight group-hover:text-blue-600 transition-colors truncate max-w-[210px]">
                               {school.name}
@@ -1049,13 +1065,7 @@ const SuperAdminDashboard = () => {
                 <div key={school.id} className="p-4 space-y-3">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-10 h-10 rounded-xl bg-white border border-slate-100 flex items-center justify-center overflow-hidden flex-shrink-0 shadow-sm font-bold text-blue-600 text-sm">
-                        {school.logo_url ? (
-                          <img src={school.logo_url} alt={school.name} className="w-full h-full object-contain p-1" />
-                        ) : (
-                          school.name[0]
-                        )}
-                      </div>
+                      <SchoolAvatar name={school.name} logoUrl={school.logo_url} className="w-10 h-10 text-sm" />
                       <div className="min-w-0">
                         <p className="font-semibold text-slate-900 text-sm truncate">{school.name}</p>
                         <p className="text-xs text-slate-400 truncate">{school.contact_email || "–"}</p>
