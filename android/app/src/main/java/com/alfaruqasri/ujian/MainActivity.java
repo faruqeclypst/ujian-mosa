@@ -44,6 +44,17 @@ public class MainActivity extends BridgeActivity {
         }
 
         @android.webkit.JavascriptInterface
+        public void enableLockMode() {
+            Log.d(TAG, "NativeExamBridge.enableLockMode");
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    enableLockModeInternal();
+                }
+            });
+        }
+
+        @android.webkit.JavascriptInterface
         public void unlockScreen() {
             Log.d(TAG, "NativeExamBridge.unlockScreen");
             runOnUiThread(new Runnable() {
@@ -239,6 +250,16 @@ public class MainActivity extends BridgeActivity {
         
         // 4. Inisialisasi Layar Blokir (Layout)
         createBlockingLayout();
+
+        // 5. Otomatis picu mode Kiosk (Sematkan Layar) saat aplikasi dibuka
+        getWindow().getDecorView().postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                if (!isExiting && !isDevicePinned()) {
+                    triggerKioskPinning();
+                }
+            }
+        }, 1200);
     }
 
     public void setThemeModeInternal(final String theme, final String colorHex) {
@@ -306,6 +327,35 @@ public class MainActivity extends BridgeActivity {
         });
     }
 
+    public boolean isDevicePinned() {
+        try {
+            ActivityManager am = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
+            if (am != null) {
+                int state = am.getLockTaskModeState();
+                return state == ActivityManager.LOCK_TASK_MODE_PINNED || state == ActivityManager.LOCK_TASK_MODE_LOCKED;
+            }
+        } catch (Exception e) {}
+        return false;
+    }
+
+    public void triggerKioskPinning() {
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                if (isFinishing() || isExiting || isDevicePinned()) return;
+                try {
+                    ActivityManager am = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
+                    if (am != null && am.getLockTaskModeState() == ActivityManager.LOCK_TASK_MODE_NONE) {
+                        Log.d(TAG, "Memicu startLockTask() untuk Kiosk (Sematkan Layar)...");
+                        startLockTask();
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "Gagal memicu startLockTask: " + e.getMessage());
+                }
+            }
+        });
+    }
+
     public void enableLockModeInternal() {
         isExiting = false;
         isLockEnabled = true;
@@ -316,26 +366,13 @@ public class MainActivity extends BridgeActivity {
             @Override
             public void run() {
                 Log.d(TAG, "enableLockModeInternal: Kuncian diaktifkan");
-                try {
-                    ActivityManager am = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
-                    if (am != null && am.getLockTaskModeState() == ActivityManager.LOCK_TASK_MODE_NONE) {
-                        startLockTask();
-                    }
-                } catch (Exception e) {
-                    Log.e(TAG, "Auto startLockTask failed: " + e.getMessage());
-                }
+                triggerKioskPinning();
                 try {
                     if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
                         getWindow().setHideOverlayWindows(true);
                     }
                 } catch (Exception e) {}
-                handler.postDelayed(new Runnable() {
-                    @Override
-                    public void run() {
-                        checkLockTaskOnly();
-                        startRepeatingCheck();
-                    }
-                }, 800);
+                startRepeatingCheck();
             }
         });
     }
@@ -1113,6 +1150,16 @@ public class MainActivity extends BridgeActivity {
         makeFullScreen();
         applyThemeColors();
         applyNotchToWebView();
+        if (!isExiting && !isDevicePinned()) {
+            getWindow().getDecorView().postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    if (!isExiting && !isDevicePinned()) {
+                        triggerKioskPinning();
+                    }
+                }
+            }, 600);
+        }
         if (isLockEnabled) {
             checkLockTaskOnly();
         }
@@ -1172,11 +1219,11 @@ public class MainActivity extends BridgeActivity {
                 public void run() {
                     if (isFinishing() || isExiting) return;
                     if (lockState == ActivityManager.LOCK_TASK_MODE_NONE) {
-                        if (blockingLayout != null && blockingLayout.getVisibility() != View.VISIBLE) {
-                            blockingLayout.setVisibility(View.VISIBLE);
-                        }
-                        // Alarm HANYA berdering jika sebelumnya pernah terkunci (siswa melepas kuncian paksa)
+                        // Hanya tampilkan blockingLayout jika sebelumnya aplikasi PERNAH disematkan lalu dilepas paksa oleh siswa saat ujian
                         if (stateChanged && previousState != -1 && previousState != ActivityManager.LOCK_TASK_MODE_NONE) {
+                            if (blockingLayout != null && blockingLayout.getVisibility() != View.VISIBLE) {
+                                blockingLayout.setVisibility(View.VISIBLE);
+                            }
                             playRingtone();
                         }
                     } else {
@@ -1208,6 +1255,16 @@ public class MainActivity extends BridgeActivity {
                     }
                 }
             }, 500);
+            if (!isExiting && !isDevicePinned()) {
+                getWindow().getDecorView().postDelayed(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (!isExiting && !isDevicePinned()) {
+                            triggerKioskPinning();
+                        }
+                    }
+                }, 600);
+            }
             if (isLockEnabled) {
                 checkLockTaskOnly();
                 // Beri tahu WebView bahwa fokus jendela telah kembali

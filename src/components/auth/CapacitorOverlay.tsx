@@ -59,9 +59,19 @@ const CapacitorOverlay = () => {
         CheatAlert.notifyWebOverlayActive();
       } catch (e) {}
 
+      // Otomatis aktifkan mode kiosk saat aplikasi EXAMKU dimuat
       try {
-        if (typeof (window as any).AndroidExam !== "undefined" && (window as any).AndroidExam.notifyWebOverlayActive) {
-          (window as any).AndroidExam.notifyWebOverlayActive();
+        CheatAlert.enableLockMode();
+      } catch (e) {}
+
+      try {
+        if (typeof (window as any).AndroidExam !== "undefined") {
+          if ((window as any).AndroidExam.notifyWebOverlayActive) {
+            (window as any).AndroidExam.notifyWebOverlayActive();
+          }
+          if ((window as any).AndroidExam.enableLockMode) {
+            (window as any).AndroidExam.enableLockMode();
+          }
         }
       } catch (e) {}
     }
