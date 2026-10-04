@@ -9,7 +9,7 @@ import { APP_DISPLAY_VERSION } from "../../utils/version";
 
 export const isLocalServer = (school: SchoolRecord): boolean => {
   if (!school) return false;
-  if (school.slug === "local" || school.id === "local_server" || school.id === "local_server_detected") return true;
+  if (school.slug === "local" || school.id === "local_server" || school.id.startsWith("local_server_")) return true;
 
   const plan = (school.plan || "").toLowerCase();
   if (plan === "offline" || plan === "local" || plan === "lokal" || plan === "mandiri") return true;
@@ -42,9 +42,68 @@ export const isLocalServer = (school: SchoolRecord): boolean => {
   return false;
 };
 
+/**
+ * Deteksi subnet LAN perangkat menggunakan WebRTC ICE candidate.
+ * Tidak memerlukan izin apapun — hanya membaca kandidat IP lokal yang dikembalikan browser.
+ * Mengembalikan prefix subnet (misal "192.168.1") atau null jika gagal.
+ */
+function detectLanSubnet(): Promise<string | null> {
+  return new Promise((resolve) => {
+    try {
+      const RTCPeerConnection =
+        (window as any).RTCPeerConnection ||
+        (window as any).webkitRTCPeerConnection ||
+        (window as any).mozRTCPeerConnection;
+
+      if (!RTCPeerConnection) {
+        resolve(null);
+        return;
+      }
+
+      const pc = new RTCPeerConnection({ iceServers: [] });
+      pc.createDataChannel("");
+
+      const found = new Set<string>();
+      const timeout = setTimeout(() => {
+        pc.close();
+        resolve(found.size > 0 ? [...found][0] : null);
+      }, 800);
+
+      pc.onicecandidate = (e: any) => {
+        if (!e || !e.candidate || !e.candidate.candidate) return;
+        const m = e.candidate.candidate.match(
+          /([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})\.[0-9]{1,3}/
+        );
+        if (m) {
+          const prefix = m[1];
+          // Hanya simpan IP private (192.168.x, 10.x, 172.16-31.x)
+          if (
+            prefix.startsWith("192.168.") ||
+            prefix.startsWith("10.") ||
+            /^172\.(1[6-9]|2\d|3[01])$/.test(prefix)
+          ) {
+            found.add(prefix);
+          }
+        }
+      };
+
+      pc.createOffer()
+        .then((offer: any) => pc.setLocalDescription(offer))
+        .catch(() => {
+          clearTimeout(timeout);
+          pc.close();
+          resolve(null);
+        });
+    } catch {
+      resolve(null);
+    }
+  });
+}
+
 const SelectSchoolPage = () => {
   const [schools, setSchools] = useState<SchoolRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [scanningLan, setScanningLan] = useState(false);
   const [search, setSearch] = useState("");
   const { setManualSchool } = useTenant();
 
@@ -62,10 +121,8 @@ const SelectSchoolPage = () => {
         console.warn("Master PB fetch error (mungkin mode offline):", err);
       }
 
-      // Deteksi otomatis jika ada server lokal mandiri (Offline CBT) yang sedang berjalan
-      // PENTING: Jangan pernah memanggil fetch ke http://localhost:8090 jika dibuka dari domain publik (seperti examku.my.id)
-      // karena browser Chromium akan memunculkan popup Private Network Access (PNA):
-      // "examku.my.id ingin mengakses aplikasi dan layanan lain di perangkat ini".
+      // Deteksi otomatis server lokal di jaringan yang sama (LAN scan)
+      // PENTING: Jangan pernah scan ke IP lokal jika app dibuka dari domain publik (PNA Chromium policy)
       const isLocalEnvironment =
         typeof window !== "undefined" &&
         (window.location.hostname === "localhost" ||
@@ -76,51 +133,94 @@ const SelectSchoolPage = () => {
           Capacitor.isNativePlatform());
 
       if (isLocalEnvironment) {
-        try {
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 1000);
+        if (isMounted) setScanningLan(true);
+        // Kumpulkan kandidat IP yang akan di-probe
+        const ipCandidates: string[] = [];
 
-          const localOrigin =
-            window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
-              ? (window.location.port === "8090" ? window.location.origin : "http://localhost:8090")
-              : (Capacitor.isNativePlatform() ? "http://localhost:8090" : window.location.origin);
+        // 1. Selalu coba localhost terlebih dahulu (untuk dev atau server di perangkat sendiri)
+        ipCandidates.push("http://localhost:8090");
+        ipCandidates.push("http://127.0.0.1:8090");
 
-          const probeRes = await fetch(`${localOrigin}/api/collections/settings/records?perPage=1`, {
-            signal: controller.signal,
-          });
-          clearTimeout(timeoutId);
+        // 2. Jika app dibuka dari IP lokal (browser siswa terhubung ke server proktor),
+        //    coba origin saat ini langsung
+        if (
+          window.location.hostname !== "localhost" &&
+          window.location.hostname !== "127.0.0.1" &&
+          !Capacitor.isNativePlatform()
+        ) {
+          ipCandidates.push(window.location.origin);
+        }
 
-          if (probeRes.ok) {
-            const probeData = await probeRes.json();
-            let localSchoolName = "Server CBT Mandiri (Lokal)";
-            let localLogo = "";
-
-            if (probeData?.items && probeData.items.length > 0) {
-              const s = probeData.items[0];
-              if (s.name) localSchoolName = s.name;
-              if (s.logoUrl || s.logo) localLogo = s.logoUrl || s.logo;
+        // 3. Jika berjalan di Android (Capacitor), scan seluruh subnet LAN
+        //    untuk menemukan server proktor di jaringan yang sama
+        if (Capacitor.isNativePlatform()) {
+          try {
+            // Dapatkan IP gateway dari RTCPeerConnection (tanpa izin khusus)
+            const gatewaySubnet = await detectLanSubnet();
+            if (gatewaySubnet) {
+              // Scan paralel semua host di subnet (misal 192.168.1.1 - 192.168.1.254)
+              const [a, b, c] = gatewaySubnet.split(".");
+              for (let i = 1; i <= 254; i++) {
+                ipCandidates.push(`http://${a}.${b}.${c}.${i}:8090`);
+              }
             }
+          } catch (_) {}
+        }
 
-            const alreadyExists = masterRecords.some(
-              (r) => r.slug === "local" || isLocalServer(r)
-            );
-
-            if (!alreadyExists) {
-              const localRecord: SchoolRecord = {
-                id: "local_server_detected",
-                name: localSchoolName,
-                slug: "local",
-                pb_url: localOrigin,
-                type: "school",
-                is_active: true,
-                logo_url: localLogo || "/logo-default.png",
-                plan: "offline",
-              };
-              masterRecords = [localRecord, ...masterRecords];
+        // Probe semua kandidat secara paralel dengan timeout ketat 600ms
+        const PROBE_TIMEOUT = 600;
+        const probeResults = await Promise.allSettled(
+          ipCandidates.map(async (origin) => {
+            const ctrl = new AbortController();
+            const tid = setTimeout(() => ctrl.abort(), PROBE_TIMEOUT);
+            try {
+              const res = await fetch(`${origin}/api/collections/settings/records?perPage=1`, {
+                signal: ctrl.signal,
+              });
+              clearTimeout(tid);
+              if (!res.ok) throw new Error("not ok");
+              const data = await res.json();
+              return { origin, data };
+            } catch {
+              clearTimeout(tid);
+              throw new Error("unreachable");
             }
+          })
+        );
+
+        for (const result of probeResults) {
+          if (result.status !== "fulfilled") continue;
+          const { origin, data } = result.value;
+
+          let localSchoolName = "Server CBT Mandiri (Lokal)";
+          let localLogo = "";
+          if (data?.items && data.items.length > 0) {
+            const s = data.items[0];
+            if (s.name) localSchoolName = s.name;
+            if (s.logoUrl || s.logo) localLogo = s.logoUrl || s.logo;
           }
-        } catch (_) {}
+
+          // Jangan duplikat jika sudah ada di masterRecords
+          const alreadyExists = masterRecords.some(
+            (r) => r.pb_url === origin || r.slug === "local" || isLocalServer(r)
+          );
+          if (!alreadyExists) {
+            const localRecord: SchoolRecord = {
+              id: `local_server_${origin.replace(/[^a-z0-9]/gi, "_")}`,
+              name: localSchoolName,
+              slug: "local",
+              pb_url: origin,
+              type: "school",
+              is_active: true,
+              logo_url: localLogo || "/logo-default.png",
+              plan: "offline",
+            };
+            masterRecords = [localRecord, ...masterRecords];
+          }
+        }
+        if (isMounted) setScanningLan(false);
       }
+
 
       // Filter sekolah berstatus Lokal Server:
       // Hanya tampilkan jika server lokal tersebut AKTIF dan BISA DIHUBUNGI dari perangkat saat ini.
@@ -129,7 +229,7 @@ const SelectSchoolPage = () => {
       for (const record of masterRecords) {
         if (isLocalServer(record)) {
           // Jika server lokal terdeteksi di localhost/LAN atau memiliki pb_url lokal
-          if (record.id === "local_server_detected") {
+          if (record.id.startsWith("local_server_")) {
             verifiedSchools.push(record);
           } else if (record.pb_url) {
             try {
@@ -278,6 +378,9 @@ const SelectSchoolPage = () => {
           <div className="flex flex-col items-center justify-center h-48">
             <Loader2 className="w-10 h-10 text-blue-500 animate-spin mb-4" />
             <p className="text-slate-500 font-medium tracking-wide">Mencari Server...</p>
+            {scanningLan && (
+              <p className="text-slate-400 text-xs mt-2 animate-pulse">Memindai jaringan lokal...</p>
+            )}
           </div>
         ) : filteredSchools.length > 0 ? (
           <div className="flex flex-col gap-4">

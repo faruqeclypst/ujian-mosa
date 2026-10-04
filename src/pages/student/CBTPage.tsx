@@ -607,22 +607,58 @@ const CBTPage = () => {
   const answersRef = useRef<Record<string, any>>({});
   const isNavigatingOrReloadingRef = useRef<boolean>(false);
 
-  // Kunci layar saat ujian aktif, dan lepas saat lembar ujian CBT ditutup / selesai
+  // Aktifkan kunci layar (Screen Pinning / Kiosk) saat ujian aktif
   useEffect(() => {
-    if (Capacitor.isNativePlatform()) {
-      try { CheatAlert.enableLockMode(); } catch (err) { }
-      try { CheatAlert.stopAlarm(); } catch (err) { }
-    }
+    if (!Capacitor.isNativePlatform()) return;
+
+    try { CheatAlert.enableLockMode(); } catch (err) {}
+    try { CheatAlert.stopAlarm(); } catch (err) {}
+
+    // Verifikasi bahwa startLockTask berhasil dalam 10 detik
+    let attempts = 0;
+    const maxAttempts = 5;
+    const pollInterval = setInterval(async () => {
+      attempts++;
+      try {
+        const result = await CheatAlert.getLockState();
+        if (result?.isPinned) {
+          clearInterval(pollInterval);
+          return;
+        }
+        // Belum ter-pin, minta native untuk retry
+        if (attempts < maxAttempts) {
+          try { CheatAlert.enableLockMode(); } catch (e) {}
+        } else {
+          clearInterval(pollInterval);
+        }
+      } catch (e) {
+        if (attempts >= maxAttempts) clearInterval(pollInterval);
+      }
+    }, 2000);
+
     return () => {
+      clearInterval(pollInterval);
       const nextPath = window.location.pathname;
       if (!nextPath.startsWith("/cbt")) {
         if (Capacitor.isNativePlatform()) {
-          try { CheatAlert.unlockScreen(); } catch (err) { }
-          try { CheatAlert.stopAlarm(); } catch (err) { }
+          try { CheatAlert.unlockScreen(); } catch (err) {}
+          try { CheatAlert.stopAlarm(); } catch (err) {}
         }
       }
     };
   }, []);
+
+  // Cegah tombol back Capacitor saat di halaman CBT
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+    const backSub = App.addListener("backButton", () => {
+      // Abaikan total tombol back perangkat saat di lembar ujian CBT
+    });
+    return () => {
+      backSub.then((l) => l.remove());
+    };
+  }, []);
+
 
   // Jika siswa terdeteksi double login (isKicked), segera tutup semua modal lembar ujian & hentikan penalti
   useEffect(() => {
@@ -2033,12 +2069,14 @@ const CBTPage = () => {
   }, [isLocked, attempt?.id]);
 
   useEffect(() => {
-    if (!isLocked) return;
-    const handlePopState = () => { window.history.pushState(null, "", window.location.href); };
+    // Selalu jebak event popstate agar gesture swipe back browser tidak meninggalkan halaman ujian
+    const handlePopState = () => {
+      window.history.pushState(null, "", window.location.href);
+    };
     window.history.pushState(null, "", window.location.href);
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
-  }, [isLocked]);
+  }, []);
 
   useEffect(() => { if (isExamOver && !loading && (attempt?.status === "ongoing" || attempt?.status === "LOCKED")) handleSubmitExam(true); }, [isExamOver, loading, attempt?.status, handleSubmitExam]);
 

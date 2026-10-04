@@ -250,16 +250,6 @@ public class MainActivity extends BridgeActivity {
         
         // 4. Inisialisasi Layar Blokir (Layout)
         createBlockingLayout();
-
-        // 5. Otomatis picu mode Kiosk (Sematkan Layar) saat aplikasi dibuka
-        getWindow().getDecorView().postDelayed(new Runnable() {
-            @Override
-            public void run() {
-                if (!isExiting && !isDevicePinned()) {
-                    triggerKioskPinning();
-                }
-            }
-        }, 1200);
     }
 
     public void setThemeModeInternal(final String theme, final String colorHex) {
@@ -338,22 +328,53 @@ public class MainActivity extends BridgeActivity {
         return false;
     }
 
+    // Coba sematkan layar. Jika belum berhasil, retry setiap 2 detik (maks 5 kali).
     public void triggerKioskPinning() {
+        triggerKioskPinningWithRetry(0);
+    }
+
+    private static final int MAX_PINNING_RETRIES = 5;
+
+    private void triggerKioskPinningWithRetry(final int attempt) {
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
-                if (isFinishing() || isExiting || isDevicePinned()) return;
+                if (isFinishing() || isExiting) return;
+                if (isDevicePinned()) {
+                    Log.d(TAG, "triggerKioskPinning: sudah terkunci (attempt=" + attempt + ")");
+                    return;
+                }
                 try {
                     ActivityManager am = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
                     if (am != null && am.getLockTaskModeState() == ActivityManager.LOCK_TASK_MODE_NONE) {
-                        Log.d(TAG, "Memicu startLockTask() untuk Kiosk (Sematkan Layar)...");
+                        Log.d(TAG, "Memicu startLockTask() (attempt=" + attempt + ")");
                         startLockTask();
                     }
                 } catch (Exception e) {
-                    Log.e(TAG, "Gagal memicu startLockTask: " + e.getMessage());
+                    Log.e(TAG, "startLockTask gagal (attempt=" + attempt + "): " + e.getMessage());
+                }
+                // Setelah 2 detik, cek apakah sudah ter-pin. Jika belum, retry.
+                if (attempt < MAX_PINNING_RETRIES) {
+                    handler.postDelayed(new Runnable() {
+                        @Override
+                        public void run() {
+                            if (!isFinishing() && !isExiting && !isDevicePinned()) {
+                                Log.w(TAG, "Belum terkunci setelah 2s, retry ke-" + (attempt + 1));
+                                triggerKioskPinningWithRetry(attempt + 1);
+                            }
+                        }
+                    }, 2000);
                 }
             }
         });
+    }
+
+    public int getLockStateInternal() {
+        try {
+            ActivityManager am = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
+            if (am != null) return am.getLockTaskModeState();
+        } catch (Exception e) {}
+        return ActivityManager.LOCK_TASK_MODE_NONE;
     }
 
     public void enableLockModeInternal() {
@@ -1150,17 +1171,30 @@ public class MainActivity extends BridgeActivity {
         makeFullScreen();
         applyThemeColors();
         applyNotchToWebView();
-        if (!isExiting && !isDevicePinned()) {
+        // Re-pin hanya jika mode kunci sudah aktif (siswa sedang ujian) dan layar lepas dari kuncian
+        if (isLockEnabled && !isExiting && !isDevicePinned()) {
             getWindow().getDecorView().postDelayed(new Runnable() {
                 @Override
                 public void run() {
-                    if (!isExiting && !isDevicePinned()) {
+                    if (isLockEnabled && !isExiting && !isDevicePinned()) {
                         triggerKioskPinning();
                     }
                 }
             }, 600);
         }
         if (isLockEnabled) {
+            try {
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                    getWindow().setHideOverlayWindows(true);
+                }
+            } catch (Exception e) {}
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N && isInMultiWindowMode()) {
+                Log.w(TAG, "onResume: Aplikasi terdeteksi dalam mode split-screen saat ujian!");
+                playRingtone();
+                if (blockingLayout != null) {
+                    blockingLayout.setVisibility(View.VISIBLE);
+                }
+            }
             checkLockTaskOnly();
         }
     }
@@ -1242,6 +1276,41 @@ public class MainActivity extends BridgeActivity {
     }
 
     @Override
+    public boolean dispatchTouchEvent(android.view.MotionEvent ev) {
+        if (isLockEnabled && !isExiting) {
+            int flags = ev.getFlags();
+            boolean isObscured = (flags & android.view.MotionEvent.FLAG_WINDOW_IS_OBSCURED) != 0;
+            boolean isPartiallyObscured = false;
+            if (android.os.Build.VERSION.SDK_INT >= 29) {
+                isPartiallyObscured = (flags & android.view.MotionEvent.FLAG_WINDOW_IS_PARTIALLY_OBSCURED) != 0;
+            }
+
+            if (isObscured || isPartiallyObscured) {
+                Log.w(TAG, "dispatchTouchEvent: Sentuhan dihalangi oleh floating app/overlay pihak ketiga! Memblokir...");
+                playRingtone();
+                if (blockingLayout != null) {
+                    blockingLayout.setVisibility(View.VISIBLE);
+                }
+                return true;
+            }
+        }
+        return super.dispatchTouchEvent(ev);
+    }
+
+    @Override
+    public void onMultiWindowModeChanged(boolean isInMultiWindowMode, android.content.res.Configuration newConfig) {
+        super.onMultiWindowModeChanged(isInMultiWindowMode, newConfig);
+        if (isLockEnabled && !isExiting && isInMultiWindowMode) {
+            Log.w(TAG, "onMultiWindowModeChanged: Siswa mencoba split screen saat ujian!");
+            playRingtone();
+            if (blockingLayout != null) {
+                blockingLayout.setVisibility(View.VISIBLE);
+            }
+            makeFullScreen();
+        }
+    }
+
+    @Override
     public void onWindowFocusChanged(boolean hasFocus) {
         super.onWindowFocusChanged(hasFocus);
         if (isFinishing() || isExiting) return;
@@ -1255,17 +1324,22 @@ public class MainActivity extends BridgeActivity {
                     }
                 }
             }, 500);
-            if (!isExiting && !isDevicePinned()) {
+            if (isLockEnabled && !isExiting && !isDevicePinned()) {
                 getWindow().getDecorView().postDelayed(new Runnable() {
                     @Override
                     public void run() {
-                        if (!isExiting && !isDevicePinned()) {
+                        if (isLockEnabled && !isExiting && !isDevicePinned()) {
                             triggerKioskPinning();
                         }
                     }
                 }, 600);
             }
             if (isLockEnabled) {
+                try {
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                        getWindow().setHideOverlayWindows(true);
+                    }
+                } catch (Exception e) {}
                 checkLockTaskOnly();
                 // Beri tahu WebView bahwa fokus jendela telah kembali
                 runOnUiThread(new Runnable() {
@@ -1291,6 +1365,24 @@ public class MainActivity extends BridgeActivity {
             } catch (Exception e) {}
 
             if (isLockEnabled && !isExiting && !isMenuDialogOpen) {
+                android.os.PowerManager pm = (android.os.PowerManager) getSystemService(Context.POWER_SERVICE);
+                boolean isInteractive = (pm != null) && pm.isInteractive();
+
+                if (isInteractive && !isScreenOff) {
+                    Log.w(TAG, "onWindowFocusChanged(false): Fokus jendela hilang saat layar aktif -> Floating app / Split screen / Notifikasi!");
+                    playRingtone();
+                    if (blockingLayout != null) {
+                        blockingLayout.setVisibility(View.VISIBLE);
+                    }
+                    try {
+                        android.content.Intent bringToFront = new android.content.Intent(this, MainActivity.class);
+                        bringToFront.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK | 
+                                               android.content.Intent.FLAG_ACTIVITY_REORDER_TO_FRONT | 
+                                               android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP);
+                        startActivity(bringToFront);
+                    } catch (Exception e) {}
+                }
+
                 // Beri tahu WebView bahwa fokus jendela hilang (CBTPage menangani countdown 5s & cek layar mati)
                 Log.d(TAG, "onWindowFocusChanged(false): Fokus jendela hilang saat ujian");
                 runOnUiThread(new Runnable() {
@@ -1513,24 +1605,20 @@ public class MainActivity extends BridgeActivity {
 
     public void handleBackAction() {
         Log.d(TAG, "handleBackAction called. isLockEnabled=" + isLockEnabled);
-        
-        // 1. Jika dalam mode kuncian ujian aktif
-        if (isLockEnabled) {
+
+        String currentUrl = null;
+        try {
             if (getBridge() != null && getBridge().getWebView() != null) {
-                android.webkit.WebBackForwardList history = getBridge().getWebView().copyBackForwardList();
-                int currentIndex = history.getCurrentIndex();
-                if (currentIndex > 0) {
-                    String prevUrl = history.getItemAtIndex(currentIndex - 1).getUrl();
-                    // Cegah mundur ke launcher lokal jika sedang ujian
-                    if (prevUrl != null && (prevUrl.contains("localhost") || prevUrl.equals(customLauncherUrl))) {
-                        Log.d(TAG, "Mencegah back ke launcher ujian saat mode terkunci aktif");
-                        android.widget.Toast.makeText(this, "Gunakan tombol menu di pojok kanan bawah untuk keluar ujian", android.widget.Toast.LENGTH_SHORT).show();
-                        return;
-                    }
-                    getBridge().getWebView().goBack();
-                    return;
-                }
+                currentUrl = getBridge().getWebView().getUrl();
             }
+        } catch (Exception e) {}
+
+        boolean isInCbt = (currentUrl != null && currentUrl.contains("/cbt"));
+
+        // 1. Jika dalam mode ujian (isLockEnabled aktif atau URL sedang di /cbt):
+        // BLOKIR TOTAL! SAMA SEKALI JANGAN panggil getWebView().goBack() atau finish()!
+        if (isLockEnabled || isInCbt) {
+            Log.d(TAG, "Mencegah tombol / gesture back saat ujian aktif (isLockEnabled=" + isLockEnabled + ", isInCbt=" + isInCbt + ")");
             android.widget.Toast.makeText(this, "Tombol Kembali dinonaktifkan demi keamanan ujian", android.widget.Toast.LENGTH_SHORT).show();
             return;
         }

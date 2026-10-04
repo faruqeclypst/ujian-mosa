@@ -59,26 +59,18 @@ const CapacitorOverlay = () => {
         CheatAlert.notifyWebOverlayActive();
       } catch (e) {}
 
-      // Otomatis aktifkan mode kiosk saat aplikasi EXAMKU dimuat
-      try {
-        CheatAlert.enableLockMode();
-      } catch (e) {}
-
       try {
         if (typeof (window as any).AndroidExam !== "undefined") {
           if ((window as any).AndroidExam.notifyWebOverlayActive) {
             (window as any).AndroidExam.notifyWebOverlayActive();
           }
-          if ((window as any).AndroidExam.enableLockMode) {
-            (window as any).AndroidExam.enableLockMode();
-          }
         }
       } catch (e) {}
     }
 
-    // Handle back button: blokir saat ujian, buka modal keluar saat di luar ujian
+    // Handle back button: blokir total saat ujian, buka modal keluar saat di luar ujian
     const backListener = App.addListener("backButton", ({ canGoBack }) => {
-      if (window.location.pathname.includes("/cbt/")) {
+      if (window.location.pathname.startsWith("/cbt")) {
         return;
       }
       if (canGoBack && window.history.length > 1) {
