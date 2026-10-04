@@ -18,9 +18,6 @@
             android:launchMode="singleTask"
             android:hardwareAccelerated="true"
             android:windowSoftInputMode="adjustResize"
-            android:resizeableActivity="false"
-            android:supportsPictureInPicture="false"
-            android:lockTaskMode="normal"
             android:exported="true">
 
             <intent-filter>

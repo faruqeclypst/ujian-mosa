@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Capacitor, registerPlugin } from "@capacitor/core";
+import { Capacitor } from "@capacitor/core";
 import { useStudentAuth } from "../../context/StudentAuthContext";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
@@ -9,8 +9,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../../componen
 import { useTenant } from "../../context/TenantContext";
 import { useTheme } from "../../context/ThemeContext";
 import { User, Lock, GraduationCap, School, Eye, EyeOff, Sun, Moon } from "lucide-react";
-
-const CheatAlert = registerPlugin<any>("CheatAlert");
 
 const StudentLoginPage = () => {
   const { student, loginStudent, changePassword } = useStudentAuth();
@@ -122,29 +120,13 @@ const StudentLoginPage = () => {
     <div className="flex flex-col items-center justify-center min-h-[100dvh] overflow-y-auto bg-[#f8fafc] dark:bg-[#020617] relative font-sans leading-relaxed px-4 py-8">
       {/* Floating Change School Button (Android Only) */}
       {Capacitor.getPlatform() === 'android' && (
-        <div className="absolute top-[max(1.5rem,calc(env(safe-area-inset-top,0px)+1rem))] left-6 z-50 flex items-center gap-2">
+        <div className="absolute top-[max(1.5rem,calc(env(safe-area-inset-top,0px)+1rem))] left-6 z-50">
           <button
             onClick={() => setManualSchool(null)}
             className="flex items-center gap-2 px-4 py-2 bg-white/90 border border-slate-200 rounded-full text-sm font-semibold text-slate-600 hover:text-emerald-600 hover:border-emerald-200 transition-colors shadow-sm"
           >
             <School size={16} />
             <span>Ganti Unit</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              if ((window as any).AndroidExam?.enableLockMode) {
-                try { (window as any).AndroidExam.enableLockMode(); } catch (_) {}
-              } else if (Capacitor.isNativePlatform()) {
-                try { CheatAlert.enableLockMode(); } catch (_) {}
-              }
-            }}
-            className="flex items-center gap-1.5 px-3.5 py-2 bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800 rounded-full text-xs font-bold text-amber-700 dark:text-amber-300 hover:bg-amber-100 transition-colors shadow-sm"
-            title="Kunci Layar (Kiosk Mode)"
-          >
-            <Lock size={14} />
-            <span>Kunci Layar</span>
           </button>
         </div>
       )}

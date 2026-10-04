@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from "react";
-import { RefreshCw, LogOut, X, MoreHorizontal, ShieldAlert, Lock } from "lucide-react";
+import { RefreshCw, LogOut, X, MoreHorizontal, ShieldAlert } from "lucide-react";
 import { Capacitor, registerPlugin } from "@capacitor/core";
 import { App } from "@capacitor/app";
 
@@ -16,22 +16,6 @@ const CapacitorOverlay = () => {
   const fabRef = useRef<HTMLDivElement>(null);
   const dragState = useRef({ isDragging: false, startX: 0, startY: 0, offsetX: 0, offsetY: 0 });
   const [position, setPosition] = useState({ x: 0, y: 0 });
-
-  const handlePinScreen = () => {
-    if ((window as any).AndroidExam && typeof (window as any).AndroidExam.enableLockMode === "function") {
-      try {
-        (window as any).AndroidExam.enableLockMode();
-        return;
-      } catch (_) {}
-    }
-    if (Capacitor.isNativePlatform()) {
-      try {
-        CheatAlert.enableLockMode();
-      } catch (e) {
-        console.error("enableLockMode failed", e);
-      }
-    }
-  };
 
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     const touch = e.touches[0];
@@ -190,18 +174,6 @@ const CapacitorOverlay = () => {
               title="Refresh"
             >
               <RefreshCw size={18} />
-            </button>
-
-            {/* Lock / Pin Screen Button */}
-            <button
-              onClick={() => {
-                handlePinScreen();
-                setShowMenu(false);
-              }}
-              className="w-10 h-10 flex items-center justify-center rounded-full bg-amber-500 text-white shadow-xl border border-amber-400 active:scale-90 transition-transform"
-              title="Kunci Layar (Kiosk)"
-            >
-              <Lock size={18} />
             </button>
 
             {/* Exit Button */}

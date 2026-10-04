@@ -15,12 +15,6 @@ public class MainActivity extends BridgeActivity {
     private android.media.ToneGenerator toneGenerator;
     private int lastLockState = -1;
     private android.widget.LinearLayout blockingLayout;
-    private android.widget.TextView blockingTitle;
-    private android.widget.TextView blockingDesc;
-    private android.widget.Button btnPinAction;
-    private android.widget.Button btnSettingsAction;
-    public volatile boolean isPinningRequested = false;
-    public volatile long pinningRequestTime = 0;
     private android.os.Handler handler = new android.os.Handler();
     private android.os.Handler alarmHandler = new android.os.Handler();
     private boolean isAlarmPlaying = false;
@@ -50,30 +44,8 @@ public class MainActivity extends BridgeActivity {
         }
 
         @android.webkit.JavascriptInterface
-        public void enableLockMode() {
-            Log.d(TAG, "NativeExamBridge.enableLockMode");
-            runOnUiThread(new Runnable() {
-                @Override
-                public void run() {
-                    enableLockModeInternal();
-                }
-            });
-        }
-
-        @android.webkit.JavascriptInterface
         public void unlockScreen() {
             Log.d(TAG, "NativeExamBridge.unlockScreen");
-            runOnUiThread(new Runnable() {
-                @Override
-                public void run() {
-                    unlockScreenInternal();
-                }
-            });
-        }
-
-        @android.webkit.JavascriptInterface
-        public void disableLockMode() {
-            Log.d(TAG, "NativeExamBridge.disableLockMode");
             runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
@@ -107,16 +79,6 @@ public class MainActivity extends BridgeActivity {
         @android.webkit.JavascriptInterface
         public boolean isNative() {
             return true;
-        }
-
-        @android.webkit.JavascriptInterface
-        public boolean isLockActive() {
-            return isLockEnabled && isDevicePinned();
-        }
-
-        @android.webkit.JavascriptInterface
-        public boolean isAppPinningSupported() {
-            return isAppPinningEnabledInSettings();
         }
     }
 
@@ -169,6 +131,18 @@ public class MainActivity extends BridgeActivity {
                 applyNotchToWebView();
             }
         });
+        getWindow().getDecorView().postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                applyNotchToWebView();
+            }
+        }, 400);
+        getWindow().getDecorView().postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                applyNotchToWebView();
+            }
+        }, 1200);
         
         // Jaga agar layar tidak mati otomatis saat ujian berlangsung
         try {
@@ -219,7 +193,15 @@ public class MainActivity extends BridgeActivity {
                     ) {
                         androidx.core.view.DisplayCutoutCompat cutout = insets.getDisplayCutout();
                         int safeTop = (cutout != null) ? cutout.getSafeInsetTop() : 0;
-                        if (safeTop != cachedCutoutTop) {
+                        if (safeTop <= 0) {
+                            try {
+                                int resId = getResources().getIdentifier("status_bar_height", "dimen", "android");
+                                if (resId > 0) {
+                                    safeTop = getResources().getDimensionPixelSize(resId);
+                                }
+                            } catch (Exception e) {}
+                        }
+                        if (safeTop > 0 && safeTop != cachedCutoutTop) {
                             cachedCutoutTop = safeTop;
                             applyNotchToWebView();
                         }
@@ -247,7 +229,6 @@ public class MainActivity extends BridgeActivity {
         
         // 3. Keamanan: Anti Screenshot & Record (FLAG_SECURE) & Blokir Floating Overlay (Android 12+)
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);
-        getWindow().getDecorView().setFilterTouchesWhenObscured(true);
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
             try {
                 getWindow().setHideOverlayWindows(true);
@@ -325,50 +306,6 @@ public class MainActivity extends BridgeActivity {
         });
     }
 
-    public boolean isDevicePinned() {
-        try {
-            ActivityManager am = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
-            if (am != null) {
-                int state = am.getLockTaskModeState();
-                return state == ActivityManager.LOCK_TASK_MODE_PINNED || state == ActivityManager.LOCK_TASK_MODE_LOCKED;
-            }
-        } catch (Exception e) {}
-        return false;
-    }
-
-    public boolean isAppPinningEnabledInSettings() {
-        try {
-            int state = android.provider.Settings.System.getInt(getContentResolver(), "lock_to_app_enabled", -1);
-            if (state != -1) return state != 0;
-        } catch (Exception e) {}
-        try {
-            int state = android.provider.Settings.Secure.getInt(getContentResolver(), "lock_to_app_enabled", -1);
-            if (state != -1) return state != 0;
-        } catch (Exception e) {}
-        return true;
-    }
-
-    public void requestPinScreen() {
-        isPinningRequested = true;
-        pinningRequestTime = System.currentTimeMillis();
-        runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    ActivityManager am = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
-                    if (am != null && am.getLockTaskModeState() == ActivityManager.LOCK_TASK_MODE_NONE) {
-                        Log.d(TAG, "Memanggil startLockTask() untuk Sematkan Layar...");
-                        startLockTask();
-                    } else {
-                        Log.d(TAG, "Perangkat sudah dalam mode pinned/locked.");
-                    }
-                } catch (Exception e) {
-                    Log.e(TAG, "Gagal memanggil startLockTask(): " + e.getMessage(), e);
-                }
-            }
-        });
-    }
-
     public void enableLockModeInternal() {
         isExiting = false;
         isLockEnabled = true;
@@ -380,29 +317,25 @@ public class MainActivity extends BridgeActivity {
             public void run() {
                 Log.d(TAG, "enableLockModeInternal: Kuncian diaktifkan");
                 try {
+                    ActivityManager am = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
+                    if (am != null && am.getLockTaskModeState() == ActivityManager.LOCK_TASK_MODE_NONE) {
+                        startLockTask();
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "Auto startLockTask failed: " + e.getMessage());
+                }
+                try {
                     if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
                         getWindow().setHideOverlayWindows(true);
                     }
                 } catch (Exception e) {}
-                try {
-                    getWindow().getDecorView().setFilterTouchesWhenObscured(true);
-                    if (getBridge() != null && getBridge().getWebView() != null) {
-                        getBridge().getWebView().setFilterTouchesWhenObscured(true);
-                    }
-                } catch (Exception e) {}
-                
-                requestPinScreen();
-
-                // Berikan jeda 5 detik agar siswa sempat membaca & mengetuk 'Mengerti/Sematkan' pada dialog sistem OS Android
                 handler.postDelayed(new Runnable() {
                     @Override
                     public void run() {
-                        if (isLockEnabled && !isExiting) {
-                            checkLockTaskOnly();
-                            startRepeatingCheck();
-                        }
+                        checkLockTaskOnly();
+                        startRepeatingCheck();
                     }
-                }, 5000);
+                }, 800);
             }
         });
     }
@@ -577,7 +510,6 @@ public class MainActivity extends BridgeActivity {
 
     public void unlockScreenInternal() {
         isLockEnabled = false;
-        isPinningRequested = false;
         stopRepeatingCheck();
         if (fallbackEnableLockRunnable != null) {
             handler.removeCallbacks(fallbackEnableLockRunnable);
@@ -708,14 +640,6 @@ public class MainActivity extends BridgeActivity {
                 canvas.drawLine(12f * scale, 7f * scale, 12f * scale, 13f * scale, paint);
                 paint.setStyle(android.graphics.Paint.Style.FILL);
                 canvas.drawCircle(12f * scale, 16.5f * scale, 1.4f * scale, paint);
-            } else if ("lock".equals(iconType)) {
-                paint.setStyle(android.graphics.Paint.Style.STROKE);
-                android.graphics.RectF body = new android.graphics.RectF(5f * scale, 10f * scale, 19f * scale, 21f * scale);
-                canvas.drawRoundRect(body, 2f * scale, 2f * scale, paint);
-                android.graphics.RectF shackle = new android.graphics.RectF(7.5f * scale, 3.5f * scale, 16.5f * scale, 13.5f * scale);
-                canvas.drawArc(shackle, 180, 180, false, paint);
-                paint.setStyle(android.graphics.Paint.Style.FILL);
-                canvas.drawCircle(12f * scale, 15f * scale, 1.5f * scale, paint);
             }
         }
     }
@@ -766,28 +690,7 @@ public class MainActivity extends BridgeActivity {
         refreshParams.bottomMargin = spacing;
         actionsLayout.addView(btnRefresh, refreshParams);
 
-        // 2. Sub-Button Lock (Amber Circle - Kunci Layar / Pinned)
-        final android.widget.FrameLayout btnLock = new android.widget.FrameLayout(this);
-        android.graphics.drawable.GradientDrawable bgLock = new android.graphics.drawable.GradientDrawable();
-        bgLock.setShape(android.graphics.drawable.GradientDrawable.OVAL);
-        bgLock.setColor(android.graphics.Color.parseColor("#F59E0B")); // Amber 500
-        bgLock.setStroke(dpToPx(1), android.graphics.Color.parseColor("#FBBF24")); // Amber 400
-        btnLock.setBackground(bgLock);
-        if (android.os.Build.VERSION.SDK_INT >= 21) {
-            btnLock.setElevation(dpToPx(6));
-        }
-
-        IconView iconLock = new IconView(this, "lock", android.graphics.Color.WHITE);
-        android.widget.FrameLayout.LayoutParams iconLockParams = new android.widget.FrameLayout.LayoutParams(
-            iconSizeSub, iconSizeSub, android.view.Gravity.CENTER
-        );
-        btnLock.addView(iconLock, iconLockParams);
-
-        android.widget.LinearLayout.LayoutParams lockParams = new android.widget.LinearLayout.LayoutParams(subFabSize, subFabSize);
-        lockParams.bottomMargin = spacing;
-        actionsLayout.addView(btnLock, lockParams);
-
-        // 3. Sub-Button Exit (Rose Circle)
+        // 2. Sub-Button Exit (Rose Circle)
         final android.widget.FrameLayout btnExit = new android.widget.FrameLayout(this);
         android.graphics.drawable.GradientDrawable bgExit = new android.graphics.drawable.GradientDrawable();
         bgExit.setShape(android.graphics.drawable.GradientDrawable.OVAL);
@@ -808,7 +711,7 @@ public class MainActivity extends BridgeActivity {
         exitParams.bottomMargin = spacing;
         actionsLayout.addView(btnExit, exitParams);
 
-        // 4. Main Toggle Button (Emerald Closed, Slate Open)
+        // 3. Main Toggle Button (Emerald Closed, Slate Open)
         final android.widget.FrameLayout btnToggle = new android.widget.FrameLayout(this);
         final android.graphics.drawable.GradientDrawable bgToggleClosed = new android.graphics.drawable.GradientDrawable();
         bgToggleClosed.setShape(android.graphics.drawable.GradientDrawable.OVAL);
@@ -871,19 +774,6 @@ public class MainActivity extends BridgeActivity {
                 isMenuOpen[0] = false;
                 updateToggleState.run();
                 showExamConfirmDialog("refresh");
-            }
-        });
-
-        btnLock.setOnClickListener(new android.view.View.OnClickListener() {
-            @Override
-            public void onClick(android.view.View v) {
-                isMenuOpen[0] = false;
-                updateToggleState.run();
-                if (isDevicePinned()) {
-                    android.widget.Toast.makeText(MainActivity.this, "Mode Kiosk (Sematkan Layar) sudah aktif", android.widget.Toast.LENGTH_SHORT).show();
-                } else {
-                    enableLockModeInternal();
-                }
             }
         });
 
@@ -1173,88 +1063,48 @@ public class MainActivity extends BridgeActivity {
         blockingLayout.setZ(999999f); 
         blockingLayout.setVisibility(View.GONE);
 
-        blockingTitle = new android.widget.TextView(this);
-        blockingTitle.setText("MODE KIOSK DIPERLUKAN");
-        blockingTitle.setTextColor(android.graphics.Color.WHITE);
-        blockingTitle.setTextSize(26);
-        blockingTitle.setGravity(android.view.Gravity.CENTER);
-        blockingTitle.setTypeface(null, android.graphics.Typeface.BOLD);
-        blockingTitle.setPadding(0, 0, 0, 32);
+        android.widget.TextView title = new android.widget.TextView(this);
+        title.setText("AKSES DIBLOKIR");
+        title.setTextColor(android.graphics.Color.WHITE);
+        title.setTextSize(28);
+        title.setGravity(android.view.Gravity.CENTER);
+        title.setTypeface(null, android.graphics.Typeface.BOLD);
+        title.setPadding(0, 0, 0, 40);
 
-        blockingDesc = new android.widget.TextView(this);
-        blockingDesc.setText("Demi keamanan ujian, aplikasi ini wajib menggunakan mode 'Sematkan Layar' (App Pinning).\n\nSilakan klik tombol di bawah, lalu pilih 'MENGERTI' atau 'SEMATKAN' pada kotak dialog sistem Android yang muncul.");
-        blockingDesc.setTextColor(android.graphics.Color.WHITE);
-        blockingDesc.setTextSize(15);
-        blockingDesc.setGravity(android.view.Gravity.CENTER);
-        blockingDesc.setPadding(0, 0, 0, 60);
+        android.widget.TextView desc = new android.widget.TextView(this);
+        desc.setText("Demi keamanan ujian, aplikasi ini wajib menggunakan mode 'Sematkan Layar'.\n\nSilakan klik tombol di bawah untuk mengaktifkan kuncian.\n\nUntuk keluar ujian, gunakan tombol menu di pojok kanan bawah.");
+        desc.setTextColor(android.graphics.Color.WHITE);
+        desc.setTextSize(16);
+        desc.setGravity(android.view.Gravity.CENTER);
+        desc.setPadding(0, 0, 0, 80);
 
-        btnPinAction = new android.widget.Button(this);
-        btnPinAction.setText("🔒 SEMATKAN LAYAR SEKARANG");
-        btnPinAction.setBackgroundColor(android.graphics.Color.WHITE);
-        btnPinAction.setTextColor(android.graphics.Color.parseColor("#E11D48"));
-        btnPinAction.setPadding(40, 20, 40, 20);
-        btnPinAction.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                if (blockingLayout != null) {
-                    blockingLayout.setVisibility(View.GONE);
-                }
-                requestPinScreen();
-            }
-        });
-
-        btnSettingsAction = new android.widget.Button(this);
-        btnSettingsAction.setText("⚙️ BUKA PENGATURAN HP");
-        btnSettingsAction.setBackgroundColor(android.graphics.Color.parseColor("#1E293B")); // Slate 800
-        btnSettingsAction.setTextColor(android.graphics.Color.WHITE);
-        btnSettingsAction.setPadding(40, 20, 40, 20);
-        android.widget.LinearLayout.LayoutParams settingsParams = new android.widget.LinearLayout.LayoutParams(
-            android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
-            android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
-        );
-        settingsParams.topMargin = 24;
-        btnSettingsAction.setLayoutParams(settingsParams);
-        btnSettingsAction.setOnClickListener(new View.OnClickListener() {
+        android.widget.Button btn = new android.widget.Button(this);
+        btn.setText("AKTIFKAN MODE KUNCI");
+        btn.setBackgroundColor(android.graphics.Color.WHITE);
+        btn.setTextColor(android.graphics.Color.parseColor("#E11D48"));
+        btn.setPadding(40, 20, 40, 20);
+        btn.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 try {
-                    android.content.Intent intent = new android.content.Intent(android.provider.Settings.ACTION_SECURITY_SETTINGS);
-                    intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
-                    startActivity(intent);
-                } catch (Exception e) {
-                    try {
-                        android.content.Intent intent = new android.content.Intent(android.provider.Settings.ACTION_SETTINGS);
-                        intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
-                        startActivity(intent);
-                    } catch (Exception ex) {}
-                }
+                    startLockTask();
+                    handler.postDelayed(new Runnable() {
+                        @Override
+                        public void run() {
+                            checkLockTaskOnly();
+                        }
+                    }, 400);
+                } catch (Exception e) {}
             }
         });
 
-        blockingLayout.addView(blockingTitle);
-        blockingLayout.addView(blockingDesc);
-        blockingLayout.addView(btnPinAction);
-        blockingLayout.addView(btnSettingsAction);
+        blockingLayout.addView(title);
+        blockingLayout.addView(desc);
+        blockingLayout.addView(btn);
         
         addContentView(blockingLayout, new android.view.ViewGroup.LayoutParams(
             android.view.ViewGroup.LayoutParams.MATCH_PARENT, 
             android.view.ViewGroup.LayoutParams.MATCH_PARENT));
-    }
-
-    private void updateBlockingLayoutContent() {
-        if (blockingTitle == null || blockingDesc == null || btnPinAction == null || btnSettingsAction == null) return;
-        boolean pinningSupported = isAppPinningEnabledInSettings();
-        if (!pinningSupported) {
-            blockingTitle.setText("SEMATKAN LAYAR DINONAKTIFKAN");
-            blockingDesc.setText("Fitur 'Sematkan Aplikasi' (App Pinning) belum diaktifkan pada sistem Android HP ini.\n\nSilakan klik tombol 'BUKA PENGATURAN HP' di bawah, cari menu 'Sematkan Aplikasi' atau 'App Pinning' pada Keamanan, lalu aktifkan.");
-            btnPinAction.setText("🔄 COBA SEMATKAN LAGI");
-            btnSettingsAction.setVisibility(View.VISIBLE);
-        } else {
-            blockingTitle.setText("MODE KIOSK DIPERLUKAN");
-            blockingDesc.setText("Demi keamanan ujian, aplikasi ini wajib menggunakan mode 'Sematkan Layar'.\n\nSilakan klik tombol di bawah, lalu pilih 'MENGERTI' atau 'SEMATKAN' pada kotak dialog sistem Android yang muncul.\n\nUntuk keluar ujian, gunakan tombol menu di pojok kanan bawah.");
-            btnPinAction.setText("🔒 SEMATKAN LAYAR SEKARANG");
-            btnSettingsAction.setVisibility(View.VISIBLE);
-        }
     }
 
     @Override
@@ -1264,27 +1114,7 @@ public class MainActivity extends BridgeActivity {
         applyThemeColors();
         applyNotchToWebView();
         if (isLockEnabled) {
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
-                try {
-                    getWindow().setHideOverlayWindows(true);
-                } catch (Exception e) {}
-            }
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N && isInMultiWindowMode()) {
-                Log.w(TAG, "onResume: Aplikasi terdeteksi dalam mode split-screen!");
-                playRingtone();
-                if (blockingLayout != null) {
-                    blockingLayout.setVisibility(View.VISIBLE);
-                }
-            }
-            if (isDevicePinned()) {
-                isPinningRequested = false;
-                stopRingtone();
-                if (blockingLayout != null) {
-                    blockingLayout.setVisibility(View.GONE);
-                }
-            } else if (!isPinningRequested || (System.currentTimeMillis() - pinningRequestTime > 2500)) {
-                checkLockTaskOnly();
-            }
+            checkLockTaskOnly();
         }
     }
 
@@ -1324,12 +1154,6 @@ public class MainActivity extends BridgeActivity {
                 return;
             }
 
-            // 3. JIKA dialog pinning sedang aktif (baru diminta < 10 detik lalu), jangan blokir dulu agar siswa sempat klik dialog
-            if (isPinningRequested && (System.currentTimeMillis() - pinningRequestTime < 10000)) {
-                Log.d(TAG, "checkLockTaskOnly: Dialog Sematkan Layar sedang aktif, menunggu konfirmasi...");
-                return;
-            }
-
             ActivityManager am = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
             final int lockState = (am != null) ? am.getLockTaskModeState() : ActivityManager.LOCK_TASK_MODE_NONE;
             final int previousState = lastLockState;
@@ -1348,7 +1172,6 @@ public class MainActivity extends BridgeActivity {
                 public void run() {
                     if (isFinishing() || isExiting) return;
                     if (lockState == ActivityManager.LOCK_TASK_MODE_NONE) {
-                        updateBlockingLayoutContent();
                         if (blockingLayout != null && blockingLayout.getVisibility() != View.VISIBLE) {
                             blockingLayout.setVisibility(View.VISIBLE);
                         }
@@ -1357,7 +1180,6 @@ public class MainActivity extends BridgeActivity {
                             playRingtone();
                         }
                     } else {
-                        isPinningRequested = false;
                         if (blockingLayout != null && blockingLayout.getVisibility() != View.GONE) {
                             blockingLayout.setVisibility(View.GONE);
                         }
@@ -1369,41 +1191,6 @@ public class MainActivity extends BridgeActivity {
             });
         } catch (Exception e) {
             Log.e(TAG, "checkLockTaskOnly error", e);
-        }
-    }
-
-    @Override
-    public boolean dispatchTouchEvent(android.view.MotionEvent ev) {
-        if (isLockEnabled && !isExiting) {
-            int flags = ev.getFlags();
-            boolean isObscured = (flags & android.view.MotionEvent.FLAG_WINDOW_IS_OBSCURED) != 0;
-            boolean isPartiallyObscured = false;
-            if (android.os.Build.VERSION.SDK_INT >= 29) {
-                isPartiallyObscured = (flags & android.view.MotionEvent.FLAG_WINDOW_IS_PARTIALLY_OBSCURED) != 0;
-            }
-
-            if (isObscured || isPartiallyObscured) {
-                Log.w(TAG, "dispatchTouchEvent: Sentuhan dihalangi oleh aplikasi floating/overlay luar! Memblokir...");
-                playRingtone();
-                if (blockingLayout != null) {
-                    blockingLayout.setVisibility(View.VISIBLE);
-                }
-                return true;
-            }
-        }
-        return super.dispatchTouchEvent(ev);
-    }
-
-    @Override
-    public void onMultiWindowModeChanged(boolean isInMultiWindowMode, android.content.res.Configuration newConfig) {
-        super.onMultiWindowModeChanged(isInMultiWindowMode, newConfig);
-        if (isLockEnabled && !isExiting && isInMultiWindowMode) {
-            Log.w(TAG, "onMultiWindowModeChanged: Siswa mencoba split screen saat ujian!");
-            playRingtone();
-            if (blockingLayout != null) {
-                blockingLayout.setVisibility(View.VISIBLE);
-            }
-            makeFullScreen();
         }
     }
 
@@ -1420,18 +1207,9 @@ public class MainActivity extends BridgeActivity {
                         makeFullScreen();
                     }
                 }
-            }, 300);
+            }, 500);
             if (isLockEnabled) {
-                if (isDevicePinned()) {
-                    isPinningRequested = false;
-                    stopRingtone();
-                    if (blockingLayout != null) {
-                        blockingLayout.setVisibility(View.GONE);
-                    }
-                } else if (!isPinningRequested || (System.currentTimeMillis() - pinningRequestTime > 2000)) {
-                    checkLockTaskOnly();
-                }
-
+                checkLockTaskOnly();
                 // Beri tahu WebView bahwa fokus jendela telah kembali
                 runOnUiThread(new Runnable() {
                     @Override
@@ -1449,14 +1227,6 @@ public class MainActivity extends BridgeActivity {
                 });
             }
         } else {
-            // Ketika fokus jendela hilang:
-            // JIKA ini terjadi karena dialog sistem "Sematkan layar?" sedang muncul ke layar,
-            // JANGAN DIBLOKIR / JANGAN BRING TO FRONT / JANGAN CLOSE DIALOG / JANGAN BUNYIKAN ALARM!
-            if (isPinningRequested && (System.currentTimeMillis() - pinningRequestTime < 15000)) {
-                Log.d(TAG, "onWindowFocusChanged(false): Dialog sistem Sematkan Layar sedang aktif, memberi ruang bagi siswa untuk memilih.");
-                return;
-            }
-
             try {
                 if (!isExiting && isLockEnabled) {
                     sendBroadcast(new android.content.Intent(android.content.Intent.ACTION_CLOSE_SYSTEM_DIALOGS));
@@ -1464,25 +1234,7 @@ public class MainActivity extends BridgeActivity {
             } catch (Exception e) {}
 
             if (isLockEnabled && !isExiting && !isMenuDialogOpen) {
-                android.os.PowerManager pm = (android.os.PowerManager) getSystemService(Context.POWER_SERVICE);
-                boolean isInteractive = (pm != null) && pm.isInteractive();
-
-                if (isInteractive && !isScreenOff) {
-                    Log.w(TAG, "onWindowFocusChanged(false): Jendela kehilangan fokus saat layar hidup -> Floating app / Split screen / Notifikasi!");
-                    playRingtone();
-                    if (blockingLayout != null) {
-                        blockingLayout.setVisibility(View.VISIBLE);
-                    }
-                    try {
-                        android.content.Intent bringToFront = new android.content.Intent(this, MainActivity.class);
-                        bringToFront.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK | 
-                                               android.content.Intent.FLAG_ACTIVITY_REORDER_TO_FRONT | 
-                                               android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP);
-                        startActivity(bringToFront);
-                    } catch (Exception e) {}
-                }
-
-                // Beri tahu WebView bahwa fokus jendela hilang
+                // Beri tahu WebView bahwa fokus jendela hilang (CBTPage menangani countdown 5s & cek layar mati)
                 Log.d(TAG, "onWindowFocusChanged(false): Fokus jendela hilang saat ujian");
                 runOnUiThread(new Runnable() {
                     @Override
@@ -1589,7 +1341,7 @@ public class MainActivity extends BridgeActivity {
     private int cachedCutoutTop = -1;
 
     public int getTopCutoutHeight() {
-        if (cachedCutoutTop >= 0) {
+        if (cachedCutoutTop > 0) {
             return cachedCutoutTop;
         }
         int top = 0;
@@ -1604,6 +1356,21 @@ public class MainActivity extends BridgeActivity {
                 }
             }
         } catch (Exception e) {}
+
+        // Fallback: Jika DisplayCutout bernilai 0 (misal di beberapa perangkat OEM atau status bar tersembunyi),
+        // gunakan tinggi fisik status bar agar web tetap pasti berada di bawah notch kamera
+        if (top <= 0) {
+            try {
+                int resourceId = getResources().getIdentifier("status_bar_height", "dimen", "android");
+                if (resourceId > 0) {
+                    top = getResources().getDimensionPixelSize(resourceId);
+                }
+            } catch (Exception e) {}
+        }
+
+        if (top > 0) {
+            cachedCutoutTop = top;
+        }
         return top;
     }
 

@@ -54,15 +54,6 @@ public class CheatAlert extends Plugin {
     }
 
     @PluginMethod
-    public void isDevicePinned(PluginCall call) {
-        MainActivity act = getMainActivity();
-        JSObject ret = new JSObject();
-        boolean pinned = (act != null) && act.isDevicePinned();
-        ret.put("isPinned", pinned);
-        call.resolve(ret);
-    }
-
-    @PluginMethod
     public void disableLockForUpdate(PluginCall call) {
         Log.d(TAG, "disableLockForUpdate called from JS");
         MainActivity act = getMainActivity();

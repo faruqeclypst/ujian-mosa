@@ -609,9 +609,6 @@ const CBTPage = () => {
 
   // Kunci layar saat ujian aktif, dan lepas saat lembar ujian CBT ditutup / selesai
   useEffect(() => {
-    if ((window as any).AndroidExam && typeof (window as any).AndroidExam.enableLockMode === 'function') {
-      try { (window as any).AndroidExam.enableLockMode(); } catch (err) { }
-    }
     if (Capacitor.isNativePlatform()) {
       try { CheatAlert.enableLockMode(); } catch (err) { }
       try { CheatAlert.stopAlarm(); } catch (err) { }
@@ -619,9 +616,6 @@ const CBTPage = () => {
     return () => {
       const nextPath = window.location.pathname;
       if (!nextPath.startsWith("/cbt")) {
-        if ((window as any).AndroidExam && typeof (window as any).AndroidExam.disableLockMode === 'function') {
-          try { (window as any).AndroidExam.disableLockMode(); } catch (err) { }
-        }
         if (Capacitor.isNativePlatform()) {
           try { CheatAlert.unlockScreen(); } catch (err) { }
           try { CheatAlert.stopAlarm(); } catch (err) { }
