@@ -587,7 +587,7 @@ export default function SuperAdminOfflineLicensesPage() {
             </button>
           </div>
 
-          {/* Search, Sort, Refresh & Add */}
+          {/* Search & Sort */}
           <div className="flex items-center gap-2 md:ml-auto">
             {/* Search Input */}
             <div className="relative flex-1 md:w-64">
@@ -608,33 +608,12 @@ export default function SuperAdminOfflineLicensesPage() {
                 onChange={(e) => setSortOption(e.target.value as SortOption)}
                 className="h-9 pl-3 pr-8 rounded-xl border border-slate-200/90 bg-white text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-400 shadow-2xs appearance-none cursor-pointer"
               >
-                <option value="newest_issued">Terbaru</option>
+                <option value="newest_issued">Penerbitan Terbaru</option>
                 <option value="nearest_expiry">Batas Terdekat</option>
                 <option value="name_asc">Nama (A-Z)</option>
               </select>
               <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
             </div>
-
-            {/* Refresh Button */}
-            <button
-              onClick={() => fetchLicenses(true)}
-              className={cn(
-                "h-9 w-9 flex items-center justify-center bg-white border border-slate-200/90 rounded-xl hover:bg-slate-50 shadow-2xs transition-all",
-                (isRefreshing || isLoading) && "opacity-60 pointer-events-none"
-              )}
-              title="Segarkan data lisensi"
-            >
-              <RefreshCw size={14} className={cn("text-slate-600", (isRefreshing || isLoading) && "animate-spin")} />
-            </button>
-
-            {/* Add Button */}
-            <button
-              onClick={handleOpenCreateNewModal}
-              className="h-9 px-3.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-sm shadow-purple-600/20 flex items-center gap-1.5 transition-all whitespace-nowrap"
-            >
-              <Plus size={14} />
-              <span className="hidden sm:inline">Terbitkan Lisensi</span>
-            </button>
           </div>
         </div>
 
@@ -671,7 +650,7 @@ export default function SuperAdminOfflineLicensesPage() {
               <p className="text-xs text-slate-400 max-w-sm mx-auto mt-1">
                 {searchQuery || filterStatus !== "all"
                   ? "Tidak ada data lisensi yang sesuai dengan kriteria filter atau pencarian Anda."
-                  : "Belum ada sekolah yang memiliki lisensi server offline. Klik tombol di bawah untuk menerbitkan izin pertama."}
+                  : "Belum ada sekolah yang memiliki lisensi server offline. Klik tombol di atas untuk menerbitkan izin pertama."}
               </p>
               {searchQuery || filterStatus !== "all" ? (
                 <Button
@@ -698,16 +677,15 @@ export default function SuperAdminOfflineLicensesPage() {
             <>
               {/* Desktop Table View */}
               <div className="hidden md:block overflow-x-auto scrollbar-thin">
-                <table className="w-full text-left border-collapse min-w-[1060px]">
+                <table className="w-full text-left border-collapse min-w-[960px]">
                   <thead className="bg-slate-50/90 border-b border-slate-200 text-slate-500 uppercase font-bold text-[11px] tracking-wider">
                     <tr>
-                      <th className="py-3.5 px-4 min-w-[260px]">Institusi & Domain</th>
-                      <th className="py-3.5 px-4 min-w-[150px]">Status & Mesin</th>
-                      <th className="py-3.5 px-4 min-w-[140px]">Diterbitkan</th>
-                      <th className="py-3.5 px-4 min-w-[160px]">Masa Berlaku</th>
-                      <th className="py-3.5 px-4 min-w-[210px]">Kode Lisensi</th>
-                      <th className="py-3.5 px-4 min-w-[160px]">Keperluan</th>
-                      <th className="py-3.5 px-4 text-right min-w-[200px]">Aksi</th>
+                      <th className="py-3.5 px-4 min-w-[240px]">Institusi & Domain</th>
+                      <th className="py-3.5 px-4 min-w-[140px]">Status & Mesin</th>
+                      <th className="py-3.5 px-4 min-w-[180px]">Masa Berlaku</th>
+                      <th className="py-3.5 px-4 min-w-[190px]">Kode Lisensi</th>
+                      <th className="py-3.5 px-4 min-w-[140px]">Keperluan</th>
+                      <th className="py-3.5 px-4 text-right min-w-[180px]">Aksi</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -783,18 +761,7 @@ export default function SuperAdminOfflineLicensesPage() {
                             </div>
                           </td>
 
-                          {/* Diterbitkan */}
-                          <td className="py-3.5 px-4">
-                            <div className="font-semibold text-slate-800 text-xs">
-                              {formatDateTimeIndonesia(lic.issued_at || lic.created)}
-                            </div>
-                            <div className="text-[10px] text-slate-400 mt-0.5 flex items-center gap-1">
-                              <Clock size={10} className="shrink-0" />
-                              <span>{getRelativeTime(lic.issued_at || lic.created)}</span>
-                            </div>
-                          </td>
-
-                          {/* Masa Berlaku */}
+                          {/* Masa Berlaku & Terbit */}
                           <td className="py-3.5 px-4">
                             <div className="font-bold text-slate-900 text-xs sm:text-sm">
                               {formatDateIndonesia(lic.valid_until)}
@@ -809,6 +776,9 @@ export default function SuperAdminOfflineLicensesPage() {
                             )}>
                               <Clock size={10} className="shrink-0" />
                               <span>{exp.text}</span>
+                            </div>
+                            <div className="text-[10px] text-slate-400 mt-1 flex items-center gap-1">
+                              <span>Terbit: {formatDateTimeIndonesia(lic.issued_at || lic.created)}</span>
                             </div>
                           </td>
 
