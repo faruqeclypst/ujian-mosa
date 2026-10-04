@@ -67,7 +67,7 @@ const SchoolAvatar = ({ name, logoUrl, className }: { name: string; logoUrl?: st
 
   if (logoUrl && !error) {
     return (
-      <div className={cn("w-10 h-10 rounded-xl bg-white border border-slate-200/90 flex items-center justify-center overflow-hidden shrink-0 shadow-2xs group-hover:scale-105 transition-transform duration-200", className)}>
+      <div className={cn("w-11 h-11 rounded-xl bg-white border border-slate-200/90 flex items-center justify-center overflow-hidden shrink-0 shadow-2xs group-hover:scale-105 transition-transform duration-200", className)}>
         <img
           src={logoUrl}
           alt=""
@@ -78,8 +78,19 @@ const SchoolAvatar = ({ name, logoUrl, className }: { name: string; logoUrl?: st
     );
   }
 
+  // Consistent colorful initial based on name string hash
+  const colors = [
+    "bg-purple-50 border-purple-200/70 text-purple-700",
+    "bg-blue-50 border-blue-200/70 text-blue-700",
+    "bg-indigo-50 border-indigo-200/70 text-indigo-700",
+    "bg-emerald-50 border-emerald-200/70 text-emerald-700",
+    "bg-amber-50 border-amber-200/70 text-amber-700",
+  ];
+  const charSum = (name || "").split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  const colorClass = colors[charSum % colors.length];
+
   return (
-    <div className={cn("w-10 h-10 rounded-xl bg-purple-50 border border-purple-100 flex items-center justify-center text-purple-700 font-black text-xs uppercase shrink-0 shadow-2xs group-hover:scale-105 transition-transform duration-200", className)}>
+    <div className={cn("w-11 h-11 rounded-xl border flex items-center justify-center font-black text-sm uppercase shrink-0 shadow-2xs group-hover:scale-105 transition-transform duration-200", colorClass, className)}>
       {initial}
     </div>
   );
@@ -538,13 +549,13 @@ export default function SuperAdminOfflineLicensesPage() {
         </div>
 
         {/* Filter Bar & Pencarian Terpadu */}
-        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 py-1">
           {/* Filter Status Tabs */}
-          <div className="flex items-center gap-1 bg-slate-100/80 p-1 rounded-xl overflow-x-auto scrollbar-none border border-slate-200/60 shadow-2xs">
+          <div className="flex items-center gap-1.5 bg-slate-100/90 p-1.5 rounded-2xl overflow-x-auto scrollbar-none border border-slate-200/70 shadow-2xs">
             <button
               onClick={() => setFilterStatus("all")}
               className={cn(
-                "px-3.5 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all",
+                "px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all",
                 filterStatus === "all"
                   ? "bg-white text-slate-900 shadow-2xs"
                   : "text-slate-600 hover:text-slate-900"
@@ -555,7 +566,7 @@ export default function SuperAdminOfflineLicensesPage() {
             <button
               onClick={() => setFilterStatus("active")}
               className={cn(
-                "px-3.5 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all",
+                "px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all",
                 filterStatus === "active"
                   ? "bg-white text-emerald-700 shadow-2xs"
                   : "text-slate-600 hover:text-slate-900"
@@ -566,7 +577,7 @@ export default function SuperAdminOfflineLicensesPage() {
             <button
               onClick={() => setFilterStatus("expiring_soon")}
               className={cn(
-                "px-3.5 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all",
+                "px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all",
                 filterStatus === "expiring_soon"
                   ? "bg-white text-amber-700 shadow-2xs"
                   : "text-slate-600 hover:text-slate-900"
@@ -577,7 +588,7 @@ export default function SuperAdminOfflineLicensesPage() {
             <button
               onClick={() => setFilterStatus("expired")}
               className={cn(
-                "px-3.5 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all",
+                "px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all",
                 filterStatus === "expired"
                   ? "bg-white text-rose-700 shadow-2xs"
                   : "text-slate-600 hover:text-slate-900"
@@ -588,16 +599,16 @@ export default function SuperAdminOfflineLicensesPage() {
           </div>
 
           {/* Search & Sort */}
-          <div className="flex items-center gap-2 md:ml-auto">
+          <div className="flex items-center gap-2.5 md:ml-auto">
             {/* Search Input */}
-            <div className="relative flex-1 md:w-64">
-              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            <div className="relative flex-1 md:w-72">
+              <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
               <input
                 type="text"
                 placeholder="Cari sekolah, NPSN, subdomain..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full h-9 pl-9 pr-3 rounded-xl border border-slate-200/90 bg-white text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-400 shadow-2xs transition-all"
+                className="w-full h-10 pl-10 pr-3.5 rounded-2xl border border-slate-200 bg-white text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-400 shadow-2xs transition-all"
               />
             </div>
 
@@ -606,13 +617,13 @@ export default function SuperAdminOfflineLicensesPage() {
               <select
                 value={sortOption}
                 onChange={(e) => setSortOption(e.target.value as SortOption)}
-                className="h-9 pl-3 pr-8 rounded-xl border border-slate-200/90 bg-white text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-400 shadow-2xs appearance-none cursor-pointer"
+                className="h-10 pl-3.5 pr-8 rounded-2xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-400 shadow-2xs appearance-none cursor-pointer"
               >
                 <option value="newest_issued">Penerbitan Terbaru</option>
                 <option value="nearest_expiry">Batas Terdekat</option>
-                <option value="name_asc">Nama (A-Z)</option>
+                <option value="name_asc">Nama Sekolah (A-Z)</option>
               </select>
-              <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
             </div>
           </div>
         </div>
@@ -677,15 +688,15 @@ export default function SuperAdminOfflineLicensesPage() {
             <>
               {/* Desktop Table View */}
               <div className="hidden md:block overflow-x-auto scrollbar-thin">
-                <table className="w-full text-left border-collapse min-w-[960px]">
-                  <thead className="bg-slate-50/90 border-b border-slate-200 text-slate-500 uppercase font-bold text-[11px] tracking-wider">
+                <table className="w-full text-left border-collapse min-w-[940px]">
+                  <thead className="bg-slate-50/80 border-b border-slate-200 text-slate-500 uppercase font-bold text-[11px] tracking-wider">
                     <tr>
-                      <th className="py-3.5 px-4 min-w-[240px]">Institusi & Domain</th>
-                      <th className="py-3.5 px-4 min-w-[140px]">Status & Mesin</th>
-                      <th className="py-3.5 px-4 min-w-[180px]">Masa Berlaku</th>
-                      <th className="py-3.5 px-4 min-w-[190px]">Kode Lisensi</th>
-                      <th className="py-3.5 px-4 min-w-[140px]">Keperluan</th>
-                      <th className="py-3.5 px-4 text-right min-w-[180px]">Aksi</th>
+                      <th className="py-3.5 px-4 min-w-[220px]">Sekolah & Domain</th>
+                      <th className="py-3.5 px-4 min-w-[130px]">Status & Mesin</th>
+                      <th className="py-3.5 px-4 min-w-[140px]">Masa Berlaku</th>
+                      <th className="py-3.5 px-4 min-w-[170px]">Kode Lisensi</th>
+                      <th className="py-3.5 px-4 min-w-[130px]">Keperluan</th>
+                      <th className="py-3.5 px-4 text-right min-w-[150px]">Aksi</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -695,32 +706,35 @@ export default function SuperAdminOfflineLicensesPage() {
                       const isCopied = copiedId === lic.id;
 
                       return (
-                        <tr key={lic.id} className="hover:bg-slate-50/80 transition-all group border-b border-slate-100/80 last:border-0">
+                        <tr key={lic.id} className="hover:bg-slate-50/70 transition-all group border-b border-slate-100/90 last:border-0">
                           {/* Nama Sekolah, Avatar, & Subdomain */}
-                          <td className="py-3.5 px-4">
+                          <td className="py-4 px-4">
                             <div className="flex items-center gap-3">
                               <SchoolAvatar
                                 name={lic.school_name}
                                 logoUrl={schoolLogoMap[lic.slug]}
+                                className="w-10 h-10 text-sm shadow-2xs"
                               />
                               <div className="min-w-0">
-                                <h4 className="font-bold text-slate-900 text-xs sm:text-sm tracking-tight leading-snug group-hover:text-purple-700 transition-colors truncate max-w-[220px]">
+                                <h4 className="font-bold text-slate-900 text-sm tracking-tight leading-snug group-hover:text-purple-700 transition-colors truncate max-w-[210px]">
                                   {lic.school_name}
                                 </h4>
-                                <a
-                                  href={`https://${lic.slug}.examku.my.id`}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-[11px] font-mono font-medium text-slate-500 hover:text-purple-600 transition-colors flex items-center gap-1 mt-0.5 w-fit"
-                                  title={`Buka https://${lic.slug}.examku.my.id`}
-                                >
-                                  <Globe size={11} className="text-slate-400 shrink-0" />
-                                  <span className="truncate max-w-[170px]">{lic.slug}.examku.my.id</span>
-                                  <ExternalLink size={10} className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
-                                </a>
-                                <div className="flex items-center gap-1.5 mt-1">
+                                <div className="flex items-center gap-2 mt-0.5">
+                                  <a
+                                    href={`https://${lic.slug}.examku.my.id`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-xs font-mono font-medium text-slate-500 hover:text-purple-600 transition-colors inline-flex items-center gap-1.5"
+                                    title={`Buka https://${lic.slug}.examku.my.id`}
+                                  >
+                                    <Globe size={11} className="text-slate-400 shrink-0" />
+                                    <span className="truncate max-w-[160px]">{lic.slug}.examku.my.id</span>
+                                    <ExternalLink size={10} className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                                  </a>
+                                </div>
+                                <div className="flex items-center gap-2 mt-1 flex-wrap">
                                   {lic.npsn && (
-                                    <span className="px-1.5 py-0.5 rounded bg-slate-100 text-[10px] font-mono text-slate-600 font-semibold border border-slate-200/60">
+                                    <span className="px-1.5 py-0.2 rounded bg-slate-100 text-[10px] font-mono text-slate-600 font-semibold border border-slate-200/70">
                                       NPSN: {lic.npsn}
                                     </span>
                                   )}
@@ -735,117 +749,118 @@ export default function SuperAdminOfflineLicensesPage() {
                           </td>
 
                           {/* Status & Kriptografi */}
-                          <td className="py-3.5 px-4">
-                            <div className="space-y-1">
-                              {isExpired ? (
-                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200 shadow-2xs">
-                                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
-                                  Kadaluarsa
-                                </span>
-                              ) : exp.isExpiringSoon ? (
-                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200 shadow-2xs">
-                                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-                                  Segera Berakhir
-                                </span>
-                              ) : (
-                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 shadow-2xs">
-                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                                  Aktif Sah
-                                </span>
-                              )}
+                          <td className="py-4 px-4">
+                            <div className="space-y-1.5">
+                              <div>
+                                {isExpired ? (
+                                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200 shadow-2xs">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                                    Kadaluarsa
+                                  </span>
+                                ) : exp.isExpiringSoon ? (
+                                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200 shadow-2xs">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                                    Segera Berakhir
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200/90 shadow-2xs">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                    Aktif Sah
+                                  </span>
+                                )}
+                              </div>
 
                               <div className="flex items-center gap-1 text-[10px] font-semibold text-slate-500">
-                                <ShieldCheck size={11} className="text-purple-600 shrink-0" />
+                                <ShieldCheck size={12} className="text-purple-600 shrink-0" />
                                 <span>{lic.version === "v2" ? "RSA-2048 Asimetris" : "SHA-256 Legasi"}</span>
                               </div>
                             </div>
                           </td>
 
                           {/* Masa Berlaku & Terbit */}
-                          <td className="py-3.5 px-4">
-                            <div className="font-bold text-slate-900 text-xs sm:text-sm">
-                              {formatDateIndonesia(lic.valid_until)}
-                            </div>
-                            <div className={cn(
-                              "inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold mt-1 shadow-2xs",
-                              isExpired
-                                ? "bg-rose-50 text-rose-700 border border-rose-100"
-                                : exp.isExpiringSoon
-                                ? "bg-amber-50 text-amber-800 border border-amber-100"
-                                : "bg-emerald-50 text-emerald-800 border border-emerald-100"
-                            )}>
-                              <Clock size={10} className="shrink-0" />
-                              <span>{exp.text}</span>
-                            </div>
-                            <div className="text-[10px] text-slate-400 mt-1 flex items-center gap-1">
-                              <span>Terbit: {formatDateTimeIndonesia(lic.issued_at || lic.created)}</span>
+                          <td className="py-4 px-4">
+                            <div>
+                              <span className="font-bold text-slate-900 text-xs sm:text-sm block">
+                                {formatDateIndonesia(lic.valid_until)}
+                              </span>
+                              <div className="mt-1">
+                                <span
+                                  className={cn(
+                                    "inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold shadow-2xs",
+                                    isExpired
+                                      ? "bg-rose-50 text-rose-700 border border-rose-200/80"
+                                      : exp.isExpiringSoon
+                                      ? "bg-amber-50 text-amber-800 border border-amber-200/80"
+                                      : "bg-emerald-50 text-emerald-800 border border-emerald-200/80"
+                                  )}
+                                >
+                                  <Clock size={10} className="shrink-0" />
+                                  <span>{exp.text}</span>
+                                </span>
+                              </div>
+                              <p className="text-[10px] text-slate-400 mt-1">
+                                Terbit {formatDateIndonesia(lic.issued_at || lic.created)}
+                              </p>
                             </div>
                           </td>
 
                           {/* Potongan Kode Lisensi */}
-                          <td className="py-3.5 px-4">
-                            <div className="inline-flex items-center gap-1.5 bg-slate-50 border border-slate-200/90 px-2.5 py-1.5 rounded-xl shadow-2xs group-hover:border-purple-300 transition-colors">
+                          <td className="py-4 px-4">
+                            <div className="inline-flex items-center gap-1.5 bg-slate-50 border border-slate-200/90 px-2.5 py-1.5 rounded-xl shadow-2xs group-hover:border-purple-200 transition-colors">
                               <KeyRound size={12} className="text-purple-600 shrink-0" />
-                              <code className="text-xs font-mono font-bold text-slate-700 select-all truncate max-w-[105px]" title={lic.license_code}>
+                              <code className="text-xs font-mono font-bold text-slate-700 select-all truncate max-w-[100px]" title={lic.license_code}>
                                 {lic.license_code}
                               </code>
                               <button
                                 onClick={() => handleCopyCode(lic.id, lic.license_code)}
                                 title="Salin Kode Lisensi"
-                                className="p-1 rounded-md hover:bg-white text-slate-400 hover:text-slate-800 transition-colors shrink-0"
-                              >
-                                {isCopied ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} />}
-                              </button>
-                              <button
-                                onClick={() => handleOpenDetailModal(lic)}
-                                title="Lihat Kode Lengkap & QR"
                                 className="p-1 rounded-md hover:bg-white text-slate-400 hover:text-purple-600 transition-colors shrink-0"
                               >
-                                <Eye size={12} />
+                                {isCopied ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} />}
                               </button>
                             </div>
                           </td>
 
                           {/* Catatan / Keperluan */}
-                          <td className="py-3.5 px-4">
-                            <div className="text-xs text-slate-600 max-w-[160px] line-clamp-2 leading-relaxed" title={lic.notes || "Izin Resmi Ujian Offline CBT"}>
-                              {lic.notes || <span className="text-slate-400 italic">Izin Resmi Ujian Offline CBT</span>}
+                          <td className="py-4 px-4">
+                            <div className="text-xs text-slate-600 max-w-[150px] leading-relaxed line-clamp-2" title={lic.notes || "Izin Resmi Ujian Offline CBT"}>
+                              {lic.notes || <span className="text-slate-400 italic">Izin Resmi Ujian CBT</span>}
                             </div>
                           </td>
 
                           {/* Tombol Aksi */}
-                          <td className="py-3.5 px-4 text-right">
+                          <td className="py-4 px-4 text-right">
                             <div className="flex items-center justify-end gap-1.5">
                               {/* Tombol Perpanjang */}
                               <Button
                                 size="sm"
                                 variant="outline"
                                 onClick={() => handleOpenRenewModal(lic)}
-                                className="h-8 px-2.5 rounded-xl text-xs font-bold border-purple-200 text-purple-700 bg-purple-50/70 hover:bg-purple-100 hover:text-purple-800 transition-all shadow-2xs whitespace-nowrap flex items-center gap-1.5 shrink-0"
+                                className="h-8 px-2.5 rounded-xl text-xs font-bold border-purple-200 text-purple-700 bg-purple-50/70 hover:bg-purple-100 hover:text-purple-800 transition-all shadow-2xs whitespace-nowrap flex items-center gap-1 shrink-0"
                               >
                                 <Calendar size={12} />
                                 <span>Perpanjang</span>
                               </Button>
 
-                              {/* Toolbar Action Icons */}
-                              <div className="inline-flex items-center p-0.5 bg-slate-100/90 border border-slate-200/90 rounded-xl shrink-0">
+                              {/* Action Buttons Toolbar */}
+                              <div className="inline-flex items-center p-0.5 bg-slate-100/90 border border-slate-200/90 rounded-xl shadow-2xs shrink-0">
                                 <button
                                   onClick={() => handleOpenDetailModal(lic)}
-                                  className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-500 hover:text-purple-600 hover:bg-white transition-all shadow-2xs"
+                                  className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-500 hover:text-purple-600 hover:bg-white hover:shadow-2xs transition-all"
                                   title="Detail Lisensi & QR"
                                 >
                                   <Eye size={13} />
                                 </button>
                                 <button
                                   onClick={() => handleSendWA(lic)}
-                                  className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-500 hover:text-emerald-600 hover:bg-white transition-all shadow-2xs"
+                                  className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-500 hover:text-emerald-600 hover:bg-white hover:shadow-2xs transition-all"
                                   title="Kirim ke WhatsApp Proktor"
                                 >
                                   <MessageCircle size={13} />
                                 </button>
                                 <button
                                   onClick={() => handleOpenDeleteConfirm(lic)}
-                                  className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-rose-600 hover:bg-white transition-all shadow-2xs"
+                                  className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-rose-600 hover:bg-white hover:shadow-2xs transition-all"
                                   title="Hapus Lisensi"
                                 >
                                   <Trash2 size={13} />
