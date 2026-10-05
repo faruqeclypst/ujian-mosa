@@ -23,6 +23,12 @@ const POPULAR_BANKS = [
   { code: "DANAMON", name: "Bank Danamon", logo: "https://upload.wikimedia.org/wikipedia/commons/f/f9/Bank_Danamon_logo.svg" },
   { code: "JAGO", name: "Bank Jago", logo: "https://upload.wikimedia.org/wikipedia/commons/1/1b/Logo_Bank_Jago.png" },
   { code: "SEABANK", name: "SeaBank", logo: "https://upload.wikimedia.org/wikipedia/commons/f/f1/SeaBank_logo.png" },
+  { code: "BPD_ACEH", name: "Bank Aceh", logo: "https://upload.wikimedia.org/wikipedia/id/3/3f/Logo_Bank_Aceh_Syariah.png" },
+  { code: "BJB", name: "Bank BJB", logo: "https://upload.wikimedia.org/wikipedia/commons/7/77/Logo_Bank_BJB.svg" },
+  { code: "DKI", name: "Bank DKI", logo: "https://upload.wikimedia.org/wikipedia/commons/a/a2/Logo_Bank_DKI.svg" },
+  { code: "JATIM", name: "Bank Jatim", logo: "https://upload.wikimedia.org/wikipedia/commons/4/41/Logo_Bank_Jatim.svg" },
+  { code: "SUMUT", name: "Bank Sumut", logo: "https://upload.wikimedia.org/wikipedia/commons/8/87/Logo_Bank_Sumut.svg" },
+  { code: "NAGARI", name: "Bank Nagari", logo: "https://upload.wikimedia.org/wikipedia/commons/7/74/Logo_Bank_Nagari.svg" },
 ];
 
 export const SuperAdminBankAccountsModal = ({ onClose }: { onClose: () => void }) => {
@@ -144,11 +150,11 @@ export const SuperAdminBankAccountsModal = ({ onClose }: { onClose: () => void }
                   </div>
                 ) : (
                   <>
-                    <div className="w-12 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center shrink-0 p-1">
-                      {POPULAR_BANKS.find(b => b.code === bank.bank_code) ? (
-                         <img src={POPULAR_BANKS.find(b => b.code === bank.bank_code)?.logo} alt={bank.bank_name} className="max-h-full max-w-full object-contain" />
+                    <div className="w-12 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center shrink-0 p-1 overflow-hidden text-center">
+                      {POPULAR_BANKS.find(b => b.code === bank.bank_code) && bank.bank_code !== "OTHER" ? (
+                         <img src={POPULAR_BANKS.find(b => b.code === bank.bank_code)?.logo} alt={bank.bank_name} className="max-h-full max-w-full object-contain" onError={e => { e.currentTarget.style.display = 'none'; e.currentTarget.parentElement!.innerHTML = `<span class="text-[9px] font-black text-slate-400 uppercase leading-none">${bank.bank_name.substring(0,3)}</span>` }} />
                       ) : (
-                         <span className="text-xs font-black text-slate-400">{bank.bank_name.substring(0,3).toUpperCase()}</span>
+                         <span className="text-[10px] font-black text-slate-400 uppercase leading-none">{bank.bank_name.substring(0,4)}</span>
                       )}
                     </div>
                     <div className="flex-1">
@@ -186,6 +192,8 @@ export const SuperAdminBankAccountsModal = ({ onClose }: { onClose: () => void }
                           </button>
                         ))}
                       </div>
+                      <label className="block text-[10px] font-bold text-slate-600 mb-1 mt-3">Atau Ketik Manual Nama Bank (Jika tidak ada di atas)</label>
+                      <input type="text" className="w-full text-xs p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none" value={form.bank_name || ""} onChange={e => setForm({...form, bank_code: "OTHER", bank_name: e.target.value})} placeholder="Contoh: Bank BPD Aceh" />
                     </div>
                 <div>
                   <label className="block text-[10px] font-bold text-slate-600 mb-1">Atas Nama</label>

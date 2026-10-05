@@ -114,6 +114,12 @@ const POPULAR_BANKS = [
   { code: "DANAMON", name: "Bank Danamon", logo: "https://upload.wikimedia.org/wikipedia/commons/f/f9/Bank_Danamon_logo.svg" },
   { code: "JAGO", name: "Bank Jago", logo: "https://upload.wikimedia.org/wikipedia/commons/1/1b/Logo_Bank_Jago.png" },
   { code: "SEABANK", name: "SeaBank", logo: "https://upload.wikimedia.org/wikipedia/commons/f/f1/SeaBank_logo.png" },
+  { code: "BPD_ACEH", name: "Bank Aceh", logo: "https://upload.wikimedia.org/wikipedia/id/3/3f/Logo_Bank_Aceh_Syariah.png" },
+  { code: "BJB", name: "Bank BJB", logo: "https://upload.wikimedia.org/wikipedia/commons/7/77/Logo_Bank_BJB.svg" },
+  { code: "DKI", name: "Bank DKI", logo: "https://upload.wikimedia.org/wikipedia/commons/a/a2/Logo_Bank_DKI.svg" },
+  { code: "JATIM", name: "Bank Jatim", logo: "https://upload.wikimedia.org/wikipedia/commons/4/41/Logo_Bank_Jatim.svg" },
+  { code: "SUMUT", name: "Bank Sumut", logo: "https://upload.wikimedia.org/wikipedia/commons/8/87/Logo_Bank_Sumut.svg" },
+  { code: "NAGARI", name: "Bank Nagari", logo: "https://upload.wikimedia.org/wikipedia/commons/7/74/Logo_Bank_Nagari.svg" },
 ];
 
 const SchoolInvoicePage = () => {
@@ -475,8 +481,8 @@ const SchoolInvoicePage = () => {
                       const logo = POPULAR_BANKS.find(p => p.code === b.bank_code)?.logo;
                       return (
                         <div key={i} className="flex items-center gap-2 p-2 bg-white dark:bg-slate-800 rounded-lg border border-slate-100 dark:border-slate-700">
-                          <div className="w-10 h-8 flex items-center justify-center shrink-0 bg-white rounded p-1 border border-slate-100">
-                            {logo ? <img src={logo} alt={b.bank_name} className="max-h-full max-w-full object-contain" onError={e => e.currentTarget.style.display = 'none'} /> : <Landmark size={14} className="text-slate-400" />}
+                          <div className="w-10 h-8 flex items-center justify-center shrink-0 bg-white rounded p-1 border border-slate-100 overflow-hidden text-center">
+                            {logo && b.bank_code !== "OTHER" ? <img src={logo} alt={b.bank_name} className="max-h-full max-w-full object-contain" onError={e => { e.currentTarget.style.display = 'none'; e.currentTarget.parentElement!.innerHTML = `<span class="text-[8px] font-black text-slate-400 uppercase leading-none">${b.bank_name.substring(0,3)}</span>` }} /> : <span className="text-[9px] font-black text-slate-400 uppercase leading-none">{b.bank_name.substring(0,3)}</span>}
                           </div>
                           <div className="flex flex-col gap-0.5">
                             <span className="font-bold text-slate-800 dark:text-slate-200 text-[11px]">{b.bank_name} - <span className="font-mono text-blue-700 dark:text-blue-400">{b.account_number}</span></span>
