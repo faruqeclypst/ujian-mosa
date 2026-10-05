@@ -102,9 +102,23 @@ const isImageProof = (proofUrl: string): boolean => {
 
 // ─── Component ────────────────────────────────────────────────
 
+
+const POPULAR_BANKS = [
+  { code: "BCA", name: "Bank BCA", logo: "https://upload.wikimedia.org/wikipedia/commons/5/5c/Bank_Central_Asia.svg" },
+  { code: "MANDIRI", name: "Bank Mandiri", logo: "https://upload.wikimedia.org/wikipedia/commons/a/a2/Logo_of_Bank_Mandiri.svg" },
+  { code: "BNI", name: "Bank BNI", logo: "https://upload.wikimedia.org/wikipedia/id/5/55/BNI_logo.svg" },
+  { code: "BRI", name: "Bank BRI", logo: "https://upload.wikimedia.org/wikipedia/commons/2/2e/BRI_2020.svg" },
+  { code: "BSI", name: "Bank Syariah Indonesia", logo: "https://upload.wikimedia.org/wikipedia/commons/a/a4/Bank_Syariah_Indonesia.svg" },
+  { code: "CIMB", name: "CIMB Niaga", logo: "https://upload.wikimedia.org/wikipedia/commons/3/38/CIMB_Niaga_logo.svg" },
+  { code: "PERMATA", name: "Permata Bank", logo: "https://upload.wikimedia.org/wikipedia/commons/3/38/PermataBank_logo.svg" },
+  { code: "DANAMON", name: "Bank Danamon", logo: "https://upload.wikimedia.org/wikipedia/commons/f/f9/Bank_Danamon_logo.svg" },
+  { code: "JAGO", name: "Bank Jago", logo: "https://upload.wikimedia.org/wikipedia/commons/1/1b/Logo_Bank_Jago.png" },
+  { code: "SEABANK", name: "SeaBank", logo: "https://upload.wikimedia.org/wikipedia/commons/f/f1/SeaBank_logo.png" },
+];
+
 const SchoolInvoicePage = () => {
   const { school, refreshSchool } = useTenant();
-  const [banks, setBanks] = useState<{bank_name: string, account_number: string, account_name: string}[]>([]);
+  const [banks, setBanks] = useState<{bank_name: string, bank_code: string, account_number: string, account_name: string}[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [detailInvoice, setDetailInvoice] = useState<Invoice | null>(null);
@@ -457,12 +471,20 @@ const SchoolInvoicePage = () => {
                 <div className="mt-3 p-3 bg-white/60 dark:bg-slate-900/40 rounded-xl border border-blue-100 dark:border-blue-900/30 text-xs">
                   <p className="font-bold text-slate-700 dark:text-slate-300 mb-2 flex items-center gap-1.5"><Landmark size={14}/> Opsi Transfer Manual:</p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {banks.map((b, i) => (
-                      <div key={i} className="flex flex-col gap-0.5">
-                        <span className="font-bold text-slate-800 dark:text-slate-200">{b.bank_name} - <span className="font-mono text-blue-700 dark:text-blue-400">{b.account_number}</span></span>
-                        <span className="text-[10px] text-slate-500">a.n. {b.account_name}</span>
-                      </div>
-                    ))}
+                    {banks.map((b, i) => {
+                      const logo = POPULAR_BANKS.find(p => p.code === b.bank_code)?.logo;
+                      return (
+                        <div key={i} className="flex items-center gap-2 p-2 bg-white dark:bg-slate-800 rounded-lg border border-slate-100 dark:border-slate-700">
+                          <div className="w-10 h-8 flex items-center justify-center shrink-0 bg-white rounded p-1 border border-slate-100">
+                            {logo ? <img src={logo} alt={b.bank_name} className="max-h-full max-w-full object-contain" onError={e => e.currentTarget.style.display = 'none'} /> : <Landmark size={14} className="text-slate-400" />}
+                          </div>
+                          <div className="flex flex-col gap-0.5">
+                            <span className="font-bold text-slate-800 dark:text-slate-200 text-[11px]">{b.bank_name} - <span className="font-mono text-blue-700 dark:text-blue-400">{b.account_number}</span></span>
+                            <span className="text-[9px] text-slate-500 font-medium">a.n. {b.account_name}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                   <p className="mt-2 text-[10px] text-slate-500 italic">* Setelah transfer, silakan klik tombol Upload di tabel Riwayat Transaksi di bawah.</p>
                 </div>
