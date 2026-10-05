@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { X, Plus, Trash2, Edit2, Check, Banknote } from "lucide-react";
+import { X, Plus, Trash2, Edit2, Check, Landmark } from "lucide-react";
 import { masterPb } from "../../lib/pocketbase";
 
 interface BankAccount {
@@ -72,7 +72,7 @@ export const SuperAdminBankAccountsModal = ({ onClose }: { onClose: () => void }
         <div className="p-4 border-b border-slate-100 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
-              <Banknote size={18} />
+              <Landmark size={18} />
             </div>
             <div>
               <h2 className="font-bold text-slate-800 text-sm">Kelola Rekening Bank</h2>
@@ -158,7 +158,7 @@ export const SuperAdminBankAccountsModal = ({ onClose }: { onClose: () => void }
             
             {banks.length === 0 && isEditing !== "new" && !loading && (
               <div className="text-center py-8 text-slate-400">
-                <Banknote size={32} className="mx-auto mb-2 opacity-50" />
+                <Landmark size={32} className="mx-auto mb-2 opacity-50" />
                 <p className="text-xs">Belum ada rekening bank.</p>
               </div>
             )}

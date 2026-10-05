@@ -5,7 +5,7 @@ import {
   RefreshCw, X, CreditCard, TrendingUp, QrCode, Sparkles,
   Send, Building2, Calendar, ShieldCheck, MessageCircle
 } from "lucide-react";
-import { Banknote } from "lucide-react";
+import { Landmark } from "lucide-react";
 import { useTenant } from "../../context/TenantContext";
 import { masterPb } from "../../lib/pocketbase";
 import { cn } from "../../lib/utils";
@@ -455,7 +455,7 @@ const SchoolInvoicePage = () => {
               </p>
               {banks.length > 0 && (
                 <div className="mt-3 p-3 bg-white/60 dark:bg-slate-900/40 rounded-xl border border-blue-100 dark:border-blue-900/30 text-xs">
-                  <p className="font-bold text-slate-700 dark:text-slate-300 mb-2 flex items-center gap-1.5"><Banknote size={14}/> Opsi Transfer Manual:</p>
+                  <p className="font-bold text-slate-700 dark:text-slate-300 mb-2 flex items-center gap-1.5"><Landmark size={14}/> Opsi Transfer Manual:</p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {banks.map((b, i) => (
                       <div key={i} className="flex flex-col gap-0.5">
