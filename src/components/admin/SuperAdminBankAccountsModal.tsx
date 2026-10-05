@@ -127,8 +127,8 @@ export const SuperAdminBankAccountsModal = ({ onClose }: { onClose: () => void }
                             onClick={() => setForm({...form, bank_code: b.code, bank_name: b.name})}
                             className={`p-2 border rounded-xl flex flex-col items-center justify-center gap-1.5 transition ${form.bank_code === b.code ? 'border-blue-500 bg-blue-50/50 ring-1 ring-blue-500' : 'border-slate-200 hover:bg-slate-50'}`}
                           >
-                            <div className="h-6 flex items-center justify-center">
-                               <img src={b.logo} alt={b.name} className="max-h-full max-w-[50px] object-contain" onError={e => e.currentTarget.style.display = 'none'} />
+                            <div className="h-6 flex items-center justify-center w-full">
+                               <img src={b.logo} alt={b.name} className="max-h-full max-w-[50px] object-contain" onError={e => { e.currentTarget.style.display = 'none'; e.currentTarget.parentElement!.innerHTML = `<span class="text-[10px] font-black text-slate-400 uppercase tracking-wider">${b.code.replace('_', ' ')}</span>`; }} />
                             </div>
                             <span className="text-[9px] font-bold text-slate-600 text-center">{b.name}</span>
                           </button>
@@ -185,8 +185,8 @@ export const SuperAdminBankAccountsModal = ({ onClose }: { onClose: () => void }
                             onClick={() => setForm({...form, bank_code: b.code, bank_name: b.name})}
                             className={`p-2 border rounded-xl flex flex-col items-center justify-center gap-1.5 transition ${form.bank_code === b.code ? 'border-blue-500 bg-blue-50/50 ring-1 ring-blue-500' : 'border-slate-200 hover:bg-slate-50'}`}
                           >
-                            <div className="h-6 flex items-center justify-center">
-                               <img src={b.logo} alt={b.name} className="max-h-full max-w-[50px] object-contain" onError={e => e.currentTarget.style.display = 'none'} />
+                            <div className="h-6 flex items-center justify-center w-full">
+                               <img src={b.logo} alt={b.name} className="max-h-full max-w-[50px] object-contain" onError={e => { e.currentTarget.style.display = 'none'; e.currentTarget.parentElement!.innerHTML = `<span class="text-[10px] font-black text-slate-400 uppercase tracking-wider">${b.code.replace('_', ' ')}</span>`; }} />
                             </div>
                             <span className="text-[9px] font-bold text-slate-600 text-center">{b.name}</span>
                           </button>
