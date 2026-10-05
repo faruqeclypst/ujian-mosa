@@ -169,9 +169,10 @@ const SuperAdminSettingsPage = () => {
     }
   };
 
-  const sideNavItems: { key: Section; label: string; icon: typeof UserCircle }[] = [
+  const sideNavItems: { key: Section; label: string; icon: any }[] = [
     { key: "profile", label: "Profil Pribadi", icon: UserCircle },
     { key: "password", label: "Ganti Kata Sandi", icon: KeyRound },
+    { key: "bank", label: "Rekening Bank", icon: Landmark },
     { key: "apk", label: "Versi APK Siswa", icon: Smartphone },
     { key: "media", label: "Penyimpanan Media", icon: Cloud },
   ];
