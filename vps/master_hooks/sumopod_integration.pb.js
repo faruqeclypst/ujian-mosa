@@ -3,8 +3,13 @@
 // 1. Endpoint untuk membuat payment link SumoPod dari frontend
 routerAdd("POST", "/api/sumopod/create-payment", (c) => {
     try {
-        const info = $apis.requestInfo(c);
-        const body = info.data;
+        const body = new DynamicModel({
+            invoice_id: "",
+            order_id: "",
+            amount: 0,
+            tenant_url: ""
+        });
+        c.bind(body);
 
         const invoiceId = body.invoice_id;
         const orderId = body.order_id;
@@ -52,13 +57,19 @@ routerAdd("POST", "/api/sumopod/webhook", (c) => {
     */
 
     try {
-        const info = $apis.requestInfo(c);
-        const event = info.data;
+        const payload = new DynamicModel({
+            event_type: "",
+            data: {
+                order_id: "",
+                payment_method: ""
+            }
+        });
+        c.bind(payload);
 
-        console.log("[SumoPod] Webhook received:", event.event_type);
+        console.log("[SumoPod] Webhook received:", payload.event_type);
 
-        if (event.event_type === "payment.completed") {
-            const paymentData = event.data;
+        if (payload.event_type === "payment.completed") {
+            const paymentData = payload.data;
             const orderId = paymentData.order_id; 
 
             if (orderId) {
@@ -115,6 +126,6 @@ routerAdd("POST", "/api/sumopod/webhook", (c) => {
     } catch (err) {
         console.log("[SumoPod] Error processing webhook:", err);
         // Return 200 so SumoPod doesn't retry infinitely on non-invoice related test payloads
-        return c.json(200, { status: "error", message: err.message });
+        return c.json(200, { status: "error", message: err.toString() });
     }
 });
