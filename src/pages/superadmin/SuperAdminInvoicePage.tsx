@@ -151,8 +151,10 @@ const SuperAdminInvoicePage = () => {
   const [loadError, setLoadError] = useState("");
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState<PaymentStatus | "all">("all");
+  const [filterTime, setFilterTime] = useState<"all" | "today" | "week" | "month" | "year">("all");
+  const [filterPackage, setFilterPackage] = useState<string>("all");
   const [showModal, setShowModal] = useState(false);
-    const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
+  const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
   const [detailInvoice, setDetailInvoice] = useState<Invoice | null>(null);
   const [form, setForm] = useState(blankForm());
   const [saving, setSaving] = useState(false);
@@ -261,7 +263,7 @@ const SuperAdminInvoicePage = () => {
     
     let matchPackage = true;
     if (filterPackage !== "all") {
-      matchPackage = (inv.package_name || "").toLowerCase().includes(filterPackage.toLowerCase());
+      matchPackage = ((inv.plan_label || inv.plan) || "").toLowerCase().includes(filterPackage.toLowerCase());
     }
 
     let matchTime = true;
