@@ -133,6 +133,13 @@ const normalizeUrl = (raw: string): string => {
   if (!clean.startsWith("http://") && !clean.startsWith("https://")) {
     clean = "http://" + clean;
   }
+  
+  // Auto-append port :8090 if the user just typed an IP address without a port
+  const urlObj = new URL(clean);
+  if (!urlObj.port && /^(192\.168|10\.|172\.)/.test(urlObj.hostname)) {
+    clean = clean.replace(urlObj.hostname, urlObj.hostname + ":8090");
+  }
+  
   return clean.replace(/\/+$/, "");
 };
 

@@ -6,7 +6,6 @@ const config: CapacitorConfig = {
   webDir: 'dist-shell',
   server: {
     androidScheme: 'https',
-    url: 'https://examku.my.id',
     //
     cleartext: true,
     allowNavigation: ['*']
@@ -15,6 +14,9 @@ const config: CapacitorConfig = {
     overrideUserAgent: 'MosaExambro/2.0 (Android)'
   },
   plugins: {
+    CapacitorHttp: {
+      enabled: true
+    },
     SplashScreen: {
       launchShowDuration: 0,
       launchAutoHide: true,
