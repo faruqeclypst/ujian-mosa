@@ -548,15 +548,7 @@ const SelectSchoolPage = () => {
           >
             <HardDrive size={16} />
             <span>Local Server</span>
-            <span
-              className={`text-[9px] font-black px-1.5 py-0.5 rounded-full uppercase tracking-wider ${
-                activeTab === "local"
-                  ? "bg-emerald-500/40 text-white"
-                  : "bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400"
-              }`}
-            >
-              LAN / Lab
-            </span>
+            
           </button>
         </div>
       </div>
@@ -708,7 +700,7 @@ const SelectSchoolPage = () => {
         )}
 
         {/* ======================================================== */}
-        {/* TAB 2: LOCAL SERVER (OFFLINE / LAB)                      */}
+        {/* TAB 2: LOCAL SERVER                      */}
         {/* ======================================================== */}
         {activeTab === "local" && (
           <div className="flex flex-col gap-4">
@@ -930,7 +922,7 @@ const SelectSchoolPage = () => {
                     {schoolForLocalModal.name}
                   </h3>
                   <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-100/80 dark:bg-emerald-900/40 px-2 py-0.5 rounded-full mt-0.5">
-                    Mode Local Server (Lab)
+                    Mode Local Server
                   </span>
                 </div>
               </div>
