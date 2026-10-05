@@ -9,14 +9,24 @@ export function downloadStudentImportTemplate(terminology?: any) {
   const classLabel = terminology?.class || "Kelas";
   const filename = `Template_Import_${studentLabel}_Master.xlsx`;
 
-  const headers = [idLabel, `Nama ${studentLabel}`, "Gender (L/P)", `Nama ${classLabel}`];
+  const headers = [
+    idLabel, 
+    `Nama ${studentLabel}`, 
+    "Gender (L/P)", 
+    `Nama ${classLabel}`,
+    "Tempat Lahir (Opsional)",
+    "Tanggal Lahir (YYYY-MM-DD)",
+    "Ruang (Opsional)",
+    "Sesi (Opsional)",
+    "Nomor Peserta (Opsional)"
+  ];
 
   const ws = XLSX.utils.aoa_to_sheet([
     [...headers],
-    ["1234567890", "Ahmad Fauzi", "L", "X-MIPA-1"],
-    ["0987654321", "Siti Aminah", "P", "X-MIPA-1"],
-    ["1122334455", "Budi Santoso", "L", "XI-IPS-2"],
-    ["5544332211", "Dewi Lestari", "P", "XI-IPS-2"],
+    ["1234567890", "Ahmad Fauzi", "L", "X-MIPA-1", "Jakarta", "2008-05-12", "Ruang 01", "Sesi 1", "01-001-001-9"],
+    ["0987654321", "Siti Aminah", "P", "X-MIPA-1", "Bandung", "2008-08-20", "Ruang 01", "Sesi 1", "01-001-002-8"],
+    ["1122334455", "Budi Santoso", "L", "XI-IPS-2", "Surabaya", "2007-11-15", "Ruang 02", "Sesi 2", "01-002-001-7"],
+    ["5544332211", "Dewi Lestari", "P", "XI-IPS-2", "Yogyakarta", "2007-02-04", "Ruang 02", "Sesi 2", "01-002-002-6"],
   ]);
   
   const headerStyle = {
@@ -37,21 +47,30 @@ export function downloadStudentImportTemplate(terminology?: any) {
   }
 
   (ws as any)["!cols"] = [
-    { wch: 20 }, // ID
-    { wch: 30 }, // Nama student
+    { wch: 18 }, // ID
+    { wch: 28 }, // Nama student
     { wch: 15 }, // Gender
-    { wch: 20 }, // Nama Kelas
+    { wch: 18 }, // Nama Kelas
+    { wch: 20 }, // Tempat Lahir
+    { wch: 25 }, // Tanggal Lahir
+    { wch: 16 }, // Ruang
+    { wch: 15 }, // Sesi
+    { wch: 22 }, // Nomor Peserta
   ];
 
   const wsNotes = XLSX.utils.aoa_to_sheet([
     [`PANDUAN PENGISIAN DATA ${studentLabel.toUpperCase()}`],
     [],
-    [`1. ${idLabel}`, "Wajib diisi. Usahakan format kolom adalah 'Text' agar nol di depan tidak hilang."],
+    [`1. ${idLabel}`, "Wajib diisi. Format kolom disarankan 'Text'."],
     [`2. NAMA ${studentLabel.toUpperCase()}`, "Wajib diisi sesuai nama lengkap."],
     ["3. GENDER", "Isi dengan 'L' untuk Laki-laki atau 'P' untuk Perempuan."],
     [`4. NAMA ${classLabel.toUpperCase()}`, `PENTING: Harus sama persis dengan nama ${classLabel.toLowerCase()} di menu 'Data ${classLabel}' .`],
+    ["5. TEMPAT LAHIR", "Opsional. Contoh: Jakarta, Medan, dll."],
+    ["6. TANGGAL LAHIR", "Opsional. Format: YYYY-MM-DD (Contoh: 2008-05-12)."],
+    ["7. RUANG & SESI", "Opsional untuk Kartu Peserta Ujian (Contoh Ruang: Ruang 01, Sesi: Sesi 1)."],
+    ["8. NOMOR PESERTA", "Opsional jika nomor kartu ujian berbeda dari NISN/Username."],
     [],
-    ["TIPS:", `Jika nama ${classLabel.toLowerCase()} di sistem adalah 'XII-IPA-1', maka di Excel harus 'XII-IPA-1' (boleh pakai spasi/tanpa spasi karena sistem sudah auto-match).`],
+    ["TIPS:", `Data Tempat/Tgl Lahir, Ruang, dan Sesi akan otomatis tercetak di Kartu Ujian Siswa (format ANBK / TKA).`],
   ]);
   (wsNotes as any)["!cols"] = [{ wch: 20 }, { wch: 80 }];
 
@@ -68,7 +87,18 @@ export async function parseStudentImportExcel(
   file: File, 
   classes: ClassData[]
 ): Promise<{ 
-  results: { nisn: string; name: string; gender: "L" | "P"; classId: string }[],
+  results: {
+    nisn: string;
+    name: string;
+    gender: "L" | "P";
+    classId: string;
+    photo?: string;
+    birthPlace?: string;
+    birthDate?: string;
+    room?: string;
+    session?: string;
+    examNumber?: string;
+  }[],
   skipped: { nisn: string; name: string; className: string }[]
 }> {
   const buffer = await file.arrayBuffer();
@@ -77,7 +107,18 @@ export async function parseStudentImportExcel(
   if (!ws) throw new Error("Sheet tidak ditemukan");
 
   const raw = XLSX.utils.sheet_to_json<Record<string, any>>(ws, { defval: "" });
-  const results: { nisn: string; name: string; gender: "L" | "P"; classId: string }[] = [];
+  const results: {
+    nisn: string;
+    name: string;
+    gender: "L" | "P";
+    classId: string;
+    photo?: string;
+    birthPlace?: string;
+    birthDate?: string;
+    room?: string;
+    session?: string;
+    examNumber?: string;
+  }[] = [];
   const skipped: { nisn: string; name: string; className: string }[] = [];
 
   for (const row of raw) {
@@ -87,7 +128,8 @@ export async function parseStudentImportExcel(
       row["NIM"] || 
       row["ID"] || 
       row["Nomor Induk"] ||
-      Object.keys(row).find(k => k.match(/NISN|NIM|ID|Nomor/i)) ? row[Object.keys(row).find(k => k.match(/NISN|NIM|ID|Nomor/i))!] : ""
+      (Object.keys(row).find(k => k.match(/^NISN$|^NIM$|^ID$/i)) ? row[Object.keys(row).find(k => k.match(/^NISN$|^NIM$|^ID$/i))!] : "") ||
+      (Object.keys(row).find(k => k.match(/NISN|NIM|Nomor Induk/i)) ? row[Object.keys(row).find(k => k.match(/NISN|NIM|Nomor Induk/i))!] : "")
     ).trim();
 
     // Robust detection for Name column
@@ -97,7 +139,8 @@ export async function parseStudentImportExcel(
       row["Nama"] || 
       row["Name"] ||
       row["Full Name"] ||
-      Object.keys(row).find(k => k.match(/Nama|Name/i)) ? row[Object.keys(row).find(k => k.match(/Nama|Name/i))!] : ""
+      (Object.keys(row).find(k => k.match(/Nama Siswa|Nama Lengkap|Full Name/i)) ? row[Object.keys(row).find(k => k.match(/Nama Siswa|Nama Lengkap|Full Name/i))!] : "") ||
+      (Object.keys(row).find(k => k.match(/^Nama$/i)) ? row[Object.keys(row).find(k => k.match(/^Nama$/i))!] : "")
     ).trim();
 
     // Detect Gender with multiple possible header names
@@ -110,6 +153,7 @@ export async function parseStudentImportExcel(
     ).toString().trim().toUpperCase();
 
     const gender: "L" | "P" = genderRaw.startsWith("P") ? "P" : "L"; 
+
     // Detect Class Name with multiple possible header names
     const className = (
       row["Nama Kelas"] || 
@@ -118,8 +162,61 @@ export async function parseStudentImportExcel(
       row["Program"] || 
       row["Class"] || 
       row["Kls"] || 
-      Object.keys(row).find(k => k.match(/Kelas|Program|Class/i)) ? row[Object.keys(row).find(k => k.match(/Kelas|Program|Class/i))!] : ""
+      (Object.keys(row).find(k => k.match(/Nama Kelas|Nama Program/i)) ? row[Object.keys(row).find(k => k.match(/Nama Kelas|Nama Program/i))!] : "") ||
+      (Object.keys(row).find(k => k.match(/^Kelas$/i)) ? row[Object.keys(row).find(k => k.match(/^Kelas$/i))!] : "")
     ).toString().trim();
+
+    // Optional profile fields
+    const birthPlace = String(
+      row["Tempat Lahir (Opsional)"] ||
+      row["Tempat Lahir"] ||
+      row["Tempat"] ||
+      row["Kota Lahir"] ||
+      ""
+    ).trim();
+
+    let birthDate = String(
+      row["Tanggal Lahir (YYYY-MM-DD)"] ||
+      row["Tanggal Lahir"] ||
+      row["Tgl Lahir"] ||
+      row["DOB"] ||
+      ""
+    ).trim();
+
+    // Jika Excel mengonversi tanggal jadi serial number (misal 39550)
+    if (/^\d{5}$/.test(birthDate)) {
+      try {
+        const parsedDate = new Date(Math.round((Number(birthDate) - 25569) * 86400 * 1000));
+        if (!isNaN(parsedDate.getTime())) {
+          birthDate = parsedDate.toISOString().split("T")[0];
+        }
+      } catch {}
+    }
+
+    const room = String(
+      row["Ruang (Opsional)"] ||
+      row["Ruang"] ||
+      row["Ruang Ujian"] ||
+      row["Ruangan"] ||
+      row["Lab"] ||
+      ""
+    ).trim();
+
+    const session = String(
+      row["Sesi (Opsional)"] ||
+      row["Sesi"] ||
+      row["Sesi Ujian"] ||
+      row["Gelombang"] ||
+      ""
+    ).trim();
+
+    const examNumber = String(
+      row["Nomor Peserta (Opsional)"] ||
+      row["Nomor Peserta"] ||
+      row["No Peserta"] ||
+      row["No. Peserta"] ||
+      ""
+    ).trim();
 
     if (!nisn && !name) continue;
 
@@ -138,6 +235,11 @@ export async function parseStudentImportExcel(
         name,
         gender,
         classId: foundClass.id,
+        birthPlace,
+        birthDate,
+        room,
+        session,
+        examNumber,
       });
     } else {
       skipped.push({ nisn, name, className });
@@ -158,7 +260,17 @@ export function exportStudentToExcel(params: {
   const classLabel = params.terminology?.class || "Kelas";
   
   const filename = params.filename ?? `data-${studentLabel.toLowerCase()}.xlsx`;
-  const headers = [idLabel, `Nama ${studentLabel}`, "Gender", `Nama ${classLabel}`];
+  const headers = [
+    idLabel, 
+    "Nomor Peserta",
+    `Nama ${studentLabel}`, 
+    "Gender", 
+    `Nama ${classLabel}`,
+    "Tempat Lahir",
+    "Tanggal Lahir",
+    "Ruang",
+    "Sesi"
+  ];
 
   const ws = XLSX.utils.aoa_to_sheet([
     [...headers],
@@ -166,9 +278,14 @@ export function exportStudentToExcel(params: {
       const cls = params.classes.find(c => c.id === s.classId);
       return [
         s.nisn, 
+        s.examNumber || s.nisn,
         s.name, 
         s.gender, 
-        cls ? cls.name : `Tanpa ${classLabel}`
+        cls ? cls.name : `Tanpa ${classLabel}`,
+        s.birthPlace || "",
+        s.birthDate || "",
+        s.room || "",
+        s.session || ""
       ];
     }),
   ]);
@@ -184,16 +301,22 @@ export function exportStudentToExcel(params: {
   }
 
   (ws as any)["!cols"] = [
-    { wch: 15 }, // ID
-    { wch: 25 }, // Nama student
-    { wch: 12 }, // Gender
-    { wch: 15 }, // Nama Kelas
+    { wch: 16 }, // ID
+    { wch: 20 }, // Nomor Peserta
+    { wch: 28 }, // Nama student
+    { wch: 10 }, // Gender
+    { wch: 18 }, // Nama Kelas
+    { wch: 18 }, // Tempat Lahir
+    { wch: 16 }, // Tanggal Lahir
+    { wch: 15 }, // Ruang
+    { wch: 12 }, // Sesi
   ];
 
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, studentLabel.toLowerCase());
   XLSX.writeFile(wb, filename);
 }
+
 
 export function exportStudentLoginsToExcel(params: { 
   students: StudentData[];

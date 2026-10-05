@@ -19,7 +19,9 @@ import {
   Sparkles,
   KeyRound,
   BarChart2,
-  ShieldCheck
+  ShieldCheck,
+  Printer,
+  Camera
 } from "lucide-react";
 import { cn } from "../lib/utils";
 import {
@@ -45,6 +47,8 @@ import StudentScoresDialog from "../components/dialogs/StudentScoresDialog";
 import BatchClassMoveDialog from "../components/dialogs/BatchClassMoveDialog";
 import ResetStudentPasswordDialog from "../components/dialogs/ResetStudentPasswordDialog";
 import BatchProgressDialog from "../components/dialogs/BatchProgressDialog";
+import PrintExamCardsDialog from "../components/dialogs/PrintExamCardsDialog";
+import BatchStudentPhotoDialog from "../components/dialogs/BatchStudentPhotoDialog";
 
 const StudentsPage = () => {
   const navigate = useNavigate();
@@ -81,6 +85,9 @@ const StudentsPage = () => {
   const [filterClassId, setFilterClassId] = useState<string>("ALL");
 
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
+  const [printCardsOpen, setPrintCardsOpen] = useState(false);
+  const [singleStudentForCard, setSingleStudentForCard] = useState<StudentData | null>(null);
+  const [isBatchPhotoOpen, setIsBatchPhotoOpen] = useState(false);
 
   const [alertDialog, setAlertDialog] = useState<{
     isOpen: boolean;
@@ -348,20 +355,34 @@ const StudentsPage = () => {
         return showAlert("File Kosong", "File yang Anda upload kosong atau tidak valid.", "warning");
       }
 
-      // Validasi NISN Duplikat
-      const existingNisns = students.map(s => s.nisn);
-      const newEntries = results.filter((p: any) => !existingNisns.includes(String(p.nisn)));
-      const duplicatesCount = results.length - newEntries.length;
+      // Pisahkan data yang baru vs data yang sudah ada (untuk update/sinkronisasi profil)
+      const existingStudentMap = new Map<string, StudentData>();
+      students.forEach(s => {
+        if (s.nisn) existingStudentMap.set(String(s.nisn).trim(), s);
+        if ((s as any).username) existingStudentMap.set(String((s as any).username).trim(), s);
+      });
 
-      if (newEntries.length === 0 && skipped.length === 0) {
-        return showAlert("Batal", `Semua ${terminology.id} di file (${results.length}) sudah terdaftar.`, "warning");
+      const toCreate: typeof results = [];
+      const toUpdate: { student: StudentData; row: (typeof results)[0] }[] = [];
+
+      for (const row of results) {
+        const found = existingStudentMap.get(String(row.nisn).trim());
+        if (found) {
+          toUpdate.push({ student: found, row });
+        } else {
+          toCreate.push(row);
+        }
       }
 
-      // Validasi Kapasitas Kuota SaaS (Bypass jika offline)
-      if (!isOffline && students.length + newEntries.length > quota) {
+      if (toCreate.length === 0 && toUpdate.length === 0 && skipped.length === 0) {
+        return showAlert("Batal", "Tidak ada baris data siswa yang dapat diproses.", "warning");
+      }
+
+      // Validasi Kapasitas Kuota SaaS (Hanya dihitung untuk siswa baru)
+      if (!isOffline && students.length + toCreate.length > quota) {
         return showAlert(
           "Melebihi Kuota Langganan",
-          `Gagal mengimpor data. Anda mencoba menambahkan ${newEntries.length} ${terminology.student.toLowerCase()} baru, tapi sisa kuota paket ${planName} Anda tinggal ${Math.max(0, quota - students.length)} ${terminology.student.toLowerCase()} (Batas maksimal: ${quota}). Silakan sesuaikan file Excel Anda atau tingkatkan paket langganan institusi.`,
+          `Gagal mengimpor data. Anda mencoba menambahkan ${toCreate.length} ${terminology.student.toLowerCase()} baru, tapi sisa kuota paket ${planName} Anda tinggal ${Math.max(0, quota - students.length)} ${terminology.student.toLowerCase()} (Batas maksimal: ${quota}). Silakan sesuaikan file Excel Anda atau tingkatkan paket langganan institusi.`,
           "danger",
           () => navigate("/admin/invoice"),
           true,
@@ -369,18 +390,54 @@ const StudentsPage = () => {
         );
       }
 
+      const totalOperations = toCreate.length + toUpdate.length;
       setBatchProgress({
         isOpen: true,
-        total: newEntries.length,
+        total: totalOperations,
         current: 0,
-        message: "Memulai import data...",
-        title: `Import Data ${terminology.student}`
+        message: "Memulai proses import & sinkronisasi data...",
+        title: `Import & Update ${terminology.student}`
       });
 
       const failures: string[] = [];
+      let createdCount = 0;
+      let updatedCount = 0;
+
+      // 1. Eksekusi Batch Update untuk siswa lama yang sudah terdaftar
       const chunkSize = 10;
-      for (let i = 0; i < newEntries.length; i += chunkSize) {
-        const chunk = newEntries.slice(i, i + chunkSize);
+      for (let i = 0; i < toUpdate.length; i += chunkSize) {
+        const chunk = toUpdate.slice(i, i + chunkSize);
+        await Promise.all(chunk.map(async (item) => {
+          try {
+            const updatePayload: any = {};
+            if (item.row.name) updatePayload.name = item.row.name;
+            if (item.row.classId) updatePayload.classId = item.row.classId;
+            if (item.row.gender) updatePayload.gender = item.row.gender;
+            if (item.row.birthPlace !== undefined) updatePayload.birthPlace = item.row.birthPlace;
+            if (item.row.birthDate !== undefined) updatePayload.birthDate = item.row.birthDate;
+            if (item.row.room !== undefined) updatePayload.room = item.row.room;
+            if (item.row.session !== undefined) updatePayload.session = item.row.session;
+            if (item.row.examNumber !== undefined) updatePayload.examNumber = item.row.examNumber;
+
+            await updateStudent(item.student.id, updatePayload);
+            updatedCount++;
+          } catch (err: any) {
+            console.error(`Gagal update profil ${item.row.name} (${item.row.nisn}):`, err);
+            failures.push(`Update: ${item.row.name} (${item.row.nisn}) - ${err.message || "Error Database"}`);
+          }
+        }));
+
+        const currentProcessed = Math.min(i + chunkSize, toUpdate.length);
+        setBatchProgress(prev => ({
+          ...prev,
+          current: currentProcessed,
+          message: `Memperbarui profil ${currentProcessed}/${totalOperations}...`
+        }));
+      }
+
+      // 2. Eksekusi Create untuk siswa baru
+      for (let i = 0; i < toCreate.length; i += chunkSize) {
+        const chunk = toCreate.slice(i, i + chunkSize);
         await Promise.all(chunk.map(async (row) => {
           try {
             await createStudent({
@@ -388,34 +445,45 @@ const StudentsPage = () => {
               name: row.name,
               gender: row.gender,
               classId: row.classId,
+              birthPlace: (row as any).birthPlace || "",
+              birthDate: (row as any).birthDate || "",
+              room: (row as any).room || "",
+              session: (row as any).session || "",
+              examNumber: (row as any).examNumber || "",
             });
+            createdCount++;
           } catch (err: any) {
-            console.error(`Gagal import ${terminology.student.toLowerCase()} ${row.nisn}:`, err);
-            failures.push(`${row.name} (${row.nisn}) - ${err.message || "Error Database"}`);
+            console.error(`Gagal import ${terminology.student.toLowerCase()} baru ${row.nisn}:`, err);
+            failures.push(`Baru: ${row.name} (${row.nisn}) - ${err.message || "Error Database"}`);
           }
         }));
 
-        const currentProcessed = Math.min(i + chunkSize, newEntries.length);
+        const currentProcessed = toUpdate.length + Math.min(i + chunkSize, toCreate.length);
         setBatchProgress(prev => ({
           ...prev,
           current: currentProcessed,
-          message: `Mengimport data (${currentProcessed}/${newEntries.length})`
+          message: `Menambahkan siswa baru ${currentProcessed}/${totalOperations}...`
         }));
       }
 
-      let message = `${newEntries.length - failures.length} ${terminology.student} berhasil diimport.`;
-      if (duplicatesCount > 0) message += ` ${duplicatesCount} data dilewati karena ${terminology.id} duplikat.`;
+      let message = `Sinkronisasi Excel Berhasil:`;
+      if (updatedCount > 0) {
+        message += `\n• ${updatedCount} ${terminology.student.toLowerCase()} lama berhasil diperbarui data profilnya (Jenis Kelamin, Tempat/Tgl Lahir, Ruang/Sesi).`;
+      }
+      if (createdCount > 0) {
+        message += `\n• ${createdCount} ${terminology.student.toLowerCase()} baru berhasil ditambahkan ke database.`;
+      }
 
       if (skipped.length > 0) {
         const uniqueSkipped = Array.from(new Set(skipped.map(s => s.className)));
-        message += `\n\n⚠️ ${skipped.length} data gagal karena Kelas [${uniqueSkipped.join(", ")}] tidak ditemukan.`;
+        message += `\n\n⚠️ ${skipped.length} baris dilewati karena Nama Kelas [${uniqueSkipped.join(", ")}] tidak ditemukan.`;
       }
 
       if (failures.length > 0) {
         message += `\n\n❌ ${failures.length} data gagal disimpan ke database:\n- ${failures.slice(0, 5).join("\n- ")}${failures.length > 5 ? "\n...dan " + (failures.length - 5) + " lainnya" : ""}`;
       }
 
-      showAlert("Hasil Import", message, (skipped.length > 0 || failures.length > 0) ? "warning" : "success");
+      showAlert("Hasil Import & Sinkronisasi", message, (skipped.length > 0 || failures.length > 0) ? "warning" : "success");
     } catch (err: any) {
       showAlert("Gagal Import", err.message || `Gagal mengimport data ${terminology.student}.`, "danger");
     } finally {
@@ -455,8 +523,25 @@ const StudentsPage = () => {
       nisn: selectedStudent.nisn,
       name: selectedStudent.name,
       gender: selectedStudent.gender,
-      classId: selectedStudent.classId
-    } : { nisn: "", name: "", gender: "L" as const, classId: "" },
+      classId: selectedStudent.classId,
+      photo: selectedStudent.photo || "",
+      birthPlace: selectedStudent.birthPlace || "",
+      birthDate: selectedStudent.birthDate || "",
+      room: selectedStudent.room || "",
+      session: selectedStudent.session || "",
+      examNumber: selectedStudent.examNumber || "",
+    } : { 
+      nisn: "", 
+      name: "", 
+      gender: "L" as const, 
+      classId: "",
+      photo: "",
+      birthPlace: "",
+      birthDate: "",
+      room: "",
+      session: "",
+      examNumber: "",
+    },
     [selectedStudent]);
 
   const filteredStudents = useMemo(() => {
@@ -678,6 +763,22 @@ const StudentsPage = () => {
                           <span className="text-[10px] text-slate-400 mt-1">Reset password {selectedIds.length} {terminology.student.toLowerCase()} terpilih</span>
                         </div>
                       </DropdownMenuItem>
+
+                      <DropdownMenuItem
+                        onClick={() => {
+                          setSingleStudentForCard(null);
+                          setPrintCardsOpen(true);
+                        }}
+                        className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 focus:bg-slate-50 dark:focus:bg-slate-900 transition-colors group"
+                      >
+                        <div className="h-10 w-10 shrink-0 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                          <Printer className="h-5 w-5" />
+                        </div>
+                        <div className="flex flex-col min-w-0">
+                          <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">Cetak Kartu ({selectedIds.length})</span>
+                          <span className="text-[10px] text-slate-400 mt-1">Cetak kartu ujian ANBK {selectedIds.length} siswa terpilih</span>
+                        </div>
+                      </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
 
@@ -778,6 +879,33 @@ const StudentsPage = () => {
                     </DropdownMenuItem>
                     <DropdownMenuSeparator className="my-1 border-slate-100 dark:border-slate-800" />
                     <DropdownMenuItem
+                      onClick={() => {
+                        setSingleStudentForCard(null);
+                        setPrintCardsOpen(true);
+                      }}
+                      className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 focus:bg-slate-50 dark:focus:bg-slate-900 transition-colors group"
+                    >
+                      <div className="h-10 w-10 shrink-0 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <Printer className="h-5 w-5" />
+                      </div>
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">Cetak Kartu Ujian (ANBK)</span>
+                        <span className="text-[10px] text-slate-400 mt-1">Format kartu login resmi ANBK / TKA</span>
+                      </div>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => setIsBatchPhotoOpen(true)}
+                      className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 focus:bg-slate-50 dark:focus:bg-slate-900 transition-colors group"
+                    >
+                      <div className="h-10 w-10 shrink-0 rounded-lg bg-purple-50 dark:bg-purple-900/30 text-purple-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <Camera className="h-5 w-5" />
+                      </div>
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">Upload Foto Massal</span>
+                        <span className="text-[10px] text-slate-400 mt-1">Unggah pas foto banyak siswa via ZIP / file NISN</span>
+                      </div>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
                       onClick={() => downloadStudentImportTemplate(terminology)}
                       className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 focus:bg-slate-50 dark:focus:bg-slate-900 transition-colors group"
                     >
@@ -809,6 +937,37 @@ const StudentsPage = () => {
                 </Button>
               )}
 
+              {/* Tombol Upload Foto Massal */}
+              {role === "admin" && (
+                <Button
+                  onClick={() => setIsBatchPhotoOpen(true)}
+                  size="sm"
+                  className="rounded-2xl bg-purple-600 hover:bg-purple-700 text-white font-bold shadow-sm h-9 px-3.5 gap-1.5 active:scale-95 transition-all"
+                  title="Upload pas foto banyak siswa sekaligus (ZIP / Multi-foto)"
+                >
+                  <Camera className="h-4 w-4" />
+                  <span>Upload Foto Massal</span>
+                </Button>
+              )}
+
+              {/* Tombol Cetak Kartu Ujian Utama */}
+              <Button
+                onClick={() => {
+                  setSingleStudentForCard(null);
+                  setPrintCardsOpen(true);
+                }}
+                size="sm"
+                className="rounded-2xl bg-amber-500 hover:bg-amber-600 text-white font-bold shadow-sm h-9 px-3.5 gap-1.5 active:scale-95 transition-all"
+              >
+                <Printer className="h-4 w-4" />
+                <span>Cetak Kartu Ujian</span>
+                {selectedIds.length > 0 && (
+                  <span className="ml-0.5 px-1.5 py-0.2 bg-black/20 rounded-full text-[10px]">
+                    {selectedIds.length}
+                  </span>
+                )}
+              </Button>
+
               {role === "admin" && (
                 <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                   <DialogTrigger asChild>
@@ -817,7 +976,7 @@ const StudentsPage = () => {
                       Tambah {terminology.student}
                     </Button>
                   </DialogTrigger>
-                  <DialogContent className="max-w-md bg-card">
+                  <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto bg-card">
                     <DialogHeader>
                       <DialogTitle className="text-base font-bold text-slate-800 dark:text-white">{dialogMode === "edit" ? `Edit Data ${terminology.student}` : `Tambah Data ${terminology.student}`}</DialogTitle>
                     </DialogHeader>
@@ -972,6 +1131,10 @@ const StudentsPage = () => {
           onResetPassword={role === "admin" ? handleResetPassword : undefined}
           onViewInterest={handleViewInterest}
           onViewScores={handleViewScores}
+          onPrintExamCard={(student) => {
+            setSingleStudentForCard(student);
+            setPrintCardsOpen(true);
+          }}
           filterActions={
             <div className="flex items-center gap-2">
               <span className="text-xs font-bold text-slate-500 uppercase tracking-wider hidden sm:inline">{terminology.class}:</span>
@@ -1065,6 +1228,33 @@ const StudentsPage = () => {
         }}
         studentId={studentForScores?.id || ""}
         studentName={studentForScores?.name || ""}
+      />
+
+      <PrintExamCardsDialog
+        isOpen={printCardsOpen}
+        onClose={() => {
+          setPrintCardsOpen(false);
+          setSingleStudentForCard(null);
+        }}
+        students={students}
+        classes={classes}
+        selectedStudentIds={singleStudentForCard ? [singleStudentForCard.id] : selectedIds}
+        filterClassId={filterClassId}
+      />
+
+      <BatchStudentPhotoDialog
+        isOpen={isBatchPhotoOpen}
+        onClose={() => setIsBatchPhotoOpen(false)}
+        students={students}
+        classes={classes}
+        onUpdateStudent={updateStudent}
+        onSuccess={(count) => {
+          showAlert(
+            "Foto Diperbarui",
+            `Berhasil memasang ${count} pas foto siswa ke database. Foto siap dicetak di Kartu Ujian.`,
+            "success"
+          );
+        }}
       />
     </div>
   );

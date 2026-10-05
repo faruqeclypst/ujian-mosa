@@ -93,7 +93,7 @@ const getLiveScore = (sisAnswers: Record<string, any>, monitorQuestions: any[], 
 
   targetQuestions.forEach((q: any) => {
     const type = q.type || "pilihan_ganda";
-    const isEssay = type === "isian_singkat" || type === "uraian";
+    const isEssay = type === "uraian";
     const itemScore = checkAns(q, sisAnswers[q.id], overrides);
 
     if (isEssay) {
@@ -140,7 +140,7 @@ const formatAnswer = (q: any, studentAns: any) => {
   if (type === "pilihan_ganda_kompleks") {
     return Array.isArray(studentAns) ? studentAns.map((k: any) => String(k).toUpperCase()).join(",") : String(studentAns).toUpperCase();
   }
-  if (type === "isian_singkat" || type === "uraian") {
+  if (type === "uraian") {
     const text = String(studentAns).replace(/<[^>]*>/g, '').trim();
     return text.length > 100 ? text.substring(0, 100) + "..." : text;
   }
@@ -314,8 +314,8 @@ export async function exportActiveRoomsToZip({
 
       questionsByExam[examId] = Array.from(new Map(mappedQuestions.map((q: any) => [q.id, q])).values())
         .sort((a: any, b: any) => {
-          const aIsEssay = a.type === "isian_singkat" || a.type === "uraian";
-          const bIsEssay = b.type === "isian_singkat" || b.type === "uraian";
+          const aIsEssay = a.type === "uraian";
+          const bIsEssay = b.type === "uraian";
           if (aIsEssay && !bIsEssay) return 1;
           if (!aIsEssay && bIsEssay) return -1;
           return 0;
@@ -350,7 +350,7 @@ export async function exportActiveRoomsToZip({
     ];
     monitorQuestions.forEach((q: any) => {
       const type = q.type || "pilihan_ganda";
-      const isEssay = type === "isian_singkat" || type === "uraian";
+      const isEssay = type === "uraian";
       COL_WIDTHS.push({ wch: isEssay ? 30 : 10 });
     });
 
@@ -424,7 +424,7 @@ export async function exportActiveRoomsToZip({
         let objCorrect = 0, objTotal = 0, essCorrect = 0, essTotal = 0;
         targetQuestions.forEach((q: any) => {
           const type = q.type || "pilihan_ganda";
-          const isEssay = type === "isian_singkat" || type === "uraian";
+          const isEssay = type === "uraian";
           const ic = checkAns(q, answers[q.id], overrides);
           if (isEssay) { essTotal++; if (ic) essCorrect++; }
           else { objTotal++; if (ic) objCorrect++; }
@@ -433,7 +433,7 @@ export async function exportActiveRoomsToZip({
         if (objTotal === 0 && essTotal === 0) {
           const maxQ = room?.max_questions && room.max_questions > 0
             ? room.max_questions
-            : monitorQuestions.filter((q: any) => q.type !== "isian_singkat" && q.type !== "uraian").length;
+            : monitorQuestions.filter((q: any) => q.type !== "uraian").length;
           objTotal = maxQ;
         }
 
@@ -463,7 +463,7 @@ export async function exportActiveRoomsToZip({
             : `${dMins}m ${dSecs}d`;
         }
 
-        const essGraded = Object.keys(overrides).filter(k => { const q = targetQuestions.find((x: any) => x.id === k); return q && (q.type === "isian_singkat" || q.type === "uraian"); }).length;
+        const essGraded = Object.keys(overrides).filter(k => { const q = targetQuestions.find((x: any) => x.id === k); return q && (q.type === "uraian"); }).length;
 
         const finalVal = Math.round(finalScore) || 0;
         const ri = idx + 3;

@@ -35,6 +35,12 @@ export interface StudentData {
   createdAt: number;
   password?: string; // Untuk PocketBase Auth
   hasChangedPassword?: boolean;
+  photo?: string;
+  birthPlace?: string;
+  birthDate?: string;
+  room?: string;
+  session?: string;
+  examNumber?: string;
 }
 
 export type StudentPayload = Omit<StudentData, "id" | "createdAt">;

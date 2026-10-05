@@ -107,8 +107,8 @@ const StudentGradingDetailPage = () => {
       }
 
       setQuestions(finalQuestions.sort((a: any, b: any) => {
-        const aIsEssay = a.type === "isian_singkat" || a.type === "uraian";
-        const bIsEssay = b.type === "isian_singkat" || b.type === "uraian";
+        const aIsEssay = a.type === "uraian";
+        const bIsEssay = b.type === "uraian";
         if (aIsEssay && !bIsEssay) return 1;
         if (!aIsEssay && bIsEssay) return -1;
         return 0;
@@ -152,7 +152,12 @@ const computeQuestionScore = (q: any, ans: any, overrideVal?: any): number | nul
   }
   if (t === "menjodohkan") {
     const pairs = q.pairs || [];
-    return pairs.length > 0 && pairs.every((p: any) => ans[p.id] === p.right) ? 1 : 0;
+    if (pairs.length > 0) {
+      let pairCorrect = 0;
+      pairs.forEach((p: any) => { if (ans[p.id] === p.right) pairCorrect++; });
+      return pairCorrect / pairs.length;
+    }
+    return 0;
   }
   if (t === "urutkan" || t === "drag_drop") {
     const co = (q.items || []).map((it: any) => it.id);
@@ -164,8 +169,8 @@ const computeQuestionScore = (q: any, ans: any, overrideVal?: any): number | nul
   return null; // essay - manual grading required
 };
 
-  const objectiveQuestions = questions.filter(q => q.type !== "isian_singkat" && q.type !== "uraian");
-  const essayQuestions = questions.filter(q => q.type === "isian_singkat" || q.type === "uraian");
+  const objectiveQuestions = questions.filter(q => q.type !== "uraian");
+  const essayQuestions = questions.filter(q => q.type === "uraian");
   const hasEssay = essayQuestions.length > 0;
 
   const getScoreBreakdown = () => {
@@ -768,7 +773,7 @@ const computeQuestionScore = (q: any, ans: any, overrideVal?: any): number | nul
                   const isFullCorrect = qScore !== null && qScore >= 1;
                   const isPartialCorrect = qScore !== null && qScore > 0 && qScore < 1;
                   const isWrong = qScore !== null && qScore === 0;
-                  const isEssay = q.type === "isian_singkat" || q.type === "uraian";
+                  const isEssay = q.type === "uraian";
                   const overrides = attempt.overrides || (attempt.answers as any)?.__overrides__ || {};
                   const isManuallyGraded = overrides[q.id] !== undefined;
                   const typeLabels: Record<string, string> = {

@@ -4,8 +4,8 @@ import { DataTable } from "../ui/data-table";
 import type { StudentData, ClassData } from "../../types/exam";
 import { useAuth } from "../../context/AuthContext";
 import { useTenant } from "../../context/TenantContext";
-import { Edit, Trash, Sparkles, KeyRound, ClipboardList } from "lucide-react";
-import { Avatar, AvatarFallback } from "../ui/avatar";
+import { Edit, Trash, Sparkles, KeyRound, ClipboardList, Printer } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 import { Badge } from "../ui/badge";
 import { cn } from "../../lib/utils";
 
@@ -19,6 +19,7 @@ interface StudentTableProps {
   onResetPassword?: (student: StudentData) => void;
   onViewInterest?: (student: StudentData) => void;
   onViewScores?: (student: StudentData) => void;
+  onPrintExamCard?: (student: StudentData) => void;
   filterActions?: React.ReactNode;
   customActions?: (student: StudentData) => React.ReactNode;
 }
@@ -33,6 +34,7 @@ export const StudentTable = ({
   onResetPassword,
   onViewInterest,
   onViewScores,
+  onPrintExamCard,
   filterActions,
   customActions,
   title
@@ -109,10 +111,17 @@ export const StudentTable = ({
       label: terminology.id, 
       sortable: true,
       className: "w-[120px] text-left",
-      render: (nisn: string) => (
-        <span className="inline-flex items-center justify-start px-2 py-0.5 rounded-lg bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-[11px] font-black tracking-widest border border-slate-200/50 dark:border-slate-700/50">
-          {nisn || "???"}
-        </span>
+      render: (nisn: string, student: StudentData) => (
+        <div className="flex flex-col">
+          <span className="inline-flex items-center justify-start px-2 py-0.5 rounded-lg bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-[11px] font-black tracking-widest border border-slate-200/50 dark:border-slate-700/50 w-fit">
+            {nisn || "???"}
+          </span>
+          {student.examNumber && student.examNumber !== nisn && (
+            <span className="text-[10px] text-slate-400 font-mono mt-0.5">
+              No: {student.examNumber}
+            </span>
+          )}
+        </div>
       )
     },
     { 
@@ -121,7 +130,8 @@ export const StudentTable = ({
       sortable: true,
       render: (name: string, student: StudentData) => (
         <div className="flex items-center gap-3">
-          <Avatar className="h-9 w-9 border-2 border-white dark:border-slate-800 shadow-sm">
+          <Avatar className="h-9 w-9 border-2 border-white dark:border-slate-800 shadow-sm flex-shrink-0">
+            {student.photo && <AvatarImage src={student.photo} alt={name} className="object-cover" />}
             <AvatarFallback className={cn(
               "text-white text-[10px] font-bold",
               student.gender === "L" ? "bg-gradient-to-br from-blue-500 to-cyan-600" : "bg-gradient-to-br from-rose-400 to-pink-600"
@@ -131,7 +141,15 @@ export const StudentTable = ({
           </Avatar>
           <div className="flex flex-col">
             <span className="font-bold text-slate-700 dark:text-slate-200 leading-tight">{name}</span>
-            <span className="text-[11px] text-slate-400 font-medium">@{student.nisn}</span>
+            <div className="flex items-center gap-1.5 text-[11px] text-slate-400 font-medium">
+              <span>@{student.nisn}</span>
+              {(student.birthPlace || student.birthDate) && (
+                <>
+                  <span>•</span>
+                  <span>{[student.birthPlace, student.birthDate].filter(Boolean).join(", ")}</span>
+                </>
+              )}
+            </div>
           </div>
         </div>
       )
@@ -154,12 +172,19 @@ export const StudentTable = ({
       key: "classId", 
       label: terminology.class, 
       sortable: true,
-      render: (classId: string) => {
+      render: (classId: string, student: StudentData) => {
         const cls = classes.find(c => c.id === classId);
         return (
-          <Badge variant="secondary" className="bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border-transparent text-[10px] font-bold px-2 py-0.5">
-            {cls?.name || `Tanpa ${terminology.class}`}
-          </Badge>
+          <div className="flex flex-col gap-0.5">
+            <Badge variant="secondary" className="bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border-transparent text-[10px] font-bold px-2 py-0.5 w-fit">
+              {cls?.name || `Tanpa ${terminology.class}`}
+            </Badge>
+            {(student.room || student.session) && (
+              <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">
+                {[student.room, student.session].filter(Boolean).join(" • ")}
+              </span>
+            )}
+          </div>
         );
       }
     },
@@ -183,7 +208,16 @@ export const StudentTable = ({
 
   const renderActions = (student: StudentData) => (
     customActions ? customActions(student) : (
-      <div className="flex justify-end gap-2">
+      <div className="flex justify-end gap-1.5">
+        {onPrintExamCard && (
+          <button 
+            className="p-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg dark:bg-blue-900/10 dark:text-blue-400 border border-blue-100 dark:border-blue-800/40"
+            onClick={() => onPrintExamCard(student)}
+            title="Cetak Kartu Ujian Siswa Ini"
+          >
+            <Printer className="h-4 w-4" />
+          </button>
+        )}
         {onViewScores && (
           <button 
             className="p-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 rounded-lg dark:bg-emerald-900/10 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-800/40"

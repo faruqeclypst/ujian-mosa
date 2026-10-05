@@ -909,7 +909,7 @@ const CBTPage = () => {
 
   const isEssayQuestion = (q: Question | undefined) => {
     const t = q?.type || "pilihan_ganda";
-    return t === "isian_singkat" || t === "uraian";
+    return t === "uraian";
   };
 
   const isQuestionAnswered = useCallback((qId: string) => {
@@ -1276,7 +1276,7 @@ const CBTPage = () => {
                 order = [...order, ...remaining.slice(0, needed)];
               }
               const objOrder = order.filter(id => { const q = loaded.find(x => x.id === id); const t = q?.type || "pilihan_ganda"; return t !== "isian_singkat" && t !== "uraian"; });
-              const essOrder = order.filter(id => { const q = loaded.find(x => x.id === id); const t = q?.type || "pilihan_ganda"; return t === "isian_singkat" || t === "uraian"; });
+              const essOrder = order.filter(id => { const q = loaded.find(x => x.id === id); const t = q?.type || "pilihan_ganda"; return t === "uraian"; });
               order = Array.from(new Set([...objOrder, ...essOrder]));
               sessionStorage.setItem(`order_${pr}`, JSON.stringify(order));
             } catch (e) { }
@@ -1913,11 +1913,17 @@ const CBTPage = () => {
 
       questions.forEach((q: any) => {
         const t = q.type || "pilihan_ganda";
-        if (t === "isian_singkat" || t === "uraian") { essayTotal++; return; }
+        if (t === "uraian") { essayTotal++; return; }
         objectiveTotal++;
         if (ovr[q.id] !== undefined) { if (ovr[q.id] === true) objectiveCorrect++; return; }
         const sa = answersRef.current[q.id]; if (!sa) return;
-        if (t === "pilihan_ganda") { 
+
+        if (t === "isian_singkat") {
+          const expected = String(q.answerKey || "").trim().toLowerCase();
+          const given = String(sa).trim().toLowerCase();
+          if (expected && given === expected) objectiveCorrect++;
+        }
+        else if (t === "pilihan_ganda") { 
           if (q.choices?.[sa]?.isCorrect === true) objectiveCorrect++; 
         }
         else if (t === "benar_salah") {
@@ -1942,7 +1948,16 @@ const CBTPage = () => {
           const itemScore = ck.length > 0 ? Math.max(0, correctChosen.length - wrongChosen.length) / ck.length : 0;
           objectiveCorrect += itemScore;
         }
-        else if (t === "menjodohkan") { const pairs = q.pairs || []; if (pairs.length > 0 && pairs.every((p: any) => sa[p.id] === p.right)) objectiveCorrect++; }
+        else if (t === "menjodohkan") { 
+          const pairs = q.pairs || []; 
+          if (pairs.length > 0) {
+            let pairCorrect = 0;
+            pairs.forEach((p: any) => {
+              if (sa[p.id] === p.right) pairCorrect++;
+            });
+            objectiveCorrect += (pairCorrect / pairs.length);
+          }
+        }
         else if (t === "urutkan" || t === "drag_drop") { const co = (q.items || []).map((it: any) => it.id); if (Array.isArray(sa) && sa.length === co.length && sa.every((v, index) => v === co[index])) objectiveCorrect++; }
       });
 
@@ -2191,7 +2206,7 @@ const CBTPage = () => {
   // Check if all objective questions are answered (gate for essay)
   const objectiveQuestions = questions.filter(q => { const t = q.type || "pilihan_ganda"; return t !== "isian_singkat" && t !== "uraian"; });
   const allObjectiveAnswered = objectiveQuestions.every(q => isQuestionAnswered(q.id));
-  const isCurrentEssay = currentQuestion && (currentQuestion.type === "isian_singkat" || currentQuestion.type === "uraian");
+  const isCurrentEssay = currentQuestion && currentQuestion.type === "uraian";
   const isEssayLocked = isCurrentEssay && !allObjectiveAnswered;
 
   const unansweredCount = questions.filter((q) => !isQuestionAnswered(q.id)).length;
@@ -3024,7 +3039,7 @@ const CBTPage = () => {
                 let separatorShown = false;
                 return questions.map((q, i) => {
                   const t = q.type || "pilihan_ganda";
-                  const isEssay = t === "isian_singkat" || t === "uraian";
+                  const isEssay = t === "uraian";
                   const showSeparator = isEssay && !separatorShown;
                   if (isEssay) separatorShown = true;
 
@@ -3168,7 +3183,7 @@ const CBTPage = () => {
               let separatorShown = false;
               return questions.map((q, i) => {
                 const t = q.type || "pilihan_ganda";
-                const isEssay = t === "isian_singkat" || t === "uraian";
+                const isEssay = t === "uraian";
                 const showSeparator = isEssay && !separatorShown;
                 if (isEssay) separatorShown = true;
                 const isQuestionAnswered = (id: string) => {

@@ -125,9 +125,15 @@ routerAdd("POST", "/api/multi-vps/activate-offline-license", (c) => {
             }
             const prevCount = rec.get("activation_count") || 0;
             rec.set("activation_count", prevCount + 1);
-            if (machineInfo) {
+
+            const deviceId = (body["device_id"] || "").toString().trim();
+            const deviceName = (body["device_name"] || "").toString().trim();
+            if (deviceId && deviceId.includes("HWID-")) {
+                rec.set("activated_device", deviceId + (deviceName ? " (" + deviceName + ")" : ""));
+            } else if (machineInfo && machineInfo.includes("HWID-")) {
                 rec.set("activated_device", machineInfo);
             }
+
             $app.save(rec);
             return c.json(200, {
                 success: true,
@@ -345,17 +351,25 @@ const handleLicenseStatusCheck = (c) => {
             }
 
             const existingDevice = (rec.get("activated_device") || "").toString().trim();
-            // Jika lisensi ini sudah terikat ke perangkat tertentu, dan ada query dari perangkat yang berbeda
-            if (deviceId && existingDevice && !existingDevice.includes(deviceId)) {
-                return c.json(200, {
-                    success: true,
-                    status: "device_mismatch",
-                    is_revoked: false,
-                    is_device_mismatch: true,
-                    message: "Lisensi ini terdaftar untuk perangkat server (" + existingDevice + "). Duplikasi aplikasi ke perangkat lain melanggar kebijakan lisensi.",
-                    school_name: rec.get("school_name"),
-                    registered_device: existingDevice
-                });
+            // Pengecekan Duplikasi Hardware ID:
+            // Hanya anggap mismatch jika lisensi ini SUDAH terikat ke sidik jari HWID sah lain
+            if (deviceId && deviceId.includes("HWID-")) {
+                if (!existingDevice || !existingDevice.includes("HWID-")) {
+                    // Belum ada binding HWID resmi, kunci otomatis ke perangkat pertama ini
+                    rec.set("activated_device", deviceId);
+                    $app.save(rec);
+                } else if (!existingDevice.includes(deviceId)) {
+                    // Sidik jari hardware benar-benar berbeda
+                    return c.json(200, {
+                        success: true,
+                        status: "device_mismatch",
+                        is_revoked: false,
+                        is_device_mismatch: true,
+                        message: "Lisensi ini terdaftar untuk perangkat server (" + existingDevice + "). Duplikasi aplikasi ke perangkat lain melanggar kebijakan lisensi.",
+                        school_name: rec.get("school_name"),
+                        registered_device: existingDevice
+                    });
+                }
             }
 
             return c.json(200, {
@@ -382,4 +396,15 @@ const handleLicenseStatusCheck = (c) => {
 
 routerAdd("GET", "/api/multi-vps/check-offline-license-status", handleLicenseStatusCheck);
 routerAdd("POST", "/api/multi-vps/check-offline-license-status", handleLicenseStatusCheck);
+
+// Alias route untuk kompatibilitas record-offline-activation
+routerAdd("POST", "/api/multi-vps/record-offline-activation", (c) => {
+    return c.json(200, { success: true, message: "Aktivasi dicatat." });
+});
+routerAdd("OPTIONS", "/api/multi-vps/record-offline-activation", (c) => {
+    try { c.setResponseHeader("Access-Control-Allow-Origin", "*"); } catch (_) {}
+    try { c.setResponseHeader("Access-Control-Allow-Methods", "POST, OPTIONS"); } catch (_) {}
+    try { c.setResponseHeader("Access-Control-Allow-Headers", "*"); } catch (_) {}
+    return c.noContent(204);
+});
 

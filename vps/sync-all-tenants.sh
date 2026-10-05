@@ -18,7 +18,9 @@ fi
 MASTER_UPDATED=()
 WORKER_UPDATED=()
 
-# 1. Sinkronkan Hooks & Restart service ke seluruh tenant di Master VPS secara dinamis
+# 1. Jalankan migrasi schema dan sinkronkan Hooks ke seluruh tenant di Master VPS
+python3 /usr/local/bin/migrate-tenant-schema.py 2>/dev/null || true
+
 for dir in "$MASTER_SCHOOLS_DIR"/*; do
   if [ -d "$dir/pb_hooks" ] && [ "$dir" != "$TEMPLATE_DIR" ]; then
     slug=$(basename "$dir")
@@ -35,8 +37,9 @@ if ssh -o BatchMode=yes -o ConnectTimeout=5 -o StrictHostKeyChecking=no root@"$W
   # Rsync template ke Worker
   rsync -avz --delete "$TEMPLATE_DIR/" root@"$WORKER_IP":"$TEMPLATE_DIR/" >/dev/null 2>&1
 
-  # Eksekusi sinkronisasi hooks & restart service di Worker VPS secara dinamis
+  # Eksekusi migrasi schema, sinkronisasi hooks & restart service di Worker VPS secara dinamis
   ssh -o BatchMode=yes -o ConnectTimeout=5 root@"$WORKER_IP" '
+    python3 /usr/local/bin/migrate-tenant-schema.py 2>/dev/null || true
     for dir in /opt/pocketbase/schools/*; do
       if [ -d "$dir/pb_hooks" ] && [ "$dir" != "/opt/pocketbase/schools/template" ]; then
         slug=$(basename "$dir")

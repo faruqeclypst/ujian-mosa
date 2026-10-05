@@ -1,7 +1,7 @@
 {
   "name": "e-ujian-aa",
   "private": true,
-  "version": "1.1.4",
+  "version": "1.1.5",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -49,6 +49,7 @@
     "mammoth": "^1.12.0",
     "pdfjs-dist": "^5.7.284",
     "pocketbase": "^0.26.8",
+    "qrcode": "^1.5.4",
     "quill": "^2.0.3",
     "quill-image-resize-module-react": "^3.0.0",
     "react": "^18.2.0",
@@ -66,6 +67,7 @@
   "devDependencies": {
     "@types/katex": "^0.16.8",
     "@types/node": "^20.10.6",
+    "@types/qrcode": "^1.5.6",
     "@types/quill": "^2.0.14",
     "@types/react": "^18.2.47",
     "@types/react-dom": "^18.2.18",

@@ -134,7 +134,13 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
           nisn: i.username || i.nisn,
           gender: i.gender || "L",
           classId: i.classId || i.classid || i.class_id,
-          hasChangedPassword: i.hasChangedPassword || false
+          hasChangedPassword: i.hasChangedPassword || false,
+          photo: i.photo || "",
+          birthPlace: i.birthPlace || "",
+          birthDate: i.birthDate || "",
+          room: i.room || "",
+          session: i.session || "",
+          examNumber: i.examNumber || "",
         } as any;
       }));
       setExamsCount(eCount);
@@ -183,12 +189,37 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
         if (e.action === "create") {
           setStudents(prev => {
             if (prev.find(i => i.id === e.record.id)) return prev;
-            const m = { ...e.record, id: e.record.id, nisn: e.record.username || e.record.nisn, gender: e.record.gender || "L", classId: e.record.classId || e.record.classid } as any;
+            const m = {
+              ...e.record,
+              id: e.record.id,
+              nisn: e.record.username || e.record.nisn,
+              gender: e.record.gender || "L",
+              classId: e.record.classId || e.record.classid,
+              photo: e.record.photo || "",
+              birthPlace: e.record.birthPlace || "",
+              birthDate: e.record.birthDate || "",
+              room: e.record.room || "",
+              session: e.record.session || "",
+              examNumber: e.record.examNumber || "",
+            } as any;
             return [m, ...prev];
           });
         }
         if (e.action === "update") {
-          const m = { ...e.record, id: e.record.id, nisn: e.record.username || e.record.nisn, gender: e.record.gender || "L", classId: e.record.classId || e.record.classid, hasChangedPassword: e.record.hasChangedPassword || false } as any;
+          const m = {
+            ...e.record,
+            id: e.record.id,
+            nisn: e.record.username || e.record.nisn,
+            gender: e.record.gender || "L",
+            classId: e.record.classId || e.record.classid,
+            hasChangedPassword: e.record.hasChangedPassword || false,
+            photo: e.record.photo || "",
+            birthPlace: e.record.birthPlace || "",
+            birthDate: e.record.birthDate || "",
+            room: e.record.room || "",
+            session: e.record.session || "",
+            examNumber: e.record.examNumber || "",
+          } as any;
           setStudents(prev => prev.map(item => item.id === e.record.id ? m : item));
         }
         if (e.action === "delete") setStudents(prev => prev.filter(item => item.id !== e.record.id));
@@ -424,25 +455,63 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
       classId: payload.classId,
       classid: payload.classId, // backup for lowercase field
       hasChangedPassword: false,
+      photo: payload.photo || "",
+      birthPlace: payload.birthPlace || "",
+      birthDate: payload.birthDate || "",
+      room: payload.room || "",
+      session: payload.session || "",
+      examNumber: payload.examNumber || "",
     });
     setStudents(prev => {
       if (prev.find(i => i.id === record.id)) return prev;
-      const m = { ...record, id: record.id, nisn: record.username || record.nisn, gender: record.gender || "L", classId: record.classId || record.classid } as any;
+      const m = {
+        ...record,
+        id: record.id,
+        nisn: record.username || record.nisn,
+        gender: record.gender || "L",
+        classId: record.classId || record.classid,
+        photo: record.photo || "",
+        birthPlace: record.birthPlace || "",
+        birthDate: record.birthDate || "",
+        room: record.room || "",
+        session: record.session || "",
+        examNumber: record.examNumber || "",
+      } as any;
       return [m, ...prev];
     });
   };
   const updateStudent = async (id: string, payload: Partial<StudentPayload>) => {
     const updateData: any = {};
-    if (payload.name) updateData.name = payload.name;
-    if (payload.nisn) updateData.username = payload.nisn;
-    if (payload.gender) updateData.gender = payload.gender;
-    if (payload.classId) {
+    if (payload.name !== undefined) updateData.name = payload.name;
+    if (payload.nisn !== undefined) updateData.username = payload.nisn;
+    if (payload.gender !== undefined) updateData.gender = payload.gender;
+    if (payload.classId !== undefined) {
       updateData.classId = payload.classId;
       updateData.classid = payload.classId;
     }
+    if (payload.photo !== undefined) updateData.photo = payload.photo;
+    if (payload.birthPlace !== undefined) updateData.birthPlace = payload.birthPlace;
+    if (payload.birthDate !== undefined) updateData.birthDate = payload.birthDate;
+    if (payload.room !== undefined) updateData.room = payload.room;
+    if (payload.session !== undefined) updateData.session = payload.session;
+    if (payload.examNumber !== undefined) updateData.examNumber = payload.examNumber;
+
     const record = await pb.collection("students").update(id, updateData);
     setStudents(prev => {
-      const m = { ...record, id: record.id, nisn: record.username || record.nisn, gender: record.gender || "L", classId: record.classId || record.classid, hasChangedPassword: record.hasChangedPassword || false } as any;
+      const m = {
+        ...record,
+        id: record.id,
+        nisn: record.username || record.nisn,
+        gender: record.gender || "L",
+        classId: record.classId || record.classid,
+        hasChangedPassword: record.hasChangedPassword || false,
+        photo: record.photo || "",
+        birthPlace: record.birthPlace || "",
+        birthDate: record.birthDate || "",
+        room: record.room || "",
+        session: record.session || "",
+        examNumber: record.examNumber || "",
+      } as any;
       return prev.map(item => item.id === id ? m : item);
     });
   };
