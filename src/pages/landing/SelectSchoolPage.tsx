@@ -668,33 +668,17 @@ const SelectSchoolPage = () => {
                           </div>
                         </div>
 
-                        {/* Action Buttons: Online Server & Local Server */}
-                        <div className={`grid gap-2 pt-1 border-t border-slate-100 dark:border-slate-800/60 ${school.plan === 'offline' || school.offline_license ? 'grid-cols-2' : 'grid-cols-1'}`}>
-                          {/* Tombol 1: Online Server */}
-                          {school.plan !== 'offline' && (
-                            <button
-                              type="button"
-                              onClick={() => handleConnectOnline(school)}
-                              className="w-full py-2.5 px-3 rounded-xl font-bold text-xs bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-all"
-                              title="Masuk ke server ujian online cloud"
-                            >
-                              <Globe size={14} />
-                              <span>{school.offline_license ? 'Cloud Server' : 'Masuk Ujian'}</span>
-                            </button>
-                          )}
-
-                          {/* Tombol 2: Local Server */}
-                          {(school.plan === 'offline' || school.offline_license) && (
-                            <button
-                              type="button"
-                              onClick={() => handleOpenLocalModal(school)}
-                              className="w-full py-2.5 px-3 rounded-xl font-bold text-xs bg-emerald-50 dark:bg-emerald-950/50 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 flex items-center justify-center gap-1.5 active:scale-95 transition-all"
-                              title="Hubungkan ke server offline lab sekolah"
-                            >
-                              <HardDrive size={14} />
-                              <span>Local Server</span>
-                            </button>
-                          )}
+                        {/* Action Button: Masuk Ujian */}
+                        <div className="pt-1 border-t border-slate-100 dark:border-slate-800/60">
+                          <button
+                            type="button"
+                            onClick={() => handleConnectOnline(school)}
+                            className="w-full py-2.5 px-3 rounded-xl font-bold text-xs bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-all"
+                            title="Masuk ke portal ujian sekolah"
+                          >
+                            <Globe size={14} />
+                            <span>Masuk Ujian</span>
+                          </button>
                         </div>
                       </motion.div>
                     );
