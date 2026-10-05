@@ -4,21 +4,9 @@ import { masterPb } from "../../lib/pocketbase";
 
 const POPULAR_BANKS = [
   { code: "BCA", name: "Bank BCA", logo: "https://upload.wikimedia.org/wikipedia/commons/5/5c/Bank_Central_Asia.svg" },
-  { code: "MANDIRI", name: "Bank Mandiri", logo: "https://upload.wikimedia.org/wikipedia/commons/a/a2/Logo_of_Bank_Mandiri.svg" },
-  { code: "BNI", name: "Bank BNI", logo: "https://upload.wikimedia.org/wikipedia/id/5/55/BNI_logo.svg" },
   { code: "BRI", name: "Bank BRI", logo: "https://upload.wikimedia.org/wikipedia/commons/2/2e/BRI_2020.svg" },
-  { code: "BSI", name: "Bank Syariah Indonesia", logo: "https://upload.wikimedia.org/wikipedia/commons/a/a4/Bank_Syariah_Indonesia.svg" },
-  { code: "CIMB", name: "CIMB Niaga", logo: "https://upload.wikimedia.org/wikipedia/commons/3/38/CIMB_Niaga_logo.svg" },
-  { code: "PERMATA", name: "Permata Bank", logo: "https://upload.wikimedia.org/wikipedia/commons/3/38/PermataBank_logo.svg" },
-  { code: "DANAMON", name: "Bank Danamon", logo: "https://upload.wikimedia.org/wikipedia/commons/f/f9/Bank_Danamon_logo.svg" },
   { code: "JAGO", name: "Bank Jago", logo: "https://upload.wikimedia.org/wikipedia/commons/1/1b/Logo_Bank_Jago.png" },
   { code: "SEABANK", name: "SeaBank", logo: "https://upload.wikimedia.org/wikipedia/commons/f/f1/SeaBank_logo.png" },
-  { code: "BPD_ACEH", name: "Bank Aceh", logo: "https://upload.wikimedia.org/wikipedia/id/3/3f/Logo_Bank_Aceh_Syariah.png" },
-  { code: "BJB", name: "Bank BJB", logo: "https://upload.wikimedia.org/wikipedia/commons/7/77/Logo_Bank_BJB.svg" },
-  { code: "DKI", name: "Bank DKI", logo: "https://upload.wikimedia.org/wikipedia/commons/a/a2/Logo_Bank_DKI.svg" },
-  { code: "JATIM", name: "Bank Jatim", logo: "https://upload.wikimedia.org/wikipedia/commons/4/41/Logo_Bank_Jatim.svg" },
-  { code: "SUMUT", name: "Bank Sumut", logo: "https://upload.wikimedia.org/wikipedia/commons/8/87/Logo_Bank_Sumut.svg" },
-  { code: "NAGARI", name: "Bank Nagari", logo: "https://upload.wikimedia.org/wikipedia/commons/7/74/Logo_Bank_Nagari.svg" },
 ];
 
 interface BankAccount {
@@ -114,8 +102,9 @@ export const BankAccountsSettings = () => {
                         onClick={() => setForm({...form, bank_code: b.code, bank_name: b.name})}
                         className={`p-2 border rounded-xl flex flex-col items-center justify-center gap-1.5 transition ${form.bank_code === b.code ? 'border-blue-500 bg-blue-50/50 ring-1 ring-blue-500' : 'border-slate-200 hover:bg-slate-50 bg-white'}`}
                       >
-                        <div className="h-6 flex items-center justify-center w-full">
-                           <img src={b.logo} alt={b.name} className="max-h-full max-w-[50px] object-contain" onError={e => { e.currentTarget.style.display = 'none'; e.currentTarget.parentElement!.innerHTML = `<span class="text-[10px] font-black text-slate-400 uppercase tracking-wider">${b.code.replace('_', ' ')}</span>`; }} />
+                        <div className="h-6 flex items-center justify-center w-full relative">
+                           <span className="absolute inset-0 flex items-center justify-center text-[10px] font-black text-slate-400 uppercase tracking-wider">{b.code.replace('_', ' ')}</span>
+                           <img src={b.logo} alt={b.name} className="relative z-10 max-h-full max-w-[50px] object-contain bg-white" onError={e => e.currentTarget.style.display = 'none'} />
                         </div>
                         <span className="text-[9px] font-bold text-slate-600 text-center">{b.name}</span>
                       </button>
@@ -139,9 +128,10 @@ export const BankAccountsSettings = () => {
               </div>
             ) : (
               <>
-                <div className="w-14 h-12 rounded-xl bg-white border border-slate-200 flex items-center justify-center shrink-0 p-1.5 overflow-hidden text-center shadow-sm">
+                <div className="w-14 h-12 rounded-xl bg-white border border-slate-200 flex items-center justify-center shrink-0 p-1.5 overflow-hidden text-center shadow-sm relative">
                   {POPULAR_BANKS.find(b => b.code === bank.bank_code) && bank.bank_code !== "OTHER" ? (
-                     <img src={POPULAR_BANKS.find(b => b.code === bank.bank_code)?.logo} alt={bank.bank_name} className="max-h-full max-w-full object-contain" onError={e => { e.currentTarget.style.display = 'none'; e.currentTarget.parentElement!.innerHTML = `<span class="text-[9px] font-black text-slate-400 uppercase leading-none">${bank.bank_name.substring(0,3)}</span>` }} />
+                     <img src={POPULAR_BANKS.find(b => b.code === bank.bank_code)?.logo} alt={bank.bank_name} className="relative z-10 max-h-full max-w-full object-contain bg-white" onError={e => e.currentTarget.style.display = 'none'} />
+                     <span className="absolute inset-0 flex items-center justify-center text-[10px] font-black text-slate-400 uppercase leading-none">{bank.bank_name.substring(0,4)}</span>
                   ) : (
                      <span className="text-[10px] font-black text-slate-400 uppercase leading-none">{bank.bank_name.substring(0,4)}</span>
                   )}
@@ -174,9 +164,10 @@ export const BankAccountsSettings = () => {
                     onClick={() => setForm({...form, bank_code: b.code, bank_name: b.name})}
                     className={`p-2 border rounded-xl flex flex-col items-center justify-center gap-1.5 transition ${form.bank_code === b.code ? 'border-blue-500 bg-blue-50/50 ring-1 ring-blue-500' : 'border-slate-200 hover:bg-slate-50 bg-white'}`}
                   >
-                    <div className="h-6 flex items-center justify-center w-full">
-                       <img src={b.logo} alt={b.name} className="max-h-full max-w-[50px] object-contain" onError={e => { e.currentTarget.style.display = 'none'; e.currentTarget.parentElement!.innerHTML = `<span class="text-[10px] font-black text-slate-400 uppercase tracking-wider">${b.code.replace('_', ' ')}</span>`; }} />
-                    </div>
+                    <div className="h-6 flex items-center justify-center w-full relative">
+                           <span className="absolute inset-0 flex items-center justify-center text-[10px] font-black text-slate-400 uppercase tracking-wider">{b.code.replace('_', ' ')}</span>
+                           <img src={b.logo} alt={b.name} className="relative z-10 max-h-full max-w-[50px] object-contain bg-white" onError={e => e.currentTarget.style.display = 'none'} />
+                        </div>
                     <span className="text-[9px] font-bold text-slate-600 text-center">{b.name}</span>
                   </button>
                 ))}
