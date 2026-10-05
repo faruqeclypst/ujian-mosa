@@ -368,6 +368,29 @@ const SuperAdminDashboard = () => {
         ? matchedSchool.active_until.slice(0, 10)
         : new Date(now.getTime() + 14 * 86400000).toISOString().slice(0, 10);
 
+      let finalAmount = planInfo.amount;
+      let notesStr = req.address ? `Permintaan Perpanjangan: ${req.address}` : `Tagihan Perpanjangan Layanan ${planInfo.planLabel} (${planInfo.periodLabel})`;
+
+      // Prorating Logic: Hitung sisa masa aktif plan lama dan jadikan potongan untuk tagihan baru
+      const currentPlan = normalizePlanKey(matchedSchool.plan || "basic");
+      if (currentPlan !== "free" && currentPlan !== targetPlan && matchedSchool.active_until) {
+        const activeUntilDate = new Date(matchedSchool.active_until);
+        if (activeUntilDate.getTime() > now.getTime()) {
+          const diffDays = Math.ceil((activeUntilDate.getTime() - now.getTime()) / (1000 * 3600 * 24));
+          if (diffDays > 0) {
+            const oldPlanPricePerMonth = calculatePlanInvoice(currentPlan, 1).amount;
+            const pricePerDay = oldPlanPricePerMonth / 30;
+            const remainingCredit = Math.floor(diffDays * pricePerDay);
+            
+            if (remainingCredit > 0) {
+              finalAmount = Math.max(0, finalAmount - remainingCredit);
+              const creditRp = remainingCredit.toLocaleString("id-ID");
+              notesStr += `\n\n*Catatan Upgrade: Total tagihan ini telah dipotong sisa masa aktif paket lama Anda (${diffDays} hari) senilai Rp ${creditRp}.`;
+            }
+          }
+        }
+      }
+
       const newInvoice = {
         invoice_number: invNum,
         school_id: matchedSchool.id,
@@ -378,10 +401,10 @@ const SuperAdminDashboard = () => {
         plan_label: planInfo.planLabel,
         duration_months: planInfo.durationMonths,
         period_label: planInfo.periodLabel,
-        amount: planInfo.amount,
+        amount: finalAmount,
         status: "unpaid",
         due_date: dueDate,
-        notes: req.address ? `Permintaan Perpanjangan: ${req.address}` : `Tagihan Perpanjangan Layanan ${planInfo.planLabel} (${planInfo.periodLabel})`,
+        notes: notesStr,
       };
 
       const createdInv = await masterPb.collection("invoices").create(newInvoice);

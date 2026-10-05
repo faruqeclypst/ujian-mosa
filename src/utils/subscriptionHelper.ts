@@ -186,8 +186,9 @@ export const upgradeSchoolFromInvoice = async (invoice: {
       const match = school.active_until.match(/^(\d{4})-(\d{2})-(\d{2})/);
       if (match) {
         const curDate = new Date(parseInt(match[1], 10), parseInt(match[2], 10) - 1, parseInt(match[3], 10), 23, 59, 59);
-        // Jika masa aktif masih berjalan di masa depan dan paket bukan free trial, perpanjang dari tanggal tersebut
-        if (curDate.getTime() > now.getTime() && school.plan !== "free") {
+        // Jika masa aktif masih berjalan di masa depan dan paket bukan free trial, perpanjang dari tanggal tersebut.
+        // KECUALI jika tenant melakukan perubahan paket (upgrade/downgrade), masa aktif dihitung ulang dari saat ini (hari pelunasan)
+        if (curDate.getTime() > now.getTime() && school.plan !== "free" && school.plan === planKey) {
           baseDate = curDate;
         }
       }
