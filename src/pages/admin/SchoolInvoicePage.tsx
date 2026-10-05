@@ -5,6 +5,7 @@ import {
   RefreshCw, X, CreditCard, TrendingUp, QrCode, Sparkles,
   Send, Building2, Calendar, ShieldCheck, MessageCircle
 } from "lucide-react";
+import { Banknote } from "lucide-react";
 import { useTenant } from "../../context/TenantContext";
 import { masterPb } from "../../lib/pocketbase";
 import { cn } from "../../lib/utils";
@@ -103,6 +104,7 @@ const isImageProof = (proofUrl: string): boolean => {
 
 const SchoolInvoicePage = () => {
   const { school, refreshSchool } = useTenant();
+  const [banks, setBanks] = useState<{bank_name: string, account_number: string, account_name: string}[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [detailInvoice, setDetailInvoice] = useState<Invoice | null>(null);
@@ -129,6 +131,10 @@ const SchoolInvoicePage = () => {
     if (!school) { setLoading(false); return; }
     setLoading(true);
     try {
+      try {
+        const banksRes = await masterPb.collection("bank_accounts").getFullList({ filter: 'is_active = true' });
+        setBanks(banksRes as any);
+      } catch(e) {}
       const result = await masterPb.collection("invoices").getList<Invoice>(1, 30);
       const records = result.items;
       const schoolId = String(school.id || "").trim();
@@ -445,8 +451,22 @@ const SchoolInvoicePage = () => {
               </h3>
             </div>
             <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed max-w-xl">
-              SuperAdmin telah menerbitkan invoice perpanjangan untuk sekolah Anda sebesar <strong>{formatRupiah(activeUnpaidInvoice.amount)}</strong>. Silakan bayar via QRIS untuk mengaktifkan masa berlaku baru.
-            </p>
+              SuperAdmin telah menerbitkan invoice perpanjangan untuk sekolah Anda sebesar <strong>{formatRupiah(activeUnpaidInvoice.amount)}</strong>. Silakan bayar via QRIS atau transfer manual untuk mengaktifkan masa berlaku baru.
+              </p>
+              {banks.length > 0 && (
+                <div className="mt-3 p-3 bg-white/60 dark:bg-slate-900/40 rounded-xl border border-blue-100 dark:border-blue-900/30 text-xs">
+                  <p className="font-bold text-slate-700 dark:text-slate-300 mb-2 flex items-center gap-1.5"><Banknote size={14}/> Opsi Transfer Manual:</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {banks.map((b, i) => (
+                      <div key={i} className="flex flex-col gap-0.5">
+                        <span className="font-bold text-slate-800 dark:text-slate-200">{b.bank_name} - <span className="font-mono text-blue-700 dark:text-blue-400">{b.account_number}</span></span>
+                        <span className="text-[10px] text-slate-500">a.n. {b.account_name}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="mt-2 text-[10px] text-slate-500 italic">* Setelah transfer, silakan klik tombol Upload di tabel Riwayat Transaksi di bawah.</p>
+                </div>
+              )}
           </div>
           <div className="flex items-center gap-2">
             <button

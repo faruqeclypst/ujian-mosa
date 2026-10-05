@@ -16,6 +16,7 @@ import {
 } from "../../utils/pricingHelper";
 import { upgradeSchoolFromInvoice } from "../../utils/subscriptionHelper";
 import { printDigitalInvoice } from "../../utils/invoicePdfHelper";
+import { SuperAdminBankAccountsModal } from "../../components/admin/SuperAdminBankAccountsModal";
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -152,6 +153,7 @@ const SuperAdminInvoicePage = () => {
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState<PaymentStatus | "all">("all");
   const [showModal, setShowModal] = useState(false);
+  const [showBankModal, setShowBankModal] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
   const [detailInvoice, setDetailInvoice] = useState<Invoice | null>(null);
   const [form, setForm] = useState(blankForm());
@@ -754,6 +756,8 @@ const SuperAdminInvoicePage = () => {
       </div>
 
       {/* ─── Create/Edit Modal ─────────────────────────────────────────── */}
+      {showBankModal && <SuperAdminBankAccountsModal onClose={() => setShowBankModal(false)} />}
+
       {showModal && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
