@@ -3,13 +3,8 @@
 // 1. Endpoint untuk membuat payment link SumoPod dari frontend
 routerAdd("POST", "/api/sumopod/create-payment", (c) => {
     try {
-        const body = new DynamicModel({
-            invoice_id: "",
-            order_id: "",
-            amount: 0,
-            tenant_url: ""
-        });
-        c.bind(body);
+        const info = c.requestInfo();
+        const body = info.body || {};
 
         const invoiceId = body.invoice_id;
         const orderId = body.order_id;
@@ -57,19 +52,13 @@ routerAdd("POST", "/api/sumopod/webhook", (c) => {
     */
 
     try {
-        const payload = new DynamicModel({
-            event_type: "",
-            data: {
-                order_id: "",
-                payment_method: ""
-            }
-        });
-        c.bind(payload);
+        const info = c.requestInfo();
+        const payload = info.body || {};
 
         console.log("[SumoPod] Webhook received:", payload.event_type);
 
         if (payload.event_type === "payment.completed") {
-            const paymentData = payload.data;
+            const paymentData = payload.data || {};
             const orderId = paymentData.order_id; 
 
             if (orderId) {
