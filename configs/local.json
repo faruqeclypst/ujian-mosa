@@ -1,0 +1,7 @@
+{
+  "id": "com.alfaruqasri.ujian.local",
+  "name": "EXAMKU Local",
+  "webDir": "dist-shell",
+  "targetApk": "examku-local.apk",
+  "vpsLink": "examku-local"
+}

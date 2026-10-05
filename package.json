@@ -20,7 +20,8 @@
     "release:offline": "node scripts/release-all.js --skip-apk",
     "version:set": "node scripts/set-version.js",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "switch:local": "node scripts/switch-app.js local"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.515.0",

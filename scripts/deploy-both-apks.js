@@ -22,11 +22,17 @@ const APKS = [
     name: 'EXAM AA Browser (Custom Exam Browser)',
     targetApk: 'exam-aa-browser-latest.apk',
     targetLink: 'exam-aa-browser-latest'
+  },
+  {
+    key: 'local',
+    name: 'EXAMKU Local (Offline Server Client)',
+    targetApk: 'examku-local.apk',
+    targetLink: 'examku-local'
   }
 ];
 
 console.log('\n======================================================');
-console.log('   Membangun & Mengirim 2 APK ke VPS (examku.my.id)');
+console.log('   Membangun & Mengirim 3 APK ke VPS (examku.my.id)');
 console.log('======================================================\n');
 
 // 1. Bersihkan APK sampah di public, dist, dan assets Android agar tidak ikut terbungkus ke APK
