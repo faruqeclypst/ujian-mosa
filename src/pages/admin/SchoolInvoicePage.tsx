@@ -711,12 +711,13 @@ const SchoolInvoicePage = () => {
                   {/* Pilih Durasi */}
                   <div className="space-y-1.5">
                     <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Durasi Perpanjangan</label>
-                    <div className="grid grid-cols-3 gap-2">
-                      {[
-                        { months: 6, label: "6 Bulan", sub: "1 Semester" },
-                        { months: 12, label: "12 Bulan", sub: "1 Tahun (Disarankan)" },
-                        { months: 24, label: "24 Bulan", sub: "2 Tahun" },
-                      ].map(d => (
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        {[
+                          { months: 1, label: "1 Bulan", sub: "Fleksibel" },
+                          { months: 3, label: "3 Bulan", sub: "Triwulan" },
+                          { months: 6, label: "6 Bulan", sub: "1 Semester" },
+                          { months: 12, label: "12 Bulan", sub: "1 Tahun" },
+                        ].map(d => (
                         <button
                           key={d.months}
                           type="button"
