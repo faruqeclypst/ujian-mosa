@@ -16,7 +16,6 @@ import {
 } from "../../utils/pricingHelper";
 import { upgradeSchoolFromInvoice } from "../../utils/subscriptionHelper";
 import { printDigitalInvoice } from "../../utils/invoicePdfHelper";
-import { SuperAdminBankAccountsModal } from "../../components/admin/SuperAdminBankAccountsModal";
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -153,8 +152,7 @@ const SuperAdminInvoicePage = () => {
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState<PaymentStatus | "all">("all");
   const [showModal, setShowModal] = useState(false);
-  const [showBankModal, setShowBankModal] = useState(false);
-  const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
+    const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
   const [detailInvoice, setDetailInvoice] = useState<Invoice | null>(null);
   const [form, setForm] = useState(blankForm());
   const [saving, setSaving] = useState(false);
@@ -255,10 +253,34 @@ const SuperAdminInvoicePage = () => {
 
   const filtered = invoices.filter(inv => {
     const effectiveStatus = getInvoiceStatus(inv);
+    
     const matchSearch = inv.school_name.toLowerCase().includes(search.toLowerCase()) ||
       inv.invoice_number.toLowerCase().includes(search.toLowerCase());
+    
     const matchStatus = filterStatus === "all" || effectiveStatus === filterStatus;
-    return matchSearch && matchStatus;
+    
+    let matchPackage = true;
+    if (filterPackage !== "all") {
+      matchPackage = (inv.package_name || "").toLowerCase().includes(filterPackage.toLowerCase());
+    }
+
+    let matchTime = true;
+    if (filterTime !== "all") {
+      const date = new Date(inv.created);
+      const now = new Date();
+      if (filterTime === "today") {
+        matchTime = date.toDateString() === now.toDateString();
+      } else if (filterTime === "week") {
+        const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        matchTime = date >= weekAgo;
+      } else if (filterTime === "month") {
+        matchTime = date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+      } else if (filterTime === "year") {
+        matchTime = date.getFullYear() === now.getFullYear();
+      }
+    }
+
+    return matchSearch && matchStatus && matchPackage && matchTime;
   });
 
   const openCreate = () => {
@@ -487,47 +509,75 @@ const SuperAdminInvoicePage = () => {
         </div>
 
         {/* Filters */}
-        <div className="flex flex-col sm:flex-row gap-3">
-          <div className="relative flex-1">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Cari nama institusi atau nomor invoice..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              className="w-full pl-9 pr-4 py-2.5 text-sm border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition"
-            />
+        <div className="flex flex-col gap-3">
+            <div className="flex flex-col sm:flex-row gap-3">
+              <div className="relative flex-1">
+                <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Cari nama institusi atau nomor invoice..."
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2.5 text-sm border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition shadow-sm"
+                />
+              </div>
+              <button
+                onClick={() => { loadSchools(); loadInvoices(); }}
+                className="p-2.5 border border-slate-200 rounded-xl bg-white hover:bg-slate-50 text-slate-500 transition shadow-sm shrink-0"
+                title="Refresh"
+              >
+                <RefreshCw size={18} />
+              </button>
+            </div>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="relative">
+                <Filter size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <select
+                  value={filterStatus}
+                  onChange={e => setFilterStatus(e.target.value as PaymentStatus | "all")}
+                  className="w-full pl-10 pr-10 py-2.5 text-xs font-semibold border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition appearance-none cursor-pointer shadow-sm text-slate-700"
+                >
+                  <option value="all">Semua Status</option>
+                  <option value="unpaid">Belum Bayar</option>
+                  <option value="paid">Lunas</option>
+                  <option value="overdue">Terlambat</option>
+                  <option value="cancelled">Dibatalkan</option>
+                </select>
+                <ChevronDown size={14} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              </div>
+
+              <div className="relative">
+                <select
+                  value={filterTime}
+                  onChange={e => setFilterTime(e.target.value as any)}
+                  className="w-full pl-4 pr-10 py-2.5 text-xs font-semibold border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition appearance-none cursor-pointer shadow-sm text-slate-700"
+                >
+                  <option value="all">Semua Waktu</option>
+                  <option value="today">Hari Ini</option>
+                  <option value="week">7 Hari Terakhir</option>
+                  <option value="month">Bulan Ini</option>
+                  <option value="year">Tahun Ini</option>
+                </select>
+                <ChevronDown size={14} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              </div>
+
+              <div className="relative">
+                <select
+                  value={filterPackage}
+                  onChange={e => setFilterPackage(e.target.value)}
+                  className="w-full pl-4 pr-10 py-2.5 text-xs font-semibold border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition appearance-none cursor-pointer shadow-sm text-slate-700"
+                >
+                  <option value="all">Semua Paket</option>
+                  <option value="free">Paket Free / Trial</option>
+                  <option value="berkembang">Paket Berkembang</option>
+                  <option value="maju">Paket Maju</option>
+                  <option value="unggul">Paket Unggul</option>
+                </select>
+                <ChevronDown size={14} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              </div>
+            </div>
           </div>
-          <div className="relative">
-            <Filter size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <select
-              value={filterStatus}
-              onChange={e => setFilterStatus(e.target.value as PaymentStatus | "all")}
-              className="pl-8 pr-8 py-2.5 text-sm border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition appearance-none cursor-pointer"
-            >
-              <option value="all">Semua Status</option>
-              <option value="unpaid">Belum Bayar</option>
-              <option value="paid">Lunas</option>
-              <option value="overdue">Terlambat</option>
-              <option value="cancelled">Dibatalkan</option>
-            </select>
-            <ChevronDown size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-          </div>
-          <button
-              onClick={() => setShowBankModal(true)}
-              className="px-3.5 py-2 border border-slate-200 rounded-xl bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs transition shadow-sm flex items-center gap-1.5"
-            >
-              <CreditCard size={14} />
-              Rekening Bank
-            </button>
-            <button
-            onClick={() => { loadSchools(); loadInvoices(); }}
-            className="p-2.5 border border-slate-200 rounded-xl bg-white hover:bg-slate-50 text-slate-500 transition"
-            title="Refresh"
-          >
-            <RefreshCw size={15} />
-          </button>
-        </div>
 
         {/* Invoice table */}
         {loading ? (
@@ -763,9 +813,7 @@ const SuperAdminInvoicePage = () => {
       </div>
 
       {/* ─── Create/Edit Modal ─────────────────────────────────────────── */}
-      {showBankModal && <SuperAdminBankAccountsModal onClose={() => setShowBankModal(false)} />}
-
-      {showModal && (
+            {showModal && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-5 border-b border-slate-100">

@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
-import { UserCircle, KeyRound, Save, CheckCircle, AlertCircle, Shield, Smartphone, Cloud, RefreshCw, Database, Server, Check } from "lucide-react";
+import { UserCircle, KeyRound, Save, CheckCircle, AlertCircle, Shield, Smartphone, Cloud, RefreshCw, Database, Server, Check, Landmark } from "lucide-react";
 import SuperAdminLayout from "../../components/layout/SuperAdminLayout";
 import { masterPb } from "../../lib/pocketbase";
+import { BankAccountsSettings } from "../../components/admin/BankAccountsSettings";
 import { useNavigate } from "react-router-dom";
 import { cn } from "../../lib/utils";
 
-type Section = "profile" | "password" | "apk" | "media";
+type Section = "profile" | "password" | "apk" | "media" | "bank";
 
 const SuperAdminSettingsPage = () => {
   const navigate = useNavigate();
@@ -461,6 +462,11 @@ const SuperAdminSettingsPage = () => {
                 </div>
               </form>
             </div>
+          )}
+
+          {/* Bank Accounts Section */}
+          {activeSection === "bank" && (
+             <BankAccountsSettings />
           )}
 
           {/* Media & Cloud Storage Section */}
