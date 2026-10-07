@@ -749,7 +749,10 @@ const StudentDashboardPage = () => {
                                         // Baca metadata dari answers.__meta (tidak perlu field baru di DB)
                                         const meta = attempt?.answers?.__meta;
                                         const essayTotal = meta?.essayTotal ?? attempt?.essayTotal ?? 0;
-                                        const objectiveCorrect = meta?.objectiveCorrect ?? attempt?.objectiveCorrect ?? attempt?.correct ?? 0;
+                                        // Nilai dihitung ulang di server (security_fix.pb.js) karena kunci jawaban
+                                        // di-strip dari soal yang diterima siswa — meta.objectiveCorrect dari
+                                        // client tidak bisa dipercaya (selalu 0 untuk PG), pakai attempt.correct.
+                                        const objectiveCorrect = attempt?.correct ?? meta?.objectiveCorrect ?? attempt?.objectiveCorrect ?? 0;
                                         const objectiveTotal = meta?.objectiveTotal ?? attempt?.objectiveTotal ?? attempt?.total ?? 0;
                                         // Selalu tampilkan nilai objektif murni (100%), tidak ada bobot essay
                                         // Gunakan attempt?.score terlebih dahulu jika ada, untuk menghindari fallback ke default '0' di kolom objectiveScore

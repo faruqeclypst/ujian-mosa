@@ -142,7 +142,8 @@ onRecordCreateRequest((e) => {
             "essay": "uraian", "uraian": "uraian",
             "true_false": "benar_salah", "benar_salah": "benar_salah",
             "matching": "menjodohkan", "menjodohkan": "menjodohkan",
-            "ordering": "urutkan", "sequence": "urutkan", "urutkan": "urutkan"
+            "ordering": "urutkan", "sequence": "urutkan", "urutkan": "urutkan",
+            "drag_drop": "urutkan"
         };
         try {
             let auth = null;
@@ -225,6 +226,31 @@ onRecordCreateRequest((e) => {
                     const okC = chosen.filter((k) => ckeys.indexOf(k) !== -1).length;
                     const badC = chosen.filter((k) => ckeys.indexOf(k) === -1).length;
                     if (ckeys.length > 0) objectiveCorrect += Math.max(0, okC - badC) / ckeys.length;
+                } else if (t === "menjodohkan") {
+                    const pairs = options.pairs || [];
+                    if (pairs.length > 0 && studentAns !== null && typeof studentAns === "object" && !Array.isArray(studentAns)) {
+                        let pairCorrect = 0;
+                        for (let pi = 0; pi < pairs.length; pi++) {
+                            const p = pairs[pi] || {};
+                            const pid = String(p.id != null ? p.id : "");
+                            if (!pid) continue;
+                            if (String(studentAns[pid] != null ? studentAns[pid] : "") === String(p.right != null ? p.right : "")) pairCorrect++;
+                        }
+                        objectiveCorrect += pairCorrect / pairs.length;
+                    }
+                } else if (t === "urutkan" || t === "drag_drop") {
+                    const items = options.items || [];
+                    const co = [];
+                    for (let ii = 0; ii < items.length; ii++) {
+                        const it = items[ii] || {};
+                        co.push(String(it.id != null ? it.id : ""));
+                    }
+                    const sarr = Array.isArray(studentAns) ? studentAns.map(function (v) { return String(v); }) : [];
+                    if (co.length > 0 && sarr.length === co.length) {
+                        let allOk = true;
+                        for (let vi = 0; vi < co.length; vi++) { if (sarr[vi] !== co[vi]) { allOk = false; break; } }
+                        if (allOk) objectiveCorrect++;
+                    }
                 }
             });
 
@@ -281,7 +307,8 @@ onRecordUpdateRequest((e) => {
             "essay": "uraian", "uraian": "uraian",
             "true_false": "benar_salah", "benar_salah": "benar_salah",
             "matching": "menjodohkan", "menjodohkan": "menjodohkan",
-            "ordering": "urutkan", "sequence": "urutkan", "urutkan": "urutkan"
+            "ordering": "urutkan", "sequence": "urutkan", "urutkan": "urutkan",
+            "drag_drop": "urutkan"
         };
         try {
             let auth = null;
@@ -363,6 +390,31 @@ onRecordUpdateRequest((e) => {
                     const okC = chosen.filter((k) => ckeys.indexOf(k) !== -1).length;
                     const badC = chosen.filter((k) => ckeys.indexOf(k) === -1).length;
                     if (ckeys.length > 0) objectiveCorrect += Math.max(0, okC - badC) / ckeys.length;
+                } else if (t === "menjodohkan") {
+                    const pairs = options.pairs || [];
+                    if (pairs.length > 0 && studentAns !== null && typeof studentAns === "object" && !Array.isArray(studentAns)) {
+                        let pairCorrect = 0;
+                        for (let pi = 0; pi < pairs.length; pi++) {
+                            const p = pairs[pi] || {};
+                            const pid = String(p.id != null ? p.id : "");
+                            if (!pid) continue;
+                            if (String(studentAns[pid] != null ? studentAns[pid] : "") === String(p.right != null ? p.right : "")) pairCorrect++;
+                        }
+                        objectiveCorrect += pairCorrect / pairs.length;
+                    }
+                } else if (t === "urutkan" || t === "drag_drop") {
+                    const items = options.items || [];
+                    const co = [];
+                    for (let ii = 0; ii < items.length; ii++) {
+                        const it = items[ii] || {};
+                        co.push(String(it.id != null ? it.id : ""));
+                    }
+                    const sarr = Array.isArray(studentAns) ? studentAns.map(function (v) { return String(v); }) : [];
+                    if (co.length > 0 && sarr.length === co.length) {
+                        let allOk = true;
+                        for (let vi = 0; vi < co.length; vi++) { if (sarr[vi] !== co[vi]) { allOk = false; break; } }
+                        if (allOk) objectiveCorrect++;
+                    }
                 }
             });
 
