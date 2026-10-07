@@ -318,6 +318,61 @@ const SettingsPage = () => {
     }
   };
 
+  const handleLoadModels = async () => {
+    if (!aiGatewayUrl?.trim()) {
+      addToast({ title: "Gagal", description: "Isi Base URL terlebih dahulu.", type: "error" });
+      return;
+    }
+    if (!aiGatewayKey?.trim()) {
+      addToast({ title: "Gagal", description: "Isi API Key terlebih dahulu.", type: "error" });
+      return;
+    }
+    setIsLoadingModels(true);
+    try {
+      let baseUrl = aiGatewayUrl.trim().replace(/\/$/, "");
+      baseUrl = baseUrl.replace(/\/chat\/completions$/, "");
+      const modelsUrl = `${baseUrl}/models`;
+
+      // Gunakan PocketBase proxy untuk menghindari CORS
+      const proxyUrl = pb!.baseUrl + "/api/ai-proxy-models";
+      const res = await fetch(proxyUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": pb!.authStore.token },
+        body: JSON.stringify({ baseUrl: modelsUrl, apiKey: aiGatewayKey })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const items = data.data || data.models || data;
+        if (Array.isArray(items) && items.length > 0) {
+          const models = items.map((m: any) => ({
+            id: m.id,
+            name: m.name || m.id,
+            speed: "Custom",
+            provider: "custom"
+          }));
+          models.sort((a: any, b: any) => (a.name || "").localeCompare(b.name || ""));
+          setRemoteModels(models);
+          if (!models.find((m: any) => m.id === aiModel) && models.length > 0) {
+            setAiModel(models[0].id);
+          }
+          addToast({ title: "Berhasil!", description: `${models.length} model ditemukan.`, type: "success" });
+        } else {
+          setRemoteModels([]);
+          addToast({ title: "Kosong", description: "Tidak ada model yang dikembalikan server.", type: "error" });
+        }
+      } else {
+        setRemoteModels([]);
+        addToast({ title: "Gagal", description: "Server menolak permintaan. Periksa Base URL & API Key.", type: "error" });
+      }
+    } catch {
+      setRemoteModels([]);
+      addToast({ title: "Gagal", description: "Tidak bisa menghubungi server model.", type: "error" });
+    } finally {
+      setIsLoadingModels(false);
+    }
+  };
+
   const loadGalleryImages = async () => {
     if (!pb) return;
     const userGroups: Record<string, Set<string>> = {
@@ -432,55 +487,8 @@ const SettingsPage = () => {
     }
 
     if (aiProvider === "custom") {
-      // Jika base URL dan API key sudah diisi, coba load model via PocketBase proxy (anti-CORS)
-      if (aiGatewayUrl && aiGatewayKey) {
-        const fetchCustomModels = async () => {
-          setIsLoadingModels(true);
-          try {
-            let baseUrl = aiGatewayUrl.trim().replace(/\/$/, "");
-            baseUrl = baseUrl.replace(/\/chat\/completions$/, "");
-            const modelsUrl = `${baseUrl}/models`;
-
-            // Gunakan PocketBase proxy untuk menghindari CORS
-            const proxyUrl = pb!.baseUrl + "/api/ai-proxy-models";
-            const res = await fetch(proxyUrl, {
-              method: "POST",
-              headers: { "Content-Type": "application/json", "Authorization": pb!.authStore.token },
-              body: JSON.stringify({ baseUrl: modelsUrl, apiKey: aiGatewayKey })
-            });
-
-            if (res.ok) {
-              const data = await res.json();
-              const items = data.data || data.models || data;
-              if (Array.isArray(items) && items.length > 0) {
-                const models = items.map((m: any) => ({
-                  id: m.id,
-                  name: m.name || m.id,
-                  speed: "Custom",
-                  provider: "custom"
-                }));
-                models.sort((a: any, b: any) => (a.name || "").localeCompare(b.name || ""));
-                setRemoteModels(models);
-                if (!models.find((m: any) => m.id === aiModel) && models.length > 0) {
-                  setAiModel(models[0].id);
-                }
-              } else {
-                setRemoteModels([]);
-              }
-            } else {
-              setRemoteModels([]);
-            }
-          } catch {
-            setRemoteModels([]);
-          } finally {
-            setIsLoadingModels(false);
-          }
-        };
-        const timeout = setTimeout(fetchCustomModels, 800);
-        return () => clearTimeout(timeout);
-      } else {
-        setRemoteModels([]);
-      }
+      // Model dimuat manual via tombol "Muat Model" (handleLoadModels),
+      // bukan otomatis — agar admin kontrol kapan request dikirim.
       return;
     }
 
@@ -1180,6 +1188,7 @@ const SettingsPage = () => {
                         onChange={(e) => {
                           setAiProvider(e.target.value);
                           setAiModel("");
+                          setRemoteModels([]);
                         }}
                         className="w-full h-9 px-3 rounded-xl text-xs font-bold bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none cursor-pointer text-slate-800 dark:text-slate-200"
                       >
@@ -1251,7 +1260,17 @@ const SettingsPage = () => {
                       </div>
                     </FormField>
 
-                    <div className="sm:col-span-2 pt-1 flex justify-end">
+                    <div className="sm:col-span-2 pt-1 flex justify-end gap-2">
+                      {aiProvider === "custom" && (
+                        <Button
+                          type="button" onClick={handleLoadModels} disabled={isLoadingModels || !aiGatewayUrl || !aiGatewayKey}
+                          variant="outline"
+                          className="h-9 px-4 rounded-xl text-xs font-bold border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 disabled:opacity-50"
+                        >
+                          {isLoadingModels ? <RefreshCw size={14} className="animate-spin mr-2" /> : <Download size={14} className="mr-2" />}
+                          Muat Model
+                        </Button>
+                      )}
                       <Button
                         type="button" onClick={handleTestAI} disabled={isTestingAI || (aiProvider === "puter" ? false : (aiProvider === "groq" ? !groqApiKey : !aiGatewayKey))}
                         variant="outline"
