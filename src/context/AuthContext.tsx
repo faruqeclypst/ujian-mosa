@@ -51,12 +51,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const initAuth = () => {
       if (pb.authStore.isValid && pb.authStore.model) {
-        const model = pb.authStore.model;
-        if (model.collectionName === "users") {
+        const model: any = pb.authStore.model;
+        // Terima model users walau collectionName hilang (kompatibilitas SDK/server)
+        if (model.collectionName === "users" || !model.collectionName) {
           setUser({
             id: model.id,
-            email: model.email,
-            name: model.name || model.username,
+            email: model.email || "",
+            name: model.name || model.username || "",
             role: model.role || "teacher",
             teacherId: model.teacherId,
             avatar: model.avatar ? pb.files.getUrl(model, model.avatar) : "",
@@ -66,6 +67,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             ai_provider: model.ai_provider || "groq",
             ai_model: model.ai_model || "",
           });
+        } else {
+          setUser(null);
         }
       } else {
         setUser(null);
@@ -79,6 +82,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       initAuth();
     });
   }, [pb, tenantLoading]);
+
+  const buildUserData = useCallback(
+    (model: any): UserData | null => {
+      if (!model || !model.id) return null;
+      // Auth dilakukan ke koleksi "users", jadi model pasti user walau collectionName hilang
+      return {
+        id: model.id,
+        email: model.email || "",
+        name: model.name || model.username || "",
+        role: model.role || "teacher",
+        teacherId: model.teacherId,
+        avatar: model.avatar && pb ? pb.files.getUrl(model, model.avatar) : "",
+        // Force change ONLY if explicitly set to false. If missing (undefined/null), assume true for compatibility.
+        hasChangedPassword: model.hasChangedPassword !== false && model.hasChangedPassword !== "false" && model.hasChangedPassword !== "0" && model.hasChangedPassword !== 0,
+        ai_api_key: model.ai_api_key || "",
+        ai_provider: model.ai_provider || "groq",
+        ai_model: model.ai_model || "",
+      };
+    },
+    [pb]
+  );
 
   const signInWithUsername = useCallback(
     async (username: string, password: string) => {
@@ -95,11 +119,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             throw firstErr;
           }
         }
+        // Jangan hanya andalkan onChange — set user langsung dari authStore
+        // (kasus: onChange tidak fire atau collectionName hilang di model)
+        const model: any = pb.authStore.model;
+        if (pb.authStore.isValid && model) {
+          const userData = buildUserData(model);
+          if (userData) setUser(userData);
+        }
       } catch (err: any) {
         throw new Error(err.message || "Email/Username atau Password Admin salah!");
       }
     },
-    [pb]
+    [pb, buildUserData]
   );
 
   const registerWithUsername = useCallback(
