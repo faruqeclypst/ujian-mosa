@@ -417,8 +417,8 @@ const fetchAI = async (opts: AIFetchOptions): Promise<string> => {
   if (useProxy) {
     response = await fetch(pb.baseUrl + "/api/ai-proxy", {
       method: "POST",
-      headers: { "Content-Type": "application/json", "X-Token": pb.authStore.token },
-      body: JSON.stringify({ baseUrl, apiKey, body })
+      headers: { "Content-Type": "application/json", "Authorization": pb.authStore.token },
+      body: JSON.stringify({ baseUrl, apiKey, model, messages, max_tokens: maxTokens, temperature, stream: false })
     });
   } else {
     response = await fetch(baseUrl, {
@@ -1409,8 +1409,8 @@ export const testAIConnection = async (pb: PocketBase, apiKey: string, modelId: 
     if (useProxy) {
       response = await fetch(pb.baseUrl + "/api/ai-proxy", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "X-Token": pb.authStore.token },
-        body: JSON.stringify({ baseUrl, apiKey, body: { model: modelId, messages: [{ role: "user", content: "hi" }], max_tokens: 5, stream: false } })
+        headers: { "Content-Type": "application/json", "Authorization": pb.authStore.token },
+        body: JSON.stringify({ baseUrl, apiKey, model: modelId, messages: [{ role: "user", content: "hi" }], max_tokens: 5, stream: false })
       });
     } else {
       response = await fetch(baseUrl, {

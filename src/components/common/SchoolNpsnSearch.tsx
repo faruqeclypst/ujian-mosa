@@ -216,11 +216,11 @@ export const SchoolNpsnSearch: React.FC<SchoolNpsnSearchProps> = ({
                             <span className="font-bold text-xs text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400">
                               {item.nama}
                             </span>
-                            <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
                               {item.bentukPendidikan}
                             </span>
                             {item.statusSatuanPendidikan && (
-                              <span className="px-1.5 py-0.2 rounded text-[10px] font-semibold text-slate-500">
+                              <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold text-slate-500">
                                 {item.statusSatuanPendidikan}
                               </span>
                             )}

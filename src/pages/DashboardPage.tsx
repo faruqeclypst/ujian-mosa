@@ -784,7 +784,7 @@ const DashboardPage = () => {
               <Icon size={13} className={isActive ? "text-blue-600 dark:text-blue-400" : "text-slate-400"} />
               <span>{t.label}</span>
               {t.count !== undefined && t.count > 0 && (
-                <span className="bg-red-500 text-white text-[10px] font-extrabold px-1.5 py-0.2 rounded-full leading-none">
+                <span className="bg-red-500 text-white text-[10px] font-extrabold px-1.5 py-0.5 rounded-full leading-none">
                   {t.count}
                 </span>
               )}

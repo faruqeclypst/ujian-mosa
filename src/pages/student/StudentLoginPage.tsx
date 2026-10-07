@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import { Capacitor } from "@capacitor/core";
 import { useStudentAuth } from "../../context/StudentAuthContext";
 import { Button } from "../../components/ui/button";
@@ -8,7 +9,7 @@ import { Card, CardContent } from "../../components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../../components/ui/dialog";
 import { useTenant } from "../../context/TenantContext";
 import { useTheme } from "../../context/ThemeContext";
-import { User, Lock, GraduationCap, School, Eye, EyeOff, Sun, Moon, HardDrive, Globe } from "lucide-react";
+import { User, Lock, GraduationCap, School, Eye, EyeOff, Sun, Moon, HardDrive, Globe, Monitor } from "lucide-react";
 import { isLocalServer } from "../landing/SelectSchoolPage";
 
 const StudentLoginPage = () => {
@@ -291,7 +292,17 @@ const StudentLoginPage = () => {
           </CardContent>
         </Card>
 
-        <div className="mt-8 flex flex-col items-center gap-1 text-slate-400 text-sm font-medium">
+                <div className="mt-8 flex flex-col items-center gap-1.5 text-slate-500 text-[13px] font-medium">
+          <div className="bg-white/60 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700 px-4 py-2 rounded-full backdrop-blur-sm flex items-center gap-2 shadow-sm">
+            <Monitor size={14} className="text-emerald-600 dark:text-emerald-400" />
+            <span>Belum punya aplikasi ujian?</span>
+            <Link to="/unduh" className="text-emerald-600 dark:text-emerald-400 font-bold hover:underline">
+              Unduh di sini
+            </Link>
+          </div>
+        </div>
+
+        <div className="mt-4 flex flex-col items-center gap-1 text-slate-400 dark:text-slate-500 text-xs font-medium">
           <p>© {new Date().getFullYear()} CBT {schoolName}.</p>
         </div>
       </div>

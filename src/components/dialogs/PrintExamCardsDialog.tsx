@@ -328,7 +328,7 @@ export const PrintExamCardsDialog = ({
               break-after: avoid;
             }
             .card-item {
-              border: 1.5px solid #000000;
+              border: 1px solid #000000;
               border-radius: 4px;
               padding: ${is4Cards ? "6px 8px" : "4px 6px"};
               display: flex;
@@ -367,11 +367,11 @@ export const PrintExamCardsDialog = ({
   const logoSizePx = is4Cards ? 38 : 30;
 
   // Template Tunggal Render Kartu Peserta
-  const renderCardContent = (student: StudentData) => {
+    const renderCardContent = (student: StudentData) => {
     const studentClass = classes.find(c => c.id === student.classId);
     const classNameText = studentClass?.name || student.className || "Kelas";
     const displayUsername = student.examNumber || (student as any).username || student.nisn;
-    const displayPassword = showPassword ? (student.password || "12345678") : "••••••••";
+    const displayPassword = showPassword ? (student.password || "12345678") : "*********";
     const birthText = formatBirthInfo(student.birthPlace, student.birthDate);
     
     const roomVal = student.room || defaultRoom;
@@ -386,9 +386,10 @@ export const PrintExamCardsDialog = ({
           boxSizing: "border-box", 
           backgroundColor: "#ffffff",
           color: "#000000",
-          border: "1.5px solid #000000",
-          borderRadius: "4px",
-          padding: is4Cards ? "7px 9px" : "5px 7px",
+          fontFamily: "'Arial', 'Helvetica', sans-serif",
+          border: "1px solid #1e293b",
+          borderRadius: "8px",
+          padding: is4Cards ? "14px 18px" : "10px 14px",
           display: "flex",
           flexDirection: "column",
           justifyContent: "space-between",
@@ -403,37 +404,36 @@ export const PrintExamCardsDialog = ({
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            gap: "6px",
-            borderBottom: "2px solid #000000",
-            borderBottomStyle: "double",
-            paddingBottom: "3px",
-            marginBottom: is4Cards ? "5px" : "3px"
+            gap: "10px",
+            borderBottom: "3px double #0f172a",
+            paddingBottom: "8px",
+            marginBottom: is4Cards ? "12px" : "8px"
           }}
         >
           {/* Logo Kiri */}
           <div style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            {renderLeftLogoComponent(logoSizePx)}
+            {renderLeftLogoComponent(is4Cards ? 42 : 36)}
           </div>
 
           {/* Teks Kop Tengah */}
-          <div style={{ flex: 1, textAlign: "center", lineHeight: "1.15" }}>
-            <div style={{ fontSize: is4Cards ? "11px" : "9.5px", fontWeight: 900, textTransform: "uppercase", letterSpacing: "0.5px" }}>
+          <div style={{ flex: 1, textAlign: "center", lineHeight: "1.2" }}>
+            <div style={{ fontSize: is4Cards ? "13px" : "11px", fontWeight: 900, textTransform: "uppercase", letterSpacing: "1px", color: "#000000" }}>
               KARTU TANDA PESERTA UJIAN
             </div>
-            <div style={{ fontSize: is4Cards ? "9px" : "8px", fontWeight: 800, textTransform: "uppercase", color: "#1e40af" }}>
+            <div style={{ fontSize: is4Cards ? "10px" : "8.5px", fontWeight: 700, textTransform: "uppercase", color: "#334155", marginTop: "2px" }}>
               {examTitle}
             </div>
-            <div style={{ fontSize: is4Cards ? "9.5px" : "8.5px", fontWeight: 900, textTransform: "uppercase", color: "#000000" }}>
+            <div style={{ fontSize: is4Cards ? "12px" : "10px", fontWeight: 900, textTransform: "uppercase", color: "#000000", marginTop: "1px" }}>
               {school?.name || "SATUAN PENDIDIKAN"}
             </div>
-            <div style={{ fontSize: is4Cards ? "7.5px" : "6.5px", fontWeight: 600, color: "#475569" }}>
+            <div style={{ fontSize: is4Cards ? "8px" : "7px", fontWeight: 600, color: "#475569", marginTop: "2px" }}>
               TAHUN PELAJARAN {academicYear}
             </div>
           </div>
 
           {/* Logo Kanan */}
           <div style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            {renderRightLogoComponent(logoSizePx)}
+            {renderRightLogoComponent(is4Cards ? 42 : 36)}
           </div>
         </div>
 
@@ -442,17 +442,17 @@ export const PrintExamCardsDialog = ({
           style={{ 
             display: "flex", 
             alignItems: "flex-start", 
-            gap: "8px", 
-            marginBottom: is4Cards ? "6px" : "3px"
+            gap: "16px", 
+            marginBottom: is4Cards ? "12px" : "8px"
           }}
         >
           {/* Pasfoto 3x4 */}
           <div 
             style={{ 
-              width: is4Cards ? "23mm" : "18mm", 
-              height: is4Cards ? "29mm" : "23mm", 
-              border: "1px solid #000000",
-              borderRadius: "2px",
+              width: is4Cards ? "26mm" : "21mm", 
+              height: is4Cards ? "34mm" : "27mm", 
+              border: "1px solid #cbd5e1",
+              borderRadius: "4px",
               backgroundColor: "#f8fafc",
               display: "flex",
               flexDirection: "column",
@@ -470,11 +470,11 @@ export const PrintExamCardsDialog = ({
               />
             ) : (
               <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "2px", textAlign: "center", color: "#94a3b8" }}>
-                <User style={{ width: "18px", height: "18px", opacity: 0.4, marginBottom: "1px" }} />
-                <span style={{ fontSize: "7px", fontWeight: 800, letterSpacing: "0.5px", textTransform: "uppercase", color: "#64748b" }}>
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.4, marginBottom: "2px" }}><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                <span style={{ fontSize: "8px", fontWeight: 800, letterSpacing: "1px", textTransform: "uppercase", color: "#64748b" }}>
                   FOTO
                 </span>
-                <span style={{ fontSize: "6px", fontWeight: 600, color: "#94a3b8" }}>
+                <span style={{ fontSize: "7px", fontWeight: 600, color: "#94a3b8" }}>
                   3 x 4
                 </span>
               </div>
@@ -487,58 +487,58 @@ export const PrintExamCardsDialog = ({
               flex: 1,
               width: "100%", 
               borderCollapse: "collapse",
-              fontSize: is4Cards ? "9.5px" : "8px",
-              lineHeight: is4Cards ? "1.3" : "1.2"
+              fontSize: is4Cards ? "10px" : "9px",
+              lineHeight: is4Cards ? "1.4" : "1.3"
             }}
           >
             <tbody>
               <tr>
-                <td style={{ width: is4Cards ? "72px" : "58px", fontWeight: 600, color: "#334155", padding: "1px 0", whiteSpace: "nowrap" }}>
+                <td style={{ width: is4Cards ? "85px" : "70px", fontWeight: 600, color: "#475569", padding: "2px 0", whiteSpace: "nowrap" }}>
                   Nama Peserta
                 </td>
-                <td style={{ width: "6px", fontWeight: 700, textAlign: "center", padding: "1px 0" }}>:</td>
-                <td style={{ fontWeight: 800, textTransform: "uppercase", color: "#000000", padding: "1px 0", wordBreak: "break-word" }}>
+                <td style={{ width: "8px", fontWeight: 600, color: "#475569", textAlign: "center", padding: "2px 0" }}>:</td>
+                <td style={{ fontWeight: 800, textTransform: "uppercase", color: "#000000", padding: "2px 0", wordBreak: "break-word" }}>
                   {student.name}
                 </td>
               </tr>
 
               <tr>
-                <td style={{ fontWeight: 600, color: "#334155", padding: "1px 0", whiteSpace: "nowrap" }}>
+                <td style={{ fontWeight: 600, color: "#475569", padding: "2px 0", whiteSpace: "nowrap" }}>
                   No. Peserta / NISN
                 </td>
-                <td style={{ fontWeight: 700, textAlign: "center", padding: "1px 0" }}>:</td>
-                <td style={{ fontWeight: 700, color: "#000000", padding: "1px 0" }}>
+                <td style={{ fontWeight: 600, color: "#475569", textAlign: "center", padding: "2px 0" }}>:</td>
+                <td style={{ fontWeight: 800, color: "#000000", padding: "2px 0" }}>
                   {displayUsername}
                 </td>
               </tr>
 
               <tr>
-                <td style={{ fontWeight: 600, color: "#334155", padding: "1px 0", whiteSpace: "nowrap" }}>
+                <td style={{ fontWeight: 600, color: "#475569", padding: "2px 0", whiteSpace: "nowrap" }}>
                   {terminology.class}
                 </td>
-                <td style={{ fontWeight: 700, textAlign: "center", padding: "1px 0" }}>:</td>
-                <td style={{ fontWeight: 700, color: "#000000", padding: "1px 0" }}>
+                <td style={{ fontWeight: 600, color: "#475569", textAlign: "center", padding: "2px 0" }}>:</td>
+                <td style={{ fontWeight: 800, color: "#000000", padding: "2px 0" }}>
                   {classNameText}
                 </td>
               </tr>
 
               <tr>
-                <td style={{ fontWeight: 600, color: "#334155", padding: "1px 0", whiteSpace: "nowrap" }}>
+                <td style={{ fontWeight: 600, color: "#475569", padding: "2px 0", whiteSpace: "nowrap" }}>
                   Jenis Kelamin
                 </td>
-                <td style={{ fontWeight: 700, textAlign: "center", padding: "1px 0" }}>:</td>
-                <td style={{ fontWeight: 600, color: "#000000", padding: "1px 0" }}>
+                <td style={{ fontWeight: 600, color: "#475569", textAlign: "center", padding: "2px 0" }}>:</td>
+                <td style={{ fontWeight: 700, color: "#000000", padding: "2px 0" }}>
                   {student.gender === "L" ? "Laki-laki" : student.gender === "P" ? "Perempuan" : "-"}
                 </td>
               </tr>
 
               {showBirthInfo && birthText && (
                 <tr>
-                  <td style={{ fontWeight: 600, color: "#334155", padding: "1px 0", whiteSpace: "nowrap" }}>
-                    Tempat, Tgl Lahir
+                  <td style={{ fontWeight: 600, color: "#475569", padding: "2px 0", whiteSpace: "nowrap" }}>
+                    Tmpt, Tgl Lahir
                   </td>
-                  <td style={{ fontWeight: 700, textAlign: "center", padding: "1px 0" }}>:</td>
-                  <td style={{ fontWeight: 500, color: "#000000", padding: "1px 0", wordBreak: "break-word" }}>
+                  <td style={{ fontWeight: 600, color: "#475569", textAlign: "center", padding: "2px 0" }}>:</td>
+                  <td style={{ fontWeight: 700, color: "#000000", padding: "2px 0", wordBreak: "break-word" }}>
                     {birthText}
                   </td>
                 </tr>
@@ -546,11 +546,11 @@ export const PrintExamCardsDialog = ({
 
               {showRoomSession && (
                 <tr>
-                  <td style={{ fontWeight: 600, color: "#334155", padding: "1px 0", whiteSpace: "nowrap" }}>
+                  <td style={{ fontWeight: 600, color: "#475569", padding: "2px 0", whiteSpace: "nowrap" }}>
                     Ruang / Sesi
                   </td>
-                  <td style={{ fontWeight: 700, textAlign: "center", padding: "1px 0" }}>:</td>
-                  <td style={{ fontWeight: 700, color: "#000000", padding: "1px 0" }}>
+                  <td style={{ fontWeight: 600, color: "#475569", textAlign: "center", padding: "2px 0" }}>:</td>
+                  <td style={{ fontWeight: 800, color: "#000000", padding: "2px 0" }}>
                     {roomSessionDisplay || "-"}
                   </td>
                 </tr>
@@ -562,40 +562,42 @@ export const PrintExamCardsDialog = ({
         {/* 3. BODY TENGAH: KOTAK AKUN LOGIN + QR CODE RESMI */}
         <div 
           style={{
-            backgroundColor: "#f8fafc",
-            border: "1px solid #94a3b8",
-            borderRadius: "3px",
-            padding: is4Cards ? "4px 8px" : "3px 6px",
-            marginBottom: is4Cards ? "5px" : "3px",
+            border: "1px dashed #94a3b8",
+            borderRadius: "6px",
+            padding: is4Cards ? "8px 12px" : "6px 10px",
+            marginBottom: is4Cards ? "12px" : "8px",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            gap: "8px"
+            gap: "12px"
           }}
         >
           {/* Akun Login Text */}
           <div style={{ flex: 1 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "2px" }}>
-              <span style={{ fontSize: is4Cards ? "8.5px" : "7.5px", fontWeight: 700, color: "#475569", textTransform: "uppercase", width: is4Cards ? "75px" : "60px" }}>
-                Username
-              </span>
-              <span style={{ fontSize: is4Cards ? "8.5px" : "7.5px", fontWeight: 700, color: "#475569" }}>:</span>
-              <span style={{ fontFamily: "monospace", fontSize: is4Cards ? "11.5px" : "10px", fontWeight: 900, color: "#000000", letterSpacing: "0.5px" }}>
-                {displayUsername}
-              </span>
-            </div>
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <tbody>
+                <tr>
+                  <td style={{ fontSize: is4Cards ? "9px" : "8px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", width: is4Cards ? "85px" : "70px", paddingBottom: "4px" }}>
+                    Username
+                  </td>
+                  <td style={{ fontSize: is4Cards ? "9px" : "8px", fontWeight: 700, color: "#64748b", width: "8px", textAlign: "center", paddingBottom: "4px" }}>:</td>
+                  <td style={{ fontFamily: "'Courier New', Courier, monospace", fontSize: is4Cards ? "13px" : "11px", fontWeight: 900, color: "#000000", letterSpacing: "1px", paddingBottom: "4px" }}>
+                    {displayUsername}
+                  </td>
+                </tr>
+                <tr>
+                  <td style={{ fontSize: is4Cards ? "9px" : "8px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", paddingBottom: "4px" }}>
+                    Password Default
+                  </td>
+                  <td style={{ fontSize: is4Cards ? "9px" : "8px", fontWeight: 700, color: "#64748b", textAlign: "center", paddingBottom: "4px" }}>:</td>
+                  <td style={{ fontFamily: "'Courier New', Courier, monospace", fontSize: is4Cards ? "13px" : "11px", fontWeight: 900, color: "#000000", letterSpacing: "1px", paddingBottom: "4px" }}>
+                    {displayPassword}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
 
-            <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "2px" }}>
-              <span style={{ fontSize: is4Cards ? "8.5px" : "7.5px", fontWeight: 700, color: "#475569", textTransform: "uppercase", width: is4Cards ? "75px" : "60px" }}>
-                Password Default
-              </span>
-              <span style={{ fontSize: is4Cards ? "8.5px" : "7.5px", fontWeight: 700, color: "#475569" }}>:</span>
-              <span style={{ fontFamily: "monospace", fontSize: is4Cards ? "11.5px" : "10px", fontWeight: 900, color: "#1e40af", letterSpacing: "0.5px" }}>
-                {displayPassword}
-              </span>
-            </div>
-
-            <div style={{ fontSize: is4Cards ? "7px" : "6px", color: "#64748b", lineHeight: "1.15", marginTop: "2px", borderTop: "1px dashed #cbd5e1", paddingTop: "2px" }}>
+            <div style={{ fontSize: is4Cards ? "7px" : "6.5px", color: "#64748b", lineHeight: "1.3", marginTop: "4px", paddingTop: "4px", borderTop: "1px dotted #cbd5e1" }}>
               *) Gunakan password di atas. Jika sudah diubah gunakan password pribadi Anda. Jika lupa hubungi Proktor.
             </div>
           </div>
@@ -605,23 +607,24 @@ export const PrintExamCardsDialog = ({
             {qrCodes[student.id] ? (
               <img 
                 src={qrCodes[student.id]} 
-                alt="QR" 
+                alt="QR Login" 
                 style={{ 
-                  width: is4Cards ? "24mm" : "18mm", 
-                  height: is4Cards ? "24mm" : "18mm", 
+                  width: is4Cards ? "28mm" : "22mm", 
+                  height: is4Cards ? "28mm" : "22mm", 
                   display: "block" 
                 }} 
               />
             ) : (
               <div 
                 style={{ 
-                  width: is4Cards ? "24mm" : "18mm", 
-                  height: is4Cards ? "24mm" : "18mm", 
-                  border: "1px dashed #cbd5e1" 
+                  width: is4Cards ? "28mm" : "22mm", 
+                  height: is4Cards ? "28mm" : "22mm", 
+                  border: "1px dashed #cbd5e1",
+                  borderRadius: "4px"
                 }} 
               />
             )}
-            <span style={{ fontSize: "6px", fontWeight: 600, color: "#64748b", marginTop: "1px" }}>
+            <span style={{ fontSize: "6.5px", fontWeight: 700, color: "#64748b", marginTop: "2px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
               QR Login
             </span>
           </div>
@@ -630,33 +633,38 @@ export const PrintExamCardsDialog = ({
         {/* 4. FOOTER: INSTRUKSI & TANDA TANGAN */}
         <div 
           style={{ 
-            borderTop: "1.5px solid #000000",
-            paddingTop: "3px",
+            borderTop: "1px solid #cbd5e1",
+            paddingTop: "8px",
             display: "flex",
             alignItems: "flex-end",
             justifyContent: "space-between",
-            gap: "8px"
+            gap: "12px",
+            marginTop: "auto"
           }}
         >
           {/* Instruksi Penggunaan */}
-          <div style={{ fontSize: is4Cards ? "7.5px" : "6.5px", lineHeight: "1.25", color: "#475569", maxWidth: "55%" }}>
-            <p style={{ fontWeight: 700, color: "#000000", margin: 0 }}>Ketentuan Peserta:</p>
-            <p style={{ margin: 0 }}>Kartu wajib dibawa dan diletakkan di atas meja selama asesmen berlangsung.</p>
+          <div style={{ fontSize: is4Cards ? "8px" : "7px", lineHeight: "1.3", color: "#475569", maxWidth: "60%" }}>
+            <p style={{ fontWeight: 800, color: "#0f172a", margin: "0 0 2px 0", textTransform: "uppercase" }}>Ketentuan Peserta:</p>
+            <ol style={{ margin: 0, paddingLeft: "12px" }}>
+              <li>Membawa kartu ini selama ujian berlangsung.</li>
+              <li>Menjaga kerahasiaan Username & Password.</li>
+              <li>Dilarang mencoret/merusak kartu ujian ini.</li>
+            </ol>
           </div>
 
           {/* Kolom Tanda Tangan */}
-          <div style={{ textAlign: "center", minWidth: is4Cards ? "105px" : "90px", lineHeight: "1.15" }}>
-            <p style={{ fontSize: is4Cards ? "7.5px" : "6.5px", color: "#334155", margin: 0 }}>
+          <div style={{ textAlign: "center", minWidth: is4Cards ? "110px" : "90px", lineHeight: "1.2" }}>
+            <p style={{ fontSize: is4Cards ? "8.5px" : "7.5px", color: "#334155", margin: 0 }}>
               {cityDate}
             </p>
-            <p style={{ fontSize: is4Cards ? "8px" : "7px", fontWeight: 700, color: "#000000", margin: "1px 0" }}>
+            <p style={{ fontSize: is4Cards ? "9px" : "8px", fontWeight: 800, color: "#0f172a", margin: "2px 0 0 0" }}>
               {signerRole},
             </p>
-            <div style={{ height: is4Cards ? "20px" : "15px" }} />
-            <p style={{ fontSize: is4Cards ? "8px" : "7px", fontWeight: 800, textDecoration: "underline", color: "#000000", margin: 0 }}>
-              {signerName || "( .................................... )"}
+            <div style={{ height: is4Cards ? "30px" : "24px" }} />
+            <p style={{ fontSize: is4Cards ? "9px" : "8px", fontWeight: 800, textDecoration: "underline", color: "#0f172a", margin: 0 }}>
+              {signerName || "( ........................................ )"}
             </p>
-            <p style={{ fontSize: is4Cards ? "7px" : "6px", color: "#475569", margin: "1px 0 0 0" }}>
+            <p style={{ fontSize: is4Cards ? "7.5px" : "6.5px", color: "#64748b", margin: "2px 0 0 0" }}>
               {signerNip ? `NIP. ${signerNip}` : "NIP. -"}
             </p>
           </div>
@@ -711,11 +719,11 @@ export const PrintExamCardsDialog = ({
         </div>
 
         {/* 2-COLUMN STUDIO LAYOUT */}
-        <div className="flex-1 flex overflow-hidden">
+        <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
           {/* ======================================================== */}
           {/* PANEL KIRI: PENGATURAN KARTU (LEBAR 340px, SCROLLABLE)    */}
           {/* ======================================================== */}
-          <div className="w-[340px] xl:w-[360px] flex-shrink-0 bg-slate-950/80 border-r border-slate-800 flex flex-col overflow-y-auto p-4 space-y-4 text-xs">
+          <div className="w-full lg:w-[340px] xl:w-[360px] flex-shrink-0 bg-slate-950/80 border-b lg:border-r lg:border-b-0 border-slate-800 flex flex-col overflow-y-auto p-4 space-y-4 text-xs h-1/2 lg:h-auto">
             {/* Bagian 1: Sasaran & Format Kertas */}
             <div className="bg-slate-900/90 rounded-xl p-3.5 border border-slate-800 space-y-3">
               <div className="flex items-center gap-1.5 text-blue-400 font-bold text-xs uppercase tracking-wider">

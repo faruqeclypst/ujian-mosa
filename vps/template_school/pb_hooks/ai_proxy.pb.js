@@ -43,13 +43,19 @@ routerAdd("POST", "/api/ai-proxy", (c) => {
         }
 
         const settings = $app.findFirstRecordByFilter("settings", "id != ''");
+        const isSuper = info.auth && info.auth.collection().name === "_superusers";
         if (!settings) return c.json(500, { error: "Settings tidak ditemukan" });
-        const apiKey = settings.getString("ai_gateway_key") || settings.getString("groq_api_key");
-        const baseUrl = settings.getString("ai_gateway_url") || "https://api.groq.com";
-        const model = settings.getString("ai_model") || "llama-3.1-8b-instant";
+        
+        const bodyData = info.body || {};
+        let apiKey = settings.getString("ai_gateway_key") || settings.getString("groq_api_key");
+        let baseUrl = settings.getString("ai_gateway_url") || "https://api.groq.com";
+        let model = settings.getString("ai_model") || "llama-3.1-8b-instant";
+        if (isSuper && bodyData.apiKey) apiKey = bodyData.apiKey;
+        if (isSuper && bodyData.baseUrl) baseUrl = bodyData.baseUrl;
+        if (isSuper && bodyData.model) model = bodyData.model;
         if (!apiKey) return c.json(500, { error: "AI belum dikonfigurasi di server" });
 
-        const bodyData = info.body || {};
+        
         const msgs = bodyData["messages"] || [];
         const msgArray = [];
         for (let i = 0; i < msgs.length; i++) {
@@ -129,9 +135,13 @@ routerAdd("POST", "/api/ai-proxy-models", (c) => {
         }
 
         const settings = $app.findFirstRecordByFilter("settings", "id != ''");
+        const isSuper = info.auth && info.auth.collection().name === "_superusers";
         if (!settings) return c.json(500, { error: "Settings tidak ditemukan" });
-        const apiKey = settings.getString("ai_gateway_key") || settings.getString("groq_api_key");
-        const baseUrl = settings.getString("ai_gateway_url") || "https://api.groq.com";
+        const bodyData = info.body || {};
+        let apiKey = settings.getString("ai_gateway_key") || settings.getString("groq_api_key");
+        let baseUrl = settings.getString("ai_gateway_url") || "https://api.groq.com";
+        if (isSuper && bodyData.apiKey) apiKey = bodyData.apiKey;
+        if (isSuper && bodyData.baseUrl) baseUrl = bodyData.baseUrl;
         if (!apiKey) return c.json(500, { error: "AI belum dikonfigurasi di server" });
 
         let modelsUrl = baseUrl.replace(/\/$/, "");
@@ -171,3 +181,7 @@ routerAdd("OPTIONS", "/api/ai-proxy-models", (c) => {
     try { c.setResponseHeader("Access-Control-Allow-Headers", "Content-Type, X-Token, Authorization"); } catch (e) {}
     return c.noContent(204);
 });
+
+
+
+

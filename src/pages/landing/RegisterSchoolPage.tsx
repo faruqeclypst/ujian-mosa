@@ -569,7 +569,7 @@ const RegisterSchoolPage = () => {
                             >
                               {d.badge && (
                                 <span className={cn(
-                                  "text-[8px] font-black uppercase tracking-wider mb-1 px-1.5 py-0.2 rounded",
+                                  "text-[8px] font-black uppercase tracking-wider mb-1 px-1.5 py-0.5 rounded",
                                   d.mode === "1 Tahun"
                                     ? "bg-blue-100 text-blue-700"
                                     : d.mode === "6 Bulan"
@@ -644,7 +644,7 @@ const RegisterSchoolPage = () => {
                                 <span>{m} Bulan</span>
                                 {m === 6 && (
                                   <span className={cn(
-                                    "text-[9px] px-1 py-0.2 rounded font-extrabold",
+                                    "text-[9px] px-1 py-0.5 rounded font-extrabold",
                                     customMonths === m ? "bg-white/20 text-white" : "bg-emerald-100 text-emerald-800"
                                   )}>
                                     Hemat
@@ -790,10 +790,10 @@ const RegisterSchoolPage = () => {
                       </div>
                       <div className="flex-1 bg-white/10 rounded-xl h-9 flex items-center px-3 gap-2 border border-white/10 overflow-hidden">
                         <ShieldCheck size={13} className="text-emerald-400 shrink-0" />
-                        <div className="flex items-center text-xs font-mono overflow-hidden min-w-0">
-                          <span className="text-white/40">https://</span>
-                          <span className="text-emerald-400 font-bold">{form.slug_request || "subdomain"}</span>
-                          <span className="text-white/60">{getDomainSuffix()}</span>
+                        <div className="flex items-center text-xs font-mono overflow-hidden min-w-0 w-full">
+                          <span className="text-white/40 shrink-0">https://</span>
+                          <span className="text-emerald-400 font-bold truncate min-w-0">{form.slug_request || "subdomain"}</span>
+                          <span className="text-white/60 shrink-0">{getDomainSuffix()}</span>
                         </div>
                       </div>
                     </div>

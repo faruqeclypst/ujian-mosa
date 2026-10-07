@@ -175,12 +175,16 @@ onRecordCreateRequest((e) => {
             questions.forEach((q) => {
                 const rawField = q.getString("field") || q.getString("type") || "multiple_choice";
                 const t = TYPE_MAP[rawField] || "pilihan_ganda";
-                if (t === "isian_singkat" || t === "uraian") { essayTotal++; return; }
+                if (t === "uraian") { essayTotal++; return; }
                 objectiveTotal++;
                 const studentAns = answers[q.id];
                 if (studentAns === undefined || studentAns === null || studentAns === "") return;
                 const options = pj(q.get("options"), {});
-                if (t === "pilihan_ganda") {
+                if (t === "isian_singkat") {
+                    const expected = String(q.getString("answerKey") || q.getString("correctAnswer") || "").trim().toLowerCase();
+                    const given = String(studentAns).trim().toLowerCase();
+                    if (expected && given === expected) objectiveCorrect++;
+                } else if (t === "pilihan_ganda") {
                     if (options[studentAns] && options[studentAns].isCorrect === true) objectiveCorrect++;
                 } else if (t === "benar_salah") {
                     if (options.statements && Array.isArray(options.statements)) {
@@ -309,12 +313,16 @@ onRecordUpdateRequest((e) => {
             questions.forEach((q) => {
                 const rawField = q.getString("field") || q.getString("type") || "multiple_choice";
                 const t = TYPE_MAP[rawField] || "pilihan_ganda";
-                if (t === "isian_singkat" || t === "uraian") { essayTotal++; return; }
+                if (t === "uraian") { essayTotal++; return; }
                 objectiveTotal++;
                 const studentAns = answers[q.id];
                 if (studentAns === undefined || studentAns === null || studentAns === "") return;
                 const options = pj(q.get("options"), {});
-                if (t === "pilihan_ganda") {
+                if (t === "isian_singkat") {
+                    const expected = String(q.getString("answerKey") || q.getString("correctAnswer") || "").trim().toLowerCase();
+                    const given = String(studentAns).trim().toLowerCase();
+                    if (expected && given === expected) objectiveCorrect++;
+                } else if (t === "pilihan_ganda") {
                     if (options[studentAns] && options[studentAns].isCorrect === true) objectiveCorrect++;
                 } else if (t === "benar_salah") {
                     if (options.statements && Array.isArray(options.statements)) {

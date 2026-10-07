@@ -1,97 +1,10 @@
-/**
- * invoicePdfHelper.ts
- * Generator Invoice Digital Resmi EXAMKU (Format Cetak / Simpan PDF)
- * Didesain khusus untuk keperluan akuntansi sekolah, pelaporan SPJ, dan dana BOS.
- */
+import os
 
-export function terbilang(nominal: number): string {
-  const n = Math.floor(Math.abs(nominal));
-  if (n === 0) return "Nol Rupiah";
+filepath = r"d:\PROJECT\ujian\src\utils\invoicePdfHelper.ts"
+with open(filepath, "r", encoding="utf-8") as f:
+    content = f.read()
 
-  const angka = [
-    "",
-    "Satu",
-    "Dua",
-    "Tiga",
-    "Empat",
-    "Lima",
-    "Enam",
-    "Tujuh",
-    "Delapan",
-    "Sembilan",
-    "Sepuluh",
-    "Sebelas",
-  ];
-
-  function toWords(num: number): string {
-    if (num < 12) return angka[num];
-    if (num < 20) return `${toWords(num - 10)} Belas`;
-    if (num < 100) return `${toWords(Math.floor(num / 10))} Puluh ${toWords(num % 10)}`.trim();
-    if (num < 200) return `Seratus ${toWords(num - 100)}`.trim();
-    if (num < 1000) return `${toWords(Math.floor(num / 100))} Ratus ${toWords(num % 100)}`.trim();
-    if (num < 2000) return `Seribu ${toWords(num - 1000)}`.trim();
-    if (num < 1000000) return `${toWords(Math.floor(num / 1000))} Ribu ${toWords(num % 1000)}`.trim();
-    if (num < 1000000000) return `${toWords(Math.floor(num / 1000000))} Juta ${toWords(num % 1000000)}`.trim();
-    if (num < 1000000000000) return `${toWords(Math.floor(num / 1000000000))} Miliar ${toWords(num % 1000000000)}`.trim();
-    return `${toWords(Math.floor(num / 1000000000000))} Triliun ${toWords(num % 1000000000000)}`.trim();
-  }
-
-  const result = toWords(n);
-  return `${result} Rupiah`;
-}
-
-export interface InvoiceData {
-  id: string;
-  invoice_number: string;
-  school_id?: string;
-  school_name: string;
-  school_slug: string;
-  contact_email?: string;
-  plan: string;
-  plan_label?: string;
-  duration_months: number;
-  period_label?: string;
-  amount: number;
-  status: "paid" | "unpaid" | "overdue" | "cancelled";
-  due_date: string;
-  paid_date?: string;
-  notes?: string;
-  created: string;
-  updated?: string;
-}
-
-export interface SchoolMeta {
-  name?: string;
-  slug?: string;
-  contact_email?: string;
-  student_quota?: number;
-  plan?: string;
-  custom_domain?: string;
-}
-
-const formatRupiah = (n: number): string =>
-  new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
-
-const formatDateIndo = (iso?: string): string => {
-  if (!iso) return "-";
-  return new Date(iso).toLocaleDateString("id-ID", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
-};
-
-export function printDigitalInvoice(inv: InvoiceData, school?: SchoolMeta | null) {
-  const isPaid = inv.status === "paid";
-  const createdDate = formatDateIndo(inv.created || new Date().toISOString());
-  const dueDate = formatDateIndo(inv.due_date);
-  const paidDate = inv.paid_date ? formatDateIndo(inv.paid_date) : "-";
-  const terbilangText = terbilang(inv.amount);
-  const quotaText = school?.student_quota ? `${school.student_quota} Siswa` : "Kuota Terdaftar";
-  const planLabel = inv.plan_label || (inv.plan ? inv.plan.toUpperCase() : "STANDARD");
-  const schoolDomain = school?.custom_domain || `${inv.school_slug}.examku.my.id`;
-
-    const html = `
+new_html = r"""  const html = `
     <!DOCTYPE html>
     <html lang="id">
     <head>
@@ -152,10 +65,17 @@ export function printDigitalInvoice(inv: InvoiceData, school?: SchoolMeta | null
           gap: 12px;
         }
         .logo-box {
+          width: 48px;
           height: 48px;
-          width: auto;
-          max-width: 160px;
-          object-fit: contain;
+          background: linear-gradient(135deg, #0284c7 0%, #1e40af 100%);
+          border-radius: 12px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: #ffffff;
+          font-weight: 800;
+          font-size: 22px;
+          letter-spacing: -1px;
         }
         .company-info h1 {
           font-size: 20px;
@@ -393,7 +313,7 @@ export function printDigitalInvoice(inv: InvoiceData, school?: SchoolMeta | null
 
         <div class="header">
           <div class="brand-section">
-            <img class="logo-box" src="https://examku.my.id/logo-default.png" alt="EXAMKU Logo" />
+            <div class="logo-box">EX</div>
             <div class="company-info">
               <h1>EXAMKU CBT</h1>
               <p>Platform Ujian & Evaluasi Akademik Sekolah Terdistribusi</p>
@@ -517,14 +437,15 @@ export function printDigitalInvoice(inv: InvoiceData, school?: SchoolMeta | null
       </div>
     </body>
     </html>
-  `;
-  const win = window.open("", "_blank");
-  if (!win) {
-    alert("Popup browser diblokir. Izinkan popup untuk mencetak / menyimpan invoice PDF.");
-    return;
-  }
-  win.document.write(html);
-  win.document.close();
-  win.focus();
-  setTimeout(() => win.print(), 500);
-}
+  `;"""
+
+idx_start = content.find("const html = `")
+idx_end = content.find("const win = window.open", idx_start)
+
+if idx_start != -1 and idx_end != -1:
+    content = content[:idx_start] + new_html + "\n  " + content[idx_end:]
+    with open(filepath, "w", encoding="utf-8") as f:
+        f.write(content)
+    print("Updated invoicePdfHelper.ts")
+else:
+    print("Could not find replacement boundaries")

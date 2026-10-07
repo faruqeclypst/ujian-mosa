@@ -128,13 +128,14 @@ export const BankAccountsSettings = () => {
               </div>
             ) : (
               <>
-                <div className="w-14 h-12 rounded-xl bg-white border border-slate-200 flex items-center justify-center shrink-0 p-1.5 overflow-hidden text-center shadow-sm relative">
-                  {POPULAR_BANKS.find(b => b.code === bank.bank_code) && bank.bank_code !== "OTHER" ? (
-                     <img src={POPULAR_BANKS.find(b => b.code === bank.bank_code)?.logo} alt={bank.bank_name} className="relative z-10 max-h-full max-w-full object-contain bg-white" onError={e => e.currentTarget.style.display = 'none'} />
-                     <span className="absolute inset-0 flex items-center justify-center text-[10px] font-black text-slate-400 uppercase leading-none">{bank.bank_name.substring(0,4)}</span>
-                  ) : (
-                     <span className="text-[10px] font-black text-slate-400 uppercase leading-none">{bank.bank_name.substring(0,4)}</span>
-                  )}
+                <div className="w-14 h-12 rounded-xl bg-white border border-slate-200 flex items-center justify-center shrink-0 p-1.5 overflow-hidden text-center shadow-sm">
+                  {(() => {
+                    const popular = bank.bank_code !== "OTHER" ? POPULAR_BANKS.find(b => b.code === bank.bank_code) : null;
+                    if (popular) {
+                      return <img src={popular.logo} alt={bank.bank_name} className="max-h-full max-w-full object-contain" onError={e => { e.currentTarget.style.display = 'none'; }} />;
+                    }
+                    return <span className="text-[10px] font-black text-slate-400 uppercase leading-tight text-center">{bank.bank_name.substring(0, 4)}</span>;
+                  })()}
                 </div>
                 <div className="flex-1">
                   <h3 className="font-bold text-slate-900 text-base">{bank.bank_name} <span className="font-mono text-blue-600 ml-2">{bank.account_number}</span></h3>

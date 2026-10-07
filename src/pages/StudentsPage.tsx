@@ -962,7 +962,7 @@ const StudentsPage = () => {
                 <Printer className="h-4 w-4" />
                 <span>Cetak Kartu Ujian</span>
                 {selectedIds.length > 0 && (
-                  <span className="ml-0.5 px-1.5 py-0.2 bg-black/20 rounded-full text-[10px]">
+                  <span className="ml-0.5 px-1.5 py-0.5 bg-black/20 rounded-full text-[10px]">
                     {selectedIds.length}
                   </span>
                 )}

@@ -445,7 +445,7 @@ const SettingsPage = () => {
             const proxyUrl = pb!.baseUrl + "/api/ai-proxy-models";
             const res = await fetch(proxyUrl, {
               method: "POST",
-              headers: { "Content-Type": "application/json" },
+              headers: { "Content-Type": "application/json", "Authorization": pb!.authStore.token },
               body: JSON.stringify({ baseUrl: modelsUrl, apiKey: aiGatewayKey })
             });
 
