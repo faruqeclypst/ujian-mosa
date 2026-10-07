@@ -30,7 +30,7 @@ interface AuthContextValue {
   signInWithUsername: (username: string, password: string) => Promise<void>;
   registerWithUsername: (username: string, password: string, displayName?: string) => Promise<void>;
   signOut: () => Promise<void>;
-  changePassword: (newPassword: string) => Promise<void>;
+  changePassword: (newPassword: string, oldPassword?: string) => Promise<void>;
   usernameFromEmail: (email?: string | null) => string;
   refreshUser: () => Promise<void>;
 }
@@ -126,19 +126,33 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     window.location.replace(`${window.location.origin}/admin`);
   }, [pb]);
 
-  const changePassword = useCallback(async (newPassword: string) => {
+  const changePassword = useCallback(async (newPassword: string, oldPassword?: string) => {
     if (!user) throw new Error("Tidak ada user yang aktif.");
     if (!pb) throw new Error("Koneksi ke sekolah belum tersedia.");
     try {
-      await pb.collection("users").update(user.id, {
+      const payload: any = {
         password: newPassword,
         passwordConfirm: newPassword,
         hasChangedPassword: true,
-      });
-      // Force logout setelah ganti password agar user login ulang dengan sesi bersih
-      await signOut();
+      };
+      if (oldPassword) {
+        payload.oldPassword = oldPassword;
+      }
+      await pb.collection("users").update(user.id, payload);
+      try {
+        await pb.collection("users").authRefresh();
+      } catch (e) {
+        console.warn("authRefresh after change password failed:", e);
+      }
+      setUser((prev) => (prev ? { ...prev, hasChangedPassword: true } : null));
     } catch (err: any) {
-      throw new Error("Gagal mengganti password: " + err.message);
+      let msg = err.message || "Gagal mengganti password.";
+      if (err.data?.oldPassword?.message) {
+        msg = `Password saat ini salah: ${err.data.oldPassword.message}`;
+      } else if (err.data?.password?.message) {
+        msg = `Password baru tidak valid: ${err.data.password.message}`;
+      }
+      throw new Error(msg);
     }
   }, [user, pb]);
 

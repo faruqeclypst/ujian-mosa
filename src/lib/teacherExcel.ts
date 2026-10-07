@@ -39,7 +39,7 @@ export function downloadTeacherImportTemplate(filename = "template-import-guru.x
   XLSX.writeFile(wb, filename);
 }
 
-export async function parseTeacherImportExcel(file: File): Promise<{ name: string; code?: string; subjects: string[] }[]> {
+export async function parseTeacherImportExcel(file: File): Promise<{ name: string; code?: string; username?: string; subjects: string[] }[]> {
   const buffer = await file.arrayBuffer();
   const wb = XLSX.read(buffer, { type: "array" });
   const ws = wb.Sheets[wb.SheetNames[0]];

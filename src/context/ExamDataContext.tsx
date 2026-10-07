@@ -358,23 +358,30 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
   const createTeacher = async (payload: TeacherPayload) => {
     const defaultPass = "12345678";
     
+    let safeUsername = (payload.username || "").trim().toLowerCase().replace(/[^a-z0-9_]/g, "");
+    if (safeUsername.length < 3) {
+      const codePart = (payload.code || "").trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+      safeUsername = codePart ? `guru_${codePart}` : `guru_${Math.floor(100 + Math.random() * 900)}`;
+    }
+    const cleanPayload = { ...payload, username: safeUsername };
+
     // 1. Create Teacher Data Record (including username)
-    const teacherRecord = await pb.collection("teachers").create(payload);
+    const teacherRecord = await pb.collection("teachers").create(cleanPayload);
     setTeachers(prev => prev.find(i => i.id === teacherRecord.id) ? prev : [teacherRecord as any, ...prev]);
     
     // 2. Create Auth User Record for the Teacher using the provided username
     try {
       await pb.collection("users").create({
-        username: payload.username,
+        username: safeUsername,
         password: defaultPass,
         passwordConfirm: defaultPass,
-        name: payload.name,
+        name: cleanPayload.name,
         role: "teacher",
         teacherId: teacherRecord.id,
         hasChangedPassword: false,
       });
     } catch (err) {
-      console.warn("User account might already exist or failed:", err);
+      console.warn("User account creation warning:", err);
     }
   };
   

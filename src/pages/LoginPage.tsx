@@ -23,7 +23,7 @@ const loginSchema = z.object({
 type LoginFormValues = z.infer<typeof loginSchema>;
 
 const LoginPage = () => {
-  const { signInWithUsername, user, changePassword } = useAuth();
+  const { signInWithUsername, user, changePassword, signOut } = useAuth();
   const { pb: tenantPb, school, setManualSchool } = useTenant();
   const { actualTheme, toggleTheme } = useTheme();
   const pb = tenantPb;
@@ -31,6 +31,8 @@ const LoginPage = () => {
   const [showPassword, setShowPassword] = useState(false);
 
   // For change password modal (Guru)
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [changePassError, setChangePassError] = useState("");
@@ -91,8 +93,15 @@ const LoginPage = () => {
     },
   });
 
+  useEffect(() => {
+    if (user && !user.hasChangedPassword && !currentPassword) {
+      setCurrentPassword("12345678");
+    }
+  }, [user, currentPassword]);
+
   const onSubmit = async (values: LoginFormValues) => {
     setFormError(null);
+    setCurrentPassword(values.password);
     try {
       await signInWithUsername(values.username, values.password);
     } catch (error: any) {
@@ -395,28 +404,50 @@ const LoginPage = () => {
             onSubmit={async (e) => {
               e.preventDefault();
               setChangePassError("");
+              if (!currentPassword) return setChangePassError("Password saat ini wajib diisi!");
               if (newPassword.length < 6) return setChangePassError("Password baru minimal 6 karakter!");
+              if (newPassword === currentPassword) return setChangePassError("Password baru tidak boleh sama dengan password saat ini!");
               if (newPassword !== confirmPassword) return setChangePassError("Konfirmasi password tidak cocok!");
 
               setIsChangingPass(true);
               try {
-                await changePassword(newPassword);
+                await changePassword(newPassword, currentPassword);
               } catch (err: any) {
                 setChangePassError(err.message || "Gagal mengubah password.");
               } finally {
                 setIsChangingPass(false);
               }
             }}
-            className="space-y-6"
+            className="space-y-4"
           >
             {changePassError && (
               <div className="bg-red-50 border border-red-100 text-red-600 text-sm px-4 py-3 rounded-2xl flex items-center gap-2">
-                <div className="w-1 h-1 rounded-full bg-red-500" />
-                {changePassError}
+                <div className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0" />
+                <span>{changePassError}</span>
               </div>
             )}
 
-            <div className="space-y-2">
+            <div className="space-y-1.5">
+              <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 ml-1">Password Saat Ini</label>
+              <div className="relative">
+                <Input
+                  type={showCurrentPassword ? "text" : "password"}
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  placeholder="Password saat ini (default: 12345678)"
+                  className="rounded-2xl h-11 bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-gray-700 pr-10 transition-all focus:ring-2 focus:ring-blue-500/20"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                >
+                  {showCurrentPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
               <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 ml-1">Password Baru</label>
               <div className="relative">
                 <Input
@@ -424,7 +455,7 @@ const LoginPage = () => {
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   placeholder="Minimal 6 karakter"
-                  className="rounded-2xl h-12 bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-gray-700 pr-10 transition-all focus:ring-2 focus:ring-blue-500/20"
+                  className="rounded-2xl h-11 bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-gray-700 pr-10 transition-all focus:ring-2 focus:ring-blue-500/20"
                 />
                 <button
                   type="button"
@@ -436,24 +467,33 @@ const LoginPage = () => {
               </div>
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 ml-1">Konfirmasi Password Baru</label>
               <Input
                 type={showNewPassword ? "text" : "password"}
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder="Ulangi password baru"
-                className="rounded-2xl h-12 bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-gray-700 transition-all focus:ring-2 focus:ring-blue-500/20"
+                className="rounded-2xl h-11 bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-gray-700 transition-all focus:ring-2 focus:ring-blue-500/20"
               />
             </div>
 
-            <div className="pt-2">
+            <div className="pt-2 flex flex-col sm:flex-row gap-2">
               <Button
-                type="submit"
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold h-12 rounded-2xl text-lg transition-all shadow-lg hover:shadow-blue-200 dark:hover:shadow-none"
+                type="button"
+                variant="outline"
+                onClick={() => signOut()}
+                className="w-full sm:w-1/3 rounded-2xl h-11 text-slate-600 dark:text-slate-300 font-medium"
                 disabled={isChangingPass}
               >
-                {isChangingPass ? "Menyimpan..." : "Simpan & Lanjutkan"}
+                Batal / Keluar
+              </Button>
+              <Button
+                type="submit"
+                className="w-full sm:w-2/3 bg-blue-600 hover:bg-blue-700 text-white font-bold h-11 rounded-2xl text-base transition-all shadow-lg hover:shadow-blue-200 dark:hover:shadow-none"
+                disabled={isChangingPass}
+              >
+                {isChangingPass ? "Menyimpan..." : "Simpan & Masuk"}
               </Button>
             </div>
           </form>

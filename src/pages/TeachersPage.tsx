@@ -158,7 +158,15 @@ const TeachersPage = () => {
           } else {
             // Re-create user account if missing (e.g. after data restore)
             const defaultPass = "12345678";
-            const username = teacher.username || teacher.code || teacher.name.toLowerCase().replace(/\s+/g, "_") + "_" + Math.floor(Math.random() * 1000);
+            let username = (teacher.username || "").trim().toLowerCase().replace(/[^a-z0-9_]/g, "");
+            if (!username || username.length < 3) {
+              const safeName = teacher.name.split(',')[0].trim().toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+              username = safeName;
+            }
+            if (!username || username.length < 3) {
+              const safeCode = (teacher.code || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+              username = safeCode ? `guru_${safeCode}` : `guru_${Math.floor(100 + Math.random() * 900)}`;
+            }
             
             await pb.collection("users").create({
               username: username,
@@ -169,8 +177,12 @@ const TeachersPage = () => {
               teacherId: teacherId,
               hasChangedPassword: false,
             });
+
+            if (!teacher.username || teacher.username !== username) {
+              await pb.collection("teachers").update(teacherId, { username });
+            }
             
-            showAlert("Berhasil Dipulihkan", `Akun login ${terminology.teacher.toLowerCase()} ${teacher.name} yang sempat hilang telah dibuat kembali dengan password default 12345678.`, "success");
+            showAlert("Berhasil Dipulihkan", `Akun login ${terminology.teacher.toLowerCase()} ${teacher.name} yang sempat hilang telah dibuat kembali dengan username "${username}" dan password default 12345678.`, "success");
           }
         } catch (error: any) {
           console.error("Gagal reset password", error);
@@ -185,8 +197,8 @@ const TeachersPage = () => {
 
   const handleSyncAllUsers = async () => {
     showAlert(
-      "Sinkronkan Semua Akun ${terminology.teacher}",
-      `Sistem akan memeriksa semua ${terminology.teacher.toLowerCase()} dan membuatkan akun login (users) bagi ${terminology.teacher.toLowerCase()} yang belum memilikinya. Username akan diambil dari kode ${terminology.teacher.toLowerCase()}/nama, dan password default adalah 12345678.`,
+      `Sinkronkan Semua Akun ${terminology.teacher}`,
+      `Sistem akan memeriksa semua ${terminology.teacher.toLowerCase()} dan membuatkan akun login (users) bagi ${terminology.teacher.toLowerCase()} yang belum memilikinya. Username akan dibuat minimal 3 karakter, dan password default adalah 12345678.`,
       "info",
       async () => {
         setBatchProgress({
@@ -210,7 +222,15 @@ const TeachersPage = () => {
               if (e.status === 404 && pb) {
                 // User missing, create it
                 const defaultPass = "12345678";
-                const username = teacher.username || teacher.code || teacher.name.toLowerCase().replace(/\s+/g, "_") + "_" + Math.floor(Math.random() * 1000);
+                let username = (teacher.username || "").trim().toLowerCase().replace(/[^a-z0-9_]/g, "");
+                if (!username || username.length < 3) {
+                  const safeName = teacher.name.split(',')[0].trim().toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+                  username = safeName;
+                }
+                if (!username || username.length < 3) {
+                  const safeCode = (teacher.code || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+                  username = safeCode ? `guru_${safeCode}` : `guru_${Math.floor(100 + Math.random() * 900)}`;
+                }
                 
                 await pb.collection("users").create({
                   username: username,
@@ -221,6 +241,10 @@ const TeachersPage = () => {
                   teacherId: teacher.id,
                   hasChangedPassword: false,
                 });
+
+                if (!teacher.username || teacher.username !== username) {
+                  await pb.collection("teachers").update(teacher.id, { username });
+                }
                 createdCount++;
               }
             }
@@ -270,10 +294,19 @@ const TeachersPage = () => {
             .toUpperCase()
             .replace(/[^A-Z]/g, '');
 
+          let finalUsername = row.username ? row.username.trim().toLowerCase().replace(/[^a-z0-9_]/g, '') : '';
+          if (!finalUsername || finalUsername.length < 3) {
+            finalUsername = generatedUsername;
+          }
+          if (!finalUsername || finalUsername.length < 3) {
+            const safeCode = (row.code || generatedCode || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+            finalUsername = safeCode ? `guru_${safeCode}` : `guru_${Math.floor(100 + Math.random() * 900)}`;
+          }
+
           await createTeacher({
             name: row.name,
             code: row.code || generatedCode,
-            username: row.code || generatedUsername || `guru_${Math.floor(Math.random() * 1000)}`,
+            username: finalUsername,
             subjects: row.subjects,
           });
           

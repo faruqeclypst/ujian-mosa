@@ -44,6 +44,20 @@ onBootstrap((e) => {
         } catch (errCol) {
             // Notice only
         }
+
+        try {
+            const usersCol = $app.findCollectionByNameOrId("users");
+            if (usersCol) {
+                const targetViewRule = 'id = @request.auth.id || @request.auth.role = "admin"';
+                if (usersCol.viewRule !== targetViewRule) {
+                    usersCol.viewRule = targetViewRule;
+                    $app.save(usersCol);
+                    console.log("[USER_SYNC] Ensured viewRule on users collection: " + targetViewRule);
+                }
+            }
+        } catch (errUser) {
+            // Notice only
+        }
     } catch (e) {
         console.warn("[STUDENT_SYNC] Bootstrap notice:", e);
     }
