@@ -1,11 +1,12 @@
 name = "r2-delete-worker"
-main = "r2-delete.js"
+main = "examku-worker.js"
 compatibility_date = "2024-01-01"
 workers_dev = true
 
-# R2 bucket binding for direct R2 API access
+# R2 bucket binding — unified worker (upload + delete + serve).
+# Nama worker dipertahankan agar VITE_R2_WORKER_URL tidak perlu diubah.
 [[r2_buckets]]
-binding = "INVENTORY_BUCKET"
+binding = "EXAMKU_BUCKET"
 bucket_name = "tu-mosa"
 
 # Environment variables (can be overridden via wrangler secrets)

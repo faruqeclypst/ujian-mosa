@@ -34,8 +34,10 @@ cd cloudflare-worker
 wrangler deploy
 ```
 
-✅ **DEPLOYED**: The worker is now deployed at:
+✅ **DEPLOYED**: The unified worker (`examku-worker.js`: upload + delete + file serve)
+is now deployed at:
 `https://r2-delete-worker.faruq-blogger.workers.dev`
+(nama worker dipertahankan agar `VITE_R2_WORKER_URL` tidak perlu diubah)
 
 ## Update Environment Variable
 
@@ -47,9 +49,10 @@ VITE_R2_WORKER_URL=https://r2-delete-worker.faruq-blogger.workers.dev
 
 ## Worker Status
 
-- ✅ **Worker Deployed**: r2-delete-worker
-- ✅ **R2 Binding**: INVENTORY_BUCKET → tu-mosa
+- ✅ **Worker Deployed**: r2-delete-worker (menjalankan `examku-worker.js`)
+- ✅ **R2 Binding**: EXAMKU_BUCKET → tu-mosa
 - ✅ **CORS Enabled**: Allows cross-origin requests
+- ✅ **Routes**: `POST /upload` (multipart FormData: `key`, `file`, `contentType`), `POST /` (JSON `{key}` untuk delete), `GET /<key>` (serve file)
 - ✅ **Error Handling**: Proper error responses and logging
 
 ## Usage
