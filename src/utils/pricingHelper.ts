@@ -99,7 +99,13 @@ export const normalizePlanKey = (raw?: string): PlanKey => {
 export const addBillingPeriod = (from: Date, months: number): Date => {
   const m = Math.max(1, Math.round(Number(months) || 1));
   const d = new Date(from);
+  const day = d.getDate();
   d.setMonth(d.getMonth() + m);
+  // Jepit ke akhir bulan bila tanggal asal tak ada di bulan tujuan
+  // (mis. 31 Jan + 1 bulan -> 28/29 Feb, bukan 2/3 Mar) — standar SaaS.
+  if (d.getDate() < day) {
+    d.setDate(0);
+  }
   return d;
 };
 
