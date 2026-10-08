@@ -3,7 +3,8 @@ import {
   FileText, Upload, Eye, Printer, CheckCircle2, Clock,
   AlertTriangle, XCircle, Paperclip, ExternalLink, Trash2,
   RefreshCw, X, CreditCard, TrendingUp, QrCode, Sparkles,
-  Send, Building2, Calendar, ShieldCheck, MessageCircle
+  Send, Building2, Calendar, ShieldCheck, MessageCircle,
+  Copy, Check, ChevronRight, Info
 } from "lucide-react";
 import { Landmark } from "lucide-react";
 import { useTenant } from "../../context/TenantContext";
@@ -119,6 +120,7 @@ const SchoolInvoicePage = () => {
   const [detailInvoice, setDetailInvoice] = useState<Invoice | null>(null);
   const [uploadingProof, setUploadingProof] = useState(false);
   const [proofView, setProofView] = useState<Invoice | null>(null);
+  const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
   const [payingInvoiceId, setPayingInvoiceId] = useState<string | null>(null);
   const [paymentNotice, setPaymentNotice] = useState<{ type: "success" | "cancelled"; message: string } | null>(null);
   const [paymentSession, setPaymentSession] = useState<{
@@ -394,522 +396,569 @@ const SchoolInvoicePage = () => {
   ];
 
   return (
-    <div className="space-y-5">
-      {/* ── Page Header ─────────────────────────────────────────── */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between bg-card p-4 rounded-2xl border border-slate-200/60 dark:border-slate-800/40 shadow-sm">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-blue-600/10 dark:bg-blue-400/10 rounded-xl flex items-center justify-center flex-shrink-0 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/30">
-            <FileText size={20} />
-          </div>
-          <div>
-            <h2 className="text-base font-bold text-slate-900 dark:text-white">Tagihan & Langganan</h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              Kelola faktur resmi, pembayaran QRIS, dan permohonan perpanjangan layanan sekolah
-            </p>
-          </div>
+    <div className="mx-auto w-full max-w-3xl">
+      {/* ── Header ── */}
+      <div className="flex items-start justify-between gap-3 mb-6">
+        <div>
+          <h1 className="text-xl font-extrabold tracking-tight text-slate-900 dark:text-white">
+            Tagihan
+          </h1>
+          <p className="mt-1 text-[13px] leading-relaxed text-slate-500 dark:text-slate-400">
+            Faktur resmi, pembayaran QRIS &amp; transfer, dan perpanjangan layanan {school.name}.
+          </p>
         </div>
-        <div className="flex items-center gap-2 self-start sm:self-auto">
+        <div className="flex items-center gap-2 shrink-0">
           <button
-            onClick={() => {
-              setRenewalSubmitted(false);
-              setShowRenewalModal(true);
-            }}
-            className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition shadow-sm"
-            title="Minta pengajuan perpanjangan layanan ke Admin"
-          >
-            <Sparkles size={13} />
-            <span>Minta Perpanjangan</span>
-          </button>
-          <button
+            type="button"
             onClick={loadInvoices}
             disabled={loading}
-            className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 border border-slate-200/60 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 transition disabled:opacity-50 shadow-sm"
+            title="Muat ulang"
+            aria-label="Muat ulang"
+            className="w-10 h-10 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 flex items-center justify-center transition disabled:opacity-50"
           >
-            <RefreshCw size={13} className={loading ? "animate-spin" : ""} />
-            <span>Refresh</span>
+            <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
+          </button>
+          <button
+            type="button"
+            onClick={() => { setRenewalSubmitted(false); setShowRenewalModal(true); }}
+            className="h-10 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-[13px] font-bold transition flex items-center gap-1.5 shadow-sm"
+          >
+            <Sparkles size={14} />
+            <span className="hidden sm:inline">Minta Perpanjangan</span>
+            <span className="sm:hidden">Perpanjang</span>
           </button>
         </div>
       </div>
 
-      {/* ── Payment Result Notification ─────────────────────────── */}
+      {/* ── Notifikasi pembayaran ── */}
       {paymentNotice && (
         <div className={cn(
-          "rounded-2xl border p-4 flex items-center justify-between shadow-sm transition-all",
+          "mb-5 flex items-center gap-3 rounded-2xl border px-4 py-3",
           paymentNotice.type === "success"
-            ? "bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800 text-emerald-900 dark:text-emerald-200"
-            : "bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200"
+            ? "border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-200"
+            : "border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
         )}>
-          <div className="flex items-center gap-3">
-            {paymentNotice.type === "success" ? (
-              <CheckCircle2 size={18} className="text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
-            ) : (
-              <Clock size={18} className="text-slate-500 dark:text-slate-400 flex-shrink-0" />
-            )}
-            <p className="text-xs sm:text-sm font-semibold">{paymentNotice.message}</p>
-          </div>
+          {paymentNotice.type === "success"
+            ? <CheckCircle2 size={18} className="text-emerald-600 dark:text-emerald-400 shrink-0" />
+            : <Clock size={18} className="text-slate-400 shrink-0" />}
+          <p className="flex-1 text-[13px] font-medium leading-relaxed">{paymentNotice.message}</p>
           <button
+            type="button"
             onClick={() => setPaymentNotice(null)}
-            className="p-1 hover:bg-black/5 dark:hover:bg-white/10 rounded-lg transition"
             aria-label="Tutup notifikasi"
+            className="p-1.5 rounded-lg text-slate-400 hover:bg-black/5 dark:hover:bg-white/10 transition"
           >
             <X size={14} />
           </button>
         </div>
       )}
 
-      {/* ── Pending Verification Banner ── */}
+      {/* ══ TAGIHAN AKTIF ══ */}
       {activePendingInvoice ? (
-        <div className="bg-gradient-to-r from-blue-600/10 via-blue-600/5 to-indigo-600/10 border border-blue-200 dark:border-blue-900/50 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xs">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <Clock size={16} className="text-blue-600 dark:text-blue-400" />
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                Menunggu Verifikasi ({activePendingInvoice.invoice_number})
-              </h3>
-            </div>
-            <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed max-w-xl">
-              Bukti transfer sebesar <strong>{formatRupiah(activePendingInvoice.amount)}</strong> sudah terkirim dan sedang diverifikasi SuperAdmin. Layanan aktif otomatis setelah pembayaran disetujui.
+        <section className="mb-6 overflow-hidden rounded-3xl border border-blue-200 dark:border-blue-900/50 bg-white dark:bg-slate-900 shadow-sm">
+          <div className="flex items-center justify-between gap-3 bg-blue-600 px-5 py-3.5">
+            <span className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-white">
+              <Clock size={13} /> Menunggu verifikasi
+            </span>
+            <span className="font-mono text-[11px] font-bold text-blue-100">{activePendingInvoice.invoice_number}</span>
+          </div>
+          <div className="p-5 sm:p-6">
+            <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Nominal yang ditransfer</p>
+            <p className="mt-1 text-4xl font-black tracking-tight tabular-nums text-slate-900 dark:text-white">
+              {formatRupiah(activePendingInvoice.amount)}
             </p>
-          </div>
-          <button
-            onClick={() => setProofView(activePendingInvoice)}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition shadow-xs flex items-center gap-1.5 shrink-0"
-          >
-            <Eye size={13} />
-            <span>Lihat Bukti</span>
-          </button>
-        </div>
-      ) : activeUnpaidInvoice ? (
-        <div className="bg-gradient-to-r from-blue-600/10 via-blue-600/5 to-indigo-600/10 border border-blue-200 dark:border-blue-900/50 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xs">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <Sparkles size={16} className="text-blue-600 dark:text-blue-400" />
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                Tagihan Perpanjangan Resmi Siap Dibayar ({activeUnpaidInvoice.invoice_number})
-              </h3>
-            </div>
-            <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed max-w-xl">
-              SuperAdmin telah menerbitkan invoice perpanjangan untuk sekolah Anda sebesar <strong>{formatRupiah(activeUnpaidInvoice.amount)}</strong>. Silakan bayar via QRIS atau transfer manual untuk mengaktifkan masa berlaku baru.
-              </p>
-              {banks.length > 0 && (
-                <div className="mt-3 p-3 bg-white/60 dark:bg-slate-900/40 rounded-xl border border-blue-100 dark:border-blue-900/30 text-xs">
-                  <p className="font-bold text-slate-700 dark:text-slate-300 mb-2 flex items-center gap-1.5"><Landmark size={14}/> Opsi Transfer Manual:</p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {banks.map((b, i) => {
-                      const logo = POPULAR_BANKS.find(p => p.code === b.bank_code)?.logo;
-                      return (
-                        <div key={i} className="flex items-center gap-2 p-2 bg-white dark:bg-slate-800 rounded-lg border border-slate-100 dark:border-slate-700">
-                          <div className="w-10 h-8 flex items-center justify-center shrink-0 bg-white rounded p-1 border border-slate-100 overflow-hidden text-center relative">
-                            {logo && b.bank_code !== "OTHER" ? (
-                              <>
-                                <img src={logo} alt={b.bank_name} className="relative z-10 max-h-full max-w-full object-contain bg-white" onError={e => e.currentTarget.style.display = 'none'} />
-                                <span className="absolute inset-0 flex items-center justify-center text-[9px] font-black text-slate-400 uppercase leading-none">{b.bank_name.substring(0,3)}</span>
-                              </>
-                            ) : <span className="text-[9px] font-black text-slate-400 uppercase leading-none">{b.bank_name.substring(0,3)}</span>}
-                          </div>
-                          <div className="flex flex-col gap-0.5">
-                            <span className="font-bold text-slate-800 dark:text-slate-200 text-[11px]">{b.bank_name} - <span className="font-mono text-blue-700 dark:text-blue-400">{b.account_number}</span></span>
-                            <span className="text-[9px] text-slate-500 font-medium">a.n. {b.account_name}</span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  <p className="mt-2 text-[10px] text-slate-500 italic">* Setelah transfer, silakan klik tombol Upload di tabel Riwayat Transaksi di bawah.</p>
-                </div>
-              )}
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => printDigitalInvoice(activeUnpaidInvoice, school)}
-              className="px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-semibold transition shadow-xs flex items-center gap-1.5"
-            >
-              <Printer size={13} />
-              <span>Invoice PDF</span>
-            </button>
-            <button
-              onClick={() => handlePayWithQris(activeUnpaidInvoice)}
-              disabled={payingInvoiceId === activeUnpaidInvoice.id}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition shadow-xs flex items-center gap-2 flex-shrink-0 disabled:opacity-50"
-            >
-              <QrCode size={14} className={payingInvoiceId === activeUnpaidInvoice.id ? "animate-spin" : ""} />
-              <span>Bayar QRIS</span>
-            </button>
-          </div>
-        </div>
-      ) : (school && (school.plan === "free" || (daysLeftActive !== null && daysLeftActive <= 30))) ? (
-        <div className={cn(
-          "rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xs border",
-          daysLeftActive !== null && daysLeftActive <= 3 && school.plan !== "free"
-            ? "bg-gradient-to-r from-red-500/10 via-red-500/5 to-amber-500/10 border-red-200 dark:border-red-900/50"
-            : "bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-blue-500/10 border-amber-200 dark:border-amber-900/50"
-        )}>
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <Sparkles size={16} className={daysLeftActive !== null && daysLeftActive <= 3 && school.plan !== "free" ? "text-red-600 dark:text-red-400" : "text-amber-600 dark:text-amber-400"} />
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                {school.plan === "free"
-                  ? "Sekolah Menggunakan Akun Free Trial (50 Siswa)"
-                  : daysLeftActive !== null && daysLeftActive <= 1
-                    ? `Masa Aktif Berakhir ${daysLeftActive <= 0 ? "Hari Ini" : "Besok"} — Segera Perpanjang!`
-                    : daysLeftActive !== null && daysLeftActive <= 3
-                      ? `Masa Aktif Tersisa ${daysLeftActive} Hari — Segera Perpanjang!`
-                      : daysLeftActive !== null && daysLeftActive <= 7
-                        ? `Masa Aktif Tersisa ${daysLeftActive} Hari`
-                        : "Masa Aktif Layanan Segera Berakhir"}
-              </h3>
-            </div>
-            <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed max-w-xl">
-              {school.plan === "free"
-                ? "Untuk meng-upgrade ke kuota siswa penuh dan membuka fitur CBT tanpa batas, silakan kirim permohonan ke Tim Admin."
-                : daysLeftActive !== null && daysLeftActive <= 3
-                  ? `Layanan akan berhenti total pada ${formatDate(school.active_until || "")}. Jika belum diperpanjang, data sekolah otomatis dipindahkan ke server utama agar aman — segera hubungi Admin untuk perpanjangan.`
-                  : "Untuk menjaga kesinambungan ujian online dan sinkronisasi data tanpa jeda, silakan minta perpanjangan paket layanan ke Admin."}
+            <p className="mt-1.5 text-[13px] text-slate-500 dark:text-slate-400">
+              {PLAN_PRICES[activePendingInvoice.plan]?.label || activePendingInvoice.plan} ·{" "}
+              {isTopupInvoice(activePendingInvoice) ? "top-up kuota" : `${activePendingInvoice.duration_months} bulan`}
             </p>
-          </div>
-          <button
-            onClick={() => {
-              setRenewalSubmitted(false);
-              setShowRenewalModal(true);
-            }}
-            className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition shadow-xs flex items-center gap-2 flex-shrink-0"
-          >
-            <Sparkles size={14} />
-            <span>Minta Perpanjangan ke Admin</span>
-          </button>
-        </div>
-      ) : null}
 
-      {/* ── Stat Cards ──────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <button
+              type="button"
+              onClick={() => setProofView(activePendingInvoice)}
+              title="Ketuk untuk memperbesar"
+              className="mt-5 block w-full overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60"
+            >
+              {isImageProof(getProofUrl(activePendingInvoice)) ? (
+                <img src={getProofUrl(activePendingInvoice)} alt="Bukti transfer" className="w-full max-h-60 object-contain" />
+              ) : (
+                <span className="flex items-center gap-3 p-4">
+                  <FileText size={28} className="text-blue-500 shrink-0" />
+                  <span className="text-[13px] font-bold text-slate-700 dark:text-slate-200">Dokumen PDF, ketuk untuk melihat</span>
+                </span>
+              )}
+            </button>
+
+            <div className="mt-4 flex flex-col sm:flex-row gap-2">
+              <button
+                type="button"
+                onClick={() => setProofView(activePendingInvoice)}
+                className="flex-1 inline-flex items-center justify-center gap-1.5 h-11 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold transition"
+              >
+                <Eye size={15} /> Lihat Bukti
+              </button>
+              <label className="flex-1 inline-flex items-center justify-center gap-1.5 h-11 px-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 text-sm font-bold hover:bg-slate-50 dark:hover:bg-slate-800 transition cursor-pointer">
+                <Upload size={15} />
+                {uploadingProof ? "Mengunggah..." : "Upload Ulang"}
+                <input
+                  type="file"
+                  accept="image/*,.pdf"
+                  className="hidden"
+                  disabled={uploadingProof}
+                  onChange={e => { const f = e.target.files?.[0]; if (f) handleProofUpload(activePendingInvoice.id, f); e.target.value = ""; }}
+                />
+              </label>
+            </div>
+            <p className="mt-3 flex items-start gap-1.5 text-xs leading-relaxed text-slate-400">
+              <Info size={13} className="shrink-0 mt-0.5" />
+              Bukti transfer sudah terkirim dan sedang diverifikasi SuperAdmin. Layanan aktif otomatis setelah disetujui.
+            </p>
+          </div>
+        </section>
+      ) : activeUnpaidInvoice ? (
+        <section className="mb-6 overflow-hidden rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
+          <div className="flex items-center justify-between gap-3 bg-slate-900 dark:bg-blue-700 px-5 py-3.5">
+            <span className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-white">
+              <span className="w-2 h-2 rounded-full bg-amber-400" /> Tagihan aktif
+            </span>
+            <span className="font-mono text-[11px] font-bold text-slate-300 dark:text-blue-100">{activeUnpaidInvoice.invoice_number}</span>
+          </div>
+          <div className="p-5 sm:p-6">
+            <div className="flex items-end justify-between gap-3 flex-wrap">
+              <div>
+                <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Total tagihan</p>
+                <p className="mt-1 text-4xl font-black tracking-tight tabular-nums text-slate-900 dark:text-white">
+                  {formatRupiah(activeUnpaidInvoice.amount)}
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-[13px] font-bold text-slate-800 dark:text-slate-100">
+                  {PLAN_PRICES[activeUnpaidInvoice.plan]?.label || activeUnpaidInvoice.plan}
+                </p>
+                <p className="text-[11px] text-slate-400">
+                  {isTopupInvoice(activeUnpaidInvoice) ? "Top-up kuota" : `${activeUnpaidInvoice.duration_months} bulan`} · jatuh tempo {formatDate(activeUnpaidInvoice.due_date)}
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-5 grid sm:grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => handlePayWithQris(activeUnpaidInvoice)}
+                disabled={payingInvoiceId === activeUnpaidInvoice.id}
+                className="inline-flex items-center justify-center gap-1.5 h-12 px-4 rounded-2xl bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white text-sm font-bold transition shadow-sm"
+              >
+                <QrCode size={16} className={payingInvoiceId === activeUnpaidInvoice.id ? "animate-spin" : ""} />
+                {payingInvoiceId === activeUnpaidInvoice.id ? "Memproses..." : "Bayar via QRIS"}
+              </button>
+              {!activeUnpaidInvoice.payment_proof && (
+                <label className="inline-flex items-center justify-center gap-1.5 h-12 px-4 rounded-2xl border-2 border-dashed border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 text-sm font-bold hover:border-blue-400 hover:text-blue-600 dark:hover:text-blue-400 transition cursor-pointer">
+                  <Upload size={16} />
+                  {uploadingProof ? "Mengunggah..." : "Upload Bukti Transfer"}
+                  <input
+                    type="file"
+                    accept="image/*,.pdf"
+                    className="hidden"
+                    disabled={uploadingProof}
+                    onChange={e => { const f = e.target.files?.[0]; if (f) handleProofUpload(activeUnpaidInvoice.id, f); e.target.value = ""; }}
+                  />
+                </label>
+              )}
+            </div>
+
+            {banks.length > 0 && (
+              <div className="mt-5 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/70 dark:border-slate-700/60 p-4">
+                <p className="flex items-center gap-1.5 text-xs font-bold text-slate-700 dark:text-slate-200 mb-3">
+                  <Landmark size={14} className="text-slate-400" /> Transfer manual ke rekening:
+                </p>
+                <div className="space-y-2">
+                  {banks.map((b, i) => (
+                    <div key={i} className="flex items-center justify-between gap-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/70 dark:border-slate-700 px-3.5 py-3">
+                      <div className="min-w-0">
+                        <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 truncate">{b.bank_name} <span className="font-normal">a.n. {b.account_name}</span></p>
+                        <p className="font-mono text-base font-extrabold tabular-nums tracking-wide text-slate-900 dark:text-white">{b.account_number}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard?.writeText(b.account_number).catch(() => {});
+                          setCopiedIdx(i);
+                          window.setTimeout(() => setCopiedIdx(null), 1500);
+                        }}
+                        className={cn(
+                          "inline-flex items-center gap-1 px-3 h-9 rounded-lg text-xs font-bold transition shrink-0",
+                          copiedIdx === i
+                            ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300"
+                            : "bg-slate-100 hover:bg-slate-200 text-slate-600 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300"
+                        )}
+                      >
+                        {copiedIdx === i ? <Check size={13} /> : <Copy size={13} />}
+                        {copiedIdx === i ? "Tersalin" : "Salin"}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setDetailInvoice(activeUnpaidInvoice)}
+              className="mt-4 text-[13px] font-bold text-blue-600 dark:text-blue-400 hover:underline"
+            >
+              Lihat rincian tagihan
+            </button>
+          </div>
+        </section>
+      ) : (
+        <section className="mb-6 rounded-3xl border border-emerald-200 dark:border-emerald-900/50 bg-emerald-50/60 dark:bg-emerald-950/20 p-6 sm:p-8 text-center">
+          <div className="w-12 h-12 mx-auto rounded-2xl bg-emerald-600/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+            <CheckCircle2 size={26} />
+          </div>
+          <h2 className="mt-3 text-base font-extrabold text-slate-900 dark:text-white">Semua tagihan lunas</h2>
+          <p className="mt-1 text-[13px] text-slate-500 dark:text-slate-400">Tidak ada tagihan aktif saat ini. Riwayat pembayaran ada di bawah.</p>
+        </section>
+      )}
+
+      {/* ── Pengingat masa aktif ── */}
+      {!activePendingInvoice && !activeUnpaidInvoice && school && (school.plan === "free" || (daysLeftActive !== null && daysLeftActive <= 30)) && (
+        <div className={cn(
+          "mb-6 flex items-start gap-3 rounded-2xl border p-4",
+          daysLeftActive !== null && daysLeftActive <= 3 && school.plan !== "free"
+            ? "border-red-200 bg-red-50/70 dark:border-red-900/50 dark:bg-red-950/20"
+            : "border-amber-200 bg-amber-50/70 dark:border-amber-900/50 dark:bg-amber-950/20"
+        )}>
+          <Sparkles size={16} className={cn("mt-0.5 shrink-0", daysLeftActive !== null && daysLeftActive <= 3 && school.plan !== "free" ? "text-red-500" : "text-amber-500")} />
+          <div className="flex-1 min-w-0">
+            <p className="text-[13px] font-bold text-slate-900 dark:text-white">
+              {school.plan === "free"
+                ? "Akun Free Trial (50 siswa)"
+                : daysLeftActive !== null && daysLeftActive <= 1
+                  ? `Masa aktif berakhir ${daysLeftActive <= 0 ? "hari ini" : "besok"}`
+                  : daysLeftActive !== null && daysLeftActive <= 7
+                    ? `Sisa ${daysLeftActive} hari masa aktif`
+                    : "Masa aktif segera berakhir"}
+            </p>
+            <p className="mt-0.5 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+              {school.plan === "free"
+                ? "Upgrade ke paket berbayar untuk kuota penuh dan fitur CBT tanpa batas."
+                : "Perpanjang layanan agar ujian dan sinkronisasi data tidak terhenti."}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => { setRenewalSubmitted(false); setShowRenewalModal(true); }}
+            className="shrink-0 h-9 px-3.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition"
+          >
+            Perpanjang
+          </button>
+        </div>
+      )}
+
+      {/* ── Ringkasan ── */}
+      <div className="mb-6 grid grid-cols-3 gap-3">
         {stats.map((s) => {
           const Icon = s.icon;
           return (
-            <div
-              key={s.label}
-              className={cn(
-                "rounded-2xl border p-4 flex items-center gap-4 shadow-sm transition-colors",
-                s.highlight
-                  ? "bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800/60"
-                  : "bg-card border-slate-200/60 dark:border-slate-800/40"
-              )}
-            >
-              <div className={cn("w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 border", s.iconBg)}>
-                <Icon size={22} className={s.iconColor} />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">{s.label}</p>
-                <p className="text-lg font-black text-slate-900 dark:text-white tracking-tight mt-0.5 truncate">{s.value}</p>
-                <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">{s.note}</p>
-              </div>
+            <div key={s.label} className="rounded-2xl border border-slate-200/70 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 py-3.5">
+              <p className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-400">
+                <Icon size={13} className={s.iconColor} />
+                <span className="truncate">{s.label}</span>
+              </p>
+              <p className="mt-1 text-lg font-extrabold tabular-nums tracking-tight text-slate-900 dark:text-white truncate">{s.value}</p>
             </div>
           );
         })}
       </div>
 
-      {/* ── Invoices List ────────────────────────────────────────── */}
-      {loading ? (
-        <div className="bg-card rounded-2xl border border-slate-200/60 dark:border-slate-800/40 p-12 text-center shadow-sm">
-          <RefreshCw size={24} className="animate-spin mx-auto text-blue-600 dark:text-blue-400 mb-3" />
-          <p className="text-xs font-semibold text-slate-500">Memuat data tagihan resmi...</p>
-        </div>
-      ) : invoices.length === 0 ? (
-        <div className="bg-card rounded-2xl border border-slate-200/60 dark:border-slate-800/40 p-12 text-center shadow-sm space-y-3">
-          <div className="w-14 h-14 bg-slate-100 dark:bg-slate-800 rounded-2xl flex items-center justify-center mx-auto text-slate-400">
-            <FileText size={24} />
+      {/* ── Riwayat ── */}
+      <section className="mb-8">
+        <h2 className="mb-3 text-sm font-extrabold text-slate-900 dark:text-white">Riwayat Tagihan</h2>
+        {loading ? (
+          <div className="rounded-2xl border border-slate-200/70 dark:border-slate-800 bg-white dark:bg-slate-900 p-10 text-center">
+            <RefreshCw size={22} className="animate-spin mx-auto text-blue-600 mb-2" />
+            <p className="text-xs font-semibold text-slate-500">Memuat tagihan...</p>
           </div>
-          <div>
-            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200">Belum Ada Tagihan</h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto mt-1 leading-relaxed">
-              Belum ada riwayat tagihan yang diterbitkan untuk sekolah Anda. Klik tombol di bawah jika Anda ingin meminta invoice perpanjangan ke Admin.
-            </p>
+        ) : invoices.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 p-10 text-center">
+            <FileText size={28} className="mx-auto text-slate-300 dark:text-slate-600 mb-2" />
+            <p className="text-[13px] font-semibold text-slate-500">Belum ada tagihan.</p>
+            <p className="text-xs text-slate-400 mt-0.5">Faktur resmi dari SuperAdmin akan muncul di sini.</p>
           </div>
-          <button
-            onClick={() => {
-              setRenewalSubmitted(false);
-              setShowRenewalModal(true);
-            }}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition shadow-xs"
+        ) : (
+          <div className="overflow-hidden rounded-2xl border border-slate-200/70 dark:border-slate-800 bg-white dark:bg-slate-900 divide-y divide-slate-100 dark:divide-slate-800">
+            {invoices.map((inv) => {
+              const st = getInvoiceStatus(inv);
+              const cfg = STATUS_CONFIG[st] || STATUS_CONFIG.unpaid;
+              const RowIcon = cfg.icon;
+              return (
+                <button
+                  key={inv.id}
+                  type="button"
+                  onClick={() => setDetailInvoice(inv)}
+                  className="w-full flex items-center gap-3 px-4 py-3.5 text-left hover:bg-slate-50 dark:hover:bg-slate-800/60 transition"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="font-mono text-xs font-bold text-slate-700 dark:text-slate-200">{inv.invoice_number}</p>
+                    <p className="mt-0.5 text-[11px] text-slate-400 truncate">
+                      {PLAN_PRICES[inv.plan]?.label || inv.plan} · {isTopupInvoice(inv) ? "top-up kuota" : `${inv.duration_months} bulan`} · {inv.status === "paid" && inv.paid_date ? `lunas ${formatDate(inv.paid_date)}` : `tempo ${formatDate(inv.due_date)}`}
+                    </p>
+                  </div>
+                  <span className={cn("hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border shrink-0", cfg.color, cfg.bg, cfg.border)}>
+                    <RowIcon size={10} /> {cfg.label}
+                  </span>
+                  <p className="text-sm font-extrabold tabular-nums text-slate-900 dark:text-white shrink-0">{formatRupiah(inv.amount)}</p>
+                  <ChevronRight size={16} className="text-slate-300 dark:text-slate-600 shrink-0" />
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      {/* ── Modal Detail ── */}
+      {detailInvoice && (() => {
+        const effectiveStatus = getInvoiceStatus(detailInvoice);
+        const modalCfg = STATUS_CONFIG[effectiveStatus] || STATUS_CONFIG.unpaid;
+        const ModalStatusIcon = modalCfg.icon;
+        return (
+          <div
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/50 dark:bg-slate-950/70 p-0 sm:p-4"
+            onClick={() => setDetailInvoice(null)}
           >
-            <Sparkles size={13} />
-            <span>Minta Perpanjangan ke Admin</span>
-          </button>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {invoices.map((inv) => {
-            const effectiveStatus = getInvoiceStatus(inv);
-            const cfg = STATUS_CONFIG[effectiveStatus] || STATUS_CONFIG.unpaid;
-            const StatusIcon = cfg.icon;
-            const needsAction = effectiveStatus === "unpaid" || effectiveStatus === "overdue";
-            const hasProof = Boolean(inv.payment_proof);
-
-            return (
-              <div
-                key={inv.id}
-                className="bg-card border border-slate-200/60 dark:border-slate-800/40 rounded-2xl p-4 sm:p-5 shadow-sm hover:border-slate-300 dark:hover:border-slate-700 transition"
-              >
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  {/* Left info */}
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-mono text-xs font-bold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-md">
-                        {inv.invoice_number}
-                      </span>
-                      <span className={cn(
-                        "inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border",
-                        cfg.color, cfg.bg, cfg.border
-                      )}>
-                        <StatusIcon size={11} />
-                        {cfg.label}
-                      </span>
-                    </div>
-                    <p className="text-sm font-bold text-slate-900 dark:text-white">
-                      {PLAN_PRICES[inv.plan]?.label || inv.plan} Plan
-                      <span className="font-normal text-slate-500 dark:text-slate-400"> · {isTopupInvoice(inv) ? "top-up kuota" : `${inv.duration_months} bulan`}</span>
-                    </p>
-                    <p className="text-xs text-slate-400 dark:text-slate-500">
-                      {inv.status === "paid" && inv.paid_date
-                        ? `Dibayar ${formatDate(inv.paid_date)}`
-                        : `Jatuh tempo ${formatDate(inv.due_date)}`
-                      }
-                    </p>
-                  </div>
-
-                  {/* Amount + Actions */}
-                  <div className="flex items-center justify-between sm:flex-col sm:items-end gap-2">
-                    <p className="font-black text-base text-slate-900 dark:text-white">{formatRupiah(inv.amount)}</p>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <button
-                        onClick={() => setDetailInvoice(inv)}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 border border-slate-200/80 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition bg-white dark:bg-slate-900 shadow-sm"
-                      >
-                        <Eye size={12} />
-                        Detail
-                      </button>
-                      <button
-                        onClick={() => printDigitalInvoice(inv, school)}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 border border-slate-200/80 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition bg-white dark:bg-slate-900 shadow-sm"
-                        title="Cetak atau Simpan Invoice Digital (PDF)"
-                      >
-                        <Printer size={12} />
-                        Invoice PDF
-                      </button>
-                      {needsAction && (
-                        <>
-                          <button
-                            onClick={() => handlePayWithQris(inv)}
-                            disabled={payingInvoiceId === inv.id}
-                            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-xl transition shadow-sm"
-                          >
-                            <QrCode size={13} className={payingInvoiceId === inv.id ? "animate-spin" : ""} />
-                            {payingInvoiceId === inv.id ? "Memproses..." : "Bayar QRIS"}
-                          </button>
-                          {!hasProof && (
-                            <label className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-xl cursor-pointer transition shadow-sm border border-slate-200/60 dark:border-slate-700">
-                              <Upload size={12} />
-                              Upload
-                              <input
-                                type="file"
-                                accept="image/*,.pdf"
-                                className="hidden"
-                                onChange={e => {
-                                  const file = e.target.files?.[0];
-                                  if (file) handleProofUpload(inv.id, file);
-                                  e.target.value = "";
-                                }}
-                              />
-                            </label>
-                          )}
-                        </>
-                      )}
-                      {effectiveStatus === "pending" && (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() => setProofView(inv)}
-                            className="text-[11px] font-bold text-blue-700 dark:text-blue-300 hover:underline"
-                          >
-                            Lihat bukti terkirim
-                          </button>
-                          <label className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-xl cursor-pointer transition shadow-sm border border-slate-200/60 dark:border-slate-700">
-                            <Upload size={12} />
-                            {uploadingProof ? "Mengunggah..." : "Upload Ulang"}
-                            <input
-                              type="file"
-                              accept="image/*,.pdf"
-                              className="hidden"
-                              disabled={uploadingProof}
-                              onChange={e => {
-                                const file = e.target.files?.[0];
-                                if (file) handleProofUpload(inv.id, file);
-                                e.target.value = "";
-                              }}
-                            />
-                          </label>
-                        </>
-                      )}
-                    </div>
-                  </div>
+            <div
+              className="w-full max-w-lg max-h-[92vh] overflow-y-auto rounded-t-3xl sm:rounded-3xl bg-white dark:bg-slate-950 shadow-2xl"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between gap-3 px-5 pt-5 pb-4 border-b border-slate-100 dark:border-slate-800">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-mono text-[13px] font-bold text-slate-700 dark:text-slate-200">{detailInvoice.invoice_number}</span>
+                  <span className={cn("inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border", modalCfg.color, modalCfg.bg, modalCfg.border)}>
+                    <ModalStatusIcon size={10} /> {modalCfg.label}
+                  </span>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => setDetailInvoice(null)}
+                  aria-label="Tutup"
+                  className="p-2 rounded-xl text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+                >
+                  <X size={18} />
+                </button>
               </div>
-            );
-          })}
-        </div>
-      )}
 
-      {/* ── Modal Pengajuan Perpanjangan ke Admin ─────────────────── */}
+              <div className="p-5 space-y-4">
+                <dl className="rounded-2xl border border-slate-200/70 dark:border-slate-800 divide-y divide-slate-100 dark:divide-slate-800 overflow-hidden text-[13px]">
+                  <div className="flex justify-between gap-3 px-4 py-3">
+                    <dt className="text-slate-500">Layanan</dt>
+                    <dd className="font-bold text-slate-900 dark:text-white text-right">{PLAN_PRICES[detailInvoice.plan]?.label || detailInvoice.plan} Plan</dd>
+                  </div>
+                  <div className="flex justify-between gap-3 px-4 py-3">
+                    <dt className="text-slate-500">Durasi</dt>
+                    <dd className="font-bold text-slate-900 dark:text-white text-right">{isTopupInvoice(detailInvoice) ? "Top-up kuota" : `${detailInvoice.duration_months} bulan`}</dd>
+                  </div>
+                  <div className="flex justify-between gap-3 px-4 py-3">
+                    <dt className="text-slate-500">Jatuh tempo</dt>
+                    <dd className="font-bold text-slate-900 dark:text-white text-right">{formatDate(detailInvoice.due_date)}</dd>
+                  </div>
+                  <div className="flex justify-between gap-3 px-4 py-3 bg-slate-50 dark:bg-slate-900/60">
+                    <dt className="font-bold text-slate-700 dark:text-slate-200">Total</dt>
+                    <dd className="font-extrabold tabular-nums text-blue-600 dark:text-blue-400 text-right">{formatRupiah(detailInvoice.amount)}</dd>
+                  </div>
+                </dl>
+
+                {effectiveStatus === "pending" && detailInvoice.payment_proof && (
+                  <div className="rounded-2xl border border-blue-200 dark:border-blue-900/60 bg-blue-50/60 dark:bg-blue-950/20 p-4">
+                    <p className="flex items-center gap-1.5 text-[13px] font-bold text-blue-800 dark:text-blue-200">
+                      <Clock size={14} /> Menunggu verifikasi
+                    </p>
+                    <p className="mt-0.5 text-xs text-blue-600/80 dark:text-blue-300/80">Bukti transfer terkirim. Layanan aktif otomatis setelah disetujui.</p>
+                    <button
+                      type="button"
+                      onClick={() => setProofView(detailInvoice)}
+                      className="mt-3 block w-full overflow-hidden rounded-xl border border-blue-200 dark:border-blue-800 bg-white dark:bg-slate-900"
+                    >
+                      {isImageProof(getProofUrl(detailInvoice)) ? (
+                        <img src={getProofUrl(detailInvoice)} alt="Bukti transfer" className="w-full max-h-56 object-contain" />
+                      ) : (
+                        <span className="flex items-center gap-2.5 p-3.5">
+                          <FileText size={24} className="text-blue-500 shrink-0" />
+                          <span className="text-xs font-bold text-blue-700 dark:text-blue-300">Dokumen PDF, ketuk untuk melihat</span>
+                        </span>
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => removeProof(detailInvoice.id)}
+                      className="mt-2 text-xs font-bold text-rose-600 dark:text-rose-400 hover:underline"
+                    >
+                      Hapus &amp; upload ulang
+                    </button>
+                  </div>
+                )}
+
+                {detailInvoice.status === "paid" && (
+                  <div className="flex items-center gap-3 rounded-2xl border border-emerald-200 dark:border-emerald-900/60 bg-emerald-50/60 dark:bg-emerald-950/20 p-4">
+                    <CheckCircle2 size={22} className="text-emerald-600 dark:text-emerald-400 shrink-0" />
+                    <div>
+                      <p className="text-[13px] font-bold text-emerald-800 dark:text-emerald-200">
+                        Lunas{detailInvoice.paid_date ? ` · ${formatDate(detailInvoice.paid_date)}` : ""}
+                      </p>
+                      <p className="text-xs text-emerald-600/80 dark:text-emerald-300/70">Pembayaran terverifikasi.</p>
+                    </div>
+                  </div>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => printDigitalInvoice(detailInvoice, school)}
+                  className="w-full inline-flex items-center justify-center gap-1.5 h-11 rounded-2xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-sm font-bold hover:bg-slate-50 dark:hover:bg-slate-800 transition"
+                >
+                  <Printer size={15} /> Cetak Invoice (PDF)
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ── Modal Perpanjangan ── */}
       {showRenewalModal && (
-        <div className="fixed inset-0 bg-slate-900/60 dark:bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-150">
-          <div className="bg-white dark:bg-slate-950 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-slate-200/70 dark:border-slate-800">
-            {/* Modal Header */}
-            <div className="flex items-center justify-between p-5 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-blue-600/10 text-blue-600 flex items-center justify-center border border-blue-200/60">
-                  <Sparkles size={18} />
-                </div>
-                <div>
-                  <h3 className="font-bold text-sm text-slate-900 dark:text-white">Pengajuan Perpanjangan Layanan</h3>
-                  <p className="text-xs text-slate-500">Kirim permintaan ke SuperAdmin untuk penerbitan invoice resmi</p>
-                </div>
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/50 dark:bg-slate-950/70 p-0 sm:p-4"
+          onClick={() => setShowRenewalModal(false)}
+        >
+          <div
+            className="w-full max-w-lg max-h-[92vh] overflow-y-auto rounded-t-3xl sm:rounded-3xl bg-white dark:bg-slate-950 shadow-2xl"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between gap-3 px-5 pt-5 pb-4 border-b border-slate-100 dark:border-slate-800">
+              <div>
+                <h3 className="text-[15px] font-extrabold text-slate-900 dark:text-white">Minta Perpanjangan</h3>
+                <p className="text-xs text-slate-500 mt-0.5">Permohonan diteruskan ke SuperAdmin</p>
               </div>
               <button
+                type="button"
                 onClick={() => setShowRenewalModal(false)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+                aria-label="Tutup"
+                className="p-2 rounded-xl text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
               >
                 <X size={18} />
               </button>
             </div>
 
-            <div className="p-5 space-y-4">
+            <div className="p-5">
               {!renewalSubmitted ? (
-                <>
-                  {/* Current School Info */}
-                  <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-800 text-xs space-y-1">
-                    <p className="font-bold text-slate-900 dark:text-white">{school.name}</p>
-                    <p className="text-slate-500">Subdomain: <code className="font-mono text-blue-600 font-bold">{school.slug}.examku.my.id</code></p>
-                    <p className="text-slate-500">Kuota Saat Ini: <strong>{school.student_quota || 50} Siswa</strong></p>
+                <div className="space-y-5">
+                  <div className="rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/70 dark:border-slate-800 p-4">
+                    <p className="text-[13px] font-bold text-slate-900 dark:text-white">{school.name}</p>
+                    <p className="mt-0.5 text-xs text-slate-500">
+                      <code className="font-mono text-blue-600 font-bold">{school.slug}.examku.my.id</code>
+                      {" · "}{school.student_quota || 50} siswa
+                    </p>
                   </div>
 
-                  {/* Pilih Paket */}
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Pilih Paket Layanan</label>
+                  <div>
+                    <p className="text-xs font-bold text-slate-700 dark:text-slate-200 mb-2">Paket layanan</p>
                     <div className="grid grid-cols-3 gap-2">
                       {[
-                        { key: "basic", label: "Berkembang", note: "100-300 Siswa" },
-                        { key: "pro", label: "Lanjutan", note: "300-600 Siswa" },
-                        { key: "ultimate", label: "Premium", note: "600+ Siswa" },
+                        { key: "basic", label: "Berkembang", note: "100–300 siswa" },
+                        { key: "pro", label: "Lanjutan", note: "300–600 siswa" },
+                        { key: "ultimate", label: "Premium", note: "600+ siswa" },
                       ].map(p => (
                         <button
                           key={p.key}
                           type="button"
                           onClick={() => setSelectedPlan(p.key)}
                           className={cn(
-                            "p-2.5 rounded-xl border text-left transition-all",
+                            "rounded-2xl border p-3 text-left transition",
                             selectedPlan === p.key
-                              ? "border-blue-600 bg-blue-50/60 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 font-bold shadow-2xs"
-                              : "border-slate-200 dark:border-slate-800 hover:bg-slate-50 text-slate-700 dark:text-slate-300"
+                              ? "border-blue-600 bg-blue-50/70 dark:bg-blue-950/40"
+                              : "border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-600"
                           )}
                         >
-                          <p className="text-xs font-bold">{p.label}</p>
+                          <p className={cn("text-[13px] font-bold", selectedPlan === p.key ? "text-blue-700 dark:text-blue-300" : "text-slate-800 dark:text-slate-100")}>{p.label}</p>
                           <p className="text-[10px] text-slate-400 mt-0.5">{p.note}</p>
                         </button>
                       ))}
                     </div>
                   </div>
 
-                  {/* Pilih Durasi */}
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Durasi Perpanjangan</label>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                        {[
-                          { months: 1, label: "1 Bulan", sub: "Fleksibel" },
-                          { months: 2, label: "2 Bulan", sub: "Fleksibel" },
-                          { months: 3, label: "3 Bulan", sub: "Triwulan" },
-                          { months: 4, label: "4 Bulan", sub: "Fleksibel" },
-                          { months: 5, label: "5 Bulan", sub: "Fleksibel" },
-                          { months: 6, label: "6 Bulan", sub: "1 Semester" },
-                          { months: 12, label: "12 Bulan", sub: "1 Tahun" },
-                        ].map(d => (
+                  <div>
+                    <p className="text-xs font-bold text-slate-700 dark:text-slate-200 mb-2">Durasi</p>
+                    <div className="grid grid-cols-4 gap-2">
+                      {[1, 2, 3, 4, 5, 6, 12].map(m => (
                         <button
-                          key={d.months}
+                          key={m}
                           type="button"
-                          onClick={() => setSelectedDuration(d.months)}
+                          onClick={() => setSelectedDuration(m)}
                           className={cn(
-                            "p-2.5 rounded-xl border text-left transition-all",
-                            selectedDuration === d.months
-                              ? "border-blue-600 bg-blue-50/60 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 font-bold shadow-2xs"
-                              : "border-slate-200 dark:border-slate-800 hover:bg-slate-50 text-slate-700 dark:text-slate-300"
+                            "rounded-xl border py-2.5 text-xs font-bold transition",
+                            selectedDuration === m
+                              ? "border-blue-600 bg-blue-600 text-white"
+                              : "border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-600"
                           )}
                         >
-                          <p className="text-xs font-bold">{d.label}</p>
-                          <p className="text-[10px] text-slate-400 mt-0.5">{d.sub}</p>
+                          {m} bln
                         </button>
                       ))}
                     </div>
                   </div>
 
-                  {/* Catatan / Kebutuhan Khusus */}
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                      Catatan Tambahan (Opsional)
+                  <div>
+                    <label className="text-xs font-bold text-slate-700 dark:text-slate-200">
+                      Catatan <span className="font-normal text-slate-400">(opsional)</span>
                     </label>
                     <textarea
                       value={renewalNotes}
                       onChange={e => setRenewalNotes(e.target.value)}
-                      placeholder="Contoh: Kami ingin tambah kuota jadi 400 siswa untuk persiapan ujian PAS semester genap..."
                       rows={3}
-                      className="w-full text-xs p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                      placeholder="Contoh: tambah kuota untuk persiapan PAS..."
+                      className="mt-1.5 w-full text-[13px] p-3 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
                     />
                   </div>
 
-                  {/* Action Buttons */}
-                  <div className="pt-2 flex flex-col sm:flex-row gap-2">
+                  <div className="flex flex-col sm:flex-row gap-2">
                     <button
                       type="button"
                       onClick={handleSubmitRenewalRequest}
                       disabled={submittingRenewal}
-                      className="flex-1 py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition shadow-sm flex items-center justify-center gap-2 disabled:opacity-50"
+                      className="flex-1 inline-flex items-center justify-center gap-1.5 h-11 rounded-2xl bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white text-sm font-bold transition"
                     >
                       <Send size={14} className={submittingRenewal ? "animate-spin" : ""} />
-                      <span>{submittingRenewal ? "Mengirim..." : "Kirim Permohonan ke Admin"}</span>
+                      {submittingRenewal ? "Mengirim..." : "Kirim Permohonan"}
                     </button>
                     <a
                       href={waUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition shadow-sm flex items-center justify-center gap-1.5"
+                      className="flex-1 inline-flex items-center justify-center gap-1.5 h-11 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold transition"
                     >
-                      <MessageCircle size={14} />
-                      <span>Hubungi via WhatsApp</span>
+                      <MessageCircle size={14} /> WhatsApp
                     </a>
                   </div>
-                </>
+                </div>
               ) : (
-                <div className="text-center py-6 space-y-4">
-                  <div className="w-14 h-14 rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto">
-                    <CheckCircle2 size={32} />
+                <div className="text-center py-6">
+                  <div className="w-14 h-14 rounded-2xl bg-emerald-600/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mx-auto">
+                    <CheckCircle2 size={30} />
                   </div>
-                  <div>
-                    <h4 className="font-bold text-sm text-slate-900 dark:text-white">Pengajuan Berhasil Terkirim</h4>
-                    <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto leading-relaxed">
-                      SuperAdmin telah menerima permohonan perpanjangan layanan untuk <strong>{school.name}</strong>. Faktur resmi akan segera diterbitkan.
-                    </p>
-                  </div>
-                  <div className="pt-2 flex flex-col sm:flex-row gap-2 justify-center">
+                  <h4 className="mt-4 text-[15px] font-extrabold text-slate-900 dark:text-white">Permohonan terkirim</h4>
+                  <p className="mt-1 text-[13px] text-slate-500 leading-relaxed max-w-sm mx-auto">
+                    SuperAdmin akan memeriksa dan menerbitkan faktur resmi untuk <strong>{school.name}</strong>.
+                  </p>
+                  <div className="mt-5 flex flex-col sm:flex-row gap-2 justify-center">
                     <a
                       href={waUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition shadow-sm flex items-center justify-center gap-1.5"
+                      className="inline-flex items-center justify-center gap-1.5 h-11 px-5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold transition"
                     >
-                      <MessageCircle size={14} />
-                      <span>Konfirmasi Cepat via WhatsApp</span>
+                      <MessageCircle size={14} /> Konfirmasi via WhatsApp
                     </a>
                     <button
                       type="button"
                       onClick={() => setShowRenewalModal(false)}
-                      className="py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition"
+                      className="h-11 px-5 rounded-2xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-sm font-bold transition"
                     >
                       Tutup
                     </button>
@@ -921,256 +970,70 @@ const SchoolInvoicePage = () => {
         </div>
       )}
 
-      {/* ─── Detail Modal ──────────────────────────────────────────── */}
-      {detailInvoice && (() => {
-        const effectiveStatus = getInvoiceStatus(detailInvoice);
-        const modalCfg = STATUS_CONFIG[effectiveStatus] || STATUS_CONFIG.unpaid;
-        const ModalStatusIcon = modalCfg.icon;
-
-        return (
-          <div className="fixed inset-0 bg-slate-900/60 dark:bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-white dark:bg-slate-950 rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto border border-slate-200/60 dark:border-slate-800">
-              {/* Modal Header */}
-              <div className="flex items-start justify-between p-5 border-b border-slate-100 dark:border-slate-800">
-                <div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-mono text-sm font-bold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-lg">
-                      {detailInvoice.invoice_number}
-                    </span>
-                    <span className={cn(
-                      "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border",
-                      modalCfg.color, modalCfg.bg, modalCfg.border
-                    )}>
-                      <ModalStatusIcon size={11} />
-                      {modalCfg.label}
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-400 dark:text-slate-500 mt-1.5">
-                    Diterbitkan {formatDate(detailInvoice.created)}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2 ml-2 flex-shrink-0">
-                  <button
-                    onClick={() => printDigitalInvoice(detailInvoice, school)}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition shadow-xs"
-                    title="Cetak atau Simpan Invoice Digital Resmi (PDF)"
-                  >
-                    <Printer size={13} />
-                    <span>Cetak Invoice (PDF)</span>
-                  </button>
-                  <button
-                    onClick={() => setDetailInvoice(null)}
-                    className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 transition"
-                  >
-                    <X size={18} />
-                  </button>
-                </div>
-              </div>
-
-              <div className="p-5 space-y-4">
-                {/* Invoice Breakdown */}
-                <div className="border border-slate-200/60 dark:border-slate-800 rounded-2xl overflow-hidden">
-                  <div className="bg-slate-50 dark:bg-slate-900 px-4 py-3 border-b border-slate-100 dark:border-slate-800">
-                    <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Rincian Tagihan</p>
-                  </div>
-                  <div className="divide-y divide-slate-100 dark:divide-slate-800/80">
-                    {[
-                      { label: "Layanan", value: `${PLAN_PRICES[detailInvoice.plan]?.label || detailInvoice.plan} Plan` },
-                      { label: "Durasi", value: isTopupInvoice(detailInvoice) ? "Top-up kuota (periode tetap)" : `${detailInvoice.duration_months} bulan` },
-                      { label: "Jatuh Tempo", value: formatDate(detailInvoice.due_date) },
-                      ...(detailInvoice.paid_date ? [{ label: "Tanggal Bayar", value: formatDate(detailInvoice.paid_date) }] : []),
-                    ].map(row => (
-                      <div key={row.label} className="flex justify-between items-center px-4 py-2.5 text-xs">
-                        <span className="text-slate-500 dark:text-slate-400">{row.label}</span>
-                        <span className="font-semibold text-slate-800 dark:text-slate-200">{row.value}</span>
-                      </div>
-                    ))}
-                    <div className="flex justify-between items-center px-4 py-3 bg-slate-50/50 dark:bg-slate-900/50 font-bold text-sm">
-                      <span className="text-slate-900 dark:text-white">Total Tagihan</span>
-                      <span className="text-blue-600 dark:text-blue-400">{formatRupiah(detailInvoice.amount)}</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Pending Verification Info */}
-                {effectiveStatus === "pending" && detailInvoice.payment_proof && (
-                  <div className="p-4 rounded-2xl bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800/60 space-y-3">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-xl bg-blue-600/10 text-blue-600 flex items-center justify-center">
-                        <Clock size={18} />
-                      </div>
-                      <div>
-                        <p className="text-xs font-bold text-blue-800 dark:text-blue-300">Menunggu Verifikasi SuperAdmin</p>
-                        <p className="text-[11px] text-blue-600 dark:text-blue-500">
-                          Bukti transfer sudah terkirim. Layanan aktif otomatis setelah disetujui.
-                        </p>
-                      </div>
-                    </div>
-                    {isImageProof(getProofUrl(detailInvoice)) ? (
-                      <button
-                        type="button"
-                        onClick={() => setProofView(detailInvoice)}
-                        className="block w-full group relative rounded-xl overflow-hidden border border-blue-200 dark:border-blue-800 bg-white dark:bg-slate-800"
-                        title="Klik untuk memperbesar"
-                      >
-                        <img
-                          src={getProofUrl(detailInvoice)}
-                          alt="Bukti transfer"
-                          className="w-full max-h-56 object-contain bg-slate-50 dark:bg-slate-900"
-                        />
-                        <span className="absolute inset-0 bg-slate-900/0 group-hover:bg-slate-900/20 transition flex items-center justify-center">
-                          <span className="opacity-0 group-hover:opacity-100 transition inline-flex items-center gap-1.5 px-3 py-1.5 bg-white rounded-lg shadow text-xs font-bold text-slate-700">
-                            <Eye size={12} /> Klik untuk memperbesar
-                          </span>
-                        </span>
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => setProofView(detailInvoice)}
-                        className="w-full flex items-center gap-3 p-3 bg-white dark:bg-slate-800 border border-blue-200 dark:border-blue-800 rounded-xl hover:bg-blue-50 dark:hover:bg-blue-950/30 transition text-left"
-                      >
-                        <FileText size={24} className="text-blue-500 shrink-0" />
-                        <span className="text-xs font-bold text-blue-700 dark:text-blue-300">
-                          Dokumen PDF — klik untuk melihat
-                        </span>
-                      </button>
-                    )}
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => removeProof(detailInvoice.id)}
-                        className="px-3 py-1.5 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-xl text-xs font-bold transition"
-                      >
-                        Hapus & Upload Ulang
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* Status Lunas Info */}
-                {detailInvoice.status === "paid" && (
-                  <div className="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800/60 flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-xl bg-emerald-600/10 text-emerald-600 flex items-center justify-center">
-                        <CheckCircle2 size={18} />
-                      </div>
-                      <div>
-                        <p className="text-xs font-bold text-emerald-800 dark:text-emerald-300">Pembayaran Terverifikasi</p>
-                        <p className="text-[11px] text-emerald-600 dark:text-emerald-500">
-                          {detailInvoice.paid_date ? `Lunas pada ${formatDate(detailInvoice.paid_date)}` : "Selesai"}
-                        </p>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => printDigitalInvoice(detailInvoice, school)}
-                      className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition shadow-xs flex items-center gap-1.5"
-                    >
-                      <Printer size={12} />
-                      <span>Invoice PDF</span>
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        );
-      })()}
-
-      {/* ── Lightbox Bukti Pembayaran ── */}
-      {proofView && (
-        <ProofLightbox
-          url={getProofUrl(proofView)}
-          title={`Bukti Pembayaran ${proofView.invoice_number}`}
-          onClose={() => setProofView(null)}
-        />
-      )}
-
-      {/* ── Modal Realtime QRIS Payment Session ── */}
+      {/* ── Modal QRIS ── */}
       {paymentSession && (
-        <div className="fixed inset-0 bg-slate-900/60 dark:bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl w-full max-w-md border border-slate-200/80 dark:border-slate-800 overflow-hidden text-center p-6">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/50 dark:bg-slate-950/70 p-0 sm:p-4">
+          <div className="w-full max-w-md max-h-[92vh] overflow-y-auto rounded-t-3xl sm:rounded-3xl bg-white dark:bg-slate-950 shadow-2xl p-6 text-center">
             {!paymentSession.isPaid ? (
               <div className="space-y-5">
-                <div className="relative w-20 h-20 mx-auto flex items-center justify-center">
-                  <div className="absolute inset-0 rounded-full bg-blue-500/20 animate-ping" />
-                  <div className="w-16 h-16 rounded-2xl bg-blue-600/10 border border-blue-200 dark:border-blue-800 flex items-center justify-center text-blue-600 dark:text-blue-400 shadow-sm relative z-10">
-                    <QrCode size={32} />
-                  </div>
+                <div className="w-16 h-16 mx-auto rounded-2xl bg-blue-600/10 border border-blue-100 dark:border-blue-900/50 flex items-center justify-center text-blue-600 dark:text-blue-400">
+                  <QrCode size={30} />
                 </div>
-
                 <div>
-                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 mb-2">
-                    <Clock size={12} className="animate-spin" />
-                    <span>Menunggu Pembayaran</span>
-                  </div>
-                  <h3 className="text-xl font-black text-slate-900 dark:text-white">
+                  <p className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                    <Clock size={11} className="animate-spin" /> Menunggu pembayaran
+                  </p>
+                  <p className="mt-2 text-3xl font-black tabular-nums tracking-tight text-slate-900 dark:text-white">
                     {formatRupiah(paymentSession.invoice.amount)}
-                  </h3>
-                  <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mt-1">
-                    Invoice: <span className="font-mono text-slate-700 dark:text-slate-200">{paymentSession.invoice.invoice_number}</span>
                   </p>
+                  <p className="mt-1 font-mono text-xs text-slate-400">{paymentSession.invoice.invoice_number}</p>
                 </div>
-
-                <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/60 rounded-2xl p-3.5 text-left text-xs space-y-1.5">
-                  <p className="font-bold text-slate-800 dark:text-slate-200">
-                    Petunjuk Pelunasan:
-                  </p>
-                  <p className="text-slate-600 dark:text-slate-300 leading-relaxed text-[11px]">
-                    Tab pembayaran QRIS telah dibuka. Silakan lakukan scan menggunakan aplikasi mobile banking atau e-wallet Anda. Sistem akan mendeteksi pelunasan secara otomatis tanpa perlu merefresh halaman ini.
-                  </p>
-                </div>
-
-                <div className="flex flex-col gap-2 pt-2">
+                <p className="text-xs leading-relaxed text-slate-500 dark:text-slate-400 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-800 p-3.5 text-left">
+                  Tab pembayaran QRIS telah dibuka di tab baru. Pindai kodenya dengan mobile banking atau e-wallet. Halaman ini mendeteksi pelunasan otomatis.
+                </p>
+                <div className="flex flex-col gap-2">
                   <button
+                    type="button"
                     onClick={() => window.open(paymentSession.paymentUrl, "_blank")}
-                    className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs transition shadow-sm flex items-center justify-center gap-2"
+                    className="w-full h-11 inline-flex items-center justify-center gap-1.5 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold transition"
                   >
-                    <ExternalLink size={14} />
-                    <span>Buka Ulang Halaman QRIS</span>
+                    <ExternalLink size={14} /> Buka Ulang Halaman QRIS
                   </button>
                   <button
+                    type="button"
                     onClick={() => setPaymentSession(null)}
-                    className="w-full py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 font-semibold rounded-xl text-xs transition"
+                    className="w-full h-10 rounded-2xl text-[13px] font-bold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
                   >
-                    Tutup Sementara (Tetap Diproses di Latar)
+                    Tutup (tetap diproses)
                   </button>
                 </div>
               </div>
             ) : (
-              <div className="space-y-5 animate-in zoom-in-95 duration-300">
-                <div className="w-20 h-20 mx-auto rounded-3xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shadow-lg shadow-emerald-500/10">
-                  <CheckCircle2 size={40} className="animate-in zoom-in-75 duration-300" />
+              <div className="space-y-5">
+                <div className="w-16 h-16 mx-auto rounded-2xl bg-emerald-600/10 border border-emerald-200 dark:border-emerald-900/50 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
+                  <CheckCircle2 size={32} />
                 </div>
-
                 <div>
-                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 mb-2">
-                    <Sparkles size={12} />
-                    <span>Transaksi Lunas Terverifikasi</span>
-                  </div>
-                  <h3 className="text-xl font-black text-slate-900 dark:text-white">
-                    Pembayaran Berhasil!
-                  </h3>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-xs mx-auto leading-relaxed">
-                    Tagihan <strong>{paymentSession.invoice.invoice_number}</strong> telah terbayar lunas. Paket institusi <strong>{school.name}</strong> kini aktif dengan kuota penuh.
+                  <h3 className="text-lg font-extrabold text-slate-900 dark:text-white">Pembayaran berhasil</h3>
+                  <p className="mt-1 text-[13px] text-slate-500 leading-relaxed">
+                    Tagihan <strong className="font-mono">{paymentSession.invoice.invoice_number}</strong> lunas. Paket {school.name} kini aktif.
                   </p>
                 </div>
-
-                <div className="flex flex-col gap-2 pt-2">
+                <div className="flex flex-col gap-2">
                   <button
+                    type="button"
                     onClick={() => printDigitalInvoice(paymentSession.invoice, school)}
-                    className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs transition shadow-sm flex items-center justify-center gap-2"
+                    className="w-full h-11 inline-flex items-center justify-center gap-1.5 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold transition"
                   >
-                    <Printer size={14} />
-                    <span>Cetak Invoice Digital Lunas (PDF)</span>
+                    <Printer size={14} /> Cetak Invoice (PDF)
                   </button>
                   <button
+                    type="button"
                     onClick={() => {
                       setPaymentSession(null);
-                      if (detailInvoice?.id === paymentSession.invoice.id) {
-                        setDetailInvoice(null);
-                      }
+                      if (detailInvoice?.id === paymentSession.invoice.id) setDetailInvoice(null);
                     }}
-                    className="w-full py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold rounded-xl text-xs transition"
+                    className="w-full h-11 rounded-2xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-sm font-bold transition"
                   >
                     Selesai
                   </button>
@@ -1179,6 +1042,15 @@ const SchoolInvoicePage = () => {
             )}
           </div>
         </div>
+      )}
+
+      {/* ── Lightbox Bukti ── */}
+      {proofView && (
+        <ProofLightbox
+          url={getProofUrl(proofView)}
+          title={`Bukti Pembayaran ${proofView.invoice_number}`}
+          onClose={() => setProofView(null)}
+        />
       )}
     </div>
   );

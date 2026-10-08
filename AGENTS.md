@@ -10,6 +10,12 @@ For UI, copy, people, mobile layout, or code comments work, load the antislop sk
 Before starting, ask the user when antislop applies: during the work, or after it is done.
 <!-- antislop:end -->
 
+## Icons: cek phosphor-bridge dulu
+- Import `lucide-react` di proyek ini di-bridge ke `@phosphor-icons/react` via `src/lib/icons/phosphor-bridge.tsx`.
+- JANGAN pakai nama ikon lucide sembarangan — kalau tidak ada di daftar export bridge, seluruh app blank (SyntaxError saat dev).
+- Selalu grep dulu: `grep -o "export const <Nama>" src/lib/icons/phosphor-bridge.tsx`.
+- Contoh kejadian 2026-10-08: `ReceiptText` tidak ada di bridge -> app blank total; diganti `FileText` yang ada.
+
 ## Deployment & Operations Guidelines
 When deploying or syncing changes, always follow these rules and refer to [COMMANDS.md](file:///d:/PROJECT/ujian/COMMANDS.md):
 

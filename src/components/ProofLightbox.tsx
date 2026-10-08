@@ -72,24 +72,26 @@ export function ProofLightbox({
         </button>
       </div>
 
-      {/* Isi: kartu putih berbingkai */}
+      {/* Isi: kartu putih berbingkai, selalu utuh terlihat */}
       <div
-        className="flex-1 min-h-0 overflow-auto flex items-start sm:items-center justify-center p-4 sm:p-8"
+        className="flex-1 min-h-0 overflow-auto flex"
         onClick={(e) => e.stopPropagation()}
       >
-        {isImage ? (
-          <img
-            src={url}
-            alt={title || "Bukti pembayaran"}
-            className="max-w-full max-h-full object-contain rounded-2xl border border-slate-300 bg-white shadow-xl"
-          />
-        ) : (
-          <iframe
-            src={url}
-            title={title || "Bukti pembayaran"}
-            className="w-full h-full max-w-5xl rounded-2xl border border-slate-300 bg-white shadow-xl"
-          />
-        )}
+        <div className="m-auto w-full max-w-4xl p-4 sm:p-8">
+          {isImage ? (
+            <img
+              src={url}
+              alt={title || "Bukti pembayaran"}
+              className="mx-auto max-h-[calc(100vh-260px)] w-auto max-w-full object-contain rounded-2xl border border-slate-300 bg-white shadow-xl"
+            />
+          ) : (
+            <iframe
+              src={url}
+              title={title || "Bukti pembayaran"}
+              className="w-full h-[calc(100vh-260px)] rounded-2xl border border-slate-300 bg-white shadow-xl"
+            />
+          )}
+        </div>
       </div>
 
       {/* Aksi opsional */}
