@@ -261,3 +261,63 @@ routerAdd("POST", "/api/multi-vps/restore-snapshot", (c) => {
         return c.json(500, { success: false, error: "Terjadi kesalahan internal: " + err });
     }
 });
+
+// ============================================================
+// 7. Status operasional backup & auto-fallback (superadmin)
+// ============================================================
+routerAdd("GET", "/api/multi-vps/ops-status", (c) => {
+    try { c.setResponseHeader("Access-Control-Allow-Origin", "*"); } catch (_) {}
+    try {
+        const out = $os.cmd("bash", "-c", "/usr/local/bin/examku-ops-status.sh").output();
+        let raw = "";
+        if (out) { for (let i = 0; i < out.length; i++) raw += String.fromCharCode(out[i]); }
+        raw = raw.trim();
+        const data = JSON.parse(raw);
+        data.success = true;
+        return c.json(200, data);
+    } catch (err) {
+        return c.json(500, { success: false, error: "Gagal membaca status operasional: " + err });
+    }
+});
+
+// ============================================================
+// 8. Jalankan job backup / fallback manual (background)
+// Body/query: job = "backup" | "fallback"
+// ============================================================
+routerAdd("POST", "/api/multi-vps/run-job", (c) => {
+    try { c.setResponseHeader("Access-Control-Allow-Origin", "*"); } catch (_) {}
+
+    let job = "";
+    try {
+        const info = c.requestInfo();
+        let b = {}; try { b = info.body || {}; } catch (_) {}
+        let q = {}; try { q = info.query || {}; } catch (_) {}
+        job = (b.job || q.job || "").toString().trim();
+    } catch (e) {
+        return c.json(400, { success: false, error: "Gagal membaca data request: " + e });
+    }
+
+    const JOBS = {
+        "backup":   { bin: "/usr/local/bin/examku-backup-workers.sh", log: "/var/log/examku-backup-workers.log", label: "Backup Harian Worker" },
+        "fallback": { bin: "/usr/local/bin/examku-auto-fallback.sh", log: "/var/log/examku-auto-fallback.log",   label: "Auto-Fallback H-3" },
+    };
+    const cfg = JOBS[job];
+    if (!cfg) {
+        return c.json(400, { success: false, error: "Job tidak valid (backup | fallback)." });
+    }
+
+    try {
+        // Tolak bila job sedang berjalan
+        const chk = $os.cmd("bash", "-c", `pgrep -f "${cfg.bin}" >/dev/null 2>&1 && echo RUNNING || echo IDLE`).output();
+        let st = "";
+        if (chk) { for (let i = 0; i < chk.length; i++) st += String.fromCharCode(chk[i]); }
+        if (st.trim() === "RUNNING") {
+            return c.json(409, { success: false, error: `${cfg.label} sedang berjalan. Tunggu selesai dulu.` });
+        }
+        $os.cmd("bash", "-c", `nohup ${cfg.bin} >> ${cfg.log} 2>&1 & echo STARTED`);
+        console.log(`[Ops] Job manual dimulai: ${job}`);
+        return c.json(200, { success: true, message: `${cfg.label} dimulai di latar. Pantau log untuk hasilnya.` });
+    } catch (err) {
+        return c.json(500, { success: false, error: "Gagal menjalankan job: " + err });
+    }
+});

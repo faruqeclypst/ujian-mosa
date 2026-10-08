@@ -24,6 +24,7 @@ import { masterPb } from "../../lib/pocketbase";
 import { cn } from "../../lib/utils";
 import { getSchoolDomain } from "../../utils/domainHelper";
 import { SyncAllTenantsModal } from "./SyncAllTenantsModal";
+import { BackupOpsSection } from "./BackupOpsSection";
 
 interface VpsNodeMetrics {
   status: "healthy" | "warning" | "error" | "offline";
@@ -625,6 +626,9 @@ const SuperAdminInfraPage = () => {
           ))}
         </div>
       </div>
+
+      {/* ── Section: Operasional Backup & Pemulihan Bencana ── */}
+      <BackupOpsSection />
 
       {/* Modal 1-Click Sync Seluruh Tenant */}
       <SyncAllTenantsModal
