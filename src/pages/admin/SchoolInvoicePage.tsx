@@ -475,56 +475,55 @@ const SchoolInvoicePage = () => {
             </span>
           </div>
 
-          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Nominal yang ditransfer</span>
-          <div className="flex items-baseline gap-1.5 mt-1">
-            <span className="text-3xl font-black tabular-nums tracking-tight text-slate-900 dark:text-white">
-              {formatRupiah(activePendingInvoice.amount)}
-            </span>
-          </div>
-          <p className="text-[11px] text-slate-400 mt-1">
-            {PLAN_PRICES[activePendingInvoice.plan]?.label || activePendingInvoice.plan} · {isTopupInvoice(activePendingInvoice) ? "top-up kuota" : `${activePendingInvoice.duration_months} bulan`}
-          </p>
+          <div className="grid md:grid-cols-2 gap-5">
+            {/* Kiri: info tagihan */}
+            <div className="flex flex-col">
+              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Nominal yang ditransfer</span>
+              <div className="flex items-baseline gap-1.5 mt-1">
+                <span className="text-3xl font-black tabular-nums tracking-tight text-slate-900 dark:text-white">
+                  {formatRupiah(activePendingInvoice.amount)}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-1">
+                {PLAN_PRICES[activePendingInvoice.plan]?.label || activePendingInvoice.plan} · {isTopupInvoice(activePendingInvoice) ? "top-up kuota" : `${activePendingInvoice.duration_months} bulan`}
+              </p>
+              <p className="mt-3 flex items-start gap-1.5 text-[11px] leading-relaxed text-slate-400">
+                <Info size={13} className="shrink-0 mt-0.5" />
+                Bukti transfer sudah terkirim dan sedang diverifikasi SuperAdmin. Layanan aktif otomatis setelah disetujui.
+              </p>
+              <label className="mt-4 inline-flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 text-xs font-semibold transition-all cursor-pointer">
+                <Upload size={13} />
+                {uploadingProof ? "Mengunggah..." : "Upload Ulang"}
+                <input
+                  type="file"
+                  accept="image/*,.pdf"
+                  className="hidden"
+                  disabled={uploadingProof}
+                  onChange={e => { const f = e.target.files?.[0]; if (f) handleProofUpload(activePendingInvoice.id, f); e.target.value = ""; }}
+                />
+              </label>
+            </div>
 
-          <button
-            type="button"
-            onClick={() => setProofView(activePendingInvoice)}
-            title="Ketuk untuk memperbesar"
-            className="mt-4 block w-full overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60"
-          >
-            {isImageProof(getProofUrl(activePendingInvoice)) ? (
-              <img src={getProofUrl(activePendingInvoice)} alt="Bukti transfer" className="w-full max-h-60 object-contain" />
-            ) : (
-              <span className="flex items-center gap-3 p-4">
-                <FileText size={28} className="text-blue-500 shrink-0" />
-                <span className="text-[13px] font-bold text-slate-700 dark:text-slate-200">Dokumen PDF, ketuk untuk melihat</span>
-              </span>
-            )}
-          </button>
-
-          <div className="mt-4 grid sm:grid-cols-2 gap-2.5">
+            {/* Kanan: bukti transfer, klik untuk memperbesar */}
             <button
               type="button"
               onClick={() => setProofView(activePendingInvoice)}
-              className="flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-sm transition-all"
+              title="Klik untuk memperbesar"
+              className="group relative block w-full overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60"
             >
-              <Eye size={13} /> Lihat Bukti
+              {isImageProof(getProofUrl(activePendingInvoice)) ? (
+                <img src={getProofUrl(activePendingInvoice)} alt="Bukti transfer" className="w-full max-h-64 object-contain" />
+              ) : (
+                <span className="flex items-center justify-center gap-3 p-8">
+                  <FileText size={28} className="text-blue-500 shrink-0" />
+                  <span className="text-[13px] font-bold text-slate-700 dark:text-slate-200">Dokumen PDF, klik untuk melihat</span>
+                </span>
+              )}
+              <span className="absolute bottom-2 right-2 inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-900/70 text-white text-[10px] font-bold opacity-0 group-hover:opacity-100 transition">
+                <Eye size={11} /> Perbesar
+              </span>
             </button>
-            <label className="flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 text-xs font-semibold transition-all cursor-pointer">
-              <Upload size={13} />
-              {uploadingProof ? "Mengunggah..." : "Upload Ulang"}
-              <input
-                type="file"
-                accept="image/*,.pdf"
-                className="hidden"
-                disabled={uploadingProof}
-                onChange={e => { const f = e.target.files?.[0]; if (f) handleProofUpload(activePendingInvoice.id, f); e.target.value = ""; }}
-              />
-            </label>
           </div>
-          <p className="mt-3 flex items-start gap-1.5 text-[11px] leading-relaxed text-slate-400">
-            <Info size={13} className="shrink-0 mt-0.5" />
-            Bukti transfer sudah terkirim dan sedang diverifikasi SuperAdmin. Layanan aktif otomatis setelah disetujui.
-          </p>
         </div>
       ) : activeUnpaidInvoice ? (
         <div className="bg-white dark:bg-slate-900 p-5 sm:p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
