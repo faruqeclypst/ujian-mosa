@@ -24,8 +24,11 @@ license_private_key.*
 # vps/template_school/pb_data/data.db yang DIBUTUHKAN setup-school.sh
 # untuk provisioning tenant baru.
 
-# File testing sementara / scratch
-scratch/
+# File testing sementara (lokal, jangan commit)
+# (folder scratch/ dikecualikan dari rule ini — berisi arsip skrip
+#  sekali-pakai yang memang diniatkan masuk repo sebagai referensi)
+scratch/tmp/
+scratch/*.log
 
 # APK binaries
 *.apk
