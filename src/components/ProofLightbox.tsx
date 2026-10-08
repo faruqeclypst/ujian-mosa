@@ -37,7 +37,7 @@ export function ProofLightbox({
 
   return (
     <div
-      className="fixed inset-0 z-[80] flex flex-col bg-slate-200/85 backdrop-blur-[2px]"
+      className="fixed inset-0 z-[200] flex flex-col bg-slate-200/85 backdrop-blur-[2px]"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
