@@ -20,7 +20,7 @@ import { printDigitalInvoice } from "../../utils/invoicePdfHelper";
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
-type PaymentStatus = "unpaid" | "paid" | "overdue" | "cancelled";
+type PaymentStatus = "unpaid" | "paid" | "overdue" | "cancelled" | "pending";
 
 interface Invoice {
   id: string;
@@ -77,6 +77,7 @@ const STATUS_CONFIG: Record<PaymentStatus, {
   icon: typeof CheckCircle2;
 }> = {
   unpaid:    { label: "Belum Bayar", color: "text-amber-700",  bg: "bg-amber-50",   border: "border-amber-200",  icon: Clock },
+  pending:   { label: "Menunggu Verifikasi", color: "text-blue-700", bg: "bg-blue-50", border: "border-blue-200", icon: Clock },
   paid:      { label: "Lunas",       color: "text-emerald-700", bg: "bg-emerald-50", border: "border-emerald-200", icon: CheckCircle2 },
   overdue:   { label: "Terlambat",   color: "text-red-700",     bg: "bg-red-50",     border: "border-red-200",    icon: AlertTriangle },
   cancelled: { label: "Dibatalkan",  color: "text-slate-500",   bg: "bg-slate-100",  border: "border-slate-200",  icon: XCircle },
@@ -105,6 +106,10 @@ const isOverdue = (invoice: Invoice): boolean => {
 };
 
 const getInvoiceStatus = (invoice: Invoice): PaymentStatus => {
+  // Sudah upload bukti transfer tapi belum diverifikasi → menunggu verifikasi
+  if (invoice.status === "unpaid" && invoice.payment_proof) {
+    return "pending";
+  }
   if (invoice.status === "unpaid" && isOverdue(invoice)) {
     return "overdue";
   }
@@ -563,6 +568,7 @@ const SuperAdminInvoicePage = () => {
   const totalAmount = invoices.reduce((sum, inv) => sum + inv.amount, 0);
   const paidAmount = invoices.filter(i => i.status === "paid").reduce((sum, i) => sum + i.amount, 0);
   const unpaidCount = invoices.filter(i => getInvoiceStatus(i) === "unpaid" || getInvoiceStatus(i) === "overdue").length;
+  const pendingCount = invoices.filter(i => getInvoiceStatus(i) === "pending").length;
   const overdueCount = invoices.filter(i => getInvoiceStatus(i) === "overdue").length;
 
   return (
@@ -592,11 +598,12 @@ const SuperAdminInvoicePage = () => {
         </div>
 
         {/* Stats row — 4 numbers, all from real data */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
           {[
             { label: "Total Tagihan", value: formatRupiah(totalAmount), note: `${invoices.length} invoice`, color: "text-slate-900" },
             { label: "Sudah Lunas", value: formatRupiah(paidAmount), note: `${invoices.filter(i => i.status === "paid").length} invoice`, color: "text-emerald-700" },
             { label: "Belum Bayar", value: String(unpaidCount), note: "invoice aktif", color: "text-amber-700" },
+            { label: "Menunggu Verifikasi", value: String(pendingCount), note: "bukti transfer masuk", color: pendingCount > 0 ? "text-blue-700" : "text-slate-400" },
             { label: "Terlambat", value: String(overdueCount), note: "melewati jatuh tempo", color: overdueCount > 0 ? "text-red-700" : "text-slate-400" },
           ].map((stat) => (
             <div key={stat.label} className="bg-white border border-slate-200 rounded-xl p-4">
@@ -639,6 +646,7 @@ const SuperAdminInvoicePage = () => {
                 >
                   <option value="all">Semua Status</option>
                   <option value="unpaid">Belum Bayar</option>
+                  <option value="pending">Menunggu Verifikasi</option>
                   <option value="paid">Lunas</option>
                   <option value="overdue">Terlambat</option>
                   <option value="cancelled">Dibatalkan</option>
@@ -1211,7 +1219,7 @@ const SuperAdminInvoicePage = () => {
                 <div className="flex items-center gap-2">
                   <h2 className="font-bold text-slate-900">{detailInvoice.invoice_number}</h2>
                   {(() => {
-                    const cfg = STATUS_CONFIG[detailInvoice.status];
+                    const cfg = STATUS_CONFIG[getInvoiceStatus(detailInvoice)];
                     const Icon = cfg.icon;
                     return (
                       <span className={cn("inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border", cfg.color, cfg.bg, cfg.border)}>

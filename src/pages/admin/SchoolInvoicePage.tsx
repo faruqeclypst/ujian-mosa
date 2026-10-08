@@ -20,7 +20,7 @@ import { isTopupInvoice } from "../../utils/subscriptionHelper";
 
 // ─── Types ───────────────────────────────────────────────────
 
-type PaymentStatus = "unpaid" | "paid" | "overdue" | "cancelled";
+type PaymentStatus = "unpaid" | "paid" | "overdue" | "cancelled" | "pending";
 
 interface Invoice {
   id: string;
@@ -60,6 +60,7 @@ const STATUS_CONFIG: Record<PaymentStatus, {
   icon: typeof CheckCircle2;
 }> = {
   unpaid:    { label: "Belum Dibayar", color: "text-amber-700",   bg: "bg-amber-50",   border: "border-amber-200",  icon: Clock },
+  pending:   { label: "Menunggu Verifikasi", color: "text-blue-700", bg: "bg-blue-50", border: "border-blue-200", icon: Clock },
   paid:      { label: "Lunas",          color: "text-emerald-700", bg: "bg-emerald-50", border: "border-emerald-200", icon: CheckCircle2 },
   overdue:   { label: "Terlambat",      color: "text-red-700",     bg: "bg-red-50",     border: "border-red-200",    icon: AlertTriangle },
   cancelled: { label: "Dibatalkan",     color: "text-slate-500",   bg: "bg-slate-100",  border: "border-slate-200",  icon: XCircle },
@@ -80,6 +81,10 @@ const isOverdue = (invoice: Invoice): boolean => {
 };
 
 const getInvoiceStatus = (invoice: Invoice): PaymentStatus => {
+  // Sudah upload bukti transfer tapi belum diverifikasi → menunggu verifikasi
+  if (invoice.status === "unpaid" && invoice.payment_proof) {
+    return "pending";
+  }
   if (invoice.status === "unpaid" && isOverdue(invoice)) {
     return "overdue";
   }
@@ -338,8 +343,10 @@ const SchoolInvoicePage = () => {
 
   const unpaidInvoices = invoices.filter(i => getInvoiceStatus(i) === "unpaid" || getInvoiceStatus(i) === "overdue");
   const unpaidCount = unpaidInvoices.length;
+  const pendingInvoices = invoices.filter(i => getInvoiceStatus(i) === "pending");
   const totalPaid = invoices.filter(i => i.status === "paid").reduce((s, i) => s + i.amount, 0);
   const activeUnpaidInvoice = unpaidInvoices[0] || null;
+  const activePendingInvoice = pendingInvoices[0] || null;
 
   if (!school) {
     return (
@@ -454,8 +461,29 @@ const SchoolInvoicePage = () => {
         </div>
       )}
 
-      {/* ── Expiry / Renewal Notification Banner ── */}
-      {activeUnpaidInvoice ? (
+      {/* ── Pending Verification Banner ── */}
+      {activePendingInvoice ? (
+        <div className="bg-gradient-to-r from-blue-600/10 via-blue-600/5 to-indigo-600/10 border border-blue-200 dark:border-blue-900/50 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xs">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <Clock size={16} className="text-blue-600 dark:text-blue-400" />
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                Menunggu Verifikasi ({activePendingInvoice.invoice_number})
+              </h3>
+            </div>
+            <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed max-w-xl">
+              Bukti transfer sebesar <strong>{formatRupiah(activePendingInvoice.amount)}</strong> sudah terkirim dan sedang diverifikasi SuperAdmin. Layanan aktif otomatis setelah pembayaran disetujui.
+            </p>
+          </div>
+          <button
+            onClick={() => setDetailInvoice(activePendingInvoice)}
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition shadow-xs flex items-center gap-1.5 shrink-0"
+          >
+            <Eye size={13} />
+            <span>Lihat Bukti</span>
+          </button>
+        </div>
+      ) : activeUnpaidInvoice ? (
         <div className="bg-gradient-to-r from-blue-600/10 via-blue-600/5 to-indigo-600/10 border border-blue-200 dark:border-blue-900/50 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xs">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
@@ -697,6 +725,28 @@ const SchoolInvoicePage = () => {
                               />
                             </label>
                           )}
+                        </>
+                      )}
+                      {effectiveStatus === "pending" && (
+                        <>
+                          <span className="text-[11px] font-medium text-blue-700 dark:text-blue-300">
+                            Bukti terkirim — menunggu verifikasi
+                          </span>
+                          <label className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-xl cursor-pointer transition shadow-sm border border-slate-200/60 dark:border-slate-700">
+                            <Upload size={12} />
+                            {uploadingProof ? "Mengunggah..." : "Upload Ulang"}
+                            <input
+                              type="file"
+                              accept="image/*,.pdf"
+                              className="hidden"
+                              disabled={uploadingProof}
+                              onChange={e => {
+                                const file = e.target.files?.[0];
+                                if (file) handleProofUpload(inv.id, file);
+                                e.target.value = "";
+                              }}
+                            />
+                          </label>
                         </>
                       )}
                     </div>
@@ -941,6 +991,40 @@ const SchoolInvoicePage = () => {
                     </div>
                   </div>
                 </div>
+
+                {/* Pending Verification Info */}
+                {effectiveStatus === "pending" && detailInvoice.payment_proof && (
+                  <div className="p-4 rounded-2xl bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800/60 space-y-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-xl bg-blue-600/10 text-blue-600 flex items-center justify-center">
+                        <Clock size={18} />
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-blue-800 dark:text-blue-300">Menunggu Verifikasi SuperAdmin</p>
+                        <p className="text-[11px] text-blue-600 dark:text-blue-500">
+                          Bukti transfer sudah terkirim. Layanan aktif otomatis setelah disetujui.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <a
+                        href={getProofUrl(detailInvoice)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-3 py-1.5 bg-white dark:bg-slate-800 border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300 rounded-xl text-xs font-bold hover:bg-blue-100 dark:hover:bg-blue-900/40 transition flex items-center gap-1.5"
+                      >
+                        <Eye size={12} />
+                        <span>Lihat Bukti Terkirim</span>
+                      </a>
+                      <button
+                        onClick={() => removeProof(detailInvoice.id)}
+                        className="px-3 py-1.5 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-xl text-xs font-bold transition"
+                      >
+                        Hapus & Upload Ulang
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 {/* Status Lunas Info */}
                 {detailInvoice.status === "paid" && (
