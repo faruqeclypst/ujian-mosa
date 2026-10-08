@@ -278,8 +278,13 @@ export const TenantProvider = ({ children }: { children: ReactNode }) => {
     }
 
     const resolveSchool = async () => {
-      // Jika data sekolah sudah cocok dengan slug dan pb sudah siap, tidak perlu fetch blocking (hanya untuk tenant cloud)
-      if (slug !== 'local' && school && school.slug === slug && pb) {
+      // [FIX] Cache hanya untuk paint instan (0ms). Data TIDAK BOLEH basi:
+      // selalu revalidasi ke server setiap mount/ganti slug (stale-while-revalidate).
+      // Sebelumnya early-return di sini membuat cache dipakai selamanya —
+      // paket yang sudah di-upgrade di DB tetap tampil "Free" di tenant.
+      // Dikecualikan hanya untuk override slug manual (pilihan eksplisit pengguna).
+      const isManualOverride = !!(allowManualSlug && manualSlug);
+      if (slug !== 'local' && school && school.slug === slug && pb && isManualOverride) {
         setLoading(false);
         return;
       }

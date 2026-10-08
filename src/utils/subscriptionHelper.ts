@@ -224,6 +224,11 @@ export const upgradeSchoolFromInvoice = async (invoice: {
   duration_months?: number;
   amount?: number;
   notes?: string;
+}, opts?: {
+  /** true (default): pembayaran baru — perpanjang dari active_until bila masih aktif.
+   *  false: sinkron ulang — JANGAN pernah memperpanjang; hanya isi bila kosong/kedaluwarsa.
+   *  Membuat tombol "Sinkron Ulang Paket" idempoten (diklik 10x hasilnya sama). */
+  extendActivePeriod?: boolean;
 }): Promise<boolean> => {
   try {
     let school: any = null;
@@ -255,37 +260,45 @@ export const upgradeSchoolFromInvoice = async (invoice: {
     }
 
     const months = Number(invoice.duration_months) || 1;
+    const extendActivePeriod = opts?.extendActivePeriod !== false;
 
     // Tentukan tanggal kedaluwarsa baru
     const now = new Date();
     let baseDate = new Date();
+    let keepCurrentExpiry = false;
 
     if (school.active_until) {
       const match = school.active_until.match(/^(\d{4})-(\d{2})-(\d{2})/);
       if (match) {
         const curDate = new Date(parseInt(match[1], 10), parseInt(match[2], 10) - 1, parseInt(match[3], 10), 23, 59, 59);
-        // Jika masa aktif masih berjalan di masa depan dan paket bukan free trial, perpanjang dari tanggal tersebut.
-        // KECUALI jika tenant melakukan perubahan paket (upgrade/downgrade), masa aktif dihitung ulang dari saat ini (hari pelunasan)
-        if (curDate.getTime() > now.getTime() && school.plan !== "free" && school.plan === planKey) {
-          baseDate = curDate;
+        if (curDate.getTime() > now.getTime()) {
+          if (!extendActivePeriod) {
+            // Mode sinkron ulang: masa aktif masih berjalan -> JANGAN ubah apa pun (idempoten)
+            keepCurrentExpiry = true;
+          } else if (school.plan !== "free" && school.plan === planKey) {
+            // Jika masa aktif masih berjalan di masa depan dan paket bukan free trial, perpanjang dari tanggal tersebut.
+            // KECUALI jika tenant melakukan perubahan paket (upgrade/downgrade), masa aktif dihitung ulang dari saat ini (hari pelunasan)
+            baseDate = curDate;
+          }
         }
       }
     }
 
-    const newExp = addBillingPeriod(baseDate, months);
-    newExp.setHours(23, 59, 59, 999);
-
-    const year = newExp.getFullYear();
-    const month = String(newExp.getMonth() + 1).padStart(2, "0");
-    const date = String(newExp.getDate()).padStart(2, "0");
-    const finalActiveUntil = `${year}-${month}-${date} 23:59:59.000Z`;
-
-    await masterPb.collection("schools").update(school.id, {
+    const payload: Record<string, unknown> = {
       plan: planKey,
       student_quota: Math.max(school.student_quota || 0, targetQuota),
-      active_until: finalActiveUntil,
       is_active: true,
-    });
+    };
+    if (!keepCurrentExpiry) {
+      const newExp = addBillingPeriod(baseDate, months);
+      newExp.setHours(23, 59, 59, 999);
+      const year = newExp.getFullYear();
+      const month = String(newExp.getMonth() + 1).padStart(2, "0");
+      const date = String(newExp.getDate()).padStart(2, "0");
+      payload.active_until = `${year}-${month}-${date} 23:59:59.000Z`;
+    }
+
+    await masterPb.collection("schools").update(school.id, payload);
 
     console.log(`[Upgrade School] Berhasil meng-upgrade ${school.name} ke ${planDetail.label} (kuota: ${targetQuota}, s/d ${finalActiveUntil})`);
     return true;

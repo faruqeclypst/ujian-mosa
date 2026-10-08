@@ -507,7 +507,7 @@ const SuperAdminInvoicePage = () => {
   const handleResyncSubscription = async (inv: Invoice) => {
     if (!confirm(`Sinkron ulang paket untuk ${inv.school_name} dari invoice ${inv.invoice_number}?`)) return;
     try {
-      const ok = await upgradeSchoolFromInvoice(inv);
+      const ok = await upgradeSchoolFromInvoice(inv, { extendActivePeriod: false });
       if (!ok) {
         alert("Gagal menyinkronkan paket. Periksa data sekolah & invoice di PocketBase.");
         return;
