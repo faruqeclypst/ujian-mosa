@@ -307,8 +307,9 @@ routerAdd("POST", "/api/multi-vps/run-job", (c) => {
     }
 
     try {
-        // Tolak bila job sedang berjalan
-        const chk = $os.cmd("bash", "-c", `pgrep -f "${cfg.bin}" >/dev/null 2>&1 && echo RUNNING || echo IDLE`).output();
+        // Tolak bila job sedang berjalan (trik [e] agar pgrep tak match proses parent-nya sendiri)
+        const scriptName = cfg.bin.split("/").pop().replace("examku-", "[e]xamku-");
+        const chk = $os.cmd("bash", "-c", `pgrep -f "${scriptName}" >/dev/null 2>&1 && echo RUNNING || echo IDLE`).output();
         let st = "";
         if (chk) { for (let i = 0; i < chk.length; i++) st += String.fromCharCode(chk[i]); }
         if (st.trim() === "RUNNING") {
