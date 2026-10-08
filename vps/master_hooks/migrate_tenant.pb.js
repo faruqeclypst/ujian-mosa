@@ -315,7 +315,7 @@ routerAdd("POST", "/api/multi-vps/run-job", (c) => {
         if (st.trim() === "RUNNING") {
             return c.json(409, { success: false, error: `${cfg.label} sedang berjalan. Tunggu selesai dulu.` });
         }
-        $os.cmd("bash", "-c", `nohup ${cfg.bin} >> ${cfg.log} 2>&1 & echo STARTED`);
+        $os.cmd("bash", "-c", `setsid nohup ${cfg.bin} >> ${cfg.log} 2>&1 < /dev/null & echo STARTED`);
         console.log(`[Ops] Job manual dimulai: ${job}`);
         return c.json(200, { success: true, message: `${cfg.label} dimulai di latar. Pantau log untuk hasilnya.` });
     } catch (err) {
