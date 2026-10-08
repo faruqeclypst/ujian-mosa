@@ -13,6 +13,14 @@
 # ============================================================
 set -u
 
+# Kunci anti-overlap (cron vs trigger manual vs klik ganda)
+LOCK_FILE="/tmp/examku-auto-fallback.lock"
+exec 200>"$LOCK_FILE"
+if ! flock -n 200; then
+  echo "[$(date '+%F %T')] SKIP: job sudah berjalan."
+  exit 0
+fi
+
 DB_PATH="/opt/pocketbase/master/pb_data/data.db"
 MIGRATE_BIN="/usr/local/bin/migrate-tenant.sh"
 LOG_FILE="/var/log/examku-auto-fallback.log"
