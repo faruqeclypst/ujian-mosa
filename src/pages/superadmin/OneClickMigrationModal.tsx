@@ -42,7 +42,7 @@ export const OneClickMigrationModal = ({
     school.server_host !== "localhost"
   );
 
-  const [direction, setDirection] = useState<"to_worker" | "to_master">(
+  const [direction, setDirection] = useState<"to_worker" | "to_master" | "restore">(
     isCurrentlyOnWorker ? "to_master" : "to_worker"
   );
 
@@ -65,6 +65,67 @@ export const OneClickMigrationModal = ({
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [copiedSetupCmd, setCopiedSetupCmd] = useState(false);
+
+  // ── Restore darurat dari snapshot harian ──
+  const [snapshots, setSnapshots] = useState<{ date: string; size: string }[]>([]);
+  const [loadingSnapshots, setLoadingSnapshots] = useState(false);
+  const [selectedSnapshot, setSelectedSnapshot] = useState("");
+  const [restoring, setRestoring] = useState(false);
+  const [forceRestore, setForceRestore] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadSnapshots = async () => {
+      setLoadingSnapshots(true);
+      try {
+        const res = await masterPb.send<any>(
+          `/api/multi-vps/snapshots?slug=${encodeURIComponent(school.slug)}`,
+          { method: "GET" }
+        );
+        if (!cancelled && res?.success && Array.isArray(res.snapshots)) {
+          setSnapshots(res.snapshots);
+          if (res.snapshots.length > 0) setSelectedSnapshot(res.snapshots[0].date);
+        }
+      } catch {
+        if (!cancelled) setSnapshots([]);
+      } finally {
+        if (!cancelled) setLoadingSnapshots(false);
+      }
+    };
+    loadSnapshots();
+    return () => { cancelled = true; };
+  }, [school.slug]);
+
+  const handleRestoreSnapshot = async () => {
+    if (!selectedSnapshot) {
+      setError("Pilih tanggal snapshot terlebih dahulu.");
+      return;
+    }
+    const ok = window.confirm(
+      `Pulihkan database '${school.slug}' dari snapshot ${selectedSnapshot} ke Master VPS?\n\n` +
+      `Data live saat ini akan dibackup otomatis (.bak) sebelum ditimpa.` +
+      (forceRestore ? `\n\nMODE PAKSA AKTIF: data live yang lebih baru akan ditimpa!` : "")
+    );
+    if (!ok) return;
+    setError("");
+    setRestoring(true);
+    try {
+      const res = await masterPb.send<any>(
+        `/api/multi-vps/restore-snapshot?slug=${encodeURIComponent(school.slug)}&date=${encodeURIComponent(selectedSnapshot)}${forceRestore ? "&force=1" : ""}`,
+        { method: "POST" }
+      );
+      if (res?.success) {
+        setSuccessMessage(res.message || "Snapshot berhasil dipulihkan ke Master VPS!");
+        setTimeout(() => onSuccess(), 1800);
+      } else {
+        throw new Error(res?.error || "Restore gagal.");
+      }
+    } catch (err: any) {
+      setError(err?.message || "Terjadi kesalahan saat restore snapshot.");
+    } finally {
+      setRestoring(false);
+    }
+  };
 
   const setupWorkerOneLiner = "curl -sSL https://raw.githubusercontent.com/faruqeclypst/ujian-mosa/feature/saas-v2/vps/setup_worker_node.sh | bash";
 
@@ -231,33 +292,52 @@ export const OneClickMigrationModal = ({
 
           {/* Mode Switcher */}
           {!migrating && !successMessage && (
-            <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-xl">
+            <div className="grid grid-cols-3 gap-2 p-1 bg-slate-100 rounded-xl">
               <button
                 type="button"
                 onClick={() => { setDirection("to_worker"); setTestResult(null); setError(""); }}
                 className={cn(
-                  "py-2 px-3 rounded-lg text-xs font-bold transition-all text-center flex items-center justify-center gap-1.5",
+                  "py-2 px-2 rounded-lg text-xs font-bold transition-all text-center flex items-center justify-center gap-1.5",
                   direction === "to_worker"
                     ? "bg-white text-purple-900 shadow-xs border border-purple-200"
                     : "text-slate-600 hover:text-slate-900"
                 )}
               >
                 <Zap size={13} className={direction === "to_worker" ? "text-purple-600" : "text-slate-400"} />
-                1. Mulai Ujian (Ke Worker)
+                1. Ke Worker
               </button>
 
               <button
                 type="button"
                 onClick={() => { setDirection("to_master"); setTestResult(null); setError(""); }}
                 className={cn(
-                  "py-2 px-3 rounded-lg text-xs font-bold transition-all text-center flex items-center justify-center gap-1.5",
+                  "py-2 px-2 rounded-lg text-xs font-bold transition-all text-center flex items-center justify-center gap-1.5",
                   direction === "to_master"
                     ? "bg-white text-blue-900 shadow-xs border border-blue-200"
                     : "text-slate-600 hover:text-slate-900"
                 )}
               >
                 <Database size={13} className={direction === "to_master" ? "text-blue-600" : "text-slate-400"} />
-                2. Selesai Ujian (Ke Master)
+                2. Ke Master
+              </button>
+
+              <button
+                type="button"
+                onClick={() => { setDirection("restore"); setError(""); }}
+                className={cn(
+                  "py-2 px-2 rounded-lg text-xs font-bold transition-all text-center flex items-center justify-center gap-1.5",
+                  direction === "restore"
+                    ? "bg-white text-amber-900 shadow-xs border border-amber-300"
+                    : "text-slate-600 hover:text-slate-900"
+                )}
+              >
+                <ShieldCheck size={13} className={direction === "restore" ? "text-amber-600" : "text-slate-400"} />
+                3. Darurat
+                {snapshots.length > 0 && (
+                  <span className="text-[9px] font-black bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded-full">
+                    {snapshots.length}
+                  </span>
+                )}
               </button>
             </div>
           )}
@@ -362,6 +442,69 @@ export const OneClickMigrationModal = ({
             </div>
           )}
 
+          {/* Mode 3: Restore Darurat dari Snapshot */}
+          {direction === "restore" && !migrating && !successMessage && (
+            <div className="space-y-3">
+              <div className="bg-amber-50/70 border border-amber-200 rounded-xl p-4 space-y-2">
+                <div className="flex items-center gap-2 text-amber-900 font-bold text-xs">
+                  <ShieldCheck size={15} className="text-amber-700" />
+                  <span>Restore Darurat dari Snapshot Harian</span>
+                </div>
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  Untuk kasus <strong>worker mati mendadak</strong> sebelum auto-fallback H-3 sempat menarik data.
+                  Snapshot diambil otomatis tiap jam 02:00 (retensi 7 hari). Setelah dipulihkan ke Master,
+                  tenant siap dimigrasi 1-klik ke worker baru.
+                </p>
+              </div>
+
+              {loadingSnapshots ? (
+                <p className="text-xs text-slate-500 flex items-center gap-2">
+                  <RefreshCw size={13} className="animate-spin" /> Memuat daftar snapshot...
+                </p>
+              ) : snapshots.length === 0 ? (
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-xs text-slate-500">
+                  Belum ada snapshot untuk tenant ini. Snapshot dibuat otomatis tiap jam 02:00
+                  selama tenant berada di worker VPS.
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <label className="block text-xs font-bold text-slate-800">
+                    Pilih tanggal snapshot:
+                  </label>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-40 overflow-y-auto">
+                    {snapshots.map((s) => (
+                      <button
+                        key={s.date}
+                        type="button"
+                        onClick={() => setSelectedSnapshot(s.date)}
+                        className={cn(
+                          "p-2.5 rounded-xl border text-xs font-bold transition-all text-left cursor-pointer",
+                          selectedSnapshot === s.date
+                            ? "bg-amber-50 border-amber-500 text-amber-900 ring-2 ring-amber-500/20"
+                            : "bg-white border-slate-200 text-slate-600 hover:border-slate-300"
+                        )}
+                      >
+                        <span className="block">{s.date}</span>
+                        <span className="block text-[10px] font-medium text-slate-400 mt-0.5">{s.size}</span>
+                      </button>
+                    ))}
+                  </div>
+                  <label className="flex items-start gap-2 text-[11px] text-slate-600 cursor-pointer pt-1">
+                    <input
+                      type="checkbox"
+                      checked={forceRestore}
+                      onChange={(e) => setForceRestore(e.target.checked)}
+                      className="mt-0.5 accent-amber-600"
+                    />
+                    <span>
+                      Timpa paksa walau data live lebih baru <span className="text-slate-400">(berisiko: data terbaru hilang)</span>
+                    </span>
+                  </label>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Progress State while Migrating */}
           {migrating && (
             <div className="py-4 space-y-4">
@@ -417,33 +560,46 @@ export const OneClickMigrationModal = ({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 border border-slate-200 text-slate-700 rounded-xl text-xs font-semibold hover:bg-white transition-all cursor-pointer"
+              disabled={restoring}
+              className="px-4 py-2 border border-slate-200 text-slate-700 rounded-xl text-xs font-semibold hover:bg-white transition-all cursor-pointer disabled:opacity-50"
             >
               Batal
             </button>
 
-            <button
-              type="button"
-              onClick={handleExecuteMigration}
-              className={cn(
-                "px-5 py-2.5 rounded-xl text-xs font-bold text-white transition-all shadow-sm flex items-center gap-2 cursor-pointer",
-                direction === "to_worker"
-                  ? "bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700"
-                  : "bg-blue-600 hover:bg-blue-700"
-              )}
-            >
-              {direction === "to_worker" ? (
-                <>
-                  <Zap size={14} />
-                  <span>Mulai Migrasi 1-Klik ke Worker</span>
-                </>
-              ) : (
-                <>
-                  <Database size={14} />
-                  <span>Tarik Database Balik ke Master (1-Klik)</span>
-                </>
-              )}
-            </button>
+            {direction === "restore" ? (
+              <button
+                type="button"
+                onClick={handleRestoreSnapshot}
+                disabled={restoring || snapshots.length === 0}
+                className="px-5 py-2.5 rounded-xl text-xs font-bold text-white transition-all shadow-sm flex items-center gap-2 cursor-pointer bg-amber-600 hover:bg-amber-700 disabled:opacity-50"
+              >
+                <ShieldCheck size={14} className={cn(restoring && "animate-pulse")} />
+                <span>{restoring ? "Memulihkan..." : "Pulihkan Snapshot ke Master"}</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleExecuteMigration}
+                className={cn(
+                  "px-5 py-2.5 rounded-xl text-xs font-bold text-white transition-all shadow-sm flex items-center gap-2 cursor-pointer",
+                  direction === "to_worker"
+                    ? "bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700"
+                    : "bg-blue-600 hover:bg-blue-700"
+                )}
+              >
+                {direction === "to_worker" ? (
+                  <>
+                    <Zap size={14} />
+                    <span>Mulai Migrasi 1-Klik ke Worker</span>
+                  </>
+                ) : (
+                  <>
+                    <Database size={14} />
+                    <span>Tarik Database Balik ke Master (1-Klik)</span>
+                  </>
+                )}
+              </button>
+            )}
           </div>
         )}
       </div>

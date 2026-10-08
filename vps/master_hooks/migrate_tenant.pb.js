@@ -152,3 +152,89 @@ routerAdd("POST", "/api/multi-vps/migrate", (c) => {
         return c.json(500, { success: false, error: "Terjadi kesalahan internal: " + err });
     }
 });
+
+// ============================================================
+// 5. Daftar snapshot harian tenant (untuk restore darurat)
+// ============================================================
+routerAdd("GET", "/api/multi-vps/snapshots", (c) => {
+    try { c.setResponseHeader("Access-Control-Allow-Origin", "*"); } catch (_) {}
+
+    let slug = "";
+    try {
+        const info = c.requestInfo();
+        let q = {};
+        try { q = info.query || {}; } catch (_) {}
+        slug = (q.slug || "").toString().trim();
+    } catch (e) {
+        return c.json(400, { success: false, error: "Gagal membaca data request: " + e });
+    }
+
+    if (!slug || !/^[a-z0-9-]+$/.test(slug)) {
+        return c.json(400, { success: false, error: "Slug sekolah tidak valid." });
+    }
+
+    try {
+        const cmd = `for f in /opt/pocketbase/worker-snapshots/${slug}/*.db; do [ -f "$f" ] || continue; echo "$(basename "$f" .db)|$(du -h "$f" | cut -f1)"; done | sort -r`;
+        const out = $os.cmd("bash", "-c", cmd).output();
+        let raw = "";
+        if (out) { for (let i = 0; i < out.length; i++) raw += String.fromCharCode(out[i]); }
+        const snapshots = raw.trim().split("\n")
+            .filter((l) => l.indexOf("|") > 0)
+            .map((l) => {
+                const p = l.split("|");
+                return { date: p[0], size: p[1] || "-" };
+            });
+        return c.json(200, { success: true, snapshots: snapshots });
+    } catch (err) {
+        return c.json(500, { success: false, error: "Terjadi kesalahan internal: " + err });
+    }
+});
+
+// ============================================================
+// 6. Restore snapshot darurat ke Master VPS
+// Dipakai bila worker mati mendadak sebelum auto-fallback H-3.
+// Body/query: slug, date (opsional, default terbaru), force.
+// ============================================================
+routerAdd("POST", "/api/multi-vps/restore-snapshot", (c) => {
+    try { c.setResponseHeader("Access-Control-Allow-Origin", "*"); } catch (_) {}
+
+    let slug = "", date = "", force = "";
+    try {
+        const info = c.requestInfo();
+        let b = {}; try { b = info.body || {}; } catch (_) {}
+        let q = {}; try { q = info.query || {}; } catch (_) {}
+        slug = (b.slug || q.slug || "").toString().trim();
+        date = (b.date || q.date || "").toString().trim();
+        force = (b.force || q.force || "").toString().trim();
+    } catch (e) {
+        return c.json(400, { success: false, error: "Gagal membaca data request: " + e });
+    }
+
+    if (!slug || !/^[a-z0-9-]+$/.test(slug)) {
+        return c.json(400, { success: false, error: "Slug sekolah tidak valid." });
+    }
+    if (date && !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        return c.json(400, { success: false, error: "Format tanggal tidak valid (YYYY-MM-DD)." });
+    }
+
+    try {
+        console.log(`[Restore] Memulai restore snapshot '${slug}' (${date || "terbaru"})...`);
+        const forceArg = (force === "1" || force === "true") ? " --force" : "";
+        const dateArg = date ? ` "${date}"` : "";
+        const cmd = `/usr/local/bin/examku-restore-snapshot.sh "${slug}"${dateArg}${forceArg}`;
+        const out = $os.cmd("bash", "-c", cmd).output();
+        let raw = "";
+        if (out) { for (let i = 0; i < out.length; i++) raw += String.fromCharCode(out[i]); }
+        raw = raw.trim();
+        if (raw.indexOf("[restore] SELESAI") >= 0) {
+            console.log(`[Restore] Sukses restore '${slug}'`);
+            return c.json(200, { success: true, message: `Snapshot ${date || "terbaru"} untuk '${slug}' berhasil dipulihkan ke Master VPS.`, log: raw });
+        }
+        console.error(`[Restore] Gagal restore '${slug}':`, raw);
+        const tail = raw.split("\n").slice(-3).join(" ").trim();
+        return c.json(400, { success: false, error: tail || "Restore gagal." });
+    } catch (err) {
+        console.error(`[Restore] Error exception saat restore '${slug}':`, err);
+        return c.json(500, { success: false, error: "Terjadi kesalahan internal: " + err });
+    }
+});
