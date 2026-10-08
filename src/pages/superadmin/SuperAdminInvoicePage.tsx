@@ -1056,7 +1056,7 @@ const SuperAdminInvoicePage = () => {
                   <div className="relative">
                     <select
                       value={form.status}
-                      onChange={e => setForm(f => ({ ...f, status: e.target.value as PaymentStatus }))}
+                      onChange={e => setForm(f => ({ ...f, status: e.target.value as StoredStatus }))}
                       className="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 appearance-none transition"
                     >
                       <option value="unpaid">Belum Bayar</option>
