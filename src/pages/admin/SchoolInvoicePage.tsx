@@ -101,12 +101,6 @@ const getProofUrl = (inv: Invoice): string => {
   return `${baseUrl}/api/files/invoices/${inv.id}/${inv.payment_proof}`;
 };
 
-const isImageProof = (proofUrl: string): boolean => {
-  if (!proofUrl) return false;
-  if (proofUrl.startsWith("data:image")) return true;
-  return /\.(jpg|jpeg|png|webp|gif|svg)($|\?)/i.test(proofUrl);
-};
-
 // ─── Component ────────────────────────────────────────────────
 
 
