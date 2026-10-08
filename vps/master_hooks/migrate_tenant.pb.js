@@ -219,6 +219,25 @@ routerAdd("POST", "/api/multi-vps/restore-snapshot", (c) => {
 
     try {
         console.log(`[Restore] Memulai restore snapshot '${slug}' (${date || "terbaru"})...`);
+
+        // Guard: bila worker masih hidup, arahkan ke migrasi 1-klik normal
+        // (restore snapshot hanya untuk kasus darurat worker mati).
+        try {
+            const qcmd = `sqlite3 /opt/pocketbase/master/pb_data/data.db "SELECT server_host FROM schools WHERE slug='${slug}';"`;
+            const qout = $os.cmd("bash", "-c", qcmd).output();
+            let srv = "";
+            if (qout) { for (let i = 0; i < qout.length; i++) srv += String.fromCharCode(qout[i]); }
+            srv = srv.trim();
+            if (srv && srv !== "127.0.0.1" && srv !== "localhost") {
+                const pout = $os.cmd("bash", "-c", `/usr/bin/ssh -o BatchMode=yes -o ConnectTimeout=5 -o StrictHostKeyChecking=no root@${srv} "true" && echo ALIVE`).output();
+                let pr = "";
+                if (pout) { for (let i = 0; i < pout.length; i++) pr += String.fromCharCode(pout[i]); }
+                if (pr.indexOf("ALIVE") >= 0) {
+                    return c.json(400, { success: false, error: `Worker ${srv} masih hidup dan terjangkau. Gunakan 'Tarik Database Balik ke Master (1-Klik)' untuk migrasi normal.` });
+                }
+            }
+        } catch (_) { /* abaikan guard, lanjutkan restore */ }
+
         const forceArg = (force === "1" || force === "true") ? " --force" : "";
         const dateArg = date ? ` "${date}"` : "";
         const cmd = `/usr/local/bin/examku-restore-snapshot.sh "${slug}"${dateArg}${forceArg}`;
