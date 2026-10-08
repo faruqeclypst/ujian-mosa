@@ -508,11 +508,26 @@ const SuperAdminInvoicePage = () => {
     if (!confirm(`Sinkron ulang paket untuk ${inv.school_name} dari invoice ${inv.invoice_number}?`)) return;
     try {
       const ok = await upgradeSchoolFromInvoice(inv);
-      if (ok) {
-        alert("Paket sekolah berhasil disinkronkan dari invoice.");
-      } else {
+      if (!ok) {
         alert("Gagal menyinkronkan paket. Periksa data sekolah & invoice di PocketBase.");
+        return;
       }
+      // Verifikasi: baca ulang record sekolah langsung dari database master
+      let verifyMsg = "";
+      try {
+        let srec: any = null;
+        if (inv.school_id) {
+          try { srec = await masterPb.collection("schools").getOne(inv.school_id); } catch {}
+        }
+        if (!srec && inv.school_slug) {
+          try { srec = await masterPb.collection("schools").getFirstListItem(`slug = "${inv.school_slug}"`); } catch {}
+        }
+        if (srec) {
+          verifyMsg = `\n\nTerverifikasi di database:\n- Paket: ${srec.plan}\n- Kuota: ${srec.student_quota}\n- Aktif s/d: ${srec.active_until || "-"}`;
+        }
+      } catch {}
+      alert(`Paket sekolah berhasil disinkronkan dari invoice.${verifyMsg}\n\nJika halaman tenant belum berubah, refresh halaman tenant (Ctrl+Shift+R) — data paket dimuat ulang dari server.`);
+      await loadInvoices();
     } catch (err: any) {
       alert(err?.message || "Gagal menyinkronkan paket.");
     }
