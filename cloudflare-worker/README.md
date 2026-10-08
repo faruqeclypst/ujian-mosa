@@ -1,6 +1,34 @@
-# Cloudflare Worker for R2 File Deletion
+# Cloudflare Workers — Examku & R2
 
-This Cloudflare Worker handles file deletion operations for Cloudflare R2 storage.
+## Arsitektur (2026-10-08)
+
+Ada **2 worker**, jangan tertukar:
+
+| Worker | URL | Bucket | Dipakai oleh |
+|---|---|---|---|
+| `examku-worker` | `https://examku-worker.faruq-blogger.workers.dev` | `examku` | **Aplikasi Examku** (upload + delete + serve file) |
+| `r2-delete-worker` | `https://r2-delete-worker.faruq-blogger.workers.dev` | `tu-mosa` | **Aplikasi lain** — ⚠️ JANGAN DIUBAH |
+
+- Aplikasi Examku **wajib** pakai `examku-worker`:
+  ```env
+  VITE_R2_WORKER_URL=https://examku-worker.faruq-blogger.workers.dev
+  VITE_R2_PUBLIC_BASE_URL=https://assets.examku.my.id
+  ```
+  Custom domain `assets.examku.my.id` terpasang di bucket `examku`
+  (terverifikasi 2026-10-08: file di bucket lain 404 di domain ini).
+- `examku-worker` menjalankan `examku-worker.js` (upload + delete + serve + proxy),
+  binding `EXAMKU_BUCKET` → bucket `examku`. Deploy via dashboard / wrangler.
+- `r2-delete-worker` menjalankan `r2-delete.js` (khusus delete),
+  binding `INVENTORY_BUCKET` → bucket `tu-mosa`.
+  **Dipakai aplikasi lain juga — jangan ubah script, binding, atau bucket-nya.**
+
+## Riwayat insiden (2026-10-08)
+
+`VITE_R2_WORKER_URL` sempat menunjuk ke `r2-delete-worker` (khusus delete),
+sehingga upload gagal dengan error
+`No number after minus sign in JSON at position 1`
+(worker delete me-`request.json()` body multipart).
+Solusi: kembalikan Examku ke `examku-worker`, jangan utak-atik `r2-delete-worker`.
 
 ## Setup
 
@@ -34,25 +62,24 @@ cd cloudflare-worker
 wrangler deploy
 ```
 
-✅ **DEPLOYED**: The unified worker (`examku-worker.js`: upload + delete + file serve)
-is now deployed at:
-`https://r2-delete-worker.faruq-blogger.workers.dev`
-(nama worker dipertahankan agar `VITE_R2_WORKER_URL` tidak perlu diubah)
+✅ **DEPLOYED**: `examku-worker` (menjalankan `examku-worker.js`: upload + delete + serve)
+`https://examku-worker.faruq-blogger.workers.dev`
 
 ## Update Environment Variable
 
 The `VITE_R2_WORKER_URL` in your `.env` file should be set to:
 
 ```env
-VITE_R2_WORKER_URL=https://r2-delete-worker.faruq-blogger.workers.dev
+VITE_R2_WORKER_URL=https://examku-worker.faruq-blogger.workers.dev
+VITE_R2_PUBLIC_BASE_URL=https://assets.examku.my.id
 ```
 
 ## Worker Status
 
-- ✅ **Worker Deployed**: r2-delete-worker (menjalankan `examku-worker.js`)
-- ✅ **R2 Binding**: EXAMKU_BUCKET → tu-mosa
+- ✅ **Worker Deployed**: examku-worker (menjalankan `examku-worker.js`)
+- ✅ **R2 Binding**: EXAMKU_BUCKET → examku
 - ✅ **CORS Enabled**: Allows cross-origin requests
-- ✅ **Routes**: `POST /upload` (multipart FormData: `key`, `file`, `contentType`), `POST /` (JSON `{key}` untuk delete), `GET /<key>` (serve file)
+- ✅ **Routes**: `POST /upload` (multipart FormData: `key`, `file`, `contentType`), `POST /` (JSON `{key}` untuk delete), `GET /<key>` (serve file), `GET /proxy?url=` (proxy gambar eksternal)
 - ✅ **Error Handling**: Proper error responses and logging
 
 ## Usage

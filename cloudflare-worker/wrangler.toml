@@ -1,15 +1,16 @@
 name = "r2-delete-worker"
-main = "examku-worker.js"
+main = "r2-delete.js"
 compatibility_date = "2024-01-01"
 workers_dev = true
 
-# R2 bucket binding — unified worker (upload + delete + serve).
-# Nama worker dipertahankan agar VITE_R2_WORKER_URL tidak perlu diubah.
-# Bucket WAJIB "examku": custom domain assets.examku.my.id terpasang di bucket ini
-# (terverifikasi 2026-10-08: file di tu-mosa tidak bisa diakses via assets.examku.my.id).
+# R2 bucket binding for direct R2 API access
+#
+# ⚠️  PENTING: worker ini dipakai APLIKASI LAIN juga (bukan cuma Examku).
+#     JANGAN ubah main script, binding, atau bucket tanpa koordinasi —
+#     perubahan di sini berdampak ke aplikasi lain tersebut.
 [[r2_buckets]]
-binding = "EXAMKU_BUCKET"
-bucket_name = "examku"
+binding = "INVENTORY_BUCKET"
+bucket_name = "tu-mosa"
 
 # Environment variables (can be overridden via wrangler secrets)
 [vars]
