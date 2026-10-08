@@ -76,7 +76,7 @@ const SidebarSkeleton = ({ isCollapsed }: { isCollapsed: boolean }) => {
 const Sidebar = () => {
   const { role, loading } = useAuth();
   const { isCollapsed, isMobileOpen, toggleCollapsed, closeMobile } = useSidebar();
-  const { terminology, school } = useTenant();
+  const { terminology, school, subscriptionStatus } = useTenant();
   const examData = useExamData();
   const [unpaidCount, setUnpaidCount] = React.useState<number>(0);
   const [accountStatus, setAccountStatus] = React.useState<{
@@ -225,6 +225,22 @@ const Sidebar = () => {
   };
 
   const filteredNavigation = React.useMemo(() => {
+    // Sekolah ditangguhkan: admin hanya boleh membuka Invoice & Pengaturan
+    // (untuk perpanjangan layanan). Fitur lain disembunyikan total.
+    if (subscriptionStatus?.isSuspended) {
+      return [
+        {
+          label: "Sistem",
+          icon: Settings,
+          badge: unpaidCount > 0 ? `${unpaidCount}` : null,
+          children: [
+            { to: "/admin/invoice", label: "Invoice", icon: FileText, badge: unpaidCount > 0 ? "Belum Bayar" : null },
+            { to: "/admin/pengaturan", label: "Pengaturan", icon: Settings, badge: null },
+          ],
+        },
+      ];
+    }
+
     if (role === "admin") return navigation;
     
     // Default/Teacher role: Filter out System, but allow Master Data -> Data Siswa only
@@ -240,7 +256,7 @@ const Sidebar = () => {
         return item;
       })
       .filter(item => item.label !== "Master Data" || (item.children && item.children.length > 0));
-  }, [role, navigation, terminology]);
+  }, [role, navigation, terminology, subscriptionStatus, unpaidCount]);
 
   if (loading) return <SidebarSkeleton isCollapsed={isCollapsed} />;
 

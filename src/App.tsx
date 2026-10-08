@@ -112,6 +112,19 @@ const SchoolAppContent = () => {
     return <SchoolSuspendedPage />;
   }
 
+  // Saat ditangguhkan, admin hanya boleh membuka halaman Invoice & Pengaturan
+  // (untuk perpanjangan layanan). URL admin lain dialihkan ke Invoice.
+  if (subscriptionStatus?.isSuspended && isAdminRoute) {
+    const path = location.pathname.replace(/\/+$/, "") || "/admin";
+    const allowedPrefixes = ["/admin/invoice", "/admin/pengaturan", "/admin/change-password"];
+    const isLoginPage = path === "/admin" && !user;
+    const isAllowed =
+      isLoginPage || allowedPrefixes.some((p) => path === p || path.startsWith(p + "/"));
+    if (!isAllowed) {
+      return <Navigate to={user ? "/admin/invoice" : "/admin"} replace />;
+    }
+  }
+
   const isGlobalLoading = adminLoading || studentLoading;
 
   return (
