@@ -16,6 +16,7 @@ import {
   PlanKey,
 } from "../../utils/pricingHelper";
 import { printDigitalInvoice } from "../../utils/invoicePdfHelper";
+import { isTopupInvoice } from "../../utils/subscriptionHelper";
 
 // ─── Types ───────────────────────────────────────────────────
 
@@ -156,7 +157,7 @@ const SchoolInvoicePage = () => {
         .map(r => ({
           ...r,
           plan: r.plan || normalizePlanKey(r.plan_label),
-          duration_months: Number(r.duration_months) || 1,
+          duration_months: Number.isFinite(Number(r.duration_months)) ? Number(r.duration_months) : 1,
           amount: Number(r.amount) || 0,
         }))
         .sort((a, b) => String(b.created || "").localeCompare(String(a.created || "")));
@@ -641,7 +642,7 @@ const SchoolInvoicePage = () => {
                     </div>
                     <p className="text-sm font-bold text-slate-900 dark:text-white">
                       {PLAN_PRICES[inv.plan]?.label || inv.plan} Plan
-                      <span className="font-normal text-slate-500 dark:text-slate-400"> · {inv.duration_months} bulan</span>
+                      <span className="font-normal text-slate-500 dark:text-slate-400"> · {isTopupInvoice(inv) ? "top-up kuota" : `${inv.duration_months} bulan`}</span>
                     </p>
                     <p className="text-xs text-slate-400 dark:text-slate-500">
                       {inv.status === "paid" && inv.paid_date
@@ -925,7 +926,7 @@ const SchoolInvoicePage = () => {
                   <div className="divide-y divide-slate-100 dark:divide-slate-800/80">
                     {[
                       { label: "Layanan", value: `${PLAN_PRICES[detailInvoice.plan]?.label || detailInvoice.plan} Plan` },
-                      { label: "Durasi", value: `${detailInvoice.duration_months} bulan` },
+                      { label: "Durasi", value: isTopupInvoice(detailInvoice) ? "Top-up kuota (periode tetap)" : `${detailInvoice.duration_months} bulan` },
                       { label: "Jatuh Tempo", value: formatDate(detailInvoice.due_date) },
                       ...(detailInvoice.paid_date ? [{ label: "Tanggal Bayar", value: formatDate(detailInvoice.paid_date) }] : []),
                     ].map(row => (

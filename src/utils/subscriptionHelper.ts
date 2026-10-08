@@ -153,12 +153,77 @@ export function getSubscriptionStatus(school: SchoolRecordForSub | null | undefi
 /**
  * Otomatis meng-upgrade data sekolah saat invoice berstatus 'paid' (lunas)
  */
+export interface TopupCalculation {
+  currentPlanKey: PlanKey;
+  targetPlanKey: PlanKey;
+  currentLabel: string;
+  targetLabel: string;
+  currentQuota: number;
+  targetQuota: number;
+  remainingDays: number;
+  amount: number;
+  activeUntil: string; // YYYY-MM-DD
+}
+
+/**
+ * Hitung top-up kuota mid-cycle (periode TETAP, tidak diperpanjang):
+ * - Sekolah harus punya masa aktif berbayar yang masih berjalan.
+ * - Paket tujuan harus punya kuota lebih besar dari paket saat ini.
+ * - Harga = selisih tarif bulanan × sisa hari / 30.
+ */
+export function calculateTopup(
+  school: SchoolRecordForSub,
+  targetPlanKey: string
+): TopupCalculation | { error: string } {
+  const currentPlanKey = normalizePlanKey(school.plan || "basic");
+  const targetKey = normalizePlanKey(targetPlanKey);
+  const current = PLAN_PRICING[currentPlanKey];
+  const target = PLAN_PRICING[targetKey];
+  if (!current || !target) return { error: "Paket tidak dikenal." };
+  if (currentPlanKey === "free" || !school.active_until) {
+    return { error: "Top-up hanya untuk sekolah dengan masa aktif berbayar yang masih berjalan." };
+  }
+  const m = school.active_until.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return { error: "Format active_until tidak dikenali." };
+  const exp = new Date(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10), 23, 59, 59);
+  const now = new Date();
+  const remainingDays = Math.ceil((exp.getTime() - now.getTime()) / 86400000);
+  if (remainingDays <= 0) {
+    return { error: "Masa aktif sudah berakhir — terbitkan invoice perpanjangan biasa." };
+  }
+  if (target.quota <= current.quota) {
+    return { error: `Paket tujuan (${target.label}) kuotanya tidak lebih besar dari paket saat ini.` };
+  }
+  const diffMonthly = target.monthlyRate - current.monthlyRate;
+  if (diffMonthly <= 0) {
+    return { error: "Selisih tarif tidak valid untuk top-up." };
+  }
+  const amount = Math.round((remainingDays * diffMonthly) / 30);
+  return {
+    currentPlanKey,
+    targetPlanKey: targetKey,
+    currentLabel: current.label,
+    targetLabel: target.label,
+    currentQuota: current.quota,
+    targetQuota: target.quota,
+    remainingDays,
+    amount,
+    activeUntil: `${m[1]}-${m[2]}-${m[3]}`,
+  };
+}
+
+/** Deteksi invoice top-up: duration 0 atau penanda [TOPUP] di catatan. */
+export function isTopupInvoice(inv: { duration_months?: number; notes?: string }): boolean {
+  return Number(inv.duration_months) === 0 || String(inv.notes || "").includes("[TOPUP]");
+}
+
 export const upgradeSchoolFromInvoice = async (invoice: {
   school_id?: string;
   school_slug?: string;
   plan?: string;
   duration_months?: number;
   amount?: number;
+  notes?: string;
 }): Promise<boolean> => {
   try {
     let school: any = null;
@@ -177,6 +242,18 @@ export const upgradeSchoolFromInvoice = async (invoice: {
     const planKey = normalizePlanKey(invoice.plan || school.plan || "basic");
     const planDetail = PLAN_PRICING[planKey];
     const targetQuota = planDetail.quota;
+
+    // ── TOP-UP KUOTA (periode tetap): hanya naikkan paket & kuota,
+    //     active_until TIDAK diubah ──
+    if (isTopupInvoice(invoice)) {
+      await masterPb.collection("schools").update(school.id, {
+        plan: planKey,
+        student_quota: Math.max(school.student_quota || 0, targetQuota),
+      });
+      console.log(`[Topup Kuota] ${school.name}: ${school.plan} → ${planKey} (kuota: ${targetQuota}), periode tetap s/d ${school.active_until}`);
+      return true;
+    }
+
     const months = Number(invoice.duration_months) || 1;
 
     // Tentukan tanggal kedaluwarsa baru

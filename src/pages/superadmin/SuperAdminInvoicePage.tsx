@@ -4,6 +4,7 @@ import {
   CheckCircle2, Clock, XCircle, Upload, X, ChevronDown,
   Building2, Calendar, CreditCard, Printer, RefreshCw,
   AlertTriangle, Paperclip, ExternalLink, Trash2, Edit,
+  ArrowUpCircle,
 } from "lucide-react";
 import { masterPb } from "../../lib/pocketbase";
 import SuperAdminLayout from "../../components/layout/SuperAdminLayout";
@@ -14,7 +15,7 @@ import {
   PLAN_PRICING,
   PlanKey,
 } from "../../utils/pricingHelper";
-import { upgradeSchoolFromInvoice } from "../../utils/subscriptionHelper";
+import { upgradeSchoolFromInvoice, calculateTopup, isTopupInvoice } from "../../utils/subscriptionHelper";
 import { printDigitalInvoice } from "../../utils/invoicePdfHelper";
 
 // ─── Types ─────────────────────────────────────────────────────────────────
@@ -48,7 +49,16 @@ interface SchoolRecord {
   slug: string;
   plan?: string;
   contact_email?: string;
+  active_until?: string;
+  student_quota?: number;
 }
+
+const formatDateID = (yyyyMmDd: string): string => {
+  const months = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+  const [y, m, d] = yyyyMmDd.split("-").map(Number);
+  if (!y || !m || !d) return yyyyMmDd;
+  return `${d} ${months[m - 1]} ${y}`;
+};
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -160,6 +170,84 @@ const SuperAdminInvoicePage = () => {
   const [saving, setSaving] = useState(false);
   const [uploadingProof, setUploadingProof] = useState<string | null>(null);
 
+  // ─── Top-Up Kuota (periode tetap) ───
+  const [showTopupModal, setShowTopupModal] = useState(false);
+  const [topupSchoolId, setTopupSchoolId] = useState("");
+  const [topupTargetPlan, setTopupTargetPlan] = useState<string>("pro");
+  const [topupSaving, setTopupSaving] = useState(false);
+
+  const topupSchool = schools.find(s => s.id === topupSchoolId) || null;
+  const topupCalc = topupSchool ? calculateTopup(topupSchool, topupTargetPlan) : null;
+  const topupCalcError = topupCalc && "error" in topupCalc ? topupCalc.error : null;
+
+  // Sekolah yang layak top-up: masa aktif berbayar masih berjalan
+  const topupEligibleSchools = schools.filter(s => {
+    if (normalizePlanKey(s.plan || "free") === "free" || !s.active_until) return false;
+    const m = s.active_until.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!m) return false;
+    return new Date(+m[1], +m[2] - 1, +m[3], 23, 59, 59).getTime() > Date.now();
+  });
+
+  // Paket tujuan: kuota harus lebih besar dari paket sekolah saat ini
+  const topupTargetOptions = topupSchool
+    ? (Object.keys(PLAN_PRICING) as PlanKey[]).filter(k =>
+        k !== "free" && PLAN_PRICING[k].quota > (PLAN_PRICING[normalizePlanKey(topupSchool.plan || "basic")]?.quota || 0)
+      )
+    : [];
+
+  const openTopup = () => {
+    setTopupSchoolId("");
+    setTopupTargetPlan("pro");
+    setShowTopupModal(true);
+  };
+
+  const handleTopupSchoolChange = (id: string) => {
+    setTopupSchoolId(id);
+    const s = schools.find(x => x.id === id);
+    if (s) {
+      const curQuota = PLAN_PRICING[normalizePlanKey(s.plan || "basic")]?.quota || 0;
+      const firstHigher = (Object.keys(PLAN_PRICING) as PlanKey[]).find(k =>
+        k !== "free" && PLAN_PRICING[k].quota > curQuota
+      );
+      if (firstHigher) setTopupTargetPlan(firstHigher);
+    }
+  };
+
+  const handleIssueTopup = async () => {
+    if (!topupSchool || !topupCalc || topupCalcError) return;
+    setTopupSaving(true);
+    try {
+      const target = PLAN_PRICING[topupCalc.targetPlanKey];
+      const current = PLAN_PRICING[topupCalc.currentPlanKey];
+      const perDay = Math.round((target.monthlyRate - current.monthlyRate) / 30);
+      const activeUntilFmt = formatDateID(topupCalc.activeUntil);
+      const payload = {
+        invoice_number: generateInvoiceNumber(),
+        school_id: topupSchool.id,
+        school_name: topupSchool.name,
+        school_slug: topupSchool.slug,
+        contact_email: topupSchool.contact_email || "",
+        plan: topupCalc.targetPlanKey,
+        plan_label: target.label,
+        duration_months: 0,
+        period_label: `Top-up s/d ${activeUntilFmt}`,
+        amount: topupCalc.amount,
+        status: "unpaid",
+        due_date: topupCalc.activeUntil,
+        notes: `[TOPUP] Top-up kuota ${topupCalc.currentLabel} (${topupCalc.currentQuota} siswa) → ${topupCalc.targetLabel} (${topupCalc.targetQuota} siswa). Periode tetap s/d ${activeUntilFmt} (${topupCalc.remainingDays} hari × Rp ${perDay.toLocaleString("id-ID")}/hari). Masa aktif TIDAK diperpanjang.`,
+      };
+      await masterPb.collection("invoices").create(payload);
+      await loadInvoices();
+      setShowTopupModal(false);
+      setTopupSchoolId("");
+      alert(`Invoice top-up Rp ${topupCalc.amount.toLocaleString("id-ID")} untuk ${topupSchool.name} berhasil diterbitkan. Kuota naik setelah pembayaran diverifikasi.`);
+    } catch (err: any) {
+      alert(err?.data?.message || err?.message || "Gagal menerbitkan invoice top-up.");
+    } finally {
+      setTopupSaving(false);
+    }
+  };
+
   const loadSchools = useCallback(async () => {
     try {
       const list = await masterPb.collection("schools").getFullList<SchoolRecord>({ sort: "name" });
@@ -180,7 +268,7 @@ const SuperAdminInvoicePage = () => {
         school_name: r.school_name || "Institusi tidak bernama",
         school_slug: r.school_slug || "-",
         plan: r.plan || (r.plan_label ? Object.keys(PLAN_PRICES).find(k => PLAN_PRICES[k].label === r.plan_label) : "basic") || "basic",
-        duration_months: Number(r.duration_months) || 1,
+        duration_months: Number.isFinite(Number(r.duration_months)) ? Number(r.duration_months) : 1,
         amount: Number(r.amount) || 0,
       }));
       setInvoices(mapped);
@@ -217,8 +305,8 @@ const SuperAdminInvoicePage = () => {
               contact_email: item.contact_email || "",
               plan: item.plan || "basic",
               plan_label: PLAN_PRICES[item.plan]?.label || item.plan || "Berkembang",
-              duration_months: Number(item.duration_months) || 1,
-              period_label: `${item.duration_months || 1} bulan`,
+              duration_months: Number.isFinite(Number(item.duration_months)) ? Number(item.duration_months) : 1,
+              period_label: item.period_label || `${Number(item.duration_months) || 1} bulan`,
               amount: Number(item.amount) || 0,
               status: item.status || "unpaid",
               due_date: item.due_date || "",
@@ -485,6 +573,13 @@ const SuperAdminInvoicePage = () => {
             <h1 className="text-xl font-bold text-slate-900 leading-none">Invoice</h1>
             <p className="text-sm text-slate-500 mt-1">Kelola tagihan dan bukti pembayaran institusi</p>
           </div>
+          <button
+            onClick={openTopup}
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold rounded-xl transition-colors shadow-sm"
+          >
+            <ArrowUpCircle size={15} />
+            Top-Up Kuota
+          </button>
           <button
             onClick={openCreate}
             className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl transition-colors shadow-sm"
@@ -997,6 +1092,112 @@ const SuperAdminInvoicePage = () => {
         </div>
       )}
 
+      {/* ─── Top-Up Kuota Modal (periode tetap) ─────────────────────────── */}
+      {showTopupModal && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-5 border-b border-slate-100">
+              <div>
+                <h2 className="font-bold text-slate-900">Top-Up Kuota (Periode Tetap)</h2>
+                <p className="text-xs text-slate-400 mt-0.5">Naikkan kuota tanpa mengubah tanggal berakhir masa aktif</p>
+              </div>
+              <button onClick={() => setShowTopupModal(false)} className="p-2 rounded-xl hover:bg-slate-100 text-slate-400 transition">
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1.5">Institusi</label>
+                <div className="relative">
+                  <Building2 size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <select
+                    value={topupSchoolId}
+                    onChange={e => handleTopupSchoolChange(e.target.value)}
+                    className="w-full pl-9 pr-4 py-2.5 text-sm border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-400 appearance-none transition"
+                  >
+                    <option value="">Pilih institusi...</option>
+                    {topupEligibleSchools.map(s => (
+                      <option key={s.id} value={s.id}>{s.name} ({s.slug})</option>
+                    ))}
+                  </select>
+                  <ChevronDown size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                </div>
+                {topupEligibleSchools.length === 0 && (
+                  <p className="text-[11px] text-slate-400 mt-1">Tidak ada sekolah dengan masa aktif berbayar yang berjalan.</p>
+                )}
+              </div>
+
+              {topupSchool && (
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1.5">Paket Tujuan</label>
+                  <div className="relative">
+                    <CreditCard size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <select
+                      value={topupTargetPlan}
+                      onChange={e => setTopupTargetPlan(e.target.value)}
+                      className="w-full pl-8 pr-4 py-2.5 text-sm border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-400 appearance-none transition"
+                    >
+                      {topupTargetOptions.map(k => (
+                        <option key={k} value={k}>{PLAN_PRICING[k].label} ({PLAN_PRICING[k].quota} siswa)</option>
+                      ))}
+                    </select>
+                    <ChevronDown size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                  </div>
+                </div>
+              )}
+
+              {topupCalcError && (
+                <div className="flex items-start gap-2 p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700">
+                  <AlertTriangle size={14} className="shrink-0 mt-0.5" />
+                  <span>{topupCalcError}</span>
+                </div>
+              )}
+
+              {topupCalc && !topupCalcError && (
+                <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-sm space-y-1.5">
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Paket saat ini</span>
+                    <span className="font-semibold text-slate-800">{topupCalc.currentLabel} ({topupCalc.currentQuota} siswa)</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Paket tujuan</span>
+                    <span className="font-semibold text-slate-800">{topupCalc.targetLabel} ({topupCalc.targetQuota} siswa)</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Sisa masa aktif</span>
+                    <span className="font-semibold text-slate-800">{topupCalc.remainingDays} hari (s/d {formatDateID(topupCalc.activeUntil)})</span>
+                  </div>
+                  <div className="flex justify-between border-t border-amber-200 pt-1.5">
+                    <span className="text-slate-500">Tagihan top-up</span>
+                    <span className="font-bold text-amber-700">Rp {topupCalc.amount.toLocaleString("id-ID")}</span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 pt-1">
+                    Selisih tarif prorata harian. Periode <strong>tidak</strong> diperpanjang — kuota naik segera setelah pembayaran diverifikasi.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-3 p-5 border-t border-slate-100">
+              <button
+                onClick={() => setShowTopupModal(false)}
+                className="flex-1 py-2.5 text-sm font-semibold text-slate-600 border border-slate-200 rounded-xl hover:bg-slate-50 transition"
+              >
+                Batal
+              </button>
+              <button
+                onClick={handleIssueTopup}
+                disabled={topupSaving || !topupCalc || !!topupCalcError}
+                className="flex-1 py-2.5 text-sm font-semibold text-white bg-amber-500 hover:bg-amber-600 rounded-xl transition disabled:opacity-50"
+              >
+                {topupSaving ? "Menerbitkan..." : "Terbitkan Invoice Top-Up"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ─── Detail/Proof Modal ─────────────────────────────────────────── */}
       {detailInvoice && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -1049,7 +1250,7 @@ const SuperAdminInvoicePage = () => {
                     <p className="text-sm font-semibold text-slate-800 mt-0.5">
                       {PLAN_PRICES[detailInvoice.plan]?.label || detailInvoice.plan}
                     </p>
-                    <p className="text-xs text-slate-400">{detailInvoice.duration_months} bulan</p>
+                    <p className="text-xs text-slate-400">{isTopupInvoice(detailInvoice) ? (detailInvoice.period_label || "Top-up kuota (periode tetap)") : `${detailInvoice.duration_months} bulan`}</p>
                   </div>
                 </div>
                 <div className="space-y-3">

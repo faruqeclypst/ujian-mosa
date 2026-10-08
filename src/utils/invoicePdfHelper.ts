@@ -457,7 +457,7 @@ export function printDigitalInvoice(inv: InvoiceData, school?: SchoolMeta | null
                   Mencakup Manajemen Bank Soal, Server Ujian Realtime, Aplikasi Mobile Exambro Anti-Curang, Pemantauan Proktor, dan Dukungan Penuh untuk ${quotaText}.
                 </div>
               </td>
-              <td style="text-align: center; font-weight: 600; color:#0f172a;">${inv.duration_months} Bulan</td>
+              <td style="text-align: center; font-weight: 600; color:#0f172a;">${Number(inv.duration_months) === 0 ? "Top-up" : `${inv.duration_months} Bulan`}</td>
               <td style="text-align: right; color: #475569;">${formatRupiah(inv.amount)}</td>
               <td style="text-align: right; font-weight: 700; color:#0f172a;">${formatRupiah(inv.amount)}</td>
             </tr>
