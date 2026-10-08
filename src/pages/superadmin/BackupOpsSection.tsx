@@ -20,6 +20,7 @@ interface SnapshotInfo {
 }
 
 interface OpsStatus {
+  success?: boolean;
   crons: string[];
   backup: JobInfo;
   fallback: JobInfo;
