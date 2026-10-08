@@ -22,7 +22,10 @@ import { ProofLightbox, isImageProof } from "../../components/ProofLightbox";
 
 // ─── Types ───────────────────────────────────────────────────
 
-type PaymentStatus = "unpaid" | "paid" | "overdue" | "cancelled" | "pending";
+/** Status yang tersimpan di database. Tidak pernah "pending". */
+type StoredStatus = "unpaid" | "paid" | "overdue" | "cancelled";
+/** Status tampilan: StoredStatus + "pending" yang di-derive dari (unpaid + payment_proof). */
+type PaymentStatus = StoredStatus | "pending";
 
 interface Invoice {
   id: string;
@@ -36,7 +39,7 @@ interface Invoice {
   duration_months: number;
   period_label?: string;
   amount: number;
-  status: PaymentStatus;
+  status: StoredStatus;
   due_date: string;
   paid_date?: string;
   notes?: string;
