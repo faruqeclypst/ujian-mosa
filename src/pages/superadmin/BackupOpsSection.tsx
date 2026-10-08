@@ -38,7 +38,11 @@ const cronSchedule = (crons: string[], key: string): string => {
 
 const summaryOk = (summary: string): boolean | null => {
   if (!summary) return null;
-  if (/failed=\d*[1-9]|FAIL/i.test(summary)) return false;
+  // Jika ada hitungan eksplisit fail=N / failed=N → gagal hanya jika N > 0.
+  // (Jangan pakai substring "FAIL" mentah: "fail=0" ikut kecocokkan.)
+  const m = summary.match(/fail(?:ed)?\s*=\s*(\d+)/i);
+  if (m) return Number(m[1]) === 0;
+  if (/FAIL/i.test(summary)) return false;
   return true;
 };
 
