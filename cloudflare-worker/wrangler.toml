@@ -5,9 +5,11 @@ workers_dev = true
 
 # R2 bucket binding — unified worker (upload + delete + serve).
 # Nama worker dipertahankan agar VITE_R2_WORKER_URL tidak perlu diubah.
+# Bucket WAJIB "examku": custom domain assets.examku.my.id terpasang di bucket ini
+# (terverifikasi 2026-10-08: file di tu-mosa tidak bisa diakses via assets.examku.my.id).
 [[r2_buckets]]
 binding = "EXAMKU_BUCKET"
-bucket_name = "tu-mosa"
+bucket_name = "examku"
 
 # Environment variables (can be overridden via wrangler secrets)
 [vars]
