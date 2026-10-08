@@ -357,8 +357,9 @@ const SchoolInvoicePage = () => {
   }
 
   const selectedPlanLabel = PLAN_PRICES[selectedPlan]?.label || selectedPlan;
+  const renewalEstimate = calculatePlanInvoice(selectedPlan, selectedDuration).amount;
   const waMessage = encodeURIComponent(
-    `Halo Admin EXAMKU, kami dari *${school.name}* (ID: ${school.slug}) ingin mengajukan *perpanjangan layanan CBT*:\n- Paket: *${selectedPlanLabel}*\n- Durasi: *${selectedDuration} Bulan*\n- Kuota: *${school.student_quota || 0} Siswa*\n${renewalNotes ? `- Catatan: ${renewalNotes}\n` : ""}Mohon bantu terbitkan tagihan/invoice resmi. Terima kasih.`
+    `Halo Admin EXAMKU, kami dari *${school.name}* (ID: ${school.slug}) ingin mengajukan *perpanjangan layanan CBT*:\n- Paket: *${selectedPlanLabel}*\n- Durasi: *${selectedDuration} Bulan*\n- Estimasi: *${formatRupiah(renewalEstimate)}*\n- Kuota: *${school.student_quota || 0} Siswa*\n${renewalNotes ? `- Catatan: ${renewalNotes}\n` : ""}Mohon bantu terbitkan tagihan/invoice resmi. Terima kasih.`
   );
   const waUrl = `https://wa.me/6285359907696?text=${waMessage}`;
 
@@ -842,22 +843,28 @@ const SchoolInvoicePage = () => {
                         { key: "basic", label: "Berkembang", note: "100-300 Siswa" },
                         { key: "pro", label: "Lanjutan", note: "300-600 Siswa" },
                         { key: "ultimate", label: "Premium", note: "600+ Siswa" },
-                      ].map(p => (
-                        <button
-                          key={p.key}
-                          type="button"
-                          onClick={() => setSelectedPlan(p.key)}
-                          className={cn(
-                            "p-2.5 rounded-xl border text-left transition-all",
-                            selectedPlan === p.key
-                              ? "border-blue-600 bg-blue-50/60 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 font-bold shadow-2xs"
-                              : "border-slate-200 dark:border-slate-800 hover:bg-slate-50 text-slate-700 dark:text-slate-300"
-                          )}
-                        >
-                          <p className="text-xs font-bold">{p.label}</p>
-                          <p className="text-[10px] text-slate-400 mt-0.5">{p.note}</p>
-                        </button>
-                      ))}
+                      ].map(p => {
+                        const monthly = PLAN_PRICING[p.key as keyof typeof PLAN_PRICING].monthlyRate;
+                        return (
+                          <button
+                            key={p.key}
+                            type="button"
+                            onClick={() => setSelectedPlan(p.key)}
+                            className={cn(
+                              "p-2.5 rounded-xl border text-left transition-all",
+                              selectedPlan === p.key
+                                ? "border-blue-600 bg-blue-50/60 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 font-bold shadow-2xs"
+                                : "border-slate-200 dark:border-slate-800 hover:bg-slate-50 text-slate-700 dark:text-slate-300"
+                            )}
+                          >
+                            <p className="text-xs font-bold">{p.label}</p>
+                            <p className="text-[10px] text-slate-400 mt-0.5">{p.note}</p>
+                            <p className="text-[11px] font-extrabold text-blue-600 dark:text-blue-400 mt-1">
+                              {formatRupiah(monthly)}<span className="font-medium text-slate-400">/bln</span>
+                            </p>
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
 
@@ -886,7 +893,9 @@ const SchoolInvoicePage = () => {
                           )}
                         >
                           <p className="text-xs font-bold">{d.label}</p>
-                          <p className="text-[10px] text-slate-400 mt-0.5">{d.sub}</p>
+                          <p className="text-[10px] font-extrabold text-blue-600 dark:text-blue-400 mt-0.5">
+                            {formatRupiah(calculatePlanInvoice(selectedPlan, d.months).amount)}
+                          </p>
                         </button>
                       ))}
                     </div>
@@ -904,6 +913,19 @@ const SchoolInvoicePage = () => {
                       rows={3}
                       className="w-full text-xs p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                     />
+                  </div>
+
+                  {/* Estimasi total */}
+                  <div className="p-3.5 rounded-xl bg-blue-50/60 dark:bg-blue-950/30 border border-blue-200/60 dark:border-blue-900/40 flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Estimasi total</p>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                        {PLAN_PRICING[selectedPlan as keyof typeof PLAN_PRICING]?.label || selectedPlan} · {selectedDuration} bulan
+                      </p>
+                    </div>
+                    <p className="text-lg font-black text-blue-700 dark:text-blue-300 whitespace-nowrap">
+                      {formatRupiah(calculatePlanInvoice(selectedPlan, selectedDuration).amount)}
+                    </p>
                   </div>
 
                   {/* Action Buttons */}

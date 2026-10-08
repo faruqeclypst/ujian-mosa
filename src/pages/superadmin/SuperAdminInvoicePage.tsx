@@ -481,7 +481,10 @@ const SuperAdminInvoicePage = () => {
 
       // Jika ditandai paid, otomatis upgrade paket dan masa aktif sekolah
       if (form.status === "paid") {
-        await upgradeSchoolFromInvoice(saved);
+        const upgraded = await upgradeSchoolFromInvoice(saved);
+        if (!upgraded) {
+          alert("Invoice tersimpan sebagai lunas, tetapi paket sekolah GAGAL di-upgrade. Gunakan tombol \"Sinkron Ulang Paket\" di detail invoice.");
+        }
       }
 
       await loadInvoices();
@@ -498,6 +501,20 @@ const SuperAdminInvoicePage = () => {
       alert(`Gagal menyimpan invoice: ${msg}`);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleResyncSubscription = async (inv: Invoice) => {
+    if (!confirm(`Sinkron ulang paket untuk ${inv.school_name} dari invoice ${inv.invoice_number}?`)) return;
+    try {
+      const ok = await upgradeSchoolFromInvoice(inv);
+      if (ok) {
+        alert("Paket sekolah berhasil disinkronkan dari invoice.");
+      } else {
+        alert("Gagal menyinkronkan paket. Periksa data sekolah & invoice di PocketBase.");
+      }
+    } catch (err: any) {
+      alert(err?.message || "Gagal menyinkronkan paket.");
     }
   };
 
@@ -520,7 +537,10 @@ const SuperAdminInvoicePage = () => {
         paid_date: today,
       });
       // Otomatis upgrade paket dan masa aktif sekolah saat ditandai lunas
-      await upgradeSchoolFromInvoice(updated);
+      const upgraded = await upgradeSchoolFromInvoice(updated);
+      if (!upgraded) {
+        alert("Invoice ditandai lunas, tetapi paket sekolah GAGAL di-upgrade. Gunakan tombol \"Sinkron Ulang Paket\" di detail invoice.");
+      }
       await loadInvoices();
       if (detailInvoice?.id === id) {
         setDetailInvoice(updated);
@@ -1402,6 +1422,16 @@ const SuperAdminInvoicePage = () => {
                   >
                     <CheckCircle2 size={15} />
                     Tandai Lunas
+                  </button>
+                )}
+                {detailInvoice.status === "paid" && (
+                  <button
+                    onClick={() => handleResyncSubscription(detailInvoice)}
+                    className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-blue-700 border border-blue-200 rounded-xl hover:bg-blue-50 transition"
+                    title="Jalankan ulang upgrade paket & masa aktif dari invoice ini"
+                  >
+                    <RefreshCw size={15} />
+                    Sinkron Ulang Paket
                   </button>
                 )}
                 <button
