@@ -84,6 +84,14 @@ const ProfilePictureUpload = ({
         avatar_url: downloadURL // Gunakan field avatar_url jika ada, atau avatar
       });
 
+      // 3. Refresh auth store agar user.avatar di AuthContext langsung ter-update
+      //    (tanpa ini, foto tidak muncul sampai user login ulang)
+      try {
+        await pb.collection("users").authRefresh();
+      } catch {
+        /* abaikan — fallback: foto tampil setelah login ulang */
+      }
+
       addToast({
         title: "Foto Berhasil Diperbarui",
         description: "Foto profil Anda telah diperbarui.",
@@ -120,6 +128,13 @@ const ProfilePictureUpload = ({
         avatar: null
       });
 
+      // Refresh auth store agar perubahan langsung tampil
+      try {
+        await pb.collection("users").authRefresh();
+      } catch {
+        /* abaikan */
+      }
+
       addToast({
         title: "Foto Dihapus",
         description: "Foto profil Anda telah dihapus.",
@@ -142,11 +157,20 @@ const ProfilePictureUpload = ({
   return (
     <div className="flex flex-col items-center gap-3">
       <div className="relative group">
-        <div className={cn(
-          "relative rounded-[2rem] bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center overflow-hidden border-4 border-white shadow-xl transition-all duration-500",
-          sizeClasses[size],
-          isUploading && "opacity-50 grayscale"
-        )}>
+        <button
+          type="button"
+          onClick={() => {
+            if (showUploadButton && !isUploading) fileInputRef.current?.click();
+          }}
+          disabled={isUploading || !showUploadButton}
+          className={cn(
+            "relative block rounded-[2rem] overflow-hidden border-4 border-white shadow-xl transition-all duration-500",
+            sizeClasses[size],
+            isUploading && "opacity-50 grayscale",
+            showUploadButton && !isUploading && "cursor-pointer hover:shadow-2xl hover:scale-[1.02]"
+          )}
+          title={showUploadButton ? "Ganti Foto" : undefined}
+        >
           {displayURL ? (
             <img
               src={displayURL}
@@ -154,10 +178,17 @@ const ProfilePictureUpload = ({
               className="w-full h-full object-cover"
             />
           ) : (
-            <div className="flex flex-col items-center text-white">
-              <span className="text-4xl md:text-5xl font-black opacity-40">
+            <div className="w-full h-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
+              <span className="text-4xl md:text-5xl font-black text-white opacity-40">
                 {(displayName || 'A').charAt(0).toUpperCase()}
               </span>
+            </div>
+          )}
+
+          {showUploadButton && !isUploading && (
+            <div className="absolute inset-0 bg-black/55 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col items-center justify-center gap-1.5 text-white pointer-events-none">
+              <Camera className={iconSizes[size]} />
+              {size !== "sm" && <span className="text-xs font-bold">Ganti Foto</span>}
             </div>
           )}
 
@@ -166,21 +197,7 @@ const ProfilePictureUpload = ({
               <Loader2 className="animate-spin h-8 w-8 text-white" />
             </div>
           )}
-        </div>
-
-        {showUploadButton && (
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            disabled={isUploading}
-            className={cn(
-              "absolute -bottom-2 -right-2 bg-white hover:bg-slate-50 text-blue-600 rounded-2xl p-3 shadow-xl border border-slate-100 transition-all duration-200 transform hover:scale-110",
-              "disabled:opacity-50 disabled:cursor-not-allowed"
-            )}
-            title="Ganti Foto"
-          >
-            <Camera size={20} />
-          </button>
-        )}
+        </button>
 
         {displayURL && showUploadButton && (
           <button

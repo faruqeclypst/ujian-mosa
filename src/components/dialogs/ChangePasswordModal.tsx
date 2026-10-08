@@ -152,10 +152,10 @@ export const ChangePasswordModal = ({ isOpen, onClose, defaultTab = "profile" }:
     }
   };
 
-  const handleProfileUpdate = (photoURL: string, displayName: string) => {
-    if (photoURL !== user?.avatar) {
-      window.location.reload();
-    }
+  const handleProfileUpdate = (_photoURL: string, _displayName: string) => {
+    // Tidak perlu reload: ProfilePictureUpload sudah memanggil authRefresh()
+    // setelah upload/hapus, sehingga AuthContext ter-update otomatis
+    // dan foto langsung tampil di modal maupun navigasi atas.
   };
 
   return (
