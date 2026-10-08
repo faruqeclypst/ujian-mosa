@@ -24,7 +24,7 @@ import { masterPb } from "../../lib/pocketbase";
 import { cn } from "../../lib/utils";
 import { getSchoolDomain } from "../../utils/domainHelper";
 import { SyncAllTenantsModal } from "./SyncAllTenantsModal";
-import { BackupOpsSection } from "./BackupOpsSection";
+import { BackupOpsSection, SectionHeader } from "./BackupOpsSection";
 
 interface VpsNodeMetrics {
   status: "healthy" | "warning" | "error" | "offline";
@@ -190,8 +190,9 @@ const SuperAdminInfraPage = () => {
 
   return (
     <SuperAdminLayout>
+      <div className="space-y-6">
       {/* ── Page Header ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold text-slate-900 tracking-tight">Status Infrastruktur & Multi-VPS</h2>
           <p className="text-slate-500 text-sm mt-0.5">
@@ -227,11 +228,11 @@ const SuperAdminInfraPage = () => {
       </div>
 
       {/* ── Global Summary Cards ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Status Global */}
         <div
           className={cn(
-            "rounded-xl p-5 text-white shadow-md relative overflow-hidden",
+            "rounded-2xl p-5 text-white shadow-md relative overflow-hidden",
             isHealthy
               ? "bg-gradient-to-br from-blue-600 to-blue-700"
               : "bg-gradient-to-br from-amber-500 to-amber-600"
@@ -255,7 +256,7 @@ const SuperAdminInfraPage = () => {
         </div>
 
         {/* Latensi Rata-rata */}
-        <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
+        <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
           <div className="flex items-center gap-2 mb-3">
             <Cloud size={18} className="text-blue-500" />
             <p className="text-sm font-semibold text-slate-500">Rata-rata Latensi</p>
@@ -268,7 +269,7 @@ const SuperAdminInfraPage = () => {
         </div>
 
         {/* Node VPS Fisik */}
-        <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
+        <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
           <div className="flex items-center gap-2 mb-3">
             <Server size={18} className="text-indigo-500" />
             <p className="text-sm font-semibold text-slate-500">Total Node VPS</p>
@@ -281,7 +282,7 @@ const SuperAdminInfraPage = () => {
         </div>
 
         {/* Tenant Aktif */}
-        <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
+        <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
           <div className="flex items-center gap-2 mb-3">
             <Database size={18} className="text-emerald-500" />
             <p className="text-sm font-semibold text-slate-500">Tenant Aktif</p>
@@ -309,18 +310,18 @@ const SuperAdminInfraPage = () => {
       </div>
 
       {/* ── Section: Multi-VPS Physical Node Cards ── */}
-      <div className="mb-6">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <Server size={18} className="text-blue-600" />
-            <h3 className="text-base font-bold text-slate-900 tracking-tight">Kesehatan Resource Node VPS</h3>
-          </div>
-          <span className="text-xs text-slate-400">
-            Terakhir sinkronisasi: {lastUpdated.toLocaleTimeString("id-ID")}
-          </span>
-        </div>
+      <div>
+        <SectionHeader
+          icon={Server}
+          title="Kesehatan Resource Node VPS"
+          action={
+            <span className="text-xs text-slate-400">
+              Terakhir sinkronisasi: {lastUpdated.toLocaleTimeString("id-ID")}
+            </span>
+          }
+        />
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {vpsNodes.length === 0 && (
             <div className="col-span-2 bg-white border border-slate-200 rounded-2xl p-8 text-center text-slate-400 text-sm">
               Memuat metrik node server...
@@ -457,14 +458,17 @@ const SuperAdminInfraPage = () => {
       </div>
 
       {/* ── Section: Per-Tenant Allocation & Health Table ── */}
-      <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
-        <div className="px-5 py-4 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Server size={16} className="text-blue-600" />
-            <h3 className="text-sm font-bold text-slate-900">Pemantauan & Alokasi Tenant Sekolah</h3>
-          </div>
-          <span className="text-xs text-slate-500 font-medium">Total: {nodes.length} Tenant</span>
-        </div>
+      <div>
+        <SectionHeader
+          icon={Server}
+          title="Pemantauan & Alokasi Tenant Sekolah"
+          action={
+            <span className="text-xs text-slate-500 font-medium bg-white border border-slate-200 rounded-full px-3 py-1 shadow-sm">
+              Total: {nodes.length} Tenant
+            </span>
+          }
+        />
+        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
 
         {/* Desktop Table */}
         <div className="hidden md:block overflow-x-auto scrollbar-thin">
@@ -625,10 +629,12 @@ const SuperAdminInfraPage = () => {
             </div>
           ))}
         </div>
+        </div>
       </div>
 
       {/* ── Section: Operasional Backup & Pemulihan Bencana ── */}
       <BackupOpsSection />
+      </div>
 
       {/* Modal 1-Click Sync Seluruh Tenant */}
       <SyncAllTenantsModal

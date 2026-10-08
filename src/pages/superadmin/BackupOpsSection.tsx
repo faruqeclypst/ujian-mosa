@@ -141,6 +141,35 @@ function JobCard({
   );
 }
 
+export function SectionHeader({
+  icon: Icon,
+  title,
+  action,
+  iconClassName,
+}: {
+  icon: any;
+  title: string;
+  action?: React.ReactNode;
+  iconClassName?: string;
+}) {
+  return (
+    <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center gap-2.5">
+        <div
+          className={cn(
+            "w-8 h-8 rounded-lg border flex items-center justify-center shrink-0",
+            iconClassName || "bg-blue-50 border-blue-100 text-blue-600"
+          )}
+        >
+          <Icon size={16} />
+        </div>
+        <h3 className="text-base font-bold text-slate-900 tracking-tight">{title}</h3>
+      </div>
+      {action}
+    </div>
+  );
+}
+
 export const BackupOpsSection = () => {
   const [status, setStatus] = useState<OpsStatus | null>(null);
   const [loading, setLoading] = useState(true);
@@ -181,22 +210,22 @@ export const BackupOpsSection = () => {
   const emptyJob: JobInfo = { last_run: "-", summary: "", log: [] };
 
   return (
-    <div className="mb-6">
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <ShieldCheck size={18} className="text-blue-600" />
-          <h3 className="text-base font-bold text-slate-900 tracking-tight">Operasional Backup & Pemulihan Bencana</h3>
-        </div>
-        <button
-          type="button"
-          onClick={fetchStatus}
-          disabled={loading}
-          className="text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-        >
-          <RefreshCw size={13} className={cn(loading && "animate-spin")} />
-          <span>Muat Ulang</span>
-        </button>
-      </div>
+    <div>
+      <SectionHeader
+        icon={ShieldCheck}
+        title="Operasional Backup & Pemulihan Bencana"
+        action={
+          <button
+            type="button"
+            onClick={fetchStatus}
+            disabled={loading}
+            className="text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1.5 cursor-pointer disabled:opacity-50 bg-white border border-slate-200 rounded-full px-3 py-1.5 shadow-sm"
+          >
+            <RefreshCw size={13} className={cn(loading && "animate-spin")} />
+            <span>Muat Ulang</span>
+          </button>
+        }
+      />
 
       {notice && (
         <div className="mb-3 bg-blue-50 border border-blue-200 text-blue-800 text-xs p-3 rounded-xl">
