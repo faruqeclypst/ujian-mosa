@@ -121,7 +121,8 @@ export const OneClickMigrationModal = ({
         throw new Error(res?.error || "Restore gagal.");
       }
     } catch (err: any) {
-      setError(err?.message || "Terjadi kesalahan saat restore snapshot.");
+      const msg = err?.data?.error || err?.data?.message || err?.message || "Terjadi kesalahan saat restore snapshot.";
+      setError(msg);
     } finally {
       setRestoring(false);
     }
@@ -157,7 +158,8 @@ export const OneClickMigrationModal = ({
         setError(res.error || "Gagal terhubung ke worker.");
       }
     } catch (err: any) {
-      setError(err?.message || "Gagal menghubungi API Master VPS.");
+      const msg = err?.data?.error || err?.data?.message || err?.message || "Gagal menghubungi API Master VPS.";
+      setError(msg);
     } finally {
       setTesting(false);
     }
@@ -213,7 +215,8 @@ export const OneClickMigrationModal = ({
         throw new Error(res.error || res.message || "Migrasi gagal.");
       }
     } catch (err: any) {
-      setError(err?.message || "Terjadi kesalahan saat mengeksekusi migrasi otomatis.");
+      const msg = err?.data?.error || err?.data?.message || err?.message || "Terjadi kesalahan saat mengeksekusi migrasi otomatis.";
+      setError(msg);
       setMigrating(false);
     }
   };
