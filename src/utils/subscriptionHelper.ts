@@ -300,7 +300,8 @@ export const upgradeSchoolFromInvoice = async (invoice: {
 
     await masterPb.collection("schools").update(school.id, payload);
 
-    console.log(`[Upgrade School] Berhasil meng-upgrade ${school.name} ke ${planDetail.label} (kuota: ${targetQuota}, s/d ${finalActiveUntil})`);
+    const expiryInfo = keepCurrentExpiry ? ` (masa aktif dipertahankan: ${school.active_until})` : ` (s/d ${payload.active_until})`;
+    console.log(`[Upgrade School] Berhasil meng-upgrade ${school.name} ke ${planDetail.label} (kuota: ${targetQuota})${expiryInfo}`);
     return true;
   } catch (err) {
     console.error("Gagal meng-upgrade tenant dari invoice:", err);
