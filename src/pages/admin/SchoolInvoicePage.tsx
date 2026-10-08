@@ -839,12 +839,10 @@ const SchoolInvoicePage = () => {
                   <div className="space-y-1.5">
                     <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Pilih Paket Layanan</label>
                     <div className="grid grid-cols-3 gap-2">
-                      {[
-                        { key: "basic", label: "Berkembang", note: "100-300 Siswa" },
-                        { key: "pro", label: "Lanjutan", note: "300-600 Siswa" },
-                        { key: "ultimate", label: "Premium", note: "600+ Siswa" },
-                      ].map(p => {
-                        const monthly = PLAN_PRICING[p.key as keyof typeof PLAN_PRICING].monthlyRate;
+                      {(["basic", "pro", "ultimate"] as const).map(planKey => {
+                        const detail = PLAN_PRICING[planKey];
+                        const p = { key: planKey, label: detail.label.replace("Paket ", ""), note: `Maks. ${detail.quota} Siswa` };
+                        const monthly = detail.monthlyRate;
                         return (
                           <button
                             key={p.key}
