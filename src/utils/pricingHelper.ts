@@ -90,42 +90,30 @@ export const normalizePlanKey = (raw?: string): PlanKey => {
 };
 
 // ============================================================
-// Aturan durasi langganan EXAMKU:
-// - 1 bulan = 28 hari (berlaku untuk paket 1, 2, 3, 4, 5, 6 bulan)
-// - 12 bulan (1 tahun) = 12 bulan kalender penuh (tanggal ke tanggal)
-// Memberi buffer ±2-3 hari antara masa sewa VPS (kalender) dan
-// masa layanan sekolah, agar migrasi darurat H-3 selalu aman.
+// Aturan durasi langganan EXAMKU: bulan kalender (standar SaaS).
+// 1 bulan = 1 bulan kalender (mis. 8 Okt -> 8 Nov),
+// 12 bulan (1 tahun) = 12 bulan kalender penuh, tanggal ke tanggal.
+// Keamanan data tidak bergantung pada satuan ini: migrasi darurat
+// H-3 + backup harian melindungi data apa pun periodenya.
 // ============================================================
-export const BILLING_MONTH_DAYS = 28;
-
-export const billingPeriodDays = (months: number): number => {
-  const m = Math.max(1, Math.round(Number(months) || 1));
-  if (m >= 12) return -1; // -1 = pakai bulan kalender
-  return m * BILLING_MONTH_DAYS;
-};
-
 export const addBillingPeriod = (from: Date, months: number): Date => {
   const m = Math.max(1, Math.round(Number(months) || 1));
-  if (m >= 12) {
-    const d = new Date(from);
-    d.setMonth(d.getMonth() + 12);
-    return d;
-  }
-  return new Date(from.getTime() + m * BILLING_MONTH_DAYS * 86400000);
+  const d = new Date(from);
+  d.setMonth(d.getMonth() + m);
+  return d;
 };
 
 export const billingPeriodLabel = (months: number): string => {
   const m = Math.max(1, Math.round(Number(months) || 1));
-  if (m >= 12) return "12 bulan kalender (1 tahun penuh)";
-  const days = m * BILLING_MONTH_DAYS;
-  return m === 1 ? `1 bulan (28 hari)` : `${m} bulan (${days} hari)`;
+  if (m >= 12) return "1 tahun (12 bulan)";
+  if (m === 6) return "1 semester (6 bulan)";
+  return m === 1 ? "1 bulan" : `${m} bulan`;
 };
 
 export const calculatePlanInvoice = (plan: string, durationMonths: number = 1): {
   amount: number;
   periodLabel: string;
   durationMonths: number;
-  durationDays: number; // -1 = 12 bulan kalender
   planKey: PlanKey;
   planLabel: string;
   quota: number;
@@ -139,7 +127,6 @@ export const calculatePlanInvoice = (plan: string, durationMonths: number = 1): 
       amount: 0,
       periodLabel: "14 Hari (Free Trial)",
       durationMonths: 1,
-      durationDays: 14,
       planKey,
       planLabel: detail.label,
       quota: detail.quota,
@@ -151,29 +138,28 @@ export const calculatePlanInvoice = (plan: string, durationMonths: number = 1): 
 
   if (months === 12) {
     amount = detail.rates[12];
-    periodLabel = "1 tahun (12 bulan kalender)";
+    periodLabel = "1 tahun (12 bulan)";
   } else if (months === 6) {
     amount = detail.rates[6];
-    periodLabel = "1 semester (6 bulan / 168 hari)";
+    periodLabel = "1 semester (6 bulan)";
   } else if (months === 3) {
     amount = detail.rates[3];
-    periodLabel = "3 bulan (84 hari)";
+    periodLabel = "3 bulan";
   } else if (months === 2) {
     amount = detail.rates[2];
-    periodLabel = "2 bulan (56 hari)";
+    periodLabel = "2 bulan";
   } else if (months === 1) {
     amount = detail.rates[1];
-    periodLabel = "1 bulan (28 hari)";
+    periodLabel = "1 bulan";
   } else {
     amount = detail.monthlyRate * months;
-    periodLabel = `${months} bulan (${months * BILLING_MONTH_DAYS} hari)`;
+    periodLabel = `${months} bulan`;
   }
 
   return {
     amount,
     periodLabel,
     durationMonths: months,
-    durationDays: billingPeriodDays(months),
     planKey,
     planLabel: detail.label,
     quota: detail.quota,

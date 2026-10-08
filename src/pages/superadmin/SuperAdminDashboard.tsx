@@ -12,7 +12,7 @@ import { masterPb } from "../../lib/pocketbase";
 import SuperAdminLayout from "../../components/layout/SuperAdminLayout";
 import { cn } from "../../lib/utils";
 import { getSchoolUrl, getSchoolDomain, getDomainSuffix } from "../../utils/domainHelper";
-import { calculatePlanInvoice, PLAN_PRICING, normalizePlanKey } from "../../utils/pricingHelper";
+import { calculatePlanInvoice, PLAN_PRICING, normalizePlanKey, addBillingPeriod } from "../../utils/pricingHelper";
 import { ensureRenewalInvoice } from "../../utils/subscriptionHelper";
 import { OneClickMigrationModal } from "./OneClickMigrationModal";
 import { OfflineLicenseModal } from "../../components/dialogs/OfflineLicenseModal";
@@ -427,13 +427,14 @@ const SuperAdminDashboard = () => {
     try {
       let targetPlan: 'free' | 'basic' | 'pro' | 'ultimate' = 'basic';
       let targetQuota = 250;
-      let durationDays = 365;
+      let durationMonths = 12;
+      let trialDays: number | null = null;
 
       const p = (req.plan || "").toLowerCase();
       if (p === "free" || p.includes("trial") || p.includes("demo")) {
         targetPlan = 'free';
         targetQuota = 50;
-        durationDays = 14;
+        trialDays = 14;
       } else if (p.includes("premium") || p === "ultimate") {
         targetPlan = 'ultimate';
         targetQuota = 1000;
@@ -449,19 +450,20 @@ const SuperAdminDashboard = () => {
         const d = req.duration.toLowerCase();
         const monthMatch = d.match(/(\d+)\s*bulan/);
         if (monthMatch) {
-          const m = parseInt(monthMatch[1], 10);
-          durationDays = m * 30;
+          durationMonths = parseInt(monthMatch[1], 10);
         } else if (d.includes("6 bulan") || d.includes("semester")) {
-          durationDays = 180;
+          durationMonths = 6;
         } else if (d.includes("1 tahun") || d.includes("12 bulan") || d.includes("tahun")) {
-          durationDays = 365;
+          durationMonths = 12;
         } else if (d.includes("14")) {
-          durationDays = 14;
+          trialDays = 14;
         }
       }
 
-      const expDate = new Date();
-      expDate.setDate(expDate.getDate() + durationDays);
+      // Bulan kalender (standar SaaS); trial tetap 14 hari
+      const expDate = trialDays !== null
+        ? new Date(Date.now() + trialDays * 86400000)
+        : addBillingPeriod(new Date(), durationMonths);
 
       setEditSchool({
         id: "",

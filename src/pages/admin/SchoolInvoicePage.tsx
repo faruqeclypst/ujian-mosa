@@ -541,9 +541,6 @@ const SchoolInvoicePage = () => {
                   ? `Layanan akan berhenti total pada ${formatDate(school.active_until || "")}. Jika belum diperpanjang, data sekolah otomatis dipindahkan ke server utama agar aman — segera hubungi Admin untuk perpanjangan.`
                   : "Untuk menjaga kesinambungan ujian online dan sinkronisasi data tanpa jeda, silakan minta perpanjangan paket layanan ke Admin."}
             </p>
-            <p className="text-[10px] text-slate-400 dark:text-slate-500 leading-relaxed max-w-xl">
-              Ketentuan: 1 bulan = 28 hari kalender (paket 1&ndash;6 bulan). Paket 1 tahun = 12 bulan kalender penuh.
-            </p>
           </div>
           <button
             onClick={() => {

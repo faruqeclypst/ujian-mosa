@@ -4,7 +4,7 @@
  * Didesain khusus untuk keperluan akuntansi sekolah, pelaporan SPJ, dan dana BOS.
  */
 
-import { PLAN_PRICING, normalizePlanKey, billingPeriodDays } from "./pricingHelper";
+import { PLAN_PRICING, normalizePlanKey } from "./pricingHelper";
 
 export function terbilang(nominal: number): string {
   const n = Math.floor(Math.abs(nominal));
@@ -99,10 +99,6 @@ export function printDigitalInvoice(inv: InvoiceData, school?: SchoolMeta | null
       : "Kuota Terdaftar";
   const planLabel = inv.plan_label || (inv.plan ? inv.plan.toUpperCase() : "STANDARD");
   const schoolDomain = school?.custom_domain || `${inv.school_slug}.examku.my.id`;
-  const durationDays = billingPeriodDays(inv.duration_months || 1);
-  const durationText = durationDays > 0
-    ? `${inv.duration_months} Bulan (${durationDays} hari)`
-    : `${inv.duration_months} Bulan (12 bulan kalender)`;
 
     const html = `
     <!DOCTYPE html>
@@ -461,7 +457,7 @@ export function printDigitalInvoice(inv: InvoiceData, school?: SchoolMeta | null
                   Mencakup Manajemen Bank Soal, Server Ujian Realtime, Aplikasi Mobile Exambro Anti-Curang, Pemantauan Proktor, dan Dukungan Penuh untuk ${quotaText}.
                 </div>
               </td>
-              <td style="text-align: center; font-weight: 600; color:#0f172a;">${durationText}</td>
+              <td style="text-align: center; font-weight: 600; color:#0f172a;">${inv.duration_months} Bulan</td>
               <td style="text-align: right; color: #475569;">${formatRupiah(inv.amount)}</td>
               <td style="text-align: right; font-weight: 700; color:#0f172a;">${formatRupiah(inv.amount)}</td>
             </tr>
@@ -498,12 +494,6 @@ export function printDigitalInvoice(inv: InvoiceData, school?: SchoolMeta | null
 
         <div class="terbilang-box">
           Terbilang: ${terbilangText} Rupiah
-        </div>
-
-        <div style="background:#f0f9ff; border:1px solid #bae6fd; border-radius:8px; padding:12px 16px; font-size:11px; color:#0c4a6e; margin-top:16px; font-weight:500; line-height:1.6;">
-          <strong>Ketentuan Masa Layanan:</strong> 1 bulan = 28 hari kalender (berlaku untuk paket 1&ndash;6 bulan).
-          Paket 1 tahun = 12 bulan kalender penuh. Mohon selesaikan pembayaran sebelum tanggal jatuh tempo
-          agar layanan tidak terhenti.
         </div>
 
         ${inv.notes ? `
