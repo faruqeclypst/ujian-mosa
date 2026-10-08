@@ -12,6 +12,18 @@ masterPb.autoCancellation(false);
 async function authMaster() {
   await masterPb.collection("super_admins").authWithPassword(process.env.MASTER_PB_ADMIN_EMAIL, process.env.MASTER_PB_ADMIN_PASSWORD);
 }
+// Tambah N bulan kalender dengan clamp akhir bulan (31 Jan + 1 bln → 28/29 Feb).
+// Cerminan addBillingPeriod di src/utils/pricingHelper.ts — dipakai agar webhook
+// otomatis menghasilkan tanggal yang sama persis dengan verifikasi manual.
+function addCalendarMonths(date, months) {
+  const d = new Date(date.getTime());
+  const day = d.getDate();
+  d.setDate(1);
+  d.setMonth(d.getMonth() + months);
+  const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+  d.setDate(Math.min(day, lastDay));
+  return d;
+}
 function validWebhook(req, body) {
   const tokenOk = process.env.SUMOPOD_WEBHOOK_TOKEN && req.get("x-webhook-token") === process.env.SUMOPOD_WEBHOOK_TOKEN;
   if (tokenOk) return true;
@@ -153,21 +165,46 @@ app.post("/api/sumopod/webhook", express.raw({ type: "application/json" }), asyn
             cleanPlan = "pro";
           }
 
-          const months = Number(invoice.duration_months) || 1;
           const now = new Date();
-          const currentActive = school.active_until ? new Date(school.active_until) : now;
-          const baseDate = (currentActive > now && school.plan !== "free") ? currentActive : new Date();
-          baseDate.setMonth(baseDate.getMonth() + months);
-          baseDate.setHours(23, 59, 59, 999);
+          const isTopup = Number(invoice.duration_months) === 0
+            || String(invoice.notes || "").includes("[TOPUP]");
 
-          await masterPb.collection("schools").update(school.id, {
-            plan: cleanPlan,
-            student_quota: Math.max(school.student_quota || 0, targetQuota),
-            active_until: baseDate.toISOString(),
-            is_active: true
-          });
+          // ── TOP-UP KUOTA (periode tetap): hanya naikkan paket & kuota,
+          //     active_until TIDAK diubah ──
+          if (isTopup) {
+            await masterPb.collection("schools").update(school.id, {
+              plan: cleanPlan,
+              student_quota: Math.max(school.student_quota || 0, targetQuota),
+            });
+            console.log(`[SumoPod Topup] ${school.name}: kuota → ${targetQuota} (${cleanPlan}), periode tetap s/d ${school.active_until}`);
+          } else {
+            const durationMonths = Number(invoice.duration_months) || 1;
+            let baseDate = new Date();
+            // Samakan dengan upgradeSchoolFromInvoice di frontend:
+            // - paket SAMA & masa aktif masih berjalan → perpanjang dari active_until
+            // - ganti paket / sudah kedaluwarsa → hitung dari tanggal bayar
+            const am = school.active_until ? String(school.active_until).match(/^(\d{4})-(\d{2})-(\d{2})/) : null;
+            if (am) {
+              const curDate = new Date(+am[1], +am[2] - 1, +am[3], 23, 59, 59);
+              const schoolPlanKey = String(school.plan || "basic").toLowerCase();
+              if (curDate.getTime() > now.getTime() && schoolPlanKey !== "free" && schoolPlanKey === cleanPlan) {
+                baseDate = curDate;
+              }
+            }
+            const newExp = addCalendarMonths(baseDate, durationMonths);
+            newExp.setHours(23, 59, 59, 999);
+            const pad = (n) => String(n).padStart(2, "0");
+            const finalActiveUntil = `${newExp.getFullYear()}-${pad(newExp.getMonth() + 1)}-${pad(newExp.getDate())} 23:59:59.000Z`;
 
-          console.log(`[SumoPod Auto Upgrade] Berhasil mengaktifkan paket ${cleanPlan} (${targetQuota} siswa) untuk ${school.name} hingga ${baseDate.toISOString()}`);
+            await masterPb.collection("schools").update(school.id, {
+              plan: cleanPlan,
+              student_quota: Math.max(school.student_quota || 0, targetQuota),
+              active_until: finalActiveUntil,
+              is_active: true
+            });
+
+            console.log(`[SumoPod Auto Upgrade] Berhasil mengaktifkan paket ${cleanPlan} (${targetQuota} siswa) untuk ${school.name} hingga ${finalActiveUntil}`);
+          }
         }
       } catch (schoolUpgradeErr) {
         console.error("Auto upgrade school quota failed:", schoolUpgradeErr);
