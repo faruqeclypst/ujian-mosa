@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { X, ReceiptText } from "lucide-react";
+import { X, FileText } from "lucide-react";
 
 /** True bila URL bukti adalah gambar (bukan PDF). */
 export const isImageProof = (proofUrl: string): boolean => {
@@ -50,7 +50,7 @@ export function ProofLightbox({
       >
         <div className="flex items-center gap-3 min-w-0">
           <div className="w-9 h-9 rounded-xl bg-blue-50 border border-blue-100 text-blue-600 flex items-center justify-center shrink-0">
-            <ReceiptText size={18} />
+            <FileText size={18} />
           </div>
           <div className="min-w-0">
             <p className="text-sm font-bold text-slate-900 truncate">
