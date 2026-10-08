@@ -471,6 +471,33 @@ const SchoolInvoicePage = () => {
             <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed max-w-xl">
               Bukti transfer sebesar <strong>{formatRupiah(activePendingInvoice.amount)}</strong> sudah terkirim dan sedang diverifikasi SuperAdmin. Layanan aktif otomatis setelah pembayaran disetujui.
             </p>
+            {banks.length > 0 && (
+              <div className="pt-2">
+                <p className="font-bold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5 text-[11px]"><Landmark size={13} /> Rekening transfer:</p>
+                <div className="flex flex-wrap gap-2">
+                  {banks.map((b, i) => {
+                    const logo = POPULAR_BANKS.find(p => p.code === b.bank_code)?.logo;
+                    return (
+                      <div key={i} className="flex items-center gap-2 pl-1 pr-2.5 py-1 bg-white/70 dark:bg-slate-900/40 rounded-lg border border-blue-100 dark:border-blue-900/30">
+                        <div className="w-8 h-6 flex items-center justify-center shrink-0 bg-white rounded p-0.5 border border-slate-100 overflow-hidden text-center relative">
+                          {logo && b.bank_code !== "OTHER" ? (
+                            <>
+                              <img src={logo} alt={b.bank_name} className="relative z-10 max-h-full max-w-full object-contain bg-white" onError={e => e.currentTarget.style.display = 'none'} />
+                              <span className="absolute inset-0 flex items-center justify-center text-[8px] font-black text-slate-400 uppercase leading-none">{b.bank_name.substring(0, 3)}</span>
+                            </>
+                          ) : <span className="text-[8px] font-black text-slate-400 uppercase leading-none">{b.bank_name.substring(0, 3)}</span>}
+                        </div>
+                        <span className="text-[11px] text-slate-600 dark:text-slate-300">
+                          <strong className="text-slate-800 dark:text-slate-200">{b.bank_name}</strong>
+                          {" "}<span className="font-mono text-blue-700 dark:text-blue-400">{b.account_number}</span>
+                          {" "}<span className="text-slate-400">a.n. {b.account_name}</span>
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
           <button
             type="button"
