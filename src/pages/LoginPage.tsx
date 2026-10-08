@@ -105,7 +105,12 @@ const LoginPage = () => {
     try {
       await signInWithUsername(values.username, values.password);
     } catch (error: any) {
-      setFormError(error.message || "Gagal login. Periksa kembali username dan password.");
+      const raw = error.message || "";
+      // Terjemahkan pesan teknis PocketBase ke bahasa Indonesia yang mudah dipahami
+      const friendly = /failed to authenticate/i.test(raw)
+        ? "Password salah, silakan coba lagi."
+        : raw || "Gagal login. Periksa kembali username dan password.";
+      setFormError(friendly);
     }
   };
 
