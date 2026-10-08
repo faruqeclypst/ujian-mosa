@@ -240,17 +240,21 @@ routerAdd("POST", "/api/multi-vps/restore-snapshot", (c) => {
 
         const forceArg = (force === "1" || force === "true") ? " --force" : "";
         const dateArg = date ? ` "${date}"` : "";
-        const cmd = `/usr/local/bin/examku-restore-snapshot.sh "${slug}"${dateArg}${forceArg}`;
+        const cmd = `/usr/local/bin/examku-restore-snapshot.sh "${slug}"${dateArg}${forceArg} 2>&1; echo "__EXIT:$?"`;
         const out = $os.cmd("bash", "-c", cmd).output();
         let raw = "";
         if (out) { for (let i = 0; i < out.length; i++) raw += String.fromCharCode(out[i]); }
         raw = raw.trim();
-        if (raw.indexOf("[restore] SELESAI") >= 0) {
+        const exitMatch = raw.match(/__EXIT:(\d+)\s*$/);
+        const exitCode = exitMatch ? parseInt(exitMatch[1], 10) : 1;
+        raw = raw.replace(/__EXIT:\d+\s*$/, "").trim();
+        if (exitCode === 0 && raw.indexOf("[restore] SELESAI") >= 0) {
             console.log(`[Restore] Sukses restore '${slug}'`);
             return c.json(200, { success: true, message: `Snapshot ${date || "terbaru"} untuk '${slug}' berhasil dipulihkan ke Master VPS.`, log: raw });
         }
         console.error(`[Restore] Gagal restore '${slug}':`, raw);
-        const tail = raw.split("\n").slice(-3).join(" ").trim();
+        const tail = raw.split("\n").filter((l) => l.indexOf("ERROR") >= 0).slice(-2).join(" ").trim()
+            || raw.split("\n").slice(-2).join(" ").trim();
         return c.json(400, { success: false, error: tail || "Restore gagal." });
     } catch (err) {
         console.error(`[Restore] Error exception saat restore '${slug}':`, err);
