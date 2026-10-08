@@ -13,7 +13,7 @@ import QuestionRepositoryDialog from "../../components/dialogs/QuestionRepositor
 import { Input } from "../../components/ui/input";
 import { Separator } from "../../components/ui/separator";
 import FormField from "../../components/forms/FormField";
-import { uploadInventoryImage, deleteImageFromStorage, deleteImagesFromStorage, safeDeleteImage, safeDeleteImages } from "../../lib/storage";
+import { uploadInventoryImage, deleteImageFromStorage, deleteImagesFromStorage, safeDeleteImage, safeDeleteImages, getR2WorkerUrl, getR2PublicBaseUrl } from "../../lib/storage";
 import { compressImage } from "../../lib/imageCompression";
 import { ImportButton } from "../../components/ui/import-button";
 import { parseQuestionsFromWord } from "../../lib/questionWordParser";
@@ -115,7 +115,7 @@ const getAbsoluteUrl = (url: string): string => {
     return `${window.location.origin}/${cleanUrl}`;
   }
   if (cleanUrl.startsWith("schools/")) {
-    const r2Base = import.meta.env.VITE_R2_PUBLIC_BASE_URL || "";
+    const r2Base = getR2PublicBaseUrl();
     if (r2Base) {
       const base = r2Base.replace(/\/$/, "");
       return `${base}/${cleanUrl}`;
@@ -257,8 +257,8 @@ const convertToPngBase64 = async (
   }
 
   // 2b. Cloudflare Worker fallback (with open CORS headers)
-  const workerUrl = (import.meta.env.VITE_R2_WORKER_URL as string | undefined || "").replace(/\/$/, "");
-  const publicBaseUrl = (import.meta.env.VITE_R2_PUBLIC_BASE_URL as string | undefined || "").replace(/\/$/, "");
+  const workerUrl = getR2WorkerUrl();
+  const publicBaseUrl = getR2PublicBaseUrl();
 
   if (!blob && workerUrl) {
     try {

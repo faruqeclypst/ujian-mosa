@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../../componen
 import { Progress } from "../../components/ui/progress";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
 import { Input } from "../../components/ui/input";
+import { getR2WorkerUrl, getR2PublicBaseUrl } from "../../lib/storage";
 import FormField from "../../components/forms/FormField";
 import { useAuth } from "../../context/AuthContext";
 import { useTenant } from "../../context/TenantContext";
@@ -214,8 +215,8 @@ const convertToPngBase64 = async (
   }
 
   // 2b. Cloudflare Worker fallback (with open CORS headers)
-  const workerUrl = (import.meta.env.VITE_R2_WORKER_URL as string | undefined || "").replace(/\/$/, "");
-  const publicBaseUrl = (import.meta.env.VITE_R2_PUBLIC_BASE_URL as string | undefined || "").replace(/\/$/, "");
+  const workerUrl = getR2WorkerUrl();
+  const publicBaseUrl = getR2PublicBaseUrl();
 
   if (!blob && workerUrl) {
     try {
@@ -1061,7 +1062,7 @@ const ExamsPage = () => {
         return `${window.location.origin}/${cleanUrl}`;
       }
       if (cleanUrl.startsWith("schools/")) {
-        const r2Base = import.meta.env.VITE_R2_PUBLIC_BASE_URL || "";
+        const r2Base = getR2PublicBaseUrl();
         if (r2Base) {
           const base = r2Base.replace(/\/$/, "");
           return `${base}/${cleanUrl}`;

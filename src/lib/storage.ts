@@ -6,8 +6,20 @@
 import PocketBase from "pocketbase";
 import { compressImage } from "./imageCompression";
 
-const workerUrl = import.meta.env.VITE_R2_WORKER_URL as string | undefined;
-const publicBaseUrl = import.meta.env.VITE_R2_PUBLIC_BASE_URL as string | undefined;
+// Fallback bawaan (sesuai cloudflare-worker/README.md) agar upload tetap jalan
+// walau env lupa di-set saat build. Ini endpoint publik, bukan kredensial.
+// Env tetap diprioritaskan bila di-set.
+const DEFAULT_R2_WORKER_URL = "https://examku-worker.faruq-blogger.workers.dev";
+const DEFAULT_R2_PUBLIC_BASE_URL = "https://assets.examku.my.id";
+
+export const getR2WorkerUrl = (): string =>
+  ((import.meta.env.VITE_R2_WORKER_URL as string | undefined) || DEFAULT_R2_WORKER_URL).replace(/\/$/, "");
+
+export const getR2PublicBaseUrl = (): string =>
+  ((import.meta.env.VITE_R2_PUBLIC_BASE_URL as string | undefined) || DEFAULT_R2_PUBLIC_BASE_URL).replace(/\/$/, "");
+
+const workerUrl = getR2WorkerUrl();
+const publicBaseUrl = getR2PublicBaseUrl();
 
 export interface UploadResult {
   key: string;
