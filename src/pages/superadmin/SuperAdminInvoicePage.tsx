@@ -4,7 +4,7 @@ import {
   CheckCircle2, Clock, XCircle, Upload, X, ChevronDown,
   Building2, Calendar, CreditCard, Printer, RefreshCw,
   AlertTriangle, Paperclip, ExternalLink, Trash2, Edit,
-  ArrowUpCircle,
+  TrendingUp,
 } from "lucide-react";
 import { masterPb } from "../../lib/pocketbase";
 import SuperAdminLayout from "../../components/layout/SuperAdminLayout";
@@ -178,6 +178,8 @@ const SuperAdminInvoicePage = () => {
 
   const topupSchool = schools.find(s => s.id === topupSchoolId) || null;
   const topupCalc = topupSchool ? calculateTopup(topupSchool, topupTargetPlan) : null;
+  // Narrowing eksplisit agar TypeScript yakin (bukan { error })
+  const topupData = topupCalc && !("error" in topupCalc) ? topupCalc : null;
   const topupCalcError = topupCalc && "error" in topupCalc ? topupCalc.error : null;
 
   // Sekolah yang layak top-up: masa aktif berbayar masih berjalan
@@ -214,33 +216,33 @@ const SuperAdminInvoicePage = () => {
   };
 
   const handleIssueTopup = async () => {
-    if (!topupSchool || !topupCalc || topupCalcError) return;
+    if (!topupSchool || !topupData) return;
     setTopupSaving(true);
     try {
-      const target = PLAN_PRICING[topupCalc.targetPlanKey];
-      const current = PLAN_PRICING[topupCalc.currentPlanKey];
+      const target = PLAN_PRICING[topupData.targetPlanKey];
+      const current = PLAN_PRICING[topupData.currentPlanKey];
       const perDay = Math.round((target.monthlyRate - current.monthlyRate) / 30);
-      const activeUntilFmt = formatDateID(topupCalc.activeUntil);
+      const activeUntilFmt = formatDateID(topupData.activeUntil);
       const payload = {
         invoice_number: generateInvoiceNumber(),
         school_id: topupSchool.id,
         school_name: topupSchool.name,
         school_slug: topupSchool.slug,
         contact_email: topupSchool.contact_email || "",
-        plan: topupCalc.targetPlanKey,
+        plan: topupData.targetPlanKey,
         plan_label: target.label,
         duration_months: 0,
         period_label: `Top-up s/d ${activeUntilFmt}`,
-        amount: topupCalc.amount,
+        amount: topupData.amount,
         status: "unpaid",
-        due_date: topupCalc.activeUntil,
-        notes: `[TOPUP] Top-up kuota ${topupCalc.currentLabel} (${topupCalc.currentQuota} siswa) → ${topupCalc.targetLabel} (${topupCalc.targetQuota} siswa). Periode tetap s/d ${activeUntilFmt} (${topupCalc.remainingDays} hari × Rp ${perDay.toLocaleString("id-ID")}/hari). Masa aktif TIDAK diperpanjang.`,
+        due_date: topupData.activeUntil,
+        notes: `[TOPUP] Top-up kuota ${topupData.currentLabel} (${topupData.currentQuota} siswa) → ${topupData.targetLabel} (${topupData.targetQuota} siswa). Periode tetap s/d ${activeUntilFmt} (${topupData.remainingDays} hari × Rp ${perDay.toLocaleString("id-ID")}/hari). Masa aktif TIDAK diperpanjang.`,
       };
       await masterPb.collection("invoices").create(payload);
       await loadInvoices();
       setShowTopupModal(false);
       setTopupSchoolId("");
-      alert(`Invoice top-up Rp ${topupCalc.amount.toLocaleString("id-ID")} untuk ${topupSchool.name} berhasil diterbitkan. Kuota naik setelah pembayaran diverifikasi.`);
+      alert(`Invoice top-up Rp ${topupData.amount.toLocaleString("id-ID")} untuk ${topupSchool.name} berhasil diterbitkan. Kuota naik setelah pembayaran diverifikasi.`);
     } catch (err: any) {
       alert(err?.data?.message || err?.message || "Gagal menerbitkan invoice top-up.");
     } finally {
@@ -577,7 +579,7 @@ const SuperAdminInvoicePage = () => {
             onClick={openTopup}
             className="inline-flex items-center gap-2 px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold rounded-xl transition-colors shadow-sm"
           >
-            <ArrowUpCircle size={15} />
+            <TrendingUp size={15} />
             Top-Up Kuota
           </button>
           <button
@@ -1154,23 +1156,23 @@ const SuperAdminInvoicePage = () => {
                 </div>
               )}
 
-              {topupCalc && !topupCalcError && (
+              {topupData && (
                 <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-sm space-y-1.5">
                   <div className="flex justify-between">
                     <span className="text-slate-500">Paket saat ini</span>
-                    <span className="font-semibold text-slate-800">{topupCalc.currentLabel} ({topupCalc.currentQuota} siswa)</span>
+                    <span className="font-semibold text-slate-800">{topupData.currentLabel} ({topupData.currentQuota} siswa)</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-500">Paket tujuan</span>
-                    <span className="font-semibold text-slate-800">{topupCalc.targetLabel} ({topupCalc.targetQuota} siswa)</span>
+                    <span className="font-semibold text-slate-800">{topupData.targetLabel} ({topupData.targetQuota} siswa)</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-500">Sisa masa aktif</span>
-                    <span className="font-semibold text-slate-800">{topupCalc.remainingDays} hari (s/d {formatDateID(topupCalc.activeUntil)})</span>
+                    <span className="font-semibold text-slate-800">{topupData.remainingDays} hari (s/d {formatDateID(topupData.activeUntil)})</span>
                   </div>
                   <div className="flex justify-between border-t border-amber-200 pt-1.5">
                     <span className="text-slate-500">Tagihan top-up</span>
-                    <span className="font-bold text-amber-700">Rp {topupCalc.amount.toLocaleString("id-ID")}</span>
+                    <span className="font-bold text-amber-700">Rp {topupData.amount.toLocaleString("id-ID")}</span>
                   </div>
                   <p className="text-[11px] text-slate-400 pt-1">
                     Selisih tarif prorata harian. Periode <strong>tidak</strong> diperpanjang — kuota naik segera setelah pembayaran diverifikasi.
@@ -1188,7 +1190,7 @@ const SuperAdminInvoicePage = () => {
               </button>
               <button
                 onClick={handleIssueTopup}
-                disabled={topupSaving || !topupCalc || !!topupCalcError}
+                disabled={topupSaving || !topupData}
                 className="flex-1 py-2.5 text-sm font-semibold text-white bg-amber-500 hover:bg-amber-600 rounded-xl transition disabled:opacity-50"
               >
                 {topupSaving ? "Menerbitkan..." : "Terbitkan Invoice Top-Up"}
