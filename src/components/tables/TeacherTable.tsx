@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { DataTable } from "../ui/data-table";
 import { Button } from "../ui/button";
 import type { Teacher } from "../../types/exam";
-import { Edit, Trash, KeyRound, User } from "lucide-react";
+import { Edit, Trash, KeyRound, User, Mail, Phone } from "lucide-react";
 import { Avatar, AvatarFallback } from "../ui/avatar";
 import { Badge } from "../ui/badge";
 import { useTenant } from "../../context/TenantContext";
@@ -113,6 +113,29 @@ export const TeacherTable = ({
             <span className="font-bold text-slate-700 dark:text-slate-200 leading-tight">{name}</span>
             <span className="text-[11px] text-slate-400 font-medium">@{teacher.username}</span>
           </div>
+        </div>
+      )
+    },
+    { 
+      key: "contact",
+      label: "Kontak",
+      render: (_: any, teacher: Teacher) => (
+        <div className="flex flex-col gap-1">
+          {teacher.email ? (
+            <span className="inline-flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+              <Mail className="h-3 w-3 shrink-0 text-slate-400" />
+              <span className="truncate max-w-[180px]">{teacher.email}</span>
+            </span>
+          ) : null}
+          {teacher.phone ? (
+            <span className="inline-flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+              <Phone className="h-3 w-3 shrink-0 text-slate-400" />
+              {teacher.phone}
+            </span>
+          ) : null}
+          {!teacher.email && !teacher.phone && (
+            <span className="text-slate-300 dark:text-slate-700 italic text-[10px]">-</span>
+          )}
         </div>
       )
     },

@@ -3,6 +3,8 @@ export interface Teacher {
   name: string;
   code?: string;
   username: string;
+  email?: string;
+  phone?: string;
   subjects: string[];
   createdAt: number;
 }

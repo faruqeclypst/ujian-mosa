@@ -13,6 +13,8 @@ export interface TeacherSubmitPayload {
   name: string;
   code?: string;
   username: string;
+  email?: string;
+  phone?: string;
   subjects: string[];
 }
 
@@ -31,6 +33,8 @@ export const TeacherForm = ({ defaultValues, onSubmit, submitLabel = "Simpan", o
     name: z.string().min(1, `Nama ${terminology.teacher.toLowerCase()} wajib diisi`),
     code: z.string().optional(),
     username: z.string().min(3, "Username minimal 3 karakter untuk login"),
+    email: z.string().email("Format email tidak valid").optional().or(z.literal("")),
+    phone: z.string().optional(),
     subjects: z.array(z.string()).min(1, `Pilih minimal 1 ${terminology.subject.toLowerCase()}`),
   }), [terminology]);
 
@@ -48,6 +52,8 @@ export const TeacherForm = ({ defaultValues, onSubmit, submitLabel = "Simpan", o
       name: "",
       code: "",
       username: "",
+      email: "",
+      phone: "",
       subjects: [],
     },
   });
@@ -58,21 +64,25 @@ export const TeacherForm = ({ defaultValues, onSubmit, submitLabel = "Simpan", o
         name: defaultValues.name || "",
         code: defaultValues.code || "",
         username: defaultValues.username || "",
+        email: defaultValues.email || "",
+        phone: defaultValues.phone || "",
         subjects: defaultValues.subjects || [],
       });
     }
-  }, [defaultValues?.name, defaultValues?.code, defaultValues?.username, JSON.stringify(defaultValues?.subjects), reset]);
+  }, [defaultValues?.name, defaultValues?.code, defaultValues?.username, defaultValues?.email, defaultValues?.phone, JSON.stringify(defaultValues?.subjects), reset]);
 
   const submitHandler = async (values: TeacherFormValues) => {
     await onSubmit({
       name: values.name,
       code: values.code || "",
       username: values.username,
+      email: values.email || "",
+      phone: values.phone || "",
       subjects: values.subjects,
     });
     
     if (!defaultValues || Object.keys(defaultValues).length === 0) {
-      reset({ name: "", code: "", username: "", subjects: [] });
+      reset({ name: "", code: "", username: "", email: "", phone: "", subjects: [] });
     }
   };
 
@@ -90,6 +100,16 @@ export const TeacherForm = ({ defaultValues, onSubmit, submitLabel = "Simpan", o
         <Input id="username" placeholder={`Masukkan username untuk login ${terminology.teacher.toLowerCase()}`} {...register("username")} />
         <p className="text-[10px] text-slate-400 mt-1">* {terminology.teacher} akan login menggunakan username ini dan password default 12345678</p>
       </FormField>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <FormField id="email" label="Email (Opsional)" error={errors.email}>
+          <Input id="email" type="email" placeholder="nama@sekolah.id" {...register("email")} />
+        </FormField>
+
+        <FormField id="phone" label="No. HP/WA (Opsional)" error={errors.phone}>
+          <Input id="phone" type="tel" placeholder="08xxxxxxxxxx" {...register("phone")} />
+        </FormField>
+      </div>
       
       <FormField id="subjects" label={`${terminology.subject} (Bisa pilih lebih dari satu)`} error={errors.subjects as any}>
         {subjects.length === 0 ? (

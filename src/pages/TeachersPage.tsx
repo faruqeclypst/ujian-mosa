@@ -482,9 +482,11 @@ const TeachersPage = () => {
           name: selectedTeacher.name,
           code: selectedTeacher.code || "",
           username: selectedTeacher.username || "",
+          email: selectedTeacher.email || "",
+          phone: selectedTeacher.phone || "",
           subjects: selectedTeacher.subjects || [],
         }
-      : { name: "", code: "", username: "", subjects: [] },
+      : { name: "", code: "", username: "", email: "", phone: "", subjects: [] },
   [selectedTeacher]);
 
   return (
