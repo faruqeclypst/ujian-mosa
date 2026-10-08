@@ -28,7 +28,16 @@ const LoginPage = () => {
   const { actualTheme, toggleTheme } = useTheme();
   const pb = tenantPb;
   const [formError, setFormError] = useState<string | null>(null);
+  const [infoMessage, setInfoMessage] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+
+  // Setelah ganti password wajib → dipaksa logout → tampilkan info saat balik ke login
+  useEffect(() => {
+    if (sessionStorage.getItem("pw_changed_relogin") === "1") {
+      sessionStorage.removeItem("pw_changed_relogin");
+      setInfoMessage("Password berhasil diubah. Silakan login kembali dengan password baru Anda.");
+    }
+  }, []);
 
   // For change password modal (Guru)
   const [currentPassword, setCurrentPassword] = useState("");
@@ -334,6 +343,20 @@ const LoginPage = () => {
                 </FormField>
               </motion.div>
 
+              {/* Info Message (mis. setelah ganti password wajib) */}
+              {infoMessage && !formError && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  className="rounded-xl bg-emerald-50 border border-emerald-200 p-3 dark:bg-emerald-900/20 dark:border-emerald-800"
+                >
+                  <p className="text-sm font-medium text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
+                    <Shield className="h-4 w-4" />
+                    {infoMessage}
+                  </p>
+                </motion.div>
+              )}
+
               {/* Error Message */}
               {formError && (
                 <motion.div
@@ -419,6 +442,9 @@ const LoginPage = () => {
               setIsChangingPass(true);
               try {
                 await changePassword(newPassword, currentPassword);
+                // Paksa login ulang: sesi & data di-refresh total agar tidak tampil "fresh"/kosong
+                sessionStorage.setItem("pw_changed_relogin", "1");
+                await signOut();
               } catch (err: any) {
                 setChangePassError(err.message || "Gagal mengubah password.");
               } finally {

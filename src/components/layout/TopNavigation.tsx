@@ -338,7 +338,7 @@ const TopNavigation = () => {
             onClick={() => setIsDropdownOpen(!isDropdownOpen)}
           >
             <Avatar className="h-9 w-9 sm:h-10 sm:w-10">
-              <AvatarImage src={(user as any)?.avatar && pb ? pb.getFileUrl(user as any, (user as any).avatar) : undefined} alt={displayName} />
+              <AvatarImage src={(user as any)?.avatar || undefined} alt={displayName} />
               <AvatarFallback className="bg-gradient-to-br from-blue-500 to-blue-600 text-white text-xs sm:text-sm">
                 {initials}
               </AvatarFallback>
@@ -351,7 +351,7 @@ const TopNavigation = () => {
               {/* Header Profile Info */}
               <div className="flex items-center justify-start gap-3 p-4 bg-slate-50/50 dark:bg-transparent">
                 <Avatar className="h-10 w-10 ring-2 ring-white dark:ring-slate-800 shadow-sm">
-                  <AvatarImage src={(user as any)?.avatar && pb ? pb.getFileUrl(user as any, (user as any).avatar) : undefined} alt={displayName} />
+                  <AvatarImage src={(user as any)?.avatar || undefined} alt={displayName} />
                   <AvatarFallback className="bg-gradient-to-br from-blue-500 to-blue-600 text-white font-bold">
                     {initials}
                   </AvatarFallback>

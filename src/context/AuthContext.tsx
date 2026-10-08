@@ -60,7 +60,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             name: model.name || model.username || "",
             role: model.role || "teacher",
             teacherId: model.teacherId,
-            avatar: model.avatar ? pb.files.getUrl(model, model.avatar) : "",
+            // avatar_url (URL R2/external) diutamakan; fallback ke field file avatar bawaan
+            avatar: model.avatar_url || (model.avatar ? pb.files.getUrl(model, model.avatar) : ""),
             // Force change ONLY if explicitly set to false. If missing (undefined/null), assume true for compatibility.
             hasChangedPassword: model.hasChangedPassword !== false && model.hasChangedPassword !== "false" && model.hasChangedPassword !== "0" && model.hasChangedPassword !== 0,
             ai_api_key: model.ai_api_key || "",
@@ -93,7 +94,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         name: model.name || model.username || "",
         role: model.role || "teacher",
         teacherId: model.teacherId,
-        avatar: model.avatar && pb ? pb.files.getUrl(model, model.avatar) : "",
+        // avatar_url (URL R2/external) diutamakan; fallback ke field file avatar bawaan
+        avatar: model.avatar_url || (model.avatar && pb ? pb.files.getUrl(model, model.avatar) : ""),
         // Force change ONLY if explicitly set to false. If missing (undefined/null), assume true for compatibility.
         hasChangedPassword: model.hasChangedPassword !== false && model.hasChangedPassword !== "false" && model.hasChangedPassword !== "0" && model.hasChangedPassword !== 0,
         ai_api_key: model.ai_api_key || "",
