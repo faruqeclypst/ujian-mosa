@@ -17,6 +17,7 @@ import {
 } from "../../utils/pricingHelper";
 import { printDigitalInvoice } from "../../utils/invoicePdfHelper";
 import { isTopupInvoice } from "../../utils/subscriptionHelper";
+import { ProofLightbox, isImageProof } from "../../components/ProofLightbox";
 
 // ─── Types ───────────────────────────────────────────────────
 
@@ -123,6 +124,7 @@ const SchoolInvoicePage = () => {
   const [loading, setLoading] = useState(true);
   const [detailInvoice, setDetailInvoice] = useState<Invoice | null>(null);
   const [uploadingProof, setUploadingProof] = useState(false);
+  const [proofView, setProofView] = useState<Invoice | null>(null);
   const [payingInvoiceId, setPayingInvoiceId] = useState<string | null>(null);
   const [paymentNotice, setPaymentNotice] = useState<{ type: "success" | "cancelled"; message: string } | null>(null);
   const [paymentSession, setPaymentSession] = useState<{
@@ -476,7 +478,7 @@ const SchoolInvoicePage = () => {
             </p>
           </div>
           <button
-            onClick={() => setDetailInvoice(activePendingInvoice)}
+            onClick={() => setProofView(activePendingInvoice)}
             className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition shadow-xs flex items-center gap-1.5 shrink-0"
           >
             <Eye size={13} />
@@ -729,9 +731,13 @@ const SchoolInvoicePage = () => {
                       )}
                       {effectiveStatus === "pending" && (
                         <>
-                          <span className="text-[11px] font-medium text-blue-700 dark:text-blue-300">
-                            Bukti terkirim — menunggu verifikasi
-                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setProofView(inv)}
+                            className="text-[11px] font-bold text-blue-700 dark:text-blue-300 hover:underline"
+                          >
+                            Lihat bukti terkirim
+                          </button>
                           <label className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-xl cursor-pointer transition shadow-sm border border-slate-200/60 dark:border-slate-700">
                             <Upload size={12} />
                             {uploadingProof ? "Mengunggah..." : "Upload Ulang"}
@@ -1006,16 +1012,37 @@ const SchoolInvoicePage = () => {
                         </p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <a
-                        href={getProofUrl(detailInvoice)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="px-3 py-1.5 bg-white dark:bg-slate-800 border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300 rounded-xl text-xs font-bold hover:bg-blue-100 dark:hover:bg-blue-900/40 transition flex items-center gap-1.5"
+                    {isImageProof(getProofUrl(detailInvoice)) ? (
+                      <button
+                        type="button"
+                        onClick={() => setProofView(detailInvoice)}
+                        className="block w-full group relative rounded-xl overflow-hidden border border-blue-200 dark:border-blue-800 bg-white dark:bg-slate-800"
+                        title="Klik untuk memperbesar"
                       >
-                        <Eye size={12} />
-                        <span>Lihat Bukti Terkirim</span>
-                      </a>
+                        <img
+                          src={getProofUrl(detailInvoice)}
+                          alt="Bukti transfer"
+                          className="w-full max-h-56 object-contain bg-slate-50 dark:bg-slate-900"
+                        />
+                        <span className="absolute inset-0 bg-slate-900/0 group-hover:bg-slate-900/20 transition flex items-center justify-center">
+                          <span className="opacity-0 group-hover:opacity-100 transition inline-flex items-center gap-1.5 px-3 py-1.5 bg-white rounded-lg shadow text-xs font-bold text-slate-700">
+                            <Eye size={12} /> Klik untuk memperbesar
+                          </span>
+                        </span>
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setProofView(detailInvoice)}
+                        className="w-full flex items-center gap-3 p-3 bg-white dark:bg-slate-800 border border-blue-200 dark:border-blue-800 rounded-xl hover:bg-blue-50 dark:hover:bg-blue-950/30 transition text-left"
+                      >
+                        <FileText size={24} className="text-blue-500 shrink-0" />
+                        <span className="text-xs font-bold text-blue-700 dark:text-blue-300">
+                          Dokumen PDF — klik untuk melihat
+                        </span>
+                      </button>
+                    )}
+                    <div className="flex items-center gap-2">
                       <button
                         onClick={() => removeProof(detailInvoice.id)}
                         className="px-3 py-1.5 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-xl text-xs font-bold transition"
@@ -1054,6 +1081,15 @@ const SchoolInvoicePage = () => {
           </div>
         );
       })()}
+
+      {/* ── Lightbox Bukti Pembayaran ── */}
+      {proofView && (
+        <ProofLightbox
+          url={getProofUrl(proofView)}
+          title={`Bukti Pembayaran ${proofView.invoice_number}`}
+          onClose={() => setProofView(null)}
+        />
+      )}
 
       {/* ── Modal Realtime QRIS Payment Session ── */}
       {paymentSession && (

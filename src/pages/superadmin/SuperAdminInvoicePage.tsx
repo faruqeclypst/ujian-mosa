@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { masterPb } from "../../lib/pocketbase";
 import SuperAdminLayout from "../../components/layout/SuperAdminLayout";
+import { ProofLightbox, isImageProof } from "../../components/ProofLightbox";
 import { cn } from "../../lib/utils";
 import {
   calculatePlanInvoice,
@@ -124,12 +125,6 @@ const getProofUrl = (inv: Invoice): string => {
   return `${masterPb.baseUrl}/api/files/invoices/${inv.id}/${inv.payment_proof}`;
 };
 
-const isImageProof = (proofUrl: string): boolean => {
-  if (!proofUrl) return false;
-  if (proofUrl.startsWith("data:image")) return true;
-  return /\.(jpg|jpeg|png|webp|gif|svg)($|\?)/i.test(proofUrl);
-};
-
 // ─── Blank form ─────────────────────────────────────────────────────────────
 
 const blankForm = (): Omit<Invoice, "id" | "created" | "updated"> => {
@@ -171,6 +166,7 @@ const SuperAdminInvoicePage = () => {
   const [showModal, setShowModal] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
   const [detailInvoice, setDetailInvoice] = useState<Invoice | null>(null);
+  const [proofView, setProofView] = useState<Invoice | null>(null);
   const [form, setForm] = useState(blankForm());
   const [saving, setSaving] = useState(false);
   const [uploadingProof, setUploadingProof] = useState<string | null>(null);
@@ -919,6 +915,27 @@ const SuperAdminInvoicePage = () => {
         )}
       </div>
 
+      {/* ── Lightbox Bukti Pembayaran ── */}
+      {proofView && (
+        <ProofLightbox
+          url={getProofUrl(proofView)}
+          title={`Bukti Pembayaran ${proofView.invoice_number} — ${proofView.school_name}`}
+          onClose={() => setProofView(null)}
+          actions={
+            (proofView.status === "unpaid" || proofView.status === "overdue") ? (
+              <button
+                type="button"
+                onClick={() => { setProofView(null); handleMarkPaid(proofView.id); }}
+                className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl transition shadow-lg"
+              >
+                <CheckCircle2 size={15} />
+                Verifikasi & Tandai Lunas
+              </button>
+            ) : undefined
+          }
+        />
+      )}
+
       {/* ─── Create/Edit Modal ─────────────────────────────────────────── */}
             {showModal && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -1320,24 +1337,24 @@ const SuperAdminInvoicePage = () => {
                   {detailInvoice.payment_proof ? (
                     <div className="space-y-3">
                       {isImageProof(getProofUrl(detailInvoice)) ? (
-                        <div className="relative group">
+                        <button
+                          type="button"
+                          onClick={() => setProofView(detailInvoice)}
+                          className="relative group block w-full text-left"
+                          title="Klik untuk memperbesar"
+                        >
                           <img
                             src={getProofUrl(detailInvoice)}
                             alt="Bukti pembayaran"
                             className="w-full max-h-64 object-contain rounded-lg border border-slate-100 bg-slate-50"
                           />
-                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 rounded-lg transition flex items-center justify-center">
-                            <a
-                              href={getProofUrl(detailInvoice)}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="opacity-0 group-hover:opacity-100 transition flex items-center gap-1.5 px-3 py-1.5 bg-white rounded-lg shadow text-xs font-semibold text-slate-700"
-                            >
+                          <span className="absolute inset-0 bg-black/0 group-hover:bg-black/10 rounded-lg transition flex items-center justify-center">
+                            <span className="opacity-0 group-hover:opacity-100 transition inline-flex items-center gap-1.5 px-3 py-1.5 bg-white rounded-lg shadow text-xs font-semibold text-slate-700">
                               <ExternalLink size={12} />
-                              Buka penuh
-                            </a>
-                          </div>
-                        </div>
+                              Perbesar
+                            </span>
+                          </span>
+                        </button>
                       ) : (
                         <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
                           <FileText size={24} className="text-blue-500 flex-shrink-0" />
@@ -1345,15 +1362,14 @@ const SuperAdminInvoicePage = () => {
                             <p className="text-sm font-medium text-slate-700">Dokumen Lampiran</p>
                             <p className="text-xs text-slate-400">Klik untuk melihat file</p>
                           </div>
-                          <a
-                            href={getProofUrl(detailInvoice)}
-                            target="_blank"
-                            rel="noopener noreferrer"
+                          <button
+                            type="button"
+                            onClick={() => setProofView(detailInvoice)}
                             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition"
                           >
                             <ExternalLink size={12} />
-                            Buka
-                          </a>
+                            Lihat
+                          </button>
                         </div>
                       )}
                       <button
