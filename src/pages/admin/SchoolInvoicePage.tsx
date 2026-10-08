@@ -475,9 +475,9 @@ const SchoolInvoicePage = () => {
             </span>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-5">
+          <div className="grid md:grid-cols-2 gap-5 items-center">
             {/* Kiri: info tagihan */}
-            <div className="flex flex-col">
+            <div className="flex flex-col justify-center py-1">
               <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Nominal yang ditransfer</span>
               <div className="flex items-baseline gap-1.5 mt-1">
                 <span className="text-3xl font-black tabular-nums tracking-tight text-slate-900 dark:text-white">
@@ -487,11 +487,11 @@ const SchoolInvoicePage = () => {
               <p className="text-[11px] text-slate-400 mt-1">
                 {PLAN_PRICES[activePendingInvoice.plan]?.label || activePendingInvoice.plan} · {isTopupInvoice(activePendingInvoice) ? "top-up kuota" : `${activePendingInvoice.duration_months} bulan`}
               </p>
-              <p className="mt-3 flex items-start gap-1.5 text-[11px] leading-relaxed text-slate-400">
+              <p className="mt-2.5 flex items-start gap-1.5 text-[11px] leading-relaxed text-slate-400">
                 <Info size={13} className="shrink-0 mt-0.5" />
                 Bukti transfer sudah terkirim dan sedang diverifikasi SuperAdmin. Layanan aktif otomatis setelah disetujui.
               </p>
-              <label className="mt-4 inline-flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 text-xs font-semibold transition-all cursor-pointer">
+              <label className="mt-3 inline-flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 text-xs font-semibold transition-all cursor-pointer">
                 <Upload size={13} />
                 {uploadingProof ? "Mengunggah..." : "Upload Ulang"}
                 <input
@@ -512,7 +512,7 @@ const SchoolInvoicePage = () => {
               className="group relative block w-full overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60"
             >
               {isImageProof(getProofUrl(activePendingInvoice)) ? (
-                <img src={getProofUrl(activePendingInvoice)} alt="Bukti transfer" className="w-full max-h-64 object-contain" />
+                <img src={getProofUrl(activePendingInvoice)} alt="Bukti transfer" className="w-full max-h-44 object-contain" />
               ) : (
                 <span className="flex items-center justify-center gap-3 p-8">
                   <FileText size={28} className="text-blue-500 shrink-0" />
