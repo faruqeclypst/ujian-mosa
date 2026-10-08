@@ -1,4 +1,5 @@
-import { X } from "lucide-react";
+import { useEffect } from "react";
+import { X, ReceiptText } from "lucide-react";
 
 /** True bila URL bukti adalah gambar (bukan PDF). */
 export const isImageProof = (proofUrl: string): boolean => {
@@ -8,8 +9,10 @@ export const isImageProof = (proofUrl: string): boolean => {
 };
 
 /**
- * Lightbox fullscreen untuk melihat bukti pembayaran.
- * Klik sekali → gambar langsung tampil besar. PDF di-embed via iframe.
+ * Penampil bukti pembayaran: overlay terang, header solid berisi judul
+ * dan tombol "Tutup" berlabel jelas. Gambar/dokumen tampil dalam kartu
+ * putih berbingkai agar tetap terbaca di atas overlay terang.
+ * Ditutup via tombol Tutup, klik overlay, atau tombol Escape.
  */
 export function ProofLightbox({
   url,
@@ -22,49 +25,77 @@ export function ProofLightbox({
   onClose: () => void;
   actions?: React.ReactNode;
 }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
   const isImage = isImageProof(url);
+
   return (
     <div
-      className="fixed inset-0 z-[80] bg-slate-950/85 backdrop-blur-sm flex flex-col p-4 sm:p-8"
+      className="fixed inset-0 z-[80] flex flex-col bg-slate-200/85 backdrop-blur-[2px]"
       onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label={title || "Bukti pembayaran"}
     >
+      {/* Header: solid, kontrol selalu terlihat */}
       <div
-        className="flex items-center justify-between gap-3 mb-3 shrink-0"
+        className="flex items-center justify-between gap-3 px-4 sm:px-6 py-3 bg-white border-b border-slate-200 shadow-sm shrink-0"
         onClick={(e) => e.stopPropagation()}
       >
-        <p className="text-white text-sm font-bold truncate">
-          {title || "Bukti Pembayaran"}
-        </p>
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-9 h-9 rounded-xl bg-blue-50 border border-blue-100 text-blue-600 flex items-center justify-center shrink-0">
+            <ReceiptText size={18} />
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-bold text-slate-900 truncate">
+              {title || "Bukti Pembayaran"}
+            </p>
+            <p className="text-[11px] text-slate-500">
+              Klik area abu-abu di luar gambar atau tekan Esc untuk menutup
+            </p>
+          </div>
+        </div>
         <button
           type="button"
           onClick={onClose}
-          className="p-2 rounded-full bg-white/10 text-white hover:bg-white/25 transition shrink-0"
-          title="Tutup"
+          autoFocus
+          className="inline-flex items-center gap-1.5 px-4 py-2 min-h-[40px] rounded-xl bg-slate-900 text-white text-sm font-bold hover:bg-slate-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 transition shrink-0"
         >
-          <X size={20} />
+          <X size={16} />
+          Tutup
         </button>
       </div>
+
+      {/* Isi: kartu putih berbingkai */}
       <div
-        className="flex-1 min-h-0 flex items-center justify-center"
+        className="flex-1 min-h-0 overflow-auto flex items-start sm:items-center justify-center p-4 sm:p-8"
         onClick={(e) => e.stopPropagation()}
       >
         {isImage ? (
           <img
             src={url}
             alt={title || "Bukti pembayaran"}
-            className="max-w-full max-h-full object-contain rounded-xl shadow-2xl bg-white"
+            className="max-w-full max-h-full object-contain rounded-2xl border border-slate-300 bg-white shadow-xl"
           />
         ) : (
           <iframe
             src={url}
             title={title || "Bukti pembayaran"}
-            className="w-full h-full max-w-5xl bg-white rounded-xl shadow-2xl"
+            className="w-full h-full max-w-5xl rounded-2xl border border-slate-300 bg-white shadow-xl"
           />
         )}
       </div>
+
+      {/* Aksi opsional */}
       {actions && (
         <div
-          className="flex flex-wrap justify-center gap-2 mt-4 shrink-0"
+          className="flex flex-wrap items-center justify-center gap-2 px-4 py-3 bg-white border-t border-slate-200 shrink-0"
           onClick={(e) => e.stopPropagation()}
         >
           {actions}
