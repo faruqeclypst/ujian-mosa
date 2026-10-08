@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { createPortal } from "react-dom";
 import { X, FileText } from "lucide-react";
 
 /** True bila URL bukti adalah gambar (bukan PDF). */
@@ -35,7 +36,9 @@ export function ProofLightbox({
 
   const isImage = isImageProof(url);
 
-  return (
+  // Portal ke document.body agar overlay selalu di atas sidebar/navbar
+  // (layout memakai framer-motion yang menciptakan stacking context sendiri).
+  return createPortal(
     <div
       className="fixed inset-0 z-[200] flex flex-col bg-slate-200/85 backdrop-blur-[2px]"
       onClick={onClose}
@@ -103,6 +106,7 @@ export function ProofLightbox({
           {actions}
         </div>
       )}
-    </div>
+    </div>,
+    document.body
   );
 }

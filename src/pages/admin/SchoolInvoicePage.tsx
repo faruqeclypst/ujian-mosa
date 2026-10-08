@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { createPortal } from "react-dom";
 import {
   FileText, Upload, Eye, Printer, CheckCircle2, Clock,
   AlertTriangle, XCircle, Paperclip, ExternalLink, Trash2,
@@ -781,7 +782,7 @@ const SchoolInvoicePage = () => {
       )}
 
       {/* ── Modal Pengajuan Perpanjangan ke Admin ─────────────────── */}
-      {showRenewalModal && (
+      {showRenewalModal && createPortal(
         <div className="fixed inset-0 bg-slate-900/60 dark:bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-150">
           <div className="bg-white dark:bg-slate-950 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-slate-200/70 dark:border-slate-800">
             {/* Modal Header */}
@@ -940,7 +941,8 @@ const SchoolInvoicePage = () => {
               )}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* ─── Detail Modal ──────────────────────────────────────────── */}
@@ -949,7 +951,7 @@ const SchoolInvoicePage = () => {
         const modalCfg = STATUS_CONFIG[effectiveStatus] || STATUS_CONFIG.unpaid;
         const ModalStatusIcon = modalCfg.icon;
 
-        return (
+        return createPortal(
           <div className="fixed inset-0 bg-slate-900/60 dark:bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <div className="bg-white dark:bg-slate-950 rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto border border-slate-200/60 dark:border-slate-800">
               {/* Modal Header */}
@@ -1094,7 +1096,8 @@ const SchoolInvoicePage = () => {
                 )}
               </div>
             </div>
-          </div>
+          </div>,
+          document.body
         );
       })()}
 
@@ -1108,7 +1111,7 @@ const SchoolInvoicePage = () => {
       )}
 
       {/* ── Modal Realtime QRIS Payment Session ── */}
-      {paymentSession && (
+      {paymentSession && createPortal(
         <div className="fixed inset-0 bg-slate-900/60 dark:bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl w-full max-w-md border border-slate-200/80 dark:border-slate-800 overflow-hidden text-center p-6">
             {!paymentSession.isPaid ? (
@@ -1200,7 +1203,8 @@ const SchoolInvoicePage = () => {
               </div>
             )}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
