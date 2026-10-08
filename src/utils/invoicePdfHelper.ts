@@ -4,6 +4,8 @@
  * Didesain khusus untuk keperluan akuntansi sekolah, pelaporan SPJ, dan dana BOS.
  */
 
+import { PLAN_PRICING, normalizePlanKey } from "./pricingHelper";
+
 export function terbilang(nominal: number): string {
   const n = Math.floor(Math.abs(nominal));
   if (n === 0) return "Nol Rupiah";
@@ -87,7 +89,14 @@ export function printDigitalInvoice(inv: InvoiceData, school?: SchoolMeta | null
   const dueDate = formatDateIndo(inv.due_date);
   const paidDate = inv.paid_date ? formatDateIndo(inv.paid_date) : "-";
   const terbilangText = terbilang(inv.amount);
-  const quotaText = school?.student_quota ? `${school.student_quota} Siswa` : "Kuota Terdaftar";
+  // Kuota di invoice mengikuti paket yang DITAGIH (bukan kuota sekolah saat ini,
+  // yang bisa masih sisa masa trial atau sudah diubah manual).
+  const planQuota = PLAN_PRICING[normalizePlanKey(inv.plan)]?.quota;
+  const quotaText = planQuota
+    ? `${planQuota} Siswa`
+    : school?.student_quota
+      ? `${school.student_quota} Siswa`
+      : "Kuota Terdaftar";
   const planLabel = inv.plan_label || (inv.plan ? inv.plan.toUpperCase() : "STANDARD");
   const schoolDomain = school?.custom_domain || `${inv.school_slug}.examku.my.id`;
 
