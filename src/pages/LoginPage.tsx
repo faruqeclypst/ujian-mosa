@@ -387,8 +387,10 @@ const LoginPage = () => {
         </Card>
       </motion.div>
 
-      {/* Mandatory Change Password Dialog for Teachers */}
-      <Dialog open={!!(user && !user.hasChangedPassword && user.role !== 'admin')} onOpenChange={() => { }}>
+      {/* Mandatory Change Password Dialog — berlaku semua role termasuk admin.
+          Tanpa ini, akun admin yang hasChangedPassword=false akan stuck di loop login:
+          route /admin menolak masuk dashboard tapi dialog ganti password tidak pernah muncul. */}
+      <Dialog open={!!(user && !user.hasChangedPassword)} onOpenChange={() => { }}>
         <DialogContent className="sm:max-w-md bg-white dark:bg-slate-900 rounded-[32px] p-8 border-none shadow-2xl" onPointerDownOutside={(e) => e.preventDefault()}>
           <DialogHeader className="mb-6">
             <div className="w-16 h-16 bg-blue-50 dark:bg-blue-900/20 rounded-2xl flex items-center justify-center mb-4 mx-auto">
