@@ -354,6 +354,11 @@ const SchoolInvoicePage = () => {
   );
   const waUrl = `https://wa.me/6285359907696?text=${waMessage}`;
 
+  // Sisa hari masa aktif (untuk pengingat H-7 / H-3 / H-1)
+  const daysLeftActive = school?.active_until
+    ? Math.ceil((new Date(school.active_until.replace(" ", "T")).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+    : null;
+
   const stats = [
     {
       label: "Total Invoice",
@@ -507,21 +512,37 @@ const SchoolInvoicePage = () => {
             </button>
           </div>
         </div>
-      ) : (school && (school.plan === "free" || (school.active_until && Math.ceil((new Date(school.active_until.replace(" ", "T")).getTime() - Date.now()) / (1000 * 60 * 60 * 24)) <= 30))) ? (
-        <div className="bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-blue-500/10 border border-amber-200 dark:border-amber-900/50 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xs">
+      ) : (school && (school.plan === "free" || (daysLeftActive !== null && daysLeftActive <= 30))) ? (
+        <div className={cn(
+          "rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xs border",
+          daysLeftActive !== null && daysLeftActive <= 3 && school.plan !== "free"
+            ? "bg-gradient-to-r from-red-500/10 via-red-500/5 to-amber-500/10 border-red-200 dark:border-red-900/50"
+            : "bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-blue-500/10 border-amber-200 dark:border-amber-900/50"
+        )}>
           <div className="space-y-1">
             <div className="flex items-center gap-2">
-              <Sparkles size={16} className="text-amber-600 dark:text-amber-400" />
+              <Sparkles size={16} className={daysLeftActive !== null && daysLeftActive <= 3 && school.plan !== "free" ? "text-red-600 dark:text-red-400" : "text-amber-600 dark:text-amber-400"} />
               <h3 className="text-sm font-bold text-slate-900 dark:text-white">
                 {school.plan === "free"
                   ? "Sekolah Menggunakan Akun Free Trial (50 Siswa)"
-                  : "Masa Aktif Layanan Segera Berakhir"}
+                  : daysLeftActive !== null && daysLeftActive <= 1
+                    ? `Masa Aktif Berakhir ${daysLeftActive <= 0 ? "Hari Ini" : "Besok"} — Segera Perpanjang!`
+                    : daysLeftActive !== null && daysLeftActive <= 3
+                      ? `Masa Aktif Tersisa ${daysLeftActive} Hari — Segera Perpanjang!`
+                      : daysLeftActive !== null && daysLeftActive <= 7
+                        ? `Masa Aktif Tersisa ${daysLeftActive} Hari`
+                        : "Masa Aktif Layanan Segera Berakhir"}
               </h3>
             </div>
             <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed max-w-xl">
               {school.plan === "free"
                 ? "Untuk meng-upgrade ke kuota siswa penuh dan membuka fitur CBT tanpa batas, silakan kirim permohonan ke Tim Admin."
-                : "Untuk menjaga kesinambungan ujian online dan sinkronisasi data tanpa jeda, silakan minta perpanjangan paket layanan ke Admin."}
+                : daysLeftActive !== null && daysLeftActive <= 3
+                  ? `Layanan akan berhenti total pada ${formatDate(school.active_until || "")}. Jika belum diperpanjang, data sekolah otomatis dipindahkan ke server utama agar aman — segera hubungi Admin untuk perpanjangan.`
+                  : "Untuk menjaga kesinambungan ujian online dan sinkronisasi data tanpa jeda, silakan minta perpanjangan paket layanan ke Admin."}
+            </p>
+            <p className="text-[10px] text-slate-400 dark:text-slate-500 leading-relaxed max-w-xl">
+              Ketentuan: 1 bulan = 28 hari kalender (paket 1&ndash;6 bulan). Paket 1 tahun = 12 bulan kalender penuh.
             </p>
           </div>
           <button

@@ -2,6 +2,7 @@ import { masterPb } from "../lib/pocketbase";
 import {
   calculatePlanInvoice,
   normalizePlanKey,
+  addBillingPeriod,
   PLAN_PRICING,
   PlanKey
 } from "./pricingHelper";
@@ -194,8 +195,7 @@ export const upgradeSchoolFromInvoice = async (invoice: {
       }
     }
 
-    const newExp = new Date(baseDate);
-    newExp.setMonth(newExp.getMonth() + months);
+    const newExp = addBillingPeriod(baseDate, months);
     newExp.setHours(23, 59, 59, 999);
 
     const year = newExp.getFullYear();
@@ -247,8 +247,21 @@ export const ensureRenewalInvoice = async (
   const seq = String(Math.floor(Math.random() * 9000) + 1000);
   const invNum = `INV-${yy}${mm}-${seq}`;
 
-  const dueDate = school.active_until
-    ? school.active_until.slice(0, 10)
+  // Jatuh tempo:
+  // - Perpanjangan (sekolah sudah paket berbayar & masa aktif berjalan):
+  //   bayar sebelum masa aktif berakhir agar layanan tidak putus.
+  // - Pembelian pertama (masih trial / belum pernah bayar / sudah kedaluwarsa):
+  //   14 hari sejak invoice diterbitkan.
+  const schoolPlanKey = normalizePlanKey(school.plan || "free");
+  const hasActivePaidPeriod = (() => {
+    if (schoolPlanKey === "free" || !school.active_until) return false;
+    const m = school.active_until.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!m) return false;
+    const exp = new Date(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10), 23, 59, 59);
+    return exp.getTime() > now.getTime();
+  })();
+  const dueDate = hasActivePaidPeriod
+    ? school.active_until!.slice(0, 10)
     : new Date(now.getTime() + 14 * 86400000).toISOString().slice(0, 10);
 
   const newInvoice = {

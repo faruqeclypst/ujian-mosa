@@ -19,6 +19,7 @@ import {
   Calendar,
   Minus,
   Plus,
+  Info,
 } from "lucide-react";
 import { masterPb } from "../../lib/pocketbase";
 import { cn } from "../../lib/utils";
@@ -549,9 +550,9 @@ const RegisterSchoolPage = () => {
                       {/* 4 Duration Buttons: 1 Bulan, 6 Bulan, 1 Tahun, Custom Bulan */}
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
                         {[
-                          { label: "1 Bulan", mode: "1 Bulan" as const, sub: "Fleksibel" },
-                          { label: "6 Bulan", mode: "6 Bulan" as const, sub: "1 Semester", badge: "Hemat 12%" },
-                          { label: "1 Tahun", mode: "1 Tahun" as const, sub: "12 Bulan", badge: "Disarankan" },
+                          { label: "1 Bulan", mode: "1 Bulan" as const, sub: "28 hari" },
+                          { label: "6 Bulan", mode: "6 Bulan" as const, sub: "168 hari", badge: "Hemat 12%" },
+                          { label: "1 Tahun", mode: "1 Tahun" as const, sub: "12 bln kalender", badge: "Disarankan" },
                           { label: "Custom Bulan", mode: "custom" as const, sub: "Atur Sendiri", badge: "Kustom" },
                         ].map((d) => {
                           const isSelected = durationMode === d.mode;
@@ -675,6 +676,16 @@ const RegisterSchoolPage = () => {
                           </div>
                         </div>
                       )}
+
+                      {/* Ketentuan durasi 1 bulan = 28 hari */}
+                      <div className="p-3 bg-blue-50/70 border border-blue-200/60 rounded-2xl text-blue-900 text-[11px] leading-relaxed flex items-start gap-2.5">
+                        <Info size={15} className="text-blue-600 shrink-0 mt-0.5" />
+                        <span>
+                          <strong>Ketentuan masa layanan:</strong> 1 bulan = <strong>28 hari</strong> kalender
+                          (berlaku untuk paket 1&ndash;6 bulan). Paket 1 tahun = 12 bulan kalender penuh,
+                          tanggal ke tanggal.
+                        </span>
+                      </div>
                     </div>
                   ) : (
                     <div className="p-3 bg-emerald-50 border border-emerald-200/80 rounded-2xl text-emerald-800 text-xs flex items-center gap-2.5">
