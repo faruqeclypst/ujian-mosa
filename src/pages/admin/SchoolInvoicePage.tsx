@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { createPortal } from "react-dom";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../../components/ui/dialog";
 import {
   FileText, Upload, Eye, Printer, CheckCircle2, Clock,
   AlertTriangle, XCircle, Paperclip, ExternalLink, Trash2,
@@ -782,29 +782,19 @@ const SchoolInvoicePage = () => {
       )}
 
       {/* ── Modal Pengajuan Perpanjangan ke Admin ─────────────────── */}
-      {showRenewalModal && createPortal(
-        <div className="fixed inset-0 bg-slate-900/60 dark:bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-150">
-          <div className="bg-white dark:bg-slate-950 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-slate-200/70 dark:border-slate-800">
-            {/* Modal Header */}
-            <div className="flex items-center justify-between p-5 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-blue-600/10 text-blue-600 flex items-center justify-center border border-blue-200/60">
-                  <Sparkles size={18} />
-                </div>
-                <div>
-                  <h3 className="font-bold text-sm text-slate-900 dark:text-white">Pengajuan Perpanjangan Layanan</h3>
-                  <p className="text-xs text-slate-500">Kirim permintaan ke SuperAdmin untuk penerbitan invoice resmi</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowRenewalModal(false)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
-              >
-                <X size={18} />
-              </button>
-            </div>
+      <Dialog open={showRenewalModal} onOpenChange={setShowRenewalModal}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2.5">
+              <span className="w-9 h-9 rounded-xl bg-blue-600/10 text-blue-600 flex items-center justify-center border border-blue-200/60 shrink-0">
+                <Sparkles size={18} />
+              </span>
+              Pengajuan Perpanjangan Layanan
+            </DialogTitle>
+            <DialogDescription>Kirim permintaan ke SuperAdmin untuk penerbitan invoice resmi</DialogDescription>
+          </DialogHeader>
 
-            <div className="p-5 space-y-4">
+          <div className="space-y-4">
               {!renewalSubmitted ? (
                 <>
                   {/* Current School Info */}
@@ -940,10 +930,8 @@ const SchoolInvoicePage = () => {
                 </div>
               )}
             </div>
-          </div>
-        </div>,
-        document.body
-      )}
+          </DialogContent>
+      </Dialog>
 
       {/* ─── Detail Modal ──────────────────────────────────────────── */}
       {detailInvoice && (() => {
@@ -951,47 +939,28 @@ const SchoolInvoicePage = () => {
         const modalCfg = STATUS_CONFIG[effectiveStatus] || STATUS_CONFIG.unpaid;
         const ModalStatusIcon = modalCfg.icon;
 
-        return createPortal(
-          <div className="fixed inset-0 bg-slate-900/60 dark:bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-white dark:bg-slate-950 rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto border border-slate-200/60 dark:border-slate-800">
-              {/* Modal Header */}
-              <div className="flex items-start justify-between p-5 border-b border-slate-100 dark:border-slate-800">
-                <div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-mono text-sm font-bold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-lg">
-                      {detailInvoice.invoice_number}
-                    </span>
-                    <span className={cn(
-                      "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border",
-                      modalCfg.color, modalCfg.bg, modalCfg.border
-                    )}>
-                      <ModalStatusIcon size={11} />
-                      {modalCfg.label}
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-400 dark:text-slate-500 mt-1.5">
-                    Diterbitkan {formatDate(detailInvoice.created)}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2 ml-2 flex-shrink-0">
-                  <button
-                    onClick={() => printDigitalInvoice(detailInvoice, school)}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition shadow-xs"
-                    title="Cetak atau Simpan Invoice Digital Resmi (PDF)"
-                  >
-                    <Printer size={13} />
-                    <span>Cetak Invoice (PDF)</span>
-                  </button>
-                  <button
-                    onClick={() => setDetailInvoice(null)}
-                    className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 transition"
-                  >
-                    <X size={18} />
-                  </button>
-                </div>
-              </div>
+        return (
+          <Dialog open onOpenChange={(open) => { if (!open) setDetailInvoice(null); }}>
+            <DialogContent className="max-w-lg">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2 flex-wrap">
+                  <span className="font-mono text-sm font-bold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-lg">
+                    {detailInvoice.invoice_number}
+                  </span>
+                  <span className={cn(
+                    "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border",
+                    modalCfg.color, modalCfg.bg, modalCfg.border
+                  )}>
+                    <ModalStatusIcon size={11} />
+                    {modalCfg.label}
+                  </span>
+                </DialogTitle>
+                <DialogDescription>
+                  Diterbitkan {formatDate(detailInvoice.created)}
+                </DialogDescription>
+              </DialogHeader>
 
-              <div className="p-5 space-y-4">
+              <div className="space-y-4">
                 {/* Invoice Breakdown */}
                 <div className="border border-slate-200/60 dark:border-slate-800 rounded-2xl overflow-hidden">
                   <div className="bg-slate-50 dark:bg-slate-900 px-4 py-3 border-b border-slate-100 dark:border-slate-800">
@@ -1056,7 +1025,7 @@ const SchoolInvoicePage = () => {
                       >
                         <FileText size={24} className="text-blue-500 shrink-0" />
                         <span className="text-xs font-bold text-blue-700 dark:text-blue-300">
-                          Dokumen PDF — klik untuk melihat
+                          Dokumen PDF, klik untuk melihat
                         </span>
                       </button>
                     )}
@@ -1095,9 +1064,18 @@ const SchoolInvoicePage = () => {
                   </div>
                 )}
               </div>
-            </div>
-          </div>,
-          document.body
+              <DialogFooter>
+                <button
+                  onClick={() => printDigitalInvoice(detailInvoice, school)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition shadow-xs"
+                  title="Cetak atau Simpan Invoice Digital Resmi (PDF)"
+                >
+                  <Printer size={13} />
+                  <span>Cetak Invoice (PDF)</span>
+                </button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         );
       })()}
 
@@ -1111,9 +1089,9 @@ const SchoolInvoicePage = () => {
       )}
 
       {/* ── Modal Realtime QRIS Payment Session ── */}
-      {paymentSession && createPortal(
-        <div className="fixed inset-0 bg-slate-900/60 dark:bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl w-full max-w-md border border-slate-200/80 dark:border-slate-800 overflow-hidden text-center p-6">
+      {paymentSession && (
+        <Dialog open onOpenChange={(open) => { if (!open) setPaymentSession(null); }}>
+          <DialogContent className="max-w-md text-center">
             {!paymentSession.isPaid ? (
               <div className="space-y-5">
                 <div className="relative w-20 h-20 mx-auto flex items-center justify-center">
@@ -1202,9 +1180,8 @@ const SchoolInvoicePage = () => {
                 </div>
               </div>
             )}
-          </div>
-        </div>,
-        document.body
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   );
