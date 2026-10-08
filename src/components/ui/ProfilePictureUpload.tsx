@@ -13,7 +13,7 @@ interface ProfilePictureUploadProps {
   currentPhotoURL?: string;
   displayName?: string;
   onUpdate?: (photoURL: string, displayName: string) => void;
-  size?: "sm" | "md" | "lg";
+  size?: "sm" | "md" | "lg" | "xl";
   showUploadButton?: boolean;
 }
 
@@ -35,13 +35,22 @@ const ProfilePictureUpload = ({
   const sizeClasses = {
     sm: "h-8 w-8",
     md: "h-10 w-10",
-    lg: "h-32 w-32 md:h-40 md:w-40"
+    lg: "h-32 w-32 md:h-40 md:w-40",
+    xl: "h-28 w-28 md:h-32 md:w-32"
   };
 
   const iconSizes = {
     sm: "h-4 w-4",
     md: "h-5 w-5",
-    lg: "h-8 w-8"
+    lg: "h-8 w-8",
+    xl: "h-7 w-7"
+  };
+
+  const initialTextSizes = {
+    sm: "text-sm",
+    md: "text-lg",
+    lg: "text-4xl md:text-5xl",
+    xl: "text-5xl md:text-6xl"
   };
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -89,7 +98,7 @@ const ProfilePictureUpload = ({
       try {
         await pb.collection("users").authRefresh();
       } catch {
-        /* abaikan — fallback: foto tampil setelah login ulang */
+        /* abaikan, fallback: foto tampil setelah login ulang */
       }
 
       addToast({
@@ -165,6 +174,7 @@ const ProfilePictureUpload = ({
           disabled={isUploading || !showUploadButton}
           className={cn(
             "relative block rounded-[2rem] overflow-hidden border-4 border-white shadow-xl transition-all duration-500",
+            "focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-500/50",
             sizeClasses[size],
             isUploading && "opacity-50 grayscale",
             showUploadButton && !isUploading && "cursor-pointer hover:shadow-2xl hover:scale-[1.02]"
@@ -179,7 +189,7 @@ const ProfilePictureUpload = ({
             />
           ) : (
             <div className="w-full h-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
-              <span className="text-4xl md:text-5xl font-black text-white opacity-40">
+              <span className={cn("font-black text-white opacity-70", initialTextSizes[size])}>
                 {(displayName || 'A').charAt(0).toUpperCase()}
               </span>
             </div>

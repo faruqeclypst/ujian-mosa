@@ -212,7 +212,7 @@ export const ChangePasswordModal = ({ isOpen, onClose, defaultTab = "profile" }:
                   currentPhotoURL={user?.avatar || ""}
                   displayName={user?.name || ""}
                   onUpdate={handleProfileUpdate}
-                  size="md"
+                  size="xl"
                 />
               </div>
 
