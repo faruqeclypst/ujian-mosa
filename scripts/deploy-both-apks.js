@@ -15,13 +15,15 @@ const APKS = [
     key: 'examaa',
     name: 'EXAM AA (Official CBT Client)',
     targetApk: 'exam-aa-latest.apk',
-    targetLink: 'exam-aa-latest'
+    targetLink: 'exam-aa-latest',
+    online: true
   },
   {
     key: 'browser',
     name: 'EXAM AA Browser (Custom Exam Browser)',
     targetApk: 'exam-aa-browser-latest.apk',
-    targetLink: 'exam-aa-browser-latest'
+    targetLink: 'exam-aa-browser-latest',
+    online: true
   },
   {
     key: 'local',
@@ -55,12 +57,19 @@ for (const dir of cleanDirs) {
 console.log('📦 [Langkah 1/3] Membangun bundle web (npm run build)...');
 execSync('npm run build', { stdio: 'inherit' });
 
-// Pastikan dist-shell & dist-browser ada (disalin dari dist hasil build)
-for (const d of ['dist-shell', 'dist-browser']) {
-  const target = path.join(process.cwd(), d);
-  if (!fs.existsSync(path.join(target, 'index.html'))) {
-    if (fs.existsSync(target)) fs.rmSync(target, { recursive: true, force: true });
-    console.log(`📦 Menyalin dist -> ${d}...`);
+// Siapkan webDir per profil:
+// - online (serverUrl): shell minimal, konten dimuat dari server (~4MB APK)
+// - offline (local): full dist agar bisa jalan tanpa internet
+const minimalHtml = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>EXAMKU</title><style>body{margin:0;display:flex;align-items:center;justify-content:center;min-height:100vh;background:#0f172a;color:#10b981;font-family:sans-serif}</style></head><body><p>Memuat EXAMKU...</p></body></html>`;
+function prepareWebDir(webDir, online) {
+  const target = path.join(process.cwd(), webDir);
+  if (fs.existsSync(target)) fs.rmSync(target, { recursive: true, force: true });
+  fs.mkdirSync(target, { recursive: true });
+  if (online) {
+    fs.writeFileSync(path.join(target, 'index.html'), minimalHtml);
+    console.log(`📦 ${webDir}: shell minimal (load online, APK ~4MB)`);
+  } else {
+    console.log(`📦 Menyalin dist -> ${webDir} (offline full)...`);
     fs.cpSync(path.join(process.cwd(), 'dist'), target, { recursive: true });
   }
 }
@@ -81,6 +90,10 @@ for (let i = 0; i < APKS.length; i++) {
   // Switch konfigurasi
   console.log(`[+] Beralih konfigurasi ke ${item.key}...`);
   execSync(`node scripts/switch-app.js ${item.key}`, { stdio: 'inherit' });
+
+  // Siapkan webDir sesuai profil (online=minimal ~4MB, offline=full)
+  const webDir = item.key === 'browser' ? 'dist-browser' : 'dist-shell';
+  prepareWebDir(webDir, !!item.online);
 
   // Bersihkan APK lama jika ada
   if (fs.existsSync(localApkPath)) {
