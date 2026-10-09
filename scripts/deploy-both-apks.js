@@ -87,13 +87,15 @@ for (let i = 0; i < APKS.length; i++) {
   console.log(`📱 [${i + 1}/${APKS.length}] Memproses ${item.name}...`);
   console.log(`------------------------------------------------------`);
 
-  // Switch konfigurasi
-  console.log(`[+] Beralih konfigurasi ke ${item.key}...`);
-  execSync(`node scripts/switch-app.js ${item.key}`, { stdio: 'inherit' });
-
-  // Siapkan webDir sesuai profil (online=minimal ~4MB, offline=full)
+  // Siapkan webDir SESUDAH switch config tapi SEBELUM cap sync.
+  // (switch-app.js menjalankan npx cap sync di dalamnya,
+  //  jadi webDir harus sudah benar sebelum switch dipanggil.)
   const webDir = item.key === 'browser' ? 'dist-browser' : 'dist-shell';
   prepareWebDir(webDir, !!item.online);
+
+  // Switch konfigurasi (menjalankan npx cap sync di dalamnya)
+  console.log(`[+] Beralih konfigurasi ke ${item.key}...`);
+  execSync(`node scripts/switch-app.js ${item.key}`, { stdio: 'inherit' });
 
   // Bersihkan APK lama jika ada
   if (fs.existsSync(localApkPath)) {
