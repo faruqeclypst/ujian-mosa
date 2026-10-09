@@ -1,5 +1,5 @@
 import { getOnlineFlag } from "../../lib/network";
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   RefreshCw,
   Users,
@@ -477,6 +477,16 @@ const MonitoringPage = () => {
   const [attempts, setAttempts] = useState<any[]>([]);
   const [monitorQuestions, setMonitorQuestions] = useState<any[]>([]);
   const [answersList, setAnswersList] = useState<Record<string, any>>({});
+  // Mode ringan untuk room besar: matikan realtime attempts + fetch daftar TANPA
+  // field answers yang berat. Progres diambil dari `answeredCount` (dihitung
+  // server-side), detail jawaban diambil on-demand saat baris siswa dibuka.
+  // Tombol refresh tetap berfungsi (memakai fetch ringan yang sama).
+  const LARGE_ROOM_THRESHOLD = 200;
+  const [isLargeRoom, setIsLargeRoom] = useState(false);
+  const largeRoomRef = useRef(false);
+  const [detailAnswers, setDetailAnswers] = useState<Record<string, any>>({});
+  // Field ringan untuk daftar attempts (tanpa `answers` yang bisa puluhan KB/record)
+  const ATTEMPT_LITE_FIELDS = "studentId,examRoomId,status,isOnline,lastHeartbeat,score,correct,total,cheatCount,submittedAt,submitTime,created,updated,startedAt,startTime,overrides,objectiveScore,objectiveCorrect,objectiveTotal,essayScore,essayCorrect,essayGraded,essayTotal,answeredCount";
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [expandedstudent, setExpandedstudent] = useState<string | null>(null);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
@@ -762,11 +772,22 @@ const MonitoringPage = () => {
         );
       }
 
-      // 3. Ambil DATA PENGERJAAN
+      // 3. Ambil DATA PENGERJAAN — ringan dulu (tanpa answers yang berat).
+      // Room kecil (<=200 attempt) di-upgrade ke data penuh agar live score
+      // & realtime tetap kaya seperti sebelumnya.
       if (pb) {
-        const loadedAttempts = await pb.collection('attempts').getFullList({
-          filter: `examRoomId = "${id}"`
+        let loadedAttempts: any[] = await pb.collection('attempts').getFullList({
+          filter: `examRoomId = "${id}"`,
+          fields: ATTEMPT_LITE_FIELDS,
         });
+        const large = loadedAttempts.length > LARGE_ROOM_THRESHOLD;
+        largeRoomRef.current = large;
+        setIsLargeRoom(large);
+        if (!large) {
+          loadedAttempts = await pb.collection('attempts').getFullList({
+            filter: `examRoomId = "${id}"`
+          });
+        }
 
         const grouped: Record<string, any> = {};
         loadedAttempts.forEach(att => {
@@ -777,9 +798,11 @@ const MonitoringPage = () => {
         setAnswersList(grouped);
         setAttempts(loadedAttempts);
 
-        // Auto-sync out-of-sync finished attempts in background
+        // Auto-sync out-of-sync finished attempts in background.
+        // DILEWATI di mode ringan: tanpa answers, komputasi dari objek kosong
+        // akan merusak skor/jawaban yang sudah benar.
         const finishedAttempts = loadedAttempts.filter(att => att.status === "finished");
-        if (finishedAttempts.length > 0 && monitorQuestions.length > 0) {
+        if (!largeRoomRef.current && finishedAttempts.length > 0 && monitorQuestions.length > 0) {
           const syncPromises = finishedAttempts.map(async (att) => {
             const answers = att.answers || {};
             const rawOverrides = typeof att.overrides === 'string' ? JSON.parse(att.overrides) : (att.overrides || {});
@@ -890,7 +913,9 @@ const MonitoringPage = () => {
     return () => clearInterval(timer);
   }, []);
 
-  // Real-time Subscription
+  // Real-time Subscription — DIMATIKAN untuk attempts di room besar agar tab tidak
+  // dibanjiri puluhan event/detik berisi answers penuh. Penggantinya: polling
+  // ringan (tanpa answers) tiap 30 detik + tombol refresh manual.
   useEffect(() => {
     if (!roomId) return;
 
@@ -900,29 +925,32 @@ const MonitoringPage = () => {
     const startSubscribe = async () => {
       if (!pb) return;
       try {
-        const unsub = await pb.collection('attempts').subscribe("*", (e) => {
-          if (!isSubscribed) return;
-          const recRoomId = e.record.examRoomId || e.record.exam_room_id || "";
-          if (recRoomId !== roomId) return;
+        let unsub: (() => void) | null = null;
+        if (!isLargeRoom) {
+          unsub = await pb.collection('attempts').subscribe("*", (e) => {
+            if (!isSubscribed) return;
+            const recRoomId = e.record.examRoomId || e.record.exam_room_id || "";
+            if (recRoomId !== roomId) return;
 
-          if (e.action === 'create' || e.action === 'update') {
-            setAttempts(prev => {
-              const idx = prev.findIndex(a => a.id === e.record.id);
-              if (idx > -1) {
-                const newArr = [...prev];
-                newArr[idx] = { ...newArr[idx], ...e.record };
-                return newArr;
+            if (e.action === 'create' || e.action === 'update') {
+              setAttempts(prev => {
+                const idx = prev.findIndex(a => a.id === e.record.id);
+                if (idx > -1) {
+                  const newArr = [...prev];
+                  newArr[idx] = { ...newArr[idx], ...e.record };
+                  return newArr;
+                }
+                return [e.record, ...prev];
+              });
+              const sId = e.record.studentId || e.record.student_id;
+              if (sId && e.record.answers) {
+                setAnswersList(prev => ({ ...prev, [sId]: e.record.answers }));
               }
-              return [e.record, ...prev];
-            });
-            const sId = e.record.studentId || e.record.student_id;
-            if (sId && e.record.answers) {
-              setAnswersList(prev => ({ ...prev, [sId]: e.record.answers }));
+            } else if (e.action === 'delete') {
+              setAttempts(prev => prev.filter(a => a.id !== e.record.id));
             }
-          } else if (e.action === 'delete') {
-            setAttempts(prev => prev.filter(a => a.id !== e.record.id));
-          }
-        });
+          });
+        }
 
         const unsubQuestions = await pb.collection('questions').subscribe("*", (e) => {
           if (!isSubscribed) return;
@@ -932,10 +960,10 @@ const MonitoringPage = () => {
         });
 
         if (!isSubscribed) {
-          unsub();
+          if (unsub) unsub();
           unsubQuestions();
         } else {
-          currentUnsub = () => { unsub(); unsubQuestions(); };
+          currentUnsub = () => { if (unsub) unsub(); unsubQuestions(); };
         }
       } catch (err) { }
     };
@@ -943,14 +971,14 @@ const MonitoringPage = () => {
     startSubscribe();
     const polling = setInterval(() => {
       handleManualRefreshMonitor();
-    }, 60000);
+    }, isLargeRoom ? 30000 : 60000);
 
     return () => {
       isSubscribed = false;
       clearInterval(polling);
       if (currentUnsub) currentUnsub();
     };
-  }, [roomId, monitorRoom?.examId]);
+  }, [roomId, monitorRoom?.examId, isLargeRoom]);
 
   const handleUnlockStudent = async (attId: string) => {
     if (!pb) return;
@@ -2870,8 +2898,12 @@ const MonitoringPage = () => {
                           if (cheatA !== cheatB) {
                             comparison = cheatA - cheatB;
                           } else {
-                            const ansA = Object.keys(attA?.answers || {}).filter(k => k !== "__overrides__" && monitorQuestions.some((q: any) => q.id === k)).length;
-                            const ansB = Object.keys(attB?.answers || {}).filter(k => k !== "__overrides__" && monitorQuestions.some((q: any) => q.id === k)).length;
+                            // Mode ringan: pakai answeredCount server-side bila answers tak diunduh
+                            const cntA = (att: any) => (att?.answers && Object.keys(att.answers).length > 0)
+                              ? Object.keys(att.answers).filter(k => k !== "__overrides__" && monitorQuestions.some((q: any) => q.id === k)).length
+                              : (att?.answeredCount ?? 0);
+                            const ansA = cntA(attA);
+                            const ansB = cntA(attB);
                             comparison = ansA - ansB;
                           }
                         } else if (monitorSortBy === "nama") {
@@ -2889,13 +2921,18 @@ const MonitoringPage = () => {
 
                     const rows = currentData.map((student, localIdx) => {
                       const attempt = attempts.find(a => a.studentId === student.id || a.student_id === student.id);
-                      const sisAnswers = attempt?.answers || {};
+                      // Mode ringan: detail jawaban diambil on-demand (detailAnswers),
+                      // daftar hanya membawa answeredCount dari server.
+                      const sisAnswers = (attempt && detailAnswers[attempt.id]) || attempt?.answers || {};
+                      const hasFullAnswers = Object.keys(sisAnswers).length > 0;
                       const targetQuestions = getTargetQuestions(monitorQuestions, sisAnswers, monitorRoom?.max_questions);
 
-                      const answered = Object.keys(sisAnswers).filter(k =>
-                        k !== "__overrides__" && k !== "__order__" && k !== "__meta" && k !== "__choices__" &&
-                        targetQuestions.some((q: any) => q.id === k)
-                      ).length;
+                      const answered = hasFullAnswers
+                        ? Object.keys(sisAnswers).filter(k =>
+                          k !== "__overrides__" && k !== "__order__" && k !== "__meta" && k !== "__choices__" &&
+                          targetQuestions.some((q: any) => q.id === k)
+                        ).length
+                        : (attempt?.answeredCount ?? 0);
                       const isExpanded = expandedstudent === student.id;
 
                       return (
@@ -2937,6 +2974,19 @@ const MonitoringPage = () => {
                             <TableCell className="text-center text-[11px] font-bold">
                               {(() => {
                                 if (!attempt) return "-";
+                                // Mode ringan tanpa answers: skor live tak bisa dihitung.
+                                // Tampilkan skor tersimpan bila sudah finished.
+                                if (!hasFullAnswers) {
+                                  if (attempt.status === "finished") {
+                                    return (
+                                      <div className="flex flex-col items-center">
+                                        <span className="text-emerald-600 dark:text-emerald-400 font-black text-sm">{attempt.score ?? "-"}</span>
+                                        <span className="text-[9px] text-slate-400">{attempt.objectiveCorrect ?? "-"}/{attempt.objectiveTotal ?? "-"}</span>
+                                      </div>
+                                    );
+                                  }
+                                  return "-";
+                                }
                                 const overrides = attempt.overrides || (sisAnswers as any)?.__overrides__ || {};
 
                                 // Calculate objective breakdown
@@ -3000,6 +3050,8 @@ const MonitoringPage = () => {
                               <TableCell className="text-center text-[11px] font-bold">
                                 {(() => {
                                   if (!attempt) return "-";
+                                  // Mode ringan tanpa answers: skor live tak bisa dihitung.
+                                  if (!hasFullAnswers && attempt.status !== "finished") return "-";
                                   const displayScore = getAttemptScore(attempt);
 
                                   return (
@@ -3038,7 +3090,17 @@ const MonitoringPage = () => {
                                     <Button
                                       size="icon"
                                       variant="ghost"
-                                      onClick={() => setExpandedstudent(isExpanded ? null : student.id)}
+                                      onClick={() => {
+                                        const next = isExpanded ? null : student.id;
+                                        setExpandedstudent(next);
+                                        // Mode ringan: ambil jawaban lengkap satu siswa ini saja, saat dibuka
+                                        // (selalu fetch ulang agar tidak basi)
+                                        if (next && isLargeRoom && attempt && pb) {
+                                          pb.collection('attempts').getOne(attempt.id).then((rec: any) => {
+                                            if (rec?.answers) setDetailAnswers(prev => ({ ...prev, [attempt.id]: rec.answers }));
+                                          }).catch(() => {});
+                                        }
+                                      }}
                                       className={`h-8 w-8 rounded-xl transition-all shadow-sm ${isExpanded
                                         ? "bg-slate-100 text-slate-700 border border-slate-200 hover:bg-slate-200 hover:text-slate-800 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700 dark:hover:bg-slate-700 dark:hover:text-white"
                                         : "bg-blue-50 text-blue-700 border border-blue-100 hover:bg-blue-100 hover:text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800/40 dark:hover:bg-blue-900/50 dark:hover:text-blue-300"

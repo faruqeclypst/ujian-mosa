@@ -20,6 +20,9 @@
         answers dikembalikan ke versi tersimpan.
       Penolakan dilakukan diam-diam (tanpa error) agar alur sync ulang
       otomatis di dashboard siswa tidak pecah.
+   3c.answeredCount: dihitung server-side tiap update attempts (jumlah key
+      jawaban non-meta) agar monitoring room besar bisa tampilkan progres
+      tanpa mengunduh objek answers yang besar.
    4. Siswa hanya bisa melihat answers miliknya sendiri.
    5. Endpoint POST /api/verify-pin untuk validasi token
       ruangan di sisi server (rate-limit sederhana).
@@ -481,6 +484,24 @@ onRecordUpdateRequest((e) => {
         }
     } catch (err) {
         console.error("[SECURITY_FIX] answer-lock error:", err);
+    }
+    // --- 3c: answeredCount ringan untuk monitoring room besar ---
+    // Dihitung server-side tiap update agar halaman monitoring bisa menampilkan
+    // progres ("sudah jawab X soal") TANPA mengunduh objek answers yang besar.
+    // Murah: tanpa query tambahan, hanya hitung key jawaban.
+    try {
+        if (e.record.collection().name === "attempts") {
+            const ans = pj(e.record.get("answers"), null);
+            if (ans && typeof ans === "object") {
+                let n = 0;
+                for (const k in ans) {
+                    if (!k.startsWith("__")) n++;
+                }
+                e.record.set("answeredCount", n);
+            }
+        }
+    } catch (err) {
+        console.error("[SECURITY_FIX] answeredCount error:", err);
     }
     try {
         if (e.record.collection().name === "attempts") doRecalc(e);
