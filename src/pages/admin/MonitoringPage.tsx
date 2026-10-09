@@ -3005,7 +3005,7 @@ const MonitoringPage = () => {
                                     return (
                                       <div className="flex flex-col items-center">
                                         <span className="text-emerald-600 dark:text-emerald-400 font-black text-sm">{attempt.score ?? "-"}</span>
-                                        <span className="text-[9px] text-slate-400">{attempt.objectiveCorrect ?? "-"}/{attempt.objectiveTotal ?? "-"}</span>
+                                        <span className="text-[9px] text-slate-400">{attempt.objectiveCorrect ?? attempt.correct ?? "-"}/{attempt.objectiveTotal ?? attempt.total ?? "-"}</span>
                                       </div>
                                     );
                                   }

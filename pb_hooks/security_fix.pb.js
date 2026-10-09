@@ -273,6 +273,9 @@ onRecordCreateRequest((e) => {
             ev.record.set("score", score);
             ev.record.set("correct", Math.floor(objectiveCorrect));
             ev.record.set("total", totalQuestions);
+            ev.record.set("objectiveCorrect", Math.floor(objectiveCorrect));
+            ev.record.set("objectiveTotal", objectiveTotal);
+            ev.record.set("objectiveScore", score);
             console.log("[SECURITY_FIX] Skor dihitung ulang di server untuk attempt " + ev.record.id +
                 " => " + score + " (" + Math.floor(objectiveCorrect) + "/" + totalQuestions + ")");
         } catch (err) {
@@ -438,6 +441,9 @@ onRecordUpdateRequest((e) => {
             ev.record.set("score", score);
             ev.record.set("correct", Math.floor(objectiveCorrect));
             ev.record.set("total", totalQuestions);
+            ev.record.set("objectiveCorrect", Math.floor(objectiveCorrect));
+            ev.record.set("objectiveTotal", objectiveTotal);
+            ev.record.set("objectiveScore", score);
             console.log("[SECURITY_FIX] Skor dihitung ulang di server untuk attempt " + ev.record.id +
                 " => " + score + " (" + Math.floor(objectiveCorrect) + "/" + totalQuestions + ")");
         } catch (err) {
