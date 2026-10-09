@@ -891,7 +891,13 @@ const CBTPage = () => {
       saveTimeoutRef.current = setTimeout(() => {
         setIsSyncing(true);
         safeUpdateAttempt(currentAttempt.id, {
-          answers: u,
+          // Delta update: kirim hanya jawaban yang berubah + meta, server merge
+          answers: {
+            [questionId]: value,
+            __delta: true,
+            __activeQuestionId__: questionId,
+            __meta: (u as any)?.__meta || {},
+          },
           isOnline: getOnlineFlag(),
           lastHeartbeat: new Date().toISOString()
         }).catch((err: any) => {
@@ -907,7 +913,7 @@ const CBTPage = () => {
             setIsSessionExpiredModalOpen(true);
           }
         });
-      }, 2000);
+      }, 5000); // Debounce 5 detik (delta update membuat payload kecil)
       return u;
     });
   };

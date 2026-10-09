@@ -445,6 +445,33 @@ onRecordUpdateRequest((e) => {
         }
     }
     // --- akhir helper lokal ---
+    // --- 3a: delta merge untuk answers (hemat payload) ---
+    // Client bisa kirim hanya jawaban yang berubah dengan flag __delta:true.
+    // Server gabungkan dengan answers tersimpan, bukan menimpa seluruh object.
+    try {
+        if (e.record.collection().name === "attempts") {
+            const incoming = pj(e.record.get("answers"), null);
+            if (incoming && incoming.__delta === true) {
+                let stored = null;
+                try { stored = $app.findRecordById("attempts", e.record.id); } catch (x) {}
+                if (stored) {
+                    const storedAns = pj(stored.get("answers"), {}) || {};
+                    const merged = Object.assign({}, storedAns);
+                    for (const k in incoming) {
+                        if (k === "__delta") continue;
+                        merged[k] = incoming[k];
+                    }
+                    // Pastikan __meta.rev dari delta dipakai (lebih baru)
+                    e.record.set("answers", merged);
+                }
+                // Hapus flag __delta agar tidak tersimpan
+                const cur = pj(e.record.get("answers"), {});
+                if (cur) { delete cur.__delta; e.record.set("answers", cur); }
+            }
+        }
+    } catch (err) {
+        console.error("[SECURITY_FIX] delta merge error:", err);
+    }
     // --- 3b: kunci answers setelah final + tolak tulisan basi (siswa) ---
     // Mencegah race autosave-vs-submit: autosave yang tiba terlambat tidak boleh
     // menimpa answers final, dan request basi (rev lebih tua) tidak boleh menimpa

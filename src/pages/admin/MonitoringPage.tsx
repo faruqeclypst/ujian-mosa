@@ -485,6 +485,8 @@ const MonitoringPage = () => {
   const [isLargeRoom, setIsLargeRoom] = useState(false);
   const largeRoomRef = useRef(false);
   const [detailAnswers, setDetailAnswers] = useState<Record<string, any>>({});
+  // Kunci monitoring untuk non-admin saat ujian besar (>200 peserta)
+  const [monitoringLocked, setMonitoringLocked] = useState(false);
   // Field ringan untuk daftar attempts (tanpa `answers` yang bisa puluhan KB/record)
   const ATTEMPT_LITE_FIELDS = "id,studentId,examRoomId,status,isOnline,lastHeartbeat,score,correct,total,cheatCount,submittedAt,submitTime,created,updated,startedAt,startTime,overrides,objectiveScore,objectiveCorrect,objectiveTotal,essayScore,essayCorrect,essayGraded,essayTotal,answeredCount";
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
@@ -783,6 +785,8 @@ const MonitoringPage = () => {
         const large = loadedAttempts.length > LARGE_ROOM_THRESHOLD;
         largeRoomRef.current = large;
         setIsLargeRoom(large);
+        // Kunci monitoring untuk non-admin saat ujian besar
+        setMonitoringLocked(large && role !== "admin");
         if (!large) {
           loadedAttempts = await pb.collection('attempts').getFullList({
             filter: `examRoomId = "${id}"`
@@ -2375,6 +2379,26 @@ const MonitoringPage = () => {
     const names = ids.map(id => examClasses.find(c => c.id === id)?.name).filter(Boolean);
     return names.length > 0 ? names.join(", ") : (ids.length > 0 ? `ID: ${String(ids[0]).substring(0, 5)}...` : "N/A");
   })();
+
+  // Monitoring dikunci untuk non-admin saat ujian besar (>200 peserta)
+  if (monitoringLocked) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4 animate-in fade-in duration-500">
+        <div className="w-20 h-20 bg-amber-100 dark:bg-amber-900/20 rounded-3xl flex items-center justify-center">
+          <svg className="w-10 h-10 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+          </svg>
+        </div>
+        <h2 className="text-xl font-black text-slate-800 dark:text-white uppercase tracking-tight text-center">
+          Monitoring Dikunci
+        </h2>
+        <p className="text-sm text-slate-500 dark:text-slate-400 text-center max-w-md font-semibold">
+          Halaman monitoring dikunci selama ujian besar berlangsung (&gt;200 peserta) untuk menjaga performa server.
+          Hanya admin yang dapat mengakses. Anda tetap dapat mengelola bank soal dan fungsi lainnya.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-5 animate-in fade-in duration-500">
