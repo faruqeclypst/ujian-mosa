@@ -3,5 +3,6 @@
   "name": "EXAMKU Browser",
   "webDir": "dist-browser",
   "targetApk": "exam-aa-browser-latest.apk",
-  "vpsLink": "exam-aa-browser-latest"
+  "vpsLink": "exam-aa-browser-latest",
+  "serverUrl": "https://examku.my.id"
 }

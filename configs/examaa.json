@@ -3,5 +3,6 @@
   "name": "EXAMKU",
   "webDir": "dist-shell",
   "targetApk": "exam-aa-latest.apk",
-  "vpsLink": "exam-aa-latest"
+  "vpsLink": "exam-aa-latest",
+  "serverUrl": "https://examku.my.id"
 }
