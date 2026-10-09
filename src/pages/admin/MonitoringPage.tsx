@@ -486,7 +486,7 @@ const MonitoringPage = () => {
   const largeRoomRef = useRef(false);
   const [detailAnswers, setDetailAnswers] = useState<Record<string, any>>({});
   // Field ringan untuk daftar attempts (tanpa `answers` yang bisa puluhan KB/record)
-  const ATTEMPT_LITE_FIELDS = "studentId,examRoomId,status,isOnline,lastHeartbeat,score,correct,total,cheatCount,submittedAt,submitTime,created,updated,startedAt,startTime,overrides,objectiveScore,objectiveCorrect,objectiveTotal,essayScore,essayCorrect,essayGraded,essayTotal,answeredCount";
+  const ATTEMPT_LITE_FIELDS = "id,studentId,examRoomId,status,isOnline,lastHeartbeat,score,correct,total,cheatCount,submittedAt,submitTime,created,updated,startedAt,startTime,overrides,objectiveScore,objectiveCorrect,objectiveTotal,essayScore,essayCorrect,essayGraded,essayTotal,answeredCount";
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [expandedstudent, setExpandedstudent] = useState<string | null>(null);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
