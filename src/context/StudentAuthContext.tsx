@@ -143,6 +143,8 @@ export const StudentAuthProvider = ({ children }: { children: ReactNode }) => {
     sessionStorage.setItem("student_session_active", "true");
     sessionStorage.setItem("student_session_id", newSessionId);
     localStorage.setItem("student_session_id", newSessionId);
+    // Waktu login untuk masa tenggang pendeteksi double-login (lihat checkSessionMatch)
+    sessionStorage.setItem("student_login_at", Date.now().toString());
 
     try {
       const authData = await pb.collection("students").authWithPassword(nisn, password, {
@@ -154,14 +156,19 @@ export const StudentAuthProvider = ({ children }: { children: ReactNode }) => {
       const classObj = model.expand?.classId || (model.expand as any)?.class_id || (model.expand as any)?.classid;
       const isDefault = isStudentPasswordDefault(model);
 
-      // Update activeSessionId di database jika bukan password default
-      try {
-        await pb.collection("students").update(model.id, { 
-          activeSessionId: isDefault ? "" : newSessionId 
-        }, { $autoCancel: false });
-      } catch (sessionErr) {
-        console.warn("Update session ID saat login:", sessionErr);
-      }
+      // Update activeSessionId di database jika bukan password default.
+      // NON-BLOCKING: user langsung masuk dashboard tanpa menunggu write antre
+      // (penting saat ratusan login bersamaan — write SQLite bersifat serial).
+      // Write yang gagal akan dicoba ulang otomatis oleh checkSessionMatch.
+      const sidToWrite = isDefault ? "" : newSessionId;
+      sessionStorage.setItem("student_session_write_pending", "1");
+      pb.collection("students").update(model.id, {
+        activeSessionId: sidToWrite
+      }, { $autoCancel: false }).then(() => {
+        sessionStorage.removeItem("student_session_write_pending");
+      }).catch((sessionErr) => {
+        console.warn("Update session ID saat login (akan dicoba ulang otomatis):", sessionErr);
+      });
 
       setstudent({
         id: model.id,
@@ -289,6 +296,24 @@ export const StudentAuthProvider = ({ children }: { children: ReactNode }) => {
       // Jika di server ada session ID dan berbeda dari yang tersimpan di perangkat ini:
       // Berarti akun ini telah login di perangkat lain!
       if (serverSid && localSid && serverSid !== localSid) {
+        // Masa tenggang 15 detik setelah login: write session id (non-blocking)
+        // mungkin belum sampai saat storm — jangan tendang dulu.
+        const loginAt = parseInt(sessionStorage.getItem("student_login_at") || "0", 10) || 0;
+        if (Date.now() - loginAt < 15000) {
+          return false;
+        }
+        // Write session masih pending (pernah gagal) → coba kirim ulang,
+        // bukan menendang. Pengecekan berikutnya akan menilai lagi.
+        if (sessionStorage.getItem("student_session_write_pending") === "1") {
+          pb.collection("students").update(student.id, {
+            activeSessionId: localSid
+          }, { $autoCancel: false }).then(() => {
+            sessionStorage.removeItem("student_session_write_pending");
+          }).catch(() => {
+            // Tetap pending — dicoba lagi di pengecekan berikutnya (tiap 3 detik)
+          });
+          return false;
+        }
         setIsKicked(true);
         try {
           window.dispatchEvent(new CustomEvent("app:studentKicked"));
@@ -296,6 +321,10 @@ export const StudentAuthProvider = ({ children }: { children: ReactNode }) => {
         pb.authStore.clear();
         sessionStorage.removeItem("student_session_active");
         return true;
+      }
+      // Session sudah sinkron — pastikan flag pending bersih
+      if (serverSid && localSid && serverSid === localSid) {
+        sessionStorage.removeItem("student_session_write_pending");
       }
       return false;
     };
