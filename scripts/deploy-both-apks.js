@@ -55,6 +55,16 @@ for (const dir of cleanDirs) {
 console.log('📦 [Langkah 1/3] Membangun bundle web (npm run build)...');
 execSync('npm run build', { stdio: 'inherit' });
 
+// Pastikan dist-shell & dist-browser ada (disalin dari dist hasil build)
+for (const d of ['dist-shell', 'dist-browser']) {
+  const target = path.join(process.cwd(), d);
+  if (!fs.existsSync(path.join(target, 'index.html'))) {
+    if (fs.existsSync(target)) fs.rmSync(target, { recursive: true, force: true });
+    console.log(`📦 Menyalin dist -> ${d}...`);
+    fs.cpSync(path.join(process.cwd(), 'dist'), target, { recursive: true });
+  }
+}
+
 // 2. Loop build masing-masing APK
 const gradlewCmd = process.platform === 'win32' 
   ? 'cmd.exe /c "cd android && gradlew.bat assembleDebug"' 
