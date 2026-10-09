@@ -198,7 +198,8 @@ onRecordCreateRequest((e) => {
                     const given = String(studentAns).trim().toLowerCase();
                     if (expected && given === expected) objectiveCorrect++;
                 } else if (t === "pilihan_ganda") {
-                    if (options[studentAns] && options[studentAns].isCorrect === true) objectiveCorrect++;
+                    const ck = Object.keys(options).find(k => String(k).toLowerCase() === String(studentAns).toLowerCase());
+                    if (ck && options[ck] && options[ck].isCorrect === true) objectiveCorrect++;
                 } else if (t === "benar_salah") {
                     if (options.statements && Array.isArray(options.statements)) {
                         // format pernyataan: options.statements=[{id, answer:"benar"/"salah"}]
@@ -225,8 +226,9 @@ onRecordCreateRequest((e) => {
                             if (given === expected) stCorr++;
                         }
                         if (stCount > 0) objectiveCorrect += (stCorr / stCount);
-                    } else if (options[studentAns] && options[studentAns].isCorrect === true) {
+                    } else { const _ck = Object.keys(options).find(k => String(k).toLowerCase() === String(studentAns).toLowerCase()); if (_ck && options[_ck] && options[_ck].isCorrect === true) {
                         objectiveCorrect++;
+                    }
                     }
                 } else if (t === "pilihan_ganda_kompleks") {
                     const ckeys = Object.keys(options)
@@ -389,8 +391,9 @@ onRecordUpdateRequest((e) => {
                             if (given === expected) stCorr++;
                         }
                         if (stCount > 0) objectiveCorrect += (stCorr / stCount);
-                    } else if (options[studentAns] && options[studentAns].isCorrect === true) {
+                    } else { const _ck = Object.keys(options).find(k => String(k).toLowerCase() === String(studentAns).toLowerCase()); if (_ck && options[_ck] && options[_ck].isCorrect === true) {
                         objectiveCorrect++;
+                    }
                     }
                 } else if (t === "pilihan_ganda_kompleks") {
                     const ckeys = Object.keys(options)
