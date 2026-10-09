@@ -22,8 +22,8 @@ const APKS = [
     key: 'browser',
     name: 'EXAM AA Browser (Custom Exam Browser)',
     targetApk: 'exam-aa-browser-latest.apk',
-    targetLink: 'exam-aa-browser-latest',
-    online: true
+    targetLink: 'exam-aa-browser-latest'
+    // tidak online: bawa full web lokal, buka langsung ke /browser (custom URL)
   },
   {
     key: 'local',

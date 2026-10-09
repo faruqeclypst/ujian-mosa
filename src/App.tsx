@@ -28,6 +28,8 @@ const InterestSurveyPage = lazy(() => import("./pages/student/InterestSurveyPage
 import NotFoundPage from "./pages/NotFoundPage";
 import { SplashScreen } from "@capacitor/splash-screen";
 import { Capacitor } from "@capacitor/core";
+import { useState } from "react";
+import { getAppId, isBrowserApp } from "./lib/appVariant";
 
 // Admin pages
 const DashboardPage = lazy(() => import("./pages/DashboardPage"));
@@ -276,10 +278,21 @@ const LandingContent = () => {
 const AppRouter = () => {
   const { isLandingDomain, loading } = useTenant();
   const location = useLocation();
+  const [isBrowserAppMode, setIsBrowserAppMode] = useState(false);
+
+  useEffect(() => {
+    // Aplikasi browser (com.alfaruqasri.ujian.browser) langsung ke /browser,
+    // tidak load examku. Custom URL browser untuk Google Form dll.
+    getAppId().then((id) => {
+      if (isBrowserApp(id) && location.pathname !== "/browser") {
+        setIsBrowserAppMode(true);
+      }
+    });
+  }, []);
 
   if (loading) return <LoadingScreen />;
 
-  if (location.pathname === '/browser') {
+  if (isBrowserAppMode || location.pathname === '/browser') {
     return (
       <Suspense fallback={<LoadingScreen />}>
         <CustomBrowserPage />

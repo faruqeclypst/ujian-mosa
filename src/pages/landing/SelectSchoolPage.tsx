@@ -21,6 +21,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { Capacitor } from "@capacitor/core";
 import { APP_DISPLAY_VERSION } from "../../utils/version";
+import { getAppId, isMainApp } from "../../lib/appVariant";
 
 export const isLocalServer = (school: SchoolRecord): boolean => {
   if (!school) return false;
@@ -181,6 +182,13 @@ const SelectSchoolPage = () => {
   const [inputLocalIp, setInputLocalIp] = useState("");
   const [isConnectingLocal, setIsConnectingLocal] = useState(false);
   const [localConnectError, setLocalConnectError] = useState<string | null>(null);
+
+  // Di aplikasi utama (EXAM AA), opsi server lokal disembunyikan.
+  // Opsi ini hanya untuk aplikasi Local (offline) dan web.
+  const [hideLocalServer, setHideLocalServer] = useState(false);
+  useEffect(() => {
+    getAppId().then((id) => setHideLocalServer(isMainApp(id)));
+  }, []);
 
   const { setManualSchool } = useTenant();
 
@@ -544,6 +552,7 @@ const SelectSchoolPage = () => {
             )}
           </button>
 
+          {!hideLocalServer && (
           <button
             type="button"
             onClick={() => setActiveTab("local")}
@@ -557,6 +566,7 @@ const SelectSchoolPage = () => {
             <span>Local Server</span>
             
           </button>
+          )}
         </div>
       </div>
 
