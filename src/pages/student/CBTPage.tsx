@@ -863,12 +863,17 @@ const CBTPage = () => {
     if (isExamOver || isLocked || !currentAttempt) return;
     setAnswers(p => {
       const curMeta = (p as any)?.__meta || {};
+      // Nomor revisi jawaban: naik +1 tiap ada perubahan jawaban.
+      // Dipakai hook server untuk menolak tulisan basi (stale write) yang tiba
+      // terlambat, mis. autosave in-flight yang mendarat setelah request submit.
+      const prevRev = Number((curMeta as any)?.rev) || 0;
       const u = {
         ...p,
         [questionId]: value,
         __activeQuestionId__: questionId,
         __meta: {
           ...curMeta,
+          rev: prevRev + 1,
           activeQuestionId: questionId,
           activeQuestionIndex: currentQuestionIndex,
           lastAnsweredAt: new Date().toISOString(),

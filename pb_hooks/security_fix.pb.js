@@ -11,6 +11,15 @@
       submit (status=finished) dari siswa — nilai dari
       client tidak lagi dipercaya. Guru/admin (users)
       tetap bisa override manual (untuk nilai uraian).
+   3b.Kunci answers setelah final + tolak tulisan basi:
+      - jika status tersimpan sudah finished/submitted dan pengupdate
+        adalah siswa, perubahan field answers diabaikan (dikembalikan
+        ke versi tersimpan); heartbeat & field lain tetap boleh lewat.
+      - jika rev jawaban yang masuk < rev tersimpan (request basi yang
+        tiba terlambat, mis. autosave in-flight setelah submit),
+        answers dikembalikan ke versi tersimpan.
+      Penolakan dilakukan diam-diam (tanpa error) agar alur sync ulang
+      otomatis di dashboard siswa tidak pecah.
    4. Siswa hanya bisa melihat answers miliknya sendiri.
    5. Endpoint POST /api/verify-pin untuk validasi token
       ruangan di sisi server (rate-limit sederhana).
@@ -430,6 +439,49 @@ onRecordUpdateRequest((e) => {
         }
     }
     // --- akhir helper lokal ---
+    // --- 3b: kunci answers setelah final + tolak tulisan basi (siswa) ---
+    // Mencegah race autosave-vs-submit: autosave yang tiba terlambat tidak boleh
+    // menimpa answers final, dan request basi (rev lebih tua) tidak boleh menimpa
+    // jawaban yang lebih baru. Heartbeat & field lain tetap boleh lewat.
+    // Penolakan diam-diam (tanpa error) agar sync ulang dashboard tidak pecah.
+    try {
+        if (e.record.collection().name === "attempts") {
+            let auth = null;
+            try { if (e.requestInfo && e.requestInfo.auth) auth = e.requestInfo.auth; } catch (x) {}
+            const aname = authName(auth);
+            const isAdmin = (aname === "_superusers" || aname === "users");
+            if (!isAdmin) {
+                let stored = null;
+                try { stored = $app.findRecordById("attempts", e.record.id); } catch (x) {}
+                if (stored) {
+                    const storedStatus = stored.getString("status");
+                    const locked = (storedStatus === "finished" || storedStatus === "submitted");
+                    const revOf = (a) => {
+                        try {
+                            const n = parseInt(a && a.__meta && a.__meta.rev, 10);
+                            return isNaN(n) ? 0 : n;
+                        } catch (x) { return 0; }
+                    };
+                    const incomingAns = pj(e.record.get("answers"), null);
+                    const storedAns = pj(stored.get("answers"), null);
+                    const incomingRev = revOf(incomingAns);
+                    const storedRev = revOf(storedAns);
+                    let touched = false;
+                    try {
+                        touched = JSON.stringify(incomingAns) !== JSON.stringify(storedAns);
+                    } catch (x) { touched = true; }
+                    if (touched && (locked || incomingRev < storedRev)) {
+                        // Kembalikan answers ke versi tersimpan
+                        e.record.set("answers", stored.get("answers"));
+                        console.log("[SECURITY_FIX] answers DITOLAK untuk attempt " + e.record.id +
+                            " (locked=" + locked + ", rev masuk=" + incomingRev + ", rev tersimpan=" + storedRev + ")");
+                    }
+                }
+            }
+        }
+    } catch (err) {
+        console.error("[SECURITY_FIX] answer-lock error:", err);
+    }
     try {
         if (e.record.collection().name === "attempts") doRecalc(e);
     } catch (err) {
