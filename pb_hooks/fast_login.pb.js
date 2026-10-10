@@ -90,7 +90,7 @@ routerAdd("POST", "/api/fast-login", (c) => {
                 } else {
                     var _chars = "0123456789abcdef", _p = "";
                     for (var _i = 0; _i < 64; _i++) _p += _chars[Math.floor(Math.random() * 16)];
-                    try { $os.writeFile(pepperFile, _p, 0600); } catch (e) {}
+                    try { $os.writeFile(pepperFile, _p); } catch (e) {}
                     pepper = _p;
                     try { console.log("[FAST_LOGIN] pepper auto-generated: " + pepperFile); } catch (e) {}
                 }
