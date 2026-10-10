@@ -6,7 +6,7 @@ import {
   Search, Trash2, Monitor, Zap, Server, ChevronDown,
   Building2, Globe, Sparkles, ShieldCheck, Calendar, Cpu, BookOpen, HardDrive,
   Activity, CheckCircle2, XCircle, AlertTriangle, Info, KeyRound, ChevronRight,
-  Database, ExternalLink, Lock
+  Database, ExternalLink, Lock, Copy
 } from "lucide-react";
 import { masterPb } from "../../lib/pocketbase";
 import SuperAdminLayout from "../../components/layout/SuperAdminLayout";
@@ -1865,6 +1865,13 @@ const AddEditSchoolModal = ({
   const [useWorkerNode, setUseWorkerNode] = useState<boolean>(
     !!(school?.server_host && school.server_host !== "127.0.0.1" && school.server_host !== "localhost")
   );
+  const [copiedSetupCmd, setCopiedSetupCmd] = useState(false);
+  const setupWorkerOneLiner = "curl -sSL https://raw.githubusercontent.com/faruqeclypst/ujian-mosa/feature/saas-v2/vps/setup_worker_node.sh | bash";
+  const handleCopySetup = () => {
+    navigator.clipboard.writeText(setupWorkerOneLiner);
+    setCopiedSetupCmd(true);
+    setTimeout(() => setCopiedSetupCmd(false), 2000);
+  };
 
   const [form, setForm] = useState({
     name: school?.name || "",
@@ -2528,17 +2535,41 @@ const AddEditSchoolModal = ({
                 </div>
 
                 {useWorkerNode && (
-                  <div className="relative mt-3">
-                    <Cpu size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-purple-500 pointer-events-none" />
-                    <input
-                      type="text"
-                      name="server_host"
-                      value={form.server_host === "127.0.0.1" || form.server_host === "localhost" ? "" : form.server_host}
-                      onChange={handleChange}
-                      placeholder="IP Worker (cth. 103.123.45.67)"
-                      autoFocus
-                      className="w-full h-11 border border-purple-300 rounded-xl pl-9 pr-4 text-[13px] font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-400 bg-purple-50/30 font-mono placeholder:font-sans placeholder:font-medium placeholder:text-slate-400 shadow-sm"
-                    />
+                  <div className="mt-3 space-y-3">
+                    <div className="relative">
+                      <Cpu size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-purple-500 pointer-events-none" />
+                      <input
+                        type="text"
+                        name="server_host"
+                        value={form.server_host === "127.0.0.1" || form.server_host === "localhost" ? "" : form.server_host}
+                        onChange={handleChange}
+                        placeholder="IP Worker (cth. 103.123.45.67)"
+                        autoFocus
+                        className="w-full h-11 border border-purple-300 rounded-xl pl-9 pr-4 text-[13px] font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-400 bg-purple-50/30 font-mono placeholder:font-sans placeholder:font-medium placeholder:text-slate-400 shadow-sm"
+                      />
+                    </div>
+                    {/* Panduan setup worker baru */}
+                    <div className="rounded-xl border border-purple-200 bg-purple-50/50 p-3 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <p className="text-[11px] font-bold text-slate-700">
+                          Belum setup VPS worker baru? Jalankan 1 baris ini di VPS baru:
+                        </p>
+                        <button
+                          type="button"
+                          onClick={handleCopySetup}
+                          className="shrink-0 text-[11px] font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 transition-colors cursor-pointer ml-2"
+                        >
+                          {copiedSetupCmd ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} />}
+                          <span>{copiedSetupCmd ? "Tersalin!" : "Salin Perintah"}</span>
+                        </button>
+                      </div>
+                      <div className="bg-slate-900 text-slate-200 p-2.5 rounded-lg font-mono text-[10px] select-all overflow-x-auto leading-relaxed">
+                        {setupWorkerOneLiner}
+                      </div>
+                      <p className="text-[10px] text-slate-500 leading-normal">
+                        Script otomatis menginstal PocketBase, membuka firewall untuk Master VPS, dan menyambungkan kunci SSH — tanpa edit file manual. Setelah selesai, masukkan IP VPS di kolom atas lalu daftarkan tenant.
+                      </p>
+                    </div>
                   </div>
                 )}
               </div>
