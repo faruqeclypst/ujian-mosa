@@ -112,7 +112,7 @@ const SuperAdminAnalyticsPage = () => {
             <div className="flex items-center justify-between mb-4">
               <div>
                 <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">{card.label}</p>
-                <h3 className="text-3xl font-bold text-slate-900">
+                <h3 className="text-2xl font-bold text-slate-900">
                   {stats.loading ? <span className="text-slate-300">–</span> : card.value}
                 </h3>
               </div>

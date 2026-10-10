@@ -619,7 +619,7 @@ const SuperAdminInvoicePage = () => {
         {/* Page header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-xl font-bold text-slate-900 leading-none">Invoice</h1>
+            <h2 className="text-xl font-bold text-slate-900 tracking-tight">Invoice</h2>
             <p className="text-sm text-slate-500 mt-1">Kelola tagihan dan bukti pembayaran institusi</p>
           </div>
           <button
@@ -649,7 +649,7 @@ const SuperAdminInvoicePage = () => {
           ].map((stat) => (
             <div key={stat.label} className="bg-white border border-slate-200 rounded-xl p-4">
               <p className="text-xs text-slate-500 font-medium">{stat.label}</p>
-              <p className={cn("text-xl font-bold mt-1 leading-none", stat.color)}>{stat.value}</p>
+              <p className={cn("text-2xl font-bold mt-1 leading-none", stat.color)}>{stat.value}</p>
               <p className="text-xs text-slate-400 mt-1">{stat.note}</p>
             </div>
           ))}

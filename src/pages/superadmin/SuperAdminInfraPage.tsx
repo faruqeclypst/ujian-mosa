@@ -262,7 +262,7 @@ const SuperAdminInfraPage = () => {
             <p className="text-sm font-semibold text-slate-500">Rata-rata Latensi</p>
           </div>
           <div className="flex items-baseline gap-1.5 mb-1">
-            <span className="text-3xl font-bold text-slate-900">{loading ? "–" : globalStats.avgLatency}</span>
+            <span className="text-2xl font-bold text-slate-900">{loading ? "–" : globalStats.avgLatency}</span>
             <span className="text-slate-400 font-semibold text-sm">ms</span>
           </div>
           <p className="text-xs text-slate-400">Respon API HTTP kesehatan</p>
@@ -275,7 +275,7 @@ const SuperAdminInfraPage = () => {
             <p className="text-sm font-semibold text-slate-500">Total Node VPS</p>
           </div>
           <div className="flex items-baseline gap-1.5 mb-1">
-            <span className="text-3xl font-bold text-slate-900">{vpsNodes.length || 2}</span>
+            <span className="text-2xl font-bold text-slate-900">{vpsNodes.length || 2}</span>
             <span className="text-slate-400 font-semibold text-sm">Server Node</span>
           </div>
           <p className="text-xs text-slate-400">1 Master + {Math.max(0, (vpsNodes.length || 2) - 1)} Worker</p>
@@ -288,7 +288,7 @@ const SuperAdminInfraPage = () => {
             <p className="text-sm font-semibold text-slate-500">Tenant Aktif</p>
           </div>
           <div className="flex items-baseline gap-1.5 mb-3">
-            <span className="text-3xl font-bold text-slate-900">{loading ? "–" : globalStats.online}</span>
+            <span className="text-2xl font-bold text-slate-900">{loading ? "–" : globalStats.online}</span>
             <span className="text-slate-400 font-semibold text-sm">/ {nodes.length}</span>
           </div>
           <div className="space-y-1.5">

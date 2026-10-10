@@ -625,9 +625,9 @@ export default function SuperAdminOfflineLicensesPage() {
                 <ShieldCheck size={12} /> RSA-2048 Asimetris
               </span>
             </div>
-            <h1 className="text-2xl font-black text-slate-900 tracking-tight">
+            <h2 className="text-xl font-bold text-slate-900 tracking-tight">
               Manajemen Lisensi Server Offline
-            </h1>
+            </h2>
             <p className="text-sm text-slate-500 mt-0.5">
               Kelola izin operasional server lokal CBT mandiri proktor untuk sekolah yang memerlukan pelaksanaan ujian tanpa ketergantungan internet.
             </p>
@@ -671,7 +671,7 @@ export default function SuperAdminOfflineLicensesPage() {
           <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
             <div>
               <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Lisensi Terbit</p>
-              <p className="text-2xl font-black text-slate-900 mt-0.5">{stats.total}</p>
+              <p className="text-2xl font-bold text-slate-900 mt-0.5">{stats.total}</p>
               <p className="text-[11px] text-slate-400 mt-0.5">Tercatat di Master VPS</p>
             </div>
             <div className="w-11 h-11 rounded-2xl bg-purple-50 border border-purple-100 flex items-center justify-center text-purple-600">
@@ -682,7 +682,7 @@ export default function SuperAdminOfflineLicensesPage() {
           <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
             <div>
               <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Sudah Digunakan</p>
-              <p className="text-2xl font-black text-emerald-600 mt-0.5">{stats.used}</p>
+              <p className="text-2xl font-bold text-emerald-600 mt-0.5">{stats.used}</p>
               <p className="text-[11px] text-slate-400 mt-0.5">Aktif di server sekolah</p>
             </div>
             <div className="w-11 h-11 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600">
@@ -693,7 +693,7 @@ export default function SuperAdminOfflineLicensesPage() {
           <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
             <div>
               <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Belum Digunakan</p>
-              <p className="text-2xl font-black text-amber-600 mt-0.5">{stats.unused}</p>
+              <p className="text-2xl font-bold text-amber-600 mt-0.5">{stats.unused}</p>
               <p className="text-[11px] text-slate-400 mt-0.5">Siap diaktivasi</p>
             </div>
             <div className="w-11 h-11 rounded-2xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-600">
@@ -704,7 +704,7 @@ export default function SuperAdminOfflineLicensesPage() {
           <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
             <div>
               <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Kadaluarsa / Dicabut</p>
-              <p className="text-2xl font-black text-rose-600 mt-0.5">{stats.expired + stats.revoked}</p>
+              <p className="text-2xl font-bold text-rose-600 mt-0.5">{stats.expired + stats.revoked}</p>
               <p className="text-[11px] text-slate-400 mt-0.5">
                 {stats.revoked > 0 ? `${stats.revoked} diblokir, ${stats.expired} habis` : "Perlu perpanjangan"}
               </p>
