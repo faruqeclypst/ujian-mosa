@@ -533,6 +533,7 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
       passwordConfirm: defaultPass,
       hasChangedPassword: false,
       activeSessionId: "",
+      fastHash: "", // Clear agar migrasi otomatis via bcrypt saat login berikutnya
     });
     setStudents(prev => prev.map(item => item.id === id ? { ...item, hasChangedPassword: false } : item));
   };
@@ -546,6 +547,7 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
         passwordConfirm: defaultPass,
         hasChangedPassword: false,
         activeSessionId: "",
+        fastHash: "", // Clear agar migrasi otomatis via bcrypt saat login berikutnya
       })));
       if (onProgress) {
         onProgress(Math.min(i + chunkSize, studentIds.length), studentIds.length);

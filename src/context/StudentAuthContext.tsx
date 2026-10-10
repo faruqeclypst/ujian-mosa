@@ -147,14 +147,69 @@ export const StudentAuthProvider = ({ children }: { children: ReactNode }) => {
     sessionStorage.setItem("student_login_at", Date.now().toString());
 
     try {
-      const authData = await pb.collection("students").authWithPassword(nisn, password, {
-        expand: 'classId'
-      });
+      // --- FAST-LOGIN: coba SHA-256 dulu, fallback ke bcrypt + migrasi otomatis ---
+      let authData: any = null;
+      let usedFastLogin = false;
+      try {
+        const fastRes = await fetch(`${pb.baseUrl}/api/fast-login`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username: nisn, password }),
+        });
+        if (fastRes.ok) {
+          const fastData = await fastRes.json();
+          // Simpan token ke authStore secara manual
+          pb.authStore.save(fastData.token, fastData.record);
+          authData = { record: fastData.record, token: fastData.token };
+          usedFastLogin = true;
+        } else if (fastRes.status !== 400) {
+          // Error selain 400 (misal 429, 500): lempar agar tidak silent fallback
+          const ed = await fastRes.json().catch(() => ({}));
+          throw new Error(ed.message || `Fast login error (${fastRes.status})`);
+        }
+        // status 400 = salah password ATAU belum migrasi → lanjut ke bcrypt di bawah
+      } catch (fastErr: any) {
+        // Network error atau fast-login belum tersedia: fallback ke bcrypt
+        if (fastErr.message && !fastErr.message.includes("Fast login")) {
+          console.warn("Fast-login tidak tersedia, pakai bcrypt:", fastErr.message);
+        } else if (fastErr.message?.includes("Terlalu banyak")) {
+          throw new Error(fastErr.message);
+        }
+      }
+
+      if (!authData) {
+        authData = await pb.collection("students").authWithPassword(nisn, password, {
+          expand: 'classId'
+        });
+        // Migrasi otomatis: isi fastHash agar login berikutnya pakai fast-login
+        // (non-blocking, tidak mengganggu alur login)
+        try {
+          await fetch(`${pb.baseUrl}/api/fast-login/setup`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${authData.token}`,
+            },
+            body: JSON.stringify({ password }),
+          });
+        } catch (migErr) {
+          console.warn("Migrasi fast-login gagal (akan dicoba login berikutnya):", migErr);
+        }
+      }
 
       const model = authData.record;
-      const classId = model.classId || model.class_id || model.classid || "";
-      const classObj = model.expand?.classId || (model.expand as any)?.class_id || (model.expand as any)?.classid;
-      const isDefault = isStudentPasswordDefault(model);
+      // Fast-login tidak me-return expand: ambil ulang dengan expand classId
+      let fullModel = model;
+      if (usedFastLogin) {
+        try {
+          fullModel = await pb.collection("students").getOne(model.id, { expand: 'classId' });
+        } catch (e) {
+          console.warn("Gagal ambil data lengkap setelah fast-login:", e);
+        }
+      }
+      const classId = fullModel.classId || fullModel.class_id || fullModel.classid || "";
+      const classObj = fullModel.expand?.classId || (fullModel.expand as any)?.class_id || (fullModel.expand as any)?.classid;
+      const isDefault = isStudentPasswordDefault(fullModel);
 
       // Update activeSessionId di database jika bukan password default.
       // NON-BLOCKING: user langsung masuk dashboard tanpa menunggu write antre
@@ -171,11 +226,11 @@ export const StudentAuthProvider = ({ children }: { children: ReactNode }) => {
       });
 
       setstudent({
-        id: model.id,
-        nisn: model.username,
-        name: model.name,
+        id: fullModel.id,
+        nisn: fullModel.username,
+        name: fullModel.name,
         classId: classId,
-        className: classObj?.name || model.className || model.class_name || "-",
+        className: classObj?.name || fullModel.className || fullModel.class_name || "-",
         hasChangedPassword: !isDefault,
       });
     } catch (err: any) {
@@ -198,6 +253,19 @@ export const StudentAuthProvider = ({ children }: { children: ReactNode }) => {
         passwordConfirm: newPassword,
         hasChangedPassword: true,
       }, { $autoCancel: false });
+      // Refresh fastHash agar sinkron dengan password baru (non-blocking)
+      try {
+        await fetch(`${pb.baseUrl}/api/fast-login/setup`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${pb.authStore.token}`,
+          },
+          body: JSON.stringify({ password: newPassword }),
+        });
+      } catch (e) {
+        console.warn("Refresh fastHash gagal (akan dimigrasi saat login berikutnya):", e);
+      }
       logoutStudent();
     } catch (err: any) {
       throw new Error("Gagal mengganti password: " + err.message);
