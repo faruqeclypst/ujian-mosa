@@ -23,7 +23,7 @@ android {
             if (keystorePropsFile.exists()) {
                 def keystoreProps = new Properties()
                 keystoreProps.load(new FileInputStream(keystorePropsFile))
-                storeFile file(keystoreProps['storeFile'])
+                storeFile rootProject.file(keystoreProps['storeFile'])
                 storePassword keystoreProps['storePassword']
                 keyAlias keystoreProps['keyAlias']
                 keyPassword keystoreProps['keyPassword']
