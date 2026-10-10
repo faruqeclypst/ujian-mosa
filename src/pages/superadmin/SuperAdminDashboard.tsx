@@ -1723,6 +1723,7 @@ const SuperAdminDashboard = () => {
               <p className="text-xs text-slate-300 mt-1">Setiap aksi di dashboard akan muncul di sini.</p>
             </div>
           ) : (
+            <>
             <div className="divide-y divide-slate-50">
               {pagedLogs.map((log, idx) => {
                 const style = LOG_STYLE[log.type];
@@ -1789,6 +1790,7 @@ const SuperAdminDashboard = () => {
                 </div>
               </div>
             )}
+            </>
           )}
         </div>
       )}
