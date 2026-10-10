@@ -39,8 +39,12 @@ if [ -n "$MASTER_PUBKEY" ]; then
 fi
 
 # 3. Buka port firewall jika UFW aktif
+# MASTER_IP dibaca dari infra.conf (disalin ke /opt/pocketbase/infra.conf)
+INFRA_CONF="/opt/pocketbase/infra.conf"
+MASTER_IP="64.235.41.108"
+[ -f "$INFRA_CONF" ] && . "$INFRA_CONF"
 if command -v ufw >/dev/null 2>&1; then
-  ufw allow proto tcp from 64.235.41.108 to any port 8090:8200 >/dev/null 2>&1 || true
+  ufw allow proto tcp from "$MASTER_IP" to any port 8090:8200 >/dev/null 2>&1 || true
   ufw allow 8791/tcp >/dev/null 2>&1 || true
 fi
 

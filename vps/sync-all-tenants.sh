@@ -7,7 +7,16 @@ set -u
 
 TEMPLATE_DIR="/opt/pocketbase/schools/template"
 MASTER_SCHOOLS_DIR="/opt/pocketbase/schools"
+
+# Baca IP dari infra.conf (disalin ke /opt/pocketbase/infra.conf saat setup)
+INFRA_CONF="/opt/pocketbase/infra.conf"
 WORKER_IP="43.134.175.87"
+WORKER_USER="root"
+if [ -f "$INFRA_CONF" ]; then
+  # shellcheck disable=SC1090
+  . "$INFRA_CONF"
+fi
+WORKER_HOST="${WORKER_USER}@${WORKER_IP}"
 
 # Pastikan folder template ada
 if [ ! -d "$TEMPLATE_DIR" ]; then
@@ -33,12 +42,12 @@ done
 
 # 2. Sinkronkan template & hooks ke Worker VPS jika SSH aktif secara dinamis
 WORKER_SUCCESS=false
-if ssh -o BatchMode=yes -o ConnectTimeout=5 -o StrictHostKeyChecking=no root@"$WORKER_IP" "true" 2>/dev/null; then
+if ssh -o BatchMode=yes -o ConnectTimeout=5 -o StrictHostKeyChecking=no "$WORKER_HOST" "true" 2>/dev/null; then
   # Rsync template ke Worker
-  rsync -avz --delete "$TEMPLATE_DIR/" root@"$WORKER_IP":"$TEMPLATE_DIR/" >/dev/null 2>&1
+  rsync -avz --delete "$TEMPLATE_DIR/" "$WORKER_HOST":"$TEMPLATE_DIR/" >/dev/null 2>&1
 
   # Eksekusi migrasi schema, sinkronisasi hooks & restart service di Worker VPS secara dinamis
-  ssh -o BatchMode=yes -o ConnectTimeout=5 root@"$WORKER_IP" '
+  ssh -o BatchMode=yes -o ConnectTimeout=5 "$WORKER_HOST" '
     python3 /usr/local/bin/migrate-tenant-schema.py 2>/dev/null || true
     for dir in /opt/pocketbase/schools/*; do
       if [ -d "$dir/pb_hooks" ] && [ "$dir" != "/opt/pocketbase/schools/template" ]; then

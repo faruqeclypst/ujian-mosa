@@ -1,8 +1,9 @@
 import { execSync } from 'child_process';
 import path from 'path';
 import fs from 'fs';
+import { INFRA, VPS_HOST, WORKER_HOST } from './infra-config.js';
 
-const VPS_HOST = 'root@64.235.41.108';
+// IP terpusat di vps/infra.conf — jangan hardcode di sini.
 const VPS_DIST = '/opt/frontend/ujian/dist';
 const VPS_DOWNLOADS = '/opt/frontend/ujian/dist/downloads';
 const REMOTE_TEMPLATE = '/opt/pocketbase/schools/template';
@@ -46,7 +47,10 @@ try {
   }
   execSync(`scp -r vps/template_school/pb_hooks/* ${VPS_HOST}:${REMOTE_TEMPLATE}/pb_hooks/`, { stdio: 'inherit' });
   execSync(`scp vps/template_school/pb_data/data.db ${VPS_HOST}:${REMOTE_TEMPLATE}/pb_data/data.db`, { stdio: 'inherit' });
-  execSync(`ssh ${VPS_HOST} "chown -R ubuntu:ubuntu ${REMOTE_TEMPLATE} && rsync -avz --delete ${REMOTE_TEMPLATE}/ root@43.134.175.87:${REMOTE_TEMPLATE}/ && ssh root@43.134.175.87 'chown -R ubuntu:ubuntu ${REMOTE_TEMPLATE}'"`, { stdio: 'inherit' });
+  // Sinkronkan infra.conf ke Master & Worker (untuk shell scripts di VPS)
+  execSync(`scp vps/infra.conf ${VPS_HOST}:/opt/pocketbase/infra.conf`, { stdio: 'inherit' });
+  execSync(`ssh ${VPS_HOST} "chown -R ubuntu:ubuntu ${REMOTE_TEMPLATE} && rsync -avz --delete ${REMOTE_TEMPLATE}/ ${WORKER_HOST}:${REMOTE_TEMPLATE}/ && ssh ${WORKER_HOST} 'chown -R ubuntu:ubuntu ${REMOTE_TEMPLATE}'"`, { stdio: 'inherit' });
+  execSync(`ssh ${VPS_HOST} "scp -o StrictHostKeyChecking=no /opt/pocketbase/infra.conf ${WORKER_HOST}:/opt/pocketbase/infra.conf"`, { stdio: 'inherit' });
   console.log('✅ Template di Master VPS dan Worker Node sudah 100% mutakhir!');
 
   // ── [4/6] 1-CLICK SYNC KE SELURUH TENANT SEKOLAH AKTIF ──

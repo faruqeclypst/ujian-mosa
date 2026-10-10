@@ -2,11 +2,12 @@ import { execSync } from 'child_process';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
+import { VPS_HOST } from './infra-config.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const VPS_HOST = 'root@64.235.41.108';
+// IP terpusat di vps/infra.conf
 const VPS_DIST = '/opt/frontend/ujian/dist';
 const VPS_APKS = '/opt/frontend/ujian/apks';
 
