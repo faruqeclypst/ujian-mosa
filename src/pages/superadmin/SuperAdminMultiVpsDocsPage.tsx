@@ -8,8 +8,9 @@ import {
   CreditCard, Terminal, HelpCircle, HardDrive, Zap,
   Monitor, Smartphone, Layers, Activity, KeyRound, Laptop, RotateCcw, Download
 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { cn } from "../../lib/utils";
+import { masterPb } from "../../lib/pocketbase";
 
 interface DocItem {
   id: string;
@@ -41,6 +42,9 @@ const DOC_ITEMS: DocItem[] = [
   { id: "tambah-tenant", title: "Tambah Sekolah Baru", category: "Siklus Tenant", description: "Pendaftaran tenant lokal di Master vs worker node.", keywords: ["tambah", "create", "daftar", "sekolah", "tenant", "baru", "slug"] },
   { id: "edit-tenant", title: "Edit Kuota & Custom Domain", category: "Siklus Tenant", description: "Penyesuaian paket siswa, domain sendiri, dan auto-sync data.", keywords: ["edit", "update", "custom domain", "kuota", "domain", "ssl", "cname"] },
   { id: "migrasi-burst", title: "Migrasi 1-Klik (Burst Mode)", category: "Siklus Tenant", description: "Alur memindahkan sekolah sebelum ujian dan menarik kembali data.", keywords: ["migrasi", "burst mode", "pindah", "tarik", "ujian", "pas", "pat", "sqlite"] },
+  { id: "isolasi-worker", title: "Isolasi Worker Node", category: "Siklus Tenant", description: "Tenant baru langsung dibuat di worker VPS terpisah.", keywords: ["isolasi", "worker node", "tenant baru", "server_host", "daftar"] },
+  { id: "snapshot-restore", title: "Snapshot & Restore Backup", category: "Siklus Tenant", description: "Backup harian otomatis worker ke master dan cara restore.", keywords: ["snapshot", "backup", "restore", "rsync", "sqlite", "recovery"] },
+  { id: "infra-conf", title: "Konfigurasi Infrastruktur Terpusat", category: "Infrastruktur & Node", description: "Satu file infra.conf untuk semua IP — migrasi VPS jadi mudah.", keywords: ["infra.conf", "konfigurasi", "ip", "migrasi vps", "terpusat"] },
   { id: "hapus-tenant", title: "Hapus Sekolah Bersih", category: "Siklus Tenant", description: "Pembersihan Caddy dan penghapusan otomatis di worker via SSH.", keywords: ["hapus", "delete", "remove", "clean", "ssh", "systemd"] },
 
   // Manajemen CBT & Sekolah
@@ -122,10 +126,18 @@ const CommandSnippet: React.FC<CommandSnippetProps> = ({ code, title }) => {
 };
 
 export const SuperAdminMultiVpsDocsPage: React.FC = () => {
+  const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeSection, setActiveSection] = useState("ringkasan");
+
+  // Auth guard: hanya superadmin yang sudah login
+  useEffect(() => {
+    if (!masterPb.authStore.isValid) {
+      navigate("/superadmin/login");
+    }
+  }, [navigate]);
 
   // Collapsible categories state
   const [collapsedCategories, setCollapsedCategories] = useState<Record<string, boolean>>({
@@ -772,6 +784,78 @@ Proxy ke localhost:PORT     Proxy ke http://IP_WORKER:PORT
                   Setelah ujian selesai, klik ikon <strong>Petir (⚡)</strong> lagi. Opsi otomatis beralih ke <strong>Tarik ke Master VPS</strong>. Semua jawaban siswa dan riwayat skor ditarik 100% utuh kembali ke Master. Worker VPS kini aman dimatikan.
                 </p>
               </div>
+            </div>
+          </section>
+
+          {/* ── SECTION: ISOLASI WORKER NODE ─────────────────── */}
+          <section id="isolasi-worker" className="space-y-4 scroll-mt-24">
+            <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Isolasi Worker Node (Tenant Baru)</h2>
+            <p className="text-sm text-slate-600 leading-relaxed">
+              Saat mendaftarkan <strong>sekolah baru</strong>, Anda bisa langsung menaruh databasenya di worker VPS terpisah (bukan di master). Cocok untuk sekolah besar yang butuh resource dedicated sejak awal.
+            </p>
+            <div className="p-4 rounded-xl border border-purple-200 bg-purple-50/50 space-y-3 text-xs">
+              <p className="font-bold text-slate-900">Cara pakai:</p>
+              <ol className="list-decimal list-inside space-y-1.5 text-slate-700 leading-relaxed">
+                <li>Siapkan VPS worker baru dengan perintah 1-baris (lihat section <a href="#worker-setup" className="text-blue-600 font-bold">Setup Worker Node</a>).</li>
+                <li>Di form <strong>Daftarkan Tenant</strong>, aktifkan toggle <strong>Isolasi Worker Node</strong>.</li>
+                <li>Masukkan IP worker baru (cth. <code className="font-mono bg-white px-1 py-0.5 rounded border">103.123.45.67</code>).</li>
+                <li>Klik <strong>Daftarkan Tenant</strong> — database tenant otomatis dibuat di worker via SSH, Caddy di master otomatis reverse-proxy.</li>
+              </ol>
+              <p className="text-slate-600 leading-relaxed">
+                <strong>Bedanya dengan Migrasi 1-Klik:</strong> Isolasi untuk tenant <em>baru</em> (mulai dari kosong). Migrasi 1-Klik untuk tenant <em>existing</em> yang databasenya sudah ada dan perlu dipindah.
+              </p>
+            </div>
+          </section>
+
+          {/* ── SECTION: SNAPSHOT & RESTORE ────────────────────── */}
+          <section id="snapshot-restore" className="space-y-4 scroll-mt-24">
+            <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Snapshot & Restore Backup Worker</h2>
+            <p className="text-sm text-slate-600 leading-relaxed">
+              Setiap tenant di worker VPS otomatis di-backup harian ke master. Tidak perlu setting manual — script membaca daftar worker dari database.
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+              <div className="p-4 rounded-xl border border-blue-200 bg-blue-50/50 space-y-2">
+                <p className="font-bold text-slate-900">Backup Otomatis (Cron 02:00)</p>
+                <ul className="list-disc list-inside space-y-1 text-slate-600 leading-relaxed">
+                  <li>Script: <code className="font-mono bg-white px-1 rounded border">examku-backup-workers.sh</code></li>
+                  <li>Snapshot via <code className="font-mono bg-white px-1 rounded border">sqlite3 .backup</code> — tanpa hentikan layanan</li>
+                  <li>Ditarik via rsync ke <code className="font-mono bg-white px-1 rounded border">/opt/pocketbase/worker-snapshots/&lt;slug&gt;/</code></li>
+                  <li>Verifikasi <code className="font-mono bg-white px-1 rounded border">PRAGMA integrity_check</code></li>
+                  <li>Retensi 7 hari (otomatis hapus yang lama)</li>
+                </ul>
+              </div>
+              <div className="p-4 rounded-xl border border-amber-200 bg-amber-50/50 space-y-2">
+                <p className="font-bold text-slate-900">Restore (Darurat)</p>
+                <ul className="list-disc list-inside space-y-1 text-slate-600 leading-relaxed">
+                  <li>Via dashboard: modal Migrasi → pilih tanggal snapshot → Restore</li>
+                  <li>Via terminal: <code className="font-mono bg-white px-1 rounded border">examku-restore-snapshot.sh &lt;slug&gt; [YYYY-MM-DD]</code></li>
+                  <li>Data live otomatis dibackup (.bak) sebelum ditimpa</li>
+                  <li>Mode <code className="font-mono bg-white px-1 rounded border">--force</code> untuk timpa paksa</li>
+                </ul>
+              </div>
+            </div>
+            <p className="text-xs text-slate-500 leading-relaxed">
+              Skenario: worker mati mendadak → restore snapshot ke master (tenant jalan darurat di master) → setelah worker baru siap, pakai Migrasi 1-Klik untuk pindah lagi.
+            </p>
+          </section>
+
+          {/* ── SECTION: INFRA.CONF ────────────────────────────── */}
+          <section id="infra-conf" className="space-y-4 scroll-mt-24">
+            <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Konfigurasi Infrastruktur Terpusat</h2>
+            <p className="text-sm text-slate-600 leading-relaxed">
+              Semua IP server terpusat di <strong>satu file</strong>: <code className="font-mono bg-slate-100 px-1 py-0.5 rounded">vps/infra.conf</code>. Tidak ada lagi IP hardcoded yang tersebar di banyak script.
+            </p>
+            <CommandSnippet
+              title="vps/infra.conf"
+              code={'MASTER_IP="64.235.41.108"\nMASTER_USER="root"\nWORKER_IP="43.134.175.87"\nWORKER_USER="root"'}
+            />
+            <div className="p-4 rounded-xl border border-slate-200 bg-white shadow-xs text-xs space-y-2">
+              <p className="font-bold text-slate-900">Cara kerja:</p>
+              <ul className="list-disc list-inside space-y-1 text-slate-600 pl-1 leading-relaxed">
+                <li>Script Node.js (<code className="font-mono bg-slate-100 px-1 rounded">release-all.js</code>, <code className="font-mono bg-slate-100 px-1 rounded">deploy-apk.js</code>) baca via <code className="font-mono bg-slate-100 px-1 rounded">scripts/infra-config.js</code>.</li>
+                <li>Script Bash di VPS baca <code className="font-mono bg-slate-100 px-1 rounded">/opt/pocketbase/infra.conf</code> (otomatis disync setiap <code className="font-mono bg-slate-100 px-1 rounded">release:all</code>).</li>
+                <li><strong>Migrasi master ke VPS baru:</strong> edit 1 baris <code className="font-mono bg-slate-100 px-1 rounded">MASTER_IP</code> → <code className="font-mono bg-slate-100 px-1 rounded">git pull</code> → <code className="font-mono bg-slate-100 px-1 rounded">npm run release:all</code> → update DNS Cloudflare.</li>
+              </ul>
             </div>
           </section>
 
