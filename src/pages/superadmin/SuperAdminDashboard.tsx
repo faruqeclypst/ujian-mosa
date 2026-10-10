@@ -607,6 +607,12 @@ const SuperAdminDashboard = () => {
   const requestTotalPages = Math.max(1, Math.ceil(requests.length / REQUEST_PAGE_SIZE));
   const pagedRequests = requests.slice((requestPage - 1) * REQUEST_PAGE_SIZE, requestPage * REQUEST_PAGE_SIZE);
 
+  // Pagination untuk log aktivitas
+  const [logPage, setLogPage] = useState(1);
+  const LOG_PAGE_SIZE = 15;
+  const logTotalPages = Math.max(1, Math.ceil(logEntries.length / LOG_PAGE_SIZE));
+  const pagedLogs = logEntries.slice((logPage - 1) * LOG_PAGE_SIZE, logPage * LOG_PAGE_SIZE);
+
   const stats = [
     { label: "Institusi Aktif", value: activeCount, icon: Zap, color: "text-amber-600", bg: "bg-amber-50", border: "border-amber-200" },
     { label: "Total Institusi", value: schools.length, icon: School, color: "text-blue-600", bg: "bg-blue-50", border: "border-blue-200" },
@@ -834,7 +840,7 @@ const SuperAdminDashboard = () => {
 
       {/* Table */}
       <div className="bg-white border border-slate-200/90 rounded-2xl shadow-xs overflow-hidden">
-        {tab !== "requests" ? (
+        {tab !== "requests" && tab !== "logs" ? (
           <>
             {/* Desktop Table */}
             <div className="hidden md:block overflow-x-auto scrollbar-thin">
@@ -1310,7 +1316,7 @@ const SuperAdminDashboard = () => {
               </div>
             )}
           </>
-        ) : (
+        ) : tab === "requests" ? (
           <>
             {/* Requests Desktop */}
             <div className="hidden md:block overflow-x-auto scrollbar-thin">
@@ -1678,7 +1684,7 @@ const SuperAdminDashboard = () => {
               </div>
             )}
           </>
-        )}
+        ) : null}
       </div>
 
       {/* Footer */}
@@ -1718,7 +1724,7 @@ const SuperAdminDashboard = () => {
             </div>
           ) : (
             <div className="divide-y divide-slate-50">
-              {logEntries.map((log, idx) => {
+              {pagedLogs.map((log, idx) => {
                 const style = LOG_STYLE[log.type];
                 const Icon = style.icon;
                 const dateStr = new Date(log.timestamp).toLocaleString("id-ID", {
@@ -1732,7 +1738,7 @@ const SuperAdminDashboard = () => {
                       <div className={cn("w-8 h-8 rounded-xl flex items-center justify-center border", style.bg, style.border)}>
                         <Icon size={14} className={style.color} />
                       </div>
-                      {idx < logEntries.length - 1 && (
+                      {idx < pagedLogs.length - 1 && (
                         <div className="w-px h-full min-h-[20px] bg-slate-100 mt-1" />
                       )}
                     </div>
@@ -1754,6 +1760,35 @@ const SuperAdminDashboard = () => {
                 );
               })}
             </div>
+            {/* Pagination Log */}
+            {logTotalPages > 1 && (
+              <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100 bg-slate-50/50">
+                <p className="text-[11px] text-slate-500 font-medium">
+                  Halaman {logPage} dari {logTotalPages} • {logEntries.length} aktivitas
+                </p>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setLogPage(p => Math.max(1, p - 1))}
+                    disabled={logPage === 1}
+                    className="min-w-[36px] min-h-[36px] px-2 rounded-lg border border-slate-200 bg-white text-slate-600 text-xs font-bold hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                  >
+                    ‹
+                  </button>
+                  <span className="text-xs font-bold text-slate-700 px-2">
+                    {logPage} / {logTotalPages}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setLogPage(p => Math.min(logTotalPages, p + 1))}
+                    disabled={logPage === logTotalPages}
+                    className="min-w-[36px] min-h-[36px] px-2 rounded-lg border border-slate-200 bg-white text-slate-600 text-xs font-bold hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                  >
+                    ›
+                  </button>
+                </div>
+              </div>
+            )}
           )}
         </div>
       )}
