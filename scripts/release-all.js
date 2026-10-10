@@ -119,6 +119,17 @@ try {
   console.log('✅ Berkas Offline 1-Click Update berhasil dipublikasikan di CDN Examku!');
 
   // ── [6/6] BUILD & DEPLOY APK (OPTIONAL / DEFAULT) ──
+  let apkVersionCode = null;
+  let apkVersionName = null;
+  // Baca versionCode & versionName dari build.gradle untuk sync app_settings
+  try {
+    const gradleContent = fs.readFileSync('android/app/build.gradle', 'utf8');
+    const codeMatch = gradleContent.match(/versionCode\s+(\d+)/);
+    const nameMatch = gradleContent.match(/versionName\s+"([^"]+)"/);
+    if (codeMatch) apkVersionCode = codeMatch[1];
+    if (nameMatch) apkVersionName = nameMatch[1];
+  } catch (e) {}
+
   if (skipApk) {
     console.log('\n⏩ [6/6] Dilewati: Build APK dilewati (--skip-apk / --quick).');
   } else {
@@ -129,6 +140,20 @@ try {
       execSync('node scripts/deploy-apk.js', { stdio: 'inherit' });
     }
     console.log('✅ APK Android berhasil di-build dan di-deploy ke server!');
+  }
+
+  // ── [7/7] SYNC VERSI APK KE APP_SETTINGS (FORCE UPDATE) ──
+  // Update min_version_code & min_version_name di master agar
+  // fitur force update di aplikasi Android berfungsi otomatis.
+  // TIDAK mengubah is_force_update (tetap keputusan user via dashboard).
+  if (apkVersionCode && apkVersionName) {
+    console.log('\n🔄 [7/7] Menyinkronkan versi APK ke app_settings master...');
+    try {
+      execSync(`ssh ${VPS_HOST} "python3 /usr/local/bin/update-app-settings.py ${apkVersionCode} ${apkVersionName}"`, { stdio: 'inherit' });
+      console.log('✅ app_settings master diupdate (force_update tidak diubah).');
+    } catch (e) {
+      console.log('⚠️ Gagal update app_settings (tidak fatal, bisa set manual via dashboard).');
+    }
   }
 
   // ── PURGE CLOUDFLARE CACHE ──

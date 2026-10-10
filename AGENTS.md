@@ -30,13 +30,14 @@ When deploying or syncing changes, always follow these rules and refer to [COMMA
   npm run version:set <versi_baru> [--notes "Catatan Rilis"]
   ```
   Contoh: `npm run version:set 1.1.2` atau `npm run version:set 1.2.0 --notes "Peningkatan stabilitas dan proteksi kiosk"`
-- **6 Gerbang yang Otomatis Disinkronkan**:
+- **7 Gerbang yang Otomatis Disinkronkan**:
   1. `package.json` (`"version"`)
   2. `src/utils/version.ts` (`APP_VERSION` & `APP_DISPLAY_VERSION` untuk seluruh UI Web)
   3. `android/app/build.gradle` (`versionName` disinkronkan & `versionCode` otomatis naik +1)
   4. `public/version.json` & `offline_package/version.json` (metadata CDN & paket offline)
   5. `pb_hooks/offline_update.pb.js` & template hooks sekolah (versi fallback backend)
   6. `scripts/release-all.js` (konstanta fallback rilis)
+  7. `app_settings` di Master PocketBase (`min_version_code` & `min_version_name` — via step [7/7] di `release-all.js`; `is_force_update` TIDAK diubah otomatis)
 - Setelah versi di-set dengan `npm run version:set`, baru lanjutkan dengan alur rilis: `npm run release:all` atau `npm run release:quick`.
 
 ### 1. All-in-One Master Release
