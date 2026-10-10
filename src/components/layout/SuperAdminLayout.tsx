@@ -25,10 +25,14 @@ const navItems = [
   { label: "Dashboard", sublabel: "Seluruh Tenant", icon: LayoutDashboard, path: "/superadmin" },
   { label: "Lisensi Offline", sublabel: "Server Mandiri CBT", icon: KeyRound, path: "/superadmin/offline-licenses" },
   { label: "Infrastruktur", sublabel: "Status & Latensi", icon: Database, path: "/superadmin/infra" },
-  { label: "Panduan Multi-VPS", sublabel: "Manual Worker Node", icon: BookOpen, path: "/superadmin/multi-vps-docs" },
   { label: "Statistik", sublabel: "Analitik Server", icon: Globe, path: "/superadmin/analytics" },
   { label: "Invoice", sublabel: "Tagihan & Pembayaran", icon: FileText, path: "/superadmin/invoice" },
   { label: "Pengaturan", sublabel: "Akun & Keamanan", icon: Settings, path: "/superadmin/settings" },
+];
+
+// Item bantuan — selalu di paling bawah sidebar
+const helpItems = [
+  { label: "Panduan Multi-VPS", sublabel: "Manual Worker Node", icon: BookOpen, path: "/superadmin/multi-vps-docs" },
 ];
 
 const SuperAdminLayout: React.FC<SuperAdminLayoutProps> = ({ children }) => {
@@ -64,7 +68,7 @@ const SuperAdminLayout: React.FC<SuperAdminLayoutProps> = ({ children }) => {
   const adminName = masterPb.authStore.model?.name || masterPb.authStore.model?.email || "Super Admin";
   const adminInitial = adminName.charAt(0).toUpperCase();
 
-  const currentPage = navItems.find(item => item.path === location.pathname);
+  const currentPage = [...navItems, ...helpItems].find(item => item.path === location.pathname);
 
   // Quick mobile navigation items (top 4 destinations)
   const mobileNavItems = [
@@ -155,6 +159,41 @@ const SuperAdminLayout: React.FC<SuperAdminLayoutProps> = ({ children }) => {
                   <p className="text-[10px] text-slate-400 leading-tight mt-0.5">{item.sublabel}</p>
                 </div>
                 {isActive && <ChevronRight size={14} className="text-blue-400 shrink-0" />}
+              </Link>
+            );
+          })}
+
+          {/* Bantuan — selalu di paling bawah */}
+          <p className="px-3 pt-4 pb-1 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Bantuan</p>
+          {helpItems.map((item) => {
+            const isActive = location.pathname === item.path;
+            return (
+              <Link
+                key={item.path}
+                to={item.path}
+                className={cn(
+                  "flex items-center gap-3 px-3 py-3 min-h-[44px] rounded-xl transition-all duration-200 group relative",
+                  isActive
+                    ? "bg-purple-50 text-purple-700 font-semibold"
+                    : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                )}
+              >
+                {isActive && (
+                  <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-7 bg-purple-600 rounded-r-full" />
+                )}
+                <div className={cn(
+                  "w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-colors",
+                  isActive ? "bg-purple-100 text-purple-600" : "bg-slate-100 text-slate-500 group-hover:bg-slate-200"
+                )}>
+                  <item.icon size={16} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className={cn("text-xs sm:text-sm font-semibold leading-tight", isActive ? "text-purple-700" : "text-slate-800")}>
+                    {item.label}
+                  </p>
+                  <p className="text-[10px] text-slate-400 leading-tight mt-0.5">{item.sublabel}</p>
+                </div>
+                {isActive && <ChevronRight size={14} className="text-purple-400 shrink-0" />}
               </Link>
             );
           })}

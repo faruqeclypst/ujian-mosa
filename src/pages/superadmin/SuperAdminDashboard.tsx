@@ -593,6 +593,20 @@ const SuperAdminDashboard = () => {
   const pendingCount = requests.filter(r => r.status === "pending").length;
   const activeCount = schools.filter(s => !!s.is_active).length;
 
+  // Pagination untuk tabel sekolah
+  const [schoolPage, setSchoolPage] = useState(1);
+  const SCHOOL_PAGE_SIZE = 10;
+  const schoolTotalPages = Math.max(1, Math.ceil(filteredSchools.length / SCHOOL_PAGE_SIZE));
+  const pagedSchools = filteredSchools.slice((schoolPage - 1) * SCHOOL_PAGE_SIZE, schoolPage * SCHOOL_PAGE_SIZE);
+  // Reset ke halaman 1 saat filter/search berubah
+  useEffect(() => { setSchoolPage(1); }, [searchQuery, tab]);
+
+  // Pagination untuk tabel requests
+  const [requestPage, setRequestPage] = useState(1);
+  const REQUEST_PAGE_SIZE = 10;
+  const requestTotalPages = Math.max(1, Math.ceil(requests.length / REQUEST_PAGE_SIZE));
+  const pagedRequests = requests.slice((requestPage - 1) * REQUEST_PAGE_SIZE, requestPage * REQUEST_PAGE_SIZE);
+
   const stats = [
     { label: "Institusi Aktif", value: activeCount, icon: Zap, color: "text-amber-600", bg: "bg-amber-50", border: "border-amber-200" },
     { label: "Total Institusi", value: schools.length, icon: School, color: "text-blue-600", bg: "bg-blue-50", border: "border-blue-200" },
@@ -857,7 +871,7 @@ const SuperAdminDashboard = () => {
                         <p className="text-sm font-medium">Belum ada data institusi di sini.</p>
                       </div>
                     </td></tr>
-                  ) : filteredSchools.map(school => (
+                  ) : pagedSchools.map(school => (
                     <tr key={school.id} className={cn(
                       "hover:bg-slate-50/80 transition-all group border-b border-slate-100/80 last:border-0",
                       selectedIds.includes(school.id) && "bg-blue-50/40 hover:bg-blue-50/60"
@@ -1086,7 +1100,7 @@ const SuperAdminDashboard = () => {
                 </div>
               ) : filteredSchools.length === 0 ? (
                 <div className="py-12 text-center text-slate-400 text-sm">Tidak ada data ditemukan.</div>
-              ) : filteredSchools.map(school => (
+              ) : pagedSchools.map(school => (
                 <div key={school.id} className="p-4 space-y-3">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center gap-3 min-w-0">
@@ -1241,6 +1255,54 @@ const SuperAdminDashboard = () => {
                 </div>
               ))}
             </div>
+
+            {/* Pagination Sekolah */}
+            {schoolTotalPages > 1 && (
+              <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100 bg-slate-50/50">
+                <p className="text-[11px] text-slate-500 font-medium">
+                  Halaman {schoolPage} dari {schoolTotalPages} • {filteredSchools.length} sekolah
+                </p>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setSchoolPage(p => Math.max(1, p - 1))}
+                    disabled={schoolPage === 1}
+                    className="min-w-[36px] min-h-[36px] px-2 rounded-lg border border-slate-200 bg-white text-slate-600 text-xs font-bold hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                  >
+                    ‹
+                  </button>
+                  {Array.from({ length: schoolTotalPages }, (_, i) => i + 1)
+                    .filter(p => p === 1 || p === schoolTotalPages || Math.abs(p - schoolPage) <= 1)
+                    .map((p, idx, arr) => (
+                      <React.Fragment key={p}>
+                        {idx > 0 && arr[idx - 1] !== p - 1 && (
+                          <span className="text-slate-400 text-xs px-1">…</span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setSchoolPage(p)}
+                          className={cn(
+                            "min-w-[36px] min-h-[36px] px-2 rounded-lg text-xs font-bold transition-all",
+                            p === schoolPage
+                              ? "bg-blue-600 text-white shadow-sm"
+                              : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                          )}
+                        >
+                          {p}
+                        </button>
+                      </React.Fragment>
+                    ))}
+                  <button
+                    type="button"
+                    onClick={() => setSchoolPage(p => Math.min(schoolTotalPages, p + 1))}
+                    disabled={schoolPage === schoolTotalPages}
+                    className="min-w-[36px] min-h-[36px] px-2 rounded-lg border border-slate-200 bg-white text-slate-600 text-xs font-bold hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                  >
+                    ›
+                  </button>
+                </div>
+              </div>
+            )}
           </>
         ) : (
           <>
@@ -1274,7 +1336,7 @@ const SuperAdminDashboard = () => {
                 <tbody className="divide-y divide-slate-100">
                   {requests.length === 0 ? (
                     <tr><td colSpan={7} className="px-5 py-12 text-center text-slate-400 text-sm">Belum ada pendaftaran.</td></tr>
-                  ) : requests.map(req => (
+                  ) : pagedRequests.map(req => (
                     <tr key={req.id} className={cn(
                       "hover:bg-slate-50 transition-colors border-b border-slate-50 last:border-0",
                       selectedIds.includes(req.id) && "bg-blue-50/40"
@@ -1433,7 +1495,7 @@ const SuperAdminDashboard = () => {
             <div className="md:hidden divide-y divide-slate-100">
               {requests.length === 0 ? (
                 <div className="py-12 text-center text-slate-400 text-sm">Belum ada pendaftaran.</div>
-              ) : requests.map(req => (
+              ) : pagedRequests.map(req => (
                 <div key={req.id} className="p-4 space-y-3">
                   <div className="flex items-start justify-between gap-2">
                     <div>
@@ -1561,6 +1623,54 @@ const SuperAdminDashboard = () => {
                 </div>
               ))}
             </div>
+
+            {/* Pagination Requests */}
+            {requestTotalPages > 1 && (
+              <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100 bg-slate-50/50">
+                <p className="text-[11px] text-slate-500 font-medium">
+                  Halaman {requestPage} dari {requestTotalPages} • {requests.length} pendaftaran
+                </p>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setRequestPage(p => Math.max(1, p - 1))}
+                    disabled={requestPage === 1}
+                    className="min-w-[36px] min-h-[36px] px-2 rounded-lg border border-slate-200 bg-white text-slate-600 text-xs font-bold hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                  >
+                    ‹
+                  </button>
+                  {Array.from({ length: requestTotalPages }, (_, i) => i + 1)
+                    .filter(p => p === 1 || p === requestTotalPages || Math.abs(p - requestPage) <= 1)
+                    .map((p, idx, arr) => (
+                      <React.Fragment key={p}>
+                        {idx > 0 && arr[idx - 1] !== p - 1 && (
+                          <span className="text-slate-400 text-xs px-1">…</span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setRequestPage(p)}
+                          className={cn(
+                            "min-w-[36px] min-h-[36px] px-2 rounded-lg text-xs font-bold transition-all",
+                            p === requestPage
+                              ? "bg-blue-600 text-white shadow-sm"
+                              : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                          )}
+                        >
+                          {p}
+                        </button>
+                      </React.Fragment>
+                    ))}
+                  <button
+                    type="button"
+                    onClick={() => setRequestPage(p => Math.min(requestTotalPages, p + 1))}
+                    disabled={requestPage === requestTotalPages}
+                    className="min-w-[36px] min-h-[36px] px-2 rounded-lg border border-slate-200 bg-white text-slate-600 text-xs font-bold hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                  >
+                    ›
+                  </button>
+                </div>
+              </div>
+            )}
           </>
         )}
       </div>
