@@ -244,3 +244,11 @@
     background: rgb(107 114 128);
   }
 }
+  /* Sembunyikan scrollbar tapi tetap bisa scroll */
+  .scrollbar-none {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }

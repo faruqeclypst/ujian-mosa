@@ -676,8 +676,9 @@ const SuperAdminDashboard = () => {
       </div>
 
       {/* Tab + Action bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-4">
-        <div className="flex items-center bg-slate-100 rounded-xl p-1 gap-1 w-fit overflow-x-auto max-w-full">
+      <div className="flex flex-col gap-3 mb-4">
+        {/* Baris 1: Tabs */}
+        <div className="flex items-center bg-slate-100 rounded-xl p-1 gap-1 w-full sm:w-fit overflow-x-auto scrollbar-none">
           <button
             onClick={() => { setTab("all"); setSelectedIds([]); }}
             className={cn(
@@ -781,48 +782,53 @@ const SuperAdminDashboard = () => {
           </button>
         </div>
 
-        <div className="flex items-center gap-2 sm:ml-auto">
+        {/* Baris 2: Search + aksi */}
+        <div className="flex items-center gap-2 flex-wrap">
           {/* Search */}
-          <div className="relative flex-1 sm:flex-none sm:w-56">
+          <div className="relative flex-1 min-w-[200px] sm:max-w-xs">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
               placeholder="Cari sekolah/universitas..."
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              className="w-full h-9 bg-white border border-slate-200 rounded-xl pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 shadow-sm"
+              className="w-full h-10 bg-white border border-slate-200 rounded-xl pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 shadow-sm"
             />
           </div>
 
           {/* Refresh */}
           <button
             onClick={loadData}
+            title="Muat ulang data"
             className={cn(
-              "h-9 w-9 flex items-center justify-center bg-white border border-slate-200 rounded-xl hover:bg-slate-50 shadow-sm transition-all",
+              "h-10 w-10 shrink-0 flex items-center justify-center bg-white border border-slate-200 rounded-xl hover:bg-slate-50 shadow-sm transition-all",
               loading && "opacity-60 pointer-events-none"
             )}
           >
             <RefreshCw size={15} className={cn("text-slate-600", loading && "animate-spin")} />
           </button>
 
-          {/* Docs Multi-VPS */}
-          <a
-            href="/superadmin/multi-vps-docs"
-            className="h-9 px-3 rounded-2xl bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 font-semibold shadow-xs flex items-center gap-1.5 transition-all text-xs whitespace-nowrap"
-            title="Buka panduan manual Multi-VPS"
-          >
-            <BookOpen size={14} className="text-purple-600" />
-            <span className="hidden md:inline">Panduan Multi-VPS</span>
-          </a>
+          <div className="flex items-center gap-2 ml-auto">
+            {/* Docs Multi-VPS */}
+            <a
+              href="/superadmin/multi-vps-docs"
+              className="h-10 px-3 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 font-semibold shadow-xs flex items-center gap-1.5 transition-all text-xs whitespace-nowrap"
+              title="Buka panduan manual Multi-VPS"
+            >
+              <BookOpen size={14} className="text-purple-600 shrink-0" />
+              <span className="hidden md:inline">Panduan Multi-VPS</span>
+            </a>
 
-          {/* Add */}
-          <button
-            onClick={() => { setEditSchool(null); setShowAddModal(true); }}
-            className="h-9 px-4 rounded-2xl bg-blue-50 hover:bg-blue-100 active:bg-blue-50 border border-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 dark:active:bg-blue-900/30 dark:border-blue-800/40 text-blue-700 font-bold shadow-sm flex items-center gap-1.5 transition-all text-sm whitespace-nowrap"
-          >
-            <Plus size={15} />
-            <span className="hidden sm:inline">Tambah Sekolah</span>
-          </button>
+            {/* Add */}
+            <button
+              onClick={() => { setEditSchool(null); setShowAddModal(true); }}
+              className="h-10 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-bold shadow-sm flex items-center gap-1.5 transition-all text-sm whitespace-nowrap"
+            >
+              <Plus size={15} className="shrink-0" />
+              <span className="hidden sm:inline">Tambah Sekolah</span>
+              <span className="sm:hidden">Tambah</span>
+            </button>
+          </div>
         </div>
       </div>
 
