@@ -103,8 +103,10 @@ try {
   fs.rmSync(stagingDir, { recursive: true, force: true });
 
   // Kirim ke Master VPS /opt/frontend/ujian/dist/downloads/
-  execSync(`ssh ${VPS_HOST} "mkdir -p ${VPS_DOWNLOADS} && chown -R caddy:caddy ${VPS_DOWNLOADS}"`, { stdio: 'inherit' });
+  // (mkdir diulang sebelum tiap scp untuk cegah race condition)
+  execSync(`ssh ${VPS_HOST} "mkdir -p ${VPS_DOWNLOADS} && chown -R caddy:caddy ${VPS_DOWNLOADS} && test -d ${VPS_DOWNLOADS}"`, { stdio: 'inherit' });
   execSync(`scp ${updateZipName} ${VPS_HOST}:${VPS_DOWNLOADS}/${updateZipName}`, { stdio: 'inherit' });
+  execSync(`ssh ${VPS_HOST} "mkdir -p ${VPS_DOWNLOADS} && test -d ${VPS_DOWNLOADS}"`, { stdio: 'inherit' });
   execSync(`scp version.json ${VPS_HOST}:${VPS_DOWNLOADS}/version.json`, { stdio: 'inherit' });
   execSync(`ssh ${VPS_HOST} "chmod 644 ${VPS_DOWNLOADS}/${updateZipName} ${VPS_DOWNLOADS}/version.json && chown -R caddy:caddy ${VPS_DOWNLOADS}"`, { stdio: 'inherit' });
   
