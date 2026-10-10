@@ -3074,8 +3074,20 @@ const MonitoringPage = () => {
                               <TableCell className="text-center text-[11px] font-bold">
                                 {(() => {
                                   if (!attempt) return "-";
-                                  // Mode ringan tanpa answers: skor live tak bisa dihitung.
-                                  if (!hasFullAnswers && attempt.status !== "finished") return "-";
+                                  // Mode ringan tanpa answers: pakai skor dari server (hook hitung tiap autosave).
+                                  if (!hasFullAnswers && attempt.status !== "finished") {
+                                    const oc = attempt.objectiveCorrect ?? attempt.correct;
+                                    const ot = attempt.objectiveTotal ?? attempt.total;
+                                    if (oc !== undefined && ot !== undefined && ot > 0) {
+                                      return (
+                                        <div className="flex flex-col items-center">
+                                          <span className="text-indigo-600 dark:text-indigo-400 font-black text-sm animate-pulse">{attempt.objectiveScore ?? attempt.score ?? "-"}</span>
+                                          <span className="text-[9px] text-slate-400">{oc}/{ot}</span>
+                                        </div>
+                                      );
+                                    }
+                                    return "-";
+                                  }
                                   const displayScore = getAttemptScore(attempt);
 
                                   return (
