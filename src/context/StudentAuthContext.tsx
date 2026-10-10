@@ -178,23 +178,12 @@ export const StudentAuthProvider = ({ children }: { children: ReactNode }) => {
       }
 
       if (!authData) {
+        // Fallback ke bcrypt (untuk kasus fast-login error / belum tersedia).
+        // Catatan: /api/fast-login sudah melakukan migrasi otomatis via bcrypt,
+        // jadi fallback ini hanya untuk jika endpoint tidak ada sama sekali.
         authData = await pb.collection("students").authWithPassword(nisn, password, {
           expand: 'classId'
         });
-        // Migrasi otomatis: isi fastHash agar login berikutnya pakai fast-login
-        // (non-blocking, tidak mengganggu alur login)
-        try {
-          await fetch(`${pb.baseUrl}/api/fast-login/setup`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "Authorization": `Bearer ${authData.token}`,
-            },
-            body: JSON.stringify({ password }),
-          });
-        } catch (migErr) {
-          console.warn("Migrasi fast-login gagal (akan dicoba login berikutnya):", migErr);
-        }
       }
 
       const model = authData.record;
@@ -253,19 +242,9 @@ export const StudentAuthProvider = ({ children }: { children: ReactNode }) => {
         passwordConfirm: newPassword,
         hasChangedPassword: true,
       }, { $autoCancel: false });
-      // Refresh fastHash agar sinkron dengan password baru (non-blocking)
-      try {
-        await fetch(`${pb.baseUrl}/api/fast-login/setup`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${pb.authStore.token}`,
-          },
-          body: JSON.stringify({ password: newPassword }),
-        });
-      } catch (e) {
-        console.warn("Refresh fastHash gagal (akan dimigrasi saat login berikutnya):", e);
-      }
+      // Refresh fastHash agar sinkron dengan password baru
+      // (akan dimigrasi otomatis saat login berikutnya via /api/fast-login)
+      // Tidak perlu panggilan khusus - endpoint utama handle migrasi otomatis.
       logoutStudent();
     } catch (err: any) {
       throw new Error("Gagal mengganti password: " + err.message);
