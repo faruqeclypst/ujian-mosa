@@ -2,7 +2,8 @@
 // Fast Login untuk siswa — alternatif ringan pengganti bcrypt
 // POST /api/fast-login { username, password }
 // Verifikasi: SHA-256(pepper + username + password) vs field fastHash
-// Pepper dari env FAST_LOGIN_PEPPER. Rate limit 30/menit/IP.
+// Pepper dari env FAST_LOGIN_PEPPER (disarankan) atau auto-generate via /dev/urandom.
+// Rate limit: 20/menit per-akun + 2000/menit per-IP (ramah NAT sekolah).
 // HANYA untuk collection "students".
 // CATATAN: semua helper inline di handler (binding top-level
 // tidak terlihat di callback routerAdd).
@@ -88,8 +89,33 @@ routerAdd("POST", "/api/fast-login", (c) => {
                 if (saved && saved.length >= 32) {
                     pepper = saved;
                 } else {
-                    var _chars = "0123456789abcdef", _p = "";
-                    for (var _i = 0; _i < 64; _i++) _p += _chars[Math.floor(Math.random() * 16)];
+                    // CSPRNG: baca dari /dev/urandom (Linux) untuk pepper yang aman.
+                    // Math.random() TIDAK aman untuk secret kriptografi.
+                    var _p = "";
+                    try {
+                        var _ur = $os.readFile("/dev/urandom");
+                        // Ambil 32 byte pertama, encode ke hex (64 char)
+                        var _bytes = [];
+                        var _raw = String(_ur);
+                        for (var _bi = 0; _bi < 32 && _bi < _raw.length; _bi++) {
+                            _bytes.push(_raw.charCodeAt(_bi) & 0xff);
+                        }
+                        // Jika /dev/urandom tidak memberi cukup byte, fallback ke kombinasi
+                        // Math.random + timestamp + counter (lebih baik dari Math.random murni,
+                        // tapi tetap disarankan set FAST_LOGIN_PEPPER via env untuk produksi).
+                        while (_bytes.length < 32) {
+                            _bytes.push(Math.floor(Math.random() * 256) ^ (Date.now() & 0xff) ^ _bytes.length);
+                        }
+                        var _hex = "0123456789abcdef";
+                        for (var _hi = 0; _hi < 32; _hi++) {
+                            _p += _hex[(_bytes[_hi] >> 4) & 0xf] + _hex[_bytes[_hi] & 0xf];
+                        }
+                    } catch (e) {
+                        // Fallback terakhir jika $os.readFile gagal total
+                        var _chars = "0123456789abcdef";
+                        for (var _i = 0; _i < 64; _i++) _p += _chars[Math.floor(Math.random() * 16)];
+                        try { console.log("[FAST_LOGIN] WARNING: pepper generated without CSPRNG, set FAST_LOGIN_PEPPER env!"); } catch (_) {}
+                    }
                     try { $os.writeFile(pepperFile, _p); } catch (e) {}
                     pepper = _p;
                     try { console.log("[FAST_LOGIN] pepper auto-generated: " + pepperFile); } catch (e) {}
@@ -98,22 +124,39 @@ routerAdd("POST", "/api/fast-login", (c) => {
         }
         if (!pepper) return c.json(500, { message: "Fast login belum dikonfigurasi." });
 
-        // --- Rate limit sederhana: max 60 req/menit per IP ---
-        // (disimpan di memori proses; reset saat restart — cukup untuk CBT)
+        // --- Rate limit: per-akun + per-IP (ramah NAT sekolah) ---
+        // Sekolah di balik 1 NAT: ratusan siswa share 1 IP publik.
+        // Rate limit murni per-IP akan memblokir login massal yang sah.
+        // Solusi: batasi per-username (cegah brute force 1 akun) dengan
+        // batas IP yang longgar (cegah abuse skala besar).
+        // - Per-username: max 20 percobaan/menit (brute force 1 akun diblokir)
+        // - Per-IP: max 2000 req/menit (500 siswa login bareng tetap lolos)
         try {
-            if (typeof __flRl === "undefined") __flRl = {};
+            if (typeof __flRlUser === "undefined") __flRlUser = {};
+            if (typeof __flRlIp === "undefined") __flRlIp = {};
             var _ip = "";
             try {
                 var _h = c.requestInfo().headers || {};
                 _ip = _h["x-forwarded-for"] || _h["x-real-ip"] || "unknown";
                 if (_ip.indexOf(",") >= 0) _ip = _ip.split(",")[0].trim();
             } catch (e) { _ip = "unknown"; }
+            // Baca username lebih awal untuk rate limit per-akun
+            var _rlBody = {};
+            try { _rlBody = c.requestInfo().body || {}; } catch (e) {}
+            var _rlUser = String(_rlBody.username || _rlBody.identity || "").trim().toLowerCase() || "-";
             var _now = Date.now();
-            var _r = __flRl[_ip] || { n: 0, t: _now };
-            if (_now - _r.t > 60000) { _r = { n: 0, t: _now }; }
-            _r.n++;
-            __flRl[_ip] = _r;
-            if (_r.n > 120) return c.json(429, { message: "Terlalu banyak percobaan. Tunggu sebentar." });
+            // Per-username
+            var _ru = __flRlUser[_rlUser] || { n: 0, t: _now };
+            if (_now - _ru.t > 60000) { _ru = { n: 0, t: _now }; }
+            _ru.n++;
+            __flRlUser[_rlUser] = _ru;
+            if (_ru.n > 20) return c.json(429, { message: "Terlalu banyak percobaan untuk akun ini. Tunggu sebentar." });
+            // Per-IP (longgar untuk NAT)
+            var _ri = __flRlIp[_ip] || { n: 0, t: _now };
+            if (_now - _ri.t > 60000) { _ri = { n: 0, t: _now }; }
+            _ri.n++;
+            __flRlIp[_ip] = _ri;
+            if (_ri.n > 2000) return c.json(429, { message: "Terlalu banyak percobaan. Tunggu sebentar." });
         } catch (e) {}
 
         var body = {};
