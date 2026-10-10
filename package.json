@@ -17,6 +17,7 @@
     "sync:tenants": "powershell -ExecutionPolicy Bypass -File ./scripts/push-template.ps1 -AutoSync",
     "release:all": "node scripts/release-all.js",
     "release:quick": "node scripts/release-all.js --skip-apk",
+    "build:aab": "node scripts/build-aab.js",
     "release:offline": "node scripts/release-all.js --skip-apk",
     "version:set": "node scripts/set-version.js",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
