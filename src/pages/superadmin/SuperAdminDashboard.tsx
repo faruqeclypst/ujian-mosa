@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Fragment } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import {
   Plus, Check, X, Edit, Power, PowerOff,
@@ -1274,7 +1274,7 @@ const SuperAdminDashboard = () => {
                   {Array.from({ length: schoolTotalPages }, (_, i) => i + 1)
                     .filter(p => p === 1 || p === schoolTotalPages || Math.abs(p - schoolPage) <= 1)
                     .map((p, idx, arr) => (
-                      <React.Fragment key={p}>
+                      <Fragment key={p}>
                         {idx > 0 && arr[idx - 1] !== p - 1 && (
                           <span className="text-slate-400 text-xs px-1">…</span>
                         )}
@@ -1290,7 +1290,7 @@ const SuperAdminDashboard = () => {
                         >
                           {p}
                         </button>
-                      </React.Fragment>
+                      </Fragment>
                     ))}
                   <button
                     type="button"
@@ -1642,7 +1642,7 @@ const SuperAdminDashboard = () => {
                   {Array.from({ length: requestTotalPages }, (_, i) => i + 1)
                     .filter(p => p === 1 || p === requestTotalPages || Math.abs(p - requestPage) <= 1)
                     .map((p, idx, arr) => (
-                      <React.Fragment key={p}>
+                      <Fragment key={p}>
                         {idx > 0 && arr[idx - 1] !== p - 1 && (
                           <span className="text-slate-400 text-xs px-1">…</span>
                         )}
@@ -1658,7 +1658,7 @@ const SuperAdminDashboard = () => {
                         >
                           {p}
                         </button>
-                      </React.Fragment>
+                      </Fragment>
                     ))}
                   <button
                     type="button"
