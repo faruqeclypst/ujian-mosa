@@ -139,7 +139,7 @@ routerAdd("POST", "/api/fast-login", (c) => {
             try {
                 rec.set("fastHash", computed);
                 $app.save(rec);
-            } catch (e) {}
+            } catch (e) { try { console.error("[FAST_LOGIN] gagal simpan fastHash: " + (e && e.message ? e.message : String(e))); } catch (_) {} }
         } else {
             var computed = sha256(pepper + username + password);
             if (!safeEqual(computed, stored)) {
@@ -151,7 +151,7 @@ routerAdd("POST", "/api/fast-login", (c) => {
                 try {
                     rec.set("fastHash", computed);
                     $app.save(rec);
-                } catch (e) {}
+                } catch (e) { try { console.error("[FAST_LOGIN] gagal simpan fastHash: " + (e && e.message ? e.message : String(e))); } catch (_) {} }
             }
         }
 
@@ -160,7 +160,7 @@ routerAdd("POST", "/api/fast-login", (c) => {
             return c.json(500, { message: "Gagal membuat token." });
         }
         var out = null;
-        try { out = JSON.parse(JSON.stringify(rec)); delete out.fastHash; }
+        try { out = JSON.parse(JSON.stringify(rec)); delete out.fastHash; delete out.password; delete out.tokenKey; }
         catch (e) { out = { id: rec.id }; }
         return c.json(200, { token: token, record: out });
     } catch (err) {
