@@ -386,6 +386,13 @@ export default function SuperAdminOfflineLicensesPage() {
       });
   }, [licenses, searchQuery, filterStatus, sortOption]);
 
+  // Pagination
+  const [licPage, setLicPage] = useState(1);
+  const LIC_PAGE_SIZE = 10;
+  const licTotalPages = Math.max(1, Math.ceil(filteredLicenses.length / LIC_PAGE_SIZE));
+  const pagedLicenses = filteredLicenses.slice((licPage - 1) * LIC_PAGE_SIZE, licPage * LIC_PAGE_SIZE);
+  useEffect(() => { setLicPage(1); }, [searchQuery, filterStatus, sortOption]);
+
   // Aksi Toggle Status Penggunaan Lisensi (Digunakan / Belum Digunakan)
   const [isTogglingUsed, setIsTogglingUsed] = useState(false);
   const handleToggleUsed = async (lic: OfflineLicenseRecord, newUsed: boolean) => {
@@ -709,9 +716,9 @@ export default function SuperAdminOfflineLicensesPage() {
         </div>
 
         {/* Filter Bar & Pencarian Terpadu */}
-        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 py-1">
+        <div className="flex flex-col gap-3 py-1">
           {/* Filter Status Tabs */}
-          <div className="flex items-center gap-1.5 bg-slate-100/90 p-1.5 rounded-2xl overflow-x-auto scrollbar-none border border-slate-200/70 shadow-2xs">
+          <div className="flex items-center gap-1.5 bg-slate-100/90 p-1.5 rounded-2xl overflow-x-auto scrollbar-none border border-slate-200/70 shadow-2xs w-full sm:w-fit">
             <button
               onClick={() => setFilterStatus("all")}
               className={cn(
@@ -781,9 +788,9 @@ export default function SuperAdminOfflineLicensesPage() {
           </div>
 
           {/* Search & Sort */}
-          <div className="flex items-center gap-2.5 md:ml-auto">
+          <div className="flex items-center gap-2.5 flex-wrap">
             {/* Search Input */}
-            <div className="relative flex-1 md:w-72">
+            <div className="relative flex-1 min-w-[200px] sm:max-w-xs">
               <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
               <input
                 type="text"
@@ -882,7 +889,7 @@ export default function SuperAdminOfflineLicensesPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {filteredLicenses.map((lic) => {
+                    {pagedLicenses.map((lic) => {
                       const exp = getExpiryDetails(lic.valid_until);
                       const isExpired = lic.status === "revoked" || exp.isExpired;
                       const isCopied = copiedId === lic.id;
@@ -1108,9 +1115,37 @@ export default function SuperAdminOfflineLicensesPage() {
                 </table>
               </div>
 
+              {/* Pagination */}
+              {licTotalPages > 1 && (
+                <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100 bg-slate-50/50">
+                  <p className="text-[11px] text-slate-500 font-medium">
+                    Halaman {licPage} dari {licTotalPages} • {filteredLicenses.length} lisensi
+                  </p>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setLicPage(p => Math.max(1, p - 1))}
+                      disabled={licPage === 1}
+                      className="min-w-[36px] min-h-[36px] px-2 rounded-lg border border-slate-200 bg-white text-slate-600 text-xs font-bold hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                    >
+                      ‹
+                    </button>
+                    <span className="text-xs font-bold text-slate-700 px-2">{licPage} / {licTotalPages}</span>
+                    <button
+                      type="button"
+                      onClick={() => setLicPage(p => Math.min(licTotalPages, p + 1))}
+                      disabled={licPage === licTotalPages}
+                      className="min-w-[36px] min-h-[36px] px-2 rounded-lg border border-slate-200 bg-white text-slate-600 text-xs font-bold hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                    >
+                      ›
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* Mobile Card List View */}
               <div className="md:hidden divide-y divide-slate-100">
-                {filteredLicenses.map((lic) => {
+                {pagedLicenses.map((lic) => {
                   const exp = getExpiryDetails(lic.valid_until);
                   const isExpired = lic.status === "revoked" || exp.isExpired;
                   const isCopied = copiedId === lic.id;

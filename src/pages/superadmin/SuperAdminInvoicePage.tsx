@@ -379,6 +379,13 @@ const SuperAdminInvoicePage = () => {
     return matchSearch && matchStatus && matchPackage && matchTime;
   });
 
+  // Pagination
+  const [invPage, setInvPage] = useState(1);
+  const INV_PAGE_SIZE = 10;
+  const invTotalPages = Math.max(1, Math.ceil(filtered.length / INV_PAGE_SIZE));
+  const pagedInvoices = filtered.slice((invPage - 1) * INV_PAGE_SIZE, invPage * INV_PAGE_SIZE);
+  useEffect(() => { setInvPage(1); }, [search, filterStatus, filterPackage, filterTime]);
+
   const openCreate = () => {
     setEditingInvoice(null);
     setForm(blankForm());
@@ -755,7 +762,7 @@ const SuperAdminInvoicePage = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {filtered.map(inv => {
+                  {pagedInvoices.map(inv => {
                     const effectiveStatus = getInvoiceStatus(inv);
                     const cfg = STATUS_CONFIG[effectiveStatus] || STATUS_CONFIG.unpaid;
                     const StatusIcon = cfg.icon;
@@ -855,9 +862,37 @@ const SuperAdminInvoicePage = () => {
               </table>
             </div>
 
+            {/* Pagination */}
+            {invTotalPages > 1 && (
+              <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100 bg-slate-50/50">
+                <p className="text-[11px] text-slate-500 font-medium">
+                  Halaman {invPage} dari {invTotalPages} • {filtered.length} invoice
+                </p>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setInvPage(p => Math.max(1, p - 1))}
+                    disabled={invPage === 1}
+                    className="min-w-[36px] min-h-[36px] px-2 rounded-lg border border-slate-200 bg-white text-slate-600 text-xs font-bold hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                  >
+                    ‹
+                  </button>
+                  <span className="text-xs font-bold text-slate-700 px-2">{invPage} / {invTotalPages}</span>
+                  <button
+                    type="button"
+                    onClick={() => setInvPage(p => Math.min(invTotalPages, p + 1))}
+                    disabled={invPage === invTotalPages}
+                    className="min-w-[36px] min-h-[36px] px-2 rounded-lg border border-slate-200 bg-white text-slate-600 text-xs font-bold hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                  >
+                    ›
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Mobile Card List View */}
             <div className="md:hidden divide-y divide-slate-100">
-              {filtered.map(inv => {
+              {pagedInvoices.map(inv => {
                 const effectiveStatus = getInvoiceStatus(inv);
                 const cfg = STATUS_CONFIG[effectiveStatus] || STATUS_CONFIG.unpaid;
                 const StatusIcon = cfg.icon;
