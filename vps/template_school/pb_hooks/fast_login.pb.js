@@ -71,8 +71,31 @@ routerAdd("POST", "/api/fast-login", (c) => {
     try { c.setResponseHeader("Access-Control-Allow-Headers", "Content-Type, Authorization"); } catch (e) {}
 
     try {
+        // Pepper: prioritas 1 = env var, prioritas 2 = file lokal (auto-generate),
+        // prioritas 3 = tolak (tidak ada pepper = tidak aman).
         var pepper = "";
         try { pepper = $os.getenv("FAST_LOGIN_PEPPER") || ""; } catch (e) {}
+        if (!pepper) {
+            // Auto-generate: simpan di file persisten di luar pb_data
+            // (tidak ikut backup DB, tapi survive reboot).
+            // Lokasi: <dataDir>/../fastlogin_pepper.key
+            try {
+                var dataDir = "";
+                try { dataDir = $app.dataDir() || ""; } catch (e) {}
+                var pepperFile = (dataDir ? dataDir + "/../fastlogin_pepper.key" : "./fastlogin_pepper.key");
+                var saved = "";
+                try { saved = String($os.readFile(pepperFile) || "").trim(); } catch (e) {}
+                if (saved && saved.length >= 32) {
+                    pepper = saved;
+                } else {
+                    var _chars = "0123456789abcdef", _p = "";
+                    for (var _i = 0; _i < 64; _i++) _p += _chars[Math.floor(Math.random() * 16)];
+                    try { $os.writeFile(pepperFile, _p, 0600); } catch (e) {}
+                    pepper = _p;
+                    try { console.log("[FAST_LOGIN] pepper auto-generated: " + pepperFile); } catch (e) {}
+                }
+            } catch (e) {}
+        }
         if (!pepper) return c.json(500, { message: "Fast login belum dikonfigurasi." });
 
         // --- Rate limit sederhana: max 60 req/menit per IP ---
