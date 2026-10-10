@@ -49,6 +49,18 @@ Perintah di atas otomatis menyinkronkan ke 7 tempat:
 
 **Catatan:** `is_force_update` di `app_settings` TIDAK diubah otomatis — tetap dikontrol manual via dashboard superadmin.
 
+## Cara Cek Versi Saat Ini
+
+```bash
+# Lihat versionName (dari package.json)
+npm run version:set
+# Output: "Versi saat ini: 1.1.19"
+
+# Lihat versionCode (dari build.gradle)
+grep "versionCode" android/app/build.gradle
+# Output: versionCode 21
+```
+
 ## Alur Rilis Normal
 
 ```bash
