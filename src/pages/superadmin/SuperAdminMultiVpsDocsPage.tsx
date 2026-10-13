@@ -1312,6 +1312,23 @@ Proxy ke localhost:PORT     Proxy ke http://IP_WORKER:PORT
                 </p>
                 <CommandSnippet code="systemctl status pb-<slug>.service --no-pager" />
               </div>
+
+              {/* Masalah 4 */}
+              <div className="p-4 rounded-xl border border-slate-200 bg-white shadow-xs space-y-1.5">
+                <p className="font-bold text-slate-900 text-sm flex items-center gap-1.5 text-blue-700">
+                  <AlertCircle size={15} /> 4. Login Siswa Nyangkut di "Memverifikasi..." (Tenant Baru)
+                </p>
+                <p className="text-slate-600 leading-relaxed">
+                  <strong>Penyebab:</strong> Service tenant tidak punya env <code className="font-mono bg-slate-100 px-1 py-0.5 rounded text-slate-800">FAST_LOGIN_PEPPER</code>, sehingga endpoint <code className="font-mono bg-slate-100 px-1 py-0.5 rounded text-slate-800">/api/fast-login</code> hang dan tombol login tidak pernah selesai.
+                </p>
+                <p className="text-slate-600 leading-relaxed">
+                  <strong>Solusi:</strong> Tambahkan pepper acak ke service file tenant, lalu restart:
+                </p>
+                <CommandSnippet code={'PEPPER=$(head -c 32 /dev/urandom | od -A n -t x1 | tr -d " \\n")\nsudo sed -i "/^\\[Service\\]/a Environment=FAST_LOGIN_PEPPER=$PEPPER" /etc/systemd/system/pb-<slug>.service\nsudo systemctl daemon-reload && sudo systemctl restart pb-<slug>.service'} />
+                <p className="text-slate-600 leading-relaxed">
+                  <strong>Verifikasi:</strong> <code className="font-mono bg-slate-100 px-1 py-0.5 rounded text-slate-800">curl -m 10 -X POST https://&lt;slug&gt;.examku.my.id/api/fast-login -H "Content-Type: application/json" -d '{"{"}"username":"x","password":"y"{"}"}'</code> harus membalas dalam ~1 detik (400 untuk kredensial salah), bukan timeout.
+                </p>
+              </div>
             </div>
           </section>
         </main>
