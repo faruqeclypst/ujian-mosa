@@ -1,7 +1,7 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.alfaruqasri.ujian',
+  appId: 'examku.alfaprojects.com',
   appName: 'EXAMKU',
   webDir: 'dist-shell',
   server: {

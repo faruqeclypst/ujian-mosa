@@ -281,7 +281,7 @@ const AppRouter = () => {
   const [isBrowserAppMode, setIsBrowserAppMode] = useState(false);
 
   useEffect(() => {
-    // Aplikasi browser (com.alfaruqasri.ujian.browser) langsung ke /browser,
+    // Aplikasi browser (examku.alfaprojects.com.browser) langsung ke /browser,
     // tidak load examku. Custom URL browser untuk Google Form dll.
     getAppId().then((id) => {
       if (isBrowserApp(id) && location.pathname !== "/browser") {

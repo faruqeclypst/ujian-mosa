@@ -1,5 +1,5 @@
 {
-  "id": "com.alfaruqasri.ujian.browser",
+  "id": "examku.alfaprojects.com.browser",
   "name": "EXAMKU Browser",
   "webDir": "dist-browser",
   "targetApk": "exam-aa-browser-latest.apk",

@@ -5,9 +5,9 @@ let cachedAppId: string | null = null;
 
 /**
  * Ambil application ID dari native app.
- * - com.alfaruqasri.ujian = EXAM AA (utama, online)
- * - com.alfaruqasri.ujian.browser = EXAM AA Browser (custom URL browser)
- * - com.alfaruqasri.ujian.local = EXAMKU Local (offline)
+ * - examku.alfaprojects.com = EXAM AA (utama, online)
+ * - examku.alfaprojects.com.browser = EXAM AA Browser (custom URL browser)
+ * - examku.alfaprojects.com.local = EXAMKU Local (offline)
  * Di web browser biasa, return null.
  */
 export async function getAppId(): Promise<string | null> {
@@ -31,9 +31,9 @@ export function getCachedAppId(): string | null {
 }
 
 export const APP_IDS = {
-  main: "com.alfaruqasri.ujian",
-  browser: "com.alfaruqasri.ujian.browser",
-  local: "com.alfaruqasri.ujian.local",
+  main: "examku.alfaprojects.com",
+  browser: "examku.alfaprojects.com.browser",
+  local: "examku.alfaprojects.com.local",
 } as const;
 
 export function isMainApp(appId: string | null): boolean {

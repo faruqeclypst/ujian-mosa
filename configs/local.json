@@ -1,5 +1,5 @@
 {
-  "id": "com.alfaruqasri.ujian.local",
+  "id": "examku.alfaprojects.com.local",
   "name": "EXAMKU Local",
   "webDir": "dist-shell",
   "targetApk": "examku-local.apk",

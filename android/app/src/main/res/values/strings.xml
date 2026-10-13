@@ -2,6 +2,6 @@
 <resources>
     <string name="app_name">EXAMKU</string>
     <string name="title_activity_main">EXAMKU</string>
-    <string name="package_name">com.alfaruqasri.ujian</string>
-    <string name="custom_url_scheme">com.alfaruqasri.ujian</string>
+    <string name="package_name">examku.alfaprojects.com</string>
+    <string name="custom_url_scheme">examku.alfaprojects.com</string>
 </resources>
