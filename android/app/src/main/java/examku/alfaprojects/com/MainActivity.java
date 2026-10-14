@@ -95,6 +95,19 @@ public class MainActivity extends BridgeActivity {
         @android.webkit.JavascriptInterface
         public String getDeviceIpAddress() {
             try {
+                // Prioritas 1: WifiManager (paling cepat dan akurat saat terhubung Wi-Fi lab)
+                try {
+                    android.net.wifi.WifiManager wm = (android.net.wifi.WifiManager) getApplicationContext().getSystemService(android.content.Context.WIFI_SERVICE);
+                    if (wm != null) {
+                        int ip = wm.getConnectionInfo().getIpAddress();
+                        if (ip != 0) {
+                            return String.format(java.util.Locale.US, "%d.%d.%d.%d",
+                                (ip & 0xff), (ip >> 8 & 0xff), (ip >> 16 & 0xff), (ip >> 24 & 0xff));
+                        }
+                    }
+                } catch (Exception ignored) {}
+
+                // Prioritas 2: NetworkInterface (mendukung LAN kabel / ethernet / hotspot)
                 java.util.List<java.net.NetworkInterface> interfaces = java.util.Collections.list(java.net.NetworkInterface.getNetworkInterfaces());
                 for (java.net.NetworkInterface intf : interfaces) {
                     if (intf.isLoopback() || !intf.isUp()) continue;
@@ -106,6 +119,22 @@ public class MainActivity extends BridgeActivity {
                                 return sAddr;
                             }
                         }
+                    }
+                }
+            } catch (Exception ignored) {}
+            return "";
+        }
+
+        @android.webkit.JavascriptInterface
+        public String getGatewayIpAddress() {
+            try {
+                android.net.wifi.WifiManager wm = (android.net.wifi.WifiManager) getApplicationContext().getSystemService(android.content.Context.WIFI_SERVICE);
+                if (wm != null) {
+                    android.net.DhcpInfo dhcp = wm.getDhcpInfo();
+                    if (dhcp != null && dhcp.gateway != 0) {
+                        int gw = dhcp.gateway;
+                        return String.format(java.util.Locale.US, "%d.%d.%d.%d",
+                            (gw & 0xff), (gw >> 8 & 0xff), (gw >> 16 & 0xff), (gw >> 24 & 0xff));
                     }
                 }
             } catch (Exception ignored) {}

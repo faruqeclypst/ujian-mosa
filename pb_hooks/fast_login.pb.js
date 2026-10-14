@@ -84,9 +84,22 @@ routerAdd("POST", "/api/fast-login", (c) => {
             try {
                 var dataDir = "";
                 try { dataDir = $app.dataDir() || ""; } catch (e) {}
-                var pepperFile = (dataDir ? dataDir + "/../fastlogin_pepper.key" : "./fastlogin_pepper.key");
+                var pepperFile = dataDir ? (dataDir.replace(/\\/g, "/") + "/../fastlogin_pepper.key") : "./fastlogin_pepper.key";
                 var saved = "";
-                try { saved = String($os.readFile(pepperFile) || "").trim(); } catch (e) {}
+                try {
+                    var _raw = $os.readFile(pepperFile);
+                    if (_raw) {
+                        if (typeof _raw === "string") {
+                            saved = _raw.trim();
+                        } else if (_raw.length !== undefined) {
+                            var _str = "";
+                            for (var _si = 0; _si < _raw.length; _si++) {
+                                _str += String.fromCharCode(_raw[_si]);
+                            }
+                            saved = _str.trim();
+                        }
+                    }
+                } catch (e) {}
                 if (saved && saved.length >= 32) {
                     pepper = saved;
                 } else {

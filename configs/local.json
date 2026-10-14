@@ -1,7 +1,7 @@
 {
   "id": "examku.alfaprojects.com.local",
   "name": "EXAMKU Local",
-  "webDir": "dist-shell",
+  "webDir": "dist",
   "targetApk": "examku-local.apk",
   "vpsLink": "examku-local"
 }

@@ -43,18 +43,27 @@ routerAdd("POST", "/api/ai-proxy", (c) => {
         }
 
         const settings = $app.findFirstRecordByFilter("settings", "id != ''");
-        const isSuper = info.auth && info.auth.collection().name === "_superusers";
-        if (!settings) return c.json(500, { error: "Settings tidak ditemukan" });
-        
         const bodyData = info.body || {};
-        let apiKey = settings.getString("ai_gateway_key") || settings.getString("groq_api_key");
-        let baseUrl = settings.getString("ai_gateway_url") || "https://api.groq.com";
-        let model = settings.getString("ai_model") || "llama-3.1-8b-instant";
-        if (isSuper && bodyData.apiKey) apiKey = bodyData.apiKey;
-        if (isSuper && bodyData.baseUrl) baseUrl = bodyData.baseUrl;
-        if (isSuper && bodyData.model) model = bodyData.model;
-        if (!apiKey) return c.json(500, { error: "AI belum dikonfigurasi di server" });
+        
+        let apiKey = (settings ? (settings.getString("ai_gateway_key") || settings.getString("groq_api_key")) : "");
+        let baseUrl = (settings ? settings.getString("ai_gateway_url") : "") || "https://api.groq.com";
+        let model = (settings ? settings.getString("ai_model") : "") || "llama-3.1-8b-instant";
+        
+        // Izinkan guru/admin yang terotentikasi membawa API Key, Base URL, atau Model pribadi/khusus
+        if (bodyData.apiKey && typeof bodyData.apiKey === "string" && bodyData.apiKey.trim()) {
+            apiKey = bodyData.apiKey.trim();
+        }
+        if (bodyData.baseUrl && typeof bodyData.baseUrl === "string" && bodyData.baseUrl.trim()) {
+            baseUrl = bodyData.baseUrl.trim();
+        }
+        if (bodyData.model && typeof bodyData.model === "string" && bodyData.model.trim()) {
+            model = bodyData.model.trim();
+        }
 
+        const isOllama = baseUrl.includes("ollama") || baseUrl.includes(":11434") || baseUrl.includes("localhost") || baseUrl.includes("127.0.0.1");
+        if (!isOllama && !apiKey) {
+            return c.json(400, { error: "API Key AI belum diatur. Silakan masukkan API Key di Pengaturan AI." });
+        }
         
         const msgs = bodyData["messages"] || [];
         const msgArray = [];
@@ -80,13 +89,15 @@ routerAdd("POST", "/api/ai-proxy", (c) => {
         const finalUrl = chatUrl(baseUrl);
         console.log("[PROXY] forwarding to " + finalUrl + " model " + model);
 
+        const reqHeaders = { "Content-Type": "application/json" };
+        if (apiKey && apiKey !== "no-key" && !isOllama) {
+            reqHeaders["Authorization"] = "Bearer " + apiKey;
+        }
+
         const res = $http.send({
             url: finalUrl,
             method: "POST",
-            headers: {
-                "Authorization": "Bearer " + apiKey,
-                "Content-Type": "application/json"
-            },
+            headers: reqHeaders,
             body: JSON.stringify(reqBody)
         });
 
@@ -98,8 +109,8 @@ routerAdd("POST", "/api/ai-proxy", (c) => {
         }
         return c.json(res.statusCode, result);
     } catch (e) {
-        console.log("[PROXY] CRASH: " + e.message);
-        return c.json(500, { error: e.message });
+        console.log("[PROXY] CRASH: " + (e && e.message ? e.message : String(e)));
+        return c.json(500, { error: (e && e.message ? e.message : String(e)) });
     }
 });
 
@@ -135,17 +146,25 @@ routerAdd("POST", "/api/ai-proxy-models", (c) => {
         }
 
         const settings = $app.findFirstRecordByFilter("settings", "id != ''");
-        const isSuper = info.auth && info.auth.collection().name === "_superusers";
-        if (!settings) return c.json(500, { error: "Settings tidak ditemukan" });
         const bodyData = info.body || {};
-        let apiKey = settings.getString("ai_gateway_key") || settings.getString("groq_api_key");
-        let baseUrl = settings.getString("ai_gateway_url") || "https://api.groq.com";
-        if (isSuper && bodyData.apiKey) apiKey = bodyData.apiKey;
-        if (isSuper && bodyData.baseUrl) baseUrl = bodyData.baseUrl;
-        if (!apiKey) return c.json(500, { error: "AI belum dikonfigurasi di server" });
+        
+        let apiKey = (settings ? (settings.getString("ai_gateway_key") || settings.getString("groq_api_key")) : "");
+        let baseUrl = (settings ? settings.getString("ai_gateway_url") : "") || "https://api.groq.com";
+        
+        if (bodyData.apiKey && typeof bodyData.apiKey === "string" && bodyData.apiKey.trim()) {
+            apiKey = bodyData.apiKey.trim();
+        }
+        if (bodyData.baseUrl && typeof bodyData.baseUrl === "string" && bodyData.baseUrl.trim()) {
+            baseUrl = bodyData.baseUrl.trim();
+        }
+
+        const isOllama = baseUrl.includes("ollama") || baseUrl.includes(":11434") || baseUrl.includes("localhost") || baseUrl.includes("127.0.0.1");
+        if (!isOllama && !apiKey) {
+            return c.json(400, { error: "AI belum dikonfigurasi di server" });
+        }
 
         let modelsUrl = baseUrl.replace(/\/$/, "");
-        if (baseUrl.includes("ollama.com") || baseUrl.includes(":11434")) {
+        if (isOllama) {
             modelsUrl = modelsUrl + "/api/tags";
         } else {
             modelsUrl = modelsUrl + "/models";
@@ -153,13 +172,15 @@ routerAdd("POST", "/api/ai-proxy-models", (c) => {
 
         console.log("[PROXY-MODELS] fetching: " + modelsUrl);
 
+        const reqHeaders = { "Content-Type": "application/json" };
+        if (apiKey && apiKey !== "no-key" && !isOllama) {
+            reqHeaders["Authorization"] = "Bearer " + apiKey;
+        }
+
         const res = $http.send({
             url: modelsUrl,
             method: "GET",
-            headers: {
-                "Authorization": "Bearer " + apiKey,
-                "Content-Type": "application/json"
-            }
+            headers: reqHeaders
         });
 
         let result = {};

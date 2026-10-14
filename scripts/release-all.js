@@ -113,13 +113,12 @@ try {
   if (fs.existsSync(updateZipName)) fs.unlinkSync(updateZipName);
   if (fs.existsSync('version.json')) fs.unlinkSync('version.json');
 
-  // Sinkronkan juga ke folder test offline lokal jika ada (misal Music)
-  const musicOfflineDir = 'C:\\Users\\Admin\\Music\\exam aa sd\\offline_package';
-  if (fs.existsSync(musicOfflineDir)) {
+  // Sinkronkan folder repo offline_package lokal agar selalu identik dengan rilis terbaru
+  if (fs.existsSync('offline_package')) {
     try {
-      execSync(`powershell -Command "Copy-Item offline_package/pb_hooks/* '${musicOfflineDir}\\pb_hooks\\' -Recurse -Force"`, { stdio: 'ignore' });
-      execSync(`powershell -Command "Copy-Item offline_package/pb_public/* '${musicOfflineDir}\\pb_public\\' -Recurse -Force"`, { stdio: 'ignore' });
-      console.log('✅ Sinkronisasi otomatis ke folder pengujian offline lokal berhasil!');
+      execSync(`powershell -Command "Copy-Item pb_hooks/* offline_package/pb_hooks/ -Recurse -Force"`, { stdio: 'ignore' });
+      execSync(`powershell -Command "Copy-Item dist/* offline_package/pb_public/ -Recurse -Force"`, { stdio: 'ignore' });
+      console.log('✅ Sinkronisasi otomatis ke offline_package lokal berhasil!');
     } catch {}
   }
   console.log('✅ Berkas Offline 1-Click Update berhasil dipublikasikan di CDN Examku!');

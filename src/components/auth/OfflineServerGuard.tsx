@@ -10,20 +10,23 @@ export const OfflineServerGuard: React.FC<{ children: React.ReactNode }> = ({ ch
   const [verification, setVerification] = useState<VerificationResult | null>(null);
   const [licenseCode, setLicenseCode] = useState<string | null>(null);
 
+  const isLocal = school?.id === "local_server" || school?.slug === "local" || (school?.id ? school.id.startsWith("local_server") : false);
+
   const checkLicense = async () => {
     // Hanya berlaku ketika sistem berjalan di server lokal mandiri (offline)
-    if (school?.id !== "local_server") {
+    if (!isLocal) {
       setChecking(false);
       return;
     }
 
     setChecking(true);
     let code = school?.offline_license || null;
+    const effectiveOrigin = (school?.pb_url || pb?.baseUrl || (typeof window !== "undefined" ? window.location.origin : "")).replace(/\/+$/, "");
 
     // 1. Coba baca dari dedicated endpoint /api/offline-license jika belum ada
-    if (!code) {
+    if (!code && effectiveOrigin) {
       try {
-        const resp = await fetch(`${window.location.origin}/api/offline-license`);
+        const resp = await fetch(`${effectiveOrigin}/api/offline-license`);
         if (resp.ok) {
           const data = await resp.json();
           if (data.license) {
@@ -36,9 +39,9 @@ export const OfflineServerGuard: React.FC<{ children: React.ReactNode }> = ({ ch
     }
 
     // 2. Coba baca dari tabel settings database server secara langsung
-    if (!code) {
+    if (!code && effectiveOrigin) {
       try {
-        const resp = await fetch(`${window.location.origin}/api/collections/settings/records?limit=1`);
+        const resp = await fetch(`${effectiveOrigin}/api/collections/settings/records?limit=1`);
         if (resp.ok) {
           const data = await resp.json();
           if (data.items && data.items.length > 0 && data.items[0].offline_license) {
@@ -99,7 +102,7 @@ export const OfflineServerGuard: React.FC<{ children: React.ReactNode }> = ({ ch
   }, [school?.id, school?.offline_license, loading]);
 
   // Jika bukan server lokal offline mandiri, langsung lewati tanpa proteksi offline
-  if (school?.id !== "local_server") {
+  if (!isLocal) {
     return <>{children}</>;
   }
 

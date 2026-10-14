@@ -11,6 +11,18 @@
       submit (status=finished) dari siswa — nilai dari
       client tidak lagi dipercaya. Guru/admin (users)
       tetap bisa override manual (untuk nilai uraian).
+   3b.Kunci answers setelah final + tolak tulisan basi:
+      - jika status tersimpan sudah finished/submitted dan pengupdate
+        adalah siswa, perubahan field answers diabaikan (dikembalikan
+        ke versi tersimpan); heartbeat & field lain tetap boleh lewat.
+      - jika rev jawaban yang masuk < rev tersimpan (request basi yang
+        tiba terlambat, mis. autosave in-flight setelah submit),
+        answers dikembalikan ke versi tersimpan.
+      Penolakan dilakukan diam-diam (tanpa error) agar alur sync ulang
+      otomatis di dashboard siswa tidak pecah.
+   3c.answeredCount: dihitung server-side tiap update attempts (jumlah key
+      jawaban non-meta) agar monitoring room besar bisa tampilkan progres
+      tanpa mengunduh objek answers yang besar.
    4. Siswa hanya bisa melihat answers miliknya sendiri.
    5. Endpoint POST /api/verify-pin untuk validasi token
       ruangan di sisi server (rate-limit sederhana).
@@ -186,7 +198,8 @@ onRecordCreateRequest((e) => {
                     const given = String(studentAns).trim().toLowerCase();
                     if (expected && given === expected) objectiveCorrect++;
                 } else if (t === "pilihan_ganda") {
-                    if (options[studentAns] && options[studentAns].isCorrect === true) objectiveCorrect++;
+                    const ck = Object.keys(options).find(k => String(k).toLowerCase() === String(studentAns).toLowerCase());
+                    if (ck && options[ck] && options[ck].isCorrect === true) objectiveCorrect++;
                 } else if (t === "benar_salah") {
                     if (options.statements && Array.isArray(options.statements)) {
                         // format pernyataan: options.statements=[{id, answer:"benar"/"salah"}]
@@ -213,8 +226,9 @@ onRecordCreateRequest((e) => {
                             if (given === expected) stCorr++;
                         }
                         if (stCount > 0) objectiveCorrect += (stCorr / stCount);
-                    } else if (options[studentAns] && options[studentAns].isCorrect === true) {
+                    } else { const _ck = Object.keys(options).find(k => String(k).toLowerCase() === String(studentAns).toLowerCase()); if (_ck && options[_ck] && options[_ck].isCorrect === true) {
                         objectiveCorrect++;
+                    }
                     }
                 } else if (t === "pilihan_ganda_kompleks") {
                     const ckeys = Object.keys(options)
@@ -259,6 +273,9 @@ onRecordCreateRequest((e) => {
             ev.record.set("score", score);
             ev.record.set("correct", Math.floor(objectiveCorrect));
             ev.record.set("total", totalQuestions);
+            ev.record.set("objectiveCorrect", Math.floor(objectiveCorrect));
+            ev.record.set("objectiveTotal", objectiveTotal);
+            ev.record.set("objectiveScore", score);
             console.log("[SECURITY_FIX] Skor dihitung ulang di server untuk attempt " + ev.record.id +
                 " => " + score + " (" + Math.floor(objectiveCorrect) + "/" + totalQuestions + ")");
         } catch (err) {
@@ -377,8 +394,9 @@ onRecordUpdateRequest((e) => {
                             if (given === expected) stCorr++;
                         }
                         if (stCount > 0) objectiveCorrect += (stCorr / stCount);
-                    } else if (options[studentAns] && options[studentAns].isCorrect === true) {
+                    } else { const _ck = Object.keys(options).find(k => String(k).toLowerCase() === String(studentAns).toLowerCase()); if (_ck && options[_ck] && options[_ck].isCorrect === true) {
                         objectiveCorrect++;
+                    }
                     }
                 } else if (t === "pilihan_ganda_kompleks") {
                     const ckeys = Object.keys(options)
@@ -423,6 +441,12 @@ onRecordUpdateRequest((e) => {
             ev.record.set("score", score);
             ev.record.set("correct", Math.floor(objectiveCorrect));
             ev.record.set("total", totalQuestions);
+            try {
+                const colFields = ev.record.collection().fields;
+                if (colFields && colFields.getByName("objectiveCorrect")) ev.record.set("objectiveCorrect", Math.floor(objectiveCorrect));
+                if (colFields && colFields.getByName("objectiveTotal")) ev.record.set("objectiveTotal", objectiveTotal);
+                if (colFields && colFields.getByName("objectiveScore")) ev.record.set("objectiveScore", score);
+            } catch (_) {}
             console.log("[SECURITY_FIX] Skor dihitung ulang di server untuk attempt " + ev.record.id +
                 " => " + score + " (" + Math.floor(objectiveCorrect) + "/" + totalQuestions + ")");
         } catch (err) {
@@ -430,6 +454,99 @@ onRecordUpdateRequest((e) => {
         }
     }
     // --- akhir helper lokal ---
+    // --- 3a: delta merge untuk answers (hemat payload) ---
+    // Client bisa kirim hanya jawaban yang berubah dengan flag __delta:true.
+    // Server gabungkan dengan answers tersimpan, bukan menimpa seluruh object.
+    try {
+        if (e.record.collection().name === "attempts") {
+            const incoming = pj(e.record.get("answers"), null);
+            if (incoming && incoming.__delta === true) {
+                let stored = null;
+                try { stored = $app.findRecordById("attempts", e.record.id); } catch (x) {}
+                if (stored) {
+                    const storedAns = pj(stored.get("answers"), {}) || {};
+                    const merged = Object.assign({}, storedAns);
+                    for (const k in incoming) {
+                        if (k === "__delta") continue;
+                        merged[k] = incoming[k];
+                    }
+                    // Pastikan __meta.rev dari delta dipakai (lebih baru)
+                    e.record.set("answers", merged);
+                }
+                // Hapus flag __delta agar tidak tersimpan
+                const cur = pj(e.record.get("answers"), {});
+                if (cur) { delete cur.__delta; e.record.set("answers", cur); }
+            }
+        }
+    } catch (err) {
+        console.error("[SECURITY_FIX] delta merge error:", err);
+    }
+    // --- 3b: kunci answers setelah final + tolak tulisan basi (siswa) ---
+    // Mencegah race autosave-vs-submit: autosave yang tiba terlambat tidak boleh
+    // menimpa answers final, dan request basi (rev lebih tua) tidak boleh menimpa
+    // jawaban yang lebih baru. Heartbeat & field lain tetap boleh lewat.
+    // Penolakan diam-diam (tanpa error) agar sync ulang dashboard tidak pecah.
+    try {
+        if (e.record.collection().name === "attempts") {
+            let auth = null;
+            try { if (e.requestInfo && e.requestInfo.auth) auth = e.requestInfo.auth; } catch (x) {}
+            const aname = authName(auth);
+            const isAdmin = (aname === "_superusers" || aname === "users");
+            if (!isAdmin) {
+                let stored = null;
+                try { stored = $app.findRecordById("attempts", e.record.id); } catch (x) {}
+                if (stored) {
+                    const storedStatus = stored.getString("status");
+                    const locked = (storedStatus === "finished" || storedStatus === "submitted");
+                    const revOf = (a) => {
+                        try {
+                            const n = parseInt(a && a.__meta && a.__meta.rev, 10);
+                            return isNaN(n) ? 0 : n;
+                        } catch (x) { return 0; }
+                    };
+                    const incomingAns = pj(e.record.get("answers"), null);
+                    const storedAns = pj(stored.get("answers"), null);
+                    const incomingRev = revOf(incomingAns);
+                    const storedRev = revOf(storedAns);
+                    let touched = false;
+                    try {
+                        touched = JSON.stringify(incomingAns) !== JSON.stringify(storedAns);
+                    } catch (x) { touched = true; }
+                    if (touched && (locked || incomingRev < storedRev)) {
+                        // Kembalikan answers ke versi tersimpan
+                        e.record.set("answers", stored.get("answers"));
+                        console.log("[SECURITY_FIX] answers DITOLAK untuk attempt " + e.record.id +
+                            " (locked=" + locked + ", rev masuk=" + incomingRev + ", rev tersimpan=" + storedRev + ")");
+                    }
+                }
+            }
+        }
+    } catch (err) {
+        console.error("[SECURITY_FIX] answer-lock error:", err);
+    }
+    // --- 3c: answeredCount ringan untuk monitoring room besar ---
+    // Dihitung server-side tiap update agar halaman monitoring bisa menampilkan
+    // progres ("sudah jawab X soal") TANPA mengunduh objek answers yang besar.
+    // Murah: tanpa query tambahan, hanya hitung key jawaban.
+    try {
+        if (e.record.collection().name === "attempts") {
+            const ans = pj(e.record.get("answers"), null);
+            if (ans && typeof ans === "object") {
+                let n = 0;
+                for (const k in ans) {
+                    if (!k.startsWith("__")) n++;
+                }
+                try {
+                    const colFields = e.record.collection().fields;
+                    if (colFields && colFields.getByName("answeredCount")) {
+                        e.record.set("answeredCount", n);
+                    }
+                } catch (_) {}
+            }
+        }
+    } catch (err) {
+        console.error("[SECURITY_FIX] answeredCount error:", err);
+    }
     try {
         if (e.record.collection().name === "attempts") doRecalc(e);
     } catch (err) {

@@ -2,7 +2,8 @@
 // Fast Login untuk siswa — alternatif ringan pengganti bcrypt
 // POST /api/fast-login { username, password }
 // Verifikasi: SHA-256(pepper + username + password) vs field fastHash
-// Pepper dari env FAST_LOGIN_PEPPER (disarankan) atau auto-generate via /dev/urandom.
+// Pepper dari env FAST_LOGIN_PEPPER (disarankan) atau auto-generate non-blocking
+// (JANGAN baca /dev/urandom via $os.readFile: hang tanpa EOF di goja).
 // Rate limit: 20/menit per-akun + 2000/menit per-IP (ramah NAT sekolah).
 // HANYA untuk collection "students".
 // CATATAN: semua helper inline di handler (binding top-level
@@ -83,35 +84,45 @@ routerAdd("POST", "/api/fast-login", (c) => {
             try {
                 var dataDir = "";
                 try { dataDir = $app.dataDir() || ""; } catch (e) {}
-                var pepperFile = (dataDir ? dataDir + "/../fastlogin_pepper.key" : "./fastlogin_pepper.key");
+                var pepperFile = dataDir ? (dataDir.replace(/\\/g, "/") + "/../fastlogin_pepper.key") : "./fastlogin_pepper.key";
                 var saved = "";
-                try { saved = String($os.readFile(pepperFile) || "").trim(); } catch (e) {}
+                try {
+                    var _raw = $os.readFile(pepperFile);
+                    if (_raw) {
+                        if (typeof _raw === "string") {
+                            saved = _raw.trim();
+                        } else if (_raw.length !== undefined) {
+                            var _str = "";
+                            for (var _si = 0; _si < _raw.length; _si++) {
+                                _str += String.fromCharCode(_raw[_si]);
+                            }
+                            saved = _str.trim();
+                        }
+                    }
+                } catch (e) {}
                 if (saved && saved.length >= 32) {
                     pepper = saved;
                 } else {
-                    // CSPRNG: baca dari /dev/urandom (Linux) untuk pepper yang aman.
-                    // Math.random() TIDAK aman untuk secret kriptografi.
+                    // JANGAN baca /dev/urandom via $os.readFile: di goja itu blocking
+                    // tanpa EOF (pernah bikin /api/fast-login hang + CPU 100% di
+                    // tenant baru tanpa FAST_LOGIN_PEPPER, 2026-10-13). Pakai
+                    // campuran Math.random + timestamp + counter yang non-blocking.
+                    // Untuk produksi tetap disarankan set FAST_LOGIN_PEPPER via env.
                     var _p = "";
                     try {
-                        var _ur = $os.readFile("/dev/urandom");
-                        // Ambil 32 byte pertama, encode ke hex (64 char)
                         var _bytes = [];
-                        var _raw = String(_ur);
-                        for (var _bi = 0; _bi < 32 && _bi < _raw.length; _bi++) {
-                            _bytes.push(_raw.charCodeAt(_bi) & 0xff);
-                        }
-                        // Jika /dev/urandom tidak memberi cukup byte, fallback ke kombinasi
-                        // Math.random + timestamp + counter (lebih baik dari Math.random murni,
-                        // tapi tetap disarankan set FAST_LOGIN_PEPPER via env untuk produksi).
-                        while (_bytes.length < 32) {
-                            _bytes.push(Math.floor(Math.random() * 256) ^ (Date.now() & 0xff) ^ _bytes.length);
+                        var _seed = Date.now() ^ (Math.floor(Math.random() * 0xffffffff) >>> 0);
+                        for (var _bi = 0; _bi < 32; _bi++) {
+                            _seed = ((_seed * 1103515245 + 12345) & 0x7fffffff) >>> 0;
+                            _bytes.push((_seed ^ Math.floor(Math.random() * 256) ^ (Date.now() & 0xff) ^ _bi) & 0xff);
                         }
                         var _hex = "0123456789abcdef";
                         for (var _hi = 0; _hi < 32; _hi++) {
                             _p += _hex[(_bytes[_hi] >> 4) & 0xf] + _hex[_bytes[_hi] & 0xf];
                         }
+                        try { console.log("[FAST_LOGIN] WARNING: pepper auto-generated without env, set FAST_LOGIN_PEPPER via env for production!"); } catch (_) {}
                     } catch (e) {
-                        // Fallback terakhir jika $os.readFile gagal total
+                        // Fallback terakhir jika generasi di atas gagal total
                         var _chars = "0123456789abcdef";
                         for (var _i = 0; _i < 64; _i++) _p += _chars[Math.floor(Math.random() * 16)];
                         try { console.log("[FAST_LOGIN] WARNING: pepper generated without CSPRNG, set FAST_LOGIN_PEPPER env!"); } catch (_) {}

@@ -89,6 +89,13 @@ const TenantContext = createContext<TenantContextValue | undefined>(undefined);
 // Slug & Custom Domain Resolver
 // ============================================================
 function resolveSlugFromUrl(): { slug: string | null; customDomain: string | null; isLanding: boolean } {
+  // Di aplikasi native Android/iOS (Capacitor), web assets dimuat dari localhost/bundled storage.
+  // URL tidak merefleksikan domain/subdomain sekolah online.
+  // Pilihan sekolah/server harus ditentukan secara eksplisit melalui manualSlug / localStorage.
+  if (Capacitor.isNativePlatform()) {
+    return { slug: null, customDomain: null, isLanding: true };
+  }
+
   const hostname = window.location.hostname.toLowerCase();
   const mainDomain = (import.meta.env.VITE_MAIN_DOMAIN || 'examku.my.id').toLowerCase();
   const landingSubdomain = (import.meta.env.VITE_LANDING_SUBDOMAIN || 'ujian').toLowerCase();
@@ -280,7 +287,7 @@ export const TenantProvider = ({ children }: { children: ReactNode }) => {
     const resolveSchool = async () => {
       // [FIX] Cache hanya untuk paint instan (0ms). Data TIDAK BOLEH basi:
       // selalu revalidasi ke server setiap mount/ganti slug (stale-while-revalidate).
-      // Sebelumnya early-return di sini membuat cache dipakai selamanya —
+      // Sebelumnya early-return di sini membuat cache dipakai selamanya:
       // paket yang sudah di-upgrade di DB tetap tampil "Free" di tenant.
       // Dikecualikan hanya untuk override slug manual (pilihan eksplisit pengguna).
       const isManualOverride = !!(allowManualSlug && manualSlug);
@@ -291,13 +298,16 @@ export const TenantProvider = ({ children }: { children: ReactNode }) => {
       // 0. Mode Server Mandiri / Standalone Offline CBT
       if (slug === 'local') {
         try {
+          const isNative = Capacitor.isNativePlatform();
           const isPrivateIp = /^(192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+)$/.test(window.location.hostname);
-          const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+          const isLocalhostBrowser = !isNative && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
           const savedLocalUrl = typeof window !== 'undefined' ? localStorage.getItem('local_server_url') : null;
 
-          const targetOrigin = (isLocalhost || isPrivateIp)
-            ? window.location.origin
-            : (savedLocalUrl || 'http://localhost:8090');
+          const targetOrigin = savedLocalUrl
+            ? savedLocalUrl.replace(/\/+$/, '')
+            : (isLocalhostBrowser || isPrivateIp)
+              ? window.location.origin
+              : 'http://localhost:8090';
 
           const localPb = getSchoolPb(targetOrigin);
           let schoolName = 'EXAMKU - Server Lokal';

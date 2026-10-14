@@ -89,18 +89,33 @@ Jika Anda mengubah tampilan, komponen React, atau styling di `src/`:
 ---
 
 ### C. Alur Build & Rilis APK Mobile (Exambro)
-Jika Anda memperbarui aplikasi Android Exambro:
+Jika Anda memperbarui aplikasi Android:
 
-1. **Pilih Profil Aplikasi**:
+1. **Pilih Profil Aplikasi (Build Satuan)**:
    ```bash
-   npm run switch:examaa      # Mode Exam AA (Aplikasi Resmi Ujian)
-   # atau
-   npm run switch:browser     # Mode Browser Biasa
+   npm run switch:examaa      # 1. EXAMKU Utama (CBT Online Resmi)
+   npm run switch:browser     # 2. EXAMKU Browser (Custom URL Browser)
+   npm run switch:local       # 3. EXAMKU Local (Server Mandiri Offline)
    ```
-2. **Build dan Kirim APK ke Server**:
+2. **Build dan Kirim APK Satuan ke Server**:
    ```bash
    npm run deploy:apk
    ```
+3. **Atau Build & Deploy Ketiga Versi APK Sekaligus**:
+   ```bash
+   npm run deploy:apks
+   ```
+
+#### 🌐 Endpoint Unduhan APK di Server:
+1. **EXAMKU Utama (Online)**:
+   - https://examku.my.id/exam-aa-latest
+   - https://examku.my.id/exam-aa-latest.apk (alias: https://examku.my.id/app-debug.apk)
+2. **EXAMKU Browser**:
+   - https://examku.my.id/exam-aa-browser-latest
+   - https://examku.my.id/exam-aa-browser-latest.apk
+3. **EXAMKU Local (Offline Server)**:
+   - https://examku.my.id/examku-local
+   - https://examku.my.id/examku-local.apk
 
 ---
 
@@ -134,11 +149,12 @@ Sekolah pengguna Server Offline Mandiri dapat memperbarui server dengan dua cara
 | `npm run deploy:vps` | Build frontend dan deploy langsung ke server web VPS | Master VPS (`/opt/frontend/ujian/dist`) |
 | `npm run push:template` | Push `pb_hooks` dan database template lokal ke template VPS | Template Master VPS & Worker VPS |
 | `npm run sync:tenants` | Push template sekaligus sinkronisasi ke seluruh sekolah aktif | Seluruh tenant di Master & Worker |
-| `npm run switch:examaa` | Switch konfigurasi Android ke mode Exam AA | `capacitor.config.ts` & native Android |
-| `npm run switch:browser`| Switch konfigurasi Android ke mode Browser | `capacitor.config.ts` & native Android |
+| `npm run switch:examaa` | Switch konfigurasi Android ke mode EXAMKU Utama | `capacitor.config.ts` & native Android |
+| `npm run switch:browser`| Switch konfigurasi Android ke mode EXAMKU Browser | `capacitor.config.ts` & native Android |
+| `npm run switch:local`  | Switch konfigurasi Android ke mode EXAMKU Local | `capacitor.config.ts` & native Android |
 | `npm run switch` | Menu interaktif pemilihan profil aplikasi | Terminal CLI |
-| `npm run deploy:apk` | Build APK Android dan rilis otomatis ke server download | `https://examku.my.id/app-debug.apk` |
-| `npm run deploy:apks` | Build dan deploy kedua versi APK sekaligus | Server download VPS |
+| `npm run deploy:apk` | Build APK profil aktif dan rilis ke server | Endpoint APK profil aktif |
+| `npm run deploy:apks` | Build dan deploy ketiga versi APK sekaligus | Server download VPS (Utama, Browser, Local) |
 | `npm run lint` | Pengecekan standar kode (ESLint) | Local environment |
 | `npm run format` | Memformat kode secara otomatis (Prettier) | Local codebase |
 

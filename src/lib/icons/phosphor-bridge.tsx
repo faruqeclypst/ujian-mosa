@@ -80,6 +80,7 @@ export const Forward = createIcon(P.ArrowFatRight);
 export const Globe = createIcon(P.Globe);
 export const GraduationCap = createIcon(P.GraduationCap);
 export const GripVertical = createIcon(P.DotsSixVertical);
+export const HardDrive = createIcon(P.HardDrives);
 export const Hash = createIcon(P.Hash);
 export const HelpCircle = createIcon(P.Question);
 export const Home = createIcon(P.House);

@@ -508,8 +508,11 @@ const MonitoringPage = () => {
     }
     setMonitorPage(1);
   };
-  const [monitorTimeLeft, setMonitorTimeLeft] = useState(0);
+  const [monitorTimeLeft, setMonitorTimeLeft] = useState(30);
   const [isMonitorRefreshing, setIsMonitorRefreshing] = useState(false);
+  const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
+  const isRefreshingRef = useRef(false);
+  const lastTickRef = useRef(Date.now());
 
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -670,6 +673,7 @@ const MonitoringPage = () => {
     if (!id) return;
 
     setIsMonitorRefreshing(true);
+    isRefreshingRef.current = true;
     try {
       if (!pb) return;
       // 1. Ambil Data Ruangan jika belum ada
@@ -898,28 +902,52 @@ const MonitoringPage = () => {
       console.error("Refresh Monitor Error:", e);
     } finally {
       setIsMonitorRefreshing(false);
+      isRefreshingRef.current = false;
       setLoading(false);
+      setLastSyncTime(new Date());
     }
   }, [roomId, monitorRoom, monitorQuestions.length, pb, subjects, masterTeachers]);
+
+  // Pemicu penyegaran manual oleh pengawas / guru
+  const handleTriggerManualRefresh = useCallback(() => {
+    if (isRefreshingRef.current) return;
+    lastTickRef.current = Date.now();
+    setMonitorTimeLeft(isLargeRoom ? 45 : 30);
+    handleManualRefreshMonitor();
+  }, [isLargeRoom, handleManualRefreshMonitor]);
 
   // Initial Fetch
   useEffect(() => {
     handleManualRefreshMonitor();
   }, [roomId]);
 
-  // Timer for Token-like effect/Countdown
+  // Sinkronisasi otomatis berkala (30 dtk default / 45 dtk room besar)
   useEffect(() => {
+    lastTickRef.current = Date.now();
+    const intervalSec = isLargeRoom ? 45 : 30;
     const timer = setInterval(() => {
       const now = Date.now();
-      const bucket = Math.floor(now / 300000);
-      setMonitorTimeLeft(Math.floor(((bucket + 1) * 300000 - now) / 1000));
+      const elapsed = Math.floor((now - lastTickRef.current) / 1000);
+      if (elapsed >= 1) {
+        lastTickRef.current = now;
+        setMonitorTimeLeft(prev => {
+          const next = prev - elapsed;
+          if (next <= 0) {
+            if (!isRefreshingRef.current) {
+              handleManualRefreshMonitor();
+            }
+            return intervalSec;
+          }
+          return next;
+        });
+      }
     }, 1000);
     return () => clearInterval(timer);
-  }, []);
+  }, [handleManualRefreshMonitor, isLargeRoom]);
 
-  // Real-time Subscription — DIMATIKAN untuk attempts di room besar agar tab tidak
+  // Real-time Subscription - DIMATIKAN untuk attempts di room besar agar tab tidak
   // dibanjiri puluhan event/detik berisi answers penuh. Penggantinya: polling
-  // ringan (tanpa answers) tiap 30 detik + tombol refresh manual.
+  // ringan (tanpa answers) tiap 30-45 detik + tombol refresh manual.
   useEffect(() => {
     if (!roomId) return;
 
@@ -973,13 +1001,9 @@ const MonitoringPage = () => {
     };
 
     startSubscribe();
-    const polling = setInterval(() => {
-      handleManualRefreshMonitor();
-    }, isLargeRoom ? 30000 : 60000);
 
     return () => {
       isSubscribed = false;
-      clearInterval(polling);
       if (currentUnsub) currentUnsub();
     };
   }, [roomId, monitorRoom?.examId, isLargeRoom]);
@@ -2454,21 +2478,41 @@ const MonitoringPage = () => {
             </div>
           </div>
 
-          <div className="flex items-center gap-4 self-end md:self-center">
-            <div className="flex items-center gap-3 bg-slate-50 dark:bg-slate-900/60 px-3 py-1.5 rounded-2xl border border-slate-200/60 dark:border-slate-800/40">
-              <div className="flex flex-col items-end">
-                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider leading-none">Penyegaran</span>
-                <span className="text-sm font-mono font-bold text-blue-600 dark:text-blue-400 leading-none mt-1">
-                  {isLoading ? "--:--" : `${Math.floor(monitorTimeLeft / 60).toString().padStart(2, '0')}:${(monitorTimeLeft % 60).toString().padStart(2, '0')}`}
+          <div className="flex items-center gap-2.5 self-stretch sm:self-end md:self-center">
+            <div className="flex items-center justify-between sm:justify-start gap-3 bg-slate-50 dark:bg-slate-900/60 pl-3.5 pr-1.5 py-1.5 rounded-2xl border border-slate-200/60 dark:border-slate-800/60 w-full sm:w-auto">
+              <div className="flex flex-col text-left">
+                <div className="flex items-center gap-1.5 leading-none">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                  </span>
+                  <span className="text-[10px] font-semibold text-slate-600 dark:text-slate-300">
+                    Auto-Sync
+                  </span>
+                  <span className="text-[10px] font-mono font-bold text-blue-600 dark:text-blue-400">
+                    {isLoading ? "--" : `${monitorTimeLeft}s`}
+                  </span>
+                </div>
+                <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium leading-none mt-1">
+                  {lastSyncTime ? `Diperbarui ${lastSyncTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}` : "Menghubungkan..."}
                 </span>
               </div>
+
               <Button
-                onClick={() => handleManualRefreshMonitor()}
-                size="icon"
+                onClick={() => handleTriggerManualRefresh()}
+                disabled={isMonitorRefreshing}
+                size="sm"
                 variant="ghost"
-                className={`h-9 w-9 rounded-xl transition-all ${isMonitorRefreshing ? "text-blue-500" : "text-slate-400 hover:text-blue-500 hover:bg-white dark:hover:bg-slate-800"}`}
+                title="Segarkan data pengerjaan, skor, dan status siswa sekarang"
+                aria-label="Segarkan data monitoring"
+                className={`h-8 px-2.5 rounded-xl font-medium text-xs transition-all flex items-center gap-1.5 bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/60 shadow-xs ${
+                  isMonitorRefreshing
+                    ? "text-blue-600 dark:text-blue-400 cursor-not-allowed"
+                    : "text-slate-700 dark:text-slate-200 hover:text-blue-600 hover:border-blue-300 dark:hover:border-blue-700"
+                }`}
               >
-                <RefreshCw className={`h-4.5 w-4.5 ${isMonitorRefreshing ? "animate-spin" : ""}`} />
+                <RefreshCw className={`h-3.5 w-3.5 ${isMonitorRefreshing ? "animate-spin text-blue-600 dark:text-blue-400" : "text-slate-500 dark:text-slate-400"}`} />
+                <span>{isMonitorRefreshing ? "Memuat..." : "Segarkan"}</span>
               </Button>
             </div>
           </div>

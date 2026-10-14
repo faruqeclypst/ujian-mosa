@@ -1,9 +1,9 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'examku.alfaprojects.com',
-  appName: 'EXAMKU',
-  webDir: 'dist-shell',
+  appId: 'examku.alfaprojects.com.local',
+  appName: 'EXAMKU Local',
+  webDir: 'dist',
   server: {
     androidScheme: 'https',
     //

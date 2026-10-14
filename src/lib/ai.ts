@@ -354,6 +354,8 @@ const getAIConfig = async (pb: PocketBase): Promise<AIConfig> => {
   let apiKey = "";
   if (finalProvider === "puter") {
     apiKey = "puter-no-key-needed";
+  } else if (finalProvider === "ollama") {
+    apiKey = "ollama-no-key-needed";
   } else if (userRole === "admin") {
     apiKey = finalProvider === "groq" ? config?.groq_api_key : config?.ai_gateway_key;
     if (!apiKey?.trim()) throw new Error(`API Key untuk Provider ${finalProvider.toUpperCase()} belum diatur.`);
@@ -1377,7 +1379,7 @@ export const testAIConnection = async (pb: PocketBase, apiKey: string, modelId: 
       }
     }
 
-    if (!apiKey) throw new Error("API Key Kosong");
+    if (finalProvider !== "ollama" && !apiKey) throw new Error("API Key Kosong");
     const useProxy = finalProvider !== "groq";
 
     const resolveBaseUrl = (p: string, url: string) => {

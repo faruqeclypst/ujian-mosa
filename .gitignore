@@ -37,5 +37,6 @@ public/*.apk
 # Offline and raw packaging assets
 offline_package/
 dist-shell/
+dist-browser/
 assets-raw/
 keystore.properties

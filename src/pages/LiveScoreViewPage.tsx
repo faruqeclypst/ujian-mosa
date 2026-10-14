@@ -572,11 +572,16 @@ const LiveScoreViewPage = () => {
           <button
             onClick={() => selectedRoomId && handleRefreshData(selectedRoomId)}
             disabled={isRefreshing}
-            className={`group p-2.5 rounded-xl border transition-all hover:scale-105 active:scale-95 disabled:opacity-40 disabled:hover:scale-100 ${isDarkMode ? "bg-slate-900/80 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700" : "bg-white border-gray-200 text-gray-600 hover:text-gray-900 hover:border-gray-300 shadow-sm"
-              }`}
-            title="Segarkan data"
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-semibold transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 ${
+              isDarkMode
+                ? "bg-slate-900/80 border-slate-800 text-slate-300 hover:text-white hover:border-slate-700"
+                : "bg-white border-gray-200 text-gray-700 hover:text-gray-900 hover:border-gray-300 shadow-sm"
+            }`}
+            title="Segarkan data nilai dan status pengerjaan sekarang"
+            aria-label="Segarkan data"
           >
-            <RefreshCw className={`w-4.5 h-4.5 transition-all ${isRefreshing ? "animate-spin" : "group-hover:rotate-90"}`} />
+            <RefreshCw className={`w-3.5 h-3.5 transition-all ${isRefreshing ? "animate-spin text-indigo-500" : ""}`} />
+            <span>{isRefreshing ? "Memuat..." : "Segarkan"}</span>
           </button>
 
           <button

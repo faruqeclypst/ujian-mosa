@@ -91,8 +91,10 @@ for (let i = 0; i < APKS.length; i++) {
   // Siapkan webDir SESUDAH switch config tapi SEBELUM cap sync.
   // (switch-app.js menjalankan npx cap sync di dalamnya,
   //  jadi webDir harus sudah benar sebelum switch dipanggil.)
-  const webDir = item.key === 'browser' ? 'dist-browser' : 'dist-shell';
-  prepareWebDir(webDir, !!item.online);
+  const webDir = item.key === 'browser' ? 'dist-browser' : (item.online ? 'dist-shell' : 'dist');
+  if (webDir !== 'dist') {
+    prepareWebDir(webDir, !!item.online);
+  }
 
   // Switch konfigurasi (menjalankan npx cap sync di dalamnya)
   console.log(`[+] Beralih konfigurasi ke ${item.key}...`);
@@ -150,12 +152,15 @@ execSync('node scripts/switch-app.js examaa', { stdio: 'inherit' });
 console.log('\n======================================================');
 console.log('   🎉 SEMUA APK & WEB DIST SELESAI DI-DEPLOY KE VPS!');
 console.log('======================================================');
-console.log(`1. APK EXAM AA:`);
+console.log(`1. APK EXAM AA (Online):`);
 console.log(`   👉 https://examku.my.id/exam-aa-latest`);
 console.log(`   👉 https://examku.my.id/exam-aa-latest.apk`);
 console.log(`2. APK EXAM AA Browser:`);
 console.log(`   👉 https://examku.my.id/exam-aa-browser-latest`);
 console.log(`   👉 https://examku.my.id/exam-aa-browser-latest.apk`);
-console.log(`3. Web App:`);
+console.log(`3. APK EXAMKU Local (Offline Server):`);
+console.log(`   👉 https://examku.my.id/examku-local`);
+console.log(`   👉 https://examku.my.id/examku-local.apk`);
+console.log(`4. Web App:`);
 console.log(`   👉 https://examku.my.id`);
 console.log('======================================================\n');

@@ -21,7 +21,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { Capacitor } from "@capacitor/core";
 import { APP_DISPLAY_VERSION } from "../../utils/version";
-import { getAppId, isMainApp } from "../../lib/appVariant";
+import { getAppId, isMainApp, isLocalApp } from "../../lib/appVariant";
 
 export const isLocalServer = (school: SchoolRecord): boolean => {
   if (!school) return false;
@@ -61,22 +61,37 @@ export const isLocalServer = (school: SchoolRecord): boolean => {
 /**
  * Deteksi subnet LAN perangkat menggunakan Android Bridge atau WebRTC ICE candidate.
  */
-async function detectLanSubnet(): Promise<string | null> {
+async function detectLanSubnet(): Promise<{ subnet: string | null; gateway: string | null }> {
+  let detectedSubnet: string | null = null;
+  let detectedGateway: string | null = null;
+
   // 1. Coba dari Native Android Bridge jika tersedia
   try {
     const nativeBridge = (window as any).AndroidExam;
-    if (nativeBridge && typeof nativeBridge.getDeviceIpAddress === "function") {
-      const nativeIp = nativeBridge.getDeviceIpAddress();
-      if (nativeIp && typeof nativeIp === "string") {
-        const parts = nativeIp.trim().split(".");
-        if (parts.length === 4) {
-          return `${parts[0]}.${parts[1]}.${parts[2]}`;
+    if (nativeBridge) {
+      if (typeof nativeBridge.getGatewayIpAddress === "function") {
+        const gw = nativeBridge.getGatewayIpAddress();
+        if (gw && typeof gw === "string" && gw.trim()) {
+          detectedGateway = gw.trim();
+        }
+      }
+      if (typeof nativeBridge.getDeviceIpAddress === "function") {
+        const nativeIp = nativeBridge.getDeviceIpAddress();
+        if (nativeIp && typeof nativeIp === "string") {
+          const parts = nativeIp.trim().split(".");
+          if (parts.length === 4) {
+            detectedSubnet = `${parts[0]}.${parts[1]}.${parts[2]}`;
+          }
         }
       }
     }
   } catch {}
 
-  // 2. WebRTC ICE candidate fallback
+  if (detectedSubnet || detectedGateway) {
+    return { subnet: detectedSubnet, gateway: detectedGateway };
+  }
+
+  // 2. WebRTC ICE candidate fallback (untuk browser di PC / laptop)
   return new Promise((resolve) => {
     try {
       const RTCPeerConnection =
@@ -85,7 +100,7 @@ async function detectLanSubnet(): Promise<string | null> {
         (window as any).mozRTCPeerConnection;
 
       if (!RTCPeerConnection) {
-        resolve(null);
+        resolve({ subnet: null, gateway: null });
         return;
       }
 
@@ -95,7 +110,7 @@ async function detectLanSubnet(): Promise<string | null> {
       const found = new Set<string>();
       const timeout = setTimeout(() => {
         pc.close();
-        resolve(found.size > 0 ? [...found][0] : null);
+        resolve({ subnet: found.size > 0 ? [...found][0] : null, gateway: null });
       }, 700);
 
       pc.onicecandidate = (e: any) => {
@@ -120,10 +135,10 @@ async function detectLanSubnet(): Promise<string | null> {
         .catch(() => {
           clearTimeout(timeout);
           pc.close();
-          resolve(null);
+          resolve({ subnet: null, gateway: null });
         });
     } catch {
-      resolve(null);
+      resolve({ subnet: null, gateway: null });
     }
   });
 }
@@ -183,11 +198,21 @@ const SelectSchoolPage = () => {
   const [isConnectingLocal, setIsConnectingLocal] = useState(false);
   const [localConnectError, setLocalConnectError] = useState<string | null>(null);
 
-  // Di aplikasi utama (EXAM AA), opsi server lokal disembunyikan.
-  // Opsi ini hanya untuk aplikasi Local (offline) dan web.
+  // Deteksi varian aplikasi:
+  // - EXAMKU (Utama): opsi server lokal disembunyikan (fokus CBT Online Cloud)
+  // - EXAMKU Local: khusus server lokal offline (tab online disembunyikan, tanpa fetch cloud)
   const [hideLocalServer, setHideLocalServer] = useState(false);
+  const [isLocalOnly, setIsLocalOnly] = useState(false);
+
   useEffect(() => {
-    getAppId().then((id) => setHideLocalServer(isMainApp(id)));
+    getAppId().then((id) => {
+      const isLocal = isLocalApp(id);
+      setIsLocalOnly(isLocal);
+      if (isLocal) {
+        setActiveTab("local");
+      }
+      setHideLocalServer(isMainApp(id));
+    });
   }, []);
 
   const { setManualSchool } = useTenant();
@@ -267,10 +292,14 @@ const SelectSchoolPage = () => {
     recentServers.forEach((s) => candidateSet.add(s.origin));
 
     try {
-      const gatewaySubnet = await detectLanSubnet();
-      if (gatewaySubnet) {
-        const [a, b, c] = gatewaySubnet.split(".");
-        const priorityHosts = [1, 100, 2, 3, 4, 5, 10, 50, 101, 150, 200, 254];
+      const netInfo = await detectLanSubnet();
+      if (netInfo.gateway) {
+        candidateSet.add(`http://${netInfo.gateway}:8090`);
+        candidateSet.add(`http://${netInfo.gateway}`);
+      }
+      if (netInfo.subnet) {
+        const [a, b, c] = netInfo.subnet.split(".");
+        const priorityHosts = [1, 100, 2, 3, 4, 5, 10, 15, 20, 25, 50, 101, 137, 150, 200, 254];
         for (const i of priorityHosts) {
           candidateSet.add(`http://${a}.${b}.${c}.${i}:8090`);
         }
@@ -278,9 +307,17 @@ const SelectSchoolPage = () => {
           candidateSet.add(`http://${a}.${b}.${c}.${i}:8090`);
         }
       } else {
-        const commonSubnets = ["192.168.1", "192.168.0", "192.168.100", "192.168.43", "192.168.8", "10.0.0"];
+        const commonSubnets = [
+          "192.168.1",
+          "192.168.0",
+          "192.168.137", // Windows Mobile Hotspot default
+          "192.168.43",  // Android Hotspot default
+          "192.168.100",
+          "192.168.8",
+          "10.0.0"
+        ];
         for (const sub of commonSubnets) {
-          for (const host of [1, 100, 2, 10, 50, 200]) {
+          for (const host of [1, 100, 2, 10, 15, 50, 137, 200]) {
             candidateSet.add(`http://${sub}.${host}:8090`);
           }
         }
@@ -340,10 +377,14 @@ const SelectSchoolPage = () => {
 
       if (found.length > 0) {
         setDetectedServers([...found]);
+        setInputLocalIp((prev) => (prev && prev !== "http://192.168.1." ? prev : found[0].origin));
       }
     }
 
     setDetectedServers([...found]);
+    if (found.length > 0) {
+      setInputLocalIp((prev) => (prev && prev !== "http://192.168.1." ? prev : found[0].origin));
+    }
     setScanningLan(false);
   }, [recentServers]);
 
@@ -352,6 +393,16 @@ const SelectSchoolPage = () => {
     let isMounted = true;
 
     const fetchSchools = async () => {
+      // Jika varian aplikasi adalah EXAMKU Local, skip pemanggilan Cloud Master PB
+      const currentAppId = await getAppId();
+      if (isLocalApp(currentAppId)) {
+        if (isMounted) {
+          setLoading(false);
+          setActiveTab("local");
+        }
+        return;
+      }
+
       let masterRecords: SchoolRecord[] = [];
       let isCloudOk = true;
 
@@ -447,7 +498,7 @@ const SelectSchoolPage = () => {
     saveRecentServer(cleanUrl, schoolName);
 
     const localRecord: SchoolRecord = {
-      id: schoolTarget ? `local_${schoolTarget.id}` : `local_server_${cleanUrl.replace(/[^a-z0-9]/gi, "_")}`,
+      id: "local_server",
       name: schoolName,
       slug: "local",
       pb_url: cleanUrl,
@@ -458,6 +509,7 @@ const SelectSchoolPage = () => {
     };
 
     localStorage.setItem("local_server_url", cleanUrl);
+    localStorage.setItem("selected_school_slug", "local");
     if (schoolTarget) {
       localStorage.setItem(`local_server_url_${schoolTarget.id}`, cleanUrl);
     }
@@ -516,58 +568,73 @@ const SelectSchoolPage = () => {
 
           <div className="flex-1 min-w-0">
             <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">
-              Pilih Unit Sekolah
+              {isLocalOnly ? "EXAMKU Local" : "Pilih Unit Sekolah"}
             </h1>
             <p className="text-slate-500 dark:text-slate-400 text-xs font-medium truncate mt-0.5">
-              Pilih server ujian yang digunakan sekolah Anda
+              {isLocalOnly
+                ? "Hubungkan ke server proktor di jaringan lab sekolah"
+                : "Pilih server ujian yang digunakan sekolah Anda"}
             </p>
           </div>
         </div>
 
         {/* ======================================================== */}
-        {/* TAB TOGGLE: ONLINE SERVER VS LOCAL SERVER               */}
+        {/* TAB TOGGLE ATAU BADGE KHUSUS EXAMKU LOCAL               */}
         {/* ======================================================== */}
-        <div className="bg-slate-200/70 dark:bg-slate-900/70 p-1 rounded-2xl flex items-center gap-1 border border-slate-300/40 dark:border-slate-800 shadow-inner">
-          <button
-            type="button"
-            onClick={() => setActiveTab("online")}
-            className={`flex-1 py-2.5 px-3 rounded-xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all duration-200 ${
-              activeTab === "online"
-                ? "bg-blue-600 text-white shadow-md shadow-blue-500/25 scale-[1.01]"
-                : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
-            }`}
-          >
-            <Globe size={16} />
-            <span>Online Server</span>
-            {schools.length > 0 && (
-              <span
-                className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${
-                  activeTab === "online"
-                    ? "bg-blue-500/40 text-white"
-                    : "bg-slate-300 dark:bg-slate-800 text-slate-600 dark:text-slate-300"
+        {isLocalOnly ? (
+          <div className="bg-emerald-500/10 dark:bg-emerald-950/40 border border-emerald-500/30 rounded-2xl px-4 py-2.5 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="text-xs font-bold text-emerald-800 dark:text-emerald-300">
+                Server CBT Mandiri (Offline / LAN)
+              </span>
+            </div>
+            <span className="text-[10px] font-mono font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-100/70 dark:bg-emerald-900/60 px-2 py-0.5 rounded-md">
+              Port :8090
+            </span>
+          </div>
+        ) : (
+          <div className="bg-slate-200/70 dark:bg-slate-900/70 p-1 rounded-2xl flex items-center gap-1 border border-slate-300/40 dark:border-slate-800 shadow-inner">
+            <button
+              type="button"
+              onClick={() => setActiveTab("online")}
+              className={`flex-1 py-2.5 px-3 rounded-xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all duration-200 ${
+                activeTab === "online"
+                  ? "bg-blue-600 text-white shadow-md shadow-blue-500/25 scale-[1.01]"
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+              }`}
+            >
+              <Globe size={16} />
+              <span>Online Server</span>
+              {schools.length > 0 && (
+                <span
+                  className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${
+                    activeTab === "online"
+                      ? "bg-blue-500/40 text-white"
+                      : "bg-slate-300 dark:bg-slate-800 text-slate-600 dark:text-slate-300"
+                  }`}
+                >
+                  {schools.length}
+                </span>
+              )}
+            </button>
+
+            {!hideLocalServer && (
+              <button
+                type="button"
+                onClick={() => setActiveTab("local")}
+                className={`flex-1 py-2.5 px-3 rounded-xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all duration-200 ${
+                  activeTab === "local"
+                    ? "bg-emerald-600 text-white shadow-md shadow-emerald-500/25 scale-[1.01]"
+                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
                 }`}
               >
-                {schools.length}
-              </span>
+                <HardDrive size={16} />
+                <span>Local Server</span>
+              </button>
             )}
-          </button>
-
-          {!hideLocalServer && (
-          <button
-            type="button"
-            onClick={() => setActiveTab("local")}
-            className={`flex-1 py-2.5 px-3 rounded-xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all duration-200 ${
-              activeTab === "local"
-                ? "bg-emerald-600 text-white shadow-md shadow-emerald-500/25 scale-[1.01]"
-                : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
-            }`}
-          >
-            <HardDrive size={16} />
-            <span>Local Server</span>
-            
-          </button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       {/* Content Area */}

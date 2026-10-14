@@ -108,10 +108,11 @@ export const AISettingsModal = ({ isOpen, onClose }: AISettingsModalProps) => {
 
         if (isPuter) {
           // Puter doesn't need API key
-        } else if (isOllama) {
-          payload.ai_gateway_key = values.ai_api_key;
+        } else if (values.ai_provider === 'groq') {
+          payload.groq_api_key = values.ai_api_key || "";
         } else {
-          payload.groq_api_key = values.ai_api_key;
+          payload.ai_gateway_key = values.ai_api_key || "";
+          payload.groq_api_key = values.ai_api_key || "";
         }
 
         if (config) {
@@ -151,7 +152,7 @@ export const AISettingsModal = ({ isOpen, onClose }: AISettingsModalProps) => {
     const aiProvider = watch("ai_provider");
     const aiModel = watch("ai_model");
 
-    if (!aiKey) {
+    if (aiProvider !== "ollama" && aiProvider !== "puter" && !aiKey) {
       addToast({ title: "Gagal", description: "Masukkan API Key terlebih dahulu.", type: "error" });
       return;
     }
@@ -167,7 +168,7 @@ export const AISettingsModal = ({ isOpen, onClose }: AISettingsModalProps) => {
       const modelId = aiModel || config?.ai_model || AI_MODELS[0].id;
       const customUrl = config?.ai_gateway_url || "https://ollama.com";
 
-      const res = await testAIConnection(pb!, aiKey, modelId, customUrl, provider);
+      const res = await testAIConnection(pb!, aiKey || "", modelId, customUrl, provider);
       setTestResult(res);
 
       if (res.success) {

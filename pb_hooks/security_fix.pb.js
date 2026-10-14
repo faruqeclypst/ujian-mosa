@@ -441,9 +441,12 @@ onRecordUpdateRequest((e) => {
             ev.record.set("score", score);
             ev.record.set("correct", Math.floor(objectiveCorrect));
             ev.record.set("total", totalQuestions);
-            ev.record.set("objectiveCorrect", Math.floor(objectiveCorrect));
-            ev.record.set("objectiveTotal", objectiveTotal);
-            ev.record.set("objectiveScore", score);
+            try {
+                const colFields = ev.record.collection().fields;
+                if (colFields && colFields.getByName("objectiveCorrect")) ev.record.set("objectiveCorrect", Math.floor(objectiveCorrect));
+                if (colFields && colFields.getByName("objectiveTotal")) ev.record.set("objectiveTotal", objectiveTotal);
+                if (colFields && colFields.getByName("objectiveScore")) ev.record.set("objectiveScore", score);
+            } catch (_) {}
             console.log("[SECURITY_FIX] Skor dihitung ulang di server untuk attempt " + ev.record.id +
                 " => " + score + " (" + Math.floor(objectiveCorrect) + "/" + totalQuestions + ")");
         } catch (err) {
@@ -533,7 +536,12 @@ onRecordUpdateRequest((e) => {
                 for (const k in ans) {
                     if (!k.startsWith("__")) n++;
                 }
-                e.record.set("answeredCount", n);
+                try {
+                    const colFields = e.record.collection().fields;
+                    if (colFields && colFields.getByName("answeredCount")) {
+                        e.record.set("answeredCount", n);
+                    }
+                } catch (_) {}
             }
         }
     } catch (err) {

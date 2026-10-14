@@ -1998,21 +1998,16 @@ const CBTPage = () => {
         }
       };
 
-      const finalPayload = {
+      const finalPayload: Record<string, any> = {
         answers: answersWithMeta,
         isOnline: getOnlineFlag(),
         lastHeartbeat: submittedAt,
         score,
-        totalQuestions,
         correct: Math.floor(objectiveCorrect),
         total: totalQuestions,
         usedTime: usedTime > 0 ? usedTime : undefined,
         status: "finished",
         submittedAt,
-        objectiveScore,
-        objectiveCorrect: Math.floor(objectiveCorrect),
-        objectiveTotal,
-        essayTotal,
       };
 
       // Simpan ke localStorage sebagai fallback SEBELUM kirim ke server
