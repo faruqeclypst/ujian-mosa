@@ -138,6 +138,14 @@ routerAdd("POST", "/api/offline-update-apply", (c) => {
             $os.cmd("cmd.exe", "/c", "del " + tempZip).run();
         } catch (_) { }
 
+        // 4. Bersihkan hook usang yang sudah digantikan Go native (cegah route conflict)
+        try {
+            $os.cmd("cmd.exe", "/c", "del /f /q pb_hooks\\fast_login.pb.js").run();
+        } catch (_) { }
+        try {
+            $os.remove("pb_hooks/fast_login.pb.js");
+        } catch (_) { }
+
         return c.json(200, {
             ok: true,
             message: "Aplikasi server offline berhasil diperbarui ke versi terbaru! Halaman akan dimuat ulang."

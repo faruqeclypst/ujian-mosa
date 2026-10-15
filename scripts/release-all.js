@@ -121,6 +121,7 @@ try {
   if (fs.existsSync('offline_package')) {
     try {
       execSync(`powershell -Command "Copy-Item pb_hooks/* offline_package/pb_hooks/ -Recurse -Force"`, { stdio: 'ignore' });
+      execSync(`powershell -Command "Remove-Item offline_package/pb_hooks/fast_login.pb.js -Force -ErrorAction SilentlyContinue"`, { stdio: 'ignore' });
       execSync(`powershell -Command "Copy-Item dist/* offline_package/pb_public/ -Recurse -Force"`, { stdio: 'ignore' });
       console.log('✅ Sinkronisasi otomatis ke offline_package lokal berhasil!');
     } catch {}
