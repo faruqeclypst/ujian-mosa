@@ -1,0 +1,8 @@
+# Paksa Unix line endings (LF) untuk script shell dan config VPS
+# Mencegah CRLF dari Windows merusak script di VPS
+*.sh text eol=lf
+vps/infra.conf text eol=lf
+*.py text eol=lf
+
+# PowerShell script tetap CRLF (native Windows)
+*.ps1 text eol=crlf
