@@ -45,6 +45,7 @@ import { ReopenDialog, ReopenDialogState } from "./monitoring/components/ReopenD
 import { EditAnswerDialog, EditAnswerDialogState } from "./monitoring/components/EditAnswerDialog";
 import { StudentTable } from "./monitoring/components/StudentTable";
 import { QuickGradeDialog } from "./monitoring/components/QuickGradeDialog";
+import { countUniqueOngoingStudents } from "../../lib/attemptStats";
 
 
 const MonitoringPage = () => {
@@ -1283,7 +1284,10 @@ const MonitoringPage = () => {
         // Filter attempts hanya untuk siswa eligible
         const filteredAttempts = attempts.filter(a => eligibleIds.has(a.studentId || a.student_id));
 
-        const ongoingCount = filteredAttempts.filter(a => a.status === 'ongoing').length;
+        // "Sedang Ujian" = SISWA UNIK dengan attempt ongoing (definisi kanonis,
+        // sama seperti yang dipakai ExamRoomsPage via lib/attemptStats).
+        // Dedupe: satu siswa dengan 2 attempt ongoing tetap dihitung 1.
+        const ongoingCount = countUniqueOngoingStudents(filteredAttempts);
         const finishedCount = filteredAttempts.filter(a => a.status === 'finished' || a.status === 'submitted' || a.status === 'graded').length;
         const lockedCount = filteredAttempts.filter(a => a.status === 'LOCKED').length;
 
