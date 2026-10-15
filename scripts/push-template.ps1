@@ -32,6 +32,8 @@ if (Test-Path "vps/template_school/pocketbase") {
     Write-Host "    Binary tidak di repo - mengambil dari Worker VPS..." -ForegroundColor Cyan
     ssh "$VPS_USER@$VPS_IP" "scp -o StrictHostKeyChecking=no root@43.134.175.87:/opt/pocketbase/schools/template/pocketbase $REMOTE_TEMPLATE/pocketbase; chmod +x $REMOTE_TEMPLATE/pocketbase"
 }
+# Binary Windows untuk offline-update (juga dari Worker VPS, cegah rsync --delete menghapusnya)
+ssh "$VPS_USER@$VPS_IP" "scp -o StrictHostKeyChecking=no root@43.134.175.87:/opt/pocketbase/schools/template/pocketbase.exe $REMOTE_TEMPLATE/pocketbase.exe; chmod +x $REMOTE_TEMPLATE/pocketbase.exe"
 # Hapus fast_login.pb.js dari template (diganti Go native - hindari route conflict)
 ssh "$VPS_USER@$VPS_IP" "rm -f $REMOTE_TEMPLATE/pb_hooks/fast_login.pb.js"
 # Update sync-all-tenants.sh di Master VPS (versi baru: sync binary + hapus JS hook)
