@@ -47,6 +47,15 @@ try {
   }
   execSync(`scp -r vps/template_school/pb_hooks/* ${VPS_HOST}:${REMOTE_TEMPLATE}/pb_hooks/`, { stdio: 'inherit' });
   execSync(`scp vps/template_school/pb_data/data.db ${VPS_HOST}:${REMOTE_TEMPLATE}/pb_data/data.db`, { stdio: 'inherit' });
+  // Binary Go-native: dari repo lokal jika ada, fallback dari Worker VPS
+  if (fs.existsSync('vps/template_school/pocketbase')) {
+    execSync(`scp vps/template_school/pocketbase ${VPS_HOST}:${REMOTE_TEMPLATE}/pocketbase`, { stdio: 'inherit' });
+  } else {
+    execSync(`ssh ${VPS_HOST} "scp -o StrictHostKeyChecking=no ${WORKER_HOST}:/opt/pocketbase/schools/template/pocketbase ${REMOTE_TEMPLATE}/pocketbase"`, { stdio: 'inherit' });
+  }
+  execSync(`ssh ${VPS_HOST} "chmod +x ${REMOTE_TEMPLATE}/pocketbase"`, { stdio: 'inherit' });
+  // Hapus fast_login.pb.js dari template (diganti Go native)
+  execSync(`ssh ${VPS_HOST} "rm -f ${REMOTE_TEMPLATE}/pb_hooks/fast_login.pb.js"`, { stdio: 'inherit' });
   // Sinkronkan infra.conf ke Master & Worker (untuk shell scripts di VPS)
   execSync(`scp vps/infra.conf ${VPS_HOST}:/opt/pocketbase/infra.conf`, { stdio: 'inherit' });
   execSync(`ssh ${VPS_HOST} "chown -R ubuntu:ubuntu ${REMOTE_TEMPLATE} && rsync -avz --delete ${REMOTE_TEMPLATE}/ ${WORKER_HOST}:${REMOTE_TEMPLATE}/ && ssh ${WORKER_HOST} 'chown -R ubuntu:ubuntu ${REMOTE_TEMPLATE}'"`, { stdio: 'inherit' });
