@@ -34,7 +34,19 @@ for dir in "$MASTER_SCHOOLS_DIR"/*; do
   if [ -d "$dir/pb_hooks" ] && [ "$dir" != "$TEMPLATE_DIR" ]; then
     slug=$(basename "$dir")
     cp -r "$TEMPLATE_DIR/pb_hooks"/* "$dir/pb_hooks/" 2>/dev/null || true
+    # Hapus fast_login.pb.js — diganti Go native di binary (hindari route conflict)
+    rm -f "$dir/pb_hooks/fast_login.pb.js"
     chown -R ubuntu:ubuntu "$dir/pb_hooks" 2>/dev/null || true
+    # Sync binary Go-native jika template lebih baru
+    if [ -f "$TEMPLATE_DIR/pocketbase" ]; then
+      if ! cmp -s "$TEMPLATE_DIR/pocketbase" "$dir/pocketbase" 2>/dev/null; then
+        systemctl stop "pb-${slug}" 2>/dev/null || true
+        cp "$TEMPLATE_DIR/pocketbase" "$dir/pocketbase"
+        chmod +x "$dir/pocketbase"
+        chown ubuntu:ubuntu "$dir/pocketbase" 2>/dev/null || true
+        echo "[$slug] binary Go-native dipasang"
+      fi
+    fi
     systemctl restart "pb-${slug}" 2>/dev/null || true
     MASTER_UPDATED+=("$slug")
   fi
@@ -53,7 +65,16 @@ if ssh -o BatchMode=yes -o ConnectTimeout=5 -o StrictHostKeyChecking=no "$WORKER
       if [ -d "$dir/pb_hooks" ] && [ "$dir" != "/opt/pocketbase/schools/template" ]; then
         slug=$(basename "$dir")
         cp -r /opt/pocketbase/schools/template/pb_hooks/* "$dir/pb_hooks/" 2>/dev/null || true
+        rm -f "$dir/pb_hooks/fast_login.pb.js"
         chown -R ubuntu:ubuntu "$dir/pb_hooks" 2>/dev/null || true
+        if [ -f /opt/pocketbase/schools/template/pocketbase ]; then
+          if ! cmp -s /opt/pocketbase/schools/template/pocketbase "$dir/pocketbase" 2>/dev/null; then
+            systemctl stop "pb-${slug}" 2>/dev/null || true
+            cp /opt/pocketbase/schools/template/pocketbase "$dir/pocketbase"
+            chmod +x "$dir/pocketbase"
+            echo "[$slug] binary Go-native dipasang"
+          fi
+        fi
         systemctl restart "pb-${slug}" 2>/dev/null || true
       fi
     done
