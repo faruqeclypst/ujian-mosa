@@ -92,18 +92,29 @@ routerAdd("GET", "/api/room-detail-stats", (e) => {
         const roomId = String(e.queryParam("roomId") || e.queryParam("roomid") || "");
         if (!roomId) return e.json(400, { error: "roomId wajib diisi" });
 
-        // Ambil classIds room untuk eligibility
+        // Ambil classIds room untuk eligibility (SQL langsung, bukan findRecordById)
         let classIds = [];
         let allClasses = false;
         try {
-            const room = $app.findRecordById("exam_rooms", roomId);
-            if (room) {
-                allClasses = !!(room.get("allClasses") || room.get("all_classes"));
-                const raw = room.get("classIds") || room.get("classId") || room.get("classids") || "";
+            const rqTpl = new DynamicModel({ eci: "" });
+            const rqRows = arrayOf(rqTpl);
+            $app.db().newQuery(
+                "SELECT classIds AS eci FROM exam_rooms WHERE id = '" + roomId.replace(/'/g, "''") + "'"
+            ).all(rqRows);
+            if (rqRows.length > 0) {
+                const raw = rqRows[0].eci || "";
                 if (Array.isArray(raw)) {
                     classIds = raw.map((c) => String(c).trim()).filter((c) => c && c !== "all");
                 } else if (typeof raw === "string" && raw.length > 0) {
-                    classIds = raw.split(",").map((c) => String(c).trim()).filter((c) => c && c !== "all");
+                    // classIds tersimpan sebagai JSON string: '["id1","id2"]'
+                    try {
+                        const parsed = JSON.parse(raw);
+                        if (Array.isArray(parsed)) {
+                            classIds = parsed.map((c) => String(c).trim()).filter((c) => c && c !== "all");
+                        }
+                    } catch (pe) {
+                        classIds = raw.split(",").map((c) => String(c).trim()).filter((c) => c && c !== "all");
+                    }
                 }
             }
         } catch (err) {}
@@ -240,11 +251,15 @@ routerAdd("GET", "/api/leaderboard", (e) => {
         const page = Math.max(1, parseInt(e.queryParam("page") || "1", 10) || 1);
         const perPage = Math.min(200, Math.max(1, parseInt(e.queryParam("perPage") || e.queryParam("perpage") || "50", 10) || 50));
 
-        // 1. Ambil examId dari room
+        // 1. Ambil examId dari room (SQL langsung, bukan findRecordById)
         let examId = "";
         try {
-            const room = $app.findRecordById("exam_rooms", roomId);
-            if (room) examId = String(room.get("examId") || room.get("exam_id") || "");
+            const rqTpl = new DynamicModel({ eid: "" });
+            const rqRows = arrayOf(rqTpl);
+            $app.db().newQuery(
+                "SELECT examId AS eid FROM exam_rooms WHERE id = '" + roomId.replace(/'/g, "''") + "'"
+            ).all(rqRows);
+            if (rqRows.length > 0) examId = String(rqRows[0].eid || "");
         } catch (err) {}
         if (!examId) return e.json(400, { error: "exam tidak ditemukan untuk room ini" });
 
