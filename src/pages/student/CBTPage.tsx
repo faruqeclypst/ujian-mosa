@@ -604,10 +604,13 @@ const CBTPage = () => {
   const [errorMessage, setErrorMessage] = useState("");
   const [loadingMessage, setLoadingMessage] = useState("Menyiapkan lembar ujian...");
   const [isGameModeBlocked, setIsGameModeBlocked] = useState(false);
+  const [isLargeRoom, setIsLargeRoom] = useState(false);
 
   const [penaltyCountdown, setPenaltyCountdown] = useState<number | null>(null);
   const penaltyCountdownIntervalRef = useRef<any>(null);
   const saveTimeoutRef = useRef<any>(null);
+  const answerCountRef = useRef(0);
+  const pendingAnswersRef = useRef<Record<string, any>>({});
   const cheatTimerRef = useRef<any>(null);
   const lastLeftTimeRef = useRef<number | null>(null);
   const orientationChangeRef = useRef<boolean>(false);
@@ -881,39 +884,74 @@ const CBTPage = () => {
       };
       answersRef.current = u;
 
-      // 1. SIMPAN KE HP INSTAN (0 DETIK)
+      // 1. SIMPAN KE HP INSTAN (0 DETIK) - tidak berubah
       if (student && roomId) {
         safeSetItem(`offline_answers_${student.id}_${roomId}`, JSON.stringify(u));
       }
 
-      // 2. BACKUP KE SERVER (TUNGGU 2 DETIK)
-      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-      saveTimeoutRef.current = setTimeout(() => {
-        setIsSyncing(true);
-        safeUpdateAttempt(currentAttempt.id, {
-          // Delta update: kirim hanya jawaban yang berubah + meta, server merge
-          answers: {
-            [questionId]: value,
-            __delta: true,
-            __activeQuestionId__: questionId,
-            __meta: (u as any)?.__meta || {},
-          },
-          isOnline: getOnlineFlag(),
-          lastHeartbeat: new Date().toISOString()
-        }).catch((err: any) => {
-          if (isKicked) return;
-          if (err?.status === 404) {
-            // Jika attempt sudah dihapus/reset oleh admin
-            sessionStorage.removeItem("activeCBTRoomId");
-            setIsSubmitModalOpen(false);
-            setIsResetModalOpen(true);
-          } else if (err?.status === 403) {
-            // Sesi token expired atau invalid
-            setIsSubmitModalOpen(false);
-            setIsSessionExpiredModalOpen(true);
-          }
-        });
-      }, 5000); // Debounce 5 detik (delta update membuat payload kecil)
+      // 2. BACKUP KE SERVER - dynamic berdasarkan ukuran room
+      if (isLargeRoom) {
+        // LARGE ROOM (>500 siswa): batch setiap 10 jawaban
+        answerCountRef.current += 1;
+        pendingAnswersRef.current[questionId] = value;
+        // Simpan juga meta terbaru
+        pendingAnswersRef.current.__meta = (u as any)?.__meta || {};
+        pendingAnswersRef.current.__activeQuestionId__ = questionId;
+
+        if (answerCountRef.current % 10 === 0) {
+          // Sync semua pending answers ke server
+          const pendingToSync = { ...pendingAnswersRef.current };
+          pendingAnswersRef.current = {};
+          setIsSyncing(true);
+          safeUpdateAttempt(currentAttempt.id, {
+            answers: {
+              ...pendingToSync,
+              __delta: true,
+            },
+            isOnline: getOnlineFlag(),
+            lastHeartbeat: new Date().toISOString()
+          }).catch((err: any) => {
+            if (isKicked) return;
+            if (err?.status === 404) {
+              sessionStorage.removeItem("activeCBTRoomId");
+              setIsSubmitModalOpen(false);
+              setIsResetModalOpen(true);
+            } else if (err?.status === 403) {
+              setIsSubmitModalOpen(false);
+              setIsSessionExpiredModalOpen(true);
+            }
+          });
+        }
+      } else {
+        // SMALL ROOM (≤500 siswa): debounce 4 detik
+        if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+        saveTimeoutRef.current = setTimeout(() => {
+          setIsSyncing(true);
+          safeUpdateAttempt(currentAttempt.id, {
+            // Delta update: kirim hanya jawaban yang berubah + meta, server merge
+            answers: {
+              [questionId]: value,
+              __delta: true,
+              __activeQuestionId__: questionId,
+              __meta: (u as any)?.__meta || {},
+            },
+            isOnline: getOnlineFlag(),
+            lastHeartbeat: new Date().toISOString()
+          }).catch((err: any) => {
+            if (isKicked) return;
+            if (err?.status === 404) {
+              // Jika attempt sudah dihapus/reset oleh admin
+              sessionStorage.removeItem("activeCBTRoomId");
+              setIsSubmitModalOpen(false);
+              setIsResetModalOpen(true);
+            } else if (err?.status === 403) {
+              // Sesi token expired atau invalid
+              setIsSubmitModalOpen(false);
+              setIsSessionExpiredModalOpen(true);
+            }
+          });
+        }, 4000); // Debounce 4 detik (delta update membuat payload kecil)
+      }
       return u;
     });
   };
@@ -1006,6 +1044,20 @@ const CBTPage = () => {
 
       const ex = rData.expand?.examId;
       setRoomData({ ...rData, examTitle: rData.room_name || ex?.title || "CBT", subject: ex?.expand?.subjectId?.name || "Ujian", teacherName: ex?.expand?.teacherId?.name || "-" });
+
+      // Hitung jumlah peserta untuk dynamic autosave: >500 = batch mode
+      try {
+        const classIds = rData.classIds || [];
+        let studentCount = 0;
+        if (Array.isArray(classIds) && classIds.length > 0) {
+          const filter = classIds.map((id: string) => `classId="${id}"`).join(" || ");
+          const students = await pb.collection("students").getFullList({ filter, fields: "id" });
+          studentCount = students.length;
+        }
+        setIsLargeRoom(studentCount > 500);
+      } catch (e) {
+        setIsLargeRoom(false);
+      }
 
       const qRecord = await pb.collection("questions").getFullList({ filter: `examId = "${rData.examId}"`, sort: "order,created" });
       const loaded: Question[] = qRecord.map(q => {
@@ -1902,19 +1954,22 @@ const CBTPage = () => {
     isSubmittingRef.current = true;
     setLoading(true);
     try {
-      // Flush pending debounced save ke server secara instan
+      // Flush pending save ke server secara instan (debounce untuk small room, batch untuk large room)
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
         saveTimeoutRef.current = null;
-        try {
-          await safeUpdateAttempt(currentAttempt.id, {
-            answers: answersRef.current,
-            isOnline: getOnlineFlag(),
-            lastHeartbeat: new Date().toISOString()
-          });
-        } catch (flushErr) {
-          console.warn("Gagal flush jawaban terakhir ke server, tetap melanjutkan submit:", flushErr);
-        }
+      }
+      // Reset batch counter untuk large room (submit mengirim full answers di bawah)
+      answerCountRef.current = 0;
+      pendingAnswersRef.current = {};
+      try {
+        await safeUpdateAttempt(currentAttempt.id, {
+          answers: answersRef.current,
+          isOnline: getOnlineFlag(),
+          lastHeartbeat: new Date().toISOString()
+        });
+      } catch (flushErr) {
+        console.warn("Gagal flush jawaban terakhir ke server, tetap melanjutkan submit:", flushErr);
       }
 
       let objectiveCorrect = 0;
