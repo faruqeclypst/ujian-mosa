@@ -192,6 +192,19 @@ const ExamRoomsPage = () => {
     setTotalOngoing(total);
   }, [getStudentsById]);
 
+  // Throttle recompute: saat 10k siswa ujian, subscription attempts dibanjiri
+  // ribuan event/detik (autosave + heartbeat). Tanpa throttle, recompute di
+  // setiap event membuat main thread 100% → halaman freeze/stuck loading.
+  // Event tetap dicatat murah ke cache; angka dihitung ulang maks 1×/2 detik.
+  const recomputeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scheduleRecompute = useCallback(() => {
+    if (recomputeTimerRef.current) return;
+    recomputeTimerRef.current = setTimeout(() => {
+      recomputeTimerRef.current = null;
+      recomputeLiveStats();
+    }, 2000);
+  }, [recomputeLiveStats]);
+
   const isOwner = useCallback((room: ExamRoomData) => {
     const is_admin = role === "admin";
     const is_teacher_full = role === "teacher" && teacherFullAccess;
@@ -482,30 +495,36 @@ const ExamRoomsPage = () => {
 
     const fetchFresh = async () => {
       try {
+        // Bersihkan tombstone lama (>10 mnt) agar tidak menumpuk di memori.
+        // Aman: tombstone hanya relevan untuk fetch yang sedang berjalan.
+        const nowTs = Date.now();
+        for (const [tid, tts] of Object.entries(finishTombstonesRef.current)) {
+          if (nowTs - (tts as number) > 10 * 60 * 1000) {
+            delete finishTombstonesRef.current[tid];
+          }
+        }
+
         const all = await pb.collection("attempts").getFullList({
           filter: 'status = "ongoing"',
-          fields: "id,studentId,examRoomId,status,updated",
+          // Ringan: hanya field yang dipakai untuk hitung "sedang mengerjakan".
+          // - status ikut (dipakai filter di countOngoingPerRoom)
+          // - updated TIDAK perlu: tombstone berbasis keberadaan, bukan timestamp
+          fields: "id,studentId,examRoomId,status",
         });
         const merged: Record<string, any> = {};
         for (const a of all) {
-          // Jangan hidupkan lagi attempt yang sudah finish setelah snapshot
-          // (event finish-nya masuk via subscription selama fetch).
-          const tomb = finishTombstonesRef.current[a.id];
-          const aTime = a.updated ? new Date(a.updated).getTime() : 0;
-          if (tomb && aTime <= tomb) continue;
+          // Tombstone = event finish/delete sudah masuk via subscription selama
+          // fetch (subscription dipasang SEBELUM fetch). Record snapshot untuk
+          // id ini pasti basi → buang. Tidak perlu bandingkan timestamp karena
+          // tombstone keyed by attempt id dan dihapus saat ada event ongoing.
+          if (finishTombstonesRef.current[a.id]) continue;
           merged[a.id] = a;
         }
-        // Event realtime yang masuk selama fetch dipertahankan; bila bentrok
-        // dengan snapshot, yang timestamp-nya lebih baru yang menang.
+        // Event realtime yang masuk selama fetch dipertahankan dan MENANG atas
+        // snapshot bila bentrok: subscription dipasang sebelum fetch dimulai,
+        // jadi event pasti lebih baru daripada data snapshot.
         for (const [id, ev] of Object.entries(attemptsCacheRef.current)) {
-          const base = merged[id];
-          if (!base) {
-            merged[id] = ev;
-          } else {
-            const evTime = (ev as any).updated ? new Date((ev as any).updated).getTime() : 0;
-            const baseTime = base.updated ? new Date(base.updated).getTime() : 0;
-            merged[id] = evTime >= baseTime ? ev : base;
-          }
+          merged[id] = ev;
         }
         attemptsCacheRef.current = merged;
         recomputeLiveStats();
@@ -517,7 +536,8 @@ const ExamRoomsPage = () => {
     // Subscribe DULU supaya tidak ada event yang hilang selama fetch awal.
     const unsub = pb.collection("attempts").subscribe("*", (e: any) => {
       applyEvent(e);
-      if (initialDone) recomputeLiveStats();
+      // PENTING: pakai versi throttle — jangan recompute di setiap event.
+      if (initialDone) scheduleRecompute();
     });
 
     (async () => {
@@ -526,13 +546,20 @@ const ExamRoomsPage = () => {
       recomputeLiveStats();
     })();
 
-    pollTimer = setInterval(fetchFresh, 60000);
+    pollTimer = setInterval(() => {
+      // Hemat resource: jangan poll saat tab tidak terlihat.
+      if (!document.hidden) fetchFresh();
+    }, 60000);
 
     return () => {
       if (pollTimer) clearInterval(pollTimer);
+      if (recomputeTimerRef.current) {
+        clearTimeout(recomputeTimerRef.current);
+        recomputeTimerRef.current = null;
+      }
       unsub.then((u) => u && u());
     };
-  }, [pb, recomputeLiveStats]);
+  }, [pb, recomputeLiveStats, scheduleRecompute]);
 
   // Hitung ulang saat daftar rooms/students berubah (tanpa re-subscribe).
   useEffect(() => {

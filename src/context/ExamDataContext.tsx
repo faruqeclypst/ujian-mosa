@@ -118,7 +118,13 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
         pb.collection("teachers").getFullList({ sort: '-created' }),
         pb.collection("classes").getFullList({ sort: '-created' }),
         pb.collection("subjects").getFullList({ sort: '-created' }),
-        pb.collection("students").getFullList({ sort: '-created' }),
+        // Ringan: hanya field yang dipakai UI admin. Field berat/tidak dipakai
+        // (fastHash 64 char × N siswa, tokenKey, activeSessionId) dibuang agar
+        // halaman tidak stuck loading saat puluhan ribu siswa.
+        pb.collection("students").getFullList({
+          sort: '-created',
+          fields: "id,username,name,email,emailVisibility,verified,classId,gender,birthPlace,birthDate,examNumber,room,session,photo,hasChangedPassword,created,updated",
+        }),
         pb.collection("exams").getList(1, 1).then(res => res.totalItems).catch(() => 0),
         pb.collection("questions").getList(1, 1).then(res => res.totalItems).catch(() => 0),
         pb.collection("exam_rooms").getList(1, 1, { filter: 'status != "archive"' }).then(res => res.totalItems).catch(() => 0),
