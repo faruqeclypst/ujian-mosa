@@ -136,6 +136,10 @@ try {
     execSync(`scp vps/sync-all-tenants.sh ${VPS_HOST}:/usr/local/bin/sync-all-tenants.sh`, { stdio: 'inherit' });
     execSync(`ssh ${VPS_HOST} "chmod +x /usr/local/bin/sync-all-tenants.sh && sed -i 's/\\r$//' /usr/local/bin/sync-all-tenants.sh"`, { stdio: 'inherit' });
   }
+  if (fs.existsSync('vps/migrate-tenant.sh')) {
+    execSync(`scp vps/migrate-tenant.sh ${VPS_HOST}:/usr/local/bin/migrate-tenant.sh`, { stdio: 'inherit' });
+    execSync(`ssh ${VPS_HOST} "chmod +x /usr/local/bin/migrate-tenant.sh && sed -i 's/\\r$//' /usr/local/bin/migrate-tenant.sh"`, { stdio: 'inherit' });
+  }
 
   // ── [4/6] 1-CLICK SYNC KE SELURUH TENANT SEKOLAH AKTIF ──
   console.log('\n🔄 [4/6] Menjalankan 1-Click Sync ke seluruh tenant sekolah aktif...');
