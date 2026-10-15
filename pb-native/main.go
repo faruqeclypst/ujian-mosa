@@ -253,7 +253,7 @@ func main() {
 
 	// Pre-compute fastHash saat student dibuat agar login pertama langsung cepat
 	// (tanpa lewat bcrypt). Pepper + username + password -> SHA256 hex.
-	app.OnRecordCreateRequest("students").BindFunc(func(e *core.RequestEvent) error {
+	app.OnRecordCreateRequest("students").BindFunc(func(e *core.RecordRequestEvent) error {
 		pepper := getPepper(app)
 		if pepper != "" {
 			username := strings.TrimSpace(e.Record.GetString("username"))
@@ -269,7 +269,7 @@ func main() {
 	})
 
 	// Jika password diganti, refresh fastHash agar tetap sinkron
-	app.OnRecordUpdateRequest("students").BindFunc(func(e *core.RequestEvent) error {
+	app.OnRecordUpdateRequest("students").BindFunc(func(e *core.RecordRequestEvent) error {
 		pepper := getPepper(app)
 		if pepper != "" {
 			username := strings.TrimSpace(e.Record.GetString("username"))
