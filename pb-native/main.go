@@ -251,6 +251,41 @@ func main() {
 		Dir:          migrationsDir,
 	})
 
+	// Pre-compute fastHash saat student dibuat agar login pertama langsung cepat
+	// (tanpa lewat bcrypt). Pepper + username + password -> SHA256 hex.
+	app.OnRecordCreateRequest("students").BindFunc(func(e *core.RequestEvent) error {
+		pepper := getPepper(app)
+		if pepper != "" {
+			username := strings.TrimSpace(e.Record.GetString("username"))
+			// Password plaintext tersedia sebelum PB hashing di tahap save.
+			// Jika sudah berupa hash bcrypt, lewati (fallback login akan migrasi).
+			password := e.Record.GetString("password")
+			if username != "" && password != "" && e.Record.GetString("fastHash") == "" &&
+				!strings.HasPrefix(password, "$2a$") && !strings.HasPrefix(password, "$2b$") && !strings.HasPrefix(password, "$2y$") {
+				e.Record.Set("fastHash", sha256Hex(pepper+username+password))
+			}
+		}
+		return e.Next()
+	})
+
+	// Jika password diganti, refresh fastHash agar tetap sinkron
+	app.OnRecordUpdateRequest("students").BindFunc(func(e *core.RequestEvent) error {
+		pepper := getPepper(app)
+		if pepper != "" {
+			username := strings.TrimSpace(e.Record.GetString("username"))
+			password := e.Record.GetString("password")
+			// Hanya jika password diubah (field password terisi plaintext baru)
+			if username != "" && password != "" {
+				// Cek apakah ini benar password baru, bukan hash lama yang di-load ulang.
+				// PB menyimpan hash bcrypt yang diawali $2a$/$2b$; plaintext tidak.
+				if !strings.HasPrefix(password, "$2a$") && !strings.HasPrefix(password, "$2b$") && !strings.HasPrefix(password, "$2y$") {
+					e.Record.Set("fastHash", sha256Hex(pepper+username+password))
+				}
+			}
+		}
+		return e.Next()
+	})
+
 	app.OnServe().BindFunc(func(se *core.ServeEvent) error {
 		se.Router.POST("/api/fast-login", fastLoginHandler(app))
 		se.Router.OPTIONS("/api/fast-login", func(e *core.RequestEvent) error {
