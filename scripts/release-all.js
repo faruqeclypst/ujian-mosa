@@ -107,12 +107,12 @@ try {
   console.log('\n🔄 [3b/6] Update binary & restart semua tenant di Worker VPS...');
   try {
     // Ambil daftar tenant (direktori di /opt/pocketbase/schools, kecuali template)
-    const tenants = execSync(`ssh ${WORKER_HOST} "ls /opt/pocketbase/schools/"`, { encoding: 'utf-8' })
+    const tenants = execSync(`ssh ${VPS_HOST} "ssh -o BatchMode=yes -o StrictHostKeyChecking=no ${WORKER_HOST} 'ls /opt/pocketbase/schools/'"`, { encoding: 'utf-8' })
       .split('\n').map(s => s.trim()).filter(s => s && s !== 'template');
     console.log(`   Ditemukan ${tenants.length} tenant: ${tenants.join(', ')}`);
     for (const t of tenants) {
       console.log(`   → Update & restart pb-${t}...`);
-      execSync(`ssh ${WORKER_HOST} "cp ${REMOTE_TEMPLATE}/pocketbase /opt/pocketbase/schools/${t}/pocketbase && chmod +x /opt/pocketbase/schools/${t}/pocketbase && systemctl restart pb-${t}"`, { stdio: 'inherit' });
+      execSync(`ssh ${VPS_HOST} "ssh -o BatchMode=yes -o StrictHostKeyChecking=no ${WORKER_HOST} 'cp ${REMOTE_TEMPLATE}/pocketbase /opt/pocketbase/schools/${t}/pocketbase && chmod +x /opt/pocketbase/schools/${t}/pocketbase && systemctl restart pb-${t}'"`, { stdio: 'inherit' });
     }
     console.log('✅ Semua tenant berhasil di-restart dengan binary baru!');
   } catch (e) {
