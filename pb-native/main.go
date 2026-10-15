@@ -75,8 +75,8 @@ func getEnvInt(key string, def int) int {
 }
 
 var (
-	rlUser = newRateLimiter(getEnvInt("FAST_LOGIN_RL_USER", 20))     // per-username: cegah brute force 1 akun
-	rlIP   = newRateLimiter(getEnvInt("FAST_LOGIN_RL_IP", 2000))     // per-IP longgar: ramah NAT sekolah
+	rlUser = newRateLimiter(getEnvInt("FAST_LOGIN_RL_USER", 20)) // per-username: cegah brute force 1 akun
+	// rlIP dihapus — lihat NOTE di handler login
 )
 
 // ---------------------------------------------------------------------------
@@ -181,9 +181,9 @@ func fastLoginHandler(app *pocketbase.PocketBase) func(e *core.RequestEvent) err
 		if !rlUser.allow(rlKey) {
 			return e.JSON(429, map[string]string{"message": "Terlalu banyak percobaan untuk akun ini. Tunggu sebentar."})
 		}
-		if !rlIP.allow(clientIP(e)) {
-			return e.JSON(429, map[string]string{"message": "Terlalu banyak percobaan. Tunggu sebentar."})
-		}
+		// NOTE: IP-based limiter dihapus (opsi 3) — sekolah di belakang NAT
+		// dengan ribuan siswa burst login akan kena blokir. Proteksi brute-force
+		// cukup via per-user limiter (20/menit per username).
 
 		if username == "" || password == "" {
 			return e.JSON(http.StatusBadRequest, map[string]string{"message": "Username dan password wajib diisi."})
