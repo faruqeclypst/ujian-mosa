@@ -289,17 +289,25 @@ const MonitoringPage = () => {
         const teacherObj = examObj?.expand?.teacherId || masterTeachers.find((t: any) => t.id === (examObj?.teacherId || (examObj as any)?.teacherid));
 
         // Robust mapping for Class IDs
+        // Field di DB: classIds (JSON array). classId bisa kosong atau tidak ada.
+        // Prioritaskan classIds. Jika kosong → room terbuka untuk semua kelas.
         const isAllClasses = roomRecord.allClasses || (roomRecord as any).all_classes || false;
-        const clsData = roomRecord.classId || (roomRecord as any).classid || (roomRecord as any).classIds || (roomRecord as any).classids || "";
+        const clsData = (roomRecord as any).classIds || (roomRecord as any).classids || roomRecord.classId || (roomRecord as any).classid || "";
         let classList: string[] = [];
 
-        if (!isAllClasses) {
-          if (Array.isArray(clsData)) {
-            classList = clsData;
-          } else if (typeof clsData === 'string' && clsData.length > 0) {
-            classList = clsData.split(",").map(id => id.trim()).filter(Boolean);
+        if (Array.isArray(clsData)) {
+          classList = clsData.map((id: string) => String(id).trim()).filter(Boolean);
+        } else if (typeof clsData === 'string' && clsData.length > 0) {
+          try {
+            const parsed = JSON.parse(clsData);
+            classList = Array.isArray(parsed) ? parsed.map((id: string) => String(id).trim()).filter(Boolean) : clsData.split(",").map((id: string) => id.trim()).filter(Boolean);
+          } catch {
+            classList = clsData.split(",").map((id: string) => id.trim()).filter(Boolean);
           }
         }
+
+        // classIds kosong di DB = room terbuka semua kelas
+        const effectiveAllClasses = isAllClasses || classList.length === 0;
 
         currentRoom = {
           ...roomRecord,
@@ -311,8 +319,8 @@ const MonitoringPage = () => {
           subjectName: subjectObj?.name || "N/A",
           teacherName: teacherObj?.name || "N/A",
           isDisabled: isOff,
-          allClasses: isAllClasses,
-          classId: classList.length > 0 ? classList : (roomRecord.classId || [])
+          allClasses: effectiveAllClasses,
+          classId: classList
         } as any;
         setMonitorRoom(currentRoom);
       }

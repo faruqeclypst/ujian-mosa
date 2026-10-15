@@ -190,22 +190,35 @@ export const StudentTable = (props: StudentTableProps) => {
                       </TableRow>
                     ))
                   ) : (() => {
-                    const filtered = students
-                      .map(s => ({
-                        ...s,
-                        className: examClasses.find(c => c.id === s.classId)?.name || "-"
-                      }))
-                      .filter((s) => {
-                        // Search Filter
-                        if (searchQuery && !s.name.toLowerCase().includes(searchQuery.toLowerCase()) && !s.nisn.includes(searchQuery)) return false;
+                    // Fallback: jika students context belum loaded tapi attempts sudah ada,
+                    // tampilkan baris dari attempts agar monitoring tidak kosong saat background fetch 10k siswa.
+                    const studentsSource = students.length > 0 ? students : attempts.map((att: any) => ({
+                      id: att.studentId || att.student_id || att.id,
+                      name: att.studentId || att.student_id || "(Memuat...)",
+                      nisn: "",
+                      classId: "",
+                      className: "-",
+                    }));
 
-                        // Class Filter
-                        if (monitorRoom?.allClasses) {
+                    const filtered = studentsSource
+                      .map((s: any) => ({
+                        ...s,
+                        className: examClasses.find((c: any) => c.id === s.classId)?.name || s.className || "-"
+                      }))
+                      .filter((s: any) => {
+                        // Search Filter
+                        if (searchQuery && !s.name.toLowerCase().includes(searchQuery.toLowerCase()) && !(s.nisn || "").includes(searchQuery)) return false;
+
+                        // Class Filter — kalau students belum loaded (classId kosong), tampilkan semua
+                        if (!s.classId || monitorRoom?.allClasses) {
                           if (monitorClassFilter !== "all" && s.className !== monitorClassFilter) return false;
                           return true;
                         }
-                        const allowedIds = Array.isArray(monitorRoom?.classId) ? monitorRoom?.classId : String(monitorRoom?.classId || "").split(",");
-                        if (!allowedIds.includes(s.classId)) return false;
+                        const allowedIds = Array.isArray(monitorRoom?.classId) && (monitorRoom.classId as string[]).length > 0
+                          ? monitorRoom.classId as string[]
+                          : null;
+                        // allowedIds null = allClasses
+                        if (allowedIds && !allowedIds.includes(s.classId)) return false;
                         if (monitorClassFilter !== "all" && s.className !== monitorClassFilter) return false;
                         return true;
                       })
