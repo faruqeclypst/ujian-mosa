@@ -71,6 +71,39 @@ export const StudentTable = (props: StudentTableProps) => {
     setDetailAnswers, role, teacherFullAccess, aiGradingId,
   } = props;
 
+  // Realtime on-demand: subscribe HANYA ke attempt siswa yang sedang dibuka detailnya.
+  // - Saat admin klik tombol mata (expandedstudent berubah) -> subscribe ke attemptId itu.
+  // - Saat panel ditutup / pindah siswa -> unsubscribe otomatis (cleanup).
+  // - Batasan: hanya melihat jawaban yang sudah masuk DB (batch-10), bukan yang
+  //   masih pending di browser siswa.
+  const expandedAttemptId = React.useMemo(() => {
+    if (!expandedstudent) return null;
+    const att = attempts.find((a: any) => {
+      const sid = a.studentId || a.student_id;
+      return sid === expandedstudent;
+    });
+    return att?.id || null;
+  }, [expandedstudent, attempts]);
+
+  React.useEffect(() => {
+    if (!pb || !expandedAttemptId) return;
+    let cancelled = false;
+    let unsub: (() => void) | null = null;
+    pb.collection("attempts").subscribe(expandedAttemptId, (e: any) => {
+      if (cancelled) return;
+      const rec = e.record;
+      if (rec?.answers) {
+        setDetailAnswers((prev: Record<string, any>) => ({ ...prev, [expandedAttemptId]: rec.answers }));
+      }
+    }).then((u: () => void) => {
+      if (cancelled) { u(); } else { unsub = u; }
+    }).catch(() => {});
+    return () => {
+      cancelled = true;
+      if (unsub) unsub();
+    };
+  }, [pb, expandedAttemptId, setDetailAnswers]);
+
   return (
               <Table>
                 <TableHeader className="bg-slate-50 dark:bg-slate-900/50">

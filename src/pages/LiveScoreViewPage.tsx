@@ -305,6 +305,9 @@ const LiveScoreViewPage = () => {
 
       const loadedAttempts = await pb.collection("attempts").getFullList({
         filter: `examRoomId = "${roomId}"`,
+        // Field ringan saja untuk leaderboard: cukup untuk hitung skor + tampilkan status.
+        // (tanpa realtime per-event; refresh manual via tombol Segarkan)
+        fields: "id,studentId,examRoomId,status,answers,overrides,score,cheatCount,totalQuestions,total,updated",
       });
       setAttempts(loadedAttempts);
     } catch (e) {
@@ -321,54 +324,11 @@ const LiveScoreViewPage = () => {
     }
   }, [selectedRoomId, handleRefreshData]);
 
-  // Real-time Subscriptions
-  useEffect(() => {
-    if (!pb || !selectedRoomId) return;
-
-    let isSubscribed = true;
-    let currentUnsub: (() => void) | null = null;
-
-    const startSubscribe = async () => {
-      try {
-        const unsub = await pb.collection("attempts").subscribe("*", (e) => {
-          if (!isSubscribed) return;
-          const recRoomId = e.record.examRoomId || e.record.exam_room_id || "";
-          if (recRoomId !== selectedRoomId) return;
-
-          if (e.action === "create" || e.action === "update") {
-            setAttempts(prev => {
-              const idx = prev.findIndex(a => a.id === e.record.id);
-              if (idx > -1) {
-                const newArr = [...prev];
-                newArr[idx] = { ...newArr[idx], ...e.record };
-                return newArr;
-              }
-              return [e.record, ...prev];
-            });
-          } else if (e.action === "delete") {
-            setAttempts(prev => prev.filter(a => a.id !== e.record.id));
-          }
-        });
-
-        if (!isSubscribed) {
-          unsub();
-        } else {
-          currentUnsub = () => { unsub(); };
-        }
-      } catch (err) { }
-    };
-
-    startSubscribe();
-    const polling = setInterval(() => {
-      handleRefreshData(selectedRoomId);
-    }, 45000);
-
-    return () => {
-      isSubscribed = false;
-      clearInterval(polling);
-      if (currentUnsub) currentUnsub();
-    };
-  }, [pb, selectedRoomId, handleRefreshData]);
+  // Leaderboard on-demand: TANPA realtime subscription per-event.
+  // Alasan: subscribe("*") ke 10k attempts = ribuan event/detik -> browser freeze.
+  // Data di-refresh on-demand: saat ganti room (otomatis) atau via tombol "Segarkan".
+  // Ranking tetap akurat: semua attempts di-fetch (field ringan), skor dihitung,
+  // lalu di-sort descending sebelum paginasi.
 
   const activeRoom = useMemo(() => rooms.find(r => r.id === selectedRoomId), [rooms, selectedRoomId]);
 
@@ -431,6 +391,19 @@ const LiveScoreViewPage = () => {
 
   // Auto Scroll state
   const [autoScroll, setAutoScroll] = useState(false);
+
+  // Paginasi leaderboard: 50 per halaman. Ranking dihitung dari SEMUA attempts
+  // (sudah di-sort desc by skor di rankedStudents), lalu di-slice per halaman.
+  // Jadi siswa nilai tertinggi selalu di halaman 1.
+  const LEADERBOARD_PAGE_SIZE = 50;
+  const [leaderboardPage, setLeaderboardPage] = useState(1);
+  const leaderboardTotalPages = Math.max(1, Math.ceil(rankedStudents.length / LEADERBOARD_PAGE_SIZE));
+  const pagedRankedStudents = React.useMemo(() => {
+    const start = (leaderboardPage - 1) * LEADERBOARD_PAGE_SIZE;
+    return rankedStudents.slice(start, start + LEADERBOARD_PAGE_SIZE);
+  }, [rankedStudents, leaderboardPage]);
+  // Reset ke halaman 1 saat room/data berubah
+  React.useEffect(() => { setLeaderboardPage(1); }, [selectedRoomId, rankedStudents.length]);
 
   // Ref for table container to apply auto-scroll
   const tableContainerRef = useRef<HTMLDivElement>(null);
@@ -799,8 +772,9 @@ const LiveScoreViewPage = () => {
                           </div>
                         </td>
                       </tr>
-                    ) : rankedStudents.map((s, idx) => {
-                      const isTop3 = idx < 3;
+                    ) : pagedRankedStudents.map((s, idx) => {
+                      const globalRank = (leaderboardPage - 1) * LEADERBOARD_PAGE_SIZE + idx;
+                      const isTop3 = globalRank < 3;
                       const status = s.attempt?.status || "offline";
                       const cheatCount = s.attempt?.cheatCount || 0;
 
@@ -814,18 +788,18 @@ const LiveScoreViewPage = () => {
                         >
                           <td className="py-4 px-6 text-center">
                             <span
-                              className={`inline-flex items-center justify-center w-9 h-9 rounded-xl text-sm font-black font-mono transition-all group-hover:scale-110 ${idx === 0
+                              className={`inline-flex items-center justify-center w-9 h-9 rounded-xl text-sm font-black font-mono transition-all group-hover:scale-110 ${globalRank === 0
                                 ? "bg-gradient-to-br from-amber-400 to-amber-600 text-white shadow-lg shadow-amber-500/30"
-                                : idx === 1
+                                : globalRank === 1
                                   ? isDarkMode ? "bg-gradient-to-br from-slate-300 to-slate-400 text-slate-900 shadow-lg" : "bg-gradient-to-br from-gray-300 to-gray-400 text-gray-900 shadow-lg"
-                                  : idx === 2
+                                  : globalRank === 2
                                     ? "bg-gradient-to-br from-amber-700 to-amber-800 text-white shadow-lg shadow-amber-700/30"
                                     : isDarkMode
                                       ? "bg-slate-900/60 text-slate-400 border border-slate-800"
                                       : "bg-gray-100 text-gray-600 border border-gray-200"
                                 }`}
                             >
-                              {idx + 1}
+                              {globalRank + 1}
                             </span>
                           </td>
                           <td className="py-4 px-6">
@@ -901,6 +875,39 @@ const LiveScoreViewPage = () => {
                   </tbody>
                 </table>
               </div>
+              {/* Paginasi leaderboard: 50 per halaman */}
+              {leaderboardTotalPages > 1 && (
+                <div className={`flex items-center justify-between px-6 py-4 border-t ${isDarkMode ? "border-slate-800/30" : "border-gray-100"}`}>
+                  <span className={`text-xs font-semibold ${isDarkMode ? "text-slate-400" : "text-gray-500"}`}>
+                    Halaman {leaderboardPage} dari {leaderboardTotalPages} • {rankedStudents.length} siswa
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setLeaderboardPage(p => Math.max(1, p - 1))}
+                      disabled={leaderboardPage <= 1}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${leaderboardPage <= 1
+                        ? "opacity-40 cursor-not-allowed"
+                        : "hover:scale-105 active:scale-95"
+                        } ${isDarkMode ? "bg-slate-800 text-slate-200" : "bg-gray-100 text-gray-700"}`}
+                    >
+                      ← Prev
+                    </button>
+                    <span className={`text-xs font-mono font-bold ${isDarkMode ? "text-slate-300" : "text-gray-600"}`}>
+                      {leaderboardPage} / {leaderboardTotalPages}
+                    </span>
+                    <button
+                      onClick={() => setLeaderboardPage(p => Math.min(leaderboardTotalPages, p + 1))}
+                      disabled={leaderboardPage >= leaderboardTotalPages}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${leaderboardPage >= leaderboardTotalPages
+                        ? "opacity-40 cursor-not-allowed"
+                        : "hover:scale-105 active:scale-95"
+                        } ${isDarkMode ? "bg-slate-800 text-slate-200" : "bg-gray-100 text-gray-700"}`}
+                    >
+                      Next →
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </>
         ) : (
