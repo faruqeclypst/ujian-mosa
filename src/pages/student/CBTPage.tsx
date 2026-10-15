@@ -611,6 +611,8 @@ const CBTPage = () => {
   const saveTimeoutRef = useRef<any>(null);
   const answerCountRef = useRef(0);
   const pendingAnswersRef = useRef<Record<string, any>>({});
+  // Timer terpisah untuk sync progress ringan (answeredCount) — tidak saling clear dengan batch answers
+  const progressTimeoutRef = useRef<any>(null);
   const cheatTimerRef = useRef<any>(null);
   const lastLeftTimeRef = useRef<number | null>(null);
   const orientationChangeRef = useRef<boolean>(false);
@@ -891,7 +893,7 @@ const CBTPage = () => {
 
       // 2. BACKUP KE SERVER - dynamic berdasarkan ukuran room
       if (isLargeRoom) {
-        // LARGE ROOM (>500 siswa): batch setiap 10 jawaban
+        // LARGE ROOM (>500 siswa): batch setiap 10 jawaban untuk full answers
         answerCountRef.current += 1;
         pendingAnswersRef.current[questionId] = value;
         // Simpan juga meta terbaru
@@ -922,6 +924,21 @@ const CBTPage = () => {
             }
           });
         }
+
+        // JALUR RINGAN (realtime monitoring): kirim answeredCount saja, debounce 4 detik.
+        // Timer terpisah — tidak saling clear dengan batch answers di atas.
+        // Payload kecil (tanpa answers) agar monitoring tampil realtime tanpa membebani DB.
+        if (progressTimeoutRef.current) clearTimeout(progressTimeoutRef.current);
+        progressTimeoutRef.current = setTimeout(() => {
+          const SKIP_KEYS = ["__meta", "__order__", "__activeQuestionId__", "__delta"];
+          const all = answersRef.current || {};
+          const count = Object.keys(all).filter(k => !SKIP_KEYS.includes(k)).length;
+          safeUpdateAttempt(currentAttempt.id, {
+            answeredCount: count,
+            isOnline: getOnlineFlag(),
+            lastHeartbeat: new Date().toISOString()
+          }).catch(() => { /* progress sync gagal: diabaikan, batch answers tetap jalan */ });
+        }, 4000); // Debounce 4 detik untuk progress ringan
       } else {
         // SMALL ROOM (≤500 siswa): debounce 4 detik
         if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
@@ -1958,6 +1975,11 @@ const CBTPage = () => {
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
         saveTimeoutRef.current = null;
+      }
+      // Flush timer progress ringan (large room) agar tidak sync setelah submit
+      if (progressTimeoutRef.current) {
+        clearTimeout(progressTimeoutRef.current);
+        progressTimeoutRef.current = null;
       }
       // Reset batch counter untuk large room (submit mengirim full answers di bawah)
       answerCountRef.current = 0;
