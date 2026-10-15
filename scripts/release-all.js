@@ -62,6 +62,12 @@ try {
   execSync(`ssh ${VPS_HOST} "scp -o StrictHostKeyChecking=no /opt/pocketbase/infra.conf ${WORKER_HOST}:/opt/pocketbase/infra.conf"`, { stdio: 'inherit' });
   console.log('✅ Template di Master VPS dan Worker Node sudah 100% mutakhir!');
 
+  // Update sync-all-tenants.sh di Master VPS (pastikan versi terbaru)
+  if (fs.existsSync('vps/sync-all-tenants.sh')) {
+    execSync(`scp vps/sync-all-tenants.sh ${VPS_HOST}:/usr/local/bin/sync-all-tenants.sh`, { stdio: 'inherit' });
+    execSync(`ssh ${VPS_HOST} "chmod +x /usr/local/bin/sync-all-tenants.sh && sed -i 's/\\r$//' /usr/local/bin/sync-all-tenants.sh"`, { stdio: 'inherit' });
+  }
+
   // ── [4/6] 1-CLICK SYNC KE SELURUH TENANT SEKOLAH AKTIF ──
   console.log('\n🔄 [4/6] Menjalankan 1-Click Sync ke seluruh tenant sekolah aktif...');
   execSync(`ssh ${VPS_HOST} "/usr/local/bin/sync-all-tenants.sh"`, { stdio: 'inherit' });
