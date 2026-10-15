@@ -55,8 +55,14 @@ for (const dir of cleanDirs) {
 }
 
 // 2. Build Web terlebih dahulu agar dist selalu versi terbaru
-console.log('📦 [Langkah 1/3] Membangun bundle web (npm run build)...');
-execSync('npm run build', { stdio: 'inherit' });
+// Skip jika dipanggil dari release-all.js (sudah di-build di langkah [1/6])
+const skipBuild = process.argv.includes('--skip-build');
+if (!skipBuild) {
+  console.log('📦 [Langkah 1/3] Membangun bundle web (npm run build)...');
+  execSync('npm run build', { stdio: 'inherit' });
+} else {
+  console.log('📦 [Langkah 1/3] Skip build (sudah di-build sebelumnya)...');
+}
 
 // Siapkan webDir per profil:
 // - online (serverUrl): shell minimal, konten dimuat dari server (~4MB APK)
@@ -125,6 +131,8 @@ for (let i = 0; i < APKS.length; i++) {
 }
 
 // 3. Update izin dan kirim web dist terbaru ke VPS
+// Skip jika dipanggil dari release-all.js (sudah di-upload di langkah [2/6])
+if (!skipBuild) {
 console.log('\n🌐 [Langkah 3/4] Mengompres dan memperbarui web bundle di VPS...');
 try {
   execSync(`tar -czf dist.tar.gz -C dist .`, { stdio: 'inherit' });
@@ -135,14 +143,22 @@ try {
     fs.unlinkSync('dist.tar.gz');
   }
 }
+} else {
+  console.log('\n🌐 [Langkah 3/4] Skip upload dist (sudah di-upload sebelumnya)...');
+}
 
 // 4. Purge Cache Cloudflare otomatis
+// Skip jika dipanggil dari release-all.js (sudah di-purge di akhir)
+if (!skipBuild) {
 console.log('\n⚡ [Langkah 4/4] Membersihkan Cache Cloudflare (Purge Cache)...');
 try {
   execSync(`ssh ${VPS_HOST} "/root/purge_cache.sh"`, { stdio: 'inherit' });
   console.log('✅ Cloudflare Cache berhasil dibersihkan otomatis!');
 } catch (err) {
   console.warn('⚠️ Gagal membersihkan cache Cloudflare otomatis:', err.message);
+}
+} else {
+  console.log('\n⚡ [Langkah 4/4] Skip purge cache (sudah di-purge di akhir release)...');
 }
 
 // Kembalikan profil default ke examaa

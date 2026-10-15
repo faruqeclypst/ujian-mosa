@@ -108,7 +108,29 @@ try {
   // Binary PocketBase Go-native (Windows) untuk server offline sekolah
   // Diambil dari Master VPS saat release (tidak disimpan di git — 45MB)
   // NOTE: scp langsung ke staging lokal (bukan via ssh, karena path Windows tidak ada di VPS)
-  execSync(`scp -o StrictHostKeyChecking=no ${VPS_HOST}:/opt/pocketbase/schools/template/pocketbase.exe ${stagingDir}/pocketbase.exe`, { stdio: 'inherit' });
+  // Cache: jika sudah ada di .cache/ dan ukurannya sama dengan VPS, skip download
+  const pbExeCache = path.join(process.cwd(), '.cache', 'pocketbase.exe');
+  let needDownload = true;
+  if (fs.existsSync(pbExeCache)) {
+    try {
+      const localSize = fs.statSync(pbExeCache).size;
+      const remoteSize = parseInt(execSync(`ssh -o StrictHostKeyChecking=no ${VPS_HOST} "stat -c%s /opt/pocketbase/schools/template/pocketbase.exe"`, { encoding: 'utf-8' }).trim());
+      if (localSize === remoteSize && localSize > 40000000) {
+        console.log('  ♻️ pocketbase.exe sudah di-cache lokal, skip download 43MB');
+        needDownload = false;
+      }
+    } catch {}
+  }
+  if (needDownload) {
+    execSync(`scp -o StrictHostKeyChecking=no ${VPS_HOST}:/opt/pocketbase/schools/template/pocketbase.exe ${stagingDir}/pocketbase.exe`, { stdio: 'inherit' });
+    // Simpan ke cache
+    try {
+      fs.mkdirSync(path.dirname(pbExeCache), { recursive: true });
+      fs.copyFileSync(path.join(stagingDir, 'pocketbase.exe'), pbExeCache);
+    } catch {}
+  } else {
+    fs.copyFileSync(pbExeCache, path.join(stagingDir, 'pocketbase.exe'));
+  }
   if (fs.existsSync('offline_package/perbarui-server.bat')) {
     execSync(`powershell -Command "Copy-Item offline_package/perbarui-server.bat ${stagingDir}/perbarui-server.bat -Force"`, { stdio: 'inherit' });
   }
@@ -161,7 +183,7 @@ try {
   } else {
     console.log('\n📱 [6/6] Membangun dan merilis APK Android...');
     if (buildBothApks) {
-      execSync('node scripts/deploy-both-apks.js', { stdio: 'inherit' });
+      execSync('node scripts/deploy-both-apks.js --skip-build', { stdio: 'inherit' });
     } else {
       execSync('node scripts/deploy-apk.js', { stdio: 'inherit' });
     }
