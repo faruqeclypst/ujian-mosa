@@ -56,6 +56,70 @@ CURRENT_HOST=$(python3 -c "import json; print(json.loads('''$INFO''')['server_ho
 SCHOOL_NAME=$(python3 -c "import json; print(json.loads('''$INFO''')['name'])")
 
 # ============================================================
+# PEPPER MIGRATION — FAST_LOGIN_PEPPER wajib ikut pindah
+# Tanpa ini, fastHash di DB tidak valid di target -> login
+# fallback ke bcrypt -> overload saat ujian massal.
+# (Insiden 2026-10-15: migrasi agugu Worker->Master tanpa pepper,
+#  5000 user gagal login massal sampai pepper disamakan manual.)
+# Catatan: add-school.sh SELALU generate pepper BARU di target,
+# jadi fungsi di bawah menimpanya dengan pepper dari source
+# via drop-in systemd (override inline Environment di service file).
+# ============================================================
+SSH_OPTS="-o BatchMode=yes -o ConnectTimeout=5 -o StrictHostKeyChecking=no"
+
+# Ambil pepper dari sebuah host. host kosong = lokal, selain itu via ssh root@host.
+# Coba 3 lokasi berurutan, kembalikan string kosong jika tidak ketemu/tidak valid.
+read_pepper() {
+  local host="$1" slug="$2" pepper="" get_cmd=""
+  if [ -n "$host" ]; then
+    get_cmd="ssh $SSH_OPTS root@${host}"
+  fi
+  pepper=$($get_cmd sh -c '
+    slug="$1"
+    p=$(grep -h -o "FAST_LOGIN_PEPPER=[0-9a-fA-F]*" "/etc/systemd/system/pb-${slug}.service.d/pepper.conf" 2>/dev/null | head -1 | cut -d= -f2)
+    [ -z "$p" ] && p=$(grep -h -o "FAST_LOGIN_PEPPER=[0-9a-fA-F]*" "/etc/systemd/system/pb-${slug}.service" 2>/dev/null | head -1 | cut -d= -f2)
+    [ -z "$p" ] && p=$(tr -d " \n\r" < "/opt/pocketbase/schools/${slug}/fastlogin_pepper.key" 2>/dev/null)
+    printf "%s" "$p"
+  ' sh "$slug" 2>/dev/null)
+  # Validasi: harus tepat 64 hex chars (openssl rand -hex 32)
+  if [[ "$pepper" =~ ^[0-9a-fA-F]{64}$ ]]; then
+    printf "%s" "$pepper"
+  else
+    printf ""
+  fi
+}
+
+# Tulis pepper ke target sebagai drop-in systemd, lalu daemon-reload + restart
+# agar langsung aktif. Drop-in meng-override Environment inline dari add-school.sh.
+write_pepper() {
+  local host="$1" slug="$2" pepper="$3" get_cmd=""
+  if [ -n "$host" ]; then
+    get_cmd="ssh $SSH_OPTS root@${host}"
+  fi
+  $get_cmd sh -c '
+    slug="$1"; pepper="$2"
+    mkdir -p "/etc/systemd/system/pb-${slug}.service.d"
+    printf "Environment=FAST_LOGIN_PEPPER=%s\n" "$pepper" > "/etc/systemd/system/pb-${slug}.service.d/pepper.conf"
+    chmod 600 "/etc/systemd/system/pb-${slug}.service.d/pepper.conf"
+    systemctl daemon-reload
+    systemctl restart "pb-${slug}.service"
+  ' sh "$slug" "$pepper"
+}
+
+pepper_missing_warning() {
+  local slug="$1"
+  echo "=================================================================" >&2
+  echo "PERINGATAN KERAS: FAST_LOGIN_PEPPER tidak ditemukan di source" >&2
+  echo "untuk tenant '$slug'!" >&2
+  echo "Target akan memakai pepper BARU dari add-school.sh." >&2
+  echo "Ini WAJAR hanya untuk tenant BARU (belum ada siswa)." >&2
+  echo "Untuk MIGRASI tenant existing: fastHash di DB tidak akan valid," >&2
+  echo "login akan fallback ke bcrypt (LAMBAT) dan bisa overload." >&2
+  echo "Batalkan dan periksa source jika ini migrasi data existing!" >&2
+  echo "=================================================================" >&2
+}
+
+# ============================================================
 # KASUS A: PINDAH KE WORKER VPS (Mulai Ujian / Burst Mode)
 # ============================================================
 if [ "$DIRECTION" = "to_worker" ]; then
@@ -68,6 +132,12 @@ if [ "$DIRECTION" = "to_worker" ]; then
   if ! ssh -o BatchMode=yes -o ConnectTimeout=5 -o StrictHostKeyChecking=no root@"$TARGET_HOST" "true" 2>/dev/null; then
     echo "{\"success\": false, \"error\": \"Gagal terhubung ke Worker $TARGET_HOST via SSH. Pastikan worker sudah menjalankan script setup_worker_node.sh.\"}"
     exit 1
+  fi
+
+  # Bawa FAST_LOGIN_PEPPER dari Master (baca SEBELUM service lokal dimatikan/dihapus)
+  SRC_PEPPER=$(read_pepper "" "$SLUG")
+  if [ -z "$SRC_PEPPER" ]; then
+    pepper_missing_warning "$SLUG"
   fi
 
   # Matikan service lokal di Master agar SQLite aman disalin
@@ -86,6 +156,12 @@ if [ "$DIRECTION" = "to_worker" ]; then
 
   # Pasang dan jalankan systemd service pada Worker VPS
   ssh -o BatchMode=yes -o ConnectTimeout=5 -o StrictHostKeyChecking=no root@"$TARGET_HOST" "/usr/local/bin/add-school.sh '${SLUG}' ${PORT} '${CUSTOM_DOMAIN}' ${QUOTA}" >/dev/null 2>&1
+
+  # Timpa pepper Worker (add-school.sh selalu generate baru) dengan pepper Master
+  # agar fastHash di DB yang baru disalin tetap valid.
+  if [ -n "$SRC_PEPPER" ]; then
+    write_pepper "$TARGET_HOST" "$SLUG" "$SRC_PEPPER"
+  fi
 
   # Perbarui Caddy di Master VPS (arah reverse proxy ke Worker IP)
   /usr/local/bin/add-school.sh "${SLUG}" "${PORT}" "${CUSTOM_DOMAIN}" "${QUOTA}" "${TARGET_HOST}" >/dev/null 2>&1
@@ -117,6 +193,12 @@ elif [ "$DIRECTION" = "to_master" ]; then
     exit 1
   fi
 
+  # Bawa FAST_LOGIN_PEPPER dari Worker (baca SEBELUM cleanup remove-school.sh)
+  SRC_PEPPER=$(read_pepper "$SOURCE_HOST" "$SLUG")
+  if [ -z "$SRC_PEPPER" ]; then
+    pepper_missing_warning "$SLUG"
+  fi
+
   # Matikan service di Worker agar file SQLite konsisten saat disalin
   ssh -o BatchMode=yes -o ConnectTimeout=5 -o StrictHostKeyChecking=no root@"$SOURCE_HOST" "systemctl stop pb-${SLUG}.service 2>/dev/null || true"
 
@@ -126,6 +208,12 @@ elif [ "$DIRECTION" = "to_master" ]; then
 
   # Jalankan tenant secara lokal di Master VPS (systemd + rambalancer)
   /usr/local/bin/add-school.sh "${SLUG}" "${PORT}" "${CUSTOM_DOMAIN}" "${QUOTA}" "127.0.0.1" >/dev/null 2>&1
+
+  # Timpa pepper Master (add-school.sh selalu generate baru) dengan pepper Worker
+  # agar fastHash di DB yang baru ditarik tetap valid.
+  if [ -n "$SRC_PEPPER" ]; then
+    write_pepper "" "$SLUG" "$SRC_PEPPER"
+  fi
 
   # Bersihkan service di Worker Node
   ssh -o BatchMode=yes -o ConnectTimeout=5 -o StrictHostKeyChecking=no root@"$SOURCE_HOST" "/usr/local/bin/remove-school.sh '${SLUG}' 2>/dev/null || true"
