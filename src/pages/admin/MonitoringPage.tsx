@@ -1104,11 +1104,11 @@ const MonitoringPage = () => {
 
   // 📥 Export Excel (extracted to utils/exportExcel.ts)
   const handleExportExcel = () => {
-    exportRecapExcel({ monitorRoom, filteredStudents, students, attempts, monitorQuestions, terminology, getLiveScore, showAlert });
+    exportRecapExcel({ monitorRoom, students, attempts, monitorQuestions, terminology, examClasses, monitorClassFilter, getLiveScore, showAlert });
   };
 
   const handleExportEssayExcel = () => {
-    exportEssayExcel({ monitorRoom, filteredStudents, students, attempts, monitorQuestions, terminology, getLiveScore, showAlert });
+    exportEssayExcel({ monitorRoom, students, attempts, monitorQuestions, terminology, examClasses, monitorClassFilter, getLiveScore, showAlert });
   };
 
   const handleForceSubmitAll = () => {
@@ -1502,7 +1502,7 @@ const MonitoringPage = () => {
                   {(role === "admin" || (role === "teacher" && teacherFullAccess)) && monitorQuestions.some((q: any) => q.type === "uraian") ? (
                     <div className="grid grid-cols-2 gap-2">
                       <button
-                        onClick={() => { setQuickGradeText(""); setQuickGradeProgress(null); setQuickGradeOpen(true); }}
+                        onClick={() => { setQuickGradeOpen(true); }}
                         className="w-full rounded-xl bg-violet-50 hover:bg-violet-100 border border-violet-100 dark:bg-violet-900/20 dark:text-violet-400 dark:hover:bg-violet-900/40 dark:border-violet-800/40 text-violet-700 font-bold text-[10px] py-2 px-1 shadow-sm transition-all flex items-center justify-center gap-1 whitespace-nowrap tracking-tight"
                       >
                         <Zap className="h-3.5 w-3.5 text-violet-500 shrink-0" /> Quick Grade
@@ -1617,6 +1617,16 @@ const MonitoringPage = () => {
                 setEditAnswerDialog={setEditAnswerDialog}
                 detailAnswers={detailAnswers}
                 answersList={answersList}
+                isLoading={isLoading}
+                examClasses={examClasses}
+                searchQuery={searchQuery}
+                roomId={roomId}
+                isLargeRoom={isLargeRoom}
+                pb={pb}
+                setDetailAnswers={setDetailAnswers}
+                role={role}
+                teacherFullAccess={teacherFullAccess}
+                aiGradingId={aiGradingId}
               />
             </div>
 
@@ -1802,6 +1812,8 @@ const MonitoringPage = () => {
         students={students}
         attempts={attempts}
         monitorQuestions={monitorQuestions}
+        monitorRoom={monitorRoom}
+        setAttempts={setAttempts}
         showAlert={showAlert}
       />
 
