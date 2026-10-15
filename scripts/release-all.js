@@ -106,8 +106,9 @@ try {
   execSync(`powershell -Command "Copy-Item pb_hooks ${stagingDir}/pb_hooks_tmp -Recurse -Force; Remove-Item ${stagingDir}/pb_hooks_tmp/_removed_go_native -Recurse -Force -ErrorAction SilentlyContinue; Move-Item ${stagingDir}/pb_hooks_tmp ${stagingDir}/pb_hooks -Force"`, { stdio: 'inherit' });
   execSync(`powershell -Command "Copy-Item version.json ${stagingDir}/version.json -Force"`, { stdio: 'inherit' });
   // Binary PocketBase Go-native (Windows) untuk server offline sekolah
-  // Diambil dari Worker VPS saat release (tidak disimpan di git — 45MB)
-  execSync(`ssh ${VPS_HOST} "scp -o StrictHostKeyChecking=no root@43.134.175.87:/opt/pocketbase/schools/template/pocketbase.exe /tmp/pb-win.exe 2>/dev/null && cp /tmp/pb-win.exe ${stagingDir}/pocketbase.exe"`, { stdio: 'inherit' });
+  // Diambil dari Master VPS saat release (tidak disimpan di git — 45MB)
+  // NOTE: scp langsung ke staging lokal (bukan via ssh, karena path Windows tidak ada di VPS)
+  execSync(`scp -o StrictHostKeyChecking=no ${VPS_HOST}:/opt/pocketbase/schools/template/pocketbase.exe ${stagingDir}/pocketbase.exe`, { stdio: 'inherit' });
   if (fs.existsSync('offline_package/perbarui-server.bat')) {
     execSync(`powershell -Command "Copy-Item offline_package/perbarui-server.bat ${stagingDir}/perbarui-server.bat -Force"`, { stdio: 'inherit' });
   }
