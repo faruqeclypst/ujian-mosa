@@ -107,6 +107,10 @@ const MonitoringPage = () => {
   const lastTickRef = useRef(Date.now());
 
   const [searchQuery, setSearchQuery] = useState("");
+  // Statistik agregasi dari backend (/api/room-detail-stats): COUNT(DISTINCT)
+  // di SQL dengan definisi kanonis (siswa unik, eligible terhadap kelas room).
+  // Dipakai untuk kartu "Sedang Ujian"/"Selesai" tanpa menunggu fetch attempts.
+  const [detailStats, setDetailStats] = useState<{ total: number; ongoing: number; finished: number } | null>(null);
 
   // 📝 Real-time Live Score Calculator (Weighted: objective + essay)
   const getLiveScore = (sisAnswers: Record<string, any>, attOverrides: Record<string, boolean> = {}) => {
@@ -261,6 +265,14 @@ const MonitoringPage = () => {
     isRefreshingRef.current = true;
     try {
       if (!pb) return;
+      // 0. Statistik agregasi backend (ringan, 1 query SQL) — untuk kartu
+      // "Sedang Ujian"/"Selesai". Tidak menunggu fetch attempts yang berat.
+      try {
+        const st: any = await pb.send(`/api/room-detail-stats?roomId=${id}`, { method: "GET" });
+        if (st && typeof st.ongoing === "number") {
+          setDetailStats({ total: Number(st.total) || 0, ongoing: Number(st.ongoing) || 0, finished: Number(st.finished) || 0 });
+        }
+      } catch (e) { /* endpoint belum tersedia: fallback ke hitungan lokal */ }
       // 1. Ambil Data Ruangan jika belum ada
       let currentRoom = monitorRoom;
       if (!currentRoom) {
@@ -1291,6 +1303,13 @@ const MonitoringPage = () => {
         const finishedCount = filteredAttempts.filter(a => a.status === 'finished' || a.status === 'submitted' || a.status === 'graded').length;
         const lockedCount = filteredAttempts.filter(a => a.status === 'LOCKED').length;
 
+        // Preferensi: angka agregasi backend (/api/room-detail-stats) bila tidak
+        // ada filter kelas — definisinya identik (siswa unik + eligible), tapi
+        // dihitung di SQL tanpa menunggu fetch attempts selesai.
+        const useBackendStats = detailStats !== null && monitorClassFilter === "all";
+        const dispOngoing = useBackendStats ? detailStats.ongoing : ongoingCount;
+        const dispFinished = useBackendStats ? detailStats.finished : finishedCount;
+
         const absentList = eligibleStudents
           .filter(s => !filteredAttempts.find(a => (a.studentId || a.student_id) === s.id))
           .sort((a, b) => {
@@ -1325,7 +1344,7 @@ const MonitoringPage = () => {
                 <div>
                   <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-0.5">Sedang Ujian</p>
                   <h4 className="text-xl font-black text-emerald-600 dark:text-emerald-400 leading-none">
-                    {isLoading ? <Skeleton className="h-6 w-8" /> : ongoingCount}
+                    {isLoading ? <Skeleton className="h-6 w-8" /> : dispOngoing}
                   </h4>
                 </div>
               </div>
@@ -1341,7 +1360,7 @@ const MonitoringPage = () => {
                   <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-0.5">Selesai</p>
                   {isLoading ? <Skeleton className="h-6 w-16" /> : (
                     <h4 className="text-xl font-black text-blue-600 dark:text-blue-400 leading-none">
-                      {finishedCount}<span className="text-sm font-bold text-slate-400">/{eligibleStudents.length}</span>
+                      {dispFinished}<span className="text-sm font-bold text-slate-400">/{eligibleStudents.length}</span>
                     </h4>
                   )}
                 </div>

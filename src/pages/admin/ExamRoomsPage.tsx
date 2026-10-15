@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Plus, Trash, Edit, Users, Archive, RotateCw, BookOpen, ClipboardList, Lock, Clock, ChevronDown, ChevronRight, Power, PowerOff, Search, ShieldAlert, FileSpreadsheet, BarChart2, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "../../components/ui/button";
@@ -15,7 +15,6 @@ import { BatchProgressDialog, type BatchProgressState } from "../../components/d
 import { useToast } from "../../components/ui/toast";
 import { cn } from "../../lib/utils";
 import { exportActiveRoomsToZip } from "../../lib/roomExcelExport";
-import { countOngoingPerRoom } from "../../lib/attemptStats";
 
 import { DataTable } from "../../components/ui/data-table";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../components/ui/table";
@@ -160,50 +159,6 @@ const ExamRoomsPage = () => {
 
   const [liveBreakdown, setLiveBreakdown] = useState<Record<string, number>>({});
   const [totalOngoing, setTotalOngoing] = useState(0);
-
-  // Cache attempts ongoing + tombstone, hidup di ref agar bisa dibaca
-  // oleh beberapa effect (realtime subscription & recount saat rooms/students berubah).
-  const attemptsCacheRef = useRef<Record<string, any>>({});
-  const finishTombstonesRef = useRef<Record<string, number>>({});
-  const roomsRef = useRef<ExamRoomData[]>([]);
-  const studentsRef = useRef<any[]>([]);
-  const studentsByIdRef = useRef<{ arr: any[]; map: Record<string, any> }>({ arr: [], map: {} });
-
-  const getStudentsById = useCallback(() => {
-    const st = studentsRef.current;
-    if (studentsByIdRef.current.arr !== st) {
-      const map: Record<string, any> = {};
-      for (const s of st || []) if (s && s.id) map[s.id] = s;
-      studentsByIdRef.current = { arr: st, map };
-    }
-    return studentsByIdRef.current.map;
-  }, []);
-
-  // Hitung ulang "sedang mengerjakan" dari cache.
-  // DEFINISI KANONIS (lib/attemptStats, sama dengan MonitoringPage "Sedang Ujian"):
-  // siswa unik dengan attempt 'ongoing' yang eligible terhadap kelas room.
-  const recomputeLiveStats = useCallback(() => {
-    const { perRoom, total } = countOngoingPerRoom(
-      attemptsCacheRef.current,
-      roomsRef.current,
-      getStudentsById()
-    );
-    setLiveBreakdown(perRoom);
-    setTotalOngoing(total);
-  }, [getStudentsById]);
-
-  // Throttle recompute: saat 10k siswa ujian, subscription attempts dibanjiri
-  // ribuan event/detik (autosave + heartbeat). Tanpa throttle, recompute di
-  // setiap event membuat main thread 100% → halaman freeze/stuck loading.
-  // Event tetap dicatat murah ke cache; angka dihitung ulang maks 1×/2 detik.
-  const recomputeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const scheduleRecompute = useCallback(() => {
-    if (recomputeTimerRef.current) return;
-    recomputeTimerRef.current = setTimeout(() => {
-      recomputeTimerRef.current = null;
-      recomputeLiveStats();
-    }, 2000);
-  }, [recomputeLiveStats]);
 
   const isOwner = useCallback((room: ExamRoomData) => {
     const is_admin = role === "admin";
@@ -466,107 +421,44 @@ const ExamRoomsPage = () => {
     }
   ], [masterTeachers, liveBreakdown, rooms, selectableRooms, selectedIds, terminology, isOwner, lastSelectedIndex, filteredRooms]);
 
-  // Sync Live Monitoring Progres
-  // Sumber data: realtime subscription attempts + fetch awal + rekonsiliasi
-  // berkala (60 dtk) untuk menyembuhkan drift bila ada event yang terlewat
-  // saat burst load (mis. websocket reconnect).
+  // Sync Live Monitoring Progres — via backend agregasi /api/room-stats.
+  // Alasan: subscribe("*") ke attempts saat 10k siswa ujian membanjiri browser
+  // dengan ribuan event/detik (autosave + heartbeat) -> main thread 100%.
+  // Endpoint menghitung COUNT(DISTINCT studentId) di SQL dengan definisi
+  // kanonis yang sama (siswa unik, ongoing, eligible terhadap kelas room).
+  // Polling 15 detik cukup untuk daftar room; hemat resource saat tab hidden.
   useEffect(() => {
     if (!pb) return;
-    let initialDone = false;
-    let pollTimer: ReturnType<typeof setInterval> | null = null;
+    let cancelled = false;
 
-    const applyEvent = (e: any) => {
-      const rec = e.record;
-      if (!rec || !rec.id) return;
-      if (e.action === "delete") {
-        delete attemptsCacheRef.current[rec.id];
-        finishTombstonesRef.current[rec.id] = Date.now();
-      } else if (rec.status === "ongoing") {
-        attemptsCacheRef.current[rec.id] = rec;
-        delete finishTombstonesRef.current[rec.id];
-      } else {
-        // ongoing -> finished/submitted/LOCKED/dll: keluarkan dari cache
-        // + catat tombstone supaya merge snapshot tidak menghidupkannya lagi.
-        delete attemptsCacheRef.current[rec.id];
-        const ts = rec.updated ? new Date(rec.updated).getTime() : Date.now();
-        finishTombstonesRef.current[rec.id] = Number.isFinite(ts) ? ts : Date.now();
-      }
-    };
-
-    const fetchFresh = async () => {
+    const fetchStats = async () => {
       try {
-        // Bersihkan tombstone lama (>10 mnt) agar tidak menumpuk di memori.
-        // Aman: tombstone hanya relevan untuk fetch yang sedang berjalan.
-        const nowTs = Date.now();
-        for (const [tid, tts] of Object.entries(finishTombstonesRef.current)) {
-          if (nowTs - (tts as number) > 10 * 60 * 1000) {
-            delete finishTombstonesRef.current[tid];
-          }
+        const res: any = await pb.send("/api/room-stats", { method: "GET" });
+        if (cancelled || !res || typeof res !== "object") return;
+        const breakdown: Record<string, number> = {};
+        let total = 0;
+        for (const [rid, v] of Object.entries(res)) {
+          const n = Number((v as any)?.ongoing) || 0;
+          if (n > 0) breakdown[rid] = n;
+          total += n;
         }
-
-        const all = await pb.collection("attempts").getFullList({
-          filter: 'status = "ongoing"',
-          // Ringan: hanya field yang dipakai untuk hitung "sedang mengerjakan".
-          // - status ikut (dipakai filter di countOngoingPerRoom)
-          // - updated TIDAK perlu: tombstone berbasis keberadaan, bukan timestamp
-          fields: "id,studentId,examRoomId,status",
-        });
-        const merged: Record<string, any> = {};
-        for (const a of all) {
-          // Tombstone = event finish/delete sudah masuk via subscription selama
-          // fetch (subscription dipasang SEBELUM fetch). Record snapshot untuk
-          // id ini pasti basi → buang. Tidak perlu bandingkan timestamp karena
-          // tombstone keyed by attempt id dan dihapus saat ada event ongoing.
-          if (finishTombstonesRef.current[a.id]) continue;
-          merged[a.id] = a;
-        }
-        // Event realtime yang masuk selama fetch dipertahankan dan MENANG atas
-        // snapshot bila bentrok: subscription dipasang sebelum fetch dimulai,
-        // jadi event pasti lebih baru daripada data snapshot.
-        for (const [id, ev] of Object.entries(attemptsCacheRef.current)) {
-          merged[id] = ev;
-        }
-        attemptsCacheRef.current = merged;
-        recomputeLiveStats();
+        setLiveBreakdown(breakdown);
+        setTotalOngoing(total);
       } catch (err) {
-        // Abaikan; cache dari subscription tetap dipakai.
+        // Endpoint belum tersedia (belum release) atau error: pertahankan angka lama.
       }
     };
 
-    // Subscribe DULU supaya tidak ada event yang hilang selama fetch awal.
-    const unsub = pb.collection("attempts").subscribe("*", (e: any) => {
-      applyEvent(e);
-      // PENTING: pakai versi throttle — jangan recompute di setiap event.
-      if (initialDone) scheduleRecompute();
-    });
-
-    (async () => {
-      await fetchFresh();
-      initialDone = true;
-      recomputeLiveStats();
-    })();
-
-    pollTimer = setInterval(() => {
-      // Hemat resource: jangan poll saat tab tidak terlihat.
-      if (!document.hidden) fetchFresh();
-    }, 60000);
+    fetchStats();
+    const pollTimer = setInterval(() => {
+      if (!document.hidden) fetchStats();
+    }, 15000);
 
     return () => {
-      if (pollTimer) clearInterval(pollTimer);
-      if (recomputeTimerRef.current) {
-        clearTimeout(recomputeTimerRef.current);
-        recomputeTimerRef.current = null;
-      }
-      unsub.then((u) => u && u());
+      cancelled = true;
+      clearInterval(pollTimer);
     };
-  }, [pb, recomputeLiveStats, scheduleRecompute]);
-
-  // Hitung ulang saat daftar rooms/students berubah (tanpa re-subscribe).
-  useEffect(() => {
-    roomsRef.current = rooms;
-    studentsRef.current = students;
-    recomputeLiveStats();
-  }, [rooms, students, recomputeLiveStats]);
+  }, [pb]);
 
   // Sync Master Exams for Room creation selection
   useEffect(() => {

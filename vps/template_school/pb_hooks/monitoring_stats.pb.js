@@ -8,6 +8,8 @@
 // 3. GET /api/leaderboard?roomId=xxx&page=1&perPage=50
 //    -> {items: [{studentId, name, username, score, answered, status}], totalItems, totalPages, page}
 //    Dipakai halaman Live Score (ranking akurat, paginasi server-side).
+//    Response juga membawa `stats: {total, ongoing, finished, locked, avgScore}`
+//    untuk kartu statistik tanpa request tambahan.
 //
 // Auth: hanya admin (users dengan role admin / _superusers).
 console.log("[MONITOR] monitoring_stats hook loaded: /api/room-stats, /api/room-detail-stats, /api/leaderboard");
@@ -271,10 +273,10 @@ routerAdd("GET", "/api/leaderboard", (e) => {
         }
 
         // 3. Ambil attempts room ini (field ringan)
-        const aTpl = new DynamicModel({ id: "", sid: "", st: "", ans: "", ovr: "" });
+        const aTpl = new DynamicModel({ id: "", sid: "", st: "", ans: "", ovr: "", cc: 0 });
         const aRows = arrayOf(aTpl);
         $app.db().newQuery(
-            "SELECT id AS id, studentId AS sid, status AS st, answers AS ans, overrides AS ovr " +
+            "SELECT id AS id, studentId AS sid, status AS st, answers AS ans, overrides AS ovr, cheatCount AS cc " +
             "FROM attempts WHERE examRoomId = '" + roomId.replace(/'/g, "''") + "'"
         ).all(aRows);
 
@@ -291,6 +293,7 @@ routerAdd("GET", "/api/leaderboard", (e) => {
 
         // 5. Hitung skor semua, sort, paginasi
         const scored = [];
+        let stOngoing = 0, stFinished = 0, stLocked = 0, scoreSum = 0;
         for (let i = 0; i < aRows.length; i++) {
             const r = aRows[i];
             if (!r || !r.sid) continue;
@@ -303,16 +306,22 @@ routerAdd("GET", "/api/leaderboard", (e) => {
                 try { overrides = answers.__overrides__ || {}; } catch (err) {}
             }
             const calc = msCalcScore(answers, questions, overrides);
+            const stt = String(r.st || "");
+            if (stt === "ongoing") stOngoing++;
+            else if (stt === "finished" || stt === "submitted") stFinished++;
+            else if (stt === "LOCKED") stLocked++;
+            scoreSum += calc.score;
             const sm = sMap[String(r.sid)] || { name: "", username: "" };
             scored.push({
                 studentId: String(r.sid),
                 attemptId: String(r.id),
                 name: sm.name,
                 username: sm.username,
-                status: String(r.st || ""),
+                status: stt,
                 score: calc.score,
                 answered: calc.answered,
-                totalQuestions: questions.length
+                totalQuestions: questions.length,
+                cheatCount: Number(r.cc) || 0
             });
         }
         scored.sort((a, b) => b.score - a.score || b.answered - a.answered);
@@ -325,7 +334,15 @@ routerAdd("GET", "/api/leaderboard", (e) => {
             return it;
         });
 
-        return e.json(200, { items: items, totalItems: totalItems, totalPages: totalPages, page: page, perPage: perPage });
+        const stats = {
+            total: totalItems,
+            ongoing: stOngoing,
+            finished: stFinished,
+            locked: stLocked,
+            avgScore: totalItems > 0 ? Math.round(scoreSum / totalItems) : 0
+        };
+
+        return e.json(200, { items: items, totalItems: totalItems, totalPages: totalPages, page: page, perPage: perPage, stats: stats });
     } catch (err) {
         console.error("[MONITOR] leaderboard error:", err);
         return e.json(500, { error: "gagal menghitung leaderboard" });

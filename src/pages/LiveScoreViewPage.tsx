@@ -40,7 +40,7 @@ export interface ExamRoomOption {
 const LiveScoreViewPage = () => {
   const navigate = useNavigate();
   const { pb, school } = useTenant();
-  const { classes: examClasses, students, loading: dataLoading } = useExamData();
+  const { classes: examClasses, students } = useExamData();
 
   // Pin Gate
   const [pinUnlocked, setPinUnlocked] = useState(() => sessionStorage.getItem("livescore_view_unlocked") === "1");
@@ -53,13 +53,19 @@ const LiveScoreViewPage = () => {
 
   // Selection states
   const [rooms, setRooms] = useState<ExamRoomOption[]>([]);
-  const roomsRef = useRef<ExamRoomOption[]>([]);
   const [selectedRoomId, setSelectedRoomId] = useState<string>("");
   const [roomsLoading, setRoomsLoading] = useState(true);
 
-  // Active room data
-  const [attempts, setAttempts] = useState<any[]>([]);
-  const [monitorQuestions, setMonitorQuestions] = useState<any[]>([]);
+  // Leaderboard dari backend (/api/leaderboard): skor + ranking dihitung di
+  // server (SQL), paginasi server-side. Frontend tidak lagi fetch attempts
+  // atau questions penuh, dan tidak menghitung skor sendiri.
+  const LEADERBOARD_PAGE_SIZE = 50;
+  const [lbItems, setLbItems] = useState<any[]>([]);
+  const [lbTotalItems, setLbTotalItems] = useState(0);
+  const [lbTotalPages, setLbTotalPages] = useState(1);
+  const [lbStats, setLbStats] = useState({ total: 0, ongoing: 0, finished: 0, locked: 0, avgScore: 0 });
+  const [topItems, setTopItems] = useState<any[]>([]);
+  const [leaderboardPage, setLeaderboardPage] = useState(1);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Toggle theme handler
@@ -108,7 +114,6 @@ const LiveScoreViewPage = () => {
           };
         });
 
-        roomsRef.current = mapped;
         setRooms(mapped);
         if (mapped.length > 0) {
           setSelectedRoomId(mapped[0].id);
@@ -123,287 +128,85 @@ const LiveScoreViewPage = () => {
     fetchRooms();
   }, [pb]);
 
-  // Live Score Calculator
-  const isFuzzyMatch = (studentAns: any, correctKey: string) => {
-    if (typeof studentAns !== "string" || !correctKey) return false;
-    const stripHtml = (s: string) => s.replace(/<[^>]*>/g, "");
-    const sAns = stripHtml(studentAns).trim().toLowerCase().replace(/[^a-z0-9]/g, "");
-    const cKey = stripHtml(correctKey).trim().toLowerCase().replace(/[^a-z0-9]/g, "");
-    if (sAns === cKey) return true;
-    if (!sAns || !cKey) return false;
-    if (sAns.includes(cKey) || cKey.includes(sAns)) return true;
-    if (cKey.length < 3) return sAns === cKey;
-    const distance = (a: string, b: string) => {
-      const matrix = Array(b.length + 1).fill(null).map(() => Array(a.length + 1).fill(null));
-      for (let i = 0; i <= a.length; i++) matrix[0][i] = i;
-      for (let j = 0; j <= b.length; j++) matrix[j][0] = j;
-      for (let j = 1; j <= b.length; j++) {
-        for (let i = 1; i <= a.length; i++) {
-          const cost = a[i - 1] === b[j - 1] ? 0 : 1;
-          matrix[j][i] = Math.min(matrix[j][i - 1] + 1, matrix[j - 1][i] + 1, matrix[j - 1][i - 1] + cost);
-        }
-      }
-      return matrix[b.length][a.length];
-    };
-    const dist = distance(sAns, cKey);
-    const maxLen = Math.max(sAns.length, cKey.length);
-    const maxAllowed = maxLen > 10 ? 3 : (maxLen > 6 ? 2 : (maxLen >= 4 ? 1 : 0));
-    return dist <= maxAllowed;
-  };
-
-  const getLiveScore = useCallback((sisAnswers: Record<string, any>, attOverrides: Record<string, boolean> = {}) => {
-    if (!sisAnswers || monitorQuestions.length === 0) return 0;
-    const overrides = Object.keys(attOverrides).length > 0 ? attOverrides : ((sisAnswers as any)?.__overrides__ || {});
-    const studentOrder = (sisAnswers as any)?.__order__ || (sisAnswers as any)?.__meta?.questionOrder;
-    const targetQuestions = Array.isArray(studentOrder) && studentOrder.length > 0
-      ? monitorQuestions.filter((q: any) => studentOrder.includes(q.id))
-      : monitorQuestions;
-
-    let objectiveCorrect = 0;
-    let objectiveTotal = 0;
-    let essayCorrect = 0;
-    let essayTotal = 0;
-
-    targetQuestions.forEach((q: any) => {
-      const type = q.type || "pilihan_ganda";
-      const isEssay = type === "isian_singkat" || type === "uraian";
-      let itemScore = 0;
-
-      if (overrides[q.id] !== undefined) {
-        itemScore = overrides[q.id] === true ? 1 : (typeof overrides[q.id] === "number" ? overrides[q.id] : 0);
-      } else {
-        const ansId = sisAnswers[q.id];
-        if (ansId !== undefined && ansId !== null) {
-          if (type === "pilihan_ganda") {
-            const ck = Object.keys(q.choices || {}).find(k => k.toLowerCase() === String(ansId).toLowerCase());
-            itemScore = ck ? (q.choices[ck].isCorrect === true ? 1 : 0) : 0;
-          } else if (type === "benar_salah") {
-            const sts = q.statements || q.choices?.statements || [];
-            if (sts.length > 0) {
-              let stCorrect = 0;
-              sts.forEach((st: any) => {
-                const expected = (st.answer || "benar").toLowerCase();
-                const given = (ansId?.[st.id] || "").toLowerCase();
-                if (given === expected) stCorrect++;
-              });
-              itemScore = sts.length > 0 ? stCorrect / sts.length : 0;
-            } else {
-              const ck = Object.keys(q.choices || {}).find(k => k.toLowerCase() === String(ansId).toLowerCase());
-              itemScore = ck ? (q.choices[ck].isCorrect === true ? 1 : 0) : 0;
-            }
-          } else if (type === "pilihan_ganda_kompleks") {
-            const correctKeys = Object.keys(q.choices || {}).filter(k => q.choices[k].isCorrect).map(k => k.toLowerCase());
-            const studentKeys = Array.isArray(ansId) ? ansId.map(k => String(k).toLowerCase()) : [];
-            const correctChosen = studentKeys.filter(k => correctKeys.includes(k));
-            const wrongChosen = studentKeys.filter(k => !correctKeys.includes(k));
-            itemScore = correctKeys.length > 0 ? Math.max(0, correctChosen.length - wrongChosen.length) / correctKeys.length : 0;
-          } else if (type === "isian_singkat") {
-            itemScore = isFuzzyMatch(ansId, q.answerKey) ? 1 : 0;
-          } else if (type === "urutkan" || type === "drag_drop") {
-            const co = (q.items || []).map((it: any) => it.id);
-            itemScore = Array.isArray(ansId) && ansId.length === co.length && ansId.every((v, i) => v === co[i]) ? 1 : 0;
-          } else if (type === "menjodohkan") {
-            const pairs = q.pairs || [];
-            itemScore = pairs.length > 0 && pairs.every((p: any) => ansId[p.id] === p.right) ? 1 : 0;
-          }
-        }
-      }
-
-      if (isEssay) {
-        essayTotal++;
-        essayCorrect += itemScore;
-      } else {
-        objectiveTotal++;
-        objectiveCorrect += itemScore;
-      }
-    });
-
-    if (essayTotal === 0) {
-      return objectiveTotal > 0 ? Math.round((objectiveCorrect / objectiveTotal) * 100) : 0;
-    }
-
-    const objScore = objectiveTotal > 0 ? (objectiveCorrect / objectiveTotal) * 100 : 0;
-    const essScore = essayTotal > 0 ? (essayCorrect / essayTotal) * 100 : 0;
-    return Math.round(objScore * 0.6 + essScore * 0.4);
-  }, [monitorQuestions]);
-
-  const getAttemptScore = useCallback((attempt: any) => {
-    if (!attempt) return 0;
-    const sisAnswers = attempt.answers || {};
-    const overrides = attempt.overrides || (sisAnswers as any)?.__overrides__ || {};
-    const liveScore = getLiveScore(sisAnswers, overrides);
-    return attempt.status === "finished"
-      ? (attempt.score === 0 && liveScore > 0 ? liveScore : (attempt.score ?? liveScore))
-      : liveScore;
-  }, [getLiveScore]);
-
-  // Fetch data for selected room
-  const handleRefreshData = useCallback(async (roomId: string) => {
+  // Fetch leaderboard dari backend (/api/leaderboard).
+  // Skor + ranking dihitung di server (SQL), sudah ter-sort desc global,
+  // lalu dipaginasi server-side. Satu request juga membawa `stats`
+  // (ongoing/finished/locked/avgScore) untuk kartu statistik.
+  const handleRefreshData = useCallback(async (roomId: string, page: number) => {
     if (!pb || !roomId) return;
     setIsRefreshing(true);
     try {
-      // Dapatkan active room dari ref atau fetch langsung dari PocketBase jika belum tersedia di state
-      let activeRoom = roomsRef.current.find(r => r.id === roomId);
-      let targetExamId = activeRoom?.examId;
-
-      if (!targetExamId) {
-        try {
-          const roomRecord = await pb.collection("exam_rooms").getOne(roomId);
-          targetExamId = roomRecord.examId || (roomRecord as any).examid || "";
-        } catch (e) {
-          console.error("Gagal mengambil detail ruang ujian:", e);
+      const lb: any = await pb.send(
+        `/api/leaderboard?roomId=${encodeURIComponent(roomId)}&page=${page}&perPage=${LEADERBOARD_PAGE_SIZE}`,
+        { method: "GET" }
+      );
+      if (lb && Array.isArray(lb.items)) {
+        setLbItems(lb.items);
+        setLbTotalItems(Number(lb.totalItems) || 0);
+        setLbTotalPages(Math.max(1, Number(lb.totalPages) || 1));
+        if (lb.stats) {
+          setLbStats({
+            total: Number(lb.stats.total) || 0,
+            ongoing: Number(lb.stats.ongoing) || 0,
+            finished: Number(lb.stats.finished) || 0,
+            locked: Number(lb.stats.locked) || 0,
+            avgScore: Number(lb.stats.avgScore) || 0,
+          });
         }
+        // Podium selalu dari 3 teratas global (halaman 1).
+        if (page === 1) setTopItems(lb.items.slice(0, 3));
       }
-
-      if (targetExamId) {
-        const qList = await pb.collection("questions").getFullList({
-          filter: `examId = "${targetExamId}"`,
-          sort: "order,created",
-        });
-
-        const mappedQuestions = qList.map(q => {
-          const rawType = q.field || q.type || "pilihan_ganda";
-          const typeMapReverse: Record<string, string> = {
-            multiple_choice: "pilihan_ganda",
-            complex_multiple_choice: "pilihan_ganda_kompleks",
-            complex_choice: "pilihan_ganda_kompleks",
-            matching: "menjodohkan",
-            true_false: "benar_salah",
-            short_answer: "isian_singkat",
-            essay: "uraian",
-            ordering: "urutkan",
-            sequence: "urutkan",
-            drag_drop: "drag_drop",
-            pilihan_ganda: "pilihan_ganda",
-            pilihan_ganda_kompleks: "pilihan_ganda_kompleks",
-            isian_singkat: "isian_singkat",
-            uraian: "uraian",
-            menjodohkan: "menjodohkan",
-            urutkan: "urutkan",
-            benar_salah: "benar_salah"
-          };
-          const mappedType = typeMapReverse[rawType] || rawType;
-          let options = q.options || {};
-          if (typeof options === "string") {
-            try { options = JSON.parse(options); } catch (e) { options = {}; }
-          }
-          return {
-            ...q,
-            type: mappedType,
-            choices: options,
-            statements: (mappedType === "benar_salah" && Array.isArray(options.statements)) ? options.statements : undefined,
-            pairs: mappedType === "menjodohkan" ? options.pairs : undefined,
-            items: (mappedType === "urutkan" || mappedType === "drag_drop") ? options.items : undefined,
-            answerKey: q.correctAnswer || q.answerKey
-          };
-        });
-
-        setMonitorQuestions(
-          Array.from(new Map(mappedQuestions.map((q: any) => [q.id, q])).values())
-        );
-      }
-
-      const loadedAttempts = await pb.collection("attempts").getFullList({
-        filter: `examRoomId = "${roomId}"`,
-        // Field ringan saja untuk leaderboard: cukup untuk hitung skor + tampilkan status.
-        // (tanpa realtime per-event; refresh manual via tombol Segarkan)
-        fields: "id,studentId,examRoomId,status,answers,overrides,score,cheatCount,totalQuestions,total,updated",
-      });
-      setAttempts(loadedAttempts);
     } catch (e) {
-      console.error(e);
+      console.error("Gagal memuat leaderboard:", e);
     } finally {
       setIsRefreshing(false);
     }
   }, [pb]);
 
-  // Handle room switch
+  // Handle room switch / page change: fetch halaman dari backend.
   useEffect(() => {
     if (selectedRoomId) {
-      handleRefreshData(selectedRoomId);
+      handleRefreshData(selectedRoomId, leaderboardPage);
     }
-  }, [selectedRoomId, handleRefreshData]);
+  }, [selectedRoomId, leaderboardPage, handleRefreshData]);
 
-  // Leaderboard on-demand: TANPA realtime subscription per-event.
+  // Reset ke halaman 1 saat ganti room.
+  useEffect(() => { setLeaderboardPage(1); }, [selectedRoomId]);
+
+  // Leaderboard on-demand via backend: TANPA realtime subscription per-event
+  // dan TANPA hitung skor di frontend.
   // Alasan: subscribe("*") ke 10k attempts = ribuan event/detik -> browser freeze.
-  // Data di-refresh on-demand: saat ganti room (otomatis) atau via tombol "Segarkan".
-  // Ranking tetap akurat: semua attempts di-fetch (field ringan), skor dihitung,
-  // lalu di-sort descending sebelum paginasi.
+  // Ranking akurat: backend menghitung skor SEMUA attempts, sort desc global,
+  // lalu memotong per halaman. Siswa nilai tertinggi selalu di halaman 1.
 
   const activeRoom = useMemo(() => rooms.find(r => r.id === selectedRoomId), [rooms, selectedRoomId]);
 
-  // Filter & Rank eligible students
-  const rankedStudents = useMemo(() => {
-    if (!activeRoom || dataLoading) return [];
-
-    const eligibleStudents = students.filter(s => {
-      if (activeRoom.allClasses) return true;
-      return activeRoom.classId.includes(s.classId);
-    });
-
-    const mapped = eligibleStudents.map(s => {
-      const attempt = attempts.find(a => (a.studentId || a.student_id) === s.id);
-      const score = attempt ? getAttemptScore(attempt) : 0;
-      const className = examClasses.find(c => c.id === s.classId)?.name || "-";
-
-      const sisAnswers = attempt?.answers || {};
-      const studentOrder = (sisAnswers as any)?.__order__ || (sisAnswers as any)?.__meta?.questionOrder;
-      const targetQuestions = Array.isArray(studentOrder) && studentOrder.length > 0
-        ? monitorQuestions.filter((q: any) => studentOrder.includes(q.id))
-        : monitorQuestions;
-
-      const totalStudentQuestions =
-        (Array.isArray(studentOrder) && studentOrder.length > 0 ? studentOrder.length : 0) ||
-        attempt?.totalQuestions ||
-        attempt?.total ||
-        (activeRoom?.max_questions && activeRoom.max_questions > 0 ? activeRoom.max_questions : 0) ||
-        monitorQuestions.length;
-
-      const answeredCount = Object.keys(sisAnswers).filter(k => {
-        if (k.startsWith("__")) return false;
-        const val = sisAnswers[k];
-        if (val === null || val === undefined || val === "") return false;
-        if (Array.isArray(val) && val.length === 0) return false;
-        if (typeof val === "object" && Object.keys(val).length === 0) return false;
-        return targetQuestions.length > 0
-          ? targetQuestions.some((q: any) => q.id === k)
-          : true;
-      }).length;
-
-      return {
-        id: s.id,
-        name: s.name,
-        nisn: s.nisn,
-        className,
-        attempt,
-        answeredCount,
-        totalQuestions: totalStudentQuestions,
-        score,
+  // Meta siswa (nisn, nama kelas) dari context — untuk melengkapi item backend.
+  const studentMeta = useMemo(() => {
+    const map: Record<string, { nisn: string; className: string }> = {};
+    for (const s of students || []) {
+      if (!s?.id) continue;
+      map[s.id] = {
+        nisn: s.nisn || "",
+        className: examClasses.find((c: any) => c.id === s.classId)?.name || "-",
       };
-    });
+    }
+    return map;
+  }, [students, examClasses]);
 
-    // Sort: score desc, name asc
-    return mapped.sort((a, b) => {
-      if (b.score !== a.score) return b.score - a.score;
-      return a.name.localeCompare(b.name);
-    });
-  }, [activeRoom, students, attempts, examClasses, dataLoading, getAttemptScore, monitorQuestions]);
+  // Jumlah siswa eligible (terdaftar) untuk kartu "Siswa Terdaftar".
+  const eligibleCount = useMemo(() => {
+    if (!activeRoom) return 0;
+    return (students || []).filter((s: any) =>
+      activeRoom.allClasses ? true : activeRoom.classId.includes(s.classId)
+    ).length;
+  }, [activeRoom, students]);
 
   // Auto Scroll state
   const [autoScroll, setAutoScroll] = useState(false);
 
-  // Paginasi leaderboard: 50 per halaman. Ranking dihitung dari SEMUA attempts
-  // (sudah di-sort desc by skor di rankedStudents), lalu di-slice per halaman.
-  // Jadi siswa nilai tertinggi selalu di halaman 1.
-  const LEADERBOARD_PAGE_SIZE = 50;
-  const [leaderboardPage, setLeaderboardPage] = useState(1);
-  const leaderboardTotalPages = Math.max(1, Math.ceil(rankedStudents.length / LEADERBOARD_PAGE_SIZE));
-  const pagedRankedStudents = React.useMemo(() => {
-    const start = (leaderboardPage - 1) * LEADERBOARD_PAGE_SIZE;
-    return rankedStudents.slice(start, start + LEADERBOARD_PAGE_SIZE);
-  }, [rankedStudents, leaderboardPage]);
-  // Reset ke halaman 1 saat room/data berubah
-  React.useEffect(() => { setLeaderboardPage(1); }, [selectedRoomId, rankedStudents.length]);
+  // Paginasi server-side: halaman diminta ke backend via handleRefreshData.
+  const leaderboardTotalPages = lbTotalPages;
 
   // Ref for table container to apply auto-scroll
   const tableContainerRef = useRef<HTMLDivElement>(null);
@@ -450,20 +253,22 @@ const LiveScoreViewPage = () => {
       clearTimeout(delayStart);
       clearInterval(scrollInterval);
     };
-  }, [autoScroll, rankedStudents.length]);
+  }, [autoScroll, lbItems.length]);
 
-  // Statistics
-  const stats = useMemo(() => {
-    const total = rankedStudents.length;
-    const ongoing = rankedStudents.filter(s => s.attempt?.status === "ongoing").length;
-    const finished = rankedStudents.filter(s => s.attempt?.status === "finished").length;
-    const locked = rankedStudents.filter(s => s.attempt?.status === "LOCKED").length;
+  // Statistics: "Siswa Terdaftar" dari context (eligible), sisanya dari backend.
+  const stats = useMemo(() => ({
+    total: eligibleCount,
+    ongoing: lbStats.ongoing,
+    finished: lbStats.finished,
+    locked: lbStats.locked,
+    avgScore: lbStats.avgScore,
+  }), [eligibleCount, lbStats]);
 
-    const scores = rankedStudents.filter(s => s.attempt).map(s => s.score);
-    const avgScore = scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0;
-
-    return { total, ongoing, finished, locked, avgScore };
-  }, [rankedStudents]);
+  // Podium: 3 teratas global dari backend, dilengkapi className/nisn.
+  const podium = useMemo(() => topItems.map((it: any) => {
+    const meta = studentMeta[it.studentId] || { nisn: "", className: "-" };
+    return { ...it, className: meta.className, nisn: meta.nisn, answeredCount: it.answered };
+  }), [topItems, studentMeta]);
 
   if (!pinUnlocked) {
     return (
@@ -543,7 +348,7 @@ const LiveScoreViewPage = () => {
           )}
 
           <button
-            onClick={() => selectedRoomId && handleRefreshData(selectedRoomId)}
+            onClick={() => selectedRoomId && handleRefreshData(selectedRoomId, leaderboardPage)}
             disabled={isRefreshing}
             className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-semibold transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 ${
               isDarkMode
@@ -654,10 +459,10 @@ const LiveScoreViewPage = () => {
             </div>
 
             {/* Podium (Top 3) */}
-            {rankedStudents.length > 0 && (
+            {podium.length > 0 && (
               <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                 {/* 2nd Place */}
-                {rankedStudents[1] && (
+                {podium[1] && (
                   <div className={`border rounded-3xl p-6 flex items-center justify-between shadow-xl relative overflow-hidden group transition-all hover:scale-[1.02] ${isDarkMode ? "bg-gradient-to-br from-slate-900/80 to-slate-950 border-slate-800/50 hover:border-slate-700" : "bg-gradient-to-br from-gray-50 to-white border-gray-200 hover:border-gray-300 shadow-gray-200/50"
                     }`}>
                     <div className={`absolute right-0 top-0 w-32 h-32 rounded-full blur-3xl opacity-50 group-hover:opacity-70 transition-all ${isDarkMode ? "bg-slate-700/20" : "bg-gray-300/30"
@@ -669,14 +474,14 @@ const LiveScoreViewPage = () => {
                       </div>
                       <div>
                         <h3 className={`font-bold text-base truncate max-w-[180px] ${isDarkMode ? "text-slate-100" : "text-gray-900"
-                          }`}>{rankedStudents[1].name}</h3>
+                          }`}>{podium[1].name}</h3>
                         <p className={`text-[10px] font-semibold mt-0.5 ${isDarkMode ? "text-slate-500" : "text-gray-500"
-                          }`}>{rankedStudents[1].className} • {rankedStudents[1].answeredCount}/{rankedStudents[1].totalQuestions || monitorQuestions.length} Soal</p>
+                          }`}>{podium[1].className} • {podium[1].answeredCount}/{podium[1].totalQuestions} Soal</p>
                       </div>
                     </div>
                     <div className="text-right relative z-10">
                       <span className={`text-3xl font-black ${isDarkMode ? "text-slate-200" : "text-gray-700"
-                        }`}>{rankedStudents[1].score}</span>
+                        }`}>{podium[1].score}</span>
                       <p className={`text-[8px] font-bold tracking-widest uppercase mt-1 ${isDarkMode ? "text-slate-500" : "text-gray-400"
                         }`}>Live Score</p>
                     </div>
@@ -684,7 +489,7 @@ const LiveScoreViewPage = () => {
                 )}
 
                 {/* 1st Place */}
-                {rankedStudents[0] && (
+                {podium[0] && (
                   <div className={`border rounded-3xl p-6 flex items-center justify-between shadow-2xl relative overflow-hidden group transition-all hover:scale-[1.03] ${isDarkMode ? "bg-gradient-to-br from-indigo-950/60 to-slate-950 border-indigo-500/30 hover:border-indigo-500/50" : "bg-gradient-to-br from-indigo-50 to-white border-indigo-200 hover:border-indigo-300 shadow-indigo-200/50"
                     }`}>
                     <div className={`absolute right-0 top-0 w-40 h-40 rounded-full blur-3xl opacity-40 group-hover:opacity-60 transition-all ${isDarkMode ? "bg-indigo-500/20" : "bg-indigo-400/30"
@@ -695,20 +500,20 @@ const LiveScoreViewPage = () => {
                       </div>
                       <div>
                         <h3 className={`font-black text-lg truncate max-w-[180px] ${isDarkMode ? "text-indigo-100" : "text-indigo-900"
-                          }`}>{rankedStudents[0].name}</h3>
+                          }`}>{podium[0].name}</h3>
                         <p className={`text-[10px] font-semibold mt-0.5 ${isDarkMode ? "text-indigo-400" : "text-indigo-600"
-                          }`}>{rankedStudents[0].className} • {rankedStudents[0].answeredCount}/{rankedStudents[0].totalQuestions || monitorQuestions.length} Soal</p>
+                          }`}>{podium[0].className} • {podium[0].answeredCount}/{podium[0].totalQuestions} Soal</p>
                       </div>
                     </div>
                     <div className="text-right relative z-10">
-                      <span className="text-4xl font-black text-amber-500">{rankedStudents[0].score}</span>
+                      <span className="text-4xl font-black text-amber-500">{podium[0].score}</span>
                       <p className="text-[8px] font-bold text-amber-500/60 tracking-widest uppercase mt-1">Live Score</p>
                     </div>
                   </div>
                 )}
 
                 {/* 3rd Place */}
-                {rankedStudents[2] && (
+                {podium[2] && (
                   <div className={`border rounded-3xl p-6 flex items-center justify-between shadow-xl relative overflow-hidden group transition-all hover:scale-[1.02] ${isDarkMode ? "bg-gradient-to-br from-slate-900/80 to-slate-950 border-slate-800/50 hover:border-slate-700" : "bg-gradient-to-br from-gray-50 to-white border-gray-200 hover:border-gray-300 shadow-gray-200/50"
                     }`}>
                     <div className={`absolute right-0 top-0 w-32 h-32 rounded-full blur-3xl opacity-50 group-hover:opacity-70 transition-all ${isDarkMode ? "bg-amber-700/10" : "bg-amber-200/30"
@@ -720,13 +525,13 @@ const LiveScoreViewPage = () => {
                       </div>
                       <div>
                         <h3 className={`font-bold text-base truncate max-w-[180px] ${isDarkMode ? "text-slate-100" : "text-gray-900"
-                          }`}>{rankedStudents[2].name}</h3>
+                          }`}>{podium[2].name}</h3>
                         <p className={`text-[10px] font-semibold mt-0.5 ${isDarkMode ? "text-slate-500" : "text-gray-500"
-                          }`}>{rankedStudents[2].className} • {rankedStudents[2].answeredCount}/{rankedStudents[2].totalQuestions || monitorQuestions.length} Soal</p>
+                          }`}>{podium[2].className} • {podium[2].answeredCount}/{podium[2].totalQuestions} Soal</p>
                       </div>
                     </div>
                     <div className="text-right relative z-10">
-                      <span className="text-3xl font-black text-amber-600">{rankedStudents[2].score}</span>
+                      <span className="text-3xl font-black text-amber-600">{podium[2].score}</span>
                       <p className={`text-[8px] font-bold tracking-widest uppercase mt-1 ${isDarkMode ? "text-slate-500" : "text-gray-400"
                         }`}>Live Score</p>
                     </div>
@@ -753,7 +558,7 @@ const LiveScoreViewPage = () => {
                   </thead>
                   <tbody className={`divide-y transition-colors ${isDarkMode ? "divide-slate-800/30" : "divide-gray-100"
                     }`}>
-                    {rankedStudents.length === 0 ? (
+                    {lbItems.length === 0 ? (
                       <tr>
                         <td colSpan={6} className="py-12 text-center">
                           <div className="flex flex-col items-center gap-3">
@@ -772,15 +577,18 @@ const LiveScoreViewPage = () => {
                           </div>
                         </td>
                       </tr>
-                    ) : pagedRankedStudents.map((s, idx) => {
-                      const globalRank = (leaderboardPage - 1) * LEADERBOARD_PAGE_SIZE + idx;
+                    ) : lbItems.map((s: any) => {
+                      const meta = studentMeta[s.studentId] || { nisn: "", className: "-" };
+                      const globalRank = (s.rank || 0) - 1; // rank backend 1-based -> 0-based
                       const isTop3 = globalRank < 3;
-                      const status = s.attempt?.status || "offline";
-                      const cheatCount = s.attempt?.cheatCount || 0;
+                      const status = s.status || "offline";
+                      const cheatCount = s.cheatCount || 0;
+                      const totalQ = s.totalQuestions || 0;
+                      const answered = s.answered || 0;
 
                       return (
                         <tr
-                          key={s.id}
+                          key={s.attemptId || s.studentId}
                           className={`transition-all h-16 group ${isDarkMode
                             ? `hover:bg-slate-900/40 ${isTop3 ? "bg-indigo-500/[0.02]" : ""}`
                             : `hover:bg-gray-50 ${isTop3 ? "bg-indigo-50/40" : ""}`
@@ -806,11 +614,11 @@ const LiveScoreViewPage = () => {
                             <div className={`font-bold text-sm ${isDarkMode ? "text-slate-100" : "text-gray-900"
                               }`}>{s.name}</div>
                             <div className={`text-[10px] font-mono mt-1 ${isDarkMode ? "text-slate-500" : "text-gray-500"
-                              }`}>{s.nisn}</div>
+                              }`}>{meta.nisn}</div>
                           </td>
                           <td className={`py-4 px-6 text-center text-sm font-semibold ${isDarkMode ? "text-slate-300" : "text-gray-700"
                             }`}>
-                            {s.className}
+                            {meta.className}
                           </td>
                           <td className="py-4 px-6 text-center">
                             <div className="flex flex-col items-center gap-1.5">
@@ -839,15 +647,15 @@ const LiveScoreViewPage = () => {
                             <div className="flex flex-col items-center gap-2">
                               <span className={`text-xs font-mono font-bold ${isDarkMode ? "text-slate-300" : "text-gray-700"
                                 }`}>
-                                {s.answeredCount} <span className={isDarkMode ? "text-slate-600" : "text-gray-400"}>/ {s.totalQuestions || monitorQuestions.length}</span>
+                                {answered} <span className={isDarkMode ? "text-slate-600" : "text-gray-400"}>/ {totalQ}</span>
                               </span>
                               <div className={`w-28 h-2 rounded-full overflow-hidden shadow-inner transition-all ${isDarkMode ? "bg-slate-900/60 border border-slate-800" : "bg-gray-100 border border-gray-200"
                                 }`}>
                                 <div
                                   className="h-full bg-gradient-to-r from-indigo-500 to-indigo-600 rounded-full transition-all duration-500 ease-out"
                                   style={{
-                                    width: `${(s.totalQuestions || monitorQuestions.length) > 0
-                                      ? Math.min(100, Math.round((s.answeredCount / (s.totalQuestions || monitorQuestions.length)) * 100))
+                                    width: `${totalQ > 0
+                                      ? Math.min(100, Math.round((answered / totalQ) * 100))
                                       : 0
                                       }%`,
                                   }}
@@ -879,7 +687,7 @@ const LiveScoreViewPage = () => {
               {leaderboardTotalPages > 1 && (
                 <div className={`flex items-center justify-between px-6 py-4 border-t ${isDarkMode ? "border-slate-800/30" : "border-gray-100"}`}>
                   <span className={`text-xs font-semibold ${isDarkMode ? "text-slate-400" : "text-gray-500"}`}>
-                    Halaman {leaderboardPage} dari {leaderboardTotalPages} • {rankedStudents.length} siswa
+                    Halaman {leaderboardPage} dari {leaderboardTotalPages} • {lbTotalItems} siswa
                   </span>
                   <div className="flex items-center gap-2">
                     <button
