@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../../../../components/ui/dialog";
 import { Button } from "../../../../components/ui/button";
 import { Zap, RefreshCw } from "lucide-react";
+import { getTargetQuestions, checkAns } from "../utils/helpers";
 
 export interface QuickGradeDialogProps {
   open: boolean;
@@ -10,18 +11,22 @@ export interface QuickGradeDialogProps {
   students: any[];
   attempts: any[];
   monitorQuestions: any[];
+  monitorRoom: any;
+  setAttempts: React.Dispatch<React.SetStateAction<any[]>>;
   showAlert: (title: string, description: string, type?: "success" | "danger" | "warning" | "info") => void;
 }
 
-export const QuickGradeDialog: React.FC<QuickGradeDialogProps> = ({
+export function QuickGradeDialog({
   open,
   onOpenChange,
   pb,
   students,
   attempts,
   monitorQuestions,
+  monitorRoom,
+  setAttempts,
   showAlert,
-}) => {
+}: QuickGradeDialogProps) {
   const [quickGradeText, setQuickGradeText] = useState("");
   const [quickGradeProgress, setQuickGradeProgress] = useState<{ total: number; done: number; errors: string[] } | null>(null);
   const [quickGradeRunning, setQuickGradeRunning] = useState(false);
@@ -231,6 +236,8 @@ const handleQuickGrade = async () => {
   else { showAlert("Selesai", `${done - errors.length} berhasil, ${errors.length} gagal:\n${errors.join("\n")}`, "warning"); }
 };
 
+  return (
+  <>
   {/* ⚡ Dialog Quick Grade */}
   <Dialog open={open} onOpenChange={(o) => { if (!o) handleClose(); }}>
     <DialogContent className="max-w-2xl bg-white dark:bg-slate-950 rounded-2xl border-none shadow-2xl p-0 overflow-hidden flex flex-col max-h-[90vh]">
@@ -404,6 +411,8 @@ const handleQuickGrade = async () => {
       </div>
     </DialogContent>
   </Dialog>
-};
+  </>
+  );
+}
 
 export default QuickGradeDialog;

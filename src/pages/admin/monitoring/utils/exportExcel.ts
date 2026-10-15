@@ -1,18 +1,19 @@
 import * as XLSX from "xlsx-js-style";
-import { checkAns } from "./helpers";
+import { checkAns, getTargetQuestions, computeQuestionScore, stripHtmlTags } from "./helpers";
 
 export interface ExportExcelParams {
   monitorRoom: any;
-  filteredStudents: any[];
   students: any[];
   attempts: any[];
   monitorQuestions: any[];
   terminology: any;
+  examClasses: any[];
+  monitorClassFilter: string;
   getLiveScore: (answers: Record<string, any>, overrides?: Record<string, boolean>) => number;
   showAlert: (title: string, description: string, type?: "success" | "danger" | "warning" | "info") => void;
 }
 
-export function exportRecapExcel({ monitorRoom, filteredStudents, students, attempts, monitorQuestions, terminology, getLiveScore, showAlert }: ExportExcelParams): void {
+export function exportRecapExcel({ monitorRoom, students, attempts, monitorQuestions, terminology, examClasses, monitorClassFilter, getLiveScore, showAlert }: ExportExcelParams): void {
   if (!monitorRoom) return;
   const workbook = XLSX.utils.book_new();
 
@@ -406,7 +407,7 @@ export function exportRecapExcel({ monitorRoom, filteredStudents, students, atte
   XLSX.writeFile(workbook, `Rekap_${monitorRoom.room_name || "Monitoring"}_${new Date().toISOString().split('T')[0]}.xlsx`);
 };
 
-export function exportEssayExcel({ monitorRoom, filteredStudents, students, attempts, monitorQuestions, terminology, showAlert }: ExportExcelParams): void {
+export function exportEssayExcel({ monitorRoom, students, attempts, monitorQuestions, terminology, examClasses, monitorClassFilter, showAlert }: ExportExcelParams): void {
   if (!monitorRoom) return;
 
   const essayQuestions = monitorQuestions.filter((q: any) => q.type === "uraian");
