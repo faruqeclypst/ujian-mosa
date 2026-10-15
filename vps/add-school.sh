@@ -142,6 +142,8 @@ MEM_MAX="${BUDGET_MB}M"
 MEM_HIGH=$(awk -v b="$BUDGET_MB" 'BEGIN{printf "%dM", b*0.85}')
 
 # ---------- 4. Systemd service (pengaman memori terpasang) ----------
+# Generate FAST_LOGIN_PEPPER untuk Go native fast-login (wajib untuk tenant produksi)
+PEPPER=$(openssl rand -hex 32 2>/dev/null || head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')
 cat > "/etc/systemd/system/pb-${SLUG}.service" << SVC
 [Unit]
 StartLimitIntervalSec=300
@@ -161,6 +163,7 @@ MemorySwapMax=0
 OOMScoreAdjust=-100
 TasksMax=4096
 WorkingDirectory=$TARGET_DIR
+Environment=FAST_LOGIN_PEPPER=$PEPPER
 ExecStart=$TARGET_DIR/pocketbase serve --http="0.0.0.0:${PORT}" --dir=$TARGET_DIR/pb_data --hooksDir=$TARGET_DIR/pb_hooks
 
 [Install]
