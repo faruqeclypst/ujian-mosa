@@ -26,8 +26,37 @@ console.log(`       Mode    : ${skipApk ? 'Web + Hooks + Offline Update (Tanpa A
 console.log('================================================================\n');
 
 try {
+  // ── [0/6] BUILD GO BINARY (jika source berubah) ──
+  console.log('🔨 [0/6] Mengecek binary Go-native PocketBase...');
+  try {
+    const goSrc = 'pb-native/main.go';
+    const goBin = 'vps/template_school/pocketbase';
+    let needBuild = false;
+    if (!fs.existsSync(goBin)) {
+      console.log('   Binary belum ada, akan build...');
+      needBuild = true;
+    } else if (fs.existsSync(goSrc)) {
+      const srcTime = fs.statSync(goSrc).mtimeMs;
+      const binTime = fs.statSync(goBin).mtimeMs;
+      if (srcTime > binTime) {
+        console.log('   Source berubah, akan rebuild...');
+        needBuild = true;
+      } else {
+        console.log('   Binary sudah up-to-date, skip build.');
+      }
+    }
+    if (needBuild) {
+      console.log('   Building Go binary (bisa 1-2 menit)...');
+      execSync('go build -o ../vps/template_school/pocketbase -ldflags="-s -w" .', { cwd: 'pb-native', stdio: 'inherit' });
+      console.log('✅ Go binary berhasil di-build!');
+    }
+  } catch (goErr) {
+    console.log('⚠️  Go build gagal/dilewati:', goErr.message.split('\n')[0]);
+    console.log('   Lanjut tanpa rebuild binary (pakai yang ada di template).');
+  }
+
   // ── [1/6] BUILD WEB FRONTEND ──
-  console.log('📦 [1/6] Membangun bundle web frontend (npm run build)...');
+  console.log('\n📦 [1/6] Membangun bundle web frontend (npm run build)...');
   execSync('npm run build', { stdio: 'inherit' });
 
   // ── [2/6] DEPLOY WEB KE MASTER VPS ──
