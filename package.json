@@ -14,6 +14,7 @@
     "deploy:apks": "node scripts/deploy-both-apks.js",
     "deploy:vps": "powershell -ExecutionPolicy Bypass -File ./deploy-vps.ps1",
     "push:template": "powershell -ExecutionPolicy Bypass -File ./scripts/push-template.ps1",
+    "push:master-hooks": "powershell -ExecutionPolicy Bypass -File ./scripts/push-master-hooks.ps1",
     "sync:tenants": "powershell -ExecutionPolicy Bypass -File ./scripts/push-template.ps1 -AutoSync",
     "release:all": "node scripts/release-all.js",
     "release:quick": "node scripts/release-all.js --skip-apk",
