@@ -30,9 +30,9 @@ if (Test-Path "vps/template_school/pocketbase") {
     ssh "$VPS_USER@$VPS_IP" "chmod +x $REMOTE_TEMPLATE/pocketbase"
 } else {
     Write-Host "    Binary tidak di repo — mengambil dari Worker VPS..." -ForegroundColor Cyan
-    ssh "$VPS_USER@$VPS_IP" "scp -o StrictHostKeyChecking=no root@43.134.175.87:/opt/pocketbase/schools/template/pocketbase $REMOTE_TEMPLATE/pocketbase && chmod +x $REMOTE_TEMPLATE/pocketbase"
+    ssh "$VPS_USER@$VPS_IP" "scp -o StrictHostKeyChecking=no root@43.134.175.87:/opt/pocketbase/schools/template/pocketbase $REMOTE_TEMPLATE/pocketbase; chmod +x $REMOTE_TEMPLATE/pocketbase"
 }
-# Hapus fast_login.pb.js dari template (diganti Go native — hindari route conflict)
+# Hapus fast_login.pb.js dari template (diganti Go native - hindari route conflict)
 ssh "$VPS_USER@$VPS_IP" "rm -f $REMOTE_TEMPLATE/pb_hooks/fast_login.pb.js"
 # Update sync-all-tenants.sh di Master VPS (versi baru: sync binary + hapus JS hook)
 if (Test-Path "vps/sync-all-tenants.sh") {
@@ -42,7 +42,7 @@ if (Test-Path "vps/sync-all-tenants.sh") {
 }
 
 Write-Host "==> 3. Mengatur permission & sinkronisasi ke Worker Node (43.134.175.87)..." -ForegroundColor Cyan
-ssh "$VPS_USER@$VPS_IP" "chown -R ubuntu:ubuntu $REMOTE_TEMPLATE && rsync -avz --delete $REMOTE_TEMPLATE/ root@43.134.175.87:$REMOTE_TEMPLATE/ && ssh root@43.134.175.87 'chown -R ubuntu:ubuntu $REMOTE_TEMPLATE'"
+ssh "$VPS_USER@$VPS_IP" "chown -R ubuntu:ubuntu $REMOTE_TEMPLATE; rsync -avz --delete $REMOTE_TEMPLATE/ root@43.134.175.87:$REMOTE_TEMPLATE/; ssh root@43.134.175.87 'chown -R ubuntu:ubuntu $REMOTE_TEMPLATE'"
 
 Write-Host ""
 Write-Host "==> SUKSES: Template di Master VPS dan Worker VPS sudah 100% mutakhir!" -ForegroundColor Green
