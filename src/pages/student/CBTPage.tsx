@@ -1062,16 +1062,14 @@ const CBTPage = () => {
       const ex = rData.expand?.examId;
       setRoomData({ ...rData, examTitle: rData.room_name || ex?.title || "CBT", subject: ex?.expand?.subjectId?.name || "Ujian", teacherName: ex?.expand?.teacherId?.name || "-" });
 
-      // Hitung jumlah peserta untuk dynamic autosave: >500 = batch mode
+      // Hitung total siswa aktif di SELURUH tenant untuk dynamic autosave: >500 = batch mode.
+      // Sengaja per-tenant (bukan per-room): 8 room x 500 siswa tetap 4000 write konkuren ke 1 DB SQLite.
       try {
-        const classIds = rData.classIds || [];
-        let studentCount = 0;
-        if (Array.isArray(classIds) && classIds.length > 0) {
-          const filter = classIds.map((id: string) => `classId="${id}"`).join(" || ");
-          const students = await pb.collection("students").getFullList({ filter, fields: "id" });
-          studentCount = students.length;
-        }
-        setIsLargeRoom(studentCount > 500);
+        const activeAttempts = await pb.collection("attempts").getFullList({
+          filter: 'status="ongoing"',
+          fields: "id"
+        });
+        setIsLargeRoom(activeAttempts.length > 500);
       } catch (e) {
         setIsLargeRoom(false);
       }
