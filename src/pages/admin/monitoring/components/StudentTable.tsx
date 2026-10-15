@@ -406,9 +406,9 @@ export const StudentTable = (props: StudentTableProps) => {
                                       onClick={() => {
                                         const next = isExpanded ? null : student.id;
                                         setExpandedstudent(next);
-                                        // Mode ringan: ambil jawaban lengkap satu siswa ini saja, saat dibuka
-                                        // (selalu fetch ulang agar tidak basi)
-                                        if (next && isLargeRoom && attempt && pb) {
+                                        // Detail on-demand: ambil jawaban lengkap satu siswa ini saja saat dibuka
+                                        // (selalu fetch ulang agar tidak basi; tidak fetch semua siswa)
+                                        if (next && attempt && pb) {
                                           pb.collection('attempts').getOne(attempt.id).then((rec: any) => {
                                             if (rec?.answers) setDetailAnswers(prev => ({ ...prev, [attempt.id]: rec.answers }));
                                           }).catch(() => {});

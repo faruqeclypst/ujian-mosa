@@ -613,6 +613,8 @@ const CBTPage = () => {
   const pendingAnswersRef = useRef<Record<string, any>>({});
   // Timer terpisah untuk sync progress ringan (answeredCount) — tidak saling clear dengan batch answers
   const progressTimeoutRef = useRef<any>(null);
+  // Akumulasi delta jawaban small-room: cegah jawaban cepat beruntun hilang saat debounce di-reset
+  const pendingSmallRef = useRef<Record<string, any>>({});
   const cheatTimerRef = useRef<any>(null);
   const lastLeftTimeRef = useRef<number | null>(null);
   const orientationChangeRef = useRef<boolean>(false);
@@ -938,19 +940,25 @@ const CBTPage = () => {
             isOnline: getOnlineFlag(),
             lastHeartbeat: new Date().toISOString()
           }).catch(() => { /* progress sync gagal: diabaikan, batch answers tetap jalan */ });
-        }, 4000); // Debounce 4 detik untuk progress ringan
+        }, syncJitter(4000, 5000)); // Debounce 4 detik + jitter 0-1 detik untuk progress ringan (sebar beban)
       } else {
-        // SMALL ROOM (≤500 siswa): debounce 4 detik
+        // SMALL ROOM (≤500 siswa): debounce 4 detik + jitter 0-1 detik (sebar beban).
+        // Perubahan diakumulasi dulu: hanya kirim delta jawaban yang berubah sejak
+        // sync terakhir (bukan full answers), agar jawaban cepat beruntun tidak hilang
+        // saat timer debounce di-reset.
+        pendingSmallRef.current[questionId] = value;
+        pendingSmallRef.current.__meta = (u as any)?.__meta || {};
+        pendingSmallRef.current.__activeQuestionId__ = questionId;
         if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
         saveTimeoutRef.current = setTimeout(() => {
+          const toSync = { ...pendingSmallRef.current };
+          pendingSmallRef.current = {};
           setIsSyncing(true);
           safeUpdateAttempt(currentAttempt.id, {
             // Delta update: kirim hanya jawaban yang berubah + meta, server merge
             answers: {
-              [questionId]: value,
+              ...toSync,
               __delta: true,
-              __activeQuestionId__: questionId,
-              __meta: (u as any)?.__meta || {},
             },
             isOnline: getOnlineFlag(),
             lastHeartbeat: new Date().toISOString()
@@ -967,7 +975,7 @@ const CBTPage = () => {
               setIsSessionExpiredModalOpen(true);
             }
           });
-        }, 4000); // Debounce 4 detik (delta update membuat payload kecil)
+        }, syncJitter(4000, 5000)); // Debounce 4 detik + jitter 0-1 detik (sebar beban, cegah thundering herd)
       }
       return u;
     });
@@ -1982,6 +1990,8 @@ const CBTPage = () => {
       // Reset batch counter untuk large room (submit mengirim full answers di bawah)
       answerCountRef.current = 0;
       pendingAnswersRef.current = {};
+      // Reset akumulasi delta small-room (sudah termasuk di full answers submit)
+      pendingSmallRef.current = {};
       try {
         await safeUpdateAttempt(currentAttempt.id, {
           answers: answersRef.current,
