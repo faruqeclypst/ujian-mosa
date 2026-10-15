@@ -1,5 +1,5 @@
 import React from "react";
-import { ConfirmationDialog } from "../../../components/dialogs/ConfirmationDialog";
+import { ConfirmationDialog } from "../../../../components/dialogs/ConfirmationDialog";
 
 export interface ConfirmDialogState {
   isOpen: boolean;

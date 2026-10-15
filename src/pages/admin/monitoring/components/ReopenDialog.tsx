@@ -1,8 +1,8 @@
 import React from "react";
 import { RotateCcw } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../../../components/ui/dialog";
-import { Button } from "../../../components/ui/button";
-import { cn } from "../../../lib/utils";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../../../../components/ui/dialog";
+import { Button } from "../../../../components/ui/button";
+import { cn } from "../../../../lib/utils";
 
 export interface ReopenDialogState {
   isOpen: boolean;

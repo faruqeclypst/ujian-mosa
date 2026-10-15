@@ -1,6 +1,6 @@
 import React from "react";
 import { ChevronDown, RotateCcw, Eye } from "lucide-react";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../../components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../../../components/ui/table";
 import { StudentTimer } from "./StudentTimer";
 
 interface StudentTableProps {

@@ -1,7 +1,7 @@
 import React from "react";
 import { Pencil } from "lucide-react";
-import { Dialog, DialogContent, DialogTitle } from "../../../components/ui/dialog";
-import { MathText } from "../../../components/ui/MathText";
+import { Dialog, DialogContent, DialogTitle } from "../../../../components/ui/dialog";
+import { MathText } from "../../../../components/ui/MathText";
 
 export interface EditAnswerDialogState {
   open: boolean;
