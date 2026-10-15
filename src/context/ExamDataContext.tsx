@@ -107,24 +107,44 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
     });
   }, []);
 
-  const initAll = useCallback(async () => {
+  // Field ringan untuk students — field berat/tidak dipakai UI admin
+  // (fastHash 64 char × N siswa, tokenKey, activeSessionId) dibuang agar
+  // fetch 10k siswa tidak memakan bandwidth/memori berlebih.
+  const STUDENT_FIELDS =
+    "id,username,name,email,emailVisibility,verified,classId,gender,birthPlace,birthDate,examNumber,room,session,photo,hasChangedPassword,created,updated";
+
+  // Mapping record students -> StudentData (satu sumber kebenaran, dipakai
+  // init critical, background load, dan realtime handler agar konsisten).
+  const mapStudentRecord = useCallback((i: any) => {
+    return {
+      ...i,
+      id: i.id,
+      nisn: i.username || i.nisn,
+      gender: i.gender || "L",
+      classId: i.classId || i.classid || i.class_id,
+      hasChangedPassword: i.hasChangedPassword || false,
+      photo: i.photo || "",
+      birthPlace: i.birthPlace || "",
+      birthDate: i.birthDate || "",
+      room: i.room || "",
+      session: i.session || "",
+      examNumber: i.examNumber || "",
+    } as any;
+  }, []);
+
+  // TAHAP 1 (critical): data ringan yang wajib ada sebelum UI render.
+  // Students TIDAK ikut di sini — 10k records bisa menggantung Promise.all
+  // dan membuat setLoading(false) tidak pernah dipanggil (UI stuck).
+  const initCritical = useCallback(async () => {
     try {
       setLoading(true);
       // Disable auto-cancellation globally to prevent AbortErrors during parallel fetches
       pb.autoCancellation(false);
 
-      // Ambil data awal untuk semua
-      const [tData, cData, sMapel, stData, eCount, qCount, rCount] = await Promise.all([
+      const [tData, cData, sMapel, eCount, qCount, rCount] = await Promise.all([
         pb.collection("teachers").getFullList({ sort: '-created' }),
         pb.collection("classes").getFullList({ sort: '-created' }),
         pb.collection("subjects").getFullList({ sort: '-created' }),
-        // Ringan: hanya field yang dipakai UI admin. Field berat/tidak dipakai
-        // (fastHash 64 char × N siswa, tokenKey, activeSessionId) dibuang agar
-        // halaman tidak stuck loading saat puluhan ribu siswa.
-        pb.collection("students").getFullList({
-          sort: '-created',
-          fields: "id,username,name,email,emailVisibility,verified,classId,gender,birthPlace,birthDate,examNumber,room,session,photo,hasChangedPassword,created,updated",
-        }),
         pb.collection("exams").getList(1, 1).then(res => res.totalItems).catch(() => 0),
         pb.collection("questions").getList(1, 1).then(res => res.totalItems).catch(() => 0),
         pb.collection("exam_rooms").getList(1, 1, { filter: 'status != "archive"' }).then(res => res.totalItems).catch(() => 0),
@@ -133,22 +153,6 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
       setTeachers(tData.map(i => ({ ...i, id: i.id } as any)));
       setClasses(cData.map(i => ({ ...i, id: i.id } as any)));
       setSubjects(sMapel.map(i => ({ ...i, id: i.id } as any)));
-      setStudents(stData.map(i => {
-        return {
-          ...i,
-          id: i.id,
-          nisn: i.username || i.nisn,
-          gender: i.gender || "L",
-          classId: i.classId || i.classid || i.class_id,
-          hasChangedPassword: i.hasChangedPassword || false,
-          photo: i.photo || "",
-          birthPlace: i.birthPlace || "",
-          birthDate: i.birthDate || "",
-          room: i.room || "",
-          session: i.session || "",
-          examNumber: i.examNumber || "",
-        } as any;
-      }));
       setExamsCount(eCount);
       setQuestionsCount(qCount);
       setRoomsCount(rCount);
@@ -156,7 +160,23 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [pb]);
+
+  // TAHAP 2 (background): students dimuat async TANPA memblokir UI.
+  // Aman dari race dengan realtime subscription: fetch full-list adalah
+  // source of truth dan selalu menang (dieksekusi terakhir), sementara
+  // event incremental yang datang lebih dulu akan tertimpa oleh data
+  // terbaru dari server — state akhir tetap konsisten.
+  const loadStudentsBackground = useCallback(() => {
+    pb.collection("students").getFullList({
+      sort: '-created',
+      fields: STUDENT_FIELDS,
+    })
+      .then((stData) => {
+        setStudents(stData.map(mapStudentRecord));
+      })
+      .catch(err => console.error("Error loading students (background):", err));
+  }, [pb, mapStudentRecord]);
 
   useEffect(() => {
     let unsubscribeTeachers: any, unsubscribeClasses: any, unsubscribeSubjects: any, unsubscribeStudents: any;
@@ -164,8 +184,15 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
 
     const setup = async () => {
       pb.autoCancellation(false);
-      await initAll();
-      
+      // Tahap 1: data kritis (ringan) → UI boleh render.
+      await initCritical();
+
+      // Tahap 2: students (berat, 10k records) jalan di background,
+      // TIDAK di-await agar tidak memblokir UI maupun subscription di bawah.
+      // Konsumen (mis. ExamRoomsPage) sudah me-recompute saat `students`
+      // berubah, jadi angka akan koreksi sendiri begitu data tiba.
+      loadStudentsBackground();
+
       // Subscribe with incremental updates instead of initAll (re-fetch everything)
       unsubscribeTeachers = await pb.collection("teachers").subscribe("*", (e) => {
         if (e.action === "create") {
@@ -195,37 +222,11 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
         if (e.action === "create") {
           setStudents(prev => {
             if (prev.find(i => i.id === e.record.id)) return prev;
-            const m = {
-              ...e.record,
-              id: e.record.id,
-              nisn: e.record.username || e.record.nisn,
-              gender: e.record.gender || "L",
-              classId: e.record.classId || e.record.classid,
-              photo: e.record.photo || "",
-              birthPlace: e.record.birthPlace || "",
-              birthDate: e.record.birthDate || "",
-              room: e.record.room || "",
-              session: e.record.session || "",
-              examNumber: e.record.examNumber || "",
-            } as any;
-            return [m, ...prev];
+            return [mapStudentRecord(e.record), ...prev];
           });
         }
         if (e.action === "update") {
-          const m = {
-            ...e.record,
-            id: e.record.id,
-            nisn: e.record.username || e.record.nisn,
-            gender: e.record.gender || "L",
-            classId: e.record.classId || e.record.classid,
-            hasChangedPassword: e.record.hasChangedPassword || false,
-            photo: e.record.photo || "",
-            birthPlace: e.record.birthPlace || "",
-            birthDate: e.record.birthDate || "",
-            room: e.record.room || "",
-            session: e.record.session || "",
-            examNumber: e.record.examNumber || "",
-          } as any;
+          const m = mapStudentRecord(e.record);
           setStudents(prev => prev.map(item => item.id === e.record.id ? m : item));
         }
         if (e.action === "delete") setStudents(prev => prev.filter(item => item.id !== e.record.id));
@@ -267,7 +268,7 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
       if (unsubscribeRooms) unsubscribeRooms();
       if (unsubscribeQuestions) unsubscribeQuestions();
     };
-  }, [pb, initAll]);
+  }, [pb, initCritical, loadStudentsBackground]);
 
   // --- Universal Token & Settings Sync ---
   useEffect(() => {
