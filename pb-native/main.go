@@ -22,6 +22,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"strconv"
 	"sync"
 	"time"
 
@@ -64,9 +65,18 @@ func (r *rateLimiter) allow(key string) bool {
 	return e.n <= r.max
 }
 
+func getEnvInt(key string, def int) int {
+	if v := os.Getenv(key); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			return n
+		}
+	}
+	return def
+}
+
 var (
-	rlUser = newRateLimiter(20)   // per-username: cegah brute force 1 akun
-	rlIP   = newRateLimiter(2000) // per-IP longgar: ramah NAT sekolah
+	rlUser = newRateLimiter(getEnvInt("FAST_LOGIN_RL_USER", 20))     // per-username: cegah brute force 1 akun
+	rlIP   = newRateLimiter(getEnvInt("FAST_LOGIN_RL_IP", 2000))     // per-IP longgar: ramah NAT sekolah
 )
 
 // ---------------------------------------------------------------------------
