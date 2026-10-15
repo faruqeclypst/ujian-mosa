@@ -50,7 +50,8 @@ try {
       console.log('   Install Go di Main VPS jika belum ada...');
       execSync(`ssh ${VPS_HOST} "test -x /usr/local/go/bin/go || (cd /tmp && wget -q https://go.dev/dl/go1.25.1.linux-amd64.tar.gz && tar -C /usr/local -xzf go1.25.1.linux-amd64.tar.gz && /usr/local/go/bin/go version)"`, { stdio: 'inherit' });
       console.log('   Sync source ke Main VPS & build (bisa 1-2 menit)...');
-      execSync(`scp -r pb-native ${VPS_HOST}:/tmp/pb-native-build/`, { stdio: 'inherit' });
+      execSync(`ssh ${VPS_HOST} "rm -rf /tmp/pb-native-build && mkdir -p /tmp/pb-native-build"`, { stdio: 'inherit' });
+      execSync(`scp -r pb-native/* ${VPS_HOST}:/tmp/pb-native-build/`, { stdio: 'inherit' });
       execSync(`ssh ${VPS_HOST} "cd /tmp/pb-native-build && /usr/local/go/bin/go build -o ${REMOTE_TEMPLATE}/pocketbase -ldflags='-s -w' . && chmod +x ${REMOTE_TEMPLATE}/pocketbase"`, { stdio: 'inherit' });
       // Simpan hash source yang sudah di-build
       execSync(`ssh ${VPS_HOST} "echo '${localHash}' > ${REMOTE_TEMPLATE}/.go_src_hash"`, { stdio: 'inherit' });
@@ -118,7 +119,7 @@ try {
     console.log(`   Ditemukan ${tenants.length} tenant: ${tenants.join(', ')}`);
     for (const t of tenants) {
       console.log(`   → Update & restart pb-${t}...`);
-      execSync(`ssh ${VPS_HOST} "ssh -o BatchMode=yes -o StrictHostKeyChecking=no ${WORKER_HOST} 'cp ${REMOTE_TEMPLATE}/pocketbase /opt/pocketbase/schools/${t}/pocketbase && chmod +x /opt/pocketbase/schools/${t}/pocketbase && systemctl restart pb-${t}'"`, { stdio: 'inherit' });
+      execSync(`ssh ${VPS_HOST} "ssh -o BatchMode=yes -o StrictHostKeyChecking=no ${WORKER_HOST} 'cp ${REMOTE_TEMPLATE}/pocketbase /opt/pocketbase/schools/${t}/pocketbase.new && chmod +x /opt/pocketbase/schools/${t}/pocketbase.new && mv /opt/pocketbase/schools/${t}/pocketbase.new /opt/pocketbase/schools/${t}/pocketbase && systemctl restart pb-${t}'"`, { stdio: 'inherit' });
     }
     console.log('✅ Semua tenant berhasil di-restart dengan binary baru!');
   } catch (e) {
