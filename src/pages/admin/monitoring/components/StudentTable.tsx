@@ -49,7 +49,7 @@ interface StudentTableProps {
   isLargeRoom: boolean;
   pb: any;
   setDetailAnswers: React.Dispatch<React.SetStateAction<Record<string, any>>>;
-  role: string;
+  role: string | null;
   teacherFullAccess: boolean;
   aiGradingId: string | null;
 }
