@@ -22,6 +22,19 @@ interface StudentTableProps {
   onPrintExamCard?: (student: StudentData) => void;
   filterActions?: React.ReactNode;
   customActions?: (student: StudentData) => React.ReactNode;
+  // ── Mode server-side (diteruskan ke DataTable) ──
+  serverSide?: boolean;
+  serverTotalItems?: number;
+  serverCurrentPage?: number;
+  serverPageSize?: number;
+  onServerPageChange?: (page: number) => void;
+  onServerPageSizeChange?: (size: number) => void;
+  serverSearchTerm?: string;
+  onServerSearchChange?: (term: string) => void;
+  serverSortColumn?: string | null;
+  serverSortDirection?: "asc" | "desc";
+  onServerSortChange?: (column: string, direction: "asc" | "desc") => void;
+  tableLoading?: boolean;
 }
 
 export const StudentTable = ({ 
@@ -37,10 +50,25 @@ export const StudentTable = ({
   onPrintExamCard,
   filterActions,
   customActions,
-  title
+  title,
+  serverSide = false,
+  serverTotalItems,
+  serverCurrentPage = 1,
+  serverPageSize = 50,
+  onServerPageChange,
+  onServerPageSizeChange,
+  serverSearchTerm,
+  onServerSearchChange,
+  serverSortColumn,
+  serverSortDirection,
+  onServerSortChange,
+  tableLoading = false,
 }: StudentTableProps & { title?: string }) => {
   const { terminology } = useTenant();
   const displayTitle = title || `Daftar ${terminology.student}`;
+
+  // Offset nomor baris global saat mode server-side (untuk shift-select)
+  const rowOffset = serverSide ? (serverCurrentPage - 1) * serverPageSize : 0;
 
   const handleSelectAll = (checked: boolean) => {
     const currentIds = students.map((s) => s.id);
@@ -56,10 +84,12 @@ export const StudentTable = ({
 
   const handleSelectOne = (id: string, checked: boolean, index: number, event: any) => {
     let newSelectedIds = [...selectedIds];
+    // index dari DataTable adalah nomor baris global; ubah ke lokal untuk slice
+    const localIndex = index - rowOffset;
 
     if (checked && event.nativeEvent.shiftKey && lastSelectedIndex !== null) {
-      const start = Math.min(lastSelectedIndex, index);
-      const end = Math.max(lastSelectedIndex, index);
+      const start = Math.min(lastSelectedIndex, localIndex);
+      const end = Math.max(lastSelectedIndex, localIndex);
       const idsInRange = students.slice(start, end + 1).map(s => s.id);
       
       newSelectedIds = Array.from(new Set([...newSelectedIds, ...idsInRange]));
@@ -74,7 +104,7 @@ export const StudentTable = ({
     }
 
     onSelectChange(newSelectedIds);
-    setLastSelectedIndex(index);
+    setLastSelectedIndex(localIndex);
   };
 
   const isAllSelected = students.length > 0 && students.every(s => selectedIds.includes(s.id));
@@ -280,6 +310,18 @@ export const StudentTable = ({
           actions={renderActions}
           emptyMessage={`Belum ada data ${terminology.student}.`}
           filterActions={filterActions}
+          loading={tableLoading}
+          serverSide={serverSide}
+          serverTotalItems={serverTotalItems}
+          serverCurrentPage={serverCurrentPage}
+          serverPageSize={serverPageSize}
+          onServerPageChange={onServerPageChange}
+          onServerPageSizeChange={onServerPageSizeChange}
+          serverSearchTerm={serverSearchTerm}
+          onServerSearchChange={onServerSearchChange}
+          serverSortColumn={serverSortColumn}
+          serverSortDirection={serverSortDirection}
+          onServerSortChange={onServerSortChange}
         />
       </CardContent>
     </Card>

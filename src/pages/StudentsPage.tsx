@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Skeleton } from "../components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
@@ -59,9 +59,120 @@ const StudentsPage = () => {
   const isOffline = school?.plan === "offline" || school?.id === "local_server";
   const quota = isOffline ? 999999 : (subscriptionStatus?.effectiveQuota || school?.student_quota || (school?.plan === "free" ? 50 : 250));
   const planName = isOffline ? "Offline Mandiri" : (school?.plan ? school.plan.charAt(0).toUpperCase() + school.plan.slice(1) : "Free");
-  const quotaUsedPercent = isOffline ? 0 : Math.min(100, Math.round((students.length / Math.max(1, quota)) * 100));
-  const isQuotaFull = isOffline ? false : students.length >= quota;
+  // Total siswa dari server (diisi fetch tabel); fallback ke context saat belum load
+  const [tableTotal, setTableTotal] = useState<number | null>(null);
+  const studentCount = tableTotal ?? students.length;
+  const quotaUsedPercent = isOffline ? 0 : Math.min(100, Math.round((studentCount / Math.max(1, quota)) * 100));
+  const isQuotaFull = isOffline ? false : studentCount >= quota;
   const isQuotaWarning = isOffline ? false : quotaUsedPercent >= 80;
+
+  // Filter kelas (dipakai tabel server-side & dialog) — dideklarasikan di sini
+  // agar bisa dipakai oleh buildStudentFilter di bawah.
+  const [filterClassId, setFilterClassId] = useState<string>("ALL");
+
+  // ── Server-side pagination untuk tabel siswa ──
+  // Tabel TIDAK menunggu context memuat 10k siswa; fetch 50/page langsung dari server.
+  const STUDENT_PAGE_SIZE = 50;
+  const STUDENT_LIST_FIELDS =
+    "id,username,name,email,emailVisibility,verified,classId,gender,birthPlace,birthDate,examNumber,room,session,photo,hasChangedPassword,created,updated";
+  const STUDENT_SORT_MAP: Record<string, string> = {
+    nisn: "username",
+    name: "name",
+    gender: "gender",
+    classId: "classId",
+    hasChangedPassword: "hasChangedPassword",
+  };
+  const mapStudentRow = (i: any): StudentData => ({
+    ...i,
+    id: i.id,
+    nisn: i.username || i.nisn,
+    gender: i.gender || "L",
+    classId: i.classId || i.classid || i.class_id,
+    hasChangedPassword: i.hasChangedPassword || false,
+    photo: i.photo || "",
+    birthPlace: i.birthPlace || "",
+    birthDate: i.birthDate || "",
+    room: i.room || "",
+    session: i.session || "",
+    examNumber: i.examNumber || "",
+  } as StudentData);
+
+  const [tablePage, setTablePage] = useState(1);
+  const [tableSearchInput, setTableSearchInput] = useState("");
+  const [tableSearch, setTableSearch] = useState(""); // debounced
+  const [tableSort, setTableSort] = useState<{ column: string; direction: "asc" | "desc" }>({ column: "name", direction: "asc" });
+  const [tableRows, setTableRows] = useState<StudentData[]>([]);
+  const [tableLoading, setTableLoading] = useState(false);
+  const [tableLoadedOnce, setTableLoadedOnce] = useState(false);
+
+  // Debounce search 400ms agar tidak spam request per ketikan;
+  // sekalian reset ke halaman 1 (dibatch dalam satu render -> 1x fetch)
+  useEffect(() => {
+    const t = setTimeout(() => { setTableSearch(tableSearchInput); setTablePage(1); }, 400);
+    return () => clearTimeout(t);
+  }, [tableSearchInput]);
+
+  const buildStudentFilter = useCallback(() => {
+    const parts: string[] = [`classId != "ALUMNI"`];
+    if (filterClassId === "NONE") {
+      const validIds = classes.map(c => c.id).filter(Boolean);
+      if (validIds.length > 0) {
+        parts.push(`(${validIds.map(id => `classId != "${id}"`).join(" && ")})`);
+      }
+    } else if (filterClassId !== "ALL") {
+      parts.push(`classId = "${filterClassId}"`);
+    }
+    if (tableSearch) {
+      const q = tableSearch.replace(/"/g, "").slice(0, 64);
+      if (q) parts.push(`(name ~ "${q}" || username ~ "${q}")`);
+    }
+    return parts.join(" && ");
+  }, [filterClassId, classes, tableSearch]);
+
+  const fetchIdRef = useRef(0);
+  const fetchStudentTable = useCallback(async () => {
+    if (!pb) return;
+    const fid = ++fetchIdRef.current;
+    setTableLoading(true);
+    try {
+      const sortField = STUDENT_SORT_MAP[tableSort.column] || tableSort.column;
+      const res = await pb.collection("students").getList(tablePage, STUDENT_PAGE_SIZE, {
+        sort: (tableSort.direction === "desc" ? "-" : "") + sortField,
+        filter: buildStudentFilter(),
+        fields: STUDENT_LIST_FIELDS,
+      });
+      if (fetchIdRef.current !== fid) return; // abaikan response basi (pindah halaman cepat)
+      setTableRows(res.items.map(mapStudentRow));
+      setTableTotal(res.totalItems);
+      setTableLoadedOnce(true);
+    } catch (err) {
+      console.error("Gagal memuat daftar siswa:", err);
+    } finally {
+      if (fetchIdRef.current === fid) setTableLoading(false);
+    }
+  }, [pb, tablePage, buildStudentFilter, tableSort]);
+
+  // Kembali ke halaman 1 saat filter kelas berubah (search dihandle debounce di atas)
+  const handleFilterClassChange = useCallback((v: string) => {
+    setFilterClassId(v);
+    setTablePage(1);
+  }, []);
+
+  useEffect(() => { fetchStudentTable(); }, [fetchStudentTable]);
+
+  // Refresh tabel saat ada perubahan data siswa dari sumber lain (debounced)
+  const fetchTableRef = useRef(fetchStudentTable);
+  fetchTableRef.current = fetchStudentTable;
+  useEffect(() => {
+    if (!pb) return;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let unsub: (() => void) | null = null;
+    pb.collection("students").subscribe("*", () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => fetchTableRef.current(), 800);
+    }).then((u) => { unsub = u as any; }).catch(() => {});
+    return () => { if (timer) clearTimeout(timer); if (unsub) (unsub as any)(); };
+  }, [pb]);
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [dialogMode, setDialogMode] = useState<"create" | "edit">("create");
@@ -82,7 +193,6 @@ const StudentsPage = () => {
 
   const [isBatchOpen, setIsBatchOpen] = useState(false);
   const [targetClassId, setTargetClassId] = useState<string>("");
-  const [filterClassId, setFilterClassId] = useState<string>("ALL");
 
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
   const [printCardsOpen, setPrintCardsOpen] = useState(false);
@@ -160,10 +270,10 @@ const StudentsPage = () => {
 
     // Cek Batasan Kuota Hanya Jika Menambah Siswa Baru (Bypass jika offline)
     if (dialogMode === "create" && !isOffline) {
-      if (students.length >= quota) {
+      if (studentCount >= quota) {
         return showAlert(
           "Batas Kuota Tercapai",
-          `Penambahan tidak dapat diproses. ${terminology.school} Anda telah mencapai batas maksimal kuota (${students.length}/${quota} ${terminology.student}) pada paket ${planName}. Silakan tingkatkan paket langganan Anda untuk menambah kapasitas.`,
+          `Penambahan tidak dapat diproses. ${terminology.school} Anda telah mencapai batas maksimal kuota (${studentCount}/${quota} ${terminology.student}) pada paket ${planName}. Silakan tingkatkan paket langganan Anda untuk menambah kapasitas.`,
           "warning",
           () => navigate("/admin/invoice"),
           true,
@@ -179,6 +289,7 @@ const StudentsPage = () => {
         await createStudent(values);
       }
       closeDialog();
+      fetchStudentTable();
     } catch (error) {
       console.error(`Gagal menyimpan data ${terminology.student.toLowerCase()}`, error);
       showAlert("Gagal", `Gagal menyimpan data ${terminology.student.toLowerCase()}.`, "danger");
@@ -236,6 +347,7 @@ const StudentsPage = () => {
           showAlert("Gagal", error.message || `Gagal mereset password ${terminology.student.toLowerCase()}.`, "danger");
         } finally {
           setBatchProgress(prev => ({ ...prev, isOpen: false }));
+          fetchStudentTable();
         }
       },
       true,
@@ -243,20 +355,31 @@ const StudentsPage = () => {
     );
   };
 
-  const handleResetClassPassword = (classId: string) => {
+  const handleResetClassPassword = async (classId: string) => {
+    if (!pb) return;
     const targetClass = classes.find(c => c.id === classId);
-    const classStudents = students.filter(s => s.classId === classId);
+    // Ambil ID siswa kelas ini on-demand (tidak menunggu context 10k)
+    let studentIds: string[] = [];
+    try {
+      const res = await pb.collection("students").getFullList({
+        filter: `classId = "${classId}"`,
+        fields: "id",
+      });
+      studentIds = res.map((r: any) => r.id);
+    } catch (err) {
+      console.error("Gagal mengambil data siswa kelas:", err);
+      return showAlert("Gagal", "Gagal mengambil data siswa kelas.", "danger");
+    }
 
-    if (classStudents.length === 0) {
+    if (studentIds.length === 0) {
       return showAlert("Informasi", `Tidak ada data ${terminology.student.toLowerCase()} di ${terminology.class.toLowerCase()} ${targetClass?.name || ""}.`, "info");
     }
 
     showAlert(
       `Reset Password ${terminology.class}`,
-      `Apakah Anda yakin ingin mereset password ${classStudents.length} ${terminology.student.toLowerCase()} di ${terminology.class.toLowerCase()} ${targetClass?.name || ""} menjadi default (12345678)?`,
+      `Apakah Anda yakin ingin mereset password ${studentIds.length} ${terminology.student.toLowerCase()} di ${terminology.class.toLowerCase()} ${targetClass?.name || ""} menjadi default (12345678)?`,
       "warning",
       async () => {
-        const studentIds = classStudents.map(s => s.id);
         setBatchProgress({
           isOpen: true,
           total: studentIds.length,
@@ -279,6 +402,7 @@ const StudentsPage = () => {
           showAlert("Gagal", error.message || `Gagal mereset password ${terminology.student.toLowerCase()} kelas.`, "danger");
         } finally {
           setBatchProgress(prev => ({ ...prev, isOpen: false }));
+          fetchStudentTable();
         }
       },
       true,
@@ -286,19 +410,30 @@ const StudentsPage = () => {
     );
   };
 
-  const handleResetAllStudentsPassword = () => {
-    const activeStudents = students.filter(s => s.classId !== "ALUMNI");
+  const handleResetAllStudentsPassword = async () => {
+    if (!pb) return;
+    // Ambil ID semua siswa aktif on-demand (tidak menunggu context 10k)
+    let studentIds: string[] = [];
+    try {
+      const res = await pb.collection("students").getFullList({
+        filter: `classId != "ALUMNI"`,
+        fields: "id",
+      });
+      studentIds = res.map((r: any) => r.id);
+    } catch (err) {
+      console.error("Gagal mengambil data siswa:", err);
+      return showAlert("Gagal", "Gagal mengambil data siswa.", "danger");
+    }
 
-    if (activeStudents.length === 0) {
+    if (studentIds.length === 0) {
       return showAlert("Informasi", `Tidak ada ${terminology.student.toLowerCase()} aktif untuk direset.`, "info");
     }
 
     showAlert(
       `Reset Password SELURUH ${terminology.student}`,
-      `⚠️ PERHATIAN! Apakah Anda YAKIN ingin mereset password SELURUH ${activeStudents.length} ${terminology.student.toLowerCase()} menjadi default (12345678)?`,
+      `⚠️ PERHATIAN! Apakah Anda YAKIN ingin mereset password SELURUH ${studentIds.length} ${terminology.student.toLowerCase()} menjadi default (12345678)?`,
       "danger",
       async () => {
-        const studentIds = activeStudents.map(s => s.id);
         setBatchProgress({
           isOpen: true,
           total: studentIds.length,
@@ -321,6 +456,7 @@ const StudentsPage = () => {
           showAlert("Gagal", error.message || `Gagal mereset password seluruh ${terminology.student.toLowerCase()}.`, "danger");
         } finally {
           setBatchProgress(prev => ({ ...prev, isOpen: false }));
+          fetchStudentTable();
         }
       },
       true,
@@ -337,6 +473,12 @@ const StudentsPage = () => {
     setIsDeleting(true);
     try {
       await deleteStudent(studentToDelete.id);
+      // Jika baris terakhir di halaman ini dihapus, mundur ke halaman sebelumnya
+      if (tableRows.length <= 1 && tablePage > 1) {
+        setTablePage(tablePage - 1);
+      } else {
+        fetchStudentTable();
+      }
     } catch (error) {
       console.error("Gagal menghapus siswa:", error);
     } finally {
@@ -379,10 +521,10 @@ const StudentsPage = () => {
       }
 
       // Validasi Kapasitas Kuota SaaS (Hanya dihitung untuk siswa baru)
-      if (!isOffline && students.length + toCreate.length > quota) {
+      if (!isOffline && studentCount + toCreate.length > quota) {
         return showAlert(
           "Melebihi Kuota Langganan",
-          `Gagal mengimpor data. Anda mencoba menambahkan ${toCreate.length} ${terminology.student.toLowerCase()} baru, tapi sisa kuota paket ${planName} Anda tinggal ${Math.max(0, quota - students.length)} ${terminology.student.toLowerCase()} (Batas maksimal: ${quota}). Silakan sesuaikan file Excel Anda atau tingkatkan paket langganan institusi.`,
+          `Gagal mengimpor data. Anda mencoba menambahkan ${toCreate.length} ${terminology.student.toLowerCase()} baru, tapi sisa kuota paket ${planName} Anda tinggal ${Math.max(0, quota - studentCount)} ${terminology.student.toLowerCase()} (Batas maksimal: ${quota}). Silakan sesuaikan file Excel Anda atau tingkatkan paket langganan institusi.`,
           "danger",
           () => navigate("/admin/invoice"),
           true,
@@ -489,24 +631,39 @@ const StudentsPage = () => {
     } finally {
       setIsImporting(false);
       setBatchProgress(prev => ({ ...prev, isOpen: false }));
+      fetchStudentTable();
     }
   };
 
-  const handleExportStudents = () => {
-    exportStudentToExcel({ students, classes, filename: `data-${terminology.student.toLowerCase()}.xlsx`, terminology });
+  // Ambil SEMUA siswa sesuai filter tabel saat ini (untuk export) — on demand, field ringan.
+  const fetchAllFilteredStudents = useCallback(async (): Promise<StudentData[]> => {
+    if (!pb) return [];
+    const res = await pb.collection("students").getFullList({
+      sort: "name",
+      filter: buildStudentFilter(),
+      fields: STUDENT_LIST_FIELDS,
+    });
+    return res.map(mapStudentRow);
+  }, [pb, buildStudentFilter]);
+
+  const handleExportStudents = async () => {
+    const all = await fetchAllFilteredStudents();
+    exportStudentToExcel({ students: all, classes, filename: `data-${terminology.student.toLowerCase()}.xlsx`, terminology });
   };
 
-  const handleExportStudentLogins = () => {
-    exportStudentLoginsToExcel({ students: filteredStudents, classes, filename: `data-login-${terminology.student.toLowerCase()}.xlsx`, terminology });
+  const handleExportStudentLogins = async () => {
+    const all = await fetchAllFilteredStudents();
+    exportStudentLoginsToExcel({ students: all, classes, filename: `data-login-${terminology.student.toLowerCase()}.xlsx`, terminology });
   };
 
   const handleExportAllScores = async () => {
     if (!pb) return;
     setIsExportingScores(true);
     try {
+      const all = await fetchAllFilteredStudents();
       await exportAllStudentScores({
         pb,
-        students,
+        students: all,
         classes,
         terminology,
         filename: `rekap-nilai-semua-${terminology.student.toLowerCase()}.xlsx`,
@@ -543,19 +700,6 @@ const StudentsPage = () => {
       examNumber: "",
     },
     [selectedStudent]);
-
-  const filteredStudents = useMemo(() => {
-    let result = students.filter(s => s.classId !== "ALUMNI");
-
-    if (filterClassId === "NONE") {
-      const validClassIds = classes.map(c => c.id);
-      result = result.filter(s => !s.classId || !validClassIds.includes(s.classId));
-    } else if (filterClassId !== "ALL") {
-      result = result.filter(s => s.classId === filterClassId);
-    }
-
-    return [...result].sort((a, b) => a.name.localeCompare(b.name));
-  }, [students, filterClassId, classes]);
 
   const { updateStudentClassBatch, deleteStudentsBatch } = useExamData();
 
@@ -597,6 +741,7 @@ const StudentsPage = () => {
       showAlert("Gagal", `Gagal memindahkan ${terminology.student.toLowerCase()}.`, "danger");
     } finally {
       setBatchProgress(prev => ({ ...prev, isOpen: false }));
+      fetchStudentTable();
     }
   };
 
@@ -634,6 +779,7 @@ const StudentsPage = () => {
           showAlert("Gagal", `Gagal menghapus ${terminology.student.toLowerCase()} massal.`, "danger");
         } finally {
           setBatchProgress(prev => ({ ...prev, isOpen: false }));
+          fetchStudentTable();
         }
       },
       true,
@@ -675,6 +821,7 @@ const StudentsPage = () => {
           showAlert("Gagal", "Gagal memindahkan ke alumni.", "danger");
         } finally {
           setBatchProgress(prev => ({ ...prev, isOpen: false }));
+          fetchStudentTable();
         }
       },
       true,
@@ -1007,7 +1154,7 @@ const StudentsPage = () => {
                 Server Mandiri Offline: Tanpa Batas Kuota {terminology.student}
               </p>
               <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                Saat ini terdapat <strong>{students.length}</strong> {terminology.student.toLowerCase()} terdaftar. Anda dapat menambahkan data siswa sebanyak kapasitas server lokal.
+                Saat ini terdapat <strong>{studentCount}</strong> {terminology.student.toLowerCase()} terdaftar. Anda dapat menambahkan data siswa sebanyak kapasitas server lokal.
               </p>
             </div>
           </div>
@@ -1028,7 +1175,7 @@ const StudentsPage = () => {
             <div className="space-y-1.5">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="font-bold text-slate-900 dark:text-white">
-                  Kapasitas Kuota {terminology.student}: {students.length} / {quota} Terdaftar
+                  Kapasitas Kuota {terminology.student}: {studentCount} / {quota} Terdaftar
                 </span>
                 <span className={cn(
                   "px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border",
@@ -1075,7 +1222,7 @@ const StudentsPage = () => {
         </div>
       )}
 
-      {loading ? (
+      {(!tableLoadedOnce && (loading || tableLoading)) ? (
         <Card>
           <CardHeader className="flex flex-row items-center justify-between p-4">
             <CardTitle className="text-base font-semibold text-slate-800 dark:text-slate-100">Daftar {terminology.student}</CardTitle>
@@ -1122,7 +1269,7 @@ const StudentsPage = () => {
         </Card>
       ) : (
         <StudentTable
-          students={filteredStudents}
+          students={tableRows}
           classes={classes}
           selectedIds={selectedIds}
           onSelectChange={setSelectedIds}
@@ -1135,12 +1282,23 @@ const StudentsPage = () => {
             setSingleStudentForCard(student);
             setPrintCardsOpen(true);
           }}
+          serverSide
+          serverTotalItems={tableTotal ?? 0}
+          serverCurrentPage={tablePage}
+          serverPageSize={STUDENT_PAGE_SIZE}
+          onServerPageChange={setTablePage}
+          serverSearchTerm={tableSearchInput}
+          onServerSearchChange={setTableSearchInput}
+          serverSortColumn={tableSort.column}
+          serverSortDirection={tableSort.direction}
+          onServerSortChange={(column, direction) => { setTableSort({ column, direction }); setTablePage(1); }}
+          tableLoading={tableLoading}
           filterActions={
             <div className="flex items-center gap-2">
               <span className="text-xs font-bold text-slate-500 uppercase tracking-wider hidden sm:inline">{terminology.class}:</span>
               <select
                 value={filterClassId}
-                onChange={(e) => setFilterClassId(e.target.value)}
+                onChange={(e) => handleFilterClassChange(e.target.value)}
                 className="h-9 min-w-[140px] rounded-xl border border-slate-200 bg-card px-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all cursor-pointer dark:border-slate-800"
               >
                 <option value="ALL">Semua {terminology.class}</option>
@@ -1254,6 +1412,7 @@ const StudentsPage = () => {
             `Berhasil memasang ${count} pas foto siswa ke database. Foto siap dicetak di Kartu Ujian.`,
             "success"
           );
+          fetchStudentTable();
         }}
       />
     </div>

@@ -47,6 +47,20 @@ interface DataTableProps<T> {
   loading?: boolean;
   emptyMessage?: string;
   filterActions?: React.ReactNode;
+  // ── Mode server-side (opsional, backward-compatible) ──
+  // Jika serverSide=true, search/sort/pagination di-delegasikan ke parent
+  // via callback di bawah; DataTable hanya me-render `data` apa adanya.
+  serverSide?: boolean;
+  serverTotalItems?: number;
+  serverCurrentPage?: number;
+  serverPageSize?: number;
+  onServerPageChange?: (page: number) => void;
+  onServerPageSizeChange?: (size: number) => void;
+  serverSearchTerm?: string;
+  onServerSearchChange?: (term: string) => void;
+  serverSortColumn?: string | null;
+  serverSortDirection?: "asc" | "desc";
+  onServerSortChange?: (column: string, direction: "asc" | "desc") => void;
 }
 
 interface DataTableState<T> {
@@ -74,6 +88,17 @@ export function DataTable<T>({
   loading = false,
   emptyMessage = "Tidak ada data yang ditemukan.",
   filterActions,
+  serverSide = false,
+  serverTotalItems,
+  serverCurrentPage,
+  serverPageSize,
+  onServerPageChange,
+  onServerPageSizeChange,
+  serverSearchTerm,
+  onServerSearchChange,
+  serverSortColumn,
+  serverSortDirection = "asc",
+  onServerSortChange,
 }: DataTableProps<T>) {
   const [state, setState] = React.useState<DataTableState<T>>({
     data,
@@ -108,7 +133,12 @@ export function DataTable<T>({
   }, [showColumnMenu]);
 
   // Update filtered data when data or search term changes
+  // (mode server-side: filtering/sorting/pagination dikerjakan parent via API)
   React.useEffect(() => {
+    if (serverSide) {
+      setState(prev => ({ ...prev, filteredData: [...data] }));
+      return;
+    }
     let filtered = [...data];
 
     // Apply search filter
@@ -140,15 +170,30 @@ export function DataTable<T>({
       const nextPageIndex = prev.currentPage > totalPages && totalPages > 0 ? totalPages : prev.currentPage;
       return { ...prev, filteredData: filtered, currentPage: nextPageIndex || 1 };
     });
-  }, [data, state.searchTerm, state.sortColumn, state.sortDirection, state.visibleColumns, columns, state.pageSize]);
+  }, [serverSide, data, state.searchTerm, state.sortColumn, state.sortDirection, state.visibleColumns, columns, state.pageSize]);
 
-  const totalPages = Math.ceil(state.filteredData.length / state.pageSize);
-  const startIndex = (state.currentPage - 1) * state.pageSize;
-  const endIndex = startIndex + state.pageSize;
-  const currentData = state.filteredData.slice(startIndex, endIndex);
+  // Nilai efektif: mode server-side memakai prop dari parent, selain itu state internal.
+  const effPage = serverSide ? (serverCurrentPage ?? 1) : state.currentPage;
+  const effPageSize = serverSide ? (serverPageSize ?? 50) : state.pageSize;
+  const effTotal = serverSide ? (serverTotalItems ?? 0) : state.filteredData.length;
+  const effSearchTerm = serverSide ? (serverSearchTerm ?? "") : state.searchTerm;
+  const effSortColumn = serverSide ? (serverSortColumn ?? null) : state.sortColumn;
+  const effSortDirection = serverSide ? serverSortDirection : state.sortDirection;
+
+  const totalPages = Math.ceil(effTotal / effPageSize);
+  const startIndex = (effPage - 1) * effPageSize;
+  const endIndex = startIndex + effPageSize;
+  const currentData = serverSide ? data : state.filteredData.slice(startIndex, endIndex);
 
   const handleSort = (column: Column<T>) => {
     if (!column.sortable) return;
+
+    if (serverSide && onServerSortChange) {
+      const key = column.key.toString();
+      const nextDir = effSortColumn === key && effSortDirection === "asc" ? "desc" : "asc";
+      onServerSortChange(key, nextDir);
+      return;
+    }
 
     setState(prev => ({
       ...prev,
@@ -159,10 +204,18 @@ export function DataTable<T>({
   };
 
   const handlePageChange = (page: number) => {
+    if (serverSide && onServerPageChange) {
+      onServerPageChange(page);
+      return;
+    }
     setState(prev => ({ ...prev, currentPage: page }));
   };
 
   const handlePageSizeChange = (pageSize: number) => {
+    if (serverSide && onServerPageSizeChange) {
+      onServerPageSizeChange(pageSize);
+      return;
+    }
     setState(prev => ({ ...prev, pageSize, currentPage: 1 }));
   };
 
@@ -228,8 +281,14 @@ export function DataTable<T>({
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               placeholder={searchPlaceholder}
-              value={state.searchTerm}
-              onChange={(e) => setState(prev => ({ ...prev, searchTerm: e.target.value, currentPage: 1 }))}
+              value={effSearchTerm}
+              onChange={(e) => {
+                if (serverSide && onServerSearchChange) {
+                  onServerSearchChange(e.target.value);
+                } else {
+                  setState(prev => ({ ...prev, searchTerm: e.target.value, currentPage: 1 }));
+                }
+              }}
               className="pl-9 text-sm sm:text-base"
             />
           </div>
@@ -302,11 +361,11 @@ export function DataTable<T>({
                   >
                     <div className="flex items-center gap-2">
                       {column.label}
-                      {column.sortable && state.sortColumn === column.key && (
+                      {column.sortable && effSortColumn === column.key && (
                         <ChevronDown
                           className={cn(
                             "h-4 w-4 transition-transform",
-                            state.sortDirection === "desc" && "rotate-180"
+                            effSortDirection === "desc" && "rotate-180"
                           )}
                         />
                       )}
@@ -348,7 +407,7 @@ export function DataTable<T>({
                           ? column.render(
                               column.key.toString().split('.').reduce((obj: any, key) => obj?.[key], item),
                               item,
-                              (state.currentPage - 1) * state.pageSize + index
+                              startIndex + index
                             )
                           : column.key.toString().split('.').reduce((obj: any, key) => obj?.[key], item)?.toString() || "-"
                         }
@@ -363,7 +422,7 @@ export function DataTable<T>({
                   )}
                 </TableRow>
               ))}
-              {currentData.length < state.pageSize && Array.from({ length: state.pageSize - currentData.length }).map((_, i) => (
+              {currentData.length < effPageSize && Array.from({ length: effPageSize - currentData.length }).map((_, i) => (
                 <TableRow key={`empty-${i}`}>
                   <TableCell colSpan={columns.filter(col => state.visibleColumns.has(col.key.toString())).length + (actions ? 1 : 0)} className="h-[49px]">&nbsp;</TableCell>
                 </TableRow>
@@ -462,14 +521,15 @@ export function DataTable<T>({
       {totalPages > 1 && (
         <div className="flex flex-col gap-3 sm:gap-4 sm:flex-row sm:items-center sm:justify-between bg-slate-50/50 dark:bg-slate-900/40 p-3 sm:p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
           <div className="text-xs sm:text-sm text-muted-foreground text-center sm:text-left">
-            Menampilkan {startIndex + 1}-{Math.min(endIndex, state.filteredData.length)} dari {state.filteredData.length} data
+            Menampilkan {effTotal === 0 ? 0 : startIndex + 1}-{Math.min(endIndex, effTotal)} dari {effTotal} data
           </div>
 
           <div className="flex flex-col sm:flex-row items-center gap-3 sm:gap-2">
+            {!(serverSide && !onServerPageSizeChange) && (
             <div className="flex items-center gap-2">
               <span className="text-xs sm:text-sm shrink-0">Baris per halaman:</span>
               <select
-                value={state.pageSize}
+                value={effPageSize}
                 onChange={(e) => handlePageSizeChange(Number(e.target.value))}
                 className="h-10 min-h-[40px] sm:min-h-0 sm:h-9 rounded-xl border border-input bg-background px-2.5 text-xs sm:text-sm touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
               >
@@ -480,13 +540,14 @@ export function DataTable<T>({
                 ))}
               </select>
             </div>
+            )}
 
             <div className="flex items-center gap-1">
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => handlePageChange(1)}
-                disabled={state.currentPage === 1}
+                disabled={effPage === 1}
                 className="min-h-[40px] min-w-[40px] h-10 w-10 sm:min-h-0 sm:min-w-0 sm:h-9 sm:w-9 p-0 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30"
               >
                 <ChevronsLeft className="h-4 w-4" />
@@ -495,8 +556,8 @@ export function DataTable<T>({
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => handlePageChange(state.currentPage - 1)}
-                disabled={state.currentPage === 1}
+                onClick={() => handlePageChange(effPage - 1)}
+                disabled={effPage === 1}
                 className="min-h-[40px] min-w-[40px] h-10 w-10 sm:min-h-0 sm:min-w-0 sm:h-9 sm:w-9 p-0 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30"
               >
                 <ChevronLeft className="h-4 w-4" />
@@ -512,12 +573,12 @@ export function DataTable<T>({
                       let pageNum;
                       if (totalPages <= 3) {
                         pageNum = i + 1;
-                      } else if (state.currentPage <= 2) {
+                      } else if (effPage <= 2) {
                         pageNum = i + 1;
-                      } else if (state.currentPage >= totalPages - 1) {
+                      } else if (effPage >= totalPages - 1) {
                         pageNum = totalPages - 2 + i;
                       } else {
-                        pageNum = state.currentPage - 1 + i;
+                        pageNum = effPage - 1 + i;
                       }
 
                       return (
@@ -528,7 +589,7 @@ export function DataTable<T>({
                           onClick={() => handlePageChange(pageNum)}
                           className={cn(
                             "min-h-[40px] min-w-[40px] h-10 w-10 p-0 text-xs rounded-xl transition-colors border",
-                            state.currentPage === pageNum 
+                            effPage === pageNum 
                               ? "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/40 dark:text-blue-300 dark:border-blue-800/60 font-bold" 
                               : "border-transparent bg-transparent hover:bg-slate-100 dark:hover:bg-slate-800"
                           )}
@@ -543,12 +604,12 @@ export function DataTable<T>({
                       let pageNum;
                       if (totalPages <= 5) {
                         pageNum = i + 1;
-                      } else if (state.currentPage <= 3) {
+                      } else if (effPage <= 3) {
                         pageNum = i + 1;
-                      } else if (state.currentPage >= totalPages - 2) {
+                      } else if (effPage >= totalPages - 2) {
                         pageNum = totalPages - 4 + i;
                       } else {
-                        pageNum = state.currentPage - 2 + i;
+                        pageNum = effPage - 2 + i;
                       }
 
                       return (
@@ -559,7 +620,7 @@ export function DataTable<T>({
                           onClick={() => handlePageChange(pageNum)}
                           className={cn(
                             "min-h-[36px] min-w-[36px] h-9 w-9 p-0 text-sm rounded-xl transition-colors border",
-                            state.currentPage === pageNum 
+                            effPage === pageNum 
                               ? "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/40 dark:text-blue-300 dark:border-blue-800/60 font-bold" 
                               : "border-transparent bg-transparent hover:bg-slate-100 dark:hover:bg-slate-800"
                           )}
@@ -575,8 +636,8 @@ export function DataTable<T>({
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => handlePageChange(state.currentPage + 1)}
-                disabled={state.currentPage === totalPages}
+                onClick={() => handlePageChange(effPage + 1)}
+                disabled={effPage === totalPages}
                 className="min-h-[40px] min-w-[40px] h-10 w-10 sm:min-h-0 sm:min-w-0 sm:h-9 sm:w-9 p-0 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30"
               >
                 <ChevronRight className="h-4 w-4" />
@@ -586,7 +647,7 @@ export function DataTable<T>({
                 variant="ghost"
                 size="sm"
                 onClick={() => handlePageChange(totalPages)}
-                disabled={state.currentPage === totalPages}
+                disabled={effPage === totalPages}
                 className="min-h-[40px] min-w-[40px] h-10 w-10 sm:min-h-0 sm:min-w-0 sm:h-9 sm:w-9 p-0 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30"
               >
                 <ChevronsRight className="h-4 w-4" />
