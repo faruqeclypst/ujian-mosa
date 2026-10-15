@@ -1,7 +1,13 @@
 import React from "react";
-import { ChevronDown, RotateCcw, Eye } from "lucide-react";
+import { ChevronDown, RotateCcw, Eye, EyeOff, Settings, Check, X, CheckCircle2, Sparkles, Pencil } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../../../components/ui/table";
+import { Button } from "../../../../components/ui/button";
+import { Skeleton } from "../../../../components/ui/skeleton";
+import { cn } from "../../../../lib/utils";
+import { MathText } from "../../../../components/ui/MathText";
+import { useNavigate } from "react-router-dom";
 import { StudentTimer } from "./StudentTimer";
+import { getTargetQuestions, computeQuestionScore, getQuestionDetailInfo, stripHtmlTags } from "../utils/helpers";
 
 interface StudentTableProps {
   students: any[];
@@ -10,7 +16,7 @@ interface StudentTableProps {
   monitorRoom: any;
   terminology: any;
   selectedStudentIds: string[];
-  setSelectedStudentIds: (ids: string[]) => void;
+  setSelectedStudentIds: React.Dispatch<React.SetStateAction<string[]>>;
   monitorSortBy: string;
   monitorSortOrder: "asc" | "desc";
   toggleSort: (key: any) => void;
@@ -35,9 +41,21 @@ interface StudentTableProps {
   setEditAnswerDialog: (d: any) => void;
   detailAnswers: Record<string, any>;
   answersList: Record<string, any>;
+  // Additional props extracted from main file
+  isLoading: boolean;
+  examClasses: any[];
+  searchQuery: string;
+  roomId: string | null;
+  isLargeRoom: boolean;
+  pb: any;
+  setDetailAnswers: React.Dispatch<React.SetStateAction<Record<string, any>>>;
+  role: string;
+  teacherFullAccess: boolean;
+  aiGradingId: string | null;
 }
 
 export const StudentTable = (props: StudentTableProps) => {
+  const navigate = useNavigate();
   const {
     students, attempts, monitorQuestions, monitorRoom, terminology,
     selectedStudentIds, setSelectedStudentIds,
@@ -49,6 +67,8 @@ export const StudentTable = (props: StudentTableProps) => {
     handleResetSession, handleResetCheatCount, handleManualGrade,
     handleClearOverride, handleAIGrade, setEditAnswerDialog,
     detailAnswers, answersList,
+    isLoading, examClasses, searchQuery, roomId, isLargeRoom, pb,
+    setDetailAnswers, role, teacherFullAccess, aiGradingId,
   } = props;
 
   return (
