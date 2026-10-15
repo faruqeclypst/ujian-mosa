@@ -120,14 +120,13 @@ for (let i = 0; i < APKS.length; i++) {
     process.exit(1);
   }
 
-  // Kirim ke VPS (ke folder apks permanen dan dist)
+  // Kirim ke VPS (upload 1x via internet ke VPS_APKS, lalu salin lokal di server ke VPS_DIST)
   console.log(`[+] Mengirim ${item.targetApk} ke VPS...`);
   execSync(`scp "${localApkPath}" ${VPS_HOST}:${VPS_APKS}/${item.targetApk}`, { stdio: 'inherit' });
-  execSync(`scp "${localApkPath}" ${VPS_HOST}:${VPS_DIST}/${item.targetApk}`, { stdio: 'inherit' });
 
-  // Buat copy / symlink tanpa ekstensi .apk agar endpoint examku.my.id/exam-aa-latest bisa langsung diakses
+  // Buat copy ke dist dan link tanpa ekstensi .apk di sisi server (jauh lebih cepat daripada upload ulang via internet)
   console.log(`[+] Menautkan endpoint ${item.targetLink} di VPS...`);
-  execSync(`ssh ${VPS_HOST} "cp -f ${VPS_APKS}/${item.targetApk} ${VPS_APKS}/${item.targetLink} && cp -f ${VPS_DIST}/${item.targetApk} ${VPS_DIST}/${item.targetLink} && chmod -R 755 ${VPS_APKS}"`, { stdio: 'inherit' });
+  execSync(`ssh ${VPS_HOST} "cp -f ${VPS_APKS}/${item.targetApk} ${VPS_DIST}/${item.targetApk} && cp -f ${VPS_APKS}/${item.targetApk} ${VPS_APKS}/${item.targetLink} && cp -f ${VPS_APKS}/${item.targetApk} ${VPS_DIST}/${item.targetLink} && chmod -R 755 ${VPS_APKS}"`, { stdio: 'inherit' });
 }
 
 // 3. Update izin dan kirim web dist terbaru ke VPS

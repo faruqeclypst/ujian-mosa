@@ -40,3 +40,5 @@ dist-shell/
 dist-browser/
 assets-raw/
 keystore.properties
+.cache/
+.temp_offline_update/

@@ -4,7 +4,7 @@ android {
     namespace = "examku.alfaprojects.com"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "examku.alfaprojects.com.local"
+        applicationId "examku.alfaprojects.com"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 21

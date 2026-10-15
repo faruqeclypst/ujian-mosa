@@ -43,23 +43,35 @@ try {
   console.log('\n⚙️ [3/6] Mengirim pb_hooks & template ke Master & Worker VPS...');
   // Sinkronkan pb_hooks root ke template lokal
   if (fs.existsSync('pb_hooks') && fs.existsSync('vps/template_school/pb_hooks')) {
-    execSync('powershell -Command "Copy-Item pb_hooks/* vps/template_school/pb_hooks/ -Recurse -Force"', { stdio: 'inherit' });
+    execSync('powershell -Command "Copy-Item pb_hooks/* vps/template_school/pb_hooks/ -Recurse -Force; Remove-Item vps/template_school/pb_hooks/_removed_go_native -Recurse -Force -ErrorAction SilentlyContinue"', { stdio: 'inherit' });
   }
   execSync(`scp -r vps/template_school/pb_hooks/* ${VPS_HOST}:${REMOTE_TEMPLATE}/pb_hooks/`, { stdio: 'inherit' });
   execSync(`scp vps/template_school/pb_data/data.db ${VPS_HOST}:${REMOTE_TEMPLATE}/pb_data/data.db`, { stdio: 'inherit' });
-  // Binary Go-native: dari repo lokal jika ada, fallback dari Worker VPS
+  // Binary Go-native: dari repo lokal jika ada, atau hanya download jika belum ada di Master VPS
   if (fs.existsSync('vps/template_school/pocketbase')) {
     execSync(`scp vps/template_school/pocketbase ${VPS_HOST}:${REMOTE_TEMPLATE}/pocketbase`, { stdio: 'inherit' });
   } else {
-    execSync(`ssh ${VPS_HOST} "scp -o StrictHostKeyChecking=no ${WORKER_HOST}:/opt/pocketbase/schools/template/pocketbase ${REMOTE_TEMPLATE}/pocketbase"`, { stdio: 'inherit' });
+    // Lewati jika binary di Master VPS sudah ada dan ukurannya valid (>40MB)
+    let needCopy = true;
+    try {
+      const remoteSize = parseInt(execSync(`ssh -o ConnectTimeout=5 ${VPS_HOST} "test -f ${REMOTE_TEMPLATE}/pocketbase && stat -c%s ${REMOTE_TEMPLATE}/pocketbase"`, { encoding: 'utf-8' }).trim());
+      if (remoteSize > 40000000) {
+        needCopy = false;
+      }
+    } catch {}
+    if (needCopy) {
+      console.log('  ⬇️ Mengunduh binary pocketbase Linux dari Worker VPS ke Master VPS...');
+      execSync(`ssh ${VPS_HOST} "scp -o StrictHostKeyChecking=no ${WORKER_HOST}:/opt/pocketbase/schools/template/pocketbase ${REMOTE_TEMPLATE}/pocketbase"`, { stdio: 'inherit' });
+    }
   }
   execSync(`ssh ${VPS_HOST} "chmod +x ${REMOTE_TEMPLATE}/pocketbase"`, { stdio: 'inherit' });
   // Hapus fast_login.pb.js dari template (diganti Go native)
   execSync(`ssh ${VPS_HOST} "rm -f ${REMOTE_TEMPLATE}/pb_hooks/fast_login.pb.js"`, { stdio: 'inherit' });
   // Sinkronkan infra.conf ke Master & Worker (untuk shell scripts di VPS)
   execSync(`scp vps/infra.conf ${VPS_HOST}:/opt/pocketbase/infra.conf`, { stdio: 'inherit' });
+  execSync(`ssh ${VPS_HOST} "sed -i 's/\\r$//' /opt/pocketbase/infra.conf"`, { stdio: 'inherit' });
   execSync(`ssh ${VPS_HOST} "chown -R ubuntu:ubuntu ${REMOTE_TEMPLATE} && rsync -avz --delete ${REMOTE_TEMPLATE}/ ${WORKER_HOST}:${REMOTE_TEMPLATE}/ && ssh ${WORKER_HOST} 'chown -R ubuntu:ubuntu ${REMOTE_TEMPLATE}'"`, { stdio: 'inherit' });
-  execSync(`ssh ${VPS_HOST} "scp -o StrictHostKeyChecking=no /opt/pocketbase/infra.conf ${WORKER_HOST}:/opt/pocketbase/infra.conf"`, { stdio: 'inherit' });
+  execSync(`ssh ${VPS_HOST} "scp -o StrictHostKeyChecking=no /opt/pocketbase/infra.conf ${WORKER_HOST}:/opt/pocketbase/infra.conf && ssh -o BatchMode=yes -o StrictHostKeyChecking=no ${WORKER_HOST} 'sed -i \"s/\\r$//\" /opt/pocketbase/infra.conf 2>/dev/null || true'"`, { stdio: 'inherit' });
   console.log('✅ Template di Master VPS dan Worker Node sudah 100% mutakhir!');
 
   // Update sync-all-tenants.sh di Master VPS (pastikan versi terbaru)
@@ -138,10 +150,14 @@ try {
     execSync(`powershell -Command "Copy-Item offline_package/jalankan-server.bat ${stagingDir}/jalankan-server.bat -Force"`, { stdio: 'inherit' });
   }
 
-  // Kompres ke offline-update.zip
+  // Kompres ke offline-update.zip (Gunakan tar.exe bawaan Windows — 20x lebih cepat dari Compress-Archive)
   const updateZipName = 'offline-update.zip';
   if (fs.existsSync(updateZipName)) fs.unlinkSync(updateZipName);
-  execSync(`powershell -Command "Compress-Archive -Path '${stagingDir}/*' -DestinationPath '${updateZipName}' -Force"`, { stdio: 'inherit' });
+  try {
+    execSync(`tar.exe -a -c -f "${updateZipName}" -C "${stagingDir}" .`, { stdio: 'inherit' });
+  } catch (tarErr) {
+    execSync(`powershell -Command "Compress-Archive -Path '${stagingDir}/*' -DestinationPath '${updateZipName}' -Force"`, { stdio: 'inherit' });
+  }
   fs.rmSync(stagingDir, { recursive: true, force: true });
 
   // Kirim ke Master VPS /opt/frontend/ujian/dist/downloads/

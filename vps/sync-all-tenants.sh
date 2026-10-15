@@ -47,7 +47,7 @@ for dir in "$MASTER_SCHOOLS_DIR"/*; do
         echo "[$slug] binary Go-native dipasang"
       fi
     fi
-    systemctl restart "pb-${slug}" 2>/dev/null || true
+    systemctl restart --no-block "pb-${slug}" 2>/dev/null || true
     MASTER_UPDATED+=("$slug")
   fi
 done
@@ -75,7 +75,7 @@ if ssh -o BatchMode=yes -o ConnectTimeout=5 -o StrictHostKeyChecking=no "$WORKER
             echo "[$slug] binary Go-native dipasang"
           fi
         fi
-        systemctl restart "pb-${slug}" 2>/dev/null || true
+        systemctl restart --no-block "pb-${slug}" 2>/dev/null || true
       fi
     done
   ' >/dev/null 2>&1
