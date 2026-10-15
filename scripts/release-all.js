@@ -28,6 +28,7 @@ console.log('================================================================\n'
 try {
   // ── [0/6] BUILD GO BINARY DI MAIN VPS (jika source berubah) ──
   console.log('🔨 [0/6] Mengecek binary Go-native PocketBase...');
+  let justBuiltGo = false;
   try {
     const goSrc = 'pb-native/main.go';
     let needBuild = false;
@@ -56,6 +57,7 @@ try {
       // Simpan hash source yang sudah di-build
       execSync(`ssh ${VPS_HOST} "echo '${localHash}' > ${REMOTE_TEMPLATE}/.go_src_hash"`, { stdio: 'inherit' });
       console.log('✅ Go binary berhasil di-build di Main VPS!');
+      justBuiltGo = true;
     }
   } catch (goErr) {
     console.log('⚠️  Go build gagal/dilewati:', goErr.message.split('\n')[0]);
@@ -84,14 +86,17 @@ try {
   execSync(`scp -r vps/template_school/pb_hooks/* ${VPS_HOST}:${REMOTE_TEMPLATE}/pb_hooks/`, { stdio: 'inherit' });
   execSync(`scp vps/template_school/pb_data/data.db ${VPS_HOST}:${REMOTE_TEMPLATE}/pb_data/data.db`, { stdio: 'inherit' });
   // Binary Go-native: dari repo lokal jika ada, atau hanya download jika belum ada di Master VPS
+  // NOTE: jika baru build di [0/6], binary sudah ada di Master — jangan overwrite dari Worker!
   if (fs.existsSync('vps/template_school/pocketbase')) {
     execSync(`scp vps/template_school/pocketbase ${VPS_HOST}:${REMOTE_TEMPLATE}/pocketbase`, { stdio: 'inherit' });
+  } else if (typeof justBuiltGo !== 'undefined' && justBuiltGo) {
+    console.log('  ✅ Binary baru sudah di-build di [0/6], lewati download dari Worker.');
   } else {
-    // Lewati jika binary di Master VPS sudah ada dan ukurannya valid (>40MB)
+    // Lewati jika binary di Master VPS sudah ada dan ukurannya valid (>25MB, binary strip ~32MB)
     let needCopy = true;
     try {
       const remoteSize = parseInt(execSync(`ssh -o ConnectTimeout=5 ${VPS_HOST} "test -f ${REMOTE_TEMPLATE}/pocketbase && stat -c%s ${REMOTE_TEMPLATE}/pocketbase"`, { encoding: 'utf-8' }).trim());
-      if (remoteSize > 40000000) {
+      if (remoteSize > 25000000) {
         needCopy = false;
       }
     } catch {}
