@@ -26,29 +26,33 @@ console.log(`       Mode    : ${skipApk ? 'Web + Hooks + Offline Update (Tanpa A
 console.log('================================================================\n');
 
 try {
-  // ── [0/6] BUILD GO BINARY (jika source berubah) ──
+  // ── [0/6] BUILD GO BINARY DI VPS (jika source berubah) ──
   console.log('🔨 [0/6] Mengecek binary Go-native PocketBase...');
   try {
     const goSrc = 'pb-native/main.go';
-    const goBin = 'vps/template_school/pocketbase';
     let needBuild = false;
-    if (!fs.existsSync(goBin)) {
-      console.log('   Binary belum ada, akan build...');
-      needBuild = true;
-    } else if (fs.existsSync(goSrc)) {
-      const srcTime = fs.statSync(goSrc).mtimeMs;
-      const binTime = fs.statSync(goBin).mtimeMs;
-      if (srcTime > binTime) {
-        console.log('   Source berubah, akan rebuild...');
+    if (fs.existsSync(goSrc)) {
+      // Bandingkan hash source lokal vs hash build terakhir di VPS
+      const localHash = execSync('powershell -Command "(Get-FileHash pb-native/main.go -Algorithm SHA256).Hash"', { encoding: 'utf-8' }).trim();
+      let remoteHash = '';
+      try {
+        remoteHash = execSync(`ssh ${VPS_HOST} "ssh -o BatchMode=yes -o StrictHostKeyChecking=no ${WORKER_HOST} 'cat /opt/pocketbase/schools/template/.go_src_hash 2>/dev/null || echo none'"`, { encoding: 'utf-8' }).trim();
+      } catch {}
+      if (localHash !== remoteHash) {
+        console.log('   Source berubah, akan build di Worker VPS...');
         needBuild = true;
       } else {
         console.log('   Binary sudah up-to-date, skip build.');
       }
     }
     if (needBuild) {
-      console.log('   Building Go binary (bisa 1-2 menit)...');
-      execSync('go build -o ../vps/template_school/pocketbase -ldflags="-s -w" .', { cwd: 'pb-native', stdio: 'inherit' });
-      console.log('✅ Go binary berhasil di-build!');
+      console.log('   Sync source ke Worker & build (bisa 1-2 menit)...');
+      execSync(`scp -r pb-native ${VPS_HOST}:/tmp/pb-native-build/`, { stdio: 'inherit' });
+      execSync(`ssh ${VPS_HOST} "scp -r -o StrictHostKeyChecking=no /tmp/pb-native-build ${WORKER_HOST}:/tmp/pb-native-build && ssh -o BatchMode=yes -o StrictHostKeyChecking=no ${WORKER_HOST} 'cd /tmp/pb-native-build && /usr/local/go/bin/go build -o /opt/pocketbase/schools/template/pocketbase -ldflags=\"-s -w\" . && chmod +x /opt/pocketbase/schools/template/pocketbase && sha256sum pb-native/main.go 2>/dev/null || sha256sum main.go'"`, { stdio: 'inherit' });
+      // Simpan hash source yang sudah di-build
+      const localHash2 = execSync('powershell -Command "(Get-FileHash pb-native/main.go -Algorithm SHA256).Hash"', { encoding: 'utf-8' }).trim();
+      execSync(`ssh ${VPS_HOST} "ssh -o BatchMode=yes -o StrictHostKeyChecking=no ${WORKER_HOST} 'echo  > /opt/pocketbase/schools/template/.go_src_hash'"`, { stdio: 'inherit' });
+      console.log('✅ Go binary berhasil di-build di VPS!');
     }
   } catch (goErr) {
     console.log('⚠️  Go build gagal/dilewati:', goErr.message.split('\n')[0]);
