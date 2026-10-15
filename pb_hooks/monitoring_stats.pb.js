@@ -93,8 +93,9 @@ routerAdd("GET", "/api/room-detail-stats", (e) => {
         if (!roomId) return e.json(400, { error: "roomId wajib diisi" });
 
         // Ambil classIds room untuk eligibility (SQL langsung, bukan findRecordById)
+        // Kolom allClasses tidak ada di semua tenant — jika classIds kosong/null,
+        // anggap room menerima semua kelas (skip filter eligibility).
         let classIds = [];
-        let allClasses = false;
         try {
             const rqTpl = new DynamicModel({ eci: "" });
             const rqRows = arrayOf(rqTpl);
@@ -106,7 +107,6 @@ routerAdd("GET", "/api/room-detail-stats", (e) => {
                 if (Array.isArray(raw)) {
                     classIds = raw.map((c) => String(c).trim()).filter((c) => c && c !== "all");
                 } else if (typeof raw === "string" && raw.length > 0) {
-                    // classIds tersimpan sebagai JSON string: '["id1","id2"]'
                     try {
                         const parsed = JSON.parse(raw);
                         if (Array.isArray(parsed)) {
@@ -120,12 +120,12 @@ routerAdd("GET", "/api/room-detail-stats", (e) => {
         } catch (err) {}
 
         // Helper: hitung distinct student dengan filter status (+ eligibility bila perlu)
+        // Jika classIds kosong → room untuk semua kelas → skip eligibility filter.
         function countByStatus(statusList, withEligibility) {
             const tpl = new DynamicModel({ c: 0 });
             const rows = arrayOf(tpl);
             let q;
-            if (withEligibility && !allClasses && classIds.length > 0) {
-                // Bangun IN clause dengan placeholder aman (classIds dari DB sendiri)
+            if (withEligibility && classIds.length > 0) {
                 const inList = classIds.map((c) => "'" + String(c).replace(/'/g, "''") + "'").join(",");
                 q = "SELECT COUNT(DISTINCT a.studentId) AS c FROM attempts a " +
                     "JOIN students s ON s.id = a.studentId " +
@@ -141,7 +141,7 @@ routerAdd("GET", "/api/room-detail-stats", (e) => {
             return rows.length > 0 ? (Number(rows[0].c) || 0) : 0;
         }
 
-        const useElig = !allClasses && classIds.length > 0;
+        const useElig = classIds.length > 0;
         const ongoing = countByStatus(["ongoing", "LOCKED"], useElig);
         const finished = countByStatus(["finished", "submitted"], useElig);
         // Total peserta = siswa eligible yang punya attempt (ongoing+finished)
