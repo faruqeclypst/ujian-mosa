@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { ConfirmationDialog } from "../../components/dialogs/ConfirmationDialog";
 import BatchProgressDialog from "../../components/dialogs/BatchProgressDialog";
 import QuestionRepositoryDialog from "../../components/dialogs/QuestionRepositoryDialog";
+import HotspotAreaEditor, { type HotspotArea } from "../../components/question-editors/HotspotAreaEditor";
 import { Input } from "../../components/ui/input";
 import { Separator } from "../../components/ui/separator";
 import FormField from "../../components/forms/FormField";
@@ -655,6 +656,9 @@ const QuestionsPage = () => {
     klasifikasiShuffle: boolean;
     isianRumpangText: string;
     isianRumpangBlanks: Array<{ id: string; answersText: string; caseSensitive: boolean }>;
+    hotspotImageUrl: string;
+    hotspotMode: "any" | "all";
+    hotspotAreas: HotspotArea[];
   }>({
     text: "",
     type: "pilihan_ganda",
@@ -693,7 +697,10 @@ const QuestionsPage = () => {
     ],
     klasifikasiShuffle: true,
     isianRumpangText: "",
-    isianRumpangBlanks: []
+    isianRumpangBlanks: [],
+    hotspotImageUrl: "",
+    hotspotMode: "any",
+    hotspotAreas: []
   });
 
   const [isLiterasiActive, setIsLiterasiActive] = useState(false);
@@ -713,6 +720,7 @@ const QuestionsPage = () => {
   }, [questions]);
 
   const [questionFile, setQuestionFile] = useState<File | null>(null);
+  const [hotspotFile, setHotspotFile] = useState<File | null>(null);
   const [choiceFiles, setChoiceFiles] = useState<Record<string, File | null>>({});
 
   const [coverSizeInfo, setCoverSizeInfo] = useState<string>("");
@@ -734,7 +742,7 @@ const QuestionsPage = () => {
 
   const [isGalleryOpen, setIsGalleryOpen] = useState(false);
   const [galleryGroups, setGalleryGroups] = useState<{ title: string; images: string[] }[]>([]);
-  const [galleryTarget, setGalleryTarget] = useState<{ type: "cover" | "choice" | "batch" | "quill"; letter?: string; index?: number; quillInstance?: any; quillIndex?: number } | null>(null);
+  const [galleryTarget, setGalleryTarget] = useState<{ type: "cover" | "choice" | "batch" | "quill" | "hotspot"; letter?: string; index?: number; quillInstance?: any; quillIndex?: number } | null>(null);
 
   // AI Import State
   const [isAIImportOpen, setIsAIImportOpen] = useState(false);
@@ -869,6 +877,9 @@ const QuestionsPage = () => {
     } else if (galleryTarget.type === "batch" && galleryTarget.index !== undefined) {
       updateBatchItem(galleryTarget.index, "imageUrl", url);
       updateBatchItem(galleryTarget.index, "imageFile", null); // Reset file jika ada
+    } else if (galleryTarget.type === "hotspot") {
+      setFormValues((prev) => ({ ...prev, hotspotImageUrl: url }));
+      setHotspotFile(null);
     } else if (galleryTarget.type === "quill" && galleryTarget.quillInstance) {
       const q = galleryTarget.quillInstance;
       const targetIndex = galleryTarget.quillIndex !== undefined ? galleryTarget.quillIndex : (q.getSelection()?.index || 0);
@@ -922,6 +933,9 @@ const QuestionsPage = () => {
     } else if (galleryTarget.type === "batch" && galleryTarget.index !== undefined) {
       updateBatchItem(galleryTarget.index, "imageFile", fileToUpload);
       updateBatchItem(galleryTarget.index, "imageUrl", "");
+    } else if (galleryTarget.type === "hotspot") {
+      setHotspotFile(fileToUpload);
+      setFormValues((prev) => ({ ...prev, hotspotImageUrl: "" }));
     } else if (galleryTarget.type === "quill" && galleryTarget.quillInstance) {
       const reader = new FileReader();
       reader.readAsDataURL(fileToUpload);
@@ -2406,6 +2420,9 @@ const QuestionsPage = () => {
   const handleCreateClick = () => {
     setDialogMode("create");
     setSelectedQuestion(null);
+    setQuestionFile(null);
+    setHotspotFile(null);
+    setChoiceFiles({});
     setFormValues({
       text: "",
       type: "pilihan_ganda",
@@ -2444,7 +2461,10 @@ const QuestionsPage = () => {
       ],
       klasifikasiShuffle: true,
     isianRumpangText: "",
-    isianRumpangBlanks: []
+    isianRumpangBlanks: [],
+    hotspotImageUrl: "",
+    hotspotMode: "any",
+    hotspotAreas: []
     });
     setIsLiterasiActive(false);
     setLiterasiMode("select");
@@ -2456,6 +2476,7 @@ const QuestionsPage = () => {
     setDialogMode("edit");
     setSelectedQuestion(q);
     setQuestionFile(null);
+    setHotspotFile(null);
     setChoiceFiles({});
     setFormValues({
       text: wrapTablesForQuill(q.text),
@@ -2509,6 +2530,16 @@ const QuestionsPage = () => {
         id: String(b.id),
         answersText: (b.answers || []).join(", "),
         caseSensitive: !!b.caseSensitive
+      })) || []) : [],
+      hotspotImageUrl: q.type === "hotspot" ? (q.options?.imageUrl || "") : "",
+      hotspotMode: q.type === "hotspot" ? (q.options?.mode === "all" ? "all" : "any") : "any",
+      hotspotAreas: q.type === "hotspot" ? ((q.options?.areas || []).map((a: any) => ({
+        id: String(a.id),
+        x: Number(a.x) || 0,
+        y: Number(a.y) || 0,
+        w: Number(a.w) || 0,
+        h: Number(a.h) || 0,
+        label: a.label || ""
       })) || []) : []
     });
     // Deteksi apakah ini soal pertama di grupnya agar hanya soal #1 yang bisa edit teks literasi
@@ -2822,6 +2853,20 @@ const QuestionsPage = () => {
           return;
         }
       }
+    } else if (formValues.type === "hotspot") {
+      const areas = formValues.hotspotAreas || [];
+      if (areas.length < 1) {
+        showAlert("Gagal", "Hotspot membutuhkan minimal 1 area target.", "danger");
+        return;
+      }
+      if (areas.some(a => !a.label.trim())) {
+        showAlert("Gagal", "Semua area Hotspot harus memiliki label.", "danger");
+        return;
+      }
+      if (!formValues.hotspotImageUrl && !hotspotFile) {
+        showAlert("Gagal", "Hotspot membutuhkan gambar. Silakan upload gambar terlebih dahulu.", "danger");
+        return;
+      }
     } else if (formValues.type === "menjodohkan") {
       if (formValues.pairs.length < 1 || formValues.pairs.some(p => !p.left.trim() || !p.right.trim())) {
         showAlert("Gagal", "Semua pasangan menjodohkan harus diisi.", "danger");
@@ -2867,6 +2912,19 @@ const QuestionsPage = () => {
         imageUrl = res.url;
       } else if (imageUrl) {
         imageUrl = await localizeImage(imageUrl, "cover_manual");
+      }
+
+      // 1b. Upload file Gambar Hotspot (dari tombol input file / galeri)
+      let hotspotImageUrl = formValues.hotspotImageUrl || "";
+      if (formValues.type === "hotspot") {
+        if (hotspotFile) {
+          const fileToUpload = await compressImage(hotspotFile);
+          const schoolFolder = school?.slug || "unknown";
+          const res = await uploadInventoryImage(`schools/${schoolFolder}/exams/${examId}`, fileToUpload);
+          hotspotImageUrl = res.url;
+        } else if (hotspotImageUrl) {
+          hotspotImageUrl = await localizeImage(hotspotImageUrl, "hotspot_manual");
+        }
       }
 
       // 2. Hapus gambar R2 yang dihapus dari teks Quill (diff lama vs baru)
@@ -2965,6 +3023,21 @@ const QuestionsPage = () => {
           }))
         };
         payload.correctAnswer = blanks.map(b => `${b.id}:${b.answersText.trim()}`).join(" | ");
+      } else if (formValues.type === "hotspot") {
+        const validAreas = (formValues.hotspotAreas || []).filter(a => a.label.trim()).map(a => ({
+          id: a.id,
+          x: a.x,
+          y: a.y,
+          w: a.w,
+          h: a.h,
+          label: a.label.trim()
+        }));
+        payload.options = {
+          imageUrl: hotspotImageUrl,
+          mode: formValues.hotspotMode || "any",
+          areas: validAreas
+        };
+        payload.correctAnswer = validAreas.map(a => a.label).join(", ");
       } else if (formValues.type === "matriks") {
         const validColumns = (formValues.matrixColumns || []).filter(c => c.text.trim());
         const validStatements = (formValues.matrixStatements || []).filter(s => s.text.trim()).map(s => ({
@@ -3070,6 +3143,7 @@ const QuestionsPage = () => {
             items: [{ id: "1", text: "" }]
           }));
           setQuestionFile(null);
+          setHotspotFile(null);
           setChoiceFiles({});
         } else {
           setIsDialogOpen(false);
@@ -3539,7 +3613,8 @@ const QuestionsPage = () => {
           drag_drop: "Drag and Drop",
           matriks: "Matriks",
           klasifikasi: "Klasifikasi",
-          isian_rumpang: "Isian Rumpang"
+          isian_rumpang: "Isian Rumpang",
+          hotspot: "Hotspot"
         };
         return (
           <span className="p-1 px-2 rounded-md bg-indigo-50 text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400 text-[10px] font-bold border border-indigo-200 dark:border-indigo-800/40 uppercase whitespace-nowrap">
@@ -3693,6 +3768,21 @@ const QuestionsPage = () => {
             <span className="p-1 px-2 rounded-md bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 text-xs font-semibold border border-amber-200 dark:border-amber-800/40 whitespace-nowrap">
               Belum ada rumpang
             </span>
+          );
+        }
+
+        if (type === "hotspot") {
+          const areas = item.options?.areas || [];
+          const mode = item.options?.mode || "any";
+          return (
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="p-1 px-2 rounded-md bg-sky-50 text-sky-700 dark:bg-sky-950/40 dark:text-sky-300 text-xs font-semibold border border-sky-200 dark:border-sky-800/40 whitespace-nowrap">
+                {areas.length} Area
+              </span>
+              <span className="p-1 px-2 rounded-md bg-slate-50 text-slate-600 dark:bg-slate-800/60 dark:text-slate-300 text-[11px] border border-slate-200 dark:border-slate-800 whitespace-nowrap">
+                {mode === "all" ? "Semua area" : "Satu saja"}
+              </span>
+            </div>
           );
         }
 
@@ -5603,6 +5693,7 @@ Aturan:
                           {(allowedTypes.matriks || formValues.type === "matriks") && <option value="matriks">Matriks (Tabel Pilihan Ganda)</option>}
                           {(allowedTypes.klasifikasi || formValues.type === "klasifikasi") && <option value="klasifikasi">Klasifikasi / Kategorisasi</option>}
                           {(allowedTypes.isian_rumpang || formValues.type === "isian_rumpang") && <option value="isian_rumpang">Isian Rumpang (Cloze)</option>}
+                          {(allowedTypes.hotspot || formValues.type === "hotspot") && <option value="hotspot">Hotspot (Klik Gambar)</option>}
                         </select>
                         <ChevronDown className="w-4 h-4 text-slate-400 dark:text-slate-500 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                       </div>
@@ -6597,6 +6688,126 @@ Aturan:
                     </div>
                   )}
 
+                  {/* RENDER HOTSPOT */}
+                  {formValues.type === "hotspot" && (
+                    <div className="space-y-4">
+                      {/* Upload Gambar */}
+                      <div className="space-y-2.5">
+                        <div className="flex items-center justify-between px-1">
+                          <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                            Gambar Hotspot <span className="text-rose-500">*</span>
+                          </span>
+                          <span className="text-[10px] text-sky-700 dark:text-sky-400 font-bold bg-sky-50 dark:bg-sky-950/40 px-2.5 py-0.5 rounded-full border border-sky-200 dark:border-sky-800">
+                            Wajib ada
+                          </span>
+                        </div>
+                        {(hotspotFile || formValues.hotspotImageUrl) ? (
+                          <div className="relative rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-800">
+                            <img
+                              src={hotspotFile ? URL.createObjectURL(hotspotFile) : formValues.hotspotImageUrl}
+                              alt="Gambar hotspot"
+                              className="w-full h-auto max-h-64 object-contain"
+                            />
+                            <div className="absolute top-2 right-2 flex gap-1.5">
+                              <Button
+                                type="button"
+                                variant="secondary"
+                                size="sm"
+                                onClick={() => { setGalleryTarget({ type: "hotspot" }); setIsGalleryOpen(true); }}
+                                className="text-xs h-8 shadow-md"
+                              >
+                                Ganti
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="destructive"
+                                size="icon"
+                                onClick={() => {
+                                  setHotspotFile(null);
+                                  setFormValues(prev => ({ ...prev, hotspotImageUrl: "" }));
+                                }}
+                                className="h-8 w-8 shadow-md"
+                                title="Hapus gambar"
+                              >
+                                <Trash className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex flex-wrap gap-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => { setGalleryTarget({ type: "hotspot" }); globalFileInputRef.current?.click(); }}
+                              className="text-xs h-10 px-4 rounded-xl font-semibold"
+                            >
+                              <Image className="w-4 h-4 mr-1.5" /> Upload Gambar
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => { setGalleryTarget({ type: "hotspot" }); setIsGalleryOpen(true); }}
+                              className="text-xs h-10 px-4 rounded-xl font-semibold"
+                            >
+                              <FolderOpen className="w-4 h-4 mr-1.5" /> Dari Galeri
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Mode */}
+                      <div className="space-y-2">
+                        <span className="text-xs font-bold text-slate-700 dark:text-slate-300 px-1">
+                          Mode Penilaian
+                        </span>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setFormValues(prev => ({ ...prev, hotspotMode: "any" }))}
+                            className={`flex-1 px-4 py-2.5 rounded-xl text-xs font-bold transition-all border shadow-xs active:scale-95 ${formValues.hotspotMode === "any"
+                              ? "bg-sky-600 text-white border-sky-600 dark:bg-sky-600"
+                              : "bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700 hover:border-sky-400"
+                              }`}
+                          >
+                            Satu saja
+                            <span className="block text-[10px] font-normal opacity-80 mt-0.5">
+                              Cukup klik salah satu area benar
+                            </span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setFormValues(prev => ({ ...prev, hotspotMode: "all" }))}
+                            className={`flex-1 px-4 py-2.5 rounded-xl text-xs font-bold transition-all border shadow-xs active:scale-95 ${formValues.hotspotMode === "all"
+                              ? "bg-sky-600 text-white border-sky-600 dark:bg-sky-600"
+                              : "bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700 hover:border-sky-400"
+                              }`}
+                          >
+                            Semua area
+                            <span className="block text-[10px] font-normal opacity-80 mt-0.5">
+                              Harus klik semua area (skor parsial)
+                            </span>
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Editor Area */}
+                      {(hotspotFile || formValues.hotspotImageUrl) && (
+                        <div className="space-y-2">
+                          <span className="text-xs font-bold text-slate-700 dark:text-slate-300 px-1">
+                            Area Target
+                          </span>
+                          <HotspotAreaEditor
+                            imageUrl={hotspotFile ? URL.createObjectURL(hotspotFile) : formValues.hotspotImageUrl}
+                            areas={formValues.hotspotAreas}
+                            onChange={(areas) => setFormValues(prev => ({ ...prev, hotspotAreas: areas }))}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   {/* RENDER MENJODOHKAN */}
                   {formValues.type === "menjodohkan" && (
                     <div className="space-y-3">
@@ -7061,6 +7272,28 @@ Aturan:
                           })}
                         </div>
                       </div>
+                    ) : previewQuestion.type === "hotspot" && (previewQuestion as any).options?.imageUrl ? (
+                      <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm p-4 sm:p-5 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <p className="text-[10px] font-black text-sky-700 dark:text-sky-400 uppercase tracking-widest">
+                            Pratinjau Hotspot
+                          </p>
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
+                            {(previewQuestion as any).options.mode === "all" ? "Mode: Semua area" : "Mode: Satu saja"} • {((previewQuestion as any).options.areas || []).length} area
+                          </span>
+                        </div>
+                        <div className="rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800">
+                          <img
+                            src={(previewQuestion as any).options.imageUrl}
+                            alt="Gambar hotspot"
+                            className="w-full h-auto block"
+                          />
+                        </div>
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                          Area target: {((previewQuestion as any).options.areas || []).map((a: any) => a.label).join(", ") || "-"}
+                          <span className="italic"> (tidak ditampilkan ke siswa)</span>
+                        </p>
+                      </div>
                     ) : (previewQuestion.type === "pilihan_ganda" || previewQuestion.type === "pilihan_ganda_kompleks" || previewQuestion.type === "benar_salah" || !previewQuestion.type) && (
                       <div className="space-y-3">
                         {Object.keys(previewQuestion.choices || {}).map((cKey, idx) => {
@@ -7215,6 +7448,7 @@ Aturan:
                                       q.type === "matriks" ? "bg-teal-50 text-teal-600 border-teal-200 dark:bg-teal-950/30 dark:text-teal-400 dark:border-teal-800/40" :
                                       q.type === "klasifikasi" ? "bg-violet-50 text-violet-600 border-violet-200 dark:bg-violet-950/30 dark:text-violet-400 dark:border-violet-800/40" :
                                       q.type === "isian_rumpang" ? "bg-lime-50 text-lime-700 border-lime-200 dark:bg-lime-950/30 dark:text-lime-400 dark:border-lime-800/40" :
+                                      q.type === "hotspot" ? "bg-sky-50 text-sky-600 border-sky-200 dark:bg-sky-950/30 dark:text-sky-400 dark:border-sky-800/40" :
                                       "bg-cyan-50 text-cyan-600 border-cyan-200 dark:bg-cyan-950/30 dark:text-cyan-400 dark:border-cyan-800/40"
                           }`}>
                           {q.type === "pilihan_ganda_kompleks" ? "PG Kompleks" :
@@ -7226,7 +7460,8 @@ Aturan:
                                       q.type === "drag_drop" ? "Drag & Drop" :
                                         q.type === "matriks" ? "Matriks" :
                                           q.type === "klasifikasi" ? "Klasifikasi" :
-                                            q.type === "isian_rumpang" ? "Isian Rumpang" : q.type}
+                                            q.type === "isian_rumpang" ? "Isian Rumpang" :
+                                              q.type === "hotspot" ? "Hotspot" : q.type}
                         </span>
                       )}
                     </div>
