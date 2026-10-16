@@ -73,12 +73,19 @@ export const QuestionRepositoryDialog: React.FC<QuestionRepositoryDialogProps> =
       setLoadingInternalExams(true);
       try {
         const records = await pb.collection("exams").getFullList({
-          filter: `id != "${targetExamId}" && status != "archive"`,
+          filter: `id != "${targetExamId}"`,
           sort: "-created"
         });
-        setExamsList(records);
-        if (records.length > 0) {
-          setSelectedSourceExamId(records[0].id);
+        // Urutkan: bank aktif dulu, yang diarsipkan di bawah
+        const sorted = [...records].sort((a: any, b: any) => {
+          const aArch = a.status === "archive" ? 1 : 0;
+          const bArch = b.status === "archive" ? 1 : 0;
+          if (aArch !== bArch) return aArch - bArch;
+          return 0; // di dalam grup tetap -created dari server
+        });
+        setExamsList(sorted);
+        if (sorted.length > 0) {
+          setSelectedSourceExamId(sorted[0].id);
         }
       } catch (e) {
         console.error("Gagal load daftar exam:", e);
@@ -411,9 +418,10 @@ export const QuestionRepositoryDialog: React.FC<QuestionRepositoryDialogProps> =
                       ) : (
                         examsList.map((exam) => {
                           const subjName = subjects.find((s: any) => s.id === (exam.subjectId || exam.subjectid))?.name || "";
+                          const isArchived = exam.status === "archive";
                           return (
                             <option key={exam.id} value={exam.id}>
-                              {exam.title} {subjName ? `(${subjName})` : ""}
+                              {exam.title} {subjName ? `(${subjName})` : ""}{isArchived ? " [Arsip]" : ""}
                             </option>
                           );
                         })
