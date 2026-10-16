@@ -418,6 +418,24 @@ export interface QuestionData {
   order?: number;
 }
 
+// Helper: deteksi ID rumpang [[n]] dari teks isian_rumpang
+const detectRumpangIds = (text: string): string[] => {
+  const ids: string[] = [];
+  const re = /\[\[(\d+)\]\]/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) {
+    if (!ids.includes(m[1])) ids.push(m[1]);
+  }
+  return ids;
+};
+
+// Helper: cek apakah ada [[ tanpa pasangan ]]
+const hasUnbalancedRumpang = (text: string): boolean => {
+  const openCount = (text.match(/\[\[/g) || []).length;
+  const closeCount = (text.match(/\]\]/g) || []).length;
+  return openCount !== closeCount;
+};
+
 
 
 const QuestionsPage = () => {
@@ -635,6 +653,8 @@ const QuestionsPage = () => {
     klasifikasiCategories: Array<{ id: string; text: string }>;
     klasifikasiStatements: Array<{ id: string; text: string; answer: string }>;
     klasifikasiShuffle: boolean;
+    isianRumpangText: string;
+    isianRumpangBlanks: Array<{ id: string; answersText: string; caseSensitive: boolean }>;
   }>({
     text: "",
     type: "pilihan_ganda",
@@ -671,7 +691,9 @@ const QuestionsPage = () => {
       { id: "s1", text: "", answer: "k1" },
       { id: "s2", text: "", answer: "k2" }
     ],
-    klasifikasiShuffle: true
+    klasifikasiShuffle: true,
+    isianRumpangText: "",
+    isianRumpangBlanks: []
   });
 
   const [isLiterasiActive, setIsLiterasiActive] = useState(false);
@@ -2420,7 +2442,9 @@ const QuestionsPage = () => {
         { id: "s1", text: "", answer: "k1" },
         { id: "s2", text: "", answer: "k2" }
       ],
-      klasifikasiShuffle: true
+      klasifikasiShuffle: true,
+    isianRumpangText: "",
+    isianRumpangBlanks: []
     });
     setIsLiterasiActive(false);
     setLiterasiMode("select");
@@ -2479,7 +2503,13 @@ const QuestionsPage = () => {
         { id: "s1", text: "", answer: "k1" },
         { id: "s2", text: "", answer: "k2" }
       ],
-      klasifikasiShuffle: q.type === "klasifikasi" ? (q.options?.shuffleStatements !== false) : true
+      klasifikasiShuffle: q.type === "klasifikasi" ? (q.options?.shuffleStatements !== false) : true,
+      isianRumpangText: q.type === "isian_rumpang" ? (q.options?.text || "") : "",
+      isianRumpangBlanks: q.type === "isian_rumpang" ? ((q.options?.blanks || []).map((b: any) => ({
+        id: String(b.id),
+        answersText: (b.answers || []).join(", "),
+        caseSensitive: !!b.caseSensitive
+      })) || []) : []
     });
     // Deteksi apakah ini soal pertama di grupnya agar hanya soal #1 yang bisa edit teks literasi
     const groupItems = questions.filter(item => q.groupId && item.groupId === q.groupId);
@@ -2768,6 +2798,30 @@ const QuestionsPage = () => {
         showAlert("Gagal", "Setiap pernyataan Klasifikasi harus memiliki kategori jawaban yang valid.", "danger");
         return;
       }
+    } else if (formValues.type === "isian_rumpang") {
+      const passage = (formValues.isianRumpangText || "").trim();
+      if (!passage) {
+        showAlert("Gagal", "Teks bacaan Isian Rumpang tidak boleh kosong.", "danger");
+        return;
+      }
+      if (hasUnbalancedRumpang(passage)) {
+        showAlert("Gagal", "Ada tanda [[ tanpa pasangan ]]. Periksa kembali penulisan rumpang.", "danger");
+        return;
+      }
+      const detectedIds = detectRumpangIds(passage);
+      if (detectedIds.length < 1) {
+        showAlert("Gagal", "Tidak ada rumpang terdeteksi. Gunakan format [[1]], [[2]], dst.", "danger");
+        return;
+      }
+      const blanks = formValues.isianRumpangBlanks || [];
+      for (const id of detectedIds) {
+        const b = blanks.find(x => x.id === id);
+        const answers = (b?.answersText || "").split(",").map(a => a.trim()).filter(Boolean);
+        if (answers.length < 1) {
+          showAlert("Gagal", `Rumpang [[${id}]] belum memiliki kunci jawaban.`, "danger");
+          return;
+        }
+      }
     } else if (formValues.type === "menjodohkan") {
       if (formValues.pairs.length < 1 || formValues.pairs.some(p => !p.left.trim() || !p.right.trim())) {
         showAlert("Gagal", "Semua pasangan menjodohkan harus diisi.", "danger");
@@ -2898,6 +2952,19 @@ const QuestionsPage = () => {
         const validStatements = (formValues.statements || []).filter(s => s.text.trim());
         payload.options = { statements: validStatements };
         payload.correctAnswer = validStatements.map(s => `${s.id}:${s.answer}`).join(",");
+      } else if (formValues.type === "isian_rumpang") {
+        const passage = (formValues.isianRumpangText || "").trim();
+        const detectedIds = detectRumpangIds(passage);
+        const blanks = (formValues.isianRumpangBlanks || []).filter(b => detectedIds.includes(b.id));
+        payload.options = {
+          text: passage,
+          blanks: blanks.map(b => ({
+            id: b.id,
+            answers: b.answersText.split(",").map(a => a.trim()).filter(Boolean),
+            caseSensitive: !!b.caseSensitive
+          }))
+        };
+        payload.correctAnswer = blanks.map(b => `${b.id}:${b.answersText.trim()}`).join(" | ");
       } else if (formValues.type === "matriks") {
         const validColumns = (formValues.matrixColumns || []).filter(c => c.text.trim());
         const validStatements = (formValues.matrixStatements || []).filter(s => s.text.trim()).map(s => ({
@@ -3471,7 +3538,8 @@ const QuestionsPage = () => {
           urutkan: "Urutkan",
           drag_drop: "Drag and Drop",
           matriks: "Matriks",
-          klasifikasi: "Klasifikasi"
+          klasifikasi: "Klasifikasi",
+          isian_rumpang: "Isian Rumpang"
         };
         return (
           <span className="p-1 px-2 rounded-md bg-indigo-50 text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400 text-[10px] font-bold border border-indigo-200 dark:border-indigo-800/40 uppercase whitespace-nowrap">
@@ -3597,6 +3665,33 @@ const QuestionsPage = () => {
           return (
             <span className="p-1 px-2 rounded-md bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 text-xs font-semibold border border-amber-200 dark:border-amber-800/40 whitespace-nowrap">
               Belum ada data klasifikasi
+            </span>
+          );
+        }
+
+        if (type === "isian_rumpang") {
+          const blanks = item.options?.blanks || [];
+          const passage = item.options?.text || "";
+          if (blanks.length > 0 || passage) {
+            return (
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="p-1 px-2 rounded-md bg-lime-50 text-lime-700 dark:bg-lime-950/40 dark:text-lime-300 text-xs font-semibold border border-lime-200 dark:border-lime-800/40 whitespace-nowrap">
+                  {blanks.length} Rumpang
+                </span>
+                {blanks.length > 0 && (
+                  <span
+                    className="p-1 px-2 rounded-md bg-slate-50 text-slate-600 dark:bg-slate-800/60 dark:text-slate-300 text-[11px] border border-slate-200 dark:border-slate-800 whitespace-nowrap cursor-help"
+                    title={blanks.map((b: any) => `[[${b.id}]]: ${(b.answers || []).join(" / ")}`).join("\n")}
+                  >
+                    {blanks.map((b: any) => `[[${b.id}]]`).join(" ").slice(0, 30)}
+                  </span>
+                )}
+              </div>
+            );
+          }
+          return (
+            <span className="p-1 px-2 rounded-md bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 text-xs font-semibold border border-amber-200 dark:border-amber-800/40 whitespace-nowrap">
+              Belum ada rumpang
             </span>
           );
         }
@@ -5487,7 +5582,12 @@ Aturan:
                               klasifikasiStatements: newType === "klasifikasi" && (!prev.klasifikasiStatements || prev.klasifikasiStatements.length === 0) ? [
                                 { id: "s1", text: "", answer: "k1" },
                                 { id: "s2", text: "", answer: "k2" }
-                              ] : prev.klasifikasiStatements
+                              ] : prev.klasifikasiStatements,
+                              isianRumpangText: newType === "isian_rumpang" && !prev.isianRumpangText ? "Ibu kota Indonesia adalah [[1]] dan mata uangnya [[2]]." : prev.isianRumpangText,
+                              isianRumpangBlanks: newType === "isian_rumpang" && (!prev.isianRumpangBlanks || prev.isianRumpangBlanks.length === 0) ? [
+                                { id: "1", answersText: "", caseSensitive: false },
+                                { id: "2", answersText: "", caseSensitive: false }
+                              ] : prev.isianRumpangBlanks
                             }));
                           }}
                           className="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm font-semibold h-10 px-3 pr-8 cursor-pointer text-slate-800 dark:text-slate-100 shadow-xs focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all appearance-none"
@@ -5502,6 +5602,7 @@ Aturan:
                           {(allowedTypes.drag_drop || formValues.type === "drag_drop") && <option value="drag_drop">Drag and Drop</option>}
                           {(allowedTypes.matriks || formValues.type === "matriks") && <option value="matriks">Matriks (Tabel Pilihan Ganda)</option>}
                           {(allowedTypes.klasifikasi || formValues.type === "klasifikasi") && <option value="klasifikasi">Klasifikasi / Kategorisasi</option>}
+                          {(allowedTypes.isian_rumpang || formValues.type === "isian_rumpang") && <option value="isian_rumpang">Isian Rumpang (Cloze)</option>}
                         </select>
                         <ChevronDown className="w-4 h-4 text-slate-400 dark:text-slate-500 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                       </div>
@@ -6402,6 +6503,100 @@ Aturan:
                     </div>
                   )}
 
+                  {/* RENDER ISIAN RUMPANG */}
+                  {formValues.type === "isian_rumpang" && (
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between px-1 flex-wrap gap-1.5">
+                          <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                            Teks Bacaan
+                          </span>
+                          <span className="text-[10px] text-lime-700 dark:text-lime-400 font-bold bg-lime-50 dark:bg-lime-950/40 px-2.5 py-0.5 rounded-full border border-lime-200 dark:border-lime-800">
+                            Tulis [[1]], [[2]] untuk rumpang
+                          </span>
+                        </div>
+                        <textarea
+                          value={formValues.isianRumpangText}
+                          onChange={(e) => {
+                            const newText = e.target.value;
+                            const detectedIds = detectRumpangIds(newText);
+                            setFormValues(prev => {
+                              const existing = prev.isianRumpangBlanks || [];
+                              const synced = detectedIds.map(id => {
+                                const found = existing.find(b => b.id === id);
+                                return found || { id, answersText: "", caseSensitive: false };
+                              });
+                              return { ...prev, isianRumpangText: newText, isianRumpangBlanks: synced };
+                            });
+                          }}
+                          placeholder="Contoh: Ibu kota Indonesia adalah [[1]] dan mata uangnya [[2]]."
+                          rows={5}
+                          className="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm p-3 text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-lime-500/20 focus:border-lime-500 resize-y"
+                        />
+                        {hasUnbalancedRumpang(formValues.isianRumpangText || "") && (
+                          <p className="text-xs font-semibold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800/40 rounded-lg px-3 py-2">
+                            ⚠️ Ada tanda [[ tanpa pasangan ]]. Periksa kembali penulisan rumpang.
+                          </p>
+                        )}
+                        {detectRumpangIds(formValues.isianRumpangText || "").length > 0 && (
+                          <p className="text-xs text-slate-500 dark:text-slate-400 px-1">
+                            Terdeteksi <span className="font-bold text-lime-700 dark:text-lime-400">{detectRumpangIds(formValues.isianRumpangText || "").length} rumpang</span>: {detectRumpangIds(formValues.isianRumpangText || "").map(id => `[[${id}]]`).join(", ")}
+                          </p>
+                        )}
+                      </div>
+
+                      {(formValues.isianRumpangBlanks || []).length > 0 && (
+                        <div className="space-y-2.5">
+                          <div className="px-1">
+                            <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                              Kunci Jawaban per Rumpang
+                            </span>
+                            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                              Pisahkan dengan koma jika ada beberapa jawaban yang diterima (mis. "Rupiah, IDR").
+                            </p>
+                          </div>
+                          <div className="space-y-2.5">
+                            {(formValues.isianRumpangBlanks || []).map((b, bIdx) => (
+                              <div
+                                key={b.id}
+                                className="flex flex-col sm:flex-row gap-2.5 items-start sm:items-center p-3 rounded-xl bg-white dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800 shadow-xs"
+                              >
+                                <span className="shrink-0 px-2.5 py-1 rounded-lg bg-lime-100 dark:bg-lime-950/40 text-lime-800 dark:text-lime-300 text-xs font-black border border-lime-200 dark:border-lime-800/40 font-mono">
+                                  [[{b.id}]]
+                                </span>
+                                <Input
+                                  placeholder={`Jawaban benar untuk [[${b.id}]]...`}
+                                  value={b.answersText}
+                                  onChange={(e) => {
+                                    const updated = [...(formValues.isianRumpangBlanks || [])];
+                                    updated[bIdx] = { ...updated[bIdx], answersText: e.target.value };
+                                    setFormValues(prev => ({ ...prev, isianRumpangBlanks: updated }));
+                                  }}
+                                  className="h-10 text-xs flex-1 bg-slate-50/50 dark:bg-slate-900 border-slate-200 dark:border-slate-700"
+                                />
+                                <label className="flex items-center gap-1.5 shrink-0 cursor-pointer select-none px-1">
+                                  <input
+                                    type="checkbox"
+                                    checked={!!b.caseSensitive}
+                                    onChange={(e) => {
+                                      const updated = [...(formValues.isianRumpangBlanks || [])];
+                                      updated[bIdx] = { ...updated[bIdx], caseSensitive: e.target.checked };
+                                      setFormValues(prev => ({ ...prev, isianRumpangBlanks: updated }));
+                                    }}
+                                    className="w-4 h-4 rounded accent-lime-600"
+                                  />
+                                  <span className="text-[11px] font-semibold text-slate-600 dark:text-slate-400 whitespace-nowrap" title="Bedakan huruf besar/kecil">
+                                    Case-sensitive
+                                  </span>
+                                </label>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   {/* RENDER MENJODOHKAN */}
                   {formValues.type === "menjodohkan" && (
                     <div className="space-y-3">
@@ -6837,6 +7032,35 @@ Aturan:
                           </p>
                         </div>
                       </div>
+                    ) : previewQuestion.type === "isian_rumpang" && (previewQuestion as any).options?.text ? (
+                      <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm p-4 sm:p-5">
+                        <p className="text-[10px] font-black text-lime-700 dark:text-lime-400 uppercase tracking-widest mb-3">
+                          Pratinjau Isian Rumpang
+                        </p>
+                        <div className="text-sm sm:text-base text-slate-800 dark:text-slate-200 leading-loose">
+                          {(previewQuestion as any).options.text.split(/(\[\[\d+\]\])/g).map((part: string, idx: number) => {
+                            const m = part.match(/\[\[(\d+)\]\]/);
+                            if (m) {
+                              const blank = ((previewQuestion as any).options.blanks || []).find((b: any) => String(b.id) === m[1]);
+                              return (
+                                <span key={idx} className="inline-flex flex-col items-center mx-1 align-middle">
+                                  <input
+                                    disabled
+                                    placeholder={`[[${m[1]}]]`}
+                                    className="h-9 min-w-[100px] text-sm text-center rounded-lg border-2 border-dashed border-lime-300 dark:border-lime-700 bg-lime-50/50 dark:bg-lime-950/20 px-2"
+                                  />
+                                  {blank && (
+                                    <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 mt-1">
+                                      {(blank.answers || []).join(" / ")}
+                                    </span>
+                                  )}
+                                </span>
+                              );
+                            }
+                            return <span key={idx}>{part}</span>;
+                          })}
+                        </div>
+                      </div>
                     ) : (previewQuestion.type === "pilihan_ganda" || previewQuestion.type === "pilihan_ganda_kompleks" || previewQuestion.type === "benar_salah" || !previewQuestion.type) && (
                       <div className="space-y-3">
                         {Object.keys(previewQuestion.choices || {}).map((cKey, idx) => {
@@ -6990,6 +7214,7 @@ Aturan:
                                     q.type === "urutkan" ? "bg-orange-50 text-orange-600 border-orange-200 dark:bg-orange-950/30 dark:text-orange-400 dark:border-orange-800/40" :
                                       q.type === "matriks" ? "bg-teal-50 text-teal-600 border-teal-200 dark:bg-teal-950/30 dark:text-teal-400 dark:border-teal-800/40" :
                                       q.type === "klasifikasi" ? "bg-violet-50 text-violet-600 border-violet-200 dark:bg-violet-950/30 dark:text-violet-400 dark:border-violet-800/40" :
+                                      q.type === "isian_rumpang" ? "bg-lime-50 text-lime-700 border-lime-200 dark:bg-lime-950/30 dark:text-lime-400 dark:border-lime-800/40" :
                                       "bg-cyan-50 text-cyan-600 border-cyan-200 dark:bg-cyan-950/30 dark:text-cyan-400 dark:border-cyan-800/40"
                           }`}>
                           {q.type === "pilihan_ganda_kompleks" ? "PG Kompleks" :
@@ -7000,7 +7225,8 @@ Aturan:
                                     q.type === "urutkan" ? "Urutkan" :
                                       q.type === "drag_drop" ? "Drag & Drop" :
                                         q.type === "matriks" ? "Matriks" :
-                                          q.type === "klasifikasi" ? "Klasifikasi" : q.type}
+                                          q.type === "klasifikasi" ? "Klasifikasi" :
+                                            q.type === "isian_rumpang" ? "Isian Rumpang" : q.type}
                         </span>
                       )}
                     </div>
