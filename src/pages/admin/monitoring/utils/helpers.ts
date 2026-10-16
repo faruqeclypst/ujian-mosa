@@ -167,6 +167,75 @@ export const computeQuestionScore = (q: any, ans: any, overrides?: Record<string
     return 0;
   }
 
+  if (type === "klasifikasi" || type === "matriks") {
+    const stmts = q.statements || (q.choices && q.choices.statements) || [];
+    if (Array.isArray(stmts) && stmts.length > 0 && typeof ans === "object" && ans !== null && !Array.isArray(ans)) {
+      let kCorr = 0;
+      for (const st of stmts) {
+        const sid = String(st.id ?? "");
+        if (!sid) continue;
+        if (String(ans[sid] ?? "") === String(st.answer ?? "")) kCorr++;
+      }
+      return kCorr / stmts.length;
+    }
+    return 0;
+  }
+
+  if (type === "isian_rumpang" || type === "cloze") {
+    const blanks = q.blanks || (q.choices && q.choices.blanks) || [];
+    if (Array.isArray(blanks) && blanks.length > 0 && typeof ans === "object" && ans !== null && !Array.isArray(ans)) {
+      let bCorr = 0;
+      for (const bl of blanks) {
+        const bid = String(bl.id ?? "");
+        if (!bid) continue;
+        let given = String(ans[bid] ?? "").trim();
+        const cs = bl.caseSensitive === true;
+        if (!cs) given = given.toLowerCase();
+        if (!given) continue;
+        const acc = Array.isArray(bl.answers) ? bl.answers : (bl.answers != null ? [bl.answers] : []);
+        for (const a of acc) {
+          let exp = String(a ?? "").trim();
+          if (!cs) exp = exp.toLowerCase();
+          if (exp && given === exp) { bCorr++; break; }
+        }
+      }
+      return bCorr / blanks.length;
+    }
+    return 0;
+  }
+
+  if (type === "hotspot") {
+    const areas = q.areas || (q.choices && q.choices.areas) || [];
+    if (!Array.isArray(areas) || areas.length === 0) return 0;
+    const inArea = (px: number, py: number, ar: any) => {
+      const ax = Number(ar.x), ay = Number(ar.y), aw = Number(ar.w), ah = Number(ar.h);
+      if (isNaN(ax) || isNaN(ay) || isNaN(aw) || isNaN(ah)) return false;
+      return px >= ax && px <= ax + aw && py >= ay && py <= ay + ah;
+    };
+    const hmode = String(q.mode || (q.choices && q.choices.mode) || "any").toLowerCase();
+    if (hmode === "all") {
+      const pts = Array.isArray(ans) ? ans : [];
+      let hit = 0;
+      for (const ar of areas) {
+        for (const pt of pts) {
+          const px = Number(pt?.x), py = Number(pt?.y);
+          if (!isNaN(px) && !isNaN(py) && inArea(px, py, ar || {})) { hit++; break; }
+        }
+      }
+      return hit / areas.length;
+    } else {
+      let hx = NaN, hy = NaN;
+      if (ans !== null && typeof ans === "object" && !Array.isArray(ans)) {
+        hx = Number(ans.x); hy = Number(ans.y);
+      }
+      if (isNaN(hx) || isNaN(hy)) return 0;
+      for (const ar of areas) {
+        if (inArea(hx, hy, ar || {})) return 1;
+      }
+      return 0;
+    }
+  }
+
   return 0;
 };
 
@@ -339,6 +408,131 @@ export const getQuestionDetailInfo = (q: any, ans: any, overrides?: Record<strin
         breakdown: { type: "menjodohkan", items: breakdownItems }
       };
     }
+  }
+
+  if (type === "klasifikasi" || type === "matriks") {
+    const stmts = q.statements || (q.choices && q.choices.statements) || [];
+    const cats = q.categories || q.columns || (q.choices && (q.choices.categories || q.choices.columns)) || [];
+    const catMap: Record<string, string> = {};
+    if (Array.isArray(cats)) cats.forEach((c: any) => { catMap[String(c.id)] = String(c.text || c.id); });
+    if (Array.isArray(stmts) && stmts.length > 0 && typeof ans === "object" && ans !== null && !Array.isArray(ans)) {
+      let matchCount = 0;
+      const breakdownItems = stmts.map((st: any, idx: number) => {
+        const sid = String(st.id ?? idx);
+        const userVal = ans[sid] !== undefined ? String(ans[sid]) : "";
+        const expected = String(st.answer ?? "");
+        const isMatch = userVal === expected && userVal !== "";
+        if (isMatch) matchCount++;
+        return {
+          id: sid,
+          num: idx + 1,
+          text: st.text,
+          userVal: userVal ? (catMap[userVal] || userVal) : "-",
+          expected: catMap[expected] || expected || "-",
+          isMatch
+        };
+      });
+      const score = matchCount / stmts.length;
+      const status = matchCount === stmts.length ? "correct" : (matchCount > 0 ? "partial" : "wrong");
+      const badgeLabel = matchCount === stmts.length
+        ? "Benar"
+        : (matchCount > 0 ? `Sebagian (${matchCount}/${stmts.length} Benar)` : `Salah (0/${stmts.length})`);
+      return {
+        score,
+        status,
+        badgeLabel,
+        breakdown: { type: "klasifikasi", items: breakdownItems }
+      };
+    }
+    return { score: 0, status: "empty", badgeLabel: "Kosong" };
+  }
+
+  if (type === "isian_rumpang" || type === "cloze") {
+    const blanks = q.blanks || (q.choices && q.choices.blanks) || [];
+    if (Array.isArray(blanks) && blanks.length > 0 && typeof ans === "object" && ans !== null && !Array.isArray(ans)) {
+      let matchCount = 0;
+      const breakdownItems = blanks.map((bl: any, idx: number) => {
+        const bid = String(bl.id ?? idx);
+        let given = String(ans[bid] ?? "").trim();
+        const cs = bl.caseSensitive === true;
+        const givenCmp = cs ? given : given.toLowerCase();
+        const acc = Array.isArray(bl.answers) ? bl.answers : (bl.answers != null ? [bl.answers] : []);
+        let isMatch = false;
+        if (given) {
+          for (const a of acc) {
+            let exp = String(a ?? "").trim();
+            const expCmp = cs ? exp : exp.toLowerCase();
+            if (expCmp && givenCmp === expCmp) { isMatch = true; break; }
+          }
+        }
+        if (isMatch) matchCount++;
+        return {
+          id: bid,
+          num: idx + 1,
+          userVal: given || "-",
+          expected: acc.map((a: any) => String(a)).join(" / ") || "-",
+          isMatch
+        };
+      });
+      const score = matchCount / blanks.length;
+      const status = matchCount === blanks.length ? "correct" : (matchCount > 0 ? "partial" : "wrong");
+      const badgeLabel = matchCount === blanks.length
+        ? "Benar"
+        : (matchCount > 0 ? `Sebagian (${matchCount}/${blanks.length} Benar)` : `Salah (0/${blanks.length})`);
+      return {
+        score,
+        status,
+        badgeLabel,
+        breakdown: { type: "isian_rumpang", items: breakdownItems }
+      };
+    }
+    return { score: 0, status: "empty", badgeLabel: "Kosong" };
+  }
+
+  if (type === "hotspot") {
+    const areas = q.areas || (q.choices && q.choices.areas) || [];
+    const hmode = String(q.mode || (q.choices && q.choices.mode) || "any").toLowerCase();
+    if (Array.isArray(areas) && areas.length > 0) {
+      const inArea = (px: number, py: number, ar: any) => {
+        const ax = Number(ar.x), ay = Number(ar.y), aw = Number(ar.w), ah = Number(ar.h);
+        if (isNaN(ax) || isNaN(ay) || isNaN(aw) || isNaN(ah)) return false;
+        return px >= ax && px <= ax + aw && py >= ay && py <= ay + ah;
+      };
+      let score = 0;
+      let desc = "";
+      if (hmode === "all") {
+        const pts = Array.isArray(ans) ? ans : [];
+        let hit = 0;
+        for (const ar of areas) {
+          for (const pt of pts) {
+            const px = Number(pt?.x), py = Number(pt?.y);
+            if (!isNaN(px) && !isNaN(py) && inArea(px, py, ar || {})) { hit++; break; }
+          }
+        }
+        score = hit / areas.length;
+        desc = `${pts.length} titik, ${hit}/${areas.length} area kena`;
+      } else {
+        let hx = NaN, hy = NaN;
+        if (ans !== null && typeof ans === "object" && !Array.isArray(ans)) {
+          hx = Number(ans.x); hy = Number(ans.y);
+        }
+        if (!isNaN(hx) && !isNaN(hy)) {
+          for (const ar of areas) {
+            if (inArea(hx, hy, ar || {})) { score = 1; break; }
+          }
+          desc = `klik di (${Math.round(hx)}%, ${Math.round(hy)}%)`;
+        }
+      }
+      const status = score >= 1 ? "correct" : (score > 0 ? "partial" : "wrong");
+      const badgeLabel = score >= 1 ? "Benar" : (score > 0 ? `Sebagian (${Math.round(score * 100)}%)` : "Salah");
+      return {
+        score,
+        status,
+        badgeLabel,
+        breakdown: { type: "hotspot", desc, mode: hmode, areaCount: areas.length }
+      };
+    }
+    return { score: 0, status: "empty", badgeLabel: "Kosong" };
   }
 
   return { score: 0, status: "empty", badgeLabel: "Kosong" };

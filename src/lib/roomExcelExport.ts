@@ -72,6 +72,72 @@ const checkAns = (q: any, studentAns: any, overrides?: Record<string, boolean>):
     const pairs = q.pairs || [];
     return pairs.length > 0 && pairs.every((p: any) => studentAns[p.id] === p.right) ? 1 : 0;
   }
+  if (type === "klasifikasi" || type === "matriks") {
+    const stmts = q.statements || q.choices?.statements || [];
+    if (Array.isArray(stmts) && stmts.length > 0 && typeof studentAns === "object" && studentAns !== null && !Array.isArray(studentAns)) {
+      let kCorr = 0;
+      stmts.forEach((st: any) => {
+        const sid = String(st.id ?? "");
+        if (!sid) return;
+        if (String(studentAns[sid] ?? "") === String(st.answer ?? "")) kCorr++;
+      });
+      return kCorr / stmts.length;
+    }
+    return 0;
+  }
+  if (type === "isian_rumpang" || type === "cloze") {
+    const blanks = q.blanks || q.choices?.blanks || [];
+    if (Array.isArray(blanks) && blanks.length > 0 && typeof studentAns === "object" && studentAns !== null && !Array.isArray(studentAns)) {
+      let bCorr = 0;
+      blanks.forEach((bl: any) => {
+        const bid = String(bl.id ?? "");
+        if (!bid) return;
+        let given = String(studentAns[bid] ?? "").trim();
+        const cs = bl.caseSensitive === true;
+        if (!cs) given = given.toLowerCase();
+        if (!given) return;
+        const acc = Array.isArray(bl.answers) ? bl.answers : (bl.answers != null ? [bl.answers] : []);
+        for (const a of acc) {
+          let exp = String(a ?? "").trim();
+          if (!cs) exp = exp.toLowerCase();
+          if (exp && given === exp) { bCorr++; return; }
+        }
+      });
+      return bCorr / blanks.length;
+    }
+    return 0;
+  }
+  if (type === "hotspot") {
+    const areas = q.areas || q.choices?.areas || [];
+    if (!Array.isArray(areas) || areas.length === 0) return 0;
+    const inArea = (px: number, py: number, ar: any) => {
+      const ax = Number(ar.x), ay = Number(ar.y), aw = Number(ar.w), ah = Number(ar.h);
+      if (isNaN(ax) || isNaN(ay) || isNaN(aw) || isNaN(ah)) return false;
+      return px >= ax && px <= ax + aw && py >= ay && py <= ay + ah;
+    };
+    const hmode = String(q.mode || q.choices?.mode || "any").toLowerCase();
+    if (hmode === "all") {
+      const pts = Array.isArray(studentAns) ? studentAns : [];
+      let hit = 0;
+      areas.forEach((ar: any) => {
+        for (const pt of pts) {
+          const px = Number(pt?.x), py = Number(pt?.y);
+          if (!isNaN(px) && !isNaN(py) && inArea(px, py, ar || {})) { hit++; break; }
+        }
+      });
+      return hit / areas.length;
+    } else {
+      let hx = NaN, hy = NaN;
+      if (studentAns !== null && typeof studentAns === "object" && !Array.isArray(studentAns)) {
+        hx = Number(studentAns.x); hy = Number(studentAns.y);
+      }
+      if (isNaN(hx) || isNaN(hy)) return 0;
+      for (const ar of areas) {
+        if (inArea(hx, hy, ar || {})) return 1;
+      }
+      return 0;
+    }
+  }
   return 0;
 };
 
@@ -153,6 +219,41 @@ const formatAnswer = (q: any, studentAns: any) => {
     }
     return String(studentAns);
   }
+  if (type === "klasifikasi" || type === "matriks") {
+    const stmts = q.statements || q.choices?.statements || [];
+    const cats = q.categories || q.columns || q.choices?.categories || q.choices?.columns || [];
+    const catMap: Record<string, string> = {};
+    if (Array.isArray(cats)) cats.forEach((c: any) => { catMap[String(c.id)] = String(c.text || c.id); });
+    if (Array.isArray(stmts) && stmts.length > 0 && typeof studentAns === "object" && studentAns !== null && !Array.isArray(studentAns)) {
+      return stmts.map((st: any, idx: number) => {
+        const sid = String(st.id ?? idx);
+        const val = studentAns[sid] !== undefined ? String(studentAns[sid]) : "-";
+        return `${idx + 1}:${catMap[val] || val}`;
+      }).join(", ");
+    }
+    return String(studentAns);
+  }
+  if (type === "isian_rumpang" || type === "cloze") {
+    const blanks = q.blanks || q.choices?.blanks || [];
+    if (Array.isArray(blanks) && blanks.length > 0 && typeof studentAns === "object" && studentAns !== null && !Array.isArray(studentAns)) {
+      return blanks.map((bl: any, idx: number) => {
+        const bid = String(bl.id ?? idx);
+        const val = studentAns[bid] !== undefined ? String(studentAns[bid]).trim() : "-";
+        return `${idx + 1}:${val || "-"}`;
+      }).join(", ");
+    }
+    return String(studentAns);
+  }
+  if (type === "hotspot") {
+    if (Array.isArray(studentAns)) {
+      return `${studentAns.length} titik`;
+    }
+    if (studentAns !== null && typeof studentAns === "object" && !Array.isArray(studentAns)) {
+      const hx = Number(studentAns.x), hy = Number(studentAns.y);
+      if (!isNaN(hx) && !isNaN(hy)) return `(${Math.round(hx)}%, ${Math.round(hy)}%)`;
+    }
+    return String(studentAns);
+  }
   return String(studentAns);
 };
 
@@ -167,6 +268,10 @@ const typeLabel = (type: string) => {
     case "drag_drop": return "DD";
     case "isian_singkat": return "IS";
     case "uraian": return "UR";
+    case "klasifikasi": return "KLAS";
+    case "hotspot": return "HS";
+    case "isian_rumpang": return "IR";
+    case "matriks": return "MTX";
     default: return "PG";
   }
 };
@@ -294,7 +399,12 @@ export async function exportActiveRoomsToZip({
           uraian: "uraian",
           menjodohkan: "menjodohkan",
           urutkan: "urutkan",
-          benar_salah: "benar_salah"
+          benar_salah: "benar_salah",
+          klasifikasi: "klasifikasi",
+          hotspot: "hotspot",
+          isian_rumpang: "isian_rumpang",
+          cloze: "isian_rumpang",
+          matriks: "matriks"
         };
         const mappedType = typeMapReverse[rawType] || rawType;
         let options = q.options || {};
@@ -305,9 +415,15 @@ export async function exportActiveRoomsToZip({
           ...q,
           type: mappedType,
           choices: options,
-          statements: (mappedType === "benar_salah" && Array.isArray(options.statements)) ? options.statements : undefined,
+          statements: (["benar_salah", "klasifikasi", "matriks"].includes(mappedType) && Array.isArray(options.statements)) ? options.statements : undefined,
           pairs: mappedType === "menjodohkan" ? options.pairs : undefined,
           items: (mappedType === "urutkan" || mappedType === "drag_drop") ? options.items : undefined,
+          categories: mappedType === "klasifikasi" ? options.categories : undefined,
+          columns: mappedType === "matriks" ? options.columns : undefined,
+          blanks: mappedType === "isian_rumpang" ? options.blanks : undefined,
+          areas: mappedType === "hotspot" ? options.areas : undefined,
+          imageUrl: mappedType === "hotspot" ? options.imageUrl : undefined,
+          mode: mappedType === "hotspot" ? options.mode : undefined,
           answerKey: q.correctAnswer || q.answerKey
         };
       });

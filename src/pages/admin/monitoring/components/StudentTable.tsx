@@ -654,6 +654,34 @@ export const StudentTable = (props: StudentTableProps) => {
                                               if (t === "isian_singkat" || t === "uraian" || t === "short_answer") return <MathText content={q.answerKey || "-"} className="inline text-[10px] [&_p]:inline [&_p]:m-0 [&_img]:hidden" />;
                                               if (t === "menjodohkan" || t === "matching") return `${(q.pairs || []).length} pasangan`;
                                               if (t === "urutkan" || t === "drag_drop") return (q.items || []).map((it: any) => stripHtmlTags(it.text || "").substring(0, 10)).join(" → ");
+                                              if (t === "klasifikasi" || t === "matriks") {
+                                                const stmts = q.statements || (q.choices && q.choices.statements) || [];
+                                                const cats = q.categories || q.columns || (q.choices && (q.choices.categories || q.choices.columns)) || [];
+                                                const catMap: Record<string, string> = {};
+                                                if (Array.isArray(cats)) cats.forEach((c: any) => { catMap[String(c.id)] = stripHtmlTags(String(c.text || c.id)); });
+                                                if (Array.isArray(stmts) && stmts.length > 0) {
+                                                  return stmts.map((s: any, idx: number) => `P${idx + 1}: ${catMap[String(s.answer)] || "-"}`).join(", ");
+                                                }
+                                                return "-";
+                                              }
+                                              if (t === "isian_rumpang" || t === "cloze") {
+                                                const blanks = q.blanks || (q.choices && q.choices.blanks) || [];
+                                                if (Array.isArray(blanks) && blanks.length > 0) {
+                                                  return blanks.map((b: any, idx: number) => {
+                                                    const acc = Array.isArray(b.answers) ? b.answers : (b.answers != null ? [b.answers] : []);
+                                                    return `[${idx + 1}]: ${acc.map((a: any) => String(a)).join(" / ") || "-"}`;
+                                                  }).join(", ");
+                                                }
+                                                return "-";
+                                              }
+                                              if (t === "hotspot") {
+                                                const areas = q.areas || (q.choices && q.choices.areas) || [];
+                                                const hmode = String(q.mode || (q.choices && q.choices.mode) || "any");
+                                                if (Array.isArray(areas) && areas.length > 0) {
+                                                  return `${areas.length} area (${hmode === "all" ? "semua" : "satu saja"})`;
+                                                }
+                                                return "-";
+                                              }
                                               return stripHtmlTags(q.answerKey || "-");
                                             })()}
                                           </span>
@@ -800,7 +828,89 @@ export const StudentTable = (props: StudentTableProps) => {
                                                 );
                                               }
 
-                                              // 4. Default / standard single choice / essay
+                                              // 4. Klasifikasi / Matriks detailed breakdown (per-statement)
+                                              if (breakdown?.type === "klasifikasi" && Array.isArray(breakdown.items)) {
+                                                return (
+                                                  <div className="flex flex-col gap-1 mt-1">
+                                                    {breakdown.items.map((it: any) => (
+                                                      <div
+                                                        key={it.id}
+                                                        className={cn(
+                                                          "flex items-center justify-between px-2 py-1 rounded text-[10px] border font-medium",
+                                                          it.isMatch
+                                                            ? "bg-emerald-100/70 dark:bg-emerald-950/40 border-emerald-300/80 dark:border-emerald-800/60 text-emerald-900 dark:text-emerald-200"
+                                                            : "bg-rose-100/70 dark:bg-rose-950/40 border-rose-300/80 dark:border-rose-800/60 text-rose-900 dark:text-rose-200"
+                                                        )}
+                                                      >
+                                                        <div className="flex items-center gap-1.5 min-w-0">
+                                                          <span className="font-black text-slate-600 dark:text-slate-400 shrink-0">P{it.num}:</span>
+                                                          <span className="font-bold truncate">{it.userVal}</span>
+                                                        </div>
+                                                        <div className="flex items-center gap-1 shrink-0 text-[9px] font-black">
+                                                          {it.isMatch ? (
+                                                            <span className="text-emerald-700 dark:text-emerald-300 flex items-center gap-0.5">
+                                                              <Check className="h-3 w-3 stroke-[3]" /> Benar
+                                                            </span>
+                                                          ) : (
+                                                            <span className="text-rose-700 dark:text-rose-300 flex items-center gap-0.5">
+                                                              <X className="h-3 w-3 stroke-[3]" /> Salah
+                                                              <span className="text-[8.5px] font-semibold opacity-80">(Kunci: {it.expected})</span>
+                                                            </span>
+                                                          )}
+                                                        </div>
+                                                      </div>
+                                                    ))}
+                                                  </div>
+                                                );
+                                              }
+
+                                              // 5. Isian Rumpang detailed breakdown (per-blank)
+                                              if (breakdown?.type === "isian_rumpang" && Array.isArray(breakdown.items)) {
+                                                return (
+                                                  <div className="flex flex-col gap-1 mt-1">
+                                                    {breakdown.items.map((it: any) => (
+                                                      <div
+                                                        key={it.id}
+                                                        className={cn(
+                                                          "flex items-center justify-between px-2 py-1 rounded text-[10px] border font-medium",
+                                                          it.isMatch
+                                                            ? "bg-emerald-100/70 dark:bg-emerald-950/40 border-emerald-300/80 dark:border-emerald-800/60 text-emerald-900 dark:text-emerald-200"
+                                                            : "bg-rose-100/70 dark:bg-rose-950/40 border-rose-300/80 dark:border-rose-800/60 text-rose-900 dark:text-rose-200"
+                                                        )}
+                                                      >
+                                                        <div className="flex items-center gap-1.5 min-w-0">
+                                                          <span className="font-black text-slate-600 dark:text-slate-400 shrink-0">[{it.num}]:</span>
+                                                          <span className="font-bold truncate">"{it.userVal}"</span>
+                                                        </div>
+                                                        <div className="flex items-center gap-1 shrink-0 text-[9px] font-black">
+                                                          {it.isMatch ? (
+                                                            <span className="text-emerald-700 dark:text-emerald-300 flex items-center gap-0.5">
+                                                              <Check className="h-3 w-3 stroke-[3]" /> Benar
+                                                            </span>
+                                                          ) : (
+                                                            <span className="text-rose-700 dark:text-rose-300 flex items-center gap-0.5">
+                                                              <X className="h-3 w-3 stroke-[3]" /> Salah
+                                                              <span className="text-[8.5px] font-semibold opacity-80">(Kunci: {it.expected})</span>
+                                                            </span>
+                                                          )}
+                                                        </div>
+                                                      </div>
+                                                    ))}
+                                                  </div>
+                                                );
+                                              }
+
+                                              // 6. Hotspot summary
+                                              if (breakdown?.type === "hotspot") {
+                                                return (
+                                                  <div className="mt-0.5 font-mono font-bold text-[10px] break-words leading-relaxed">
+                                                    {breakdown.desc || "-"}
+                                                    <span className="text-slate-500 font-semibold"> ({breakdown.areaCount} area target)</span>
+                                                  </div>
+                                                );
+                                              }
+
+                                              // 7. Default / standard single choice / essay
                                               return (
                                                 <div className="mt-0.5 font-mono font-bold text-[10px] break-words whitespace-pre-wrap leading-relaxed max-h-32 overflow-y-auto pr-1">
                                                   {(() => {

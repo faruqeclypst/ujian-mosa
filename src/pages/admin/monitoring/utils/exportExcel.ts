@@ -74,6 +74,41 @@ export function exportRecapExcel({ monitorRoom, students, attempts, monitorQuest
       }
       return String(studentAns);
     }
+    if (type === "klasifikasi" || type === "matriks") {
+      const stmts = q.statements || (q.choices && q.choices.statements) || [];
+      const cats = q.categories || q.columns || (q.choices && (q.choices.categories || q.choices.columns)) || [];
+      const catMap: Record<string, string> = {};
+      if (Array.isArray(cats)) cats.forEach((c: any) => { catMap[String(c.id)] = String(c.text || c.id); });
+      if (Array.isArray(stmts) && stmts.length > 0 && typeof studentAns === "object" && studentAns !== null && !Array.isArray(studentAns)) {
+        return stmts.map((st: any, idx: number) => {
+          const sid = String(st.id ?? idx);
+          const val = studentAns[sid] !== undefined ? String(studentAns[sid]) : "-";
+          return `${idx + 1}:${catMap[val] || val}`;
+        }).join(", ");
+      }
+      return String(studentAns);
+    }
+    if (type === "isian_rumpang" || type === "cloze") {
+      const blanks = q.blanks || (q.choices && q.choices.blanks) || [];
+      if (Array.isArray(blanks) && blanks.length > 0 && typeof studentAns === "object" && studentAns !== null && !Array.isArray(studentAns)) {
+        return blanks.map((bl: any, idx: number) => {
+          const bid = String(bl.id ?? idx);
+          const val = studentAns[bid] !== undefined ? String(studentAns[bid]).trim() : "-";
+          return `${idx + 1}:${val || "-"}`;
+        }).join(", ");
+      }
+      return String(studentAns);
+    }
+    if (type === "hotspot") {
+      if (Array.isArray(studentAns)) {
+        return `${studentAns.length} titik`;
+      }
+      if (studentAns !== null && typeof studentAns === "object" && !Array.isArray(studentAns)) {
+        const hx = Number(studentAns.x), hy = Number(studentAns.y);
+        if (!isNaN(hx) && !isNaN(hy)) return `(${Math.round(hx)}%, ${Math.round(hy)}%)`;
+      }
+      return String(studentAns);
+    }
     return String(studentAns);
   };
 
@@ -88,6 +123,10 @@ export function exportRecapExcel({ monitorRoom, students, attempts, monitorQuest
       case "drag_drop": return "DD";
       case "isian_singkat": return "IS";
       case "uraian": return "UR";
+      case "klasifikasi": return "KLAS";
+      case "hotspot": return "HS";
+      case "isian_rumpang": return "IR";
+      case "matriks": return "MTX";
       default: return "PG";
     }
   };

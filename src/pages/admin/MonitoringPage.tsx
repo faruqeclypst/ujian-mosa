@@ -366,11 +366,17 @@ const MonitoringPage = () => {
             ...q,
             type: mappedType,
             choices: rawOptions,
-            statements: (mappedType === "benar_salah" && Array.isArray(rawOptions.statements))
+            statements: (["benar_salah", "klasifikasi", "matriks"].includes(mappedType) && Array.isArray(rawOptions.statements))
               ? rawOptions.statements
               : (Array.isArray(rawOptions) ? rawOptions : (q.statements || undefined)),
             pairs: mappedType === "menjodohkan" ? rawOptions.pairs : undefined,
             items: (mappedType === "urutkan" || mappedType === "drag_drop") ? rawOptions.items : undefined,
+            categories: mappedType === "klasifikasi" ? rawOptions.categories : undefined,
+            columns: mappedType === "matriks" ? rawOptions.columns : undefined,
+            blanks: mappedType === "isian_rumpang" ? rawOptions.blanks : undefined,
+            areas: mappedType === "hotspot" ? rawOptions.areas : undefined,
+            imageUrl: mappedType === "hotspot" ? rawOptions.imageUrl : undefined,
+            mode: mappedType === "hotspot" ? rawOptions.mode : undefined,
             answerKey: q.correctAnswer || q.answerKey
           };
         });
