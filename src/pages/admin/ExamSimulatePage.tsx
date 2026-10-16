@@ -67,7 +67,7 @@ const HorizontalScrollHint = ({ children, className = "" }: { children: React.Re
    ============================================================ */
 type SimQuestion = {
   id: string;
-  type: string;
+  type?: "pilihan_ganda" | "pilihan_ganda_kompleks" | "menjodohkan" | "benar_salah" | "isian_singkat" | "uraian" | "urutkan" | "drag_drop" | "klasifikasi" | "hotspot" | "isian_rumpang" | "matriks";
   text: string;
   imageUrl: string;
   groupId: string;
@@ -249,7 +249,7 @@ export default function ExamSimulatePage() {
           }
 
           return {
-            id: q.id, type: mappedType, text: q.text, imageUrl: qImg,
+            id: q.id, type: mappedType as SimQuestion["type"], text: q.text, imageUrl: qImg,
             groupId: q.groupId || "", groupText: q.groupText || "",
             choices, pairs, items, statements, columns, blanks,
             rumpangText, hotspotImageUrl, hotspotMode,
@@ -321,7 +321,6 @@ export default function ExamSimulatePage() {
     if (idx < 0 || idx >= questions.length) return;
     setCurrentIndex(idx);
     setShowGrid(false);
-    setSelectedPair(null);
     window.scrollTo({ top: 0 });
   }, [questions.length]);
 
