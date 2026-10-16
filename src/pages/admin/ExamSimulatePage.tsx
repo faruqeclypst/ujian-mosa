@@ -374,8 +374,8 @@ export default function ExamSimulatePage() {
         </div>
 
         <div className="flex-1 text-center min-w-0 px-2 sm:px-4">
-          <p className="font-black text-slate-800 dark:text-white uppercase tracking-tight truncate text-[9px] sm:text-base leading-tight">{examTitle}</p>
-          <p className="text-[7.5px] sm:text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-none mt-0.5 sm:mt-1">Tidak disimpan</p>
+          <p className="font-black text-slate-800 dark:text-white uppercase tracking-tight text-xs sm:text-base leading-tight" title={examTitle}>{examTitle}</p>
+          <p className="text-[10px] sm:text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-none mt-0.5 sm:mt-1">Tidak disimpan</p>
         </div>
 
         <div className="flex items-center gap-1.5 sm:gap-4 ml-auto relative z-10">

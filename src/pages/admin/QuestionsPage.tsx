@@ -6340,7 +6340,7 @@ Aturan:
                                   setFormValues(prev => ({ ...prev, matrixColumns: updated }));
                                 }}
                                 disabled={(formValues.matrixColumns || []).length <= 2}
-                                className="h-8 w-8 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-lg"
+                                className="h-11 w-11 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-lg inline-flex items-center justify-center"
                                 title="Hapus Kolom"
                               >
                                 <X className="h-3.5 w-3.5" />
@@ -6488,7 +6488,7 @@ Aturan:
                                   setFormValues(prev => ({ ...prev, klasifikasiCategories: updated }));
                                 }}
                                 disabled={(formValues.klasifikasiCategories || []).length <= 2}
-                                className="h-8 w-8 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-lg"
+                                className="h-11 w-11 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-lg inline-flex items-center justify-center"
                                 title="Hapus Kategori"
                               >
                                 <X className="h-3.5 w-3.5" />
@@ -6743,7 +6743,7 @@ Aturan:
                                   setHotspotFile(null);
                                   setFormValues(prev => ({ ...prev, hotspotImageUrl: "" }));
                                 }}
-                                className="h-8 w-8 shadow-md"
+                                className="h-11 w-11 shadow-md inline-flex items-center justify-center"
                                 title="Hapus gambar"
                               >
                                 <Trash className="h-3.5 w-3.5" />

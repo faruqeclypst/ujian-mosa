@@ -2705,7 +2705,7 @@ const CBTPage = () => {
           type="button"
           disabled={currentQuestionIndex === 0}
           onClick={() => setCurrentQuestionIndex(p => p - 1)}
-          className="rounded-xl h-10 px-4 sm:h-14 sm:px-6 font-black uppercase text-[10px] sm:text-[12px] tracking-[0.15em] border-2 border-emerald-500/40 bg-emerald-50/50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100/70 active:scale-95 transition-all flex items-center gap-1 focus:outline-none"
+          className="rounded-xl h-11 px-4 sm:h-14 sm:px-6 font-black uppercase text-[10px] sm:text-[12px] tracking-[0.15em] border-2 border-emerald-500/40 bg-emerald-50/50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100/70 active:scale-95 transition-all flex items-center gap-1 focus:outline-none"
         >
           <ChevronLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
           Back
@@ -2720,7 +2720,7 @@ const CBTPage = () => {
         <button
           type="button"
           onClick={() => currentQuestionIndex === questions.length - 1 ? setIsSubmitModalOpen(true) : handleNextClick()}
-          className="rounded-xl h-10 px-4 sm:h-14 sm:px-6 text-white font-black uppercase text-[10px] sm:text-[12px] tracking-[0.15em] bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 active:scale-90 transition-all shadow-md shadow-emerald-600/25 flex items-center gap-1 focus:outline-none"
+          className="rounded-xl h-11 px-4 sm:h-14 sm:px-6 text-white font-black uppercase text-[10px] sm:text-[12px] tracking-[0.15em] bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 active:scale-90 transition-all shadow-md shadow-emerald-600/25 flex items-center gap-1 focus:outline-none"
         >
           {currentQuestionIndex === questions.length - 1 ? (
             <>

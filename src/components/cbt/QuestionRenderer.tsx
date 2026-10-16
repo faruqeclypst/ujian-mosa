@@ -357,7 +357,7 @@ function KlasifikasiBody({
                           onClick={() => unassign(s.id)}
                           aria-label={`Ubah kategori pernyataan ${stmtNo(s)}`}
                           title="Ubah kategori"
-                          className="shrink-0 w-9 h-9 rounded-full inline-flex items-center justify-center text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
+                          className="shrink-0 w-11 h-11 rounded-full inline-flex items-center justify-center text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
                         >
                           <X className="w-4 h-4" />
                         </button>
@@ -1242,7 +1242,7 @@ export const QuestionRenderer = (props: QuestionRendererProps) => {
                                         <button
                                           type="button"
                                           onClick={() => pick(s.id, col.id)}
-                                          className={`relative inline-flex items-center justify-center px-4 py-2.5 rounded-2xl border-2 font-bold text-sm transition-all active:scale-95 whitespace-nowrap ${
+                                          className={`relative inline-flex items-center justify-center px-4 py-2.5 rounded-2xl border-2 font-bold text-sm transition-all active:scale-95 ${
                                             isSelected
                                               ? tone.selected
                                               : `bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 ${tone.hover}`
@@ -1312,7 +1312,7 @@ export const QuestionRenderer = (props: QuestionRendererProps) => {
                                     }`}>
                                       {isSelected && <div className={`w-2 h-2 rounded-full ${tone.dotBg}`} />}
                                     </span>
-                                    <span className="truncate">{col.text}</span>
+                                    <span className="text-wrap text-center leading-tight min-h-[2.5rem] inline-flex items-center">{col.text}</span>
                                   </button>
                                 );
                               })}
@@ -1376,6 +1376,7 @@ export const QuestionRenderer = (props: QuestionRendererProps) => {
                     className="inline-block mx-1 px-1.5 py-0.5 rounded-md border border-emerald-400 dark:border-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 text-slate-800 dark:text-slate-200 font-medium shadow-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-200 outline-none transition-all align-middle"
                     style={{
                       width: `${Math.max(3, blankVal.length + 1)}ch`,
+                      maxWidth: "100%",
                       fontSize: "16px",
                       lineHeight: 1
                     }}
@@ -1486,20 +1487,25 @@ export const QuestionRenderer = (props: QuestionRendererProps) => {
                     {markers.map((pt, idx) => (
                       <div
                         key={idx}
-                        className="absolute transform -translate-x-1/2 -translate-y-1/2 flex items-center justify-center rounded-full bg-red-500 border-2 border-white shadow-lg font-bold text-white"
+                        className="absolute transform -translate-x-1/2 -translate-y-1/2 flex items-center justify-center"
                         style={{
                           left: `${pt.x}%`,
                           top: `${pt.y}%`,
-                          width: "28px",
-                          height: "28px",
-                          fontSize: "14px",
+                          width: "44px",
+                          height: "44px",
                           pointerEvents: mode === "all" ? "auto" : "none",
                           cursor: mode === "all" ? "pointer" : "default"
                         }}
                         onClick={mode === "all" ? (e) => handleRemovePoint(idx, e) : undefined}
                         title={mode === "all" ? "Klik untuk hapus titik ini" : `Titik (${pt.x}%, ${pt.y}%)`}
                       >
-                        {mode === "all" ? idx + 1 : "•"}
+                        <span
+                          className="flex items-center justify-center rounded-full bg-red-500 border-2 border-white shadow-lg font-bold text-white"
+                          style={{ width: "28px", height: "28px", fontSize: "14px" }}
+                          aria-hidden="true"
+                        >
+                          {mode === "all" ? idx + 1 : "•"}
+                        </span>
                       </div>
                     ))}
                   </div>
