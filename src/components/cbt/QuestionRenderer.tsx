@@ -65,7 +65,14 @@ const KLASIFIKASI_COLORS = [
 // Wrapper scroll horizontal dengan indikator "geser" untuk mobile.
 // Menampilkan gradient fade di kanan + hint teks "← geser →" yang hilang
 // otomatis setelah user scroll atau jika konten ternyata muat.
-const HorizontalScrollHint = ({ children, className = "" }: { children: React.ReactNode; className?: string }) => {
+// Props scrollClassName/contentClassName opsional untuk konten non-flex
+// (mis. <table> yang tidak boleh jadi flex item).
+const HorizontalScrollHint = ({ children, className = "", scrollClassName, contentClassName }: {
+  children: React.ReactNode;
+  className?: string;
+  scrollClassName?: string;
+  contentClassName?: string;
+}) => {
   const ref = useRef<HTMLDivElement>(null);
   const [canScroll, setCanScroll] = useState(false);
   const [showHint, setShowHint] = useState(true);
@@ -98,10 +105,10 @@ const HorizontalScrollHint = ({ children, className = "" }: { children: React.Re
       <div
         ref={ref}
         onScroll={handleScroll}
-        className="overflow-x-auto pb-3"
+        className={scrollClassName ?? "overflow-x-auto pb-3"}
         style={{ scrollbarWidth: "thin" }}
       >
-        <div className="flex gap-2 w-max min-w-full pr-10">
+        <div className={contentClassName ?? "flex gap-2 w-max min-w-full pr-10"}>
           {children}
         </div>
       </div>
@@ -116,6 +123,263 @@ const HorizontalScrollHint = ({ children, className = "" }: { children: React.Re
     </div>
   );
 };
+
+// Badan soal klasifikasi — alur 3 langkah yang jelas:
+// 1. Ketuk kartu pernyataan → 2. Pilih kategori → 3. Kartu masuk zona kategori.
+// Komponen terpisah agar boleh pakai state lokal (pernyataan terpilih).
+function KlasifikasiBody({
+  question,
+  answer,
+  onAnswer,
+  fontSize = 1,
+  klasifikasiOrder,
+}: {
+  question: SharedQuestion;
+  answer: any;
+  onAnswer: (value: any) => void;
+  fontSize?: number;
+  klasifikasiOrder?: string[];
+}) {
+  const allStatements = question.statements || [];
+  const categories = question.columns || [];
+  const currentAnswers: Record<string, string> =
+    typeof answer === "object" && answer !== null ? answer : {};
+
+  // Hormati urutan acak jika ada
+  const orderIds = klasifikasiOrder;
+  const statements = orderIds && orderIds.length > 0
+    ? orderIds.map((id) => allStatements.find((s: any) => s.id === id)).filter(Boolean)
+    : allStatements;
+
+  // Pernyataan yang sedang dipilih — menunggu user memilih kategori
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  if (statements.length === 0 || categories.length === 0) return null;
+
+  const catColor = (ci: number) => KLASIFIKASI_COLORS[ci % KLASIFIKASI_COLORS.length];
+  const answered = (s: any) => !!currentAnswers[s.id];
+  const unanswered = statements.filter((s: any) => !answered(s));
+  const selStmt = selectedId ? statements.find((s: any) => s.id === selectedId) ?? null : null;
+  const stmtNo = (s: any) => statements.findIndex((x: any) => x.id === s.id) + 1;
+
+  const assign = (statementId: string, catId: string) => {
+    const next = { ...currentAnswers, [statementId]: catId };
+    onAnswer(next);
+    // Lanjut otomatis ke pernyataan berikutnya yang belum dikelompokkan
+    const nextUn = statements.find((s: any) => s.id !== statementId && !next[s.id]);
+    setSelectedId(nextUn ? nextUn.id : null);
+  };
+
+  const unassign = (statementId: string) => {
+    const next = { ...currentAnswers, [statementId]: "" };
+    onAnswer(next);
+    // Langsung buka picker agar bisa pilih ulang
+    setSelectedId(statementId);
+  };
+
+  const labelSize = Math.max(9, Math.round(10 * fontSize));
+
+  return (
+    <div className="space-y-5">
+      {/* Panduan 3 langkah */}
+      <div className="rounded-2xl border border-emerald-200 dark:border-emerald-800/60 bg-emerald-50/80 dark:bg-emerald-950/30 px-4 py-3">
+        <p
+          className="font-black text-emerald-800 dark:text-emerald-200 uppercase tracking-wider"
+          style={{ fontSize: `${Math.max(11, Math.round(12 * fontSize))}px` }}
+        >
+          Cara menjawab
+        </p>
+        <ol
+          className="mt-1.5 space-y-1 text-emerald-700 dark:text-emerald-300 font-medium"
+          style={{ fontSize: `${Math.max(11, Math.round(12.5 * fontSize))}px` }}
+        >
+          <li><span className="font-black">1.</span> Ketuk kartu pernyataan di bawah</li>
+          <li><span className="font-black">2.</span> Pilih kategorinya</li>
+          <li><span className="font-black">3.</span> Ketuk <span className="font-black">×</span> di zona untuk mengubah pilihan</li>
+        </ol>
+      </div>
+
+      {/* Pernyataan yang belum dikelompokkan */}
+      {unanswered.length > 0 ? (
+        <div>
+          <p
+            className="mb-2 font-black uppercase tracking-widest text-slate-400 dark:text-slate-500"
+            style={{ fontSize: `${labelSize}px` }}
+          >
+            Belum dikelompokkan · {unanswered.length}
+          </p>
+          <div className="space-y-3">
+            {unanswered.map((s: any) => {
+              const isSel = !!selStmt && selStmt.id === s.id;
+              return (
+                <div
+                  key={s.id}
+                  className={`rounded-2xl border-2 bg-white dark:bg-slate-900/90 shadow-sm transition-all overflow-hidden ${
+                    isSel
+                      ? "border-emerald-500 ring-2 ring-emerald-500/30"
+                      : "border-dashed border-slate-300 dark:border-slate-700"
+                  }`}
+                >
+                  <button
+                    type="button"
+                    onClick={() => setSelectedId(isSel ? null : s.id)}
+                    aria-expanded={isSel}
+                    className="w-full text-left flex items-start gap-3 p-4 min-h-[56px]"
+                  >
+                    <span
+                      className={`inline-flex shrink-0 w-7 h-7 rounded-lg font-bold items-center justify-center mt-0.5 ${
+                        isSel
+                          ? "bg-emerald-500 text-white"
+                          : "bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400"
+                      }`}
+                      style={{ fontSize: `${Math.max(11, Math.round(12 * fontSize))}px` }}
+                    >
+                      {stmtNo(s)}
+                    </span>
+                    <div
+                      className="flex-1 min-w-0 font-serif text-slate-800 dark:text-slate-200"
+                      style={{ fontSize: `${15 * fontSize}px` }}
+                    >
+                      <MathText
+                        content={s.text}
+                        disableJustify={true}
+                        className="cbt-choice-text text-left font-serif leading-relaxed !p-0 [&_p]:m-0"
+                      />
+                    </div>
+                    <span
+                      className={`shrink-0 mt-1 text-emerald-600 dark:text-emerald-400 transition-transform ${isSel ? "rotate-90" : ""}`}
+                      aria-hidden="true"
+                    >
+                      <ArrowRight className="w-5 h-5" />
+                    </span>
+                  </button>
+                  {isSel && (
+                    <div className="px-4 pb-4">
+                      <div className="pt-3 border-t border-dashed border-slate-200 dark:border-slate-700">
+                        <p
+                          className="mb-2 font-bold text-slate-600 dark:text-slate-300"
+                          style={{ fontSize: `${Math.max(11, Math.round(13 * fontSize))}px` }}
+                        >
+                          Kelompokkan pernyataan {stmtNo(s)} ke:
+                        </p>
+                        <div className="grid gap-2">
+                          {categories.map((cat: any, ci: number) => {
+                            const c = catColor(ci);
+                            return (
+                              <button
+                                key={cat.id}
+                                type="button"
+                                onClick={() => assign(s.id, cat.id)}
+                                className={`w-full min-h-[52px] px-4 py-3 rounded-xl border-2 font-bold text-left flex items-center gap-3 transition-all active:scale-[0.98] ${c.softBg} ${c.border} ${c.text}`}
+                                style={{ fontSize: `${Math.max(13, Math.round(14 * fontSize))}px` }}
+                              >
+                                <span className={`w-3.5 h-3.5 rounded-full shrink-0 ${c.dot}`} />
+                                <span className="flex-1">{cat.text}</span>
+                                <ArrowRight className="w-4 h-4 opacity-60 shrink-0" />
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ) : (
+        <div className="rounded-2xl border border-emerald-200 dark:border-emerald-800/60 bg-emerald-50 dark:bg-emerald-950/30 px-4 py-3.5 flex items-center gap-3">
+          <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />
+          <p
+            className="font-bold text-emerald-700 dark:text-emerald-300"
+            style={{ fontSize: `${Math.max(12, Math.round(13 * fontSize))}px` }}
+          >
+            Semua pernyataan sudah dikelompokkan. Ketuk × di zona untuk mengubah.
+          </p>
+        </div>
+      )}
+
+      {/* Zona kategori — pernyataan yang sudah masuk */}
+      <div>
+        <p
+          className="mb-2 font-black uppercase tracking-widest text-slate-400 dark:text-slate-500"
+          style={{ fontSize: `${labelSize}px` }}
+        >
+          Zona kategori
+        </p>
+        <div className="space-y-3">
+          {categories.map((cat: any, ci: number) => {
+            const c = catColor(ci);
+            const members = statements.filter((s: any) => currentAnswers[s.id] === cat.id);
+            return (
+              <div key={cat.id} className={`rounded-2xl border-2 ${c.border} ${c.softBg} p-3`}>
+                <div className="flex items-center gap-2 px-1 pb-2">
+                  <span className={`w-3 h-3 rounded-full shrink-0 ${c.dot}`} />
+                  <span
+                    className={`font-black ${c.text}`}
+                    style={{ fontSize: `${Math.max(12, Math.round(13.5 * fontSize))}px` }}
+                  >
+                    {cat.text}
+                  </span>
+                  <span
+                    className="ml-auto inline-flex items-center justify-center min-w-[1.5rem] h-6 px-1.5 rounded-full bg-white/70 dark:bg-slate-900/60 font-black text-slate-500 dark:text-slate-400"
+                    style={{ fontSize: `${Math.max(10, Math.round(11 * fontSize))}px` }}
+                  >
+                    {members.length}
+                  </span>
+                </div>
+                {members.length > 0 ? (
+                  <div className="space-y-2">
+                    {members.map((s: any) => (
+                      <div
+                        key={s.id}
+                        className="flex items-center gap-2 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 pl-3 pr-1.5 py-1.5"
+                      >
+                        <span
+                          className="inline-flex shrink-0 w-6 h-6 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-bold items-center justify-center"
+                          style={{ fontSize: `${Math.max(10, Math.round(11 * fontSize))}px` }}
+                        >
+                          {stmtNo(s)}
+                        </span>
+                        <div
+                          className="flex-1 min-w-0 font-serif text-slate-700 dark:text-slate-200"
+                          style={{ fontSize: `${Math.max(12, Math.round(13.5 * fontSize))}px` }}
+                        >
+                          <MathText
+                            content={s.text}
+                            disableJustify={true}
+                            className="cbt-choice-text text-left font-serif leading-snug !p-0 [&_p]:m-0"
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => unassign(s.id)}
+                          aria-label={`Ubah kategori pernyataan ${stmtNo(s)}`}
+                          title="Ubah kategori"
+                          className="shrink-0 w-9 h-9 rounded-full inline-flex items-center justify-center text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p
+                    className="px-1 pb-1 italic text-slate-400 dark:text-slate-500"
+                    style={{ fontSize: `${Math.max(11, Math.round(12 * fontSize))}px` }}
+                  >
+                    Belum ada pernyataan di sini
+                  </p>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export interface SharedQuestion {
   id: string;
@@ -905,99 +1169,166 @@ export const QuestionRenderer = (props: QuestionRendererProps) => {
                 : {};
 
               if (statements.length > 0 && columns.length > 0) {
+                // Warna tombol kolom: "Benar" = hijau, "Salah" = merah (case-insensitive),
+                // kolom lain netral. Dipakai tabel desktop & kartu mobile.
+                const colTone = (col: any) => {
+                  const colName = String(col.text || "").trim().toLowerCase();
+                  const isSalahCol = colName === "salah";
+                  return {
+                    selected: isSalahCol
+                      ? "bg-red-500 border-red-500 text-white shadow-md shadow-red-500/20"
+                      : "bg-emerald-500 border-emerald-500 text-white shadow-md shadow-emerald-500/20",
+                    hover: isSalahCol
+                      ? "hover:border-red-300 dark:hover:border-red-700"
+                      : "hover:border-emerald-300 dark:hover:border-emerald-700",
+                    dotText: isSalahCol ? "text-red-600" : "text-emerald-600",
+                    dotBg: isSalahCol ? "bg-red-600" : "bg-emerald-600",
+                  };
+                };
+                const pick = (sId: string, colId: string) =>
+                  onAnswer({
+                    ...currentAnswers,
+                    [sId]: colId,
+                  });
+                const stmtHeaderSize = Math.max(11, Math.round(13 * fontSize));
+                const stmtBodySize = 15 * fontSize;
+
                 return (
-                  <div className="overflow-hidden rounded-xl sm:rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/90 shadow-sm">
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left border-collapse">
-                        <thead>
-                          <tr className="border-b border-slate-200/80 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-800/60">
-                            <th
-                              className="py-2.5 px-3 sm:py-4 sm:px-6 font-black text-slate-700 dark:text-slate-300 uppercase tracking-wider"
-                              style={{ fontSize: `${Math.max(11, Math.round(13 * fontSize))}px` }}
-                            >
-                              Pernyataan
-                            </th>
-                            {columns.map((col: any) => (
+                  <div>
+                    {/* Desktop: tabel + scroll horizontal berindikator "← geser →" */}
+                    <div className="hidden sm:block overflow-hidden rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/90 shadow-sm">
+                      <HorizontalScrollHint scrollClassName="overflow-x-auto" contentClassName="w-max min-w-full">
+                        <table className="w-full text-left border-collapse" style={{ minWidth: `${240 + columns.length * 120}px` }}>
+                          <thead>
+                            <tr className="border-b border-slate-200/80 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-800/60">
                               <th
-                                key={col.id}
-                                className="w-14 sm:w-28 py-2.5 px-1 sm:py-4 sm:px-4 text-center font-black text-slate-600 dark:text-slate-400 uppercase tracking-wider"
-                                style={{ fontSize: `${Math.max(11, Math.round(13 * fontSize))}px` }}
+                                className="py-4 px-6 font-black text-slate-700 dark:text-slate-300 uppercase tracking-wider min-w-[200px]"
+                                style={{ fontSize: `${stmtHeaderSize}px` }}
                               >
-                                {col.text}
+                                Pernyataan
                               </th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
-                          {statements.map((s: any, idx: number) => {
-                            const selected = currentAnswers[s.id];
-                            return (
-                              <tr
-                                key={s.id || idx}
-                                className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-colors"
-                              >
-                                <td className="py-2.5 px-3 sm:py-5 sm:px-6 font-serif text-slate-800 dark:text-slate-200 align-middle">
-                                  <div className="flex items-start gap-2">
-                                    <span
-                                      className="inline-flex shrink-0 w-5 h-5 sm:w-6 sm:h-6 rounded-md sm:rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-bold items-center justify-center mt-0.5"
-                                      style={{ fontSize: `${Math.max(10, Math.round(11 * fontSize))}px` }}
-                                    >
-                                      {idx + 1}
-                                    </span>
-                                    <div className="flex-1 min-w-0" style={{ fontSize: `${15 * fontSize}px` }}>
-                                      <MathText
-                                        content={s.text}
-                                        disableJustify={true}
-                                        className="cbt-choice-text text-left font-serif leading-relaxed !p-0 [&_p]:m-0"
-                                      />
-                                    </div>
-                                  </div>
-                                </td>
-                                {columns.map((col: any) => {
-                                  const isSelected = selected === col.id;
-                                  // Warna otomatis: kolom "Benar" = hijau, "Salah" = merah (case-insensitive)
-                                  const colName = String(col.text || "").trim().toLowerCase();
-                                  const isSalahCol = colName === "salah";
-                                  const selectedCls = isSalahCol
-                                    ? "bg-red-500 border-red-500 text-white shadow-md shadow-red-500/20"
-                                    : "bg-emerald-500 border-emerald-500 text-white shadow-md shadow-emerald-500/20";
-                                  const hoverCls = isSalahCol
-                                    ? "hover:border-red-300 dark:hover:border-red-700"
-                                    : "hover:border-emerald-300 dark:hover:border-emerald-700";
-                                  const dotTextCls = isSalahCol ? "text-red-600" : "text-emerald-600";
-                                  const dotBgCls = isSalahCol ? "bg-red-600" : "bg-emerald-600";
-                                  return (
-                                    <td key={col.id} className="py-2 px-1 sm:py-4 sm:px-4 text-center align-middle">
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          onAnswer( {
-                                            ...currentAnswers,
-                                            [s.id]: col.id
-                                          });
-                                        }}
-                                        className={`group/btn relative inline-flex items-center justify-center p-1.5 sm:px-4 sm:py-2.5 rounded-lg sm:rounded-2xl border-2 font-bold text-xs sm:text-sm transition-all active:scale-95 ${
-                                          isSelected
-                                            ? selectedCls
-                                            : `bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-400 dark:text-slate-500 ${hoverCls}`
-                                        }`}
-                                        title={`Pilih ${col.text}`}
+                              {columns.map((col: any) => (
+                                <th
+                                  key={col.id}
+                                  className="py-4 px-4 text-center font-black text-slate-600 dark:text-slate-400 uppercase tracking-wider min-w-[110px]"
+                                  style={{ fontSize: `${stmtHeaderSize}px` }}
+                                >
+                                  {col.text}
+                                </th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
+                            {statements.map((s: any, idx: number) => {
+                              const selected = currentAnswers[s.id];
+                              return (
+                                <tr
+                                  key={s.id || idx}
+                                  className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-colors"
+                                >
+                                  <td className="py-5 px-6 align-middle">
+                                    <div className="flex items-start gap-2">
+                                      <span
+                                        className="inline-flex shrink-0 w-6 h-6 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-bold items-center justify-center mt-0.5"
+                                        style={{ fontSize: `${Math.max(10, Math.round(11 * fontSize))}px` }}
                                       >
-                                        <span className={`w-4 h-4 sm:w-5 sm:h-5 rounded-full border-2 flex items-center justify-center sm:mr-1.5 transition-colors ${
-                                          isSelected ? `border-white bg-white ${dotTextCls}` : "border-slate-300 dark:border-slate-700"
-                                        }`}>
-                                          {isSelected && <div className={`w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full ${dotBgCls}`} />}
-                                        </span>
-                                        <span className="hidden sm:inline">{col.text}</span>
-                                      </button>
-                                    </td>
-                                  );
-                                })}
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
+                                        {idx + 1}
+                                      </span>
+                                      <div className="flex-1 min-w-0 font-serif text-slate-800 dark:text-slate-200" style={{ fontSize: `${stmtBodySize}px` }}>
+                                        <MathText
+                                          content={s.text}
+                                          disableJustify={true}
+                                          className="cbt-choice-text text-left font-serif leading-relaxed !p-0 [&_p]:m-0"
+                                        />
+                                      </div>
+                                    </div>
+                                  </td>
+                                  {columns.map((col: any) => {
+                                    const isSelected = selected === col.id;
+                                    const tone = colTone(col);
+                                    return (
+                                      <td key={col.id} className="py-4 px-4 text-center align-middle">
+                                        <button
+                                          type="button"
+                                          onClick={() => pick(s.id, col.id)}
+                                          className={`relative inline-flex items-center justify-center px-4 py-2.5 rounded-2xl border-2 font-bold text-sm transition-all active:scale-95 whitespace-nowrap ${
+                                            isSelected
+                                              ? tone.selected
+                                              : `bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 ${tone.hover}`
+                                          }`}
+                                          title={`Pilih ${col.text}`}
+                                        >
+                                          <span className={`w-5 h-5 rounded-full border-2 flex items-center justify-center mr-1.5 transition-colors ${
+                                            isSelected ? `border-white bg-white ${tone.dotText}` : "border-slate-300 dark:border-slate-700"
+                                          }`}>
+                                            {isSelected && <div className={`w-2.5 h-2.5 rounded-full ${tone.dotBg}`} />}
+                                          </span>
+                                          {col.text}
+                                        </button>
+                                      </td>
+                                    );
+                                  })}
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </HorizontalScrollHint>
+                    </div>
+
+                    {/* Mobile: tiap pernyataan jadi kartu vertikal */}
+                    <div className="sm:hidden space-y-3">
+                      {statements.map((s: any, idx: number) => {
+                        const selected = currentAnswers[s.id];
+                        return (
+                          <div
+                            key={s.id || idx}
+                            className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/90 shadow-sm"
+                          >
+                            <div className="flex items-start gap-2.5">
+                              <span
+                                className="inline-flex shrink-0 w-6 h-6 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-bold items-center justify-center mt-0.5"
+                                style={{ fontSize: `${Math.max(10, Math.round(11 * fontSize))}px` }}
+                              >
+                                {idx + 1}
+                              </span>
+                              <div className="flex-1 min-w-0 font-serif text-slate-800 dark:text-slate-200" style={{ fontSize: `${stmtBodySize}px` }}>
+                                <MathText
+                                  content={s.text}
+                                  disableJustify={true}
+                                  className="cbt-choice-text text-left font-serif leading-relaxed !p-0 [&_p]:m-0"
+                                />
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2 mt-3">
+                              {columns.map((col: any) => {
+                                const isSelected = selected === col.id;
+                                const tone = colTone(col);
+                                return (
+                                  <button
+                                    key={col.id}
+                                    type="button"
+                                    onClick={() => pick(s.id, col.id)}
+                                    aria-pressed={isSelected}
+                                    className={`min-h-[48px] px-3 py-2.5 rounded-xl border-2 font-bold text-sm transition-all active:scale-95 inline-flex items-center justify-center gap-2 ${
+                                      isSelected
+                                        ? tone.selected
+                                        : `bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 ${tone.hover}`
+                                    }`}
+                                  >
+                                    <span className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                                      isSelected ? `border-white bg-white ${tone.dotText}` : "border-slate-300 dark:border-slate-600"
+                                    }`}>
+                                      {isSelected && <div className={`w-2 h-2 rounded-full ${tone.dotBg}`} />}
+                                    </span>
+                                    <span className="truncate">{col.text}</span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 );
@@ -1006,121 +1337,13 @@ export const QuestionRenderer = (props: QuestionRendererProps) => {
             })()
           )}
           {question.type === "klasifikasi" && (
-            (() => {
-              const allStatements = question.statements || [];
-              const categories = question.columns || [];
-              const currentAnswers = (typeof answer === "object" && answer !== null)
-                ? answer
-                : {};
-
-              // Gunakan urutan acak jika ada, jika tidak pakai urutan asli
-              const orderIds = klasifikasiOrder;
-              const statements = orderIds && orderIds.length > 0
-                ? orderIds.map(id => allStatements.find((s: any) => s.id === id)).filter(Boolean)
-                : allStatements;
-
-              if (statements.length > 0 && categories.length > 0) {
-                const catColor = (ci: number) => KLASIFIKASI_COLORS[ci % KLASIFIKASI_COLORS.length];
-                return (
-                  <div className="space-y-4">
-                    {/* Legenda zona kategori — tiap kategori punya warna identitas */}
-                    <div>
-                      <p
-                        className="mb-2 font-black uppercase tracking-widest text-slate-400 dark:text-slate-500"
-                        style={{ fontSize: `${Math.max(9, Math.round(10 * fontSize))}px` }}
-                      >
-                        Zona Kategori
-                      </p>
-                      <HorizontalScrollHint>
-                        {categories.map((cat: any, ci: number) => {
-                          const c = catColor(ci);
-                          return (
-                            <div
-                              key={cat.id}
-                              className={`shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 ${c.softBg} ${c.border}`}
-                            >
-                              <span className={`w-3 h-3 rounded-full ${c.dot} shrink-0`} />
-                              <span className={`font-bold whitespace-nowrap ${c.text}`} style={{ fontSize: `${14 * fontSize}px` }}>
-                                {cat.text}
-                              </span>
-                            </div>
-                          );
-                        })}
-                      </HorizontalScrollHint>
-                    </div>
-                    {statements.map((s: any, idx: number) => {
-                      const selected = currentAnswers[s.id] || "";
-                      const selIdx = categories.findIndex((cat: any) => cat.id === selected);
-                      const selColor = selIdx >= 0 ? catColor(selIdx) : null;
-                      const selCat = selIdx >= 0 ? categories[selIdx] : null;
-                      return (
-                        <div
-                          key={s.id || idx}
-                          className={`relative p-4 sm:p-5 rounded-xl sm:rounded-2xl border bg-white dark:bg-slate-900/90 shadow-sm ${
-                            selColor
-                              ? `border-l-4 ${selColor.bar} border-slate-200 dark:border-slate-800`
-                              : "border-slate-200 dark:border-slate-800"
-                          }`}
-                        >
-                          <div className="flex items-start gap-3 mb-3">
-                            <span
-                              className="inline-flex shrink-0 w-6 h-6 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-bold items-center justify-center mt-0.5"
-                              style={{ fontSize: `${Math.max(10, Math.round(11 * fontSize))}px` }}
-                            >
-                              {idx + 1}
-                            </span>
-                            <div className="flex-1 min-w-0" style={{ fontSize: `${15 * fontSize}px` }}>
-                              <MathText
-                                content={s.text}
-                                disableJustify={true}
-                                className="cbt-choice-text text-left font-serif leading-relaxed !p-0 [&_p]:m-0 text-slate-800 dark:text-slate-200"
-                              />
-                            </div>
-                            {selCat && selColor && (
-                              <span
-                                className={`shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border-2 font-bold ${selColor.softBg} ${selColor.border} ${selColor.text}`}
-                                style={{ fontSize: `${Math.max(11, Math.round(12 * fontSize))}px` }}
-                              >
-                                <span className={`w-2 h-2 rounded-full ${selColor.dot}`} />
-                                {selCat.text}
-                              </span>
-                            )}
-                          </div>
-                          <HorizontalScrollHint className="mt-1">
-                            {categories.map((cat: any, ci: number) => {
-                              const c = catColor(ci);
-                              const isActive = selected === cat.id;
-                              return (
-                                <button
-                                  key={cat.id}
-                                  type="button"
-                                  onClick={() => {
-                                    onAnswer( {
-                                      ...currentAnswers,
-                                      [s.id]: isActive ? "" : cat.id
-                                    });
-                                  }}
-                                  aria-pressed={isActive}
-                                  className={
-                                    isActive
-                                      ? `shrink-0 min-h-[44px] px-4 py-2.5 rounded-full text-base font-bold text-white border-2 border-transparent shadow-md active:scale-95 transition-all inline-flex items-center gap-2 ${c.activeBg} ${c.activeShadow}`
-                                      : `shrink-0 min-h-[44px] px-4 py-2.5 rounded-full text-base font-semibold bg-white dark:bg-slate-900 border-2 active:scale-95 transition-all inline-flex items-center gap-2 ${c.border} ${c.text}`
-                                  }
-                                >
-                                  <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${isActive ? "bg-white" : c.dot}`} />
-                                  {cat.text}
-                                </button>
-                              );
-                            })}
-                          </HorizontalScrollHint>
-                        </div>
-                      );
-                    })}
-                  </div>
-                );
-              }
-              return null;
-            })()
+            <KlasifikasiBody
+              question={question}
+              answer={answer}
+              onAnswer={onAnswer}
+              fontSize={fontSize}
+              klasifikasiOrder={klasifikasiOrder}
+            />
           )}
           {question.type === "isian_rumpang" && (
             (() => {
