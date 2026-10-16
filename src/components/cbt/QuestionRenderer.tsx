@@ -955,6 +955,17 @@ export const QuestionRenderer = (props: QuestionRendererProps) => {
                                 </td>
                                 {columns.map((col: any) => {
                                   const isSelected = selected === col.id;
+                                  // Warna otomatis: kolom "Benar" = hijau, "Salah" = merah (case-insensitive)
+                                  const colName = String(col.text || "").trim().toLowerCase();
+                                  const isSalahCol = colName === "salah";
+                                  const selectedCls = isSalahCol
+                                    ? "bg-red-500 border-red-500 text-white shadow-md shadow-red-500/20"
+                                    : "bg-emerald-500 border-emerald-500 text-white shadow-md shadow-emerald-500/20";
+                                  const hoverCls = isSalahCol
+                                    ? "hover:border-red-300 dark:hover:border-red-700"
+                                    : "hover:border-emerald-300 dark:hover:border-emerald-700";
+                                  const dotTextCls = isSalahCol ? "text-red-600" : "text-emerald-600";
+                                  const dotBgCls = isSalahCol ? "bg-red-600" : "bg-emerald-600";
                                   return (
                                     <td key={col.id} className="py-2 px-1 sm:py-4 sm:px-4 text-center align-middle">
                                       <button
@@ -967,15 +978,15 @@ export const QuestionRenderer = (props: QuestionRendererProps) => {
                                         }}
                                         className={`group/btn relative inline-flex items-center justify-center p-1.5 sm:px-4 sm:py-2.5 rounded-lg sm:rounded-2xl border-2 font-bold text-xs sm:text-sm transition-all active:scale-95 ${
                                           isSelected
-                                            ? "bg-emerald-500 border-emerald-500 text-white shadow-md shadow-emerald-500/20"
-                                            : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-400 dark:text-slate-500 hover:border-emerald-300 dark:hover:border-emerald-700"
+                                            ? selectedCls
+                                            : `bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-400 dark:text-slate-500 ${hoverCls}`
                                         }`}
                                         title={`Pilih ${col.text}`}
                                       >
                                         <span className={`w-4 h-4 sm:w-5 sm:h-5 rounded-full border-2 flex items-center justify-center sm:mr-1.5 transition-colors ${
-                                          isSelected ? "border-white bg-white text-emerald-600" : "border-slate-300 dark:border-slate-700"
+                                          isSelected ? `border-white bg-white ${dotTextCls}` : "border-slate-300 dark:border-slate-700"
                                         }`}>
-                                          {isSelected && <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-emerald-600" />}
+                                          {isSelected && <div className={`w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full ${dotBgCls}`} />}
                                         </span>
                                         <span className="hidden sm:inline">{col.text}</span>
                                       </button>
@@ -1148,10 +1159,9 @@ export const QuestionRenderer = (props: QuestionRendererProps) => {
                       });
                     }}
                     placeholder="..."
-                    className="inline-block mx-1 px-3 py-1.5 rounded-lg border-2 border-emerald-400 dark:border-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 text-slate-800 dark:text-slate-200 font-medium shadow-sm focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 outline-none transition-all align-middle min-h-[44px]"
+                    className="inline-block mx-1 px-2 py-1 rounded-md border border-emerald-400 dark:border-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 text-slate-800 dark:text-slate-200 font-medium shadow-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-200 outline-none transition-all align-middle"
                     style={{
-                      minWidth: "60px",
-                      width: `${Math.max(60, (blankVal.length || 3) * 10)}px`,
+                      width: `${Math.max(3, blankVal.length + 1)}ch`,
                       fontSize: "16px"
                     }}
                   />
