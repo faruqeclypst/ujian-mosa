@@ -82,7 +82,14 @@ interface Question {
   pairs?: Array<{ id: string; left: string; right: string }>;
   answerKey?: string;
   items?: Array<{ id: string; text: string; imageUrl?: string }>;
-  statements?: Array<{ id: string; text: string; answer?: "benar" | "salah" }>;
+  statements?: Array<{ id: string; text: string; answer?: string }>;
+  columns?: Array<{ id: string; text: string }>;
+  categories?: Array<{ id: string; text: string }>;
+  blanks?: Array<{ id: string; caseSensitive?: boolean }>;
+  rumpangText?: string;
+  hotspotImageUrl?: string;
+  hotspotMode?: string;
+  shuffleStatements?: boolean;
 }
 
 export interface QuestionStatusInfo {
@@ -249,7 +256,51 @@ export const getQuestionStatus = (q: Question, ans: any): QuestionStatusInfo => 
     }
   }
 
-  // 5. ISIAN_SINGKAT / URAIAN
+  // 5. MATRIKS
+  if (type === "matriks") {
+    const statements = q.statements || [];
+    if (statements.length > 0) {
+      const currentAns = (typeof ans === "object" && ans !== null && !Array.isArray(ans)) ? ans : {};
+      const answeredStatements = statements.filter(
+        s => currentAns[s.id] !== undefined && currentAns[s.id] !== ""
+      );
+      const unpickedStatements = statements
+        .map((s, idx) => ({ index: idx + 1, id: s.id, isFilled: currentAns[s.id] !== undefined && currentAns[s.id] !== "" }))
+        .filter(s => !s.isFilled);
+
+      if (answeredStatements.length === statements.length) {
+        return {
+          isComplete: true,
+          isPartiallyAnswered: false,
+          isUnanswered: false,
+          typeLabel: "Matriks",
+          missingDetail: "",
+          summaryText: `Lengkap (${statements.length}/${statements.length} pernyataan)`
+        };
+      } else if (answeredStatements.length === 0) {
+        return {
+          isComplete: false,
+          isPartiallyAnswered: false,
+          isUnanswered: true,
+          typeLabel: "Matriks",
+          missingDetail: `Belum dijawab (${statements.length} pernyataan)`,
+          summaryText: "Belum dijawab"
+        };
+      } else {
+        const unpickedList = unpickedStatements.map(s => `No. ${s.index}`).join(", ");
+        return {
+          isComplete: false,
+          isPartiallyAnswered: true,
+          isUnanswered: false,
+          typeLabel: "Matriks",
+          missingDetail: `Baru ${answeredStatements.length}/${statements.length} pernyataan dipilih (${unpickedList} belum diisi)`,
+          summaryText: `Belum lengkap (${answeredStatements.length}/${statements.length})`
+        };
+      }
+    }
+  }
+
+  // 6. ISIAN_SINGKAT / URAIAN
   if (type === "isian_singkat" || type === "uraian") {
     const isFilled = typeof ans === "string" && ans.trim().length > 0;
     return {
@@ -1107,6 +1158,7 @@ const CBTPage = () => {
         let pairs: any = undefined;
         let items: any = undefined;
         let statements: any = undefined;
+        let columns: any = undefined;
 
         if (mappedType === "menjodohkan") {
           pairs = rawOptions.pairs || [];
@@ -1118,6 +1170,9 @@ const CBTPage = () => {
           if ((!statements || statements.length === 0) && (rawOptions.a || rawOptions.b)) {
             choices = { ...rawOptions };
           }
+        } else if (mappedType === "matriks") {
+          statements = rawOptions.statements || [];
+          columns = rawOptions.columns || [];
         } else {
           // Choice-based types: options = {a: {text, isCorrect, imageUrl}, b: {...}, ...}
           choices = { ...rawOptions };
@@ -1128,7 +1183,7 @@ const CBTPage = () => {
           });
         }
 
-        return { id: q.id, type: mappedType, text: q.text, imageUrl: qImg, groupId: q.groupId, groupText: q.groupText, choices, pairs, items, statements, answerKey: q.answerKey || q.correctAnswer };
+        return { id: q.id, type: mappedType, text: q.text, imageUrl: qImg, groupId: q.groupId, groupText: q.groupText, choices, pairs, items, statements, columns, answerKey: q.answerKey || q.correctAnswer };
       });
 
       const pr = `${student.nisn}_${roomId}`;
@@ -2055,6 +2110,18 @@ const CBTPage = () => {
           }
         }
         else if (t === "urutkan" || t === "drag_drop") { const co = (q.items || []).map((it: any) => it.id); if (Array.isArray(sa) && sa.length === co.length && sa.every((v, index) => v === co[index])) objectiveCorrect++; }
+        else if (t === "matriks") {
+          const sts = q.statements || [];
+          if (sts.length > 0 && sa !== null && typeof sa === "object" && !Array.isArray(sa)) {
+            let mCorrect = 0;
+            sts.forEach((st: any) => {
+              const sid = String(st.id != null ? st.id : "");
+              if (!sid) return;
+              if (String(sa[sid] != null ? sa[sid] : "") === String(st.answer != null ? st.answer : "")) mCorrect++;
+            });
+            objectiveCorrect += (mCorrect / sts.length);
+          }
+        }
       });
 
       const totalQuestions = objectiveTotal + essayTotal;
@@ -3017,6 +3084,104 @@ const CBTPage = () => {
                         })}
                       </div>
                     );
+                  })()
+                )}
+                {currentQuestion.type === "matriks" && (
+                  (() => {
+                    const statements = currentQuestion.statements || [];
+                    const columns = currentQuestion.columns || [];
+                    const currentAnswers = (typeof answers[currentQuestion.id] === "object" && answers[currentQuestion.id] !== null)
+                      ? answers[currentQuestion.id]
+                      : {};
+
+                    if (statements.length > 0 && columns.length > 0) {
+                      return (
+                        <div className="overflow-hidden rounded-xl sm:rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/90 shadow-sm">
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-left border-collapse">
+                              <thead>
+                                <tr className="border-b border-slate-200/80 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-800/60">
+                                  <th
+                                    className="py-2.5 px-3 sm:py-4 sm:px-6 font-black text-slate-700 dark:text-slate-300 uppercase tracking-wider"
+                                    style={{ fontSize: `${Math.max(11, Math.round(13 * fontSize))}px` }}
+                                  >
+                                    Pernyataan
+                                  </th>
+                                  {columns.map((col: any) => (
+                                    <th
+                                      key={col.id}
+                                      className="w-14 sm:w-28 py-2.5 px-1 sm:py-4 sm:px-4 text-center font-black text-slate-600 dark:text-slate-400 uppercase tracking-wider"
+                                      style={{ fontSize: `${Math.max(11, Math.round(13 * fontSize))}px` }}
+                                    >
+                                      {col.text}
+                                    </th>
+                                  ))}
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
+                                {statements.map((s: any, idx: number) => {
+                                  const selected = currentAnswers[s.id];
+                                  return (
+                                    <tr
+                                      key={s.id || idx}
+                                      className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-colors"
+                                    >
+                                      <td className="py-2.5 px-3 sm:py-5 sm:px-6 font-serif text-slate-800 dark:text-slate-200 align-middle">
+                                        <div className="flex items-start gap-2">
+                                          <span
+                                            className="inline-flex shrink-0 w-5 h-5 sm:w-6 sm:h-6 rounded-md sm:rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-bold items-center justify-center mt-0.5"
+                                            style={{ fontSize: `${Math.max(10, Math.round(11 * fontSize))}px` }}
+                                          >
+                                            {idx + 1}
+                                          </span>
+                                          <div className="flex-1 min-w-0" style={{ fontSize: `${15 * fontSize}px` }}>
+                                            <MathText
+                                              content={s.text}
+                                              disableJustify={true}
+                                              className="cbt-choice-text text-left font-serif leading-relaxed !p-0 [&_p]:m-0"
+                                            />
+                                          </div>
+                                        </div>
+                                      </td>
+                                      {columns.map((col: any) => {
+                                        const isSelected = selected === col.id;
+                                        return (
+                                          <td key={col.id} className="py-2 px-1 sm:py-4 sm:px-4 text-center align-middle">
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                handleAnswerSelect(currentQuestion.id, {
+                                                  ...currentAnswers,
+                                                  [s.id]: col.id
+                                                });
+                                              }}
+                                              className={`group/btn relative inline-flex items-center justify-center p-1.5 sm:px-4 sm:py-2.5 rounded-lg sm:rounded-2xl border-2 font-bold text-xs sm:text-sm transition-all active:scale-95 ${
+                                                isSelected
+                                                  ? "bg-emerald-500 border-emerald-500 text-white shadow-md shadow-emerald-500/20"
+                                                  : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-400 dark:text-slate-500 hover:border-emerald-300 dark:hover:border-emerald-700"
+                                              }`}
+                                              title={`Pilih ${col.text}`}
+                                            >
+                                              <span className={`w-4 h-4 sm:w-5 sm:h-5 rounded-full border-2 flex items-center justify-center sm:mr-1.5 transition-colors ${
+                                                isSelected ? "border-white bg-white text-emerald-600" : "border-slate-300 dark:border-slate-700"
+                                              }`}>
+                                                {isSelected && <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-emerald-600" />}
+                                              </span>
+                                              <span className="hidden sm:inline">{col.text}</span>
+                                            </button>
+                                          </td>
+                                        );
+                                      })}
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      );
+                    }
+                    return null;
                   })()
                 )}
                 {currentQuestion.type === "menjodohkan" && (
