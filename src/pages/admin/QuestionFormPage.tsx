@@ -707,8 +707,8 @@ const QuestionFormPage = () => {
       { id: "3", text: "", answer: "benar" }
     ],
     matrixColumns: [
-      { id: "c1", text: "Benar" },
-      { id: "c2", text: "Salah" }
+      { id: "c1", text: "" },
+      { id: "c2", text: "" }
     ],
     matrixStatements: [
       { id: "s1", text: "", answer: "c1" },
@@ -2470,8 +2470,8 @@ const QuestionFormPage = () => {
         { id: "3", text: "", answer: "benar" }
       ],
       matrixColumns: [
-        { id: "c1", text: "Benar" },
-        { id: "c2", text: "Salah" }
+        { id: "c1", text: "" },
+        { id: "c2", text: "" }
       ],
       matrixStatements: [
         { id: "s1", text: "", answer: "c1" },
@@ -2524,11 +2524,11 @@ const QuestionFormPage = () => {
         { id: "3", text: "", answer: "benar" }
       ],
       matrixColumns: q.type === "matriks" ? (q.options?.columns || [
-        { id: "c1", text: "Benar" },
-        { id: "c2", text: "Salah" }
+        { id: "c1", text: "" },
+        { id: "c2", text: "" }
       ]) : [
-        { id: "c1", text: "Benar" },
-        { id: "c2", text: "Salah" }
+        { id: "c1", text: "" },
+        { id: "c2", text: "" }
       ],
       matrixStatements: q.options?.statements && q.type === "matriks" ? q.options.statements : [
         { id: "s1", text: "", answer: "c1" },
@@ -5136,8 +5136,8 @@ const QuestionFormPage = () => {
                                 { id: "3", text: "", answer: "benar" }
                               ] : prev.statements,
                               matrixColumns: newType === "matriks" && (!prev.matrixColumns || prev.matrixColumns.length === 0) ? [
-                                { id: "c1", text: "Benar" },
-                                { id: "c2", text: "Salah" }
+                                { id: "c1", text: "" },
+                                { id: "c2", text: "" }
                               ] : prev.matrixColumns,
                               matrixStatements: newType === "matriks" && (!prev.matrixStatements || prev.matrixStatements.length === 0) ? [
                                 { id: "s1", text: "", answer: "c1" },
@@ -5430,7 +5430,7 @@ const QuestionFormPage = () => {
                   <div className="flex flex-wrap items-center gap-3 pt-1">
                     <button
                       type="button"
-                      className="flex items-center gap-2 cursor-pointer bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg h-9 text-xs px-3.5 border border-slate-200 dark:border-slate-700 transition-all font-semibold shadow-xs"
+                      className="flex items-center gap-2 cursor-pointer bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl h-11 text-xs px-4 border border-slate-200 dark:border-slate-700 transition-all font-semibold shadow-xs"
                       onClick={() => {
                         setGalleryTarget({ type: "cover" });
                         setIsPickerOpen(true);
@@ -5726,7 +5726,7 @@ const QuestionFormPage = () => {
                                   const updated = (formValues.statements || []).filter((_, i) => i !== index);
                                   setFormValues(prev => ({ ...prev, statements: updated }));
                                 }}
-                                className="h-9 w-9 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 ml-1 rounded-xl"
+                                className="h-11 w-11 shrink-0 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 ml-1 rounded-xl"
                                 disabled={(formValues.statements || []).length <= 1}
                                 title="Hapus Pernyataan"
                               >
@@ -5775,6 +5775,9 @@ const QuestionFormPage = () => {
                             Min. 2 Kolom
                           </span>
                         </div>
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400 px-1">
+                          Isi nama setiap kolom, mis. <span className="font-semibold text-slate-600 dark:text-slate-300">Setuju / Tidak Setuju</span> atau <span className="font-semibold text-slate-600 dark:text-slate-300">Ya / Tidak / Ragu</span>.
+                        </p>
                         <div className="flex flex-wrap gap-2">
                           {(formValues.matrixColumns || []).map((col, cIdx) => (
                             <div
@@ -5788,8 +5791,8 @@ const QuestionFormPage = () => {
                                   updated[cIdx] = { ...updated[cIdx], text: e.target.value };
                                   setFormValues(prev => ({ ...prev, matrixColumns: updated }));
                                 }}
-                                placeholder={`Kolom ${cIdx + 1}`}
-                                className="h-8 text-xs w-28 bg-slate-50/50 dark:bg-slate-900 border-slate-200 dark:border-slate-700"
+                                placeholder={`Nama kolom ${cIdx + 1}...`}
+                                className="h-11 text-sm w-32 bg-slate-50/50 dark:bg-slate-900 border-slate-200 dark:border-slate-700"
                               />
                               <Button
                                 type="button"
@@ -5800,10 +5803,10 @@ const QuestionFormPage = () => {
                                   setFormValues(prev => ({ ...prev, matrixColumns: updated }));
                                 }}
                                 disabled={(formValues.matrixColumns || []).length <= 2}
-                                className="h-8 w-8 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-lg"
+                                className="h-11 w-11 shrink-0 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-lg"
                                 title="Hapus Kolom"
                               >
-                                <X className="h-3.5 w-3.5" />
+                                <X className="h-4 w-4" />
                               </Button>
                             </div>
                           ))}
@@ -5861,7 +5864,7 @@ const QuestionFormPage = () => {
                                     updated[index] = { ...updated[index], answer: e.target.value };
                                     setFormValues(prev => ({ ...prev, matrixStatements: updated }));
                                   }}
-                                  className="h-9 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-bold px-2.5 cursor-pointer text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500"
+                                  className="h-11 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-bold px-2.5 cursor-pointer text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500"
                                 >
                                   {(formValues.matrixColumns || []).map((col) => (
                                     <option key={col.id} value={col.id}>
@@ -5877,7 +5880,7 @@ const QuestionFormPage = () => {
                                     const updated = (formValues.matrixStatements || []).filter((_, i) => i !== index);
                                     setFormValues(prev => ({ ...prev, matrixStatements: updated }));
                                   }}
-                                  className="h-9 w-9 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-xl"
+                                  className="h-11 w-11 shrink-0 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-xl"
                                   disabled={(formValues.matrixStatements || []).length <= 1}
                                   title="Hapus Pernyataan"
                                 >
@@ -5948,7 +5951,7 @@ const QuestionFormPage = () => {
                                   setFormValues(prev => ({ ...prev, klasifikasiCategories: updated }));
                                 }}
                                 disabled={(formValues.klasifikasiCategories || []).length <= 2}
-                                className="h-8 w-8 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-lg"
+                                className="h-11 w-11 shrink-0 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-lg"
                                 title="Hapus Kategori"
                               >
                                 <X className="h-3.5 w-3.5" />
@@ -6038,7 +6041,7 @@ const QuestionFormPage = () => {
                                     const updated = (formValues.klasifikasiStatements || []).filter((_, i) => i !== index);
                                     setFormValues(prev => ({ ...prev, klasifikasiStatements: updated }));
                                   }}
-                                  className="h-9 w-9 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-xl"
+                                  className="h-11 w-11 shrink-0 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-xl"
                                   disabled={(formValues.klasifikasiStatements || []).length <= 1}
                                   title="Hapus Pernyataan"
                                 >
@@ -6203,10 +6206,10 @@ const QuestionFormPage = () => {
                                   setHotspotFile(null);
                                   setFormValues(prev => ({ ...prev, hotspotImageUrl: "" }));
                                 }}
-                                className="h-8 w-8 shadow-md"
+                                className="h-11 w-11 shrink-0 shadow-md"
                                 title="Hapus gambar"
                               >
-                                <Trash className="h-3.5 w-3.5" />
+                                <Trash className="h-4 w-4" />
                               </Button>
                             </div>
                           </div>
@@ -6337,7 +6340,7 @@ const QuestionFormPage = () => {
                               variant="ghost"
                               size="icon"
                               onClick={() => handleRemovePair(pair.id)}
-                              className="h-9 w-9 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-xl shrink-0"
+                              className="h-11 w-11 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-xl shrink-0"
                               disabled={formValues.pairs.length <= 1}
                               title="Hapus pasangan"
                             >
@@ -6431,7 +6434,7 @@ const QuestionFormPage = () => {
                               variant="ghost"
                               size="icon"
                               onClick={() => handleRemoveItem(item.id)}
-                              className="h-9 w-9 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-xl shrink-0"
+                              className="h-11 w-11 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-xl shrink-0"
                               disabled={formValues.items.length <= 1}
                               title="Hapus item"
                             >
