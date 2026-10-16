@@ -340,7 +340,48 @@ export const getQuestionStatus = (q: Question, ans: any): QuestionStatusInfo => 
     }
   }
 
-  // 7. ISIAN_SINGKAT / URAIAN
+  // 7. ISIAN_RUMPANG
+  if (type === "isian_rumpang") {
+    const blanks = q.blanks || [];
+    if (blanks.length > 0) {
+      const currentAns = (typeof ans === "object" && ans !== null && !Array.isArray(ans)) ? ans : {};
+      const filledBlanks = blanks.filter(b => {
+        const v = currentAns[b.id];
+        return typeof v === "string" && v.trim().length > 0;
+      });
+
+      if (filledBlanks.length === blanks.length) {
+        return {
+          isComplete: true,
+          isPartiallyAnswered: false,
+          isUnanswered: false,
+          typeLabel: "Isian Rumpang",
+          missingDetail: "",
+          summaryText: `Lengkap (${blanks.length}/${blanks.length} rumpang)`
+        };
+      } else if (filledBlanks.length === 0) {
+        return {
+          isComplete: false,
+          isPartiallyAnswered: false,
+          isUnanswered: true,
+          typeLabel: "Isian Rumpang",
+          missingDetail: `Belum dijawab (${blanks.length} rumpang)`,
+          summaryText: "Belum dijawab"
+        };
+      } else {
+        return {
+          isComplete: false,
+          isPartiallyAnswered: true,
+          isUnanswered: false,
+          typeLabel: "Isian Rumpang",
+          missingDetail: `Baru ${filledBlanks.length}/${blanks.length} rumpang diisi`,
+          summaryText: `Belum lengkap (${filledBlanks.length}/${blanks.length})`
+        };
+      }
+    }
+  }
+
+  // 8. ISIAN_SINGKAT / URAIAN
   if (type === "isian_singkat" || type === "uraian") {
     const isFilled = typeof ans === "string" && ans.trim().length > 0;
     return {
@@ -1200,6 +1241,10 @@ const CBTPage = () => {
         let items: any = undefined;
         let statements: any = undefined;
         let columns: any = undefined;
+        let blanks: any = undefined;
+        let rumpangText: string = "";
+        let hotspotImageUrl: string = "";
+        let hotspotMode: string = "any";
 
         if (mappedType === "menjodohkan") {
           pairs = rawOptions.pairs || [];
@@ -1217,6 +1262,12 @@ const CBTPage = () => {
         } else if (mappedType === "klasifikasi") {
           statements = rawOptions.statements || [];
           columns = rawOptions.categories || [];
+        } else if (mappedType === "isian_rumpang") {
+          blanks = rawOptions.blanks || [];
+          rumpangText = rawOptions.text || "";
+        } else if (mappedType === "hotspot") {
+          hotspotImageUrl = rawOptions.imageUrl || "";
+          hotspotMode = rawOptions.mode || "any";
         } else {
           // Choice-based types: options = {a: {text, isCorrect, imageUrl}, b: {...}, ...}
           choices = { ...rawOptions };
@@ -1227,7 +1278,7 @@ const CBTPage = () => {
           });
         }
 
-        return { id: q.id, type: mappedType, text: q.text, imageUrl: qImg, groupId: q.groupId, groupText: q.groupText, choices, pairs, items, statements, columns, shuffleStatements: rawOptions.shuffleStatements !== false, answerKey: q.answerKey || q.correctAnswer };
+        return { id: q.id, type: mappedType, text: q.text, imageUrl: qImg, groupId: q.groupId, groupText: q.groupText, choices, pairs, items, statements, columns, blanks, rumpangText, hotspotImageUrl, hotspotMode, shuffleStatements: rawOptions.shuffleStatements !== false, answerKey: q.answerKey || q.correctAnswer };
       });
 
       const pr = `${student.nisn}_${roomId}`;
@@ -2198,6 +2249,12 @@ const CBTPage = () => {
             });
             objectiveCorrect += (kCorrect / sts.length);
           }
+        }
+        else if (t === "isian_rumpang") {
+          // Skoring client: hanya untuk preview, server adalah source of truth
+          // (blanks[].answers di-strip dari server, jadi kunci tidak tersedia di client)
+          // Kita tidak bisa hitung skor akurat di client tanpa kunci, jadi skip (0)
+          // Server akan hitung yang benar saat submit
         }
       });
 
@@ -3325,6 +3382,69 @@ const CBTPage = () => {
                       );
                     }
                     return null;
+                  })()
+                )}
+                {currentQuestion.type === "isian_rumpang" && (
+                  (() => {
+                    const text = currentQuestion.rumpangText || "";
+                    const blanks = currentQuestion.blanks || [];
+                    const currentAnswers = (typeof answers[currentQuestion.id] === "object" && answers[currentQuestion.id] !== null)
+                      ? answers[currentQuestion.id]
+                      : {};
+
+                    if (!text) return null;
+
+                    // Parse teks, ganti [[n]] dengan input
+                    const parts: React.ReactNode[] = [];
+                    const re = /\[\[(\d+)\]\]/g;
+                    let lastIdx = 0;
+                    let m: RegExpExecArray | null;
+                    let keyIdx = 0;
+
+                    while ((m = re.exec(text)) !== null) {
+                      if (m.index > lastIdx) {
+                        parts.push(
+                          <span key={`t-${keyIdx++}`}>{text.slice(lastIdx, m.index)}</span>
+                        );
+                      }
+                      const blankId = m[1];
+                      const blankVal = currentAnswers[blankId] || "";
+                      parts.push(
+                        <input
+                          key={`b-${blankId}-${keyIdx++}`}
+                          type="text"
+                          value={blankVal}
+                          onChange={(e) => {
+                            handleAnswerSelect(currentQuestion.id, {
+                              ...currentAnswers,
+                              [blankId]: e.target.value
+                            });
+                          }}
+                          placeholder={`(${blankId})`}
+                          className="inline-block mx-1 px-3 py-1.5 rounded-lg border-2 border-emerald-300 dark:border-emerald-700 bg-emerald-50/50 dark:bg-emerald-950/20 text-slate-800 dark:text-slate-200 font-medium focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 outline-none transition-all align-baseline"
+                          style={{
+                            minWidth: "80px",
+                            width: `${Math.max(80, (blankVal.length || 4) * 12)}px`,
+                            fontSize: "16px"
+                          }}
+                        />
+                      );
+                      lastIdx = m.index + m[0].length;
+                    }
+                    if (lastIdx < text.length) {
+                      parts.push(
+                        <span key={`t-${keyIdx++}`}>{text.slice(lastIdx)}</span>
+                      );
+                    }
+
+                    return (
+                      <div
+                        className="p-5 sm:p-8 rounded-xl sm:rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/90 shadow-sm font-serif leading-loose text-slate-800 dark:text-slate-200"
+                        style={{ fontSize: `${15 * fontSize}px` }}
+                      >
+                        {parts}
+                      </div>
+                    );
                   })()
                 )}
                 {currentQuestion.type === "menjodohkan" && (
