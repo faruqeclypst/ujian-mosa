@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Plus, Edit, Trash, Check, Copy, Image, ChevronDown, FileText, Download, Eye, EyeOff, FolderOpen, Sparkles, Wand2, RefreshCw, BookOpen, Loader2, FileSpreadsheet, Search, X, Bookmark, Forward, CheckCircle2, Menu, Maximize2, HelpCircle, FileJson, GripVertical, ChevronLeft, ChevronRight, Database, Key, Layers, Target, Info } from "lucide-react";
+import { ArrowLeft, Plus, Edit, Trash, Check, Copy, Image, ChevronDown, FileText, Download, Eye, EyeOff, FolderOpen, Sparkles, Wand2, RefreshCw, BookOpen, Loader2, FileSpreadsheet, Search, X, Bookmark, Forward, CheckCircle2, Menu, Maximize2, HelpCircle, FileJson, GripVertical, ChevronLeft, ChevronRight, Database, Key, Layers, Target, Info, MoreHorizontal } from "lucide-react";
 import { Reorder } from "framer-motion";
 import { MathText } from "../../components/ui/MathText";
 import { SmartImage } from "../../components/ui/smart-image";
@@ -5359,42 +5359,55 @@ Aturan:
                         </>
                       )}
 
-                      {questions.length > 0 && selectedIds.length === 0 && isOwner && (
-                        <Button
-                          onClick={() => setDeleteAllDialogOpen(true)}
-                          variant="secondary"
-                          size="sm"
-                          className="rounded-2xl bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-100 dark:bg-rose-950/40 dark:text-rose-400 dark:border dark:border-rose-800/30 shadow-sm font-bold h-9 px-4 transition-all text-xs"
-                        >
-                          <Trash className="mr-2 h-3.5 w-3.5" /> Hapus Semua
-                        </Button>
-                      )}
-
-                      {role === "admin" && isOwner && (
-                        <Button
-                          type="button"
-                          onClick={() => setIsRepoDialogOpen(true)}
-                          size="sm"
-                          className="rounded-2xl bg-amber-50 hover:bg-amber-100 border border-amber-100 dark:bg-amber-900/30 dark:text-amber-400 dark:hover:bg-amber-900/50 dark:border-amber-800/40 text-amber-700 font-bold shadow-sm transition-all h-9 px-4 text-xs"
-                        >
-                          <Database className="mr-1.5 h-3.5 w-3.5" />
-                          Bank / Wayground
-                        </Button>
-                      )}
-
                       {isOwner && (
                         <>
-                          {examId && (
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              onClick={() => navigate(`/admin/simulate/${examId}`)}
-                              title="Coba ujian seperti tampilan siswa (tidak menyimpan nilai)"
-                              className="rounded-2xl bg-indigo-50 hover:bg-indigo-100 border border-indigo-100 dark:bg-indigo-900/20 dark:text-indigo-400 dark:hover:bg-indigo-900/40 dark:border-indigo-800/40 text-indigo-700 font-bold shadow-sm transition-all h-9 px-4"
-                            >
-                              <Eye className="mr-1.5 h-3.5 w-3.5" />
-                              Simulasi
-                            </Button>
+                          {((questions.length > 0 && selectedIds.length === 0) || role === "admin" || examId) && (
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  variant="secondary"
+                                  size="sm"
+                                  className="rounded-2xl bg-slate-50 hover:bg-slate-100 border border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 dark:border-slate-700 text-slate-700 font-bold shadow-sm transition-all h-9 px-4"
+                                >
+                                  <MoreHorizontal className="mr-1.5 h-3.5 w-3.5" />
+                                  Lainnya
+                                  <ChevronDown className="ml-1.5 h-3 w-3 opacity-50" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-64 p-2 rounded-2xl shadow-2xl border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 z-[100]">
+                                <DropdownMenuLabel className="text-[10px] font-bold uppercase tracking-widest text-slate-400 px-3 py-2 text-left">Aksi Lainnya</DropdownMenuLabel>
+                                {examId && (
+                                  <DropdownMenuItem
+                                    onClick={() => navigate(`/admin/simulate/${examId}`)}
+                                    className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors"
+                                  >
+                                    <Eye className="h-4 w-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                                    <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">Simulasi Ujian</span>
+                                  </DropdownMenuItem>
+                                )}
+                                {role === "admin" && (
+                                  <DropdownMenuItem
+                                    onClick={() => setIsRepoDialogOpen(true)}
+                                    className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors"
+                                  >
+                                    <Database className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                                    <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">Bank / Wayground</span>
+                                  </DropdownMenuItem>
+                                )}
+                                {questions.length > 0 && selectedIds.length === 0 && (
+                                  <>
+                                    <DropdownMenuSeparator className="my-1 border-slate-100 dark:border-slate-800" />
+                                    <DropdownMenuItem
+                                      onClick={() => setDeleteAllDialogOpen(true)}
+                                      className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
+                                    >
+                                      <Trash className="h-4 w-4 text-rose-600 dark:text-rose-400 shrink-0" />
+                                      <span className="text-sm font-semibold text-rose-600 dark:text-rose-400">Hapus Semua Soal</span>
+                                    </DropdownMenuItem>
+                                  </>
+                                )}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           )}
                           <DropdownMenu>
                           <DropdownMenuTrigger asChild>
