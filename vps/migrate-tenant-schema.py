@@ -43,6 +43,29 @@ REQUIRED_FIELDS = [
     ),
 ]
 
+# Select values yang harus ada: (collection, field_name, required_values)
+# Idempotent: hanya menambahkan values yang belum ada.
+REQUIRED_SELECT_VALUES = [
+    (
+        "questions",
+        "field",
+        [
+            "multiple_choice",
+            "complex_choice",
+            "true_false",
+            "matching",
+            "short_answer",
+            "essay",
+            "sequence",
+            "drag_drop",
+            "klasifikasi",
+            "hotspot",
+            "isian_rumpang",
+            "matriks",
+        ],
+    ),
+]
+
 
 def get_existing_field_names(db_path, collection):
     """Ambil daftar nama field dari _collections."""
@@ -126,6 +149,41 @@ def migrate_tenant(tenant_dir):
                 add_field(db_path, collection, field_name, field_def, sql_type)
             except Exception as e:
                 print(f"  [ERROR] {slug}: {e}", file=sys.stderr)
+
+    for collection, field_name, required_values in REQUIRED_SELECT_VALUES:
+        try:
+            ensure_select_values(db_path, slug, collection, field_name, required_values)
+        except Exception as e:
+            print(f"  [ERROR] {slug}: {e}", file=sys.stderr)
+
+
+def ensure_select_values(db_path, slug, collection, field_name, required_values):
+    """Pastikan select field punya semua required values. Idempotent."""
+    db = sqlite3.connect(db_path)
+    cur = db.cursor()
+    row = cur.execute(
+        "SELECT fields FROM _collections WHERE name = ?", (collection,)
+    ).fetchone()
+    if not row:
+        db.close()
+        return
+    fields = json.loads(row[0])
+    changed = False
+    for f in fields:
+        if f.get("name") == field_name and f.get("type") == "select":
+            current = f.get("values", [])
+            missing = [v for v in required_values if v not in current]
+            if missing:
+                f["values"] = current + missing
+                changed = True
+                print(f"[{slug}] Migrasi: {collection}.{field_name} tambah values {missing}")
+    if changed:
+        cur.execute(
+            "UPDATE _collections SET fields = ?, updated = strftime('%Y-%m-%d %H:%M:%fZ') WHERE name = ?",
+            (json.dumps(fields), collection),
+        )
+        db.commit()
+    db.close()
 
 
 def main():
