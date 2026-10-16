@@ -58,6 +58,61 @@ const GamepadIcon = ({ className }: { className?: string }) => (
     <rect x="2" y="6" width="20" height="12" rx="2" />
   </svg>
 );
+
+// Wrapper scroll horizontal dengan indikator "geser" untuk mobile.
+// Menampilkan gradient fade di kanan + hint teks "← geser →" yang hilang
+// otomatis setelah user scroll atau jika konten ternyata muat.
+const HorizontalScrollHint = ({ children, className = "" }: { children: React.ReactNode; className?: string }) => {
+  const ref = useRef<HTMLDivElement>(null);
+  const [canScroll, setCanScroll] = useState(false);
+  const [showHint, setShowHint] = useState(true);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const check = () => {
+      const overflow = el.scrollWidth > el.clientWidth + 8;
+      setCanScroll(overflow);
+      if (!overflow) setShowHint(false);
+    };
+    check();
+    // Cek ulang setelah layout stabil (font/gambar) + saat resize/rotasi
+    const t = setTimeout(check, 300);
+    window.addEventListener("resize", check);
+    return () => {
+      clearTimeout(t);
+      window.removeEventListener("resize", check);
+    };
+  }, []);
+
+  const handleScroll = () => {
+    const el = ref.current;
+    if (el && el.scrollLeft > 16) setShowHint(false);
+  };
+
+  return (
+    <div className={`relative ${className}`}>
+      <div
+        ref={ref}
+        onScroll={handleScroll}
+        className="overflow-x-auto pb-3"
+        style={{ scrollbarWidth: "thin" }}
+      >
+        <div className="flex gap-2 w-max min-w-full pr-10">
+          {children}
+        </div>
+      </div>
+      {canScroll && (
+        <div className="pointer-events-none absolute inset-y-0 right-0 w-12 bg-gradient-to-l from-white dark:from-slate-900 to-transparent" />
+      )}
+      {canScroll && showHint && (
+        <div className="pointer-events-none absolute bottom-0 right-1 text-[11px] font-medium text-slate-400 dark:text-slate-500 animate-pulse select-none">
+          {"\u2190"} geser {"\u2192"}
+        </div>
+      )}
+    </div>
+  );
+};
 import { useNetworkStatus } from "../../lib/network";
 import { syncPendingDataLocked } from "../../lib/syncManager";
 import { getOnlineFlag, syncJitter } from "../../lib/network";
@@ -3400,24 +3455,31 @@ const CBTPage = () => {
                                     />
                                   </div>
                                 </div>
-                                <select
-                                  value={selected}
-                                  onChange={(e) => {
-                                    handleAnswerSelect(currentQuestion.id, {
-                                      ...currentAnswers,
-                                      [s.id]: e.target.value
-                                    });
-                                  }}
-                                  className="w-full p-3 rounded-xl border-2 border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-medium focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 outline-none transition-all"
-                                  style={{ fontSize: "16px" }}
-                                >
-                                  <option value="">-- Pilih kategori --</option>
-                                  {categories.map((cat: any) => (
-                                    <option key={cat.id} value={cat.id}>
-                                      {cat.text}
-                                    </option>
-                                  ))}
-                                </select>
+                                <HorizontalScrollHint className="mt-1">
+                                  {categories.map((cat: any) => {
+                                    const isActive = selected === cat.id;
+                                    return (
+                                      <button
+                                        key={cat.id}
+                                        type="button"
+                                        onClick={() => {
+                                          handleAnswerSelect(currentQuestion.id, {
+                                            ...currentAnswers,
+                                            [s.id]: isActive ? "" : cat.id
+                                          });
+                                        }}
+                                        aria-pressed={isActive}
+                                        className={
+                                          isActive
+                                            ? "shrink-0 min-h-[44px] px-4 py-2.5 rounded-full text-base font-semibold bg-emerald-500 text-white shadow-md shadow-emerald-500/30 active:scale-95 transition-all"
+                                            : "shrink-0 min-h-[44px] px-4 py-2.5 rounded-full text-base font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 active:scale-95 transition-all"
+                                        }
+                                      >
+                                        {cat.text}
+                                      </button>
+                                    );
+                                  })}
+                                </HorizontalScrollHint>
                               </div>
                             );
                           })}
@@ -3463,11 +3525,11 @@ const CBTPage = () => {
                               [blankId]: e.target.value
                             });
                           }}
-                          placeholder={`(${blankId})`}
-                          className="inline-block mx-1 px-3 py-1.5 rounded-lg border-2 border-emerald-300 dark:border-emerald-700 bg-emerald-50/50 dark:bg-emerald-950/20 text-slate-800 dark:text-slate-200 font-medium focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 outline-none transition-all align-baseline"
+                          placeholder={`[${blankId}]`}
+                          className="inline-block mx-1 px-3 py-2.5 rounded-lg border-2 border-emerald-400 dark:border-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 text-slate-800 dark:text-slate-200 font-medium shadow-sm focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 outline-none transition-all align-middle min-h-[44px]"
                           style={{
-                            minWidth: "80px",
-                            width: `${Math.max(80, (blankVal.length || 4) * 12)}px`,
+                            minWidth: "100px",
+                            width: `${Math.max(100, (blankVal.length || 4) * 12)}px`,
                             fontSize: "16px"
                           }}
                         />
