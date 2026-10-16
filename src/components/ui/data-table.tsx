@@ -343,7 +343,7 @@ export function DataTable<T>({
       </div>
 
       {/* Table */}
-      <div className="rounded-md border overflow-hidden bg-card">
+      <div className="rounded-md border overflow-x-auto bg-card">
         <div className="hidden sm:block">
           <Table>
           <TableHeader>
