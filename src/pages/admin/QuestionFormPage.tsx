@@ -6869,6 +6869,85 @@ const QuestionFormPage = () => {
             )}
           </DialogContent>
         </Dialog>
+
+        <Dialog open={isGalleryOpen} onOpenChange={setIsGalleryOpen}>
+          <DialogContent className="max-w-4xl bg-card max-h-[80vh] overflow-hidden flex flex-col p-0">
+            <DialogHeader className="p-6 border-b border-slate-100 dark:border-slate-800">
+              <DialogTitle>Galeri Media Bersama</DialogTitle>
+              <p className="text-xs text-slate-500">Pilih gambar yang pernah diunggah oleh Anda atau rekan guru lainnya.</p>
+            </DialogHeader>
+            <div className="flex-1 overflow-y-auto p-6 space-y-8 scrollbar-thin">
+              {galleryGroups.length === 0 ? (
+                <div className="text-center p-12 text-slate-400 text-sm">Belum ada gambar yang bisa digunakan di server ini.</div>
+              ) : (
+                galleryGroups.map((group, gIdx) => (
+                  <div key={gIdx} className="space-y-3">
+                    <h3 className="text-xs font-black uppercase text-indigo-500 tracking-widest pl-2 border-l-2 border-indigo-500 flex items-center gap-2">
+                      {group.title} <span className="text-slate-400 font-medium ml-1">({group.images.length} gambar)</span>
+                    </h3>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-3">
+                      {group.images.map((src, idx) => (
+                        <div
+                          key={idx}
+                          onClick={() => handlePickGallery(src)}
+                          className="group relative border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden cursor-pointer hover:border-indigo-500 dark:hover:border-indigo-400 transition-all bg-slate-50 dark:bg-slate-900 flex items-center justify-center p-2 h-24 shadow-sm"
+                        >
+                          <img src={src} alt="Media" className="max-h-full max-w-full object-contain transition-transform group-hover:scale-110" />
+                          <div className="absolute inset-0 bg-indigo-900/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all">
+                            <span className="text-white text-[10px] font-bold bg-indigo-600 px-3 py-1.5 rounded-lg shadow-sm tracking-widest uppercase">Pilih</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+        <Dialog open={isPickerOpen} onOpenChange={setIsPickerOpen}>
+          <DialogContent className="max-w-sm bg-card p-4">
+            <DialogHeader>
+              <DialogTitle className="text-sm font-bold">Pilih Sumber Gambar</DialogTitle>
+            </DialogHeader>
+            <div className="flex flex-col gap-2 pt-2">
+              <button
+                type="button"
+                className="flex items-center gap-2.5 justify-start p-3 w-full rounded-xl bg-slate-50/80 hover:bg-slate-100 dark:bg-slate-900/50 dark:hover:bg-slate-800 border border-slate-200/80 dark:border-slate-800 transition-all text-slate-700 dark:text-slate-200"
+                onClick={() => globalFileInputRef.current?.click()}
+              >
+                <div className="p-2 rounded-lg bg-purple-50 dark:bg-purple-950/40 border border-purple-100 dark:border-purple-800/40 text-purple-600 dark:text-purple-400">
+                  <Image className="h-4 w-4" />
+                </div>
+                <div className="flex flex-col items-start">
+                  <span className="font-semibold text-xs">Unggah Dari Komputer</span>
+                  <span className="text-[10px] text-slate-400">File foto maksimal 2MB</span>
+                </div>
+              </button>
+              <button
+                type="button"
+                className="flex items-center gap-2.5 justify-start p-3 w-full rounded-xl bg-slate-50/80 hover:bg-slate-100 dark:bg-slate-900/50 dark:hover:bg-slate-800 border border-slate-200/80 dark:border-slate-800 transition-all text-slate-700 dark:text-slate-200"
+                onClick={() => { setIsPickerOpen(false); setIsGalleryOpen(true); loadGalleryImages(); }}
+              >
+                <div className="p-2 rounded-lg bg-blue-50 dark:bg-blue-950/40 border border-blue-100 dark:border-blue-800/40 text-blue-600 dark:text-blue-400">
+                  <FolderOpen className="h-4 w-4" />
+                </div>
+                <div className="flex flex-col items-start">
+                  <span className="font-semibold text-xs">Ambil Dari Galeri</span>
+                  <span className="text-[10px] text-slate-400">Gunakan file yang sudah di-upload</span>
+                </div>
+              </button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        <input
+          type="file"
+          ref={globalFileInputRef}
+          accept="image/*"
+          className="hidden"
+          onChange={handleGlobalFileSelect}
+        />
     </div>
   );
 };
