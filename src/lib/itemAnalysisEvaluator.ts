@@ -446,7 +446,7 @@ export function evaluateQuestionVerdict(params: {
       }
     }
 
-    if (qType === "benar_salah" && misleadingStatements.length > 0) {
+    if (["benar_salah", "klasifikasi", "matriks", "isian_rumpang"].includes(qType) && misleadingStatements.length > 0) {
       findings.push(`Pernyataan #${misleadingStatements.map(m => m.index).join(", #")} memiliki daya pembeda negatif (menarik lebih banyak kelompok bawah).`);
     }
 
@@ -477,7 +477,7 @@ export function evaluateQuestionVerdict(params: {
 
   if (isMC) {
     findings.push(`Efektivitas Pengecoh Sempurna: Seluruh ${totalDistractors.length} opsi pengecoh bekerja optimal (DE = 100%).`);
-  } else if (qType === "benar_salah" && statementsAnalysis && statementsAnalysis.length > 0) {
+  } else if (["benar_salah", "klasifikasi", "matriks", "isian_rumpang"].includes(qType) && statementsAnalysis && statementsAnalysis.length > 0) {
     findings.push(`Seluruh ${statementsAnalysis.length} pernyataan terkonfirmasi berfungsi dengan baik dan memiliki daya diskriminasi yang positif.`);
   }
 

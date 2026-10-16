@@ -243,9 +243,14 @@ const StudentScoresDialog = ({ isOpen, onClose, studentId, studentName }: Studen
           ...q,
           type: mappedType,
           choices: mappedType === "menjodohkan" ? undefined : rawOptions,
-          statements: (mappedType === "benar_salah" && Array.isArray(rawOptions.statements))
+          statements: (["benar_salah", "klasifikasi", "matriks"].includes(mappedType) && Array.isArray(rawOptions.statements))
             ? rawOptions.statements
             : (Array.isArray(rawOptions) ? rawOptions : (q.statements || undefined)),
+          categories: mappedType === "klasifikasi" ? (rawOptions.categories || undefined) : undefined,
+          columns: mappedType === "matriks" ? (rawOptions.columns || undefined) : undefined,
+          blanks: mappedType === "isian_rumpang" ? (rawOptions.blanks || undefined) : undefined,
+          areas: mappedType === "hotspot" ? (rawOptions.areas || undefined) : undefined,
+          hotspotMode: mappedType === "hotspot" ? (rawOptions.mode || "any") : undefined,
           pairs: mappedType === "menjodohkan" ? rawOptions.pairs : undefined,
           items: (mappedType === "urutkan" || mappedType === "drag_drop") ? rawOptions.items : undefined,
           answerKey: q.correctAnswer || q.answerKey
@@ -323,6 +328,57 @@ const StudentScoresDialog = ({ isOpen, onClose, studentId, studentName }: Studen
     if (type === "menjodohkan" || type === "matching") {
       const pairs = q.pairs || [];
       return pairs.length > 0 && typeof ans === "object" && ans !== null && pairs.every((p: any) => ans[p.id] === p.right);
+    }
+    if (type === "klasifikasi" || type === "matriks") {
+      const sts = q.statements || (q.choices && q.choices.statements);
+      if (Array.isArray(sts) && sts.length > 0) {
+        if (typeof ans !== "object" || ans === null || Array.isArray(ans)) return false;
+        return sts.every((st: any) => String(ans[st.id] ?? "") === String(st.answer ?? ""));
+      }
+      return false;
+    }
+    if (type === "isian_rumpang" || type === "cloze") {
+      const blanks = q.blanks || (q.choices && q.choices.blanks);
+      if (Array.isArray(blanks) && blanks.length > 0) {
+        if (typeof ans !== "object" || ans === null || Array.isArray(ans)) return false;
+        return blanks.every((bl: any) => {
+          const bid = String(bl.id ?? "");
+          if (!bid) return true;
+          let given = String(ans[bid] ?? "").trim();
+          const cs = bl.caseSensitive === true;
+          if (!cs) given = given.toLowerCase();
+          if (!given) return false;
+          const acc = Array.isArray(bl.answers) ? bl.answers : (bl.answers != null ? [bl.answers] : []);
+          return acc.some((a: any) => {
+            let exp = String(a ?? "").trim();
+            if (!cs) exp = exp.toLowerCase();
+            return exp && given === exp;
+          });
+        });
+      }
+      return false;
+    }
+    if (type === "hotspot") {
+      const areas = q.areas || (q.choices && q.choices.areas) || [];
+      if (!Array.isArray(areas) || areas.length === 0) return false;
+      const inArea = (px: number, py: number, ar: any) => {
+        const ax = Number(ar.x), ay = Number(ar.y), aw = Number(ar.w), ah = Number(ar.h);
+        if (isNaN(ax) || isNaN(ay) || isNaN(aw) || isNaN(ah)) return false;
+        return px >= ax && px <= ax + aw && py >= ay && py <= ay + ah;
+      };
+      const hmode = String(q.hotspotMode || (q.choices && q.choices.mode) || "any").toLowerCase();
+      if (hmode === "all") {
+        const pts = Array.isArray(ans) ? ans : [];
+        return areas.every((ar: any) => pts.some((pt: any) => {
+          const px = Number(pt?.x), py = Number(pt?.y);
+          return !isNaN(px) && !isNaN(py) && inArea(px, py, ar || {});
+        }));
+      } else {
+        if (typeof ans !== "object" || ans === null || Array.isArray(ans)) return false;
+        const hx = Number(ans.x), hy = Number(ans.y);
+        if (isNaN(hx) || isNaN(hy)) return false;
+        return areas.some((ar: any) => inArea(hx, hy, ar || {}));
+      }
     }
     return false;
   };

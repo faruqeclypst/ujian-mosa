@@ -88,7 +88,14 @@ const StudentGradingDetailPage = () => {
           ...q, 
           type: t, 
           choices: opts, 
-          statements: (t === "benar_salah" && Array.isArray(opts.statements)) ? opts.statements : undefined,
+          statements: (["benar_salah", "klasifikasi", "matriks"].includes(t) && Array.isArray(opts.statements)) ? opts.statements : undefined,
+          categories: t === "klasifikasi" ? (opts.categories || []) : undefined,
+          columns: t === "matriks" ? (opts.columns || []) : undefined,
+          blanks: t === "isian_rumpang" ? (opts.blanks || []) : undefined,
+          rumpangText: t === "isian_rumpang" ? (opts.text || "") : undefined,
+          areas: t === "hotspot" ? (opts.areas || []) : undefined,
+          hotspotMode: t === "hotspot" ? (opts.mode || "any") : undefined,
+          hotspotImageUrl: t === "hotspot" ? (opts.imageUrl || "") : undefined,
           pairs: t === "menjodohkan" ? opts.pairs : undefined, 
           items: (t === "urutkan" || t === "drag_drop") ? opts.items : undefined, 
           answerKey: q.correctAnswer || q.answerKey 
@@ -162,6 +169,70 @@ const computeQuestionScore = (q: any, ans: any, overrideVal?: any): number | nul
   if (t === "urutkan" || t === "drag_drop") {
     const co = (q.items || []).map((it: any) => it.id);
     return Array.isArray(ans) && ans.length === co.length && ans.every((v: any, i: number) => v === co[i]) ? 1 : 0;
+  }
+  if (t === "klasifikasi" || t === "matriks") {
+    const kstmts = q.statements || q.choices?.statements || [];
+    if (Array.isArray(kstmts) && kstmts.length > 0 && typeof ans === "object" && ans !== null && !Array.isArray(ans)) {
+      let kCorr = 0;
+      kstmts.forEach((st: any) => {
+        const sid = String(st.id ?? "");
+        if (!sid) return;
+        if (String(ans[sid] ?? "") === String(st.answer ?? "")) kCorr++;
+      });
+      return kCorr / kstmts.length;
+    }
+    return 0;
+  }
+  if (t === "isian_rumpang") {
+    const blanks = q.blanks || q.choices?.blanks || [];
+    if (Array.isArray(blanks) && blanks.length > 0 && typeof ans === "object" && ans !== null && !Array.isArray(ans)) {
+      let bCorr = 0;
+      blanks.forEach((bl: any) => {
+        const bid = String(bl.id ?? "");
+        if (!bid) return;
+        let given = String(ans[bid] ?? "").trim();
+        const cs = bl.caseSensitive === true;
+        if (!cs) given = given.toLowerCase();
+        if (!given) return;
+        const acc = Array.isArray(bl.answers) ? bl.answers : (bl.answers != null ? [bl.answers] : []);
+        for (const ac of acc) {
+          let exp = String(ac ?? "").trim();
+          if (!cs) exp = exp.toLowerCase();
+          if (exp && given === exp) { bCorr++; break; }
+        }
+      });
+      return bCorr / blanks.length;
+    }
+    return 0;
+  }
+  if (t === "hotspot") {
+    const areas = q.areas || q.choices?.areas || [];
+    const hmode = String(q.hotspotMode || q.choices?.mode || "any").toLowerCase();
+    const inArea = (px: number, py: number, ar: any) => {
+      const ax = Number(ar.x), ay = Number(ar.y), aw = Number(ar.w), ah = Number(ar.h);
+      if (isNaN(ax) || isNaN(ay) || isNaN(aw) || isNaN(ah)) return false;
+      return px >= ax && px <= ax + aw && py >= ay && py <= ay + ah;
+    };
+    if (Array.isArray(areas) && areas.length > 0) {
+      if (hmode === "all") {
+        const pts = Array.isArray(ans) ? ans : [];
+        let hit = 0;
+        for (const ar of areas) {
+          for (const pt of pts) {
+            const px = Number(pt?.x), py = Number(pt?.y);
+            if (!isNaN(px) && !isNaN(py) && inArea(px, py, ar || {})) { hit++; break; }
+          }
+        }
+        return hit / areas.length;
+      } else {
+        let hx = NaN, hy = NaN;
+        if (ans !== null && typeof ans === "object" && !Array.isArray(ans)) { hx = Number(ans.x); hy = Number(ans.y); }
+        if (isNaN(hx) || isNaN(hy)) return 0;
+        for (const ar of areas) { if (inArea(hx, hy, ar || {})) return 1; }
+        return 0;
+      }
+    }
+    return 0;
   }
   if (t === "isian_singkat") {
     return isFuzzyMatch(ans, q.answerKey) ? 1 : 0;
@@ -371,6 +442,7 @@ const computeQuestionScore = (q: any, ans: any, overrideVal?: any): number | nul
     const typeLabels: Record<string, string> = {
       pilihan_ganda: "PG", pilihan_ganda_kompleks: "PG Kompleks", menjodohkan: "Menjodohkan",
       benar_salah: "B/S", isian_singkat: "Isian", uraian: "Uraian", urutkan: "Urutan", drag_drop: "Drag & Drop",
+      klasifikasi: "Klasifikasi", matriks: "Matriks", isian_rumpang: "Isian Rumpang", hotspot: "Hotspot",
     };
 
     const getAnswerText = (q: any) => {
@@ -394,6 +466,36 @@ const computeQuestionScore = (q: any, ans: any, overrideVal?: any): number | nul
       if (q.type === "pilihan_ganda_kompleks") return Array.isArray(ans) ? ans.map((k: string) => k.toUpperCase()).join(", ") : String(ans);
       if (q.type === "menjodohkan") { const pairs = q.pairs || []; return pairs.map((p: any) => `${p.left} → ${ans[p.id] || "?"}`).join("<br>"); }
       if (q.type === "urutkan" || q.type === "drag_drop") return Array.isArray(ans) ? ans.map((id: string, i: number) => `${i + 1}. ${(q.items || []).find((it: any) => it.id === id)?.text || id}`).join("<br>") : String(ans);
+      if (q.type === "klasifikasi" || q.type === "matriks") {
+        const stmts = q.statements || q.choices?.statements || [];
+        const cats = q.type === "klasifikasi" ? (q.categories || q.choices?.categories || []) : (q.columns || q.choices?.columns || []);
+        const catMap: Record<string, string> = {};
+        if (Array.isArray(cats)) cats.forEach((c: any) => { catMap[String(c.id)] = String(c.text || c.id); });
+        if (Array.isArray(stmts) && stmts.length > 0 && typeof ans === "object" && ans !== null) {
+          return stmts.map((st: any) => {
+            const userVal = ans?.[st.id];
+            return `${stripHtml(st.text).substring(0, 35)}: ${userVal ? stripHtml(catMap[String(userVal)] || String(userVal)).substring(0, 30) : '<em>-</em>'}`;
+          }).join("<br>");
+        }
+        return String(ans).substring(0, 200);
+      }
+      if (q.type === "isian_rumpang") {
+        const blanks = q.blanks || q.choices?.blanks || [];
+        if (Array.isArray(blanks) && blanks.length > 0 && typeof ans === "object" && ans !== null) {
+          return blanks.map((bl: any, idx: number) => `[${idx + 1}]: ${stripHtml(String(ans?.[bl.id] ?? "-")).substring(0, 40) || '<em>-</em>'}`).join("<br>");
+        }
+        return String(ans).substring(0, 200);
+      }
+      if (q.type === "hotspot") {
+        const hmode = String(q.hotspotMode || q.choices?.mode || "any").toLowerCase();
+        if (hmode === "all" && Array.isArray(ans)) {
+          return ans.map((pt: any, i: number) => `Titik ${i + 1}: (${Math.round(Number(pt?.x) || 0)}%, ${Math.round(Number(pt?.y) || 0)}%)`).join("<br>");
+        }
+        if (ans && typeof ans === "object") {
+          return `Klik di (${Math.round(Number(ans.x) || 0)}%, ${Math.round(Number(ans.y) || 0)}%)`;
+        }
+        return String(ans).substring(0, 200);
+      }
       return String(ans).substring(0, 200);
     };
 
@@ -417,6 +519,34 @@ const computeQuestionScore = (q: any, ans: any, overrideVal?: any): number | nul
       if (q.type === "pilihan_ganda_kompleks") return Object.keys(q.choices || {}).filter(k => q.choices[k].isCorrect).map(k => k.toUpperCase()).join(", ");
       if (q.type === "menjodohkan") return (q.pairs || []).map((p: any) => `${p.left} → ${p.right}`).join("<br>");
       if (q.type === "urutkan" || q.type === "drag_drop") return (q.items || []).map((it: any, i: number) => `${i + 1}. ${it.text}`).join("<br>");
+      if (q.type === "klasifikasi" || q.type === "matriks") {
+        const stmts = q.statements || q.choices?.statements || [];
+        const cats = q.type === "klasifikasi" ? (q.categories || q.choices?.categories || []) : (q.columns || q.choices?.columns || []);
+        const catMap: Record<string, string> = {};
+        if (Array.isArray(cats)) cats.forEach((c: any) => { catMap[String(c.id)] = String(c.text || c.id); });
+        if (Array.isArray(stmts) && stmts.length > 0) {
+          return stmts.map((st: any) => `${stripHtml(st.text).substring(0, 35)}: ${stripHtml(catMap[String(st.answer)] || String(st.answer || "-")).substring(0, 30)}`).join("<br>");
+        }
+        return "-";
+      }
+      if (q.type === "isian_rumpang") {
+        const blanks = q.blanks || q.choices?.blanks || [];
+        if (Array.isArray(blanks) && blanks.length > 0) {
+          return blanks.map((bl: any, idx: number) => {
+            const acc = Array.isArray(bl.answers) ? bl.answers : (bl.answers != null ? [bl.answers] : []);
+            return `[${idx + 1}]: ${acc.map((a: any) => String(a)).join(" / ") || "-"}`;
+          }).join("<br>");
+        }
+        return "-";
+      }
+      if (q.type === "hotspot") {
+        const areas = q.areas || q.choices?.areas || [];
+        const hmode = String(q.hotspotMode || q.choices?.mode || "any").toLowerCase();
+        if (Array.isArray(areas) && areas.length > 0) {
+          return `${areas.length} area (${hmode === "all" ? "semua" : "satu saja"})` + areas.map((ar: any, i: number) => `<br>Area ${i + 1}${ar.label ? ` (${stripHtml(String(ar.label)).substring(0, 30)})` : ""}: x=${ar.x}%, y=${ar.y}%, ${ar.w}%×${ar.h}%`).join("");
+        }
+        return "-";
+      }
       return (q.answerKey || "-").substring(0, 200);
     };
 
@@ -611,6 +741,123 @@ const computeQuestionScore = (q: any, ans: any, overrideVal?: any): number | nul
         return stripHtml(item?.text || id);
       }).join(" → ") : String(ans);
     }
+    if (q.type === "klasifikasi" || q.type === "matriks") {
+      const stmts = q.statements || q.choices?.statements || [];
+      const cats = q.type === "klasifikasi" ? (q.categories || q.choices?.categories || []) : (q.columns || q.choices?.columns || []);
+      const catMap: Record<string, string> = {};
+      if (Array.isArray(cats)) cats.forEach((c: any) => { catMap[String(c.id)] = String(c.text || c.id); });
+      if (Array.isArray(stmts) && stmts.length > 0 && typeof ans === "object" && ans !== null) {
+        return (
+          <div className="space-y-1.5 my-0.5">
+            {stmts.map((st: any) => {
+              const userVal = ans?.[st.id];
+              const expected = String(st.answer ?? "");
+              const isMatch = userVal !== undefined && String(userVal) === expected && userVal !== "";
+              return (
+                <div key={st.id} className="text-[11px] flex items-start justify-between gap-2 border-b border-slate-100 dark:border-slate-800/60 pb-1 last:border-0 last:pb-0">
+                  <div className="flex-1 text-slate-700 dark:text-slate-300">
+                    <MathText content={st.text} className="inline text-[11px] [&_p]:inline [&_p]:m-0" />
+                  </div>
+                  <div className="shrink-0 flex items-center gap-1">
+                    {userVal ? (
+                      <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-slate-50 text-slate-700 border border-slate-200 dark:bg-slate-800/40 dark:text-slate-300">
+                        {stripHtml(catMap[String(userVal)] || String(userVal)).substring(0, 25)}
+                      </span>
+                    ) : (
+                      <span className="text-slate-400 italic text-[10px]">-</span>
+                    )}
+                    {userVal && (isMatch ? <span className="text-emerald-500 font-bold text-[11px]">✓</span> : <span className="text-rose-500 font-bold text-[11px]">✗</span>)}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        );
+      }
+      return <span className="text-slate-300 italic">Tidak dijawab</span>;
+    }
+    if (q.type === "isian_rumpang") {
+      const blanks = q.blanks || q.choices?.blanks || [];
+      if (Array.isArray(blanks) && blanks.length > 0 && typeof ans === "object" && ans !== null) {
+        return (
+          <div className="space-y-1.5 my-0.5">
+            {blanks.map((bl: any, idx: number) => {
+              const bid = String(bl.id ?? idx);
+              const given = String(ans?.[bid] ?? "").trim();
+              const cs = bl.caseSensitive === true;
+              const givenCmp = cs ? given : given.toLowerCase();
+              const acc = Array.isArray(bl.answers) ? bl.answers : (bl.answers != null ? [bl.answers] : []);
+              let isMatch = false;
+              if (given) {
+                for (const a of acc) {
+                  const expCmp = cs ? String(a ?? "").trim() : String(a ?? "").trim().toLowerCase();
+                  if (expCmp && givenCmp === expCmp) { isMatch = true; break; }
+                }
+              }
+              return (
+                <div key={bid} className="text-[11px] flex items-start justify-between gap-2 border-b border-slate-100 dark:border-slate-800/60 pb-1 last:border-0 last:pb-0">
+                  <span className="text-slate-500 dark:text-slate-400 font-mono">[{idx + 1}]</span>
+                  <div className="flex-1 text-slate-700 dark:text-slate-300 font-medium">{given || <span className="text-slate-400 italic">-</span>}</div>
+                  <div className="shrink-0">
+                    {given && (isMatch ? <span className="text-emerald-500 font-bold text-[11px]">✓</span> : <span className="text-rose-500 font-bold text-[11px]">✗</span>)}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        );
+      }
+      return <span className="text-slate-300 italic">Tidak dijawab</span>;
+    }
+    if (q.type === "hotspot") {
+      const hmode = String(q.hotspotMode || q.choices?.mode || "any").toLowerCase();
+      const areas = q.areas || q.choices?.areas || [];
+      const inArea = (px: number, py: number, ar: any) => {
+        const ax = Number(ar.x), ay = Number(ar.y), aw = Number(ar.w), ah = Number(ar.h);
+        if (isNaN(ax) || isNaN(ay) || isNaN(aw) || isNaN(ah)) return false;
+        return px >= ax && px <= ax + aw && py >= ay && py <= ay + ah;
+      };
+      if (hmode === "all" && Array.isArray(ans)) {
+        let hitCount = 0;
+        const areaHits = (Array.isArray(areas) ? areas : []).map((ar: any) => {
+          const hit = ans.some((pt: any) => {
+            const px = Number(pt?.x), py = Number(pt?.y);
+            return !isNaN(px) && !isNaN(py) && inArea(px, py, ar || {});
+          });
+          if (hit) hitCount++;
+          return hit;
+        });
+        return (
+          <div className="text-[11px] space-y-1">
+            <div className="font-medium text-slate-700 dark:text-slate-300">{ans.length} titik diklik — {hitCount}/{areas.length} area kena</div>
+            <div className="flex flex-wrap gap-1">
+              {ans.map((pt: any, i: number) => (
+                <span key={i} className="px-1.5 py-0.2 rounded text-[10px] font-mono bg-slate-50 text-slate-600 border border-slate-200 dark:bg-slate-800/40 dark:text-slate-300">
+                  ({Math.round(Number(pt?.x) || 0)}%, {Math.round(Number(pt?.y) || 0)}%)
+                </span>
+              ))}
+            </div>
+          </div>
+        );
+      }
+      if (ans && typeof ans === "object" && !Array.isArray(ans)) {
+        const hx = Number(ans.x), hy = Number(ans.y);
+        let hitLabel = "";
+        if (!isNaN(hx) && !isNaN(hy) && Array.isArray(areas)) {
+          const hitAr = areas.find((ar: any) => inArea(hx, hy, ar || {}));
+          hitLabel = hitAr ? (hitAr.label || "area target") : "";
+        }
+        return (
+          <div className="text-[11px]">
+            <span className="font-mono bg-slate-50 text-slate-600 border border-slate-200 dark:bg-slate-800/40 dark:text-slate-300 px-1.5 py-0.2 rounded text-[10px]">
+              ({Math.round(hx || 0)}%, {Math.round(hy || 0)}%)
+            </span>
+            {hitLabel && <span className="ml-1 text-emerald-600 font-bold">✓ {stripHtml(hitLabel).substring(0, 30)}</span>}
+          </div>
+        );
+      }
+      return <span className="text-slate-300 italic">Tidak dijawab</span>;
+    }
     return String(ans);
   };
 
@@ -661,6 +908,64 @@ const computeQuestionScore = (q: any, ans: any, overrideVal?: any): number | nul
     }
     if (q.type === "urutkan" || q.type === "drag_drop") {
       return (q.items || []).map((it: any) => stripHtml(it.text)).join(" → ");
+    }
+    if (q.type === "klasifikasi" || q.type === "matriks") {
+      const stmts = q.statements || q.choices?.statements || [];
+      const cats = q.type === "klasifikasi" ? (q.categories || q.choices?.categories || []) : (q.columns || q.choices?.columns || []);
+      const catMap: Record<string, string> = {};
+      if (Array.isArray(cats)) cats.forEach((c: any) => { catMap[String(c.id)] = String(c.text || c.id); });
+      if (Array.isArray(stmts) && stmts.length > 0) {
+        return (
+          <div className="space-y-1.5 my-0.5">
+            {stmts.map((st: any) => (
+              <div key={st.id} className="text-[11px] flex items-start justify-between gap-2 border-b border-slate-100 dark:border-slate-800/60 pb-1 last:border-0 last:pb-0">
+                <div className="flex-1 text-slate-500 dark:text-slate-400">
+                  <MathText content={st.text} className="inline text-[11px] [&_p]:inline [&_p]:m-0" />
+                </div>
+                <span className="px-1.5 py-0.2 rounded text-[10px] font-bold shrink-0 bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400">
+                  {stripHtml(catMap[String(st.answer)] || String(st.answer || "-")).substring(0, 25)}
+                </span>
+              </div>
+            ))}
+          </div>
+        );
+      }
+      return "-";
+    }
+    if (q.type === "isian_rumpang") {
+      const blanks = q.blanks || q.choices?.blanks || [];
+      if (Array.isArray(blanks) && blanks.length > 0) {
+        return (
+          <div className="space-y-1 my-0.5">
+            {blanks.map((bl: any, idx: number) => {
+              const acc = Array.isArray(bl.answers) ? bl.answers : (bl.answers != null ? [bl.answers] : []);
+              return (
+                <div key={String(bl.id ?? idx)} className="text-[11px] text-slate-500 dark:text-slate-400">
+                  <span className="font-mono">[{idx + 1}]</span> <span className="font-medium text-emerald-700 dark:text-emerald-400">{acc.map((a: any) => String(a)).join(" / ") || "-"}</span>
+                </div>
+              );
+            })}
+          </div>
+        );
+      }
+      return "-";
+    }
+    if (q.type === "hotspot") {
+      const areas = q.areas || q.choices?.areas || [];
+      const hmode = String(q.hotspotMode || q.choices?.mode || "any").toLowerCase();
+      if (Array.isArray(areas) && areas.length > 0) {
+        return (
+          <div className="text-[11px] text-slate-500 dark:text-slate-400 space-y-1">
+            <div className="font-medium">{areas.length} area target ({hmode === "all" ? "klik semua" : "klik satu saja"})</div>
+            {areas.map((ar: any, i: number) => (
+              <div key={String(ar.id ?? i)}>
+                Area {i + 1}{ar.label ? `: ${stripHtml(String(ar.label)).substring(0, 30)}` : ""} <span className="font-mono text-[10px]">(x={ar.x}%, y={ar.y}%, {ar.w}%×{ar.h}%)</span>
+              </div>
+            ))}
+          </div>
+        );
+      }
+      return "-";
     }
     if (q.type === "isian_singkat" || q.type === "uraian") {
       return <MathText content={q.answerKey || "-"} className="inline text-xs [&_p]:inline [&_p]:m-0 [&_img]:hidden" />;
@@ -785,6 +1090,10 @@ const computeQuestionScore = (q: any, ans: any, overrideVal?: any): number | nul
                     uraian: "Uraian",
                     urutkan: "Urut",
                     drag_drop: "D&D",
+                    klasifikasi: "Klas",
+                    matriks: "Matriks",
+                    isian_rumpang: "Rumpang",
+                    hotspot: "Hotspot",
                   };
                   const typeColors: Record<string, string> = {
                     pilihan_ganda: "bg-blue-50 text-blue-600 border-blue-100 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-800/30",
@@ -795,6 +1104,10 @@ const computeQuestionScore = (q: any, ans: any, overrideVal?: any): number | nul
                     uraian: "bg-pink-50 text-pink-600 border-pink-100 dark:bg-pink-950/30 dark:text-pink-400 dark:border-pink-800/30",
                     urutkan: "bg-teal-50 text-teal-600 border-teal-100 dark:bg-teal-950/30 dark:text-teal-400 dark:border-teal-800/30",
                     drag_drop: "bg-orange-50 text-orange-600 border-orange-100 dark:bg-orange-950/30 dark:text-orange-400 dark:border-orange-800/30",
+                    klasifikasi: "bg-violet-50 text-violet-600 border-violet-200 dark:bg-violet-950/30 dark:text-violet-400 dark:border-violet-800/40",
+                    matriks: "bg-teal-50 text-teal-600 border-teal-200 dark:bg-teal-950/30 dark:text-teal-400 dark:border-teal-800/40",
+                    isian_rumpang: "bg-lime-50 text-lime-700 border-lime-200 dark:bg-lime-950/30 dark:text-lime-400 dark:border-lime-800/40",
+                    hotspot: "bg-sky-50 text-sky-600 border-sky-200 dark:bg-sky-950/30 dark:text-sky-400 dark:border-sky-800/40",
                   };
 
                   const bankIdx = bankQuestions.findIndex(x => x.id === q.id);

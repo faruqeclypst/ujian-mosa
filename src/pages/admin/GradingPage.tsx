@@ -62,8 +62,13 @@ const GradingPage = () => {
       const mapped = qList.map(q => {
         const t = typeMap[q.field || q.type] || q.field || q.type || "pilihan_ganda";
         const opts = q.options || {};
-        const statements = t === "benar_salah" ? (opts.statements || []) : undefined;
-        return { ...q, type: t, choices: opts, pairs: t === "menjodohkan" ? opts.pairs : undefined, items: (t === "urutkan" || t === "drag_drop") ? opts.items : undefined, statements, answerKey: q.correctAnswer || q.answerKey };
+        const statements = (t === "benar_salah" || t === "klasifikasi" || t === "matriks") ? (opts.statements || []) : undefined;
+        const categories = t === "klasifikasi" ? (opts.categories || []) : undefined;
+        const columns = t === "matriks" ? (opts.columns || []) : undefined;
+        const blanks = t === "isian_rumpang" ? (opts.blanks || []) : undefined;
+        const areas = t === "hotspot" ? (opts.areas || []) : undefined;
+        const hotspotMode = t === "hotspot" ? (opts.mode || "any") : undefined;
+        return { ...q, type: t, choices: opts, pairs: t === "menjodohkan" ? opts.pairs : undefined, items: (t === "urutkan" || t === "drag_drop") ? opts.items : undefined, statements, categories, columns, blanks, areas, hotspotMode, answerKey: q.correctAnswer || q.answerKey };
       });
       setQuestions(mapped.sort((a: any, b: any) => {
         const aIsEssay = a.type === "isian_singkat" || a.type === "uraian";
@@ -135,6 +140,67 @@ const GradingPage = () => {
         }
         else if (t === "menjodohkan") { const pairs = q.pairs||[]; qScore = pairs.length>0 && pairs.every((p:any)=>a[p.id]===p.right) ? 1 : 0; }
         else if (t === "urutkan" || t === "drag_drop") { const co = (q.items||[]).map((it:any)=>it.id); qScore = Array.isArray(a) && a.length===co.length && a.every((v:any,i:number)=>v===co[i]) ? 1 : 0; }
+        else if (t === "klasifikasi" || t === "matriks") {
+          const kstmts = q.statements || q.choices?.statements || [];
+          if (kstmts.length > 0 && a !== null && typeof a === "object" && !Array.isArray(a)) {
+            let kCorr = 0;
+            kstmts.forEach((st: any) => {
+              const sid = String(st.id ?? "");
+              if (!sid) return;
+              if (String(a[sid] ?? "") === String(st.answer ?? "")) kCorr++;
+            });
+            qScore = kCorr / kstmts.length;
+          }
+        }
+        else if (t === "isian_rumpang") {
+          const blanks = q.blanks || q.choices?.blanks || [];
+          if (blanks.length > 0 && a !== null && typeof a === "object" && !Array.isArray(a)) {
+            let bCorr = 0;
+            blanks.forEach((bl: any) => {
+              const bid = String(bl.id ?? "");
+              if (!bid) return;
+              let given = String(a[bid] ?? "").trim();
+              const cs = bl.caseSensitive === true;
+              if (!cs) given = given.toLowerCase();
+              if (!given) return;
+              const acc = Array.isArray(bl.answers) ? bl.answers : (bl.answers != null ? [bl.answers] : []);
+              for (const ac of acc) {
+                let exp = String(ac ?? "").trim();
+                if (!cs) exp = exp.toLowerCase();
+                if (exp && given === exp) { bCorr++; break; }
+              }
+            });
+            qScore = bCorr / blanks.length;
+          }
+        }
+        else if (t === "hotspot") {
+          const areas = q.areas || q.choices?.areas || [];
+          const hmode = String(q.hotspotMode || q.choices?.mode || "any").toLowerCase();
+          const inArea = (px: number, py: number, ar: any) => {
+            const ax = Number(ar.x), ay = Number(ar.y), aw = Number(ar.w), ah = Number(ar.h);
+            if (isNaN(ax) || isNaN(ay) || isNaN(aw) || isNaN(ah)) return false;
+            return px >= ax && px <= ax + aw && py >= ay && py <= ay + ah;
+          };
+          if (areas.length > 0) {
+            if (hmode === "all") {
+              const pts = Array.isArray(a) ? a : [];
+              let hit = 0;
+              for (const ar of areas) {
+                for (const pt of pts) {
+                  const px = Number(pt?.x), py = Number(pt?.y);
+                  if (!isNaN(px) && !isNaN(py) && inArea(px, py, ar || {})) { hit++; break; }
+                }
+              }
+              qScore = hit / areas.length;
+            } else {
+              let hx = NaN, hy = NaN;
+              if (a !== null && typeof a === "object" && !Array.isArray(a)) { hx = Number(a.x); hy = Number(a.y); }
+              if (!isNaN(hx) && !isNaN(hy)) {
+                for (const ar of areas) { if (inArea(hx, hy, ar || {})) { qScore = 1; break; } }
+              }
+            }
+          }
+        }
       }
       objCorrect += qScore;
     });

@@ -260,7 +260,11 @@ export const ItemAnalysisDialog: React.FC<ItemAnalysisDialogProps> = ({
           choices: choicesObj,
           pairs: mappedType === "menjodohkan" ? (options.pairs || q.pairs) : undefined,
           items: (mappedType === "urutkan" || mappedType === "drag_drop") ? (options.items || q.items) : undefined,
-          statements: mappedType === "benar_salah" ? (options.statements || q.statements) : undefined,
+          statements: ["benar_salah", "klasifikasi", "matriks"].includes(mappedType) ? (options.statements || q.statements) : undefined,
+          categories: mappedType === "klasifikasi" ? (options.categories || undefined) : undefined,
+          columns: mappedType === "matriks" ? (options.columns || undefined) : undefined,
+          blanks: mappedType === "isian_rumpang" ? (options.blanks || undefined) : undefined,
+          areas: mappedType === "hotspot" ? (options.areas || undefined) : undefined,
           options: options,
           answerKey: ansKey || undefined,
         };
@@ -340,6 +344,58 @@ export const ItemAnalysisDialog: React.FC<ItemAnalysisDialogProps> = ({
               const co = (q.items || []).map((it: any) => it.id);
               isCorrect = Array.isArray(rawAns) && rawAns.length === co.length && rawAns.every((v: string, i: number) => v === co[i]);
               selectedKey = isCorrect ? "BENAR" : "SALAH";
+            } else if (q.type === "klasifikasi" || q.type === "matriks") {
+              const ksts = (q as any).statements || (q as any).options?.statements || [];
+              if (ksts.length > 0 && typeof rawAns === "object" && rawAns !== null && !Array.isArray(rawAns)) {
+                isCorrect = ksts.every((st: any) => String(rawAns[st.id] ?? "") === String(st.answer ?? ""));
+                selectedKey = isCorrect ? "BENAR" : "SALAH";
+              } else {
+                selectedKey = "-";
+              }
+            } else if (q.type === "isian_rumpang") {
+              const rblanks = (q as any).blanks || (q as any).options?.blanks || [];
+              if (rblanks.length > 0 && typeof rawAns === "object" && rawAns !== null && !Array.isArray(rawAns)) {
+                isCorrect = rblanks.every((bl: any) => {
+                  const bid = String(bl.id ?? "");
+                  if (!bid) return true;
+                  let given = String(rawAns[bid] ?? "").trim();
+                  const cs = bl.caseSensitive === true;
+                  if (!cs) given = given.toLowerCase();
+                  if (!given) return false;
+                  const acc = Array.isArray(bl.answers) ? bl.answers : (bl.answers != null ? [bl.answers] : []);
+                  return acc.some((a: any) => {
+                    let exp = String(a ?? "").trim();
+                    if (!cs) exp = exp.toLowerCase();
+                    return exp && given === exp;
+                  });
+                });
+                selectedKey = isCorrect ? "BENAR" : "SALAH";
+              } else {
+                selectedKey = "-";
+              }
+            } else if (q.type === "hotspot") {
+              const hareas = (q as any).areas || (q as any).options?.areas || [];
+              const hmode = String((q as any).options?.mode || "any").toLowerCase();
+              const inAr = (px: number, py: number, ar: any) => {
+                const ax = Number(ar.x), ay = Number(ar.y), aw = Number(ar.w), ah = Number(ar.h);
+                if (isNaN(ax) || isNaN(ay) || isNaN(aw) || isNaN(ah)) return false;
+                return px >= ax && px <= ax + aw && py >= ay && py <= ay + ah;
+              };
+              if (hareas.length > 0) {
+                if (hmode === "all") {
+                  const pts = Array.isArray(rawAns) ? rawAns : [];
+                  isCorrect = hareas.every((ar: any) => pts.some((pt: any) => {
+                    const px = Number(pt?.x), py = Number(pt?.y);
+                    return !isNaN(px) && !isNaN(py) && inAr(px, py, ar || {});
+                  }));
+                } else if (typeof rawAns === "object" && rawAns !== null && !Array.isArray(rawAns)) {
+                  const hx = Number(rawAns.x), hy = Number(rawAns.y);
+                  isCorrect = !isNaN(hx) && !isNaN(hy) && hareas.some((ar: any) => inAr(hx, hy, ar || {}));
+                }
+                selectedKey = isCorrect ? "BENAR" : "SALAH";
+              } else {
+                selectedKey = "-";
+              }
             }
           }
 
@@ -1127,9 +1183,15 @@ export const ItemAnalysisDialog: React.FC<ItemAnalysisDialogProps> = ({
                     <option value="pilihan_ganda">Pilihan Ganda</option>
                     <option value="pilihan_ganda_kompleks">PG Kompleks</option>
                     <option value="menjodohkan">Menjodohkan</option>
+                    <option value="benar_salah">Benar / Salah</option>
                     <option value="isian_singkat">Isian Singkat</option>
                     <option value="uraian">Uraian</option>
                     <option value="urutkan">Urutkan</option>
+                    <option value="drag_drop">Drag & Drop</option>
+                    <option value="klasifikasi">Klasifikasi</option>
+                    <option value="matriks">Matriks</option>
+                    <option value="isian_rumpang">Isian Rumpang</option>
+                    <option value="hotspot">Hotspot</option>
                   </select>
                 </div>
               </div>

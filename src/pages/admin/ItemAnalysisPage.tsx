@@ -493,8 +493,8 @@ export const ItemAnalysisPage: React.FC = () => {
           }
         }
 
-        // Ekstraksi terstandar untuk pernyataan benar / salah
-        const statementsArr = (mappedType === "benar_salah" || hasStatements)
+        // Ekstraksi terstandar untuk pernyataan benar / salah / klasifikasi / matriks
+        const statementsArr = (["benar_salah", "klasifikasi", "matriks"].includes(mappedType) || hasStatements)
           ? (Array.isArray(rawStatements) ? rawStatements : (Array.isArray(rawOptions) ? rawOptions : [])).map((st: any, sIdx: number) => ({
               id: String(st.id || sIdx + 1),
               text: st.text || st.statement || st.title || "",
@@ -514,6 +514,10 @@ export const ItemAnalysisPage: React.FC = () => {
           pairs: mappedType === "menjodohkan" ? (rawOptions.pairs || q.pairs) : undefined,
           items: (mappedType === "urutkan" || mappedType === "drag_drop") ? (rawOptions.items || q.items) : undefined,
           statements: statementsArr,
+          categories: mappedType === "klasifikasi" ? (rawOptions.categories || undefined) : undefined,
+          columns: mappedType === "matriks" ? (rawOptions.columns || undefined) : undefined,
+          blanks: mappedType === "isian_rumpang" ? (rawOptions.blanks || undefined) : undefined,
+          areas: mappedType === "hotspot" ? (rawOptions.areas || undefined) : undefined,
           options: rawOptions,
           answerKey: ansKey || undefined,
         };
@@ -661,6 +665,64 @@ export const ItemAnalysisPage: React.FC = () => {
               const co = (q.items || []).map((it: any) => it.id);
               isCorrect = Array.isArray(rawAns) && rawAns.length === co.length && rawAns.every((v: string, i: number) => v === co[i]);
               selectedKey = isCorrect ? "BENAR" : "SALAH";
+            } else if (q.type === "klasifikasi" || q.type === "matriks") {
+              const ksts = q.statements || [];
+              if (ksts.length > 0 && typeof rawAns === "object" && rawAns !== null && !Array.isArray(rawAns)) {
+                let kCorr = 0;
+                const kMap: Record<string, string> = {};
+                ksts.forEach((st: any) => {
+                  const sid = String(st.id ?? "");
+                  const given = String(rawAns[sid] ?? "");
+                  kMap[sid] = given;
+                  if (given === String(st.answer ?? "")) kCorr++;
+                });
+                isCorrect = kCorr === ksts.length;
+                statementAnswers = kMap;
+                selectedKey = isCorrect ? "BENAR" : "SALAH";
+              }
+            } else if (q.type === "isian_rumpang") {
+              const rblanks = q.blanks || q.options?.blanks || [];
+              if (rblanks.length > 0 && typeof rawAns === "object" && rawAns !== null && !Array.isArray(rawAns)) {
+                let bCorr = 0;
+                const bMap: Record<string, string> = {};
+                rblanks.forEach((bl: any) => {
+                  const bid = String(bl.id ?? "");
+                  const given = String(rawAns[bid] ?? "").trim();
+                  bMap[bid] = given;
+                  const cs = bl.caseSensitive === true;
+                  const givenCmp = cs ? given : given.toLowerCase();
+                  if (!givenCmp) return;
+                  const acc = Array.isArray(bl.answers) ? bl.answers : (bl.answers != null ? [bl.answers] : []);
+                  for (const a of acc) {
+                    const expCmp = cs ? String(a ?? "").trim() : String(a ?? "").trim().toLowerCase();
+                    if (expCmp && givenCmp === expCmp) { bCorr++; break; }
+                  }
+                });
+                isCorrect = bCorr === rblanks.length;
+                statementAnswers = bMap;
+                selectedKey = isCorrect ? "BENAR" : "SALAH";
+              }
+            } else if (q.type === "hotspot") {
+              const hareas = q.areas || q.options?.areas || [];
+              const hmode = String(q.options?.mode || "any").toLowerCase();
+              const inAr = (px: number, py: number, ar: any) => {
+                const ax = Number(ar.x), ay = Number(ar.y), aw = Number(ar.w), ah = Number(ar.h);
+                if (isNaN(ax) || isNaN(ay) || isNaN(aw) || isNaN(ah)) return false;
+                return px >= ax && px <= ax + aw && py >= ay && py <= ay + ah;
+              };
+              if (hareas.length > 0) {
+                if (hmode === "all") {
+                  const pts = Array.isArray(rawAns) ? rawAns : [];
+                  isCorrect = hareas.every((ar: any) => pts.some((pt: any) => {
+                    const px = Number(pt?.x), py = Number(pt?.y);
+                    return !isNaN(px) && !isNaN(py) && inAr(px, py, ar || {});
+                  }));
+                } else if (typeof rawAns === "object" && rawAns !== null && !Array.isArray(rawAns)) {
+                  const hx = Number(rawAns.x), hy = Number(rawAns.y);
+                  isCorrect = !isNaN(hx) && !isNaN(hy) && hareas.some((ar: any) => inAr(hx, hy, ar || {}));
+                }
+                selectedKey = isCorrect ? "BENAR" : "SALAH";
+              }
             }
           }
 
@@ -727,9 +789,13 @@ export const ItemAnalysisPage: React.FC = () => {
           upperBenar: number;
           lowerBenar: number;
         }> = {};
-        if (q.type === "benar_salah" && q.statements && q.statements.length > 0) {
-          q.statements.forEach((st: any) => {
-            stStats[st.id] = { totalBenar: 0, totalSalah: 0, upperBenar: 0, lowerBenar: 0 };
+        const hasSubItems = ["benar_salah", "klasifikasi", "matriks", "isian_rumpang"].includes(q.type) && (
+          (q.statements && q.statements.length > 0) || (q.blanks && q.blanks.length > 0)
+        );
+        if (hasSubItems) {
+          const subItems = q.type === "isian_rumpang" ? (q.blanks || q.options?.blanks || []) : (q.statements || []);
+          subItems.forEach((st: any) => {
+            stStats[String(st.id)] = { totalBenar: 0, totalSalah: 0, upperBenar: 0, lowerBenar: 0 };
           });
         }
 
@@ -751,11 +817,28 @@ export const ItemAnalysisPage: React.FC = () => {
                   choiceCounts[k].total++;
                 }
               });
-            } else if (q.type === "benar_salah" && res.statementAnswers && q.statements) {
-              q.statements.forEach((st: any) => {
-                const ans = res.statementAnswers![st.id];
-                if (ans === "benar") stStats[st.id].totalBenar++;
-                else if (ans === "salah") stStats[st.id].totalSalah++;
+            } else if (["benar_salah", "klasifikasi", "matriks", "isian_rumpang"].includes(q.type) && res.statementAnswers) {
+              const subItems = q.type === "isian_rumpang" ? (q.blanks || q.options?.blanks || []) : (q.statements || []);
+              subItems.forEach((st: any) => {
+                const sid = String(st.id);
+                const ans = res.statementAnswers![sid];
+                if (q.type === "benar_salah") {
+                  if (ans === "benar") stStats[sid].totalBenar++;
+                  else if (ans === "salah") stStats[sid].totalSalah++;
+                } else if (q.type === "isian_rumpang") {
+                  const cs = st.caseSensitive === true;
+                  const givenCmp = cs ? String(ans ?? "").trim() : String(ans ?? "").trim().toLowerCase();
+                  const acc = Array.isArray(st.answers) ? st.answers : (st.answers != null ? [st.answers] : []);
+                  const isMatch = givenCmp && acc.some((a: any) => {
+                    const expCmp = cs ? String(a ?? "").trim() : String(a ?? "").trim().toLowerCase();
+                    return expCmp && givenCmp === expCmp;
+                  });
+                  if (isMatch) stStats[sid].totalBenar++; else stStats[sid].totalSalah++;
+                } else {
+                  // klasifikasi / matriks
+                  if (String(ans ?? "") === String(st.answer ?? "")) stStats[sid].totalBenar++;
+                  else stStats[sid].totalSalah++;
+                }
               });
             }
           }
@@ -777,11 +860,27 @@ export const ItemAnalysisPage: React.FC = () => {
                 choiceCounts[k].upper++;
               }
             });
-          } else if (q.type === "benar_salah" && res?.statementAnswers && q.statements) {
-            q.statements.forEach((st: any) => {
-              const ans = res.statementAnswers![st.id];
-              const expected = (st.answer || "benar").toLowerCase().trim();
-              if (ans === expected) stStats[st.id].upperBenar++;
+          } else if (["benar_salah", "klasifikasi", "matriks", "isian_rumpang"].includes(q.type) && res?.statementAnswers) {
+            const subItems = q.type === "isian_rumpang" ? (q.blanks || q.options?.blanks || []) : (q.statements || []);
+            subItems.forEach((st: any) => {
+              const sid = String(st.id);
+              const ans = res.statementAnswers![sid];
+              let isStCorrect = false;
+              if (q.type === "benar_salah") {
+                const expected = (st.answer || "benar").toLowerCase().trim();
+                isStCorrect = ans === expected;
+              } else if (q.type === "isian_rumpang") {
+                const cs = st.caseSensitive === true;
+                const givenCmp = cs ? String(ans ?? "").trim() : String(ans ?? "").trim().toLowerCase();
+                const acc = Array.isArray(st.answers) ? st.answers : (st.answers != null ? [st.answers] : []);
+                isStCorrect = !!givenCmp && acc.some((a: any) => {
+                  const expCmp = cs ? String(a ?? "").trim() : String(a ?? "").trim().toLowerCase();
+                  return expCmp && givenCmp === expCmp;
+                });
+              } else {
+                isStCorrect = String(ans ?? "") === String(st.answer ?? "");
+              }
+              if (isStCorrect) stStats[sid].upperBenar++;
             });
           }
         });
@@ -802,11 +901,27 @@ export const ItemAnalysisPage: React.FC = () => {
                 choiceCounts[k].lower++;
               }
             });
-          } else if (q.type === "benar_salah" && res?.statementAnswers && q.statements) {
-            q.statements.forEach((st: any) => {
-              const ans = res.statementAnswers![st.id];
-              const expected = (st.answer || "benar").toLowerCase().trim();
-              if (ans === expected) stStats[st.id].lowerBenar++;
+          } else if (["benar_salah", "klasifikasi", "matriks", "isian_rumpang"].includes(q.type) && res?.statementAnswers) {
+            const subItems = q.type === "isian_rumpang" ? (q.blanks || q.options?.blanks || []) : (q.statements || []);
+            subItems.forEach((st: any) => {
+              const sid = String(st.id);
+              const ans = res.statementAnswers![sid];
+              let isStCorrect = false;
+              if (q.type === "benar_salah") {
+                const expected = (st.answer || "benar").toLowerCase().trim();
+                isStCorrect = ans === expected;
+              } else if (q.type === "isian_rumpang") {
+                const cs = st.caseSensitive === true;
+                const givenCmp = cs ? String(ans ?? "").trim() : String(ans ?? "").trim().toLowerCase();
+                const acc = Array.isArray(st.answers) ? st.answers : (st.answers != null ? [st.answers] : []);
+                isStCorrect = !!givenCmp && acc.some((a: any) => {
+                  const expCmp = cs ? String(a ?? "").trim() : String(a ?? "").trim().toLowerCase();
+                  return expCmp && givenCmp === expCmp;
+                });
+              } else {
+                isStCorrect = String(ans ?? "") === String(st.answer ?? "");
+              }
+              if (isStCorrect) stStats[sid].lowerBenar++;
             });
           }
         });
@@ -890,19 +1005,21 @@ export const ItemAnalysisPage: React.FC = () => {
           ? Math.round((effectiveDistractorCount / totalDistractorCount) * 100)
           : 100;
 
-        // Layer 1 Khusus: Analisis Pernyataan Benar / Salah
+        // Layer 1 Khusus: Analisis Pernyataan (Benar/Salah, Klasifikasi, Matriks, Isian Rumpang)
         let statementsList: StatementAnalysis[] | undefined = undefined;
-        if (q.type === "benar_salah" && q.statements && q.statements.length > 0) {
-          statementsList = q.statements.map((st: any, sIdx: number) => {
-            const stats = stStats[st.id] || { totalBenar: 0, totalSalah: 0, upperBenar: 0, lowerBenar: 0 };
-            const expectedAns = (st.answer || "benar").toLowerCase() as "benar" | "salah";
+        const subItemsForAnalysis = q.type === "isian_rumpang" ? (q.blanks || q.options?.blanks || []) : (q.statements || []);
+        if (["benar_salah", "klasifikasi", "matriks", "isian_rumpang"].includes(q.type) && subItemsForAnalysis.length > 0) {
+          statementsList = subItemsForAnalysis.map((st: any, sIdx: number) => {
+            const sid = String(st.id ?? sIdx + 1);
+            const stats = stStats[sid] || { totalBenar: 0, totalSalah: 0, upperBenar: 0, lowerBenar: 0 };
+            const expectedAns = q.type === "benar_salah" ? (st.answer || "benar").toLowerCase() : "benar";
             const totalBenarPercent = N > 0 ? Math.round((stats.totalBenar / N) * 100) : 0;
             const totalSalahPercent = N > 0 ? Math.round((stats.totalSalah / N) * 100) : 0;
 
             const upperBenarPercent = upperGroup.length > 0 ? Math.round((stats.upperBenar / upperGroup.length) * 100) : 0;
             const lowerBenarPercent = lowerGroup.length > 0 ? Math.round((stats.lowerBenar / lowerGroup.length) * 100) : 0;
 
-            const correctTotal = expectedAns === "benar" ? stats.totalBenar : stats.totalSalah;
+            const correctTotal = stats.totalBenar;
             const pSt = N > 0 ? Number((correctTotal / N).toFixed(2)) : 0;
             const dSt = Number(((stats.upperBenar - stats.lowerBenar) / nGroup).toFixed(2));
 
@@ -927,10 +1044,12 @@ export const ItemAnalysisPage: React.FC = () => {
             }
 
             return {
-              id: st.id,
+              id: sid,
               index: sIdx + 1,
-              text: st.text || "",
-              correctAnswer: expectedAns,
+              text: st.text || (q.type === "isian_rumpang" ? `Rumpang ${sIdx + 1}` : ""),
+              correctAnswer: q.type === "isian_rumpang"
+                ? (Array.isArray(st.answers) ? st.answers.map((a: any) => String(a)).join(" / ") : String(st.answers || ""))
+                : expectedAns,
               totalBenar: stats.totalBenar,
               totalBenarPercent,
               totalSalah: stats.totalSalah,
@@ -947,8 +1066,8 @@ export const ItemAnalysisPage: React.FC = () => {
           });
         }
 
-        const hasValidKey = q.type === "benar_salah"
-          ? (q.statements && q.statements.length > 0 && q.statements.some((s: any) => Boolean(s.answer))) || Boolean(q.answerKey)
+        const hasValidKey = ["benar_salah", "klasifikasi", "matriks", "isian_rumpang"].includes(q.type)
+          ? (subItemsForAnalysis.length > 0 && subItemsForAnalysis.some((s: any) => q.type === "isian_rumpang" ? Boolean(s.answers) : Boolean(s.answer))) || Boolean(q.answerKey)
           : q.type === "pilihan_ganda_kompleks"
           ? (q.choices && Object.values(q.choices).some((c: any) => Boolean(c.isCorrect))) || Boolean(q.answerKey)
           : Boolean(q.answerKey);
@@ -2081,6 +2200,12 @@ export const ItemAnalysisPage: React.FC = () => {
               <option value="menjodohkan">Menjodohkan</option>
               <option value="isian_singkat">Isian Singkat</option>
               <option value="uraian">Uraian</option>
+              <option value="urutkan">Urutkan</option>
+              <option value="drag_drop">Drag & Drop</option>
+              <option value="klasifikasi">Klasifikasi</option>
+              <option value="matriks">Matriks</option>
+              <option value="isian_rumpang">Isian Rumpang</option>
+              <option value="hotspot">Hotspot</option>
             </select>
 
             {/* Kesukaran */}
