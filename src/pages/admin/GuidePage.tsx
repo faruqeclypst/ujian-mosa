@@ -490,7 +490,7 @@ const GuidePage = () => {
                    </div>
                 </SubSection>
 
-                <SubSection title="Detail 8 Tipe Soal">
+                <SubSection title="Detail 12 Tipe Soal">
                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="p-4 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50/50">
                          <h6 className="text-[11px] font-black text-indigo-600 mb-1">PG & PG KOMPLEKS</h6>
@@ -507,6 +507,22 @@ const GuidePage = () => {
                       <div className="p-4 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50/50">
                          <h6 className="text-[11px] font-black text-rose-600 mb-1">DRAG & DROP VISUAL</h6>
                          <p className="text-[10px] text-slate-500 leading-relaxed font-medium">Menyeret label jawaban masuk ke dalam area yang kosong pada teks pertanyaan.</p>
+                      </div>
+                      <div className="p-4 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50/50">
+                         <h6 className="text-[11px] font-black text-violet-600 mb-1">KLASIFIKASI</h6>
+                         <p className="text-[10px] text-slate-500 leading-relaxed font-medium">Tentukan kategori untuk setiap pernyataan. <strong>Cara buat:</strong> (1) Tambah kategori (mis. Ayah, Ibu, Adik), (2) Tambah pernyataan, (3) Pilih kategori benar untuk tiap pernyataan via dropdown. Kategori boleh dipakai berulang. Urutan pernyataan bisa diacak saat ujian. <strong>Contoh:</strong> "Seorang laki-laki yang menjadi kepala keluarga." → Ayah. <strong>Penilaian:</strong> otomatis, skor = pernyataan benar / total pernyataan.</p>
+                      </div>
+                      <div className="p-4 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50/50">
+                         <h6 className="text-[11px] font-black text-amber-600 mb-1">HOTSPOT (KLIK GAMBAR)</h6>
+                         <p className="text-[10px] text-slate-500 leading-relaxed font-medium">Siswa klik area pada gambar. <strong>Cara buat:</strong> (1) Upload gambar, (2) Pilih mode: "Satu saja" (cukup kena salah satu area) atau "Semua area" (harus klik semua titik), (3) Tandai area target dengan klik-drag pada gambar, beri label tiap area. <strong>Contoh:</strong> peta Indonesia → tandai pulau Jawa. <strong>Catatan:</strong> tidak didukung generator AI & import Excel — buat manual via editor. Bekerja di HP, tablet, dan laptop.</p>
+                      </div>
+                      <div className="p-4 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50/50">
+                         <h6 className="text-[11px] font-black text-teal-600 mb-1">ISIAN RUMPANG (CLOZE)</h6>
+                         <p className="text-[10px] text-slate-500 leading-relaxed font-medium">Lengkapi kata yang hilang dalam teks. <strong>Cara buat:</strong> tulis teks dengan <code className="px-1 bg-slate-200 dark:bg-slate-700 rounded">[[1]]</code>, <code className="px-1 bg-slate-200 dark:bg-slate-700 rounded">[[2]]</code> untuk bagian rumpang, lalu isi kunci tiap nomor (boleh lebih dari 1 jawaban alternatif, pisah koma). <strong>Contoh:</strong> "Ibu kota Indonesia adalah [[1]]" → kunci: Jakarta. Opsi tidak peka huruf besar/kecil. <strong>Penilaian:</strong> otomatis per rumpang.</p>
+                      </div>
+                      <div className="p-4 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50/50">
+                         <h6 className="text-[11px] font-black text-cyan-600 mb-1">MATRIKS</h6>
+                         <p className="text-[10px] text-slate-500 leading-relaxed font-medium">Tabel pernyataan × kolom opsi. <strong>Cara buat:</strong> (1) Buat kolom (mis. Benar, Salah — bisa custom: Ya/Tidak/Setuju), (2) Tambah pernyataan, (3) Pilih kolom benar untuk tiap baris. <strong>Contoh:</strong> "Air mendidih pada 100°C" → Benar. <strong>Bedanya dengan PG Kompleks:</strong> PG Kompleks = 1 pertanyaan pilih banyak jawaban; Matriks = banyak pernyataan, tiap baris pilih 1 kolom. <strong>Penilaian:</strong> otomatis per baris.</p>
                       </div>
                    </div>
                 </SubSection>

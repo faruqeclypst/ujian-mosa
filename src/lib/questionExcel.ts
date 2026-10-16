@@ -10,7 +10,10 @@ export const QUESTION_IMPORT_HEADERS = [
   "Opsi E", 
   "Kunci Jawaban", 
   "GroupId (Literasi)", 
-  "Teks Literasi"
+  "Teks Literasi",
+  "Kategori / Kolom",
+  "Pernyataan & Kunci",
+  "Kunci Rumpang"
 ] as const;
 
 export function downloadQuestionTemplate(filename = "Template_Soal_Baru.xlsx") {
@@ -62,7 +65,55 @@ export function downloadQuestionTemplate(filename = "Template_Soal_Baru.xlsx") {
       "",
       "Belalai panjang, telinga lebar, badan besar",
       "",
+      "",
+      "",
+      "",
       ""
+    ],
+    [
+      "Tentukan kategori yang sesuai untuk setiap pernyataan berikut.",
+      "klasifikasi",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "Mamalia | Burung | Reptil",
+      "Gajah memiliki belalai => Mamalia\nElang terbang dengan sayap => Burung\nUlar tidak berkaki => Reptil",
+      ""
+    ],
+    [
+      "Tentukan Benar atau Salah untuk setiap pernyataan berikut.",
+      "matriks",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "Benar | Salah",
+      "Gajah adalah mamalia => Benar\nGajah bisa terbang => Salah",
+      ""
+    ],
+    [
+      "Ibu kota Indonesia adalah [[1]] dan mata uangnya [[2]].",
+      "isian_rumpang",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "1=Jakarta; 2=Rupiah/Rp"
     ],
   ]);
   
@@ -94,6 +145,9 @@ export function downloadQuestionTemplate(filename = "Template_Soal_Baru.xlsx") {
     { wch: 15 }, // Kunci
     { wch: 20 }, // GroupId
     { wch: 40 }, // GroupText
+    { wch: 30 }, // Kategori / Kolom
+    { wch: 50 }, // Pernyataan & Kunci
+    { wch: 30 }, // Kunci Rumpang
   ];
 
   const wsNotes = XLSX.utils.aoa_to_sheet([
@@ -106,6 +160,10 @@ export function downloadQuestionTemplate(filename = "Template_Soal_Baru.xlsx") {
     ["   - benar_salah: Benar/Salah (isi Opsi A=Benar, Opsi B=Salah)"],
     ["   - isian_singkat: Isian singkat (kunci jawaban di kolom Kunci Jawaban)"],
     ["   - uraian: Uraian/Essay (kunci jawaban opsional)"],
+    ["   - klasifikasi: Klasifikasi (kategori di kolom 'Kategori / Kolom' pisah |, pernyataan di 'Pernyataan & Kunci' format: pernyataan => kategori, pisah baris baru)"],
+    ["   - matriks: Matriks (kolom di 'Kategori / Kolom' pisah |, pernyataan di 'Pernyataan & Kunci' format: pernyataan => kolom, pisah baris baru)"],
+    ["   - isian_rumpang: Isian rumpang (tulis teks dengan [[1]], [[2]] di kolom Pertanyaan, kunci di 'Kunci Rumpang' format: 1=Jakarta; 2=Rupiah/Rp)"],
+    ["   - hotspot: TIDAK didukung via Excel — gunakan editor soal di aplikasi (butuh gambar + tandai area)"],
     [],
     ["3. Kolom Opsi A-E diisi dengan teks jawaban."],
     ["4. Kolom Kunci Jawaban:"],
@@ -140,6 +198,14 @@ const TYPE_MAP: Record<string, { type: string; field: string }> = {
   isian: { type: "isian_singkat", field: "short_answer" },
   uraian: { type: "uraian", field: "essay" },
   essay: { type: "uraian", field: "essay" },
+  klasifikasi: { type: "klasifikasi", field: "klasifikasi" },
+  "klasifikasi / categorization": { type: "klasifikasi", field: "klasifikasi" },
+  matriks: { type: "matriks", field: "matriks" },
+  "matriks pilihan ganda": { type: "matriks", field: "matriks" },
+  isian_rumpang: { type: "isian_rumpang", field: "isian_rumpang" },
+  "isian rumpang": { type: "isian_rumpang", field: "isian_rumpang" },
+  cloze: { type: "isian_rumpang", field: "isian_rumpang" },
+  hotspot: { type: "hotspot", field: "hotspot" },
 };
 
 export async function parseQuestionImportExcel(file: File): Promise<any[]> {
@@ -162,6 +228,90 @@ export async function parseQuestionImportExcel(file: File): Promise<any[]> {
       const typeInfo = TYPE_MAP[rawType] || TYPE_MAP["pilihan_ganda"];
       
       const rawAnswer = String(cleanRow["Kunci Jawaban"] || "").trim();
+
+      // hotspot: tidak didukung via Excel
+      if (typeInfo.type === "hotspot") {
+        throw new Error(`Baris "${qText.substring(0, 40)}...": tipe hotspot tidak didukung via Excel. Gunakan editor soal di aplikasi untuk upload gambar dan menandai area.`);
+      }
+
+      // klasifikasi & matriks: kolom "Kategori / Kolom" + "Pernyataan & Kunci"
+      if (typeInfo.type === "klasifikasi" || typeInfo.type === "matriks") {
+        const catCol = String(cleanRow["Kategori / Kolom"] || "").trim();
+        const stmtCol = String(cleanRow["Pernyataan & Kunci"] || "").trim();
+        if (!catCol) throw new Error(`Baris "${qText.substring(0, 40)}...": kolom "Kategori / Kolom" wajib diisi untuk tipe ${typeInfo.type}.`);
+        if (!stmtCol) throw new Error(`Baris "${qText.substring(0, 40)}...": kolom "Pernyataan & Kunci" wajib diisi untuk tipe ${typeInfo.type}.`);
+
+        const labels = catCol.split("|").map(s => s.trim()).filter(Boolean);
+        if (labels.length < 2) throw new Error(`Baris "${qText.substring(0, 40)}...": minimal 2 kategori/kolom dipisah "|".`);
+
+        const labelIds = labels.map((label, i) => ({ id: `c${i + 1}`, text: label }));
+        const labelMap = new Map(labelIds.map(l => [l.text.toLowerCase(), l.id]));
+
+        const statements = stmtCol.split(/\r?\n/).map((line, i) => {
+          const parts = line.split("=>").map(s => s.trim());
+          if (parts.length !== 2 || !parts[0] || !parts[1]) {
+            throw new Error(`Baris "${qText.substring(0, 40)}...": format pernyataan baris ${i + 1} salah. Gunakan: pernyataan => kategori`);
+          }
+          const catId = labelMap.get(parts[1].toLowerCase());
+          if (!catId) {
+            throw new Error(`Baris "${qText.substring(0, 40)}...": kategori "${parts[1]}" tidak ada di daftar Kategori / Kolom (baris ${i + 1}).`);
+          }
+          return { id: `s${i + 1}`, text: parts[0], answer: catId };
+        }).filter(s => s.text);
+
+        if (statements.length === 0) throw new Error(`Baris "${qText.substring(0, 40)}...": tidak ada pernyataan valid.`);
+
+        const options = typeInfo.type === "klasifikasi"
+          ? { categories: labelIds, statements, shuffleStatements: true }
+          : { columns: labelIds, statements };
+
+        return {
+          text: qText,
+          type: typeInfo.type,
+          field: typeInfo.field,
+          choices: options,
+          answerKey: "",
+          groupId: String(cleanRow["GroupId (Literasi)"] || "").trim() || undefined,
+          groupText: String(cleanRow["Teks Literasi"] || "").trim() || undefined,
+        };
+      }
+
+      // isian_rumpang: kolom Pertanyaan berisi [[n]], kunci di "Kunci Rumpang"
+      if (typeInfo.type === "isian_rumpang") {
+        const kunciCol = String(cleanRow["Kunci Rumpang"] || "").trim();
+        const blankMatches = [...qText.matchAll(/\[\[(\d+)\]\]/g)].map(m => m[1]);
+        if (blankMatches.length === 0) {
+          throw new Error(`Baris "${qText.substring(0, 40)}...": teks tidak mengandung [[n]] untuk tipe isian_rumpang.`);
+        }
+        if (!kunciCol) throw new Error(`Baris "${qText.substring(0, 40)}...": kolom "Kunci Rumpang" wajib diisi.`);
+
+        const keyMap = new Map<string, string[]>();
+        kunciCol.split(";").forEach(part => {
+          const eqIdx = part.indexOf("=");
+          if (eqIdx === -1) return;
+          const num = part.substring(0, eqIdx).trim();
+          const answers = part.substring(eqIdx + 1).split("/").map(s => s.trim()).filter(Boolean);
+          if (num && answers.length > 0) keyMap.set(num, answers);
+        });
+
+        const blanks = blankMatches.map(num => {
+          const answers = keyMap.get(num);
+          if (!answers) {
+            throw new Error(`Baris "${qText.substring(0, 40)}...": kunci untuk rumpang [[${num}]] tidak ditemukan di kolom "Kunci Rumpang".`);
+          }
+          return { id: num, answers, caseSensitive: false };
+        });
+
+        return {
+          text: qText,
+          type: typeInfo.type,
+          field: typeInfo.field,
+          choices: { text: qText, blanks },
+          answerKey: "",
+          groupId: String(cleanRow["GroupId (Literasi)"] || "").trim() || undefined,
+          groupText: String(cleanRow["Teks Literasi"] || "").trim() || undefined,
+        };
+      }
 
       // For isian_singkat / uraian: answer key is the text answer itself
       if (typeInfo.type === "isian_singkat" || typeInfo.type === "uraian") {

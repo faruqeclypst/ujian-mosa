@@ -1144,6 +1144,14 @@ const ExamsPage = () => {
             collectFromHtml(item.text, q);
             addUrl(item.imageUrl, q);
           });
+        } else if ((qType === "klasifikasi" || qType === "matriks") && opts.statements) {
+          opts.statements.forEach((s: any) => {
+            collectFromHtml(s.text, q);
+          });
+        } else if (qType === "isian_rumpang" && opts.text) {
+          collectFromHtml(opts.text, q);
+        } else if (qType === "hotspot") {
+          if (opts.imageUrl) addUrl(opts.imageUrl, q);
         }
       }
 
@@ -1304,6 +1312,46 @@ const ExamsPage = () => {
           });
           html += `</ol></div>`;
           keysRows += `<tr><td align="center">${num}</td><td>${q.answerKey || correctAnswer || "-"}</td></tr>`;
+          html += `<p class="spacer">&nbsp;</p>`;
+        } else if (qType === "klasifikasi" && opts.categories && opts.statements) {
+          html += `<div style="margin-left: 25pt; margin-bottom: 5pt;">`;
+          html += `<p style="font-size:10pt;color:#555;">Kategori: ${opts.categories.map((c: any) => cleanForWord(c.text || "")).join(" | ")}</p>`;
+          html += `<ol>`;
+          opts.statements.forEach((s: any) => {
+            const catText = (opts.categories.find((c: any) => String(c.id) === String(s.answer)) || {}).text || s.answer;
+            html += `<li>${cleanForWord(processHtmlInlineImages(processLatex(s.text || ""), getAbsoluteUrl, imageMapping))} <span style="color:#555;">(....)</span></li>`;
+            keysRows += ``; // kunci digabung di bawah
+          });
+          html += `</ol></div>`;
+          const keyStr = opts.statements.map((s: any, i: number) => {
+            const catText = (opts.categories.find((c: any) => String(c.id) === String(s.answer)) || {}).text || s.answer;
+            return `${i + 1}. ${catText}`;
+          }).join("; ");
+          keysRows += `<tr><td align="center">${num}</td><td>Klasifikasi: ${cleanForWord(keyStr)}</td></tr>`;
+          html += `<p class="spacer">&nbsp;</p>`;
+        } else if (qType === "matriks" && opts.columns && opts.statements) {
+          html += `<div style="margin-left: 25pt; margin-bottom: 5pt;">`;
+          html += `<table border="1" cellpadding="4" style="border-collapse: collapse; width: 80%;">`;
+          html += `<tr style="background-color: #f3f4f6;"><th>Pernyataan</th>${opts.columns.map((c: any) => `<th>${cleanForWord(c.text || "")}</th>`).join("")}</tr>`;
+          opts.statements.forEach((s: any) => {
+            html += `<tr><td>${cleanForWord(processHtmlInlineImages(processLatex(s.text || ""), getAbsoluteUrl, imageMapping))}</td>${opts.columns.map(() => `<td align="center">○</td>`).join("")}</tr>`;
+          });
+          html += `</table></div>`;
+          const keyStr = opts.statements.map((s: any, i: number) => {
+            const colText = (opts.columns.find((c: any) => String(c.id) === String(s.answer)) || {}).text || s.answer;
+            return `${i + 1}. ${colText}`;
+          }).join("; ");
+          keysRows += `<tr><td align="center">${num}</td><td>Matriks: ${cleanForWord(keyStr)}</td></tr>`;
+          html += `<p class="spacer">&nbsp;</p>`;
+        } else if (qType === "isian_rumpang" && opts.text) {
+          const textWithBlanks = String(opts.text).replace(/\[\[(\d+)\]\]/g, " (....) ");
+          html += `<div style="margin-left: 25pt; margin-bottom: 5pt;"><p>${cleanForWord(processHtmlInlineImages(processLatex(textWithBlanks), getAbsoluteUrl, imageMapping))}</p></div>`;
+          const keyStr = (opts.blanks || []).map((b: any) => `[[${b.id}]]: ${(b.answers || []).join("/")}`).join("; ");
+          keysRows += `<tr><td align="center">${num}</td><td>Isian Rumpang: ${cleanForWord(keyStr) || "-"}</td></tr>`;
+          html += `<p class="spacer">&nbsp;</p>`;
+        } else if (qType === "hotspot") {
+          html += `<div style="margin-left: 25pt; margin-bottom: 5pt;"><p style="color:#555;font-style:italic;">[Soal Hotspot — klik pada gambar. Lihat versi digital.]</p></div>`;
+          keysRows += `<tr><td align="center">${num}</td><td>Hotspot (Lihat Digital)</td></tr>`;
           html += `<p class="spacer">&nbsp;</p>`;
         } else {
           if (qType === "uraian") {

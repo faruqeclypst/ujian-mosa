@@ -174,7 +174,11 @@ export const QuestionRepositoryDialog: React.FC<QuestionRepositoryDialogProps> =
             choices: choicesObj,
             pairs: mappedType === "menjodohkan" ? (options.pairs || q.pairs) : undefined,
             items: (mappedType === "urutkan" || mappedType === "drag_drop") ? (options.items || q.items) : undefined,
-            statements: mappedType === "benar_salah" ? (options.statements || q.statements) : undefined,
+            statements: (mappedType === "benar_salah" || mappedType === "klasifikasi" || mappedType === "matriks") ? (options.statements || q.statements) : undefined,
+            categories: mappedType === "klasifikasi" ? (options.categories || (q as any).categories) : undefined,
+            columns: mappedType === "matriks" ? (options.columns || (q as any).columns) : undefined,
+            blanks: mappedType === "isian_rumpang" ? (options.blanks || (q as any).blanks) : undefined,
+            shuffleStatements: mappedType === "klasifikasi" ? (options.shuffleStatements ?? (q as any).shuffleStatements) : undefined,
             options: options,
             answerKey: ansKey || undefined,
             order: q.order
@@ -269,6 +273,9 @@ export const QuestionRepositoryDialog: React.FC<QuestionRepositoryDialogProps> =
 
   // Toggle selection satu butir soal
   const toggleQuestionSelect = (id: string) => {
+    // Jangan izinkan pilih soal yang tidak didukung
+    const item = activeQuestionsList.find((q: any) => q.id === id);
+    if (item?.skipReason) return;
     setSelectedQuestionIds(prev => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
@@ -600,9 +607,11 @@ export const QuestionRepositoryDialog: React.FC<QuestionRepositoryDialogProps> =
                     <div
                       key={item.id || idx}
                       onClick={() => toggleQuestionSelect(item.id)}
-                      className={`p-3 rounded-xl cursor-pointer transition-all flex items-start gap-3 border ${isSelected
-                        ? "bg-blue-50/70 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800/60 shadow-sm"
-                        : "border-transparent hover:bg-slate-50 dark:hover:bg-slate-800/40"
+                      className={`p-3 rounded-xl transition-all flex items-start gap-3 border ${item.skipReason
+                        ? "opacity-60 cursor-not-allowed border-transparent"
+                        : isSelected
+                          ? "bg-blue-50/70 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800/60 shadow-sm cursor-pointer"
+                          : "border-transparent hover:bg-slate-50 dark:hover:bg-slate-800/40 cursor-pointer"
                         }`}
                     >
                       <div className="pt-0.5">
@@ -622,6 +631,11 @@ export const QuestionRepositoryDialog: React.FC<QuestionRepositoryDialogProps> =
                           <Badge variant="secondary" className="text-[9px] uppercase font-semibold py-0.5 px-1.5">
                             {typeLabels[item.type || "pilihan_ganda"] || item.type || "Pilihan Ganda"}
                           </Badge>
+                          {item.skipReason && (
+                            <Badge className="bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300 text-[9px] font-bold py-0.5 px-1.5">
+                              Tidak didukung
+                            </Badge>
+                          )}
 
                           {/* Paket Literasi Badge & Quick Group Selector */}
                           {item.groupId && (
@@ -664,6 +678,13 @@ export const QuestionRepositoryDialog: React.FC<QuestionRepositoryDialogProps> =
                         <div className="text-xs text-slate-800 dark:text-slate-200 font-serif leading-relaxed line-clamp-3">
                           <MathText content={item.text} />
                         </div>
+
+                        {/* Pesan skip untuk tipe tidak didukung */}
+                        {item.skipReason && (
+                          <div className="p-2 rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800/40 text-[11px] text-red-700 dark:text-red-300 font-medium">
+                            {item.skipReason}
+                          </div>
+                        )}
 
                         {/* Image Preview if any */}
                         {item.imageUrl && (

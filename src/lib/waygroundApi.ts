@@ -11,6 +11,7 @@ export interface ParsedExternalQuestion {
   answerKey?: string;
   items?: Array<{ id: string; text: string; imageUrl?: string }>;
   sourceTitle?: string;
+  skipReason?: string;
 }
 
 export interface ExternalQuizMeta {
@@ -112,7 +113,22 @@ export const parseWaygroundQuizData = (rawData: any, fallbackId: string = ""): E
       type = "menjodohkan";
     } else if (rawType.includes("reorder") || rawType.includes("order")) {
       type = "urutkan";
+    } else if (rawType.includes("categor") || rawType.includes("classif")) {
+      // Wayground tidak punya struktur kategori/pernyataan yang kompatibel
+      type = "klasifikasi" as QuestionType;
+    } else if (rawType.includes("hotspot") || rawType.includes("hot spot") || rawType.includes("click") && rawType.includes("image")) {
+      type = "hotspot" as QuestionType;
+    } else if (rawType.includes("cloze")) {
+      type = "isian_rumpang" as QuestionType;
+    } else if (rawType.includes("matrix") || rawType.includes("grid")) {
+      type = "matriks" as QuestionType;
     }
+
+    // Tipe baru yang tidak didukung struktur Wayground -> tandai untuk skip
+    const unsupportedTypes = ["klasifikasi", "hotspot", "isian_rumpang", "matriks"];
+    const skipReason = unsupportedTypes.includes(type)
+      ? `Tipe soal "${type}" dari Wayground tidak didukung karena struktur datanya tidak kompatibel. Buat manual via editor soal.`
+      : undefined;
 
     // Parse Pilihan Jawaban
     const rawOptions = structure.options || q.options || q.choices || [];
@@ -177,7 +193,8 @@ export const parseWaygroundQuizData = (rawData: any, fallbackId: string = ""): E
       imageUrl,
       choices: Object.keys(choices).length > 0 ? choices : undefined,
       answerKey: computedAnswerKey || undefined,
-      sourceTitle: title
+      sourceTitle: title,
+      skipReason
     };
   });
 

@@ -690,6 +690,59 @@ const validateQuestions = (questions: any[], isExactSubject: boolean = false, re
       }
     }
 
+    // For klasifikasi: must have categories + statements with valid answers
+    if (qType === "klasifikasi") {
+      const cats = q.categories;
+      const stmts = q.statements;
+      if (!Array.isArray(cats) || cats.length < 2) return false;
+      if (!Array.isArray(stmts) || stmts.length < 1) return false;
+      const catIds = new Set(cats.map((c: any) => String(c.id)));
+      // Normalize
+      q.categories = cats.filter((c: any) => c.text?.trim()).map((c: any, i: number) => ({
+        id: String(c.id || `c${i + 1}`),
+        text: String(c.text).trim()
+      }));
+      q.statements = stmts.filter((s: any) => s.text?.trim()).map((s: any, i: number) => ({
+        id: String(s.id || `s${i + 1}`),
+        text: String(s.text).trim(),
+        answer: catIds.has(String(s.answer)) ? String(s.answer) : String(q.categories[0]?.id || "c1")
+      }));
+      if (q.statements.length === 0) return false;
+    }
+
+    // For matriks: must have columns + statements with valid answers
+    if (qType === "matriks") {
+      const cols = q.columns;
+      const stmts = q.statements;
+      if (!Array.isArray(cols) || cols.length < 2) return false;
+      if (!Array.isArray(stmts) || stmts.length < 1) return false;
+      const colIds = new Set(cols.map((c: any) => String(c.id)));
+      q.columns = cols.filter((c: any) => c.text?.trim()).map((c: any, i: number) => ({
+        id: String(c.id || `col${i + 1}`),
+        text: String(c.text).trim()
+      }));
+      q.statements = stmts.filter((s: any) => s.text?.trim()).map((s: any, i: number) => ({
+        id: String(s.id || `s${i + 1}`),
+        text: String(s.text).trim(),
+        answer: colIds.has(String(s.answer)) ? String(s.answer) : String(q.columns[0]?.id || "col1")
+      }));
+      if (q.statements.length === 0) return false;
+    }
+
+    // For isian_rumpang: must have text with [[n]] + blanks
+    if (qType === "isian_rumpang") {
+      const txt = String(q.text || q.question || "");
+      const blanks = q.blanks;
+      if (!/\[\[\d+\]\]/.test(txt)) return false;
+      if (!Array.isArray(blanks) || blanks.length === 0) return false;
+      q.blanks = blanks.filter((b: any) => b.id && Array.isArray(b.answers) && b.answers.length > 0).map((b: any) => ({
+        id: String(b.id),
+        answers: b.answers.map((a: any) => String(a).trim()).filter(Boolean),
+        caseSensitive: Boolean(b.caseSensitive)
+      }));
+      if (q.blanks.length === 0) return false;
+    }
+
     // For isian_singkat: must have answerKey
     if (qType === "isian_singkat" && !q.answerKey?.trim() && !q.answer_key?.trim() && !q.answer?.trim()) return false;
 
@@ -718,6 +771,10 @@ const validateQuestions = (questions: any[], isExactSubject: boolean = false, re
     pairs: q.pairs || undefined,
     items: q.items || undefined,
     statements: q.statements || (q.options?.statements ? q.options.statements : undefined),
+    categories: q.categories || (q.options?.categories ? q.options.categories : undefined),
+    columns: q.columns || (q.options?.columns ? q.options.columns : undefined),
+    blanks: q.blanks || (q.options?.blanks ? q.options.blanks : undefined),
+    shuffleStatements: q.shuffleStatements !== undefined ? q.shuffleStatements : undefined,
     imageUrl: q.imageUrl || q.image_url || undefined,
     answerKey: q.answerKey || q.answer_key || q.answer || "",
     groupId: q.groupId || "",
@@ -783,6 +840,10 @@ export const generateQuestionsAI = async (
   materialReference: string = "",
   objectives: string[] = []
 ): Promise<AIGeneratedQuestion[]> => {
+  // hotspot tidak didukung AI (butuh gambar + koordinat manual)
+  if (type === "hotspot") {
+    throw new Error("Tipe soal hotspot tidak didukung generator AI karena membutuhkan gambar dan penandaan area manual. Gunakan editor soal di aplikasi.");
+  }
   const MAX_RETRIES = 3;
   let lastError: any = null;
 
@@ -838,7 +899,10 @@ const _generateQuestionsAIInternal = async (
       uraian: "Uraian HOTS (jawaban panjang/essay)",
       menjodohkan: "Menjodohkan/Matching (pasangkan item kiri dengan kanan)",
       urutkan: "Mengurutkan/Sequencing (susun item dalam urutan benar)",
-      drag_drop: "Drag & Drop (susun/kelompokkan item ke posisi benar)"
+      drag_drop: "Drag & Drop (susun/kelompokkan item ke posisi benar)",
+      klasifikasi: "Klasifikasi (tentukan kategori untuk setiap pernyataan)",
+      matriks: "Matriks (tabel pernyataan x kolom Benar/Salah)",
+      isian_rumpang: "Isian Rumpang/Cloze (lengkapi kata yang hilang dalam teks)"
     };
     const typeLabel = typeDesc[type] || "Pilihan Ganda";
 
@@ -892,6 +956,12 @@ const _generateQuestionsAIInternal = async (
             return `{"groupText":"<HTML stimulus lengkap>","groupId":"LIT-001","questions":[{"text":"Urutkan berdasarkan bacaan:","type":"urutkan","items":[{"id":"1","text":"..."},{"id":"2","text":"..."},{"id":"3","text":"..."},{"id":"4","text":"..."}],"answerKey":"1,2,3,4"}]}`;
           case "drag_drop":
             return `{"groupText":"<HTML stimulus lengkap>","groupId":"LIT-001","questions":[{"text":"Susun item berdasarkan bacaan:","type":"drag_drop","items":[{"id":"1","text":"..."},{"id":"2","text":"..."},{"id":"3","text":"..."},{"id":"4","text":"..."}],"answerKey":"1,2,3,4"}]}`;
+          case "klasifikasi":
+            return `{"groupText":"<HTML stimulus lengkap>","groupId":"LIT-001","questions":[{"text":"Tentukan kategori yang sesuai untuk setiap pernyataan berdasarkan bacaan:","type":"klasifikasi","categories":[{"id":"c1","text":"..."},{"id":"c2","text":"..."},{"id":"c3","text":"..."}],"statements":[{"id":"s1","text":"...","answer":"c1"},{"id":"s2","text":"...","answer":"c2"},{"id":"s3","text":"...","answer":"c3"}],"shuffleStatements":true,"answerKey":""}]}`;
+          case "matriks":
+            return `{"groupText":"<HTML stimulus lengkap>","groupId":"LIT-001","questions":[{"text":"Tentukan Benar atau Salah untuk setiap pernyataan berdasarkan bacaan:","type":"matriks","columns":[{"id":"benar","text":"Benar"},{"id":"salah","text":"Salah"}],"statements":[{"id":"s1","text":"...","answer":"benar"},{"id":"s2","text":"...","answer":"salah"}],"answerKey":""}]}`;
+          case "isian_rumpang":
+            return `{"groupText":"<HTML stimulus lengkap>","groupId":"LIT-001","questions":[{"text":"Lengkapi bagian yang hilang: ... [[1]] ... [[2]] ...","type":"isian_rumpang","blanks":[{"id":"1","answers":["..."],"caseSensitive":false},{"id":"2","answers":["..."],"caseSensitive":false}],"answerKey":""}]}`;
           default:
             return `{"groupText":"<HTML stimulus lengkap>","groupId":"LIT-001","questions":[{"text":"pertanyaan","type":"pilihan_ganda","choices":{"a":{"text":"...","isCorrect":false},"b":{"text":"...","isCorrect":true},"c":{"text":"...","isCorrect":false},"d":{"text":"...","isCorrect":false},"e":{"text":"...","isCorrect":false}},"answerKey":"b"}]}`;
         }
@@ -985,6 +1055,15 @@ CATATAN: items berisi 4-6 item yang harus diurutkan. Urutan dalam array "items" 
         case "drag_drop":
           return `OUTPUT JSON: {"questions":[{"text":"Kelompokkan/susun item berikut ke posisi yang benar:","type":"drag_drop","items":[{"id":"1","text":"Item pertama"},{"id":"2","text":"Item kedua"},{"id":"3","text":"Item ketiga"},{"id":"4","text":"Item keempat"},{"id":"5","text":"Item kelima"}],"answerKey":"1,2,3,4,5"}]}
 CATATAN: items berisi 4-6 item yang harus disusun/dikelompokkan. Urutan dalam array "items" adalah URUTAN BENAR. Buat soal tentang klasifikasi/pengelompokan/penyusunan.`;
+        case "klasifikasi":
+          return `OUTPUT JSON: {"questions":[{"text":"Tentukan kategori yang sesuai untuk setiap pernyataan berikut:","type":"klasifikasi","categories":[{"id":"c1","text":"Kategori A"},{"id":"c2","text":"Kategori B"},{"id":"c3","text":"Kategori C"}],"statements":[{"id":"s1","text":"Pernyataan pertama","answer":"c1"},{"id":"s2","text":"Pernyataan kedua","answer":"c2"},{"id":"s3","text":"Pernyataan ketiga","answer":"c3"},{"id":"s4","text":"Pernyataan keempat","answer":"c1"}],"shuffleStatements":true,"answerKey":""}]}
+CATATAN: categories berisi 2-4 kategori. statements berisi 3-5 pernyataan, masing-masing punya "answer" berupa id kategori yang benar. Kategori boleh dipakai berulang. "text" adalah instruksi soal.`;
+        case "matriks":
+          return `OUTPUT JSON: {"questions":[{"text":"Tentukan Benar atau Salah untuk setiap pernyataan berikut:","type":"matriks","columns":[{"id":"benar","text":"Benar"},{"id":"salah","text":"Salah"}],"statements":[{"id":"s1","text":"Pernyataan pertama","answer":"benar"},{"id":"s2","text":"Pernyataan kedua","answer":"salah"},{"id":"s3","text":"Pernyataan ketiga","answer":"benar"}],"answerKey":""}]}
+CATATAN: columns berisi 2-3 kolom opsi (mis. Benar/Salah atau Ya/Tidak). statements berisi 3-5 pernyataan, masing-masing punya "answer" berupa id kolom yang benar.`;
+        case "isian_rumpang":
+          return `OUTPUT JSON: {"questions":[{"text":"Bacalah teks berikut lalu lengkapi bagian yang hilang: Ibu kota Indonesia adalah [[1]] dan mata uangnya [[2]].","type":"isian_rumpang","blanks":[{"id":"1","answers":["Jakarta"],"caseSensitive":false},{"id":"2","answers":["Rupiah","Rp"],"caseSensitive":false}],"answerKey":""}]}
+CATATAN: Tulis "text" sebagai kalimat/paragraf dengan [[1]], [[2]], dst untuk bagian rumpang. "blanks" berisi kunci tiap rumpang; "answers" boleh lebih dari 1 (jawaban alternatif). caseSensitive false berarti tidak peka huruf besar/kecil.`;
         default:
           return `OUTPUT JSON: {"questions":[{"text":"...","type":"pilihan_ganda","choices":{"a":{"text":"...","isCorrect":false},"b":{"text":"...","isCorrect":false},"c":{"text":"...","isCorrect":true},"d":{"text":"...","isCorrect":false},"e":{"text":"...","isCorrect":false}},"answerKey":"c"}]}`;
       }
@@ -1049,6 +1128,9 @@ export const generateSingleQuestionAI = async (
   focus: string = "akm",
   existingLiterasi: string = ""
 ): Promise<AIGeneratedQuestion> => {
+  if (type === "hotspot") {
+    throw new Error("Tipe soal hotspot tidak didukung generator AI karena membutuhkan gambar dan penandaan area manual. Gunakan editor soal di aplikasi.");
+  }
   const MAX_RETRIES = 3;
   let lastError: any = null;
 
@@ -1087,7 +1169,10 @@ const _generateSingleQuestionInternal = async (
       uraian: "Uraian HOTS (jawaban essay)",
       menjodohkan: "Menjodohkan/Matching (4-6 pasangan kiri-kanan)",
       urutkan: "Mengurutkan/Sequencing (4-6 item disusun urut)",
-      drag_drop: "Drag & Drop (4-6 item disusun/dikelompokkan)"
+      drag_drop: "Drag & Drop (4-6 item disusun/dikelompokkan)",
+      klasifikasi: "Klasifikasi (kategori untuk setiap pernyataan)",
+      matriks: "Matriks (tabel pernyataan x kolom opsi)",
+      isian_rumpang: "Isian Rumpang/Cloze (lengkapi kata hilang dalam teks)"
     };
     const typeLabel = typeDesc[type] || "Pilihan Ganda";
 
@@ -1110,6 +1195,12 @@ const _generateSingleQuestionInternal = async (
           return `JSON:{"text":"Urutkan berikut:","type":"urutkan","items":[{"id":"1","text":"..."},{"id":"2","text":"..."},{"id":"3","text":"..."},{"id":"4","text":"..."}],"answerKey":"1,2,3,4"}`;
         case "drag_drop":
           return `JSON:{"text":"Susun item berikut:","type":"drag_drop","items":[{"id":"1","text":"..."},{"id":"2","text":"..."},{"id":"3","text":"..."},{"id":"4","text":"..."}],"answerKey":"1,2,3,4"}`;
+        case "klasifikasi":
+          return `JSON:{"text":"Tentukan kategori yang sesuai:","type":"klasifikasi","categories":[{"id":"c1","text":"..."},{"id":"c2","text":"..."}],"statements":[{"id":"s1","text":"...","answer":"c1"},{"id":"s2","text":"...","answer":"c2"}],"shuffleStatements":true,"answerKey":""}`;
+        case "matriks":
+          return `JSON:{"text":"Tentukan Benar/Salah:","type":"matriks","columns":[{"id":"benar","text":"Benar"},{"id":"salah","text":"Salah"}],"statements":[{"id":"s1","text":"...","answer":"benar"},{"id":"s2","text":"...","answer":"salah"}],"answerKey":""}`;
+        case "isian_rumpang":
+          return `JSON:{"text":"... [[1]] ... [[2]] ...","type":"isian_rumpang","blanks":[{"id":"1","answers":["..."],"caseSensitive":false},{"id":"2","answers":["..."],"caseSensitive":false}],"answerKey":""}`;
         default:
           return `JSON:{"text":"...","type":"pilihan_ganda","choices":{"a":{"text":"...","isCorrect":false},"b":{"text":"...","isCorrect":false},"c":{"text":"...","isCorrect":true},"d":{"text":"...","isCorrect":false},"e":{"text":"...","isCorrect":false}},"answerKey":"c"}`;
       }
@@ -1126,7 +1217,7 @@ Hanya JSON.`;
       ? `STIMULUS LITERASI:\n${existingLiterasi}\n\nBuat 1 soal ${typeLabel} baru dari stimulus di atas. Jangan tanya definisi. Variasi bentuk pertanyaan.`
       : `Topik: "${topic}". Buat 1 soal ${typeLabel}. Variasi bentuk pertanyaan.`;
 
-    const maxTokens = ctx.isReligious ? 900 : (type === "menjodohkan" || type === "urutkan" || type === "drag_drop" || type === "uraian") ? 800 : 600;
+    const maxTokens = ctx.isReligious ? 900 : (type === "menjodohkan" || type === "urutkan" || type === "drag_drop" || type === "uraian" || type === "klasifikasi" || type === "matriks" || type === "isian_rumpang") ? 800 : 600;
 
     const content = await fetchAI({
       pb, messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userPrompt }],
@@ -1448,6 +1539,9 @@ export const generateFromMaterialAI = async (
   level: string = "Umum",
   type: string = "pilihan_ganda"
 ): Promise<AIGeneratedQuestion[]> => {
+  if (type === "hotspot") {
+    throw new Error("Tipe soal hotspot tidak didukung generator AI karena membutuhkan gambar dan penandaan area manual. Gunakan editor soal di aplikasi.");
+  }
   try {
     const ctx = detectSubjectContext(subject, material);
     const formatRules = buildFormatRules(ctx);
@@ -1462,6 +1556,9 @@ export const generateFromMaterialAI = async (
       menjodohkan: "Menjodohkan/Matching (4-6 pasangan kiri-kanan)",
       urutkan: "Mengurutkan/Sequencing (4-6 item disusun urut)",
       drag_drop: "Drag & Drop (4-6 item disusun/dikelompokkan)",
+      klasifikasi: "Klasifikasi (kategori untuk setiap pernyataan)",
+      matriks: "Matriks (tabel pernyataan x kolom opsi)",
+      isian_rumpang: "Isian Rumpang/Cloze (lengkapi kata hilang)",
     };
     const typeDesc = typeMap[type] || "Pilihan Ganda";
 
@@ -1491,6 +1588,15 @@ Urutan dalam array items adalah URUTAN BENAR. 4-6 item.`;
         case "drag_drop":
           return `JSON: {"questions":[{"text":"Susun item berikut:","type":"drag_drop","items":[{"id":"1","text":"item 1"},{"id":"2","text":"item 2"},{"id":"3","text":"item 3"},{"id":"4","text":"item 4"}],"answerKey":"1,2,3,4"}]}
 Urutan dalam array items adalah URUTAN BENAR. 4-6 item.`;
+        case "klasifikasi":
+          return `JSON: {"questions":[{"text":"Tentukan kategori yang sesuai untuk setiap pernyataan:","type":"klasifikasi","categories":[{"id":"c1","text":"Kategori A"},{"id":"c2","text":"Kategori B"}],"statements":[{"id":"s1","text":"...","answer":"c1"},{"id":"s2","text":"...","answer":"c2"}],"shuffleStatements":true,"answerKey":""}]}
+categories: 2-4 kategori. statements: 3-5 pernyataan dengan "answer" = id kategori benar.`;
+        case "matriks":
+          return `JSON: {"questions":[{"text":"Tentukan Benar atau Salah untuk setiap pernyataan:","type":"matriks","columns":[{"id":"benar","text":"Benar"},{"id":"salah","text":"Salah"}],"statements":[{"id":"s1","text":"...","answer":"benar"},{"id":"s2","text":"...","answer":"salah"}],"answerKey":""}]}
+columns: 2-3 kolom opsi. statements: 3-5 pernyataan dengan "answer" = id kolom benar.`;
+        case "isian_rumpang":
+          return `JSON: {"questions":[{"text":"Lengkapi: ... [[1]] ... [[2]] ...","type":"isian_rumpang","blanks":[{"id":"1","answers":["..."],"caseSensitive":false},{"id":"2","answers":["..."],"caseSensitive":false}],"answerKey":""}]}
+"text" berisi [[1]], [[2]] untuk rumpang. "blanks" berisi kunci tiap rumpang (boleh jawaban alternatif).`;
         default:
           return `JSON: {"questions":[{"text":"pertanyaan SAJA","type":"pilihan_ganda","choices":{"a":{"text":"...","isCorrect":false},...,"e":{"text":"...","isCorrect":true}},"answerKey":"e"}]}`;
       }
