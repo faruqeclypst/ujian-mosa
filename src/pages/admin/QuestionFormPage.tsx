@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Plus, Edit, Trash, Check, Copy, Image, ChevronDown, FileText, Download, Eye, EyeOff, FolderOpen, Sparkles, Wand2, RefreshCw, BookOpen, Loader2, FileSpreadsheet, Search, X, Bookmark, Forward, CheckCircle2, Menu, Maximize2, HelpCircle, FileJson, GripVertical, ChevronLeft, ChevronRight, Database, Key, Layers, Target, Info, Lightbulb } from "lucide-react";
+import { ArrowLeft, Plus, Edit, Trash, Check, Copy, Image, ChevronDown, FileText, Download, Eye, EyeOff, FolderOpen, Sparkles, Wand2, RefreshCw, BookOpen, Loader2, FileSpreadsheet, Search, X, Bookmark, Forward, CheckCircle2, Menu, Maximize2, HelpCircle, FileJson, GripVertical, ChevronLeft, ChevronRight, Database, Key, Layers, Target, Info } from "lucide-react";
 import { Reorder } from "framer-motion";
 import { MathText } from "../../components/ui/MathText";
 import { SmartImage } from "../../components/ui/smart-image";
@@ -5163,7 +5163,7 @@ const QuestionFormPage = () => {
                           {(allowedTypes.pilihan_ganda !== false || formValues.type === "pilihan_ganda") && <option value="pilihan_ganda">Pilihan Ganda (Single Choice)</option>}
                           {(allowedTypes.pilihan_ganda_kompleks || formValues.type === "pilihan_ganda_kompleks") && <option value="pilihan_ganda_kompleks">Pilihan Ganda Kompleks (Multi Response)</option>}
                           {(allowedTypes.menjodohkan || formValues.type === "menjodohkan") && <option value="menjodohkan">Menjodohkan (Matching)</option>}
-                          {formValues.type === "benar_salah" && <option value="benar_salah">Benar / Salah (Legacy)</option>}
+                          {(allowedTypes.benar_salah || formValues.type === "benar_salah") && <option value="benar_salah">Benar / Salah (Matriks ANBK)</option>}
                           {(allowedTypes.isian_singkat || formValues.type === "isian_singkat") && <option value="isian_singkat">Isian Singkat</option>}
                           {(allowedTypes.uraian || formValues.type === "uraian") && <option value="uraian">Uraian / Esai</option>}
                           {(allowedTypes.urutkan || formValues.type === "urutkan") && <option value="urutkan">Urutkan (Ordering)</option>}
@@ -5177,9 +5177,6 @@ const QuestionFormPage = () => {
 
                       <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-tight">
                         Pilih format lembar jawaban siswa yang sesuai.
-                      </p>
-                      <p className="text-[11px] text-amber-600 dark:text-amber-400 leading-tight">
-                        Tipe Benar / Salah sudah digantikan oleh Matriks untuk soal baru.
                       </p>
                     </div>
 
@@ -5768,43 +5765,15 @@ const QuestionFormPage = () => {
                   {/* RENDER MATRIKS */}
                   {formValues.type === "matriks" && (
                     <div className="space-y-4">
-                      {/* Info Benar/Salah */}
-                      <div className="flex items-start gap-3 p-3.5 rounded-xl bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/50">
-                        <Lightbulb className="h-4 w-4 mt-0.5 shrink-0 text-blue-600 dark:text-blue-400" />
-                        <div className="text-xs text-blue-800 dark:text-blue-200 leading-relaxed">
-                          <span className="font-bold">Matriks bisa dipakai untuk soal Benar/Salah.</span> Klik tombol template di bawah untuk mengisi kolom "Benar" dan "Salah" otomatis.
-                        </div>
-                      </div>
-
                       {/* Editor Kolom */}
                       <div className="space-y-2.5">
                         <div className="flex items-center justify-between px-1">
                           <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
                             Kolom Pilihan
                           </span>
-                          <div className="flex items-center gap-2">
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                const t = Date.now().toString(36);
-                                setFormValues(prev => ({
-                                  ...prev,
-                                  matrixColumns: [
-                                    { id: `c${t}a`, text: "Benar" },
-                                    { id: `c${t}b`, text: "Salah" },
-                                  ],
-                                }));
-                              }}
-                              className="h-7 text-[11px] rounded-lg font-bold text-blue-600 border-blue-300 hover:bg-blue-50 dark:hover:bg-blue-950/30 px-3"
-                            >
-                              Template Benar/Salah
-                            </Button>
-                            <span className="text-[10px] text-teal-700 dark:text-teal-400 font-bold bg-teal-50 dark:bg-teal-950/40 px-2.5 py-0.5 rounded-full border border-teal-200 dark:border-teal-800">
-                              Min. 2 Kolom
-                            </span>
-                          </div>
+                          <span className="text-[10px] text-teal-700 dark:text-teal-400 font-bold bg-teal-50 dark:bg-teal-950/40 px-2.5 py-0.5 rounded-full border border-teal-200 dark:border-teal-800">
+                            Min. 2 Kolom
+                          </span>
                         </div>
                         <div className="flex flex-wrap gap-2">
                           {(formValues.matrixColumns || []).map((col, cIdx) => (

@@ -3621,20 +3621,9 @@ const QuestionsPage = () => {
           isian_rumpang: "Isian Rumpang",
           hotspot: "Hotspot"
         };
-        const qType = item.type || "pilihan_ganda";
-        const isLegacy = qType === "benar_salah";
         return (
-          <span className="inline-flex items-center gap-1">
-            <span className={`p-1 px-2 rounded-md text-[10px] font-bold border uppercase whitespace-nowrap ${isLegacy
-              ? "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400 border-amber-200 dark:border-amber-800/40"
-              : "bg-indigo-50 text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800/40"}`}>
-              {typeLabels[qType]}
-            </span>
-            {isLegacy && (
-              <span className="p-1 px-1.5 rounded-md bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 text-[9px] font-bold border border-slate-200 dark:border-slate-700 uppercase whitespace-nowrap" title="Tipe lama — gunakan Matriks untuk soal baru">
-                Legacy
-              </span>
-            )}
+          <span className="p-1 px-2 rounded-md bg-indigo-50 text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400 text-[10px] font-bold border border-indigo-200 dark:border-indigo-800/40 uppercase whitespace-nowrap">
+            {typeLabels[item.type || "pilihan_ganda"]}
           </span>
         );
       }
@@ -5714,7 +5703,7 @@ Aturan:
                           {(allowedTypes.pilihan_ganda !== false || formValues.type === "pilihan_ganda") && <option value="pilihan_ganda">Pilihan Ganda (Single Choice)</option>}
                           {(allowedTypes.pilihan_ganda_kompleks || formValues.type === "pilihan_ganda_kompleks") && <option value="pilihan_ganda_kompleks">Pilihan Ganda Kompleks (Multi Response)</option>}
                           {(allowedTypes.menjodohkan || formValues.type === "menjodohkan") && <option value="menjodohkan">Menjodohkan (Matching)</option>}
-                          {formValues.type === "benar_salah" && <option value="benar_salah">Benar / Salah (Legacy)</option>}
+                          {(allowedTypes.benar_salah || formValues.type === "benar_salah") && <option value="benar_salah">Benar / Salah (Matriks ANBK)</option>}
                           {(allowedTypes.isian_singkat || formValues.type === "isian_singkat") && <option value="isian_singkat">Isian Singkat</option>}
                           {(allowedTypes.uraian || formValues.type === "uraian") && <option value="uraian">Uraian / Esai</option>}
                           {(allowedTypes.urutkan || formValues.type === "urutkan") && <option value="urutkan">Urutkan (Ordering)</option>}
@@ -8127,6 +8116,7 @@ Aturan:
                         <select value={aiType} onChange={(e) => setAiType(e.target.value)} className="w-full h-10 px-3 rounded-xl text-xs font-bold bg-slate-50/50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-700 focus:ring-2 focus:ring-indigo-500/20 outline-none text-slate-700 dark:text-slate-200 shadow-sm focus:bg-white dark:focus:bg-slate-900 transition-colors">
                           {allowedTypes.pilihan_ganda && <option value="pilihan_ganda">Pilihan Ganda</option>}
                           {allowedTypes.pilihan_ganda_kompleks && <option value="pilihan_ganda_kompleks">PG Kompleks</option>}
+                          {allowedTypes.benar_salah && <option value="benar_salah">Benar / Salah</option>}
                           {allowedTypes.menjodohkan && <option value="menjodohkan">Menjodohkan</option>}
                           {allowedTypes.isian_singkat && <option value="isian_singkat">Isian Singkat</option>}
                           {allowedTypes.urutkan && <option value="urutkan">Mengurutkan</option>}
@@ -8339,6 +8329,7 @@ Aturan:
                         <Select value={importType} onChange={(e) => setImportType(e.target.value)}>
                           <option value="pilihan_ganda">Pilihan Ganda</option>
                           <option value="pilihan_ganda_kompleks">Ganda Kompleks</option>
+                          <option value="benar_salah">Benar / Salah</option>
                           <option value="menjodohkan">Menjodohkan</option>
                           <option value="isian_singkat">Isian Singkat</option>
                           <option value="urutkan">Mengurutkan</option>

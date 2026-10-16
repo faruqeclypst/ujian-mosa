@@ -1169,22 +1169,13 @@ export const QuestionRenderer = (props: QuestionRendererProps) => {
                 : {};
 
               if (statements.length > 0 && columns.length > 0) {
-                // Warna tombol kolom: "Benar" = hijau, "Salah" = merah (case-insensitive),
-                // kolom lain netral. Dipakai tabel desktop & kartu mobile.
-                const colTone = (col: any) => {
-                  const colName = String(col.text || "").trim().toLowerCase();
-                  const isSalahCol = colName === "salah";
-                  return {
-                    selected: isSalahCol
-                      ? "bg-red-500 border-red-500 text-white shadow-md shadow-red-500/20"
-                      : "bg-emerald-500 border-emerald-500 text-white shadow-md shadow-emerald-500/20",
-                    hover: isSalahCol
-                      ? "hover:border-red-300 dark:hover:border-red-700"
-                      : "hover:border-emerald-300 dark:hover:border-emerald-700",
-                    dotText: isSalahCol ? "text-red-600" : "text-emerald-600",
-                    dotBg: isSalahCol ? "bg-red-600" : "bg-emerald-600",
-                  };
-                };
+                // Warna tombol kolom: netral (emerald saat dipilih), sama untuk semua kolom.
+                const colTone = (_col: any) => ({
+                  selected: "bg-emerald-500 border-emerald-500 text-white shadow-md shadow-emerald-500/20",
+                  hover: "hover:border-emerald-300 dark:hover:border-emerald-700",
+                  dotText: "text-emerald-600",
+                  dotBg: "bg-emerald-600",
+                });
                 const pick = (sId: string, colId: string) =>
                   onAnswer({
                     ...currentAnswers,
