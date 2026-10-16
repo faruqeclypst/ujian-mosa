@@ -395,7 +395,7 @@ import {
   DropdownMenuLabel
 } from "../../components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../components/ui/table";
-export type QuestionType = "pilihan_ganda" | "pilihan_ganda_kompleks" | "menjodohkan" | "benar_salah" | "isian_singkat" | "uraian" | "urutkan" | "drag_drop";
+export type QuestionType = "pilihan_ganda" | "pilihan_ganda_kompleks" | "menjodohkan" | "benar_salah" | "isian_singkat" | "uraian" | "urutkan" | "drag_drop" | "klasifikasi" | "hotspot" | "isian_rumpang" | "matriks";
 
 export interface QuestionData {
   id: string;
@@ -448,6 +448,10 @@ const QuestionsPage = () => {
     urutkan: true,
     drag_drop: true,
     uraian: true,
+    klasifikasi: true,
+    hotspot: true,
+    isian_rumpang: true,
+    matriks: true,
   });
 
   const [activeAIConfig, setActiveAIConfig] = useState<{ model: string; provider: string }>({ model: "Unknown", provider: "groq" });
@@ -508,7 +512,11 @@ const QuestionsPage = () => {
         isian_singkat: "short_answer",
         uraian: "essay",
         urutkan: "sequence",
-        drag_drop: "drag_drop"
+        drag_drop: "drag_drop",
+        klasifikasi: "klasifikasi",
+        hotspot: "hotspot",
+        isian_rumpang: "isian_rumpang",
+        matriks: "matriks"
       };
 
       const chunkSize = 10;
@@ -1499,7 +1507,11 @@ const QuestionsPage = () => {
         isian_singkat: "short_answer",
         uraian: "essay",
         urutkan: "sequence",
-        drag_drop: "drag_drop"
+        drag_drop: "drag_drop",
+        klasifikasi: "klasifikasi",
+        hotspot: "hotspot",
+        isian_rumpang: "isian_rumpang",
+        matriks: "matriks"
       };
 
       setBatchProgress({
@@ -1828,7 +1840,11 @@ const QuestionsPage = () => {
       isian_singkat: "short_answer",
       uraian: "essay",
       urutkan: "sequence",
-      drag_drop: "drag_drop"
+      drag_drop: "drag_drop",
+      klasifikasi: "klasifikasi",
+      hotspot: "hotspot",
+      isian_rumpang: "isian_rumpang",
+      matriks: "matriks"
     };
 
     setIsSavingBatch(true);
@@ -2763,7 +2779,11 @@ const QuestionsPage = () => {
         isian_singkat: "short_answer",
         uraian: "essay",
         urutkan: "sequence",
-        drag_drop: "drag_drop"
+        drag_drop: "drag_drop",
+        klasifikasi: "klasifikasi",
+        hotspot: "hotspot",
+        isian_rumpang: "isian_rumpang",
+        matriks: "matriks"
       };
 
       const payload: any = {
@@ -3738,6 +3758,10 @@ const QuestionsPage = () => {
         uraian: "essay",
         urutkan: "sequence",
         drag_drop: "drag_drop",
+        klasifikasi: "klasifikasi",
+        hotspot: "hotspot",
+        isian_rumpang: "isian_rumpang",
+        matriks: "matriks",
         multiple_choice: "multiple_choice",
         complex_choice: "complex_choice",
         matching: "matching",

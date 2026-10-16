@@ -208,7 +208,11 @@ export const ItemAnalysisDialog: React.FC<ItemAnalysisDialogProps> = ({
         short_answer: "isian_singkat",
         essay: "uraian",
         sequence: "urutkan",
-        drag_drop: "drag_drop"
+        drag_drop: "drag_drop",
+        klasifikasi: "klasifikasi",
+        hotspot: "hotspot",
+        isian_rumpang: "isian_rumpang",
+        matriks: "matriks"
       };
 
       const groupTextMap: Record<string, string> = {};

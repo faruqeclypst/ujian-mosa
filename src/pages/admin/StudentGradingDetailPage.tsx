@@ -80,7 +80,7 @@ const StudentGradingDetailPage = () => {
       setRoom({ ...roomRecord, examTitle: examObj?.title || "Ujian", examId: roomRecord.examId, subjectName, roomName: roomRecord.room_name || (roomRecord as any).title || roomRecord.title || "" });
 
       const qList = await pb.collection("questions").getFullList({ filter: `examId = "${roomRecord.examId}"`, sort: "order,created" });
-      const typeMap: Record<string, string> = { multiple_choice: "pilihan_ganda", complex_choice: "pilihan_ganda_kompleks", matching: "menjodohkan", true_false: "benar_salah", short_answer: "isian_singkat", essay: "uraian", sequence: "urutkan", drag_drop: "drag_drop" };
+      const typeMap: Record<string, string> = { multiple_choice: "pilihan_ganda", complex_choice: "pilihan_ganda_kompleks", matching: "menjodohkan", true_false: "benar_salah", short_answer: "isian_singkat", essay: "uraian", sequence: "urutkan", drag_drop: "drag_drop", klasifikasi: "klasifikasi", hotspot: "hotspot", isian_rumpang: "isian_rumpang", matriks: "matriks" };
       const mapped = qList.map(q => {
         const t = typeMap[q.field || q.type] || q.field || q.type || "pilihan_ganda";
         const opts = q.options || {};

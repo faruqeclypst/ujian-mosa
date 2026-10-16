@@ -118,7 +118,11 @@ export const QuestionRepositoryDialog: React.FC<QuestionRepositoryDialogProps> =
           short_answer: "isian_singkat",
           essay: "uraian",
           sequence: "urutkan",
-          drag_drop: "drag_drop"
+          drag_drop: "drag_drop",
+          klasifikasi: "klasifikasi",
+          hotspot: "hotspot",
+          isian_rumpang: "isian_rumpang",
+          matriks: "matriks"
         };
 
         // Kumpulkan map stimulus literasi literasi (groupId -> groupText)
@@ -340,7 +344,11 @@ export const QuestionRepositoryDialog: React.FC<QuestionRepositoryDialogProps> =
     isian_singkat: "Isian Singkat",
     uraian: "Uraian",
     urutkan: "Urutkan",
-    drag_drop: "Drag & Drop"
+    drag_drop: "Drag & Drop",
+    klasifikasi: "Klasifikasi",
+    hotspot: "Hotspot (Klik Gambar)",
+    isian_rumpang: "Isian Rumpang",
+    matriks: "Matriks"
   };
 
   return (

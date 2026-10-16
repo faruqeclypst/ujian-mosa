@@ -351,7 +351,11 @@ const MonitoringPage = () => {
             uraian: "uraian",
             menjodohkan: "menjodohkan",
             urutkan: "urutkan",
-            benar_salah: "benar_salah"
+            benar_salah: "benar_salah",
+            klasifikasi: "klasifikasi",
+            hotspot: "hotspot",
+            isian_rumpang: "isian_rumpang",
+            matriks: "matriks"
           };
           const mappedType = typeMapReverse[rawType] || rawType;
           let rawOptions = q.options || {};

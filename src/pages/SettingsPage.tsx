@@ -147,6 +147,10 @@ const SettingsPage = () => {
     urutkan: true,
     drag_drop: true,
     uraian: true,
+    klasifikasi: true,
+    hotspot: true,
+    isian_rumpang: true,
+    matriks: true,
   });
 
   // 🔄 Offline 1-Click Update States
@@ -252,6 +256,10 @@ const SettingsPage = () => {
     { id: "urutkan", label: "Mengurutkan (Ordering)" },
     { id: "drag_drop", label: "Drag & Drop" },
     { id: "uraian", label: "Uraian / Essay" },
+    { id: "klasifikasi", label: "Klasifikasi" },
+    { id: "hotspot", label: "Hotspot (Klik Gambar)" },
+    { id: "isian_rumpang", label: "Isian Rumpang" },
+    { id: "matriks", label: "Matriks" },
   ];
 
   const fetchSettings = useCallback(async () => {

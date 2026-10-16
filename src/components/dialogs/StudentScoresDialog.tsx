@@ -225,7 +225,11 @@ const StudentScoresDialog = ({ isOpen, onClose, studentId, studentName }: Studen
         uraian: "uraian",
         menjodohkan: "menjodohkan",
         urutkan: "urutkan",
-        benar_salah: "benar_salah"
+        benar_salah: "benar_salah",
+        klasifikasi: "klasifikasi",
+        hotspot: "hotspot",
+        isian_rumpang: "isian_rumpang",
+        matriks: "matriks"
       };
 
       const mappedQuestions = rawQuestions.map((q: any) => {

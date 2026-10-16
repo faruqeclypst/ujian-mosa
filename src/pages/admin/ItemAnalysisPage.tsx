@@ -423,7 +423,11 @@ export const ItemAnalysisPage: React.FC = () => {
         sequence: "urutkan",
         ordering: "urutkan",
         urutkan: "urutkan",
-        drag_drop: "drag_drop"
+        drag_drop: "drag_drop",
+        klasifikasi: "klasifikasi",
+        hotspot: "hotspot",
+        isian_rumpang: "isian_rumpang",
+        matriks: "matriks"
       };
 
       const groupTextMap: Record<string, string> = {};

@@ -73,7 +73,7 @@ import { motion, AnimatePresence, Reorder } from "framer-motion";
 
 interface Question {
   id: string;
-  type?: "pilihan_ganda" | "pilihan_ganda_kompleks" | "menjodohkan" | "benar_salah" | "isian_singkat" | "uraian" | "urutkan" | "drag_drop";
+  type?: "pilihan_ganda" | "pilihan_ganda_kompleks" | "menjodohkan" | "benar_salah" | "isian_singkat" | "uraian" | "urutkan" | "drag_drop" | "klasifikasi" | "hotspot" | "isian_rumpang" | "matriks";
   text: string;
   imageUrl?: string;
   groupId?: string;
@@ -1084,7 +1084,7 @@ const CBTPage = () => {
 
       const qRecord = await pb.collection("questions").getFullList({ filter: `examId = "${rData.examId}"`, sort: "order,created" });
       const loaded: Question[] = qRecord.map(q => {
-        const tM: any = { "multiple_choice": "pilihan_ganda", "complex_multiple_choice": "pilihan_ganda_kompleks", "complex_choice": "pilihan_ganda_kompleks", "short_answer": "isian_singkat", "essay": "uraian", "matching": "menjodohkan", "ordering": "urutkan", "sequence": "urutkan", "true_false": "benar_salah", "drag_drop": "drag_drop", "pilihan_ganda": "pilihan_ganda", "pilihan_ganda_kompleks": "pilihan_ganda_kompleks", "isian_singkat": "isian_singkat", "uraian": "uraian", "menjodohkan": "menjodohkan", "urutkan": "urutkan", "benar_salah": "benar_salah" };
+        const tM: any = { "multiple_choice": "pilihan_ganda", "complex_multiple_choice": "pilihan_ganda_kompleks", "complex_choice": "pilihan_ganda_kompleks", "short_answer": "isian_singkat", "essay": "uraian", "matching": "menjodohkan", "ordering": "urutkan", "sequence": "urutkan", "true_false": "benar_salah", "drag_drop": "drag_drop", "klasifikasi": "klasifikasi", "hotspot": "hotspot", "isian_rumpang": "isian_rumpang", "matriks": "matriks", "pilihan_ganda": "pilihan_ganda", "pilihan_ganda_kompleks": "pilihan_ganda_kompleks", "isian_singkat": "isian_singkat", "uraian": "uraian", "menjodohkan": "menjodohkan", "urutkan": "urutkan", "benar_salah": "benar_salah" };
 
         let qImg = q.imageUrl || "";
         if (qImg && !qImg.startsWith('http') && !qImg.startsWith('data:')) {
