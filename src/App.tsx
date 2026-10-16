@@ -42,6 +42,7 @@ const UsersPage = lazy(() => import("./pages/UsersPage"));
 const SettingsPage = lazy(() => import("./pages/SettingsPage"));
 const ExamsPage = lazy(() => import("./pages/admin/ExamsPage"));
 const QuestionsPage = lazy(() => import("./pages/admin/QuestionsPage"));
+const QuestionFormPage = lazy(() => import("./pages/admin/QuestionFormPage"));
 const ExamRoomsPage = lazy(() => import("./pages/admin/ExamRoomsPage"));
 const MonitoringPage = lazy(() => import("./pages/admin/MonitoringPage"));
 const GradingPage = lazy(() => import("./pages/admin/GradingPage"));
@@ -198,6 +199,8 @@ const SchoolAppContent = () => {
               <Route path="kelola-akun" element={<AdminOnlyRoute><UsersPage /></AdminOnlyRoute>} />
               <Route path="bank-soal" element={<ExamsPage />} />
               <Route path="bank-soal/questions" element={<QuestionsPage />} />
+              <Route path="bank-soal/questions/new" element={<QuestionFormPage />} />
+              <Route path="bank-soal/questions/:questionId/edit" element={<QuestionFormPage />} />
               <Route path="ruang-ujian" element={<ExamRoomsPage />} />
               <Route path="monitoring" element={<MonitoringPage />} />
               <Route path="penilaian" element={<GradingPage />} />

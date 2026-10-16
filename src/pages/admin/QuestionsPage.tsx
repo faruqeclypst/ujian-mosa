@@ -2418,6 +2418,9 @@ const QuestionsPage = () => {
 
 
   const handleCreateClick = () => {
+    // Navigasi ke halaman form (bukan modal lagi)
+    navigate("/admin/bank-soal/questions/new");
+    return;
     setDialogMode("create");
     setSelectedQuestion(null);
     setQuestionFile(null);
@@ -2473,6 +2476,9 @@ const QuestionsPage = () => {
   };
 
   const handleEditClick = (q: QuestionData) => {
+    // Navigasi ke halaman form edit (bukan modal lagi)
+    navigate(`/admin/bank-soal/questions/${q.id}/edit`);
+    return;
     setDialogMode("edit");
     setSelectedQuestion(q);
     setQuestionFile(null);
