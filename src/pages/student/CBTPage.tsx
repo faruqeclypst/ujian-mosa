@@ -381,7 +381,46 @@ export const getQuestionStatus = (q: Question, ans: any): QuestionStatusInfo => 
     }
   }
 
-  // 8. ISIAN_SINGKAT / URAIAN
+  // 8. HOTSPOT
+  if (type === "hotspot") {
+    const mode = (q.hotspotMode || "any").toLowerCase();
+    if (mode === "all") {
+      const pts = Array.isArray(ans) ? ans : [];
+      const validPts = pts.filter(p => p && typeof p.x === "number" && typeof p.y === "number");
+      if (validPts.length === 0) {
+        return {
+          isComplete: false,
+          isPartiallyAnswered: false,
+          isUnanswered: true,
+          typeLabel: "Hotspot",
+          missingDetail: "Belum ada titik yang ditandai",
+          summaryText: "Belum dijawab"
+        };
+      } else {
+        return {
+          isComplete: true,
+          isPartiallyAnswered: false,
+          isUnanswered: false,
+          typeLabel: "Hotspot",
+          missingDetail: "",
+          summaryText: `${validPts.length} titik ditandai`
+        };
+      }
+    } else {
+      const isFilled = ans !== null && typeof ans === "object" && !Array.isArray(ans) &&
+        typeof ans.x === "number" && typeof ans.y === "number";
+      return {
+        isComplete: isFilled,
+        isPartiallyAnswered: false,
+        isUnanswered: !isFilled,
+        typeLabel: "Hotspot",
+        missingDetail: isFilled ? "" : "Belum klik pada gambar",
+        summaryText: isFilled ? "Titik ditandai" : "Belum dijawab"
+      };
+    }
+  }
+
+  // 9. ISIAN_SINGKAT / URAIAN
   if (type === "isian_singkat" || type === "uraian") {
     const isFilled = typeof ans === "string" && ans.trim().length > 0;
     return {
@@ -2256,6 +2295,10 @@ const CBTPage = () => {
           // Kita tidak bisa hitung skor akurat di client tanpa kunci, jadi skip (0)
           // Server akan hitung yang benar saat submit
         }
+        else if (t === "hotspot") {
+          // SKIP skoring client: areas di-strip dari server (kunci jawaban),
+          // tidak ada data untuk hitung di client. Beri 0, andalkan server.
+        }
       });
 
       const totalQuestions = objectiveTotal + essayTotal;
@@ -3443,6 +3486,135 @@ const CBTPage = () => {
                         style={{ fontSize: `${15 * fontSize}px` }}
                       >
                         {parts}
+                      </div>
+                    );
+                  })()
+                )}
+                {currentQuestion.type === "hotspot" && (
+                  (() => {
+                    const imgUrl = currentQuestion.hotspotImageUrl || currentQuestion.imageUrl || "";
+                    const mode = (currentQuestion.hotspotMode || "any").toLowerCase();
+                    const ans = answers[currentQuestion.id];
+
+                    const handleImageClick = (e: React.MouseEvent<HTMLDivElement>) => {
+                      const imgEl = (e.currentTarget as HTMLDivElement).querySelector("img");
+                      if (!imgEl) return;
+                      const rect = imgEl.getBoundingClientRect();
+                      const x = ((e.clientX - rect.left) / rect.width) * 100;
+                      const y = ((e.clientY - rect.top) / rect.height) * 100;
+                      // Clamp 0-100
+                      const cx = Math.max(0, Math.min(100, Math.round(x * 10) / 10));
+                      const cy = Math.max(0, Math.min(100, Math.round(y * 10) / 10));
+
+                      if (mode === "all") {
+                        const pts = Array.isArray(ans) ? [...ans] : [];
+                        pts.push({ x: cx, y: cy });
+                        handleAnswerSelect(currentQuestion.id, pts);
+                      } else {
+                        handleAnswerSelect(currentQuestion.id, { x: cx, y: cy });
+                      }
+                    };
+
+                    const handleClear = () => {
+                      handleAnswerSelect(currentQuestion.id, mode === "all" ? [] : null);
+                    };
+
+                    const handleRemovePoint = (idx: number, e: React.MouseEvent) => {
+                      e.stopPropagation();
+                      if (mode === "all" && Array.isArray(ans)) {
+                        const pts = [...ans];
+                        pts.splice(idx, 1);
+                        handleAnswerSelect(currentQuestion.id, pts);
+                      }
+                    };
+
+                    const handleImgError = (e: React.SyntheticEvent<HTMLImageElement>) => {
+                      const container = (e.target as HTMLImageElement).closest("[data-hotspot-container]");
+                      const fallback = container?.querySelector("[data-hotspot-fallback]");
+                      const imgWrap = container?.querySelector("[data-hotspot-imgwrap]");
+                      if (fallback) (fallback as HTMLElement).style.display = "flex";
+                      if (imgWrap) (imgWrap as HTMLElement).style.display = "none";
+                    };
+
+                    if (!imgUrl) {
+                      return (
+                        <div className="flex flex-col items-center justify-center py-12 px-6 text-center bg-slate-50 dark:bg-slate-900/50 rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-800">
+                          <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">
+                            Gambar soal tidak tersedia.
+                          </p>
+                          <p className="text-xs text-slate-400 dark:text-slate-500 mt-2">
+                            Hubungi pengawas jika masalah berlanjut.
+                          </p>
+                        </div>
+                      );
+                    }
+
+                    const markers: Array<{ x: number; y: number }> = mode === "all"
+                      ? (Array.isArray(ans) ? ans.filter((p: any) => p && typeof p.x === "number" && typeof p.y === "number") : [])
+                      : (ans && typeof ans.x === "number" && typeof ans.y === "number" ? [ans] : []);
+
+                    return (
+                      <div className="space-y-3" data-hotspot-container>
+                        <div className="text-sm text-slate-500 dark:text-slate-400 font-medium px-1">
+                          {mode === "all"
+                            ? "Klik pada gambar untuk menandai titik (bisa beberapa titik). Klik nomor untuk menghapus."
+                            : "Klik pada gambar untuk menandai titik. Klik lagi untuk memindahkan."}
+                        </div>
+                        <div
+                          data-hotspot-imgwrap
+                          className="relative inline-block max-w-full rounded-xl sm:rounded-2xl overflow-hidden border-2 border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 select-none"
+                          style={{ touchAction: "manipulation", cursor: "crosshair" }}
+                          onClick={handleImageClick}
+                        >
+                          <img
+                            src={imgUrl}
+                            alt="Soal hotspot"
+                            className="max-w-full h-auto block"
+                            style={{ maxHeight: "60vh" }}
+                            draggable={false}
+                            onError={handleImgError}
+                          />
+                          {markers.map((pt, idx) => (
+                            <div
+                              key={idx}
+                              className="absolute transform -translate-x-1/2 -translate-y-1/2 flex items-center justify-center rounded-full bg-red-500 border-2 border-white shadow-lg font-bold text-white"
+                              style={{
+                                left: `${pt.x}%`,
+                                top: `${pt.y}%`,
+                                width: "28px",
+                                height: "28px",
+                                fontSize: "14px",
+                                pointerEvents: mode === "all" ? "auto" : "none",
+                                cursor: mode === "all" ? "pointer" : "default"
+                              }}
+                              onClick={mode === "all" ? (e) => handleRemovePoint(idx, e) : undefined}
+                              title={mode === "all" ? "Klik untuk hapus titik ini" : `Titik (${pt.x}%, ${pt.y}%)`}
+                            >
+                              {mode === "all" ? idx + 1 : "•"}
+                            </div>
+                          ))}
+                        </div>
+                        <div
+                          data-hotspot-fallback
+                          className="flex-col items-center justify-center py-12 px-6 text-center bg-slate-50 dark:bg-slate-900/50 rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-800"
+                          style={{ display: "none" }}
+                        >
+                          <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">
+                            Gambar gagal dimuat.
+                          </p>
+                          <p className="text-xs text-slate-400 dark:text-slate-500 mt-2">
+                            Hubungi pengawas jika masalah berlanjut.
+                          </p>
+                        </div>
+                        {markers.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={handleClear}
+                            className="px-4 py-2 rounded-xl border-2 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 text-sm font-bold hover:border-rose-300 hover:text-rose-500 transition-all active:scale-95"
+                          >
+                            Hapus {mode === "all" ? "semua titik" : "titik"}
+                          </button>
+                        )}
                       </div>
                     );
                   })()
