@@ -3588,14 +3588,14 @@ const QuestionsPage = () => {
           <MathText content={item.text} className="line-clamp-2 text-sm font-serif text-slate-800 dark:text-slate-200 leading-relaxed ql-editor !p-0 [&_p]:m-0 [&_ol]:list-decimal [&_ul]:list-disc [&_ol]:pl-4 [&_ul]:pl-4" />
           <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
             {(item.imageUrl || item.text.includes("<img")) && (
-              <span className="p-1 px-1.5 rounded-md bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400 flex items-center gap-1 font-bold text-[9px] border border-blue-200 dark:border-blue-800/40 uppercase tracking-tight">
+              <span className="px-2.5 py-1 rounded-full bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400 flex items-center gap-1 font-semibold text-xs border border-blue-200 dark:border-blue-800/40 uppercase tracking-tight">
                 Bergambar
               </span>
             )}
             {item.groupId && (
-              <span className="p-1 px-1.5 rounded-md bg-amber-50 text-amber-600 dark:bg-amber-950/20 dark:text-amber-400 flex items-center gap-1 font-bold text-[9px] border border-amber-200 dark:border-amber-800/40 uppercase tracking-tight">
+              <span className="px-2.5 py-1 rounded-full bg-amber-50 text-amber-600 dark:bg-amber-950/20 dark:text-amber-400 flex items-center gap-1 font-semibold text-xs border border-amber-200 dark:border-amber-800/40 uppercase tracking-tight">
                 Paket: {item.groupId}
-                {questions.findIndex(q => q.groupId === item.groupId) === questions.indexOf(item) && <span className="ml-1 px-1 py-0.5 rounded bg-amber-500 text-white text-[7px] font-black">MAIN</span>}
+                {questions.findIndex(q => q.groupId === item.groupId) === questions.indexOf(item) && <span className="ml-1 px-2 py-0.5 rounded-full bg-amber-500 text-white text-xs font-black">MAIN</span>}
               </span>
             )}
           </div>
@@ -3622,7 +3622,7 @@ const QuestionsPage = () => {
           hotspot: "Hotspot"
         };
         return (
-          <span className="p-1 px-2 rounded-md bg-indigo-50 text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400 text-[10px] font-bold border border-indigo-200 dark:border-indigo-800/40 uppercase whitespace-nowrap">
+          <span className="p-1 px-2 rounded-md bg-indigo-50 text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400 text-xs font-bold border border-indigo-200 dark:border-indigo-800/40 uppercase whitespace-nowrap">
             {typeLabels[item.type || "pilihan_ganda"]}
           </span>
         );
@@ -3644,16 +3644,16 @@ const QuestionsPage = () => {
                   {stList.length} Pernyataan
                 </span>
                 <div
-                  className="flex items-center gap-1 p-1 px-1.5 rounded-md bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-800 whitespace-nowrap cursor-help"
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-800 whitespace-nowrap cursor-help"
                   title={stList.map((s: any, idx: number) => `${idx + 1}. ${s.text ? s.text.replace(/<[^>]*>/g, '').trim() : 'Pernyataan'}: ${(s.answer || 'benar').toUpperCase()}`).join("\n")}
                 >
-                  <span className="text-[10px] text-slate-500 dark:text-slate-400 font-bold mr-0.5">Kunci:</span>
+                  <span className="text-xs text-slate-500 dark:text-slate-400 font-bold mr-0.5">Kunci:</span>
                   {stList.map((s: any, idx: number) => {
                     const isBenar = (s.answer || "benar").toLowerCase() === "benar";
                     return (
                       <span
                         key={s.id || idx}
-                        className={`inline-flex items-center justify-center px-1.5 py-0.2 rounded text-[10px] font-black font-mono shadow-xs ${isBenar
+                        className={`inline-flex items-center justify-center px-1.5 py-0.2 rounded text-xs font-black font-mono shadow-xs ${isBenar
                             ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700/50"
                             : "bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-300 dark:border-rose-700/50"
                           }`}
@@ -3680,7 +3680,7 @@ const QuestionsPage = () => {
                   {keys.length} Opsi
                 </span>
                 {correctCount > 0 && (
-                  <span className="p-1 px-2 text-[11px] font-bold rounded-md bg-green-50 text-green-600 dark:bg-green-950/40 dark:text-green-400 border border-green-200 dark:border-green-800/40 whitespace-nowrap">
+                  <span className="p-1 px-2 text-xs font-bold rounded-md bg-green-50 text-green-600 dark:bg-green-950/40 dark:text-green-400 border border-green-200 dark:border-green-800/40 whitespace-nowrap">
                     Kunci: {correctKeys}
                   </span>
                 )}
@@ -3706,7 +3706,7 @@ const QuestionsPage = () => {
                 </span>
                 {cols.length > 0 && (
                   <span
-                    className="p-1 px-2 rounded-md bg-slate-50 text-slate-600 dark:bg-slate-800/60 dark:text-slate-300 text-[11px] border border-slate-200 dark:border-slate-800 whitespace-nowrap cursor-help"
+                    className="p-1 px-2 rounded-md bg-slate-50 text-slate-600 dark:bg-slate-800/60 dark:text-slate-300 text-xs border border-slate-200 dark:border-slate-800 whitespace-nowrap cursor-help"
                     title={cols.map((c: any) => c.text).join(" | ")}
                   >
                     {cols.map((c: any) => c.text).join(" / ").slice(0, 30)}
@@ -3733,7 +3733,7 @@ const QuestionsPage = () => {
                 </span>
                 {cats.length > 0 && (
                   <span
-                    className="p-1 px-2 rounded-md bg-slate-50 text-slate-600 dark:bg-slate-800/60 dark:text-slate-300 text-[11px] border border-slate-200 dark:border-slate-800 whitespace-nowrap cursor-help"
+                    className="p-1 px-2 rounded-md bg-slate-50 text-slate-600 dark:bg-slate-800/60 dark:text-slate-300 text-xs border border-slate-200 dark:border-slate-800 whitespace-nowrap cursor-help"
                     title={cats.map((c: any) => c.text).join(" | ")}
                   >
                     {cats.map((c: any) => c.text).join(" / ").slice(0, 30)}
@@ -3760,7 +3760,7 @@ const QuestionsPage = () => {
                 </span>
                 {blanks.length > 0 && (
                   <span
-                    className="p-1 px-2 rounded-md bg-slate-50 text-slate-600 dark:bg-slate-800/60 dark:text-slate-300 text-[11px] border border-slate-200 dark:border-slate-800 whitespace-nowrap cursor-help"
+                    className="p-1 px-2 rounded-md bg-slate-50 text-slate-600 dark:bg-slate-800/60 dark:text-slate-300 text-xs border border-slate-200 dark:border-slate-800 whitespace-nowrap cursor-help"
                     title={blanks.map((b: any) => `[[${b.id}]]: ${(b.answers || []).join(" / ")}`).join("\n")}
                   >
                     {blanks.map((b: any) => `[[${b.id}]]`).join(" ").slice(0, 30)}
@@ -3784,7 +3784,7 @@ const QuestionsPage = () => {
               <span className="p-1 px-2 rounded-md bg-sky-50 text-sky-700 dark:bg-sky-950/40 dark:text-sky-300 text-xs font-semibold border border-sky-200 dark:border-sky-800/40 whitespace-nowrap">
                 {areas.length} Area
               </span>
-              <span className="p-1 px-2 rounded-md bg-slate-50 text-slate-600 dark:bg-slate-800/60 dark:text-slate-300 text-[11px] border border-slate-200 dark:border-slate-800 whitespace-nowrap">
+              <span className="p-1 px-2 rounded-md bg-slate-50 text-slate-600 dark:bg-slate-800/60 dark:text-slate-300 text-xs border border-slate-200 dark:border-slate-800 whitespace-nowrap">
                 {mode === "all" ? "Semua area" : "Satu saja"}
               </span>
             </div>
@@ -3801,7 +3801,7 @@ const QuestionsPage = () => {
             <div className="flex items-center gap-1.5 flex-wrap">
               <span className="p-1 px-2 rounded-md bg-slate-50 text-slate-600 dark:bg-slate-800/60 dark:text-slate-300 text-xs border border-slate-200 dark:border-slate-800 whitespace-nowrap">{keys.length} Opsi</span>
               {correctCount > 0 && (
-                <span className="p-1 px-2 text-[11px] font-bold rounded-md bg-green-50 text-green-600 dark:bg-green-950/40 dark:text-green-400 border border-green-200 dark:border-green-800/40 whitespace-nowrap">
+                <span className="p-1 px-2 text-xs font-bold rounded-md bg-green-50 text-green-600 dark:bg-green-950/40 dark:text-green-400 border border-green-200 dark:border-green-800/40 whitespace-nowrap">
                   Kunci: {correctKeys}
                 </span>
               )}
@@ -5095,8 +5095,8 @@ const QuestionsPage = () => {
                             <ChevronDown className="ml-1.5 h-3 w-3 opacity-50" />
                           </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-72 p-2 rounded-2xl shadow-2xl border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 z-[100]">
-                          <DropdownMenuLabel className="text-[10px] font-bold uppercase tracking-widest text-slate-400 px-3 py-2 text-left">Kelola Soal</DropdownMenuLabel>
+                        <DropdownMenuContent align="end" className="w-72 p-2 rounded-2xl shadow border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 z-[100]">
+                          <DropdownMenuLabel className="text-xs font-bold uppercase tracking-widest text-slate-400 px-3 py-2 text-left">Kelola Soal</DropdownMenuLabel>
 
                           <DropdownMenuItem
                             className="p-2.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-900 transition-all cursor-pointer group flex items-center gap-3"
@@ -5108,9 +5108,9 @@ const QuestionsPage = () => {
                             <div className="flex flex-col min-w-0 text-left">
                               <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">Import Soal</span>
                               <div className="flex items-center gap-1 mt-1">
-                                <span className="px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400 text-[8px] font-black uppercase">.xlsx</span>
-                                <span className="px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-400 text-[8px] font-black uppercase">.docx</span>
-                                <span className="px-1.5 py-0.5 rounded bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-400 text-[8px] font-black uppercase">.json</span>
+                                <span className="px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400 text-xs font-black uppercase">.xlsx</span>
+                                <span className="px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-400 text-xs font-black uppercase">.docx</span>
+                                <span className="px-1.5 py-0.5 rounded bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-400 text-xs font-black uppercase">.json</span>
                               </div>
                             </div>
                           </DropdownMenuItem>
@@ -5125,7 +5125,7 @@ const QuestionsPage = () => {
                               </div>
                               <div className="flex flex-col min-w-0">
                                 <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight tracking-tight">Export ke Word</span>
-                                <span className="text-[10px] text-slate-400 mt-1">Simpan naskah & kunci</span>
+                                <span className="text-xs text-slate-400 mt-1">Simpan naskah & kunci</span>
                               </div>
                             </DropdownMenuItem>
                           )}
@@ -5140,13 +5140,13 @@ const QuestionsPage = () => {
                               </div>
                               <div className="flex flex-col min-w-0">
                                 <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight tracking-tight">Export ke JSON</span>
-                                <span className="text-[10px] text-slate-400 mt-1">Format data mentah</span>
+                                <span className="text-xs text-slate-400 mt-1">Format data mentah</span>
                               </div>
                             </DropdownMenuItem>
                           )}
 
                           <DropdownMenuSeparator className="my-1 border-slate-100 dark:border-slate-800" />
-                          <DropdownMenuLabel className="text-[10px] font-bold uppercase tracking-widest text-slate-400 px-3 py-1.5 text-left">Template Format</DropdownMenuLabel>
+                          <DropdownMenuLabel className="text-xs font-bold uppercase tracking-widest text-slate-400 px-3 py-1.5 text-left">Template Format</DropdownMenuLabel>
 
                           <DropdownMenuItem
                             onClick={() => downloadQuestionTemplate()}
@@ -5157,7 +5157,7 @@ const QuestionsPage = () => {
                             </div>
                             <div className="flex flex-col min-w-0">
                               <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">Template Excel</span>
-                              <span className="text-[10px] text-slate-400 mt-1">Download format standard</span>
+                              <span className="text-xs text-slate-400 mt-1">Download format standard</span>
                             </div>
                           </DropdownMenuItem>
 
@@ -5171,9 +5171,9 @@ const QuestionsPage = () => {
                             <div className="flex flex-col min-w-0">
                               <div className="flex items-center gap-2">
                                 <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight tracking-tight">Template Word</span>
-                                <span className="px-1.5 py-0.5 rounded-full bg-emerald-500 text-white text-[9px] font-bold">˜…</span>
+                                <span className="px-2.5 py-1 rounded-full bg-emerald-500 text-white text-xs font-semibold">˜…</span>
                               </div>
-                              <span className="text-[10px] text-slate-400 mt-0.5">Format tabel + literasi + rumus</span>
+                              <span className="text-xs text-slate-400 mt-0.5">Format tabel + literasi + rumus</span>
                             </div>
                           </DropdownMenuItem>
                           <DropdownMenuItem
@@ -5185,7 +5185,7 @@ const QuestionsPage = () => {
                             </div>
                             <div className="flex flex-col min-w-0">
                               <span className="text-sm font-bold text-sky-700 dark:text-sky-300 leading-tight">Panduan Literasi</span>
-                              <span className="text-[10px] text-sky-500 mt-1">WAJIB BACA: Cara buat soal AKM</span>
+                              <span className="text-xs text-sky-500 mt-1">WAJIB BACA: Cara buat soal AKM</span>
                             </div>
                           </DropdownMenuItem>
                         </DropdownMenuContent>
@@ -5220,7 +5220,7 @@ const QuestionsPage = () => {
                                     [Tabel Soal Nomor 2]
                                   </div>
                                 </div>
-                                <div className="flex items-start gap-2 text-[11px] text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 p-2 rounded-lg italic">
+                                <div className="flex items-start gap-2 text-xs text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 p-2 rounded-lg italic">
                                   <Check className="h-3 w-3 mt-0.5 shrink-0" />
                                   <span>Semua soal di bawah judul tsb akan otomatis menjadi satu grup literasi. Tabel data dari Word juga akan ditampilkan dengan rapi.</span>
                                 </div>
@@ -5238,15 +5238,15 @@ const QuestionsPage = () => {
                                 <p className="text-sm text-slate-700 dark:text-slate-300">Gunakan kolom <b className="text-indigo-600">GroupId</b> untuk mengelompokkan soal.</p>
                                 <div className="grid grid-cols-2 gap-3">
                                   <div className="bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
-                                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Kolom GroupId</div>
+                                    <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Kolom GroupId</div>
                                     <div className="text-indigo-600 font-bold text-sm">GAJAH-01</div>
                                   </div>
                                   <div className="bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
-                                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Teks Literasi</div>
-                                    <div className="text-slate-600 dark:text-slate-300 text-[10px] line-clamp-2">Gajah adalah mamalia...</div>
+                                    <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Teks Literasi</div>
+                                    <div className="text-slate-600 dark:text-slate-300 text-xs line-clamp-2">Gajah adalah mamalia...</div>
                                   </div>
                                 </div>
-                                <p className="text-[11px] text-slate-500 italic">Cukup tuliskan Teks Literasi pada baris pertama dalam satu grup ID.</p>
+                                <p className="text-xs text-slate-500 italic">Cukup tuliskan Teks Literasi pada baris pertama dalam satu grup ID.</p>
                               </div>
                             </div>
 
@@ -5261,7 +5261,7 @@ const QuestionsPage = () => {
                                 <p className="text-sm text-slate-700 dark:text-slate-300">Gunakan field <b className="text-orange-600">groupId</b> dan <b className="text-orange-600">groupText</b> untuk literasi. Bisa juga minta ChatGPT buatkan soal dengan format ini.</p>
 
                                 <div className="space-y-2">
-                                  <p className="text-[10px] font-black text-orange-600 uppercase tracking-widest">Template Prompt untuk ChatGPT (Klik untuk Salin):</p>
+                                  <p className="text-xs font-black text-orange-600 uppercase tracking-widest">Template Prompt untuk ChatGPT (Klik untuk Salin):</p>
                                   <div
                                     onClick={() => {
                                       const prompt = `Buatkan 10 soal pilihan ganda untuk mata pelajaran [ISI MAPEL] kelas [ISI KELAS] dengan format JSON berikut. Gunakan format KaTeX \\(...\\) untuk rumus matematika. Untuk soal literasi, isi groupId dan groupText.
@@ -5281,17 +5281,17 @@ Aturan:
                                     }}
                                     className="p-3 bg-white dark:bg-slate-900 border border-orange-200 dark:border-orange-800 rounded-xl cursor-pointer hover:bg-orange-50 dark:hover:bg-orange-950/30 transition-all group"
                                   >
-                                    <code className="text-[10px] font-mono text-slate-600 dark:text-slate-400 leading-relaxed block">
+                                    <code className="text-xs font-mono text-slate-600 dark:text-slate-400 leading-relaxed block">
                                       Buatkan 10 soal pilihan ganda untuk mata pelajaran [MAPEL] kelas [KELAS] dengan format JSON... (klik untuk salin prompt lengkap)
                                     </code>
-                                    <div className="flex items-center gap-1.5 mt-2 text-[9px] font-bold text-orange-500 group-hover:text-orange-700">
+                                    <div className="flex items-center gap-1.5 mt-2 text-xs font-bold text-orange-500 group-hover:text-orange-700">
                                       <Copy className="w-3 h-3" /> Klik untuk salin prompt ke ChatGPT
                                     </div>
                                   </div>
                                 </div>
 
                                 <div className="space-y-2">
-                                  <p className="text-[10px] font-black text-orange-600 uppercase tracking-widest">Contoh Hasil JSON (Klik untuk Salin):</p>
+                                  <p className="text-xs font-black text-orange-600 uppercase tracking-widest">Contoh Hasil JSON (Klik untuk Salin):</p>
                                   <div
                                     onClick={() => {
                                       const sample = JSON.stringify([{ "text": "<p>Perangkat keras komputer yang berfungsi menampilkan hasil proses adalah ...</p>", "type": "pilihan_ganda", "groupId": "", "groupText": "", "choices": { "a": { "isCorrect": false, "text": "Keyboard" }, "b": { "isCorrect": false, "text": "Mouse" }, "c": { "isCorrect": true, "text": "Monitor" }, "d": { "isCorrect": false, "text": "Scanner" }, "e": { "isCorrect": false, "text": "Microphone" } }, "answerKey": "c", "order": 1 }], null, 2);
@@ -5300,22 +5300,22 @@ Aturan:
                                     }}
                                     className="p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl cursor-pointer hover:bg-slate-50 transition-all group max-h-24 overflow-hidden"
                                   >
-                                    <code className="text-[9px] font-mono text-slate-500 leading-relaxed block">
+                                    <code className="text-xs font-mono text-slate-500 leading-relaxed block">
                                       {'[{"text":"<p>Perangkat keras...</p>","type":"pilihan_ganda","choices":{"a":{"isCorrect":false,"text":"Keyboard"},...},"answerKey":"c"}]'}
                                     </code>
-                                    <div className="flex items-center gap-1.5 mt-2 text-[9px] font-bold text-slate-400 group-hover:text-indigo-600">
+                                    <div className="flex items-center gap-1.5 mt-2 text-xs font-bold text-slate-400 group-hover:text-indigo-600">
                                       <Copy className="w-3 h-3" /> Klik untuk salin contoh JSON
                                     </div>
                                   </div>
                                 </div>
 
-                                <p className="text-[11px] text-orange-600/80 italic">Paste hasil dari ChatGPT ke tab "Import JSON" di Smart AI Import. Tidak perlu API key.</p>
+                                <p className="text-xs text-orange-600/80 italic">Paste hasil dari ChatGPT ke tab "Import JSON" di Smart AI Import. Tidak perlu API key.</p>
                               </div>
                             </div>
                           </div>
 
                           <DialogFooter className="p-6 bg-slate-50 dark:bg-slate-900/50 flex flex-col sm:flex-row justify-between gap-3 items-center">
-                            <div className="text-[10px] text-slate-400 italic">Pastikan format file sesuai panduan.</div>
+                            <div className="text-xs text-slate-400 italic">Pastikan format file sesuai panduan.</div>
                             <div className="flex gap-2">
                               <Button onClick={() => setIsLiterasiGuideOpen(false)} variant="ghost" className="rounded-xl px-6 font-bold text-slate-500 hover:text-slate-700">Tutup</Button>
                               <Button onClick={() => { setIsLiterasiGuideOpen(false); downloadWordTemplateLiterasi(); }} className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl px-6 font-bold shadow-lg shadow-emerald-500/20 flex items-center gap-2">
@@ -5374,8 +5374,8 @@ Aturan:
                                   <ChevronDown className="ml-1.5 h-3 w-3 opacity-50" />
                                 </Button>
                               </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="w-64 p-2 rounded-2xl shadow-2xl border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 z-[100]">
-                                <DropdownMenuLabel className="text-[10px] font-bold uppercase tracking-widest text-slate-400 px-3 py-2 text-left">Aksi Lainnya</DropdownMenuLabel>
+                              <DropdownMenuContent align="end" className="w-64 p-2 rounded-2xl shadow border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 z-[100]">
+                                <DropdownMenuLabel className="text-xs font-bold uppercase tracking-widest text-slate-400 px-3 py-2 text-left">Aksi Lainnya</DropdownMenuLabel>
                                 {examId && (
                                   <DropdownMenuItem
                                     onClick={() => navigate(`/admin/simulate/${examId}`)}
@@ -5420,8 +5420,8 @@ Aturan:
                               Tambah
                               <ChevronDown className="ml-1.5 h-3 w-3 opacity-50" />
                             </Button>
-                          </DropdownMenuTrigger><DropdownMenuContent align="end" className="w-72 p-2 rounded-2xl shadow-2xl border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 z-[100]">
-                            <DropdownMenuLabel className="text-[10px] font-bold uppercase tracking-widest text-slate-400 px-3 py-2 text-left">Opsi Pembuatan</DropdownMenuLabel>
+                          </DropdownMenuTrigger><DropdownMenuContent align="end" className="w-72 p-2 rounded-2xl shadow border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 z-[100]">
+                            <DropdownMenuLabel className="text-xs font-bold uppercase tracking-widest text-slate-400 px-3 py-2 text-left">Opsi Pembuatan</DropdownMenuLabel>
 
                             <DropdownMenuItem
                               onClick={handleCreateClick}
@@ -5432,7 +5432,7 @@ Aturan:
                               </div>
                               <div className="flex flex-col min-w-0 text-left">
                                 <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">Tambah Soal</span>
-                                <span className="text-[10px] text-slate-400 mt-1">Input manual satu per satu</span>
+                                <span className="text-xs text-slate-400 mt-1">Input manual satu per satu</span>
                               </div>
                             </DropdownMenuItem>
 
@@ -5446,7 +5446,7 @@ Aturan:
                                 </div>
                                 <div className="flex flex-col min-w-0 text-left">
                                   <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">Ambil dari Bank / Wayground</span>
-                                  <span className="text-[10px] text-slate-400 mt-1">Impor soal lama atau Wayground API</span>
+                                  <span className="text-xs text-slate-400 mt-1">Impor soal lama atau Wayground API</span>
                                 </div>
                               </DropdownMenuItem>
                             )}
@@ -5458,7 +5458,7 @@ Aturan:
 
                             {(role === "admin" || (role === "teacher" && (user?.ai_api_key || teacherAIAccess))) && (
                               <>
-                                <DropdownMenuLabel className="text-[10px] font-bold uppercase tracking-widest text-slate-400 px-3 py-1.5 text-left">Fitur Cerdas AI</DropdownMenuLabel>
+                                <DropdownMenuLabel className="text-xs font-bold uppercase tracking-widest text-slate-400 px-3 py-1.5 text-left">Fitur Cerdas AI</DropdownMenuLabel>
                                 <DropdownMenuItem
                                   onClick={() => setIsAIModalOpen(true)}
                                   className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 focus:bg-slate-50 dark:focus:bg-slate-900 transition-colors group"
@@ -5468,7 +5468,7 @@ Aturan:
                                   </div>
                                   <div className="flex flex-col min-w-0 text-left">
                                     <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">Generasi AI</span>
-                                    <span className="text-[10px] text-slate-400 mt-1">Buat soal otomatis dari materi</span>
+                                    <span className="text-xs text-slate-400 mt-1">Buat soal otomatis dari materi</span>
                                   </div>
                                 </DropdownMenuItem>
 
@@ -5481,7 +5481,7 @@ Aturan:
                                   </div>
                                   <div className="flex flex-col min-w-0 text-left">
                                     <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">Smart AI Import (PDF)</span>
-                                    <span className="text-[10px] text-slate-400 mt-1">Ekstrak soal otomatis dari PDF</span>
+                                    <span className="text-xs text-slate-400 mt-1">Ekstrak soal otomatis dari PDF</span>
                                   </div>
                                 </DropdownMenuItem>
                               </>
@@ -5506,18 +5506,18 @@ Aturan:
               <CardTitle className="text-base font-semibold text-slate-800 dark:text-white">Daftar Soal</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="bg-card border rounded-xl shadow-sm border-slate-200/60 dark:border-slate-800 overflow-hidden">
+              <div className="bg-card border rounded-2xl shadow-sm border-slate-200/60 dark:border-slate-800 overflow-x-auto">
                 <Table>
                   <TableHeader className="bg-slate-50/50 dark:bg-slate-900/50">
                     <TableRow>
                       <TableHead className="w-[40px] px-4">
                         <Skeleton className="h-4 w-4" />
                       </TableHead>
-                      <TableHead className="w-[50px]">No</TableHead>
-                      <TableHead>Teks Pertanyaan</TableHead>
-                      <TableHead className="min-w-[120px]">Tipe Soal</TableHead>
-                      <TableHead className="min-w-[150px]">Detil Jawaban</TableHead>
-                      <TableHead className="text-right pr-6">Aksi</TableHead>
+                      <TableHead className="w-[50px] uppercase tracking-wide text-xs">No</TableHead>
+                      <TableHead className="uppercase tracking-wide text-xs">Teks Pertanyaan</TableHead>
+                      <TableHead className="min-w-[120px] uppercase tracking-wide text-xs">Tipe Soal</TableHead>
+                      <TableHead className="min-w-[150px] uppercase tracking-wide text-xs">Detil Jawaban</TableHead>
+                      <TableHead className="text-right pr-6 uppercase tracking-wide text-xs">Aksi</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -5560,7 +5560,10 @@ Aturan:
         ) : (
           <div className="space-y-3">
             {questions.length === 0 ? (
-              <div className="text-center p-12 border bg-card rounded-xl text-slate-400">Belum ada soal untuk ujian ini.</div>
+              <div className="text-center py-12 px-4 border bg-card rounded-2xl">
+                <FileText className="w-10 h-10 mx-auto text-slate-300 dark:text-slate-600 mb-3" />
+                <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">Belum ada soal untuk ujian ini.</p>
+              </div>
             ) : (
               <Card>
                 <CardHeader className="p-4">
@@ -5620,10 +5623,10 @@ Aturan:
             <div className="px-5 py-3.5 sm:px-6 sm:py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50/90 dark:bg-slate-900/90 shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-3 pr-12">
               <div>
                 <div className="flex items-center gap-2 mb-1">
-                  <span className="px-2 py-0.5 text-[10px] font-bold tracking-wider uppercase rounded-md bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 border border-indigo-200/60 dark:border-indigo-800/40">
+                  <span className="px-2 py-0.5 text-xs font-bold tracking-wider uppercase rounded-md bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 border border-indigo-200/60 dark:border-indigo-800/40">
                     {dialogMode === "edit" ? "Mode Edit" : "Mode Tambah"}
                   </span>
-                  <span className="text-[11px] font-semibold text-slate-400 dark:text-slate-500">
+                  <span className="text-xs font-semibold text-slate-400 dark:text-slate-500">
                     Bank Soal
                   </span>
                 </div>
@@ -5667,11 +5670,11 @@ Aturan:
                     {/* Kolom Kiri: Jenis / Tipe Soal */}
                     <div className="p-4 space-y-2 flex flex-col justify-between">
                       <div className="flex items-center justify-between">
-                        <label htmlFor="type" className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                        <label htmlFor="type" className="text-sm font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
                           <Layers className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
                           <span>Jenis / Tipe Soal</span>
                         </label>
-                        <span className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Format Jawaban</span>
+                        <span className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Format Jawaban</span>
                       </div>
 
                       <div className="relative">
@@ -5711,7 +5714,7 @@ Aturan:
                               ] : prev.isianRumpangBlanks
                             }));
                           }}
-                          className="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm font-semibold h-10 px-3 pr-8 cursor-pointer text-slate-800 dark:text-slate-100 shadow-xs focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all appearance-none"
+                          className="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm font-semibold h-11 px-3 pr-8 cursor-pointer text-slate-800 dark:text-slate-100 shadow-xs focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all appearance-none"
                         >
                           {(allowedTypes.pilihan_ganda !== false || formValues.type === "pilihan_ganda") && <option value="pilihan_ganda">Pilihan Ganda (Single Choice)</option>}
                           {(allowedTypes.pilihan_ganda_kompleks || formValues.type === "pilihan_ganda_kompleks") && <option value="pilihan_ganda_kompleks">Pilihan Ganda Kompleks (Multi Response)</option>}
@@ -5728,7 +5731,7 @@ Aturan:
                         <ChevronDown className="w-4 h-4 text-slate-400 dark:text-slate-500 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                       </div>
 
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-tight">
+                      <p className="text-xs text-slate-500 dark:text-slate-400 leading-tight">
                         Pilih format lembar jawaban siswa yang sesuai.
                       </p>
                     </div>
@@ -5736,11 +5739,11 @@ Aturan:
                     {/* Kolom Kanan: Paket Stimulus / Literasi */}
                     <div className="p-4 space-y-2 flex flex-col justify-between">
                       <div className="flex items-center justify-between">
-                        <label className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                        <label className="text-sm font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
                           <BookOpen className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
                           <span>Paket Stimulus / Literasi</span>
                         </label>
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md border transition-colors ${isLiterasiActive
+                        <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border transition-colors ${isLiterasiActive
                             ? "bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-950/60 dark:text-blue-300 dark:border-blue-800"
                             : "bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700"
                           }`}>
@@ -5757,7 +5760,7 @@ Aturan:
                             setFormValues({ ...formValues, groupId: "", groupText: "" });
                           }
                         }}
-                        className={`w-full h-10 px-3 rounded-lg border text-left flex items-center justify-between transition-all shadow-xs ${isLiterasiActive
+                        className={`w-full h-11 px-3 rounded-xl border text-left flex items-center justify-between transition-all shadow-xs ${isLiterasiActive
                             ? "bg-blue-50/90 border-blue-300 dark:bg-blue-950/50 dark:border-blue-800 text-blue-900 dark:text-blue-200"
                             : "bg-white hover:bg-slate-50 border-slate-300 dark:bg-slate-800 dark:hover:bg-slate-750 dark:border-slate-700 text-slate-700 dark:text-slate-300"
                           }`}
@@ -5771,7 +5774,7 @@ Aturan:
                         </div>
                       </button>
 
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-tight">
+                      <p className="text-xs text-slate-500 dark:text-slate-400 leading-tight">
                         Hubungkan soal dengan bahan bacaan atau literasi bersama.
                       </p>
                     </div>
@@ -5781,7 +5784,7 @@ Aturan:
                   {isLiterasiActive && (
                     <div className="p-4 border-t border-blue-200/80 dark:border-blue-900/60 bg-blue-50/40 dark:bg-blue-950/25 space-y-3.5">
                       <div className="space-y-2">
-                        <label className="text-xs font-bold text-blue-800 dark:text-blue-300 block">
+                        <label className="text-sm font-semibold text-blue-800 dark:text-blue-300 block">
                           Pilih / Hubungkan Paket Literasi
                         </label>
                         <select
@@ -5800,7 +5803,7 @@ Aturan:
                               });
                             }
                           }}
-                          className="bg-white dark:bg-slate-800 w-full rounded-lg border border-slate-300 dark:border-slate-700 text-sm h-10 px-3 cursor-pointer text-slate-800 dark:text-slate-200 shadow-xs"
+                          className="bg-white dark:bg-slate-800 w-full rounded-xl border border-slate-300 dark:border-slate-700 text-sm h-11 px-3 cursor-pointer text-slate-800 dark:text-slate-200 shadow-xs"
                         >
                           <option value="">-- Pilih Paket Literasi yang Sudah Ada --</option>
                           {Object.keys(existingLiteracies).map((key) => (
@@ -5867,7 +5870,7 @@ Aturan:
                         {/* Pratinjau Terkunci */}
                         {literasiMode === "select" && formValues.groupId && existingLiteracies[formValues.groupId] && (
                           <div className="mt-2 bg-white dark:bg-slate-900/60 p-3 rounded-lg border border-slate-200/80 dark:border-slate-800 flex flex-col gap-1.5 shadow-xs">
-                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
                               Pratinjau Literasi Terpilih (Read-Only)
                             </span>
                             <MathText
@@ -5881,7 +5884,7 @@ Aturan:
                       {literasiMode === "create" && (
                         <div className="space-y-3 pt-2 border-t border-blue-100 dark:border-blue-900/40">
                           <div>
-                            <label className="text-xs font-bold text-blue-900 dark:text-blue-300 block mb-1">
+                            <label className="text-sm font-semibold text-blue-900 dark:text-blue-300 block mb-1">
                               Kode / Identitas Literasi Baru
                             </label>
                             <Input
@@ -5893,7 +5896,7 @@ Aturan:
                           </div>
 
                           <div>
-                            <label className="text-xs font-bold text-blue-900 dark:text-blue-300 block mb-1">
+                            <label className="text-sm font-semibold text-blue-900 dark:text-blue-300 block mb-1">
                               Isi Teks Stimulus / Literasi
                             </label>
                             <div className="bg-card rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-xs">
@@ -5921,10 +5924,10 @@ Aturan:
                 {/* Row 2: Editor Pertanyaan Utama */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <label htmlFor="text" className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                    <label htmlFor="text" className="text-sm font-semibold text-slate-700 dark:text-slate-300">
                       Pertanyaan Utama
                     </label>
-                    <span className="text-[11px] text-slate-400">
+                    <span className="text-xs text-slate-400">
                       Mendukung rumus LaTeX, teks kaya, dan tabel
                     </span>
                   </div>
@@ -5951,11 +5954,11 @@ Aturan:
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             <span className="flex h-2 w-2 rounded-full bg-indigo-600 animate-pulse" />
-                            <p className="text-[10px] font-black text-indigo-700 dark:text-indigo-400 uppercase tracking-widest">
+                            <p className="text-xs font-black text-indigo-700 dark:text-indigo-400 uppercase tracking-widest">
                               Pratinjau Tampilan Lembar Soal (Siswa)
                             </p>
                           </div>
-                          <span className="text-[10px] text-slate-400 italic">Sesuai tampilan ujian siswa</span>
+                          <span className="text-xs text-slate-400 italic">Sesuai tampilan ujian siswa</span>
                         </div>
                         <div className="p-3.5 bg-white dark:bg-slate-950 rounded-lg border border-slate-200/80 dark:border-slate-800 shadow-xs">
                           <MathText
@@ -5972,10 +5975,10 @@ Aturan:
                 {/* Row 3: Gambar Cover Soal */}
                 <div className="p-3.5 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/40 dark:bg-slate-900/20 space-y-2">
                   <div>
-                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block">
+                    <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 block">
                       Gambar Cover / Ilustrasi Soal (Opsional)
                     </label>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
                       Gambar ini tampil tepat di atas teks pertanyaan utama pada lembar ujian siswa.
                     </p>
                   </div>
@@ -6003,9 +6006,9 @@ Aturan:
                           />
                         </div>
                         <div className="flex flex-col gap-0.5">
-                          <span className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">Gambar Terlampir</span>
+                          <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">Gambar Terlampir</span>
                           {coverSizeInfo && (
-                            <span className="text-[9px] text-emerald-600 font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800/40">
+                            <span className="text-xs text-emerald-600 font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800/40">
                               {coverSizeInfo}
                             </span>
                           )}
@@ -6035,7 +6038,7 @@ Aturan:
                         Jawaban & Kunci Penilaian
                       </span>
                     </div>
-                    <span className="text-[11px] text-indigo-700 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-200/80 dark:border-indigo-800/60 px-2.5 py-0.5 rounded-full font-bold">
+                    <span className="text-xs text-indigo-700 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-200/80 dark:border-indigo-800/60 px-2.5 py-1 rounded-full font-semibold">
                       MODE: {formValues.type.replace(/_/g, " ").toUpperCase()}
                     </span>
                   </div>
@@ -6043,7 +6046,7 @@ Aturan:
                   {/* RENDER PILIHAN GANDA / PILIHAN GANDA KOMPLEKS */}
                   {(formValues.type === "pilihan_ganda" || formValues.type === "pilihan_ganda_kompleks") && (
                     <div className="space-y-3">
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                      <p className="text-xs text-slate-500 dark:text-slate-400">
                         {formValues.type === "pilihan_ganda"
                           ? "Pilih tepat satu opsi sebagai KUNCI jawaban benar."
                           : "Pilihan Ganda Kompleks: Anda dapat mencentang lebih dari satu opsi sebagai KUNCI jawaban benar."}
@@ -6194,7 +6197,7 @@ Aturan:
                                     <X className="w-3 h-3" />
                                   </button>
                                 </div>
-                                <span className="text-[11px] text-slate-400">Gambar opsi {letter.toUpperCase()}</span>
+                                <span className="text-xs text-slate-400">Gambar opsi {letter.toUpperCase()}</span>
                               </div>
                             )}
                           </div>
@@ -6210,7 +6213,7 @@ Aturan:
                         <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
                           Daftar Pernyataan & Kunci Jawaban
                         </span>
-                        <span className="text-[10px] text-emerald-700 dark:text-emerald-400 font-bold bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800">
+                        <span className="text-xs text-emerald-700 dark:text-emerald-400 font-semibold bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-1 rounded-full border border-emerald-200 dark:border-emerald-800">
                           Tabel Matriks ANBK
                         </span>
                       </div>
@@ -6324,7 +6327,7 @@ Aturan:
                           <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
                             Kolom Pilihan
                           </span>
-                          <span className="text-[10px] text-teal-700 dark:text-teal-400 font-bold bg-teal-50 dark:bg-teal-950/40 px-2.5 py-0.5 rounded-full border border-teal-200 dark:border-teal-800">
+                          <span className="text-xs text-teal-700 dark:text-teal-400 font-semibold bg-teal-50 dark:bg-teal-950/40 px-2.5 py-1 rounded-full border border-teal-200 dark:border-teal-800">
                             Min. 2 Kolom
                           </span>
                         </div>
@@ -6414,7 +6417,7 @@ Aturan:
                                     updated[index] = { ...updated[index], answer: e.target.value };
                                     setFormValues(prev => ({ ...prev, matrixStatements: updated }));
                                   }}
-                                  className="h-9 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-bold px-2.5 cursor-pointer text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500"
+                                  className="h-11 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-bold px-2.5 cursor-pointer text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500"
                                 >
                                   {(formValues.matrixColumns || []).map((col) => (
                                     <option key={col.id} value={col.id}>
@@ -6472,7 +6475,7 @@ Aturan:
                           <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
                             Kategori (boleh dipakai berulang)
                           </span>
-                          <span className="text-[10px] text-violet-700 dark:text-violet-400 font-bold bg-violet-50 dark:bg-violet-950/40 px-2.5 py-0.5 rounded-full border border-violet-200 dark:border-violet-800">
+                          <span className="text-xs text-violet-700 dark:text-violet-400 font-semibold bg-violet-50 dark:bg-violet-950/40 px-2.5 py-1 rounded-full border border-violet-200 dark:border-violet-800">
                             Min. 2 Kategori
                           </span>
                         </div>
@@ -6575,7 +6578,7 @@ Aturan:
                                     updated[index] = { ...updated[index], answer: e.target.value };
                                     setFormValues(prev => ({ ...prev, klasifikasiStatements: updated }));
                                   }}
-                                  className="h-9 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-bold px-2.5 cursor-pointer text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 max-w-[160px]"
+                                  className="h-11 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-bold px-2.5 cursor-pointer text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 max-w-[160px]"
                                 >
                                   {(formValues.klasifikasiCategories || []).map((cat) => (
                                     <option key={cat.id} value={cat.id}>
@@ -6632,7 +6635,7 @@ Aturan:
                           <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
                             Teks Bacaan
                           </span>
-                          <span className="text-[10px] text-lime-700 dark:text-lime-400 font-bold bg-lime-50 dark:bg-lime-950/40 px-2.5 py-0.5 rounded-full border border-lime-200 dark:border-lime-800">
+                          <span className="text-xs text-lime-700 dark:text-lime-400 font-semibold bg-lime-50 dark:bg-lime-950/40 px-2.5 py-1 rounded-full border border-lime-200 dark:border-lime-800">
                             Tulis [[1]], [[2]] untuk rumpang
                           </span>
                         </div>
@@ -6672,7 +6675,7 @@ Aturan:
                             <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
                               Kunci Jawaban per Rumpang
                             </span>
-                            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                            <p className="text-xs text-slate-500 dark:text-slate-400">
                               Pisahkan dengan koma jika ada beberapa jawaban yang diterima (mis. "Rupiah, IDR").
                             </p>
                           </div>
@@ -6706,7 +6709,7 @@ Aturan:
                                     }}
                                     className="w-4 h-4 rounded accent-lime-600"
                                   />
-                                  <span className="text-[11px] font-semibold text-slate-600 dark:text-slate-400 whitespace-nowrap" title="Bedakan huruf besar/kecil">
+                                  <span className="text-xs font-semibold text-slate-600 dark:text-slate-400 whitespace-nowrap" title="Bedakan huruf besar/kecil">
                                     Case-sensitive
                                   </span>
                                 </label>
@@ -6727,7 +6730,7 @@ Aturan:
                           <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
                             Gambar Hotspot <span className="text-rose-500">*</span>
                           </span>
-                          <span className="text-[10px] text-sky-700 dark:text-sky-400 font-bold bg-sky-50 dark:bg-sky-950/40 px-2.5 py-0.5 rounded-full border border-sky-200 dark:border-sky-800">
+                          <span className="text-xs text-sky-700 dark:text-sky-400 font-semibold bg-sky-50 dark:bg-sky-950/40 px-2.5 py-1 rounded-full border border-sky-200 dark:border-sky-800">
                             Wajib ada
                           </span>
                         </div>
@@ -6802,7 +6805,7 @@ Aturan:
                               }`}
                           >
                             Satu saja
-                            <span className="block text-[10px] font-normal opacity-80 mt-0.5">
+                            <span className="block text-xs font-normal opacity-80 mt-0.5">
                               Cukup klik salah satu area benar
                             </span>
                           </button>
@@ -6815,7 +6818,7 @@ Aturan:
                               }`}
                           >
                             Semua area
-                            <span className="block text-[10px] font-normal opacity-80 mt-0.5">
+                            <span className="block text-xs font-normal opacity-80 mt-0.5">
                               Harus klik semua area (skor parsial)
                             </span>
                           </button>
@@ -6914,7 +6917,7 @@ Aturan:
                   {/* RENDER ISIAN SINGKAT / URAIAN */}
                   {(formValues.type === "isian_singkat" || formValues.type === "uraian") && (
                     <div className="space-y-2 bg-slate-50/50 dark:bg-slate-900/30 p-4 rounded-xl border border-slate-200 dark:border-slate-800">
-                      <label htmlFor="answerKey" className="text-xs font-bold text-slate-700 dark:text-slate-300 block">
+                      <label htmlFor="answerKey" className="text-sm font-semibold text-slate-700 dark:text-slate-300 block">
                         {formValues.type === "isian_singkat" ? "Kunci Jawaban Tepat" : "Pedoman / Contoh Jawaban Benar"}
                       </label>
                       <Input
@@ -6925,12 +6928,12 @@ Aturan:
                         className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-sm h-10 shadow-xs"
                       />
                       {formValues.type === "isian_singkat" && (
-                        <p className="text-[11px] text-slate-500 dark:text-slate-400 italic">
+                        <p className="text-xs text-slate-500 dark:text-slate-400 italic">
                           * Siswa harus menjawab identik dengan teks di atas untuk memperoleh nilai otomatis.
                         </p>
                       )}
                       {formValues.type === "uraian" && (
-                        <p className="text-[11px] text-amber-600 dark:text-amber-400 italic">
+                        <p className="text-xs text-amber-600 dark:text-amber-400 italic">
                           * Jenis soal uraian / esai memerlukan koreksi dan penilaian manual oleh Guru di lembar penilaian.
                         </p>
                       )}
@@ -7058,7 +7061,7 @@ Aturan:
                 {/* CBT Header Replica - FIXED TOP */}
                 <div className="flex-shrink-0 bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 px-6 sm:px-10 py-5 sm:py-6 flex items-center justify-between z-20 backdrop-blur-md bg-white/90 dark:bg-slate-900/90">
                   <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-emerald-600 text-white flex items-center justify-center font-black text-xl sm:text-2xl shadow-xl shadow-emerald-200 dark:shadow-none">
+                    <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-emerald-600 text-white flex items-center justify-center font-black text-xl sm:text-2xl shadow-sm shadow-emerald-200 dark:shadow-none">
                       {questions.findIndex(q => q.id === previewQuestion.id) + 1}
                     </div>
                     <div>
@@ -7066,7 +7069,7 @@ Aturan:
                       <div className="flex items-center gap-2">
                         <span className="text-sm sm:text-base font-black text-slate-800 dark:text-white uppercase tracking-tight">Pratinjau Siswa</span>
                         {previewQuestion.groupId && (
-                          <span className="px-2 py-0.5 rounded-md bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800/40 text-[9px] font-black uppercase tracking-widest">Grup: {previewQuestion.groupId}</span>
+                          <span className="px-2.5 py-1 rounded-full bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800/40 text-xs font-black uppercase tracking-widest">Grup: {previewQuestion.groupId}</span>
                         )}
                       </div>
                     </div>
@@ -7112,14 +7115,14 @@ Aturan:
                     const firstWithText = questions.find(q => q.groupId === previewQuestion.groupId && q.groupText);
                     if (firstWithText) {
                       return (
-                        <div className="bg-slate-50 dark:bg-slate-950 p-6 sm:p-8 rounded-[30px] border border-slate-200 dark:border-slate-800 mb-10 space-y-4 relative overflow-hidden group">
+                        <div className="bg-slate-50 dark:bg-slate-950 p-4 sm:p-6 rounded-2xl border border-slate-200 dark:border-slate-800 mb-10 space-y-4 relative overflow-hidden group">
                           <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:rotate-12 transition-transform duration-700">
                             <FileText className="w-16 h-16 sm:w-20 sm:h-20 text-emerald-800" />
                           </div>
 
                           <div className="flex items-center gap-3 mb-4 relative z-10">
                             <div className="h-5 sm:h-6 w-1 sm:w-1.5 rounded-full bg-emerald-600"></div>
-                            <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-[0.2em] text-emerald-500 dark:text-emerald-400">Bacaan / Stimulus</span>
+                            <span className="text-xs sm:text-xs font-black uppercase tracking-[0.2em] text-emerald-500 dark:text-emerald-400">Bacaan / Stimulus</span>
                           </div>
 
                           <MathText
@@ -7128,7 +7131,7 @@ Aturan:
                           />
 
                           <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex justify-end opacity-50 dark:opacity-100 text-right">
-                            <span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest italic">Bacalah teks dengan seksama sebelum memberikan jawaban.</span>
+                            <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest italic">Bacalah teks dengan seksama sebelum memberikan jawaban.</span>
                           </div>
                         </div>
                       );
@@ -7142,10 +7145,10 @@ Aturan:
                       <div className="relative inline-block group">
                         <SmartImage
                           src={previewQuestion.imageUrl}
-                          className="max-h-[300px] sm:max-h-[450px] rounded-[30px] border-4 border-white dark:border-slate-800 shadow-2xl transition-all group-hover:brightness-95"
+                          className="max-h-[300px] sm:max-h-[450px] rounded-2xl border-4 border-white dark:border-slate-800 shadow transition-all group-hover:brightness-95"
                           alt="Question"
                         />
-                        <div className="absolute inset-0 bg-black/5 opacity-0 group-hover:opacity-100 transition-opacity rounded-[30px] flex items-center justify-center">
+                        <div className="absolute inset-0 bg-black/5 opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl flex items-center justify-center">
                           <Maximize2 className="w-8 h-8 text-white drop-shadow-lg" />
                         </div>
                       </div>
@@ -7161,7 +7164,7 @@ Aturan:
                     {(previewQuestion.type === "pilihan_ganda_kompleks" || previewQuestion.type === "menjodohkan" || previewQuestion.type === "urutkan") && (
                       <div className="flex items-center gap-2 mb-6 px-4 py-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/50 rounded-xl w-fit">
                         <HelpCircle className="w-4 h-4 text-blue-500" />
-                        <span className="text-[10px] sm:text-[11px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest">
+                        <span className="text-xs sm:text-xs font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest">
                           {previewQuestion.type === "pilihan_ganda_kompleks" ? "Pilih semua jawaban yang benar" :
                             previewQuestion.type === "menjodohkan" ? "Pasangkan pernyataan di bawah ini" :
                               "Urutkan pernyataan dengan benar"}
@@ -7177,18 +7180,18 @@ Aturan:
                         <table className="w-full text-left border-collapse">
                           <thead>
                             <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
-                              <th className="p-3.5 text-xs font-bold text-slate-700 dark:text-slate-300">Pernyataan</th>
-                              <th className="w-28 p-3.5 text-center text-xs font-black text-emerald-600 dark:text-emerald-400 uppercase">Kunci</th>
+                              <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-700 dark:text-slate-300">Pernyataan</th>
+                              <th className="w-28 px-4 py-3 text-center text-xs font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wide">Kunci</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                             {previewQuestion.statements.map((s: any, idx: number) => (
-                              <tr key={s.id || idx}>
-                                <td className="p-3.5 text-xs sm:text-sm text-slate-800 dark:text-slate-200">
+                              <tr key={s.id || idx} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                                <td className="px-4 py-3 text-xs sm:text-sm text-slate-800 dark:text-slate-200">
                                   <span className="font-bold mr-2 text-slate-400">{idx + 1}.</span>
                                   <MathText content={s.text} disableJustify={true} className="inline !p-0 [&_p]:inline" />
                                 </td>
-                                <td className="p-3.5 text-center">
+                                <td className="px-4 py-3 text-center">
                                   <span className={`px-2.5 py-1 rounded-full text-xs font-black uppercase ${s.answer === "benar" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400" : "bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400"
                                     }`}>
                                     {s.answer || "benar"}
@@ -7204,21 +7207,21 @@ Aturan:
                         <table className="w-full text-left border-collapse min-w-[320px]">
                           <thead>
                             <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
-                              <th className="p-3.5 text-xs font-bold text-slate-700 dark:text-slate-300">Pernyataan</th>
+                              <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-700 dark:text-slate-300">Pernyataan</th>
                               {((previewQuestion as any).options.columns || []).map((col: any) => (
-                                <th key={col.id} className="p-3.5 text-center text-xs font-black text-teal-600 dark:text-teal-400 uppercase whitespace-nowrap">
+                                <th key={col.id} className="px-4 py-3 text-center text-xs font-semibold text-teal-600 dark:text-teal-400 uppercase tracking-wide whitespace-nowrap">
                                   {col.text}
                                 </th>
                               ))}
-                              <th className="w-24 p-3.5 text-center text-xs font-black text-emerald-600 dark:text-emerald-400 uppercase">Kunci</th>
+                              <th className="w-24 px-4 py-3 text-center text-xs font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wide">Kunci</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                             {((previewQuestion as any).options.statements || []).map((s: any, idx: number) => {
                               const kunciCol = ((previewQuestion as any).options.columns || []).find((c: any) => c.id === s.answer);
                               return (
-                                <tr key={s.id || idx}>
-                                  <td className="p-3.5 text-xs sm:text-sm text-slate-800 dark:text-slate-200">
+                                <tr key={s.id || idx} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                                  <td className="px-4 py-3 text-xs sm:text-sm text-slate-800 dark:text-slate-200">
                                     <span className="font-bold mr-2 text-slate-400">{idx + 1}.</span>
                                     <MathText content={s.text} disableJustify={true} className="inline !p-0 [&_p]:inline" />
                                   </td>
@@ -7227,7 +7230,7 @@ Aturan:
                                       <span className={`inline-block w-4 h-4 rounded-full border-2 ${col.id === s.answer ? "bg-teal-500 border-teal-600" : "border-slate-300 dark:border-slate-600"}`} />
                                     </td>
                                   ))}
-                                  <td className="p-3.5 text-center">
+                                  <td className="px-4 py-3 text-center">
                                     <span className="px-2.5 py-1 rounded-full text-xs font-black bg-teal-100 text-teal-700 dark:bg-teal-950/40 dark:text-teal-400">
                                       {kunciCol?.text || "-"}
                                     </span>
@@ -7243,20 +7246,20 @@ Aturan:
                         <table className="w-full text-left border-collapse">
                           <thead>
                             <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
-                              <th className="p-3.5 text-xs font-bold text-slate-700 dark:text-slate-300">Pernyataan</th>
-                              <th className="w-36 p-3.5 text-center text-xs font-black text-emerald-600 dark:text-emerald-400 uppercase">Kategori Benar</th>
+                              <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-700 dark:text-slate-300">Pernyataan</th>
+                              <th className="w-36 px-4 py-3 text-center text-xs font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wide">Kategori Benar</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                             {((previewQuestion as any).options.statements || []).map((s: any, idx: number) => {
                               const kunciCat = ((previewQuestion as any).options.categories || []).find((c: any) => c.id === s.answer);
                               return (
-                                <tr key={s.id || idx}>
-                                  <td className="p-3.5 text-xs sm:text-sm text-slate-800 dark:text-slate-200">
+                                <tr key={s.id || idx} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                                  <td className="px-4 py-3 text-xs sm:text-sm text-slate-800 dark:text-slate-200">
                                     <span className="font-bold mr-2 text-slate-400">{idx + 1}.</span>
                                     <MathText content={s.text} disableJustify={true} className="inline !p-0 [&_p]:inline" />
                                   </td>
-                                  <td className="p-3.5 text-center">
+                                  <td className="px-4 py-3 text-center">
                                     <span className="px-2.5 py-1 rounded-full text-xs font-black bg-violet-100 text-violet-700 dark:bg-violet-950/40 dark:text-violet-400">
                                       {kunciCat?.text || "-"}
                                     </span>
@@ -7267,7 +7270,7 @@ Aturan:
                           </tbody>
                         </table>
                         <div className="px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-200 dark:border-slate-800">
-                          <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                          <p className="text-xs text-slate-500 dark:text-slate-400">
                             Kategori tersedia: {((previewQuestion as any).options.categories || []).map((c: any) => c.text).join(", ")}
                             {(previewQuestion as any).options.shuffleStatements !== false && " • Urutan pernyataan diacak saat ujian"}
                           </p>
@@ -7275,7 +7278,7 @@ Aturan:
                       </div>
                     ) : previewQuestion.type === "isian_rumpang" && (previewQuestion as any).options?.text ? (
                       <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm p-4 sm:p-5">
-                        <p className="text-[10px] font-black text-lime-700 dark:text-lime-400 uppercase tracking-widest mb-3">
+                        <p className="text-xs font-black text-lime-700 dark:text-lime-400 uppercase tracking-widest mb-3">
                           Pratinjau Isian Rumpang
                         </p>
                         <div className="text-sm sm:text-base text-slate-800 dark:text-slate-200 leading-loose">
@@ -7291,7 +7294,7 @@ Aturan:
                                     className="h-9 min-w-[100px] text-sm text-center rounded-lg border-2 border-dashed border-lime-300 dark:border-lime-700 bg-lime-50/50 dark:bg-lime-950/20 px-2"
                                   />
                                   {blank && (
-                                    <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 mt-1">
+                                    <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 mt-1">
                                       {(blank.answers || []).join(" / ")}
                                     </span>
                                   )}
@@ -7305,10 +7308,10 @@ Aturan:
                     ) : previewQuestion.type === "hotspot" && (previewQuestion as any).options?.imageUrl ? (
                       <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm p-4 sm:p-5 space-y-3">
                         <div className="flex items-center justify-between">
-                          <p className="text-[10px] font-black text-sky-700 dark:text-sky-400 uppercase tracking-widest">
+                          <p className="text-xs font-black text-sky-700 dark:text-sky-400 uppercase tracking-widest">
                             Pratinjau Hotspot
                           </p>
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
+                          <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
                             {(previewQuestion as any).options.mode === "all" ? "Mode: Semua area" : "Mode: Satu saja"} • {((previewQuestion as any).options.areas || []).length} area
                           </span>
                         </div>
@@ -7319,7 +7322,7 @@ Aturan:
                             className="w-full h-auto block"
                           />
                         </div>
-                        <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                        <p className="text-xs text-slate-500 dark:text-slate-400">
                           Area target: {((previewQuestion as any).options.areas || []).map((a: any) => a.label).join(", ") || "-"}
                           <span className="italic"> (tidak ditampilkan ke siswa)</span>
                         </p>
@@ -7358,15 +7361,15 @@ Aturan:
                       <div className="space-y-4 pt-2">
                         {(previewQuestion.pairs || []).map(p => (
                           <div key={p.id} className="flex flex-col sm:flex-row items-stretch gap-4">
-                            <div className="flex-1 p-5 bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 rounded-3xl font-serif text-slate-800 dark:text-slate-200 shadow-sm">
-                              <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Pernyataan</div>
+                            <div className="flex-1 p-5 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl font-serif text-slate-800 dark:text-slate-200 shadow-sm">
+                              <div className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Pernyataan</div>
                               {p.left}
                             </div>
                             <div className="hidden sm:flex items-center justify-center text-emerald-500">
                               <Forward className="w-8 h-8" />
                             </div>
-                            <div className="flex-1 p-5 bg-emerald-50/50 dark:bg-emerald-950/20 border-2 border-dashed border-emerald-400/50 rounded-3xl font-serif text-emerald-800 dark:text-emerald-400 shadow-inner flex flex-col justify-center">
-                              <div className="text-[10px] font-black text-emerald-600/50 uppercase tracking-widest mb-1.5 flex items-center gap-2">
+                            <div className="flex-1 p-5 bg-emerald-50/50 dark:bg-emerald-950/20 border-2 border-dashed border-emerald-400/50 rounded-2xl font-serif text-emerald-800 dark:text-emerald-400 shadow-inner flex flex-col justify-center">
+                              <div className="text-xs font-black text-emerald-600/50 uppercase tracking-widest mb-1.5 flex items-center gap-2">
                                 <CheckCircle2 className="w-3.5 h-3.5" /> Pasangan Benar
                               </div>
                               <div className="text-lg font-black">{p.right}</div>
@@ -7377,17 +7380,17 @@ Aturan:
                     )}
 
                     {(previewQuestion.type === "isian_singkat" || previewQuestion.type === "uraian") && (
-                      <div className="p-8 sm:p-10 rounded-[40px] border-2 border-dashed border-blue-200 dark:border-blue-900/40 bg-blue-50/20 dark:bg-blue-950/20 space-y-4">
+                      <div className="p-4 sm:p-6 rounded-2xl border-2 border-dashed border-blue-200 dark:border-blue-900/40 bg-blue-50/20 dark:bg-blue-950/20 space-y-4">
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-lg">
                             <Check className="w-6 h-6 stroke-[3px]" />
                           </div>
                           <div>
                             <span className="text-xs font-black text-blue-600/70 dark:text-blue-400/70 uppercase tracking-widest block">Kunci Jawaban / Pedoman</span>
-                            <span className="text-[10px] text-blue-400 font-bold uppercase tracking-tighter">Hanya terlihat oleh Administrator</span>
+                            <span className="text-xs text-blue-400 font-bold uppercase tracking-tighter">Hanya terlihat oleh Administrator</span>
                           </div>
                         </div>
-                        <div className="text-xl sm:text-2xl font-black text-blue-800 dark:text-blue-300 bg-white dark:bg-slate-900 p-6 sm:p-8 rounded-3xl border border-blue-100 dark:border-blue-800/40 shadow-xl">
+                        <div className="text-xl sm:text-2xl font-black text-blue-800 dark:text-blue-300 bg-white dark:bg-slate-900 p-4 sm:p-6 rounded-2xl border border-blue-100 dark:border-blue-800/40 shadow-sm">
                           {previewQuestion.answerKey || "(Belum diisi)"}
                         </div>
                       </div>
@@ -7396,12 +7399,12 @@ Aturan:
                     {(previewQuestion.type === "urutkan" || previewQuestion.type === "drag_drop") && (
                       <div className="space-y-4 pt-2">
                         {(previewQuestion.items || []).map((it, idx) => (
-                          <div key={it.id} className="flex items-center gap-5 p-5 rounded-3xl border-2 border-indigo-100 dark:border-indigo-900/40 bg-indigo-50/30 dark:bg-indigo-950/20 shadow-sm group">
-                            <div className="w-12 h-12 rounded-2xl bg-indigo-600 text-white flex items-center justify-center font-black text-xl shadow-xl shadow-indigo-200 dark:shadow-none transition-transform group-hover:rotate-6">
+                          <div key={it.id} className="flex items-center gap-5 p-4 sm:p-6 rounded-2xl border border-indigo-100 dark:border-indigo-900/40 bg-indigo-50/30 dark:bg-indigo-950/20 shadow-sm group">
+                            <div className="w-12 h-12 rounded-2xl bg-indigo-600 text-white flex items-center justify-center font-black text-xl shadow-sm shadow-indigo-200 dark:shadow-none transition-transform group-hover:rotate-6">
                               {idx + 1}
                             </div>
                             <div className="flex-1">
-                              <div className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-0.5">Urutan Benar</div>
+                              <div className="text-xs font-black text-indigo-400 uppercase tracking-widest mb-0.5">Urutan Benar</div>
                               <span className="text-xl font-serif font-black text-indigo-800 dark:text-indigo-300 leading-tight">{it.text}</span>
                             </div>
                             <div className="opacity-20"><Menu className="w-6 h-6" /></div>
@@ -7427,7 +7430,7 @@ Aturan:
             <div className="space-y-6 pt-3">
               {/* BATCH LITERACY STIMULUS DISPLAY */}
               {batchQuestions.length > 0 && batchQuestions[0].groupText && (
-                <div className="bg-blue-50 dark:bg-blue-950/20 border-2 border-blue-200 dark:border-blue-800/40 rounded-3xl p-6 space-y-4 animate-in fade-in slide-in-from-top-4 duration-500">
+                <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800/40 rounded-2xl p-4 sm:p-6 space-y-4 animate-in fade-in slide-in-from-top-4 duration-500">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className="p-2.5 rounded-xl bg-blue-600 text-white shadow-lg shadow-blue-200 dark:shadow-none">
@@ -7435,11 +7438,11 @@ Aturan:
                       </div>
                       <div>
                         <h3 className="text-sm font-black text-blue-900 dark:text-blue-100 uppercase tracking-tight">Stimulus / Literasi</h3>
-                        <p className="text-[10px] text-blue-700/60 dark:text-blue-400/60 font-bold uppercase tracking-widest">Stimulus / Literasi Induk untuk Paket Soal Ini</p>
+                        <p className="text-xs text-blue-700/60 dark:text-blue-400/60 font-bold uppercase tracking-widest">Stimulus / Literasi Induk untuk Paket Soal Ini</p>
                       </div>
                     </div>
                     <div className="bg-white/80 dark:bg-slate-900/80 px-4 py-1.5 rounded-full border border-blue-100 dark:border-blue-800/40 shadow-sm">
-                      <span className="text-[10px] font-black text-blue-600 uppercase tracking-tighter">ID: {batchQuestions[0].groupId || 'LIT-NEW'}</span>
+                      <span className="text-xs font-black text-blue-600 uppercase tracking-tighter">ID: {batchQuestions[0].groupId || 'LIT-NEW'}</span>
                     </div>
                   </div>
 
@@ -7461,15 +7464,15 @@ Aturan:
               )}
 
               {batchQuestions.map((q, index) => (
-                <div key={index} className="bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-3xl p-5 shadow-xl shadow-slate-200/20 dark:shadow-none relative space-y-4 hover:border-indigo-300 dark:hover:border-indigo-800 transition-all duration-300">
+                <div key={index} className="bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 sm:p-6 shadow-sm shadow-slate-200/20 dark:shadow-none relative space-y-4 hover:border-indigo-300 dark:hover:border-indigo-800 transition-all duration-300">
                   <div className="flex justify-between items-center bg-slate-50 dark:bg-slate-800/50 -mx-5 -mt-5 p-4 py-3 rounded-t-3xl border-b border-slate-100 dark:border-slate-800">
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 flex items-center justify-center font-black text-sm shadow-lg shadow-slate-200 dark:shadow-none">
                         {index + 1}
                       </div>
-                      <span className="font-black text-slate-800 dark:text-slate-100 text-[10px] uppercase tracking-widest">Unit Soal</span>
+                      <span className="font-black text-slate-800 dark:text-slate-100 text-xs uppercase tracking-widest">Unit Soal</span>
                       {q.type && q.type !== "pilihan_ganda" && (
-                        <span className={`text-[8px] font-bold px-2 py-0.5 rounded-full border ${q.type === "pilihan_ganda_kompleks" ? "bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-800/40" :
+                        <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${q.type === "pilihan_ganda_kompleks" ? "bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-800/40" :
                             q.type === "benar_salah" ? "bg-green-50 text-green-600 border-green-200 dark:bg-green-950/30 dark:text-green-400 dark:border-green-800/40" :
                               q.type === "menjodohkan" ? "bg-purple-50 text-purple-600 border-purple-200 dark:bg-purple-950/30 dark:text-purple-400 dark:border-purple-800/40" :
                                 q.type === "isian_singkat" ? "bg-amber-50 text-amber-600 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-800/40" :
@@ -7525,12 +7528,12 @@ Aturan:
                     <div className="flex items-center justify-between px-1">
                       <div className="flex items-center gap-2">
                         <div className="w-1.5 h-6 bg-indigo-500 rounded-full"></div>
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Pertanyaan Utama</p>
+                        <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Pertanyaan Utama</p>
                       </div>
                       <button
                         type="button"
                         onClick={() => setIsMathGuideOpen(true)}
-                        className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800/40 text-[10px] font-bold hover:bg-amber-100 transition-all shadow-sm"
+                        className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800/40 text-xs font-semibold hover:bg-amber-100 transition-all shadow-sm"
                       >
                         <Sparkles className="w-3 h-3" />
                         Panduan Rumus
@@ -7552,7 +7555,7 @@ Aturan:
                       <div className="p-4 bg-indigo-50/30 dark:bg-indigo-950/20 border-t border-slate-100 dark:border-slate-800 rounded-b-2xl">
                         <div className="flex items-center gap-2 mb-2 opacity-60">
                           <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
-                          <p className="text-[10px] font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-widest">Pratinjau Live Render</p>
+                          <p className="text-xs font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-widest">Pratinjau Live Render</p>
                         </div>
                         <MathText content={q.text} className="font-serif ql-editor !p-0 text-base text-slate-800 dark:text-slate-200 leading-relaxed [&_p]:mb-3" />
                       </div>
@@ -7561,7 +7564,7 @@ Aturan:
                     <div className="flex items-center gap-3 px-1">
                       <button
                         type="button"
-                        className="flex items-center gap-2 cursor-pointer bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-xl py-2 px-4 border border-slate-200 dark:border-slate-700 font-bold text-[10px] uppercase tracking-widest transition-all shadow-sm"
+                        className="flex items-center gap-2 cursor-pointer bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-xl py-2 px-4 border border-slate-200 dark:border-slate-700 font-bold text-xs uppercase tracking-widest transition-all shadow-sm"
                         onClick={() => {
                           setGalleryTarget({ type: "batch", index });
                           setIsPickerOpen(true);
@@ -7573,9 +7576,9 @@ Aturan:
                       {(q.imageFile || q.imageUrl) && (
                         <div className="flex items-center gap-2 animate-in zoom-in-95 duration-300">
                           <div className="relative group">
-                            <img src={q.imageFile ? URL.createObjectURL(q.imageFile) : q.imageUrl} className="h-10 w-auto rounded-xl border-2 border-indigo-100 object-cover shadow-md" alt="Preview" />
+                            <img src={q.imageFile ? URL.createObjectURL(q.imageFile) : q.imageUrl} className="h-10 w-auto rounded-xl border border-indigo-100 object-cover shadow-md" alt="Preview" />
                             <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 rounded-xl transition-all flex items-center justify-center">
-                              <span className="text-[8px] text-white font-bold uppercase">Gambar</span>
+                              <span className="text-xs text-white font-bold uppercase">Gambar</span>
                             </div>
                           </div>
                           <Button
@@ -7595,7 +7598,7 @@ Aturan:
                     <div className="space-y-4 pt-2">
                       <div className="flex items-center gap-2">
                         <div className="w-1.5 h-6 bg-emerald-500 rounded-full"></div>
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Pilihan Jawaban & Kunci</p>
+                        <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Pilihan Jawaban & Kunci</p>
                       </div>
                       {/* Fallback: if benar_salah has no choices, create default */}
                       {q.type === "benar_salah" && (!q.choices || (!q.choices.a && !q.choices.b)) && (
@@ -7662,7 +7665,7 @@ Aturan:
                                       <div className="mt-1.5 p-2 rounded-xl bg-indigo-50/50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800/40 animate-in fade-in slide-in-from-top-1 duration-300">
                                         <div className="flex items-center gap-1.5 mb-1 opacity-50">
                                           <Sparkles className="w-3 h-3 text-indigo-500" />
-                                          <p className="text-[8px] font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-widest">Preview Math</p>
+                                          <p className="text-xs font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-widest">Preview Math</p>
                                         </div>
                                         <MathText
                                           key={q.choices[letter].text}
@@ -7691,7 +7694,7 @@ Aturan:
                     <div className="space-y-3 pt-2">
                       <div className="flex items-center gap-2">
                         <div className="w-1.5 h-6 bg-amber-500 rounded-full"></div>
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                        <p className="text-xs font-black text-slate-400 uppercase tracking-widest">
                           {q.type === "isian_singkat" ? "Kunci Jawaban" : "Pedoman Penilaian"}
                         </p>
                       </div>
@@ -7709,12 +7712,12 @@ Aturan:
                     <div className="space-y-3 pt-2">
                       <div className="flex items-center gap-2">
                         <div className="w-1.5 h-6 bg-purple-500 rounded-full"></div>
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Pasangan (Kiri  Kanan)</p>
+                        <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Pasangan (Kiri  Kanan)</p>
                       </div>
                       {(!q.pairs || q.pairs.length === 0) ? (
                         <div className="text-center py-4 text-xs text-slate-400 italic">
                           AI tidak menghasilkan pasangan. Tambahkan manual atau regenerasi.
-                          <Button variant="outline" size="sm" className="mt-2 text-[10px]" onClick={() => {
+                          <Button variant="outline" size="sm" className="mt-2 text-xs" onClick={() => {
                             updateBatchItem(index, 'pairs', [
                               { id: "1", left: "", right: "" },
                               { id: "2", left: "", right: "" },
@@ -7744,7 +7747,7 @@ Aturan:
                               className={`flex items-center gap-2 p-2 rounded-xl bg-purple-50/50 dark:bg-purple-950/20 border border-purple-100 dark:border-purple-800/40 cursor-grab active:cursor-grabbing transition-opacity ${batchDragState?.questionIndex === index && batchDragState?.itemIndex === pIdx ? "opacity-50" : ""}`}
                             >
                               <GripVertical className="w-4 h-4 text-purple-300 flex-shrink-0" />
-                              <span className="w-6 h-6 rounded-lg bg-purple-600 text-white flex items-center justify-center text-[10px] font-black flex-shrink-0">{pIdx + 1}</span>
+                              <span className="w-6 h-6 rounded-lg bg-purple-600 text-white flex items-center justify-center text-xs font-black flex-shrink-0">{pIdx + 1}</span>
                               <input
                                 type="text"
                                 value={pair.left}
@@ -7776,7 +7779,7 @@ Aturan:
                               </button>
                             </div>
                           ))}
-                          <Button variant="ghost" size="sm" className="text-[10px] text-purple-500" onClick={() => {
+                          <Button variant="ghost" size="sm" className="text-xs text-purple-500" onClick={() => {
                             const newPairs = [...(q.pairs || []), { id: String((q.pairs?.length || 0) + 1), left: "", right: "" }];
                             updateBatchItem(index, 'pairs', newPairs);
                           }}>+ Tambah Pasangan</Button>
@@ -7789,14 +7792,14 @@ Aturan:
                     <div className="space-y-3 pt-2">
                       <div className="flex items-center gap-2">
                         <div className={`w-1.5 h-6 ${q.type === "urutkan" ? "bg-orange-500" : "bg-cyan-500"} rounded-full`}></div>
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                        <p className="text-xs font-black text-slate-400 uppercase tracking-widest">
                           {q.type === "urutkan" ? "Urutan Benar (atas  bawah)" : "Item (urutan benar)"}
                         </p>
                       </div>
                       {(!q.items || q.items.length === 0) ? (
                         <div className="text-center py-4 text-xs text-slate-400 italic">
                           AI tidak menghasilkan item. Tambahkan manual atau regenerasi.
-                          <Button variant="outline" size="sm" className="mt-2 text-[10px]" onClick={() => {
+                          <Button variant="outline" size="sm" className="mt-2 text-xs" onClick={() => {
                             updateBatchItem(index, 'items', [
                               { id: "1", text: "" },
                               { id: "2", text: "" },
@@ -7826,7 +7829,7 @@ Aturan:
                               className={`flex items-center gap-2 p-2 rounded-xl cursor-grab active:cursor-grabbing transition-opacity ${q.type === "urutkan" ? "bg-orange-50/50 dark:bg-orange-950/20 border border-orange-100 dark:border-orange-800/40" : "bg-cyan-50/50 dark:bg-cyan-950/20 border border-cyan-100 dark:border-cyan-800/40"} ${batchDragState?.questionIndex === index && batchDragState?.itemIndex === iIdx ? "opacity-50" : ""}`}
                             >
                               <GripVertical className={`w-4 h-4 flex-shrink-0 ${q.type === "urutkan" ? "text-orange-300" : "text-cyan-300"}`} />
-                              <span className={`w-6 h-6 rounded-lg ${q.type === "urutkan" ? "bg-orange-600" : "bg-cyan-600"} text-white flex items-center justify-center text-[10px] font-black flex-shrink-0`}>{iIdx + 1}</span>
+                              <span className={`w-6 h-6 rounded-lg ${q.type === "urutkan" ? "bg-orange-600" : "bg-cyan-600"} text-white flex items-center justify-center text-xs font-black flex-shrink-0`}>{iIdx + 1}</span>
                               <input
                                 type="text"
                                 value={item.text}
@@ -7846,7 +7849,7 @@ Aturan:
                               </button>
                             </div>
                           ))}
-                          <Button variant="ghost" size="sm" className={`text-[10px] ${q.type === "urutkan" ? "text-orange-500" : "text-cyan-500"}`} onClick={() => {
+                          <Button variant="ghost" size="sm" className={`text-xs ${q.type === "urutkan" ? "text-orange-500" : "text-cyan-500"}`} onClick={() => {
                             const newItems = [...(q.items || []), { id: String((q.items?.length || 0) + 1), text: "" }];
                             updateBatchItem(index, 'items', newItems);
                           }}>+ Tambah Item</Button>
@@ -7940,7 +7943,10 @@ Aturan:
             </DialogHeader>
             <div className="flex-1 overflow-y-auto p-6 space-y-8 scrollbar-thin">
               {galleryGroups.length === 0 ? (
-                <div className="text-center p-12 text-slate-400 text-sm">Belum ada gambar yang bisa digunakan di server ini.</div>
+                <div className="text-center py-12 px-4">
+                  <Image className="w-10 h-10 mx-auto text-slate-300 dark:text-slate-600 mb-3" />
+                  <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">Belum ada gambar yang bisa digunakan di server ini.</p>
+                </div>
               ) : (
                 galleryGroups.map((group, gIdx) => (
                   <div key={gIdx} className="space-y-3">
@@ -7956,7 +7962,7 @@ Aturan:
                         >
                           <img src={src} alt="Media" className="max-h-full max-w-full object-contain transition-transform group-hover:scale-110" />
                           <div className="absolute inset-0 bg-indigo-900/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all">
-                            <span className="text-white text-[10px] font-bold bg-indigo-600 px-3 py-1.5 rounded-lg shadow-sm tracking-widest uppercase">Pilih</span>
+                            <span className="text-white text-xs font-bold bg-indigo-600 px-3 py-1.5 rounded-lg shadow-sm tracking-widest uppercase">Pilih</span>
                           </div>
                         </div>
                       ))}
@@ -7983,7 +7989,7 @@ Aturan:
                 </div>
                 <div className="flex flex-col items-start">
                   <span className="font-semibold text-xs">Unggah Dari Komputer</span>
-                  <span className="text-[10px] text-slate-400">File foto maksimal 2MB</span>
+                  <span className="text-xs text-slate-400">File foto maksimal 2MB</span>
                 </div>
               </button>
               <button
@@ -7996,7 +8002,7 @@ Aturan:
                 </div>
                 <div className="flex flex-col items-start">
                   <span className="font-semibold text-xs">Ambil Dari Galeri</span>
-                  <span className="text-[10px] text-slate-400">Gunakan file yang sudah di-upload</span>
+                  <span className="text-xs text-slate-400">Gunakan file yang sudah di-upload</span>
                 </div>
               </button>
             </div>
@@ -8027,7 +8033,7 @@ Aturan:
                   </div>
                   <div>
                     <DialogTitle className="text-lg font-black text-slate-800 dark:text-slate-100 tracking-tight flex items-center gap-2">
-                      AI Studio Generator <span className="px-2 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-900/50 text-[9px] text-indigo-700 dark:text-indigo-400 font-bold uppercase tracking-wider">Beta</span>
+                      AI Studio Generator <span className="px-2.5 py-1 rounded-full bg-indigo-100 dark:bg-indigo-900/50 text-xs text-indigo-700 dark:text-indigo-400 font-semibold uppercase tracking-wider">Beta</span>
                     </DialogTitle>
                     <p className="text-xs font-medium text-slate-500 flex items-center gap-1.5 mt-0.5">
                       <Wand2 className="w-3.5 h-3.5 text-purple-500" />
@@ -8035,7 +8041,7 @@ Aturan:
                     </p>
                   </div>
                 </div>
-                <button type="button" onClick={handleRandomFill} className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors flex items-center gap-1.5 px-3 py-2 rounded-xl bg-indigo-50 dark:bg-indigo-500/10 hover:bg-indigo-100 dark:hover:bg-indigo-500/20 border border-indigo-100 dark:border-indigo-500/20">
+                <button type="button" onClick={handleRandomFill} className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors flex items-center gap-1.5 px-3 py-2 rounded-xl bg-indigo-50 dark:bg-indigo-500/10 hover:bg-indigo-100 dark:hover:bg-indigo-500/20 border border-indigo-100 dark:border-indigo-500/20">
                   <RefreshCw className="w-3.5 h-3.5" /> Isi Otomatis
                 </button>
               </div>
@@ -8047,22 +8053,22 @@ Aturan:
                 {/* Kolom Kiri: Konteks & Materi */}
                 <div className="space-y-6">
                   <div>
-                    <h4 className="text-[11px] font-black uppercase tracking-widest text-slate-400 mb-4 flex items-center gap-2">
+                    <h4 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-4 flex items-center gap-2">
                       <div className="w-2 h-2 rounded-full bg-indigo-500 shadow-sm shadow-indigo-500/50"></div> Konteks Soal
                     </h4>
                     <div className="grid grid-cols-2 gap-4 mb-4">
                       <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Jenjang / Kelas</label>
+                        <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Jenjang / Kelas</label>
                         <Input value={aiLevel} onChange={(e) => setAiLevel(e.target.value)} placeholder="Contoh: SMA Kelas 11" className="h-10 rounded-xl text-xs bg-slate-50/50 dark:bg-slate-800/50 border-slate-200/80 dark:border-slate-700 focus:bg-white dark:focus:bg-slate-900 transition-colors shadow-sm" />
                       </div>
                       <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Mata Pelajaran</label>
+                        <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Mata Pelajaran</label>
                         <Input value={aiSubject} onChange={(e) => setAiSubject(e.target.value)} placeholder="Contoh: Biologi" className="h-10 rounded-xl text-xs bg-slate-50/50 dark:bg-slate-800/50 border-slate-200/80 dark:border-slate-700 focus:bg-white dark:focus:bg-slate-900 transition-colors shadow-sm" />
                       </div>
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Topik Pembahasan</label>
+                      <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Topik Pembahasan</label>
                       <div className="flex gap-2 group">
                         <Input value={aiTopic} onChange={(e) => setAiTopic(e.target.value)} placeholder="Fotosintesis, Metabolisme..." className="flex-1 h-10 rounded-xl text-xs bg-slate-50/50 dark:bg-slate-800/50 border-slate-200/80 dark:border-slate-700 focus:bg-white dark:focus:bg-slate-900 transition-colors shadow-sm" />
                         <button type="button" onClick={handleGenerateTopic} disabled={isGeneratingTopic} className="shrink-0 h-10 px-4 rounded-xl bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-500/20 transition-all disabled:opacity-50 border border-indigo-100 dark:border-indigo-500/20 shadow-sm flex items-center justify-center gap-1.5" title="Minta saran topik dari AI">
@@ -8072,7 +8078,7 @@ Aturan:
                       {dynamicSuggestions.length > 0 && !isFetchingSuggestions && (
                         <div className="flex flex-wrap gap-1.5 mt-2.5">
                           {dynamicSuggestions.map((s, i) => (
-                            <button key={i} type="button" onClick={() => setAiTopic(String(s))} className="px-3 py-1.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-[10px] font-bold text-slate-600 dark:text-slate-400 hover:border-indigo-300 dark:hover:border-indigo-500 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors shadow-sm">{String(s)}</button>
+                            <button key={i} type="button" onClick={() => setAiTopic(String(s))} className="px-3 py-1.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-600 dark:text-slate-400 hover:border-indigo-300 dark:hover:border-indigo-500 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors shadow-sm">{String(s)}</button>
                           ))}
                         </div>
                       )}
@@ -8080,8 +8086,8 @@ Aturan:
                   </div>
 
                   <div>
-                    <h4 className="text-[11px] font-black uppercase tracking-widest text-slate-400 mb-4 flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-sm shadow-emerald-500/50"></div> Referensi Materi <span className="font-bold normal-case text-slate-400 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded ml-1 text-[9px]">Opsional</span>
+                    <h4 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-4 flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-sm shadow-emerald-500/50"></div> Referensi Materi <span className="font-semibold normal-case text-slate-400 bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-full ml-1 text-xs">Opsional</span>
                     </h4>
                     <div className="space-y-2.5">
                       {aiMaterialFileName ? (
@@ -8090,8 +8096,8 @@ Aturan:
                             <FileText className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                           </div>
                           <div className="flex-1 overflow-hidden">
-                            <p className="text-[11px] font-bold text-emerald-800 dark:text-emerald-300 truncate">{aiMaterialFileName}</p>
-                            <p className="text-[9px] text-emerald-600/70 dark:text-emerald-500/70 font-semibold mt-0.5">{Math.round(aiMaterialText.length / 1000)}k karakter disematkan</p>
+                            <p className="text-xs font-bold text-emerald-800 dark:text-emerald-300 truncate">{aiMaterialFileName}</p>
+                            <p className="text-xs text-emerald-600/70 dark:text-emerald-500/70 font-semibold mt-0.5">{Math.round(aiMaterialText.length / 1000)}k karakter disematkan</p>
                           </div>
                           <button onClick={() => { setAiMaterialFile(null); setAiMaterialText(""); setAiMaterialFileName(""); }} className="w-7 h-7 rounded-lg hover:bg-emerald-200/50 dark:hover:bg-emerald-800/50 flex items-center justify-center text-emerald-700 dark:text-emerald-400 transition-colors"><X className="w-3.5 h-3.5" /></button>
                         </div>
@@ -8101,8 +8107,8 @@ Aturan:
                             <Plus className="w-5 h-5 text-slate-400 group-hover:text-indigo-500 transition-colors" />
                           </div>
                           <div className="text-center">
-                            <p className="text-[11px] font-bold text-slate-600 dark:text-slate-400 group-hover:text-indigo-700 dark:group-hover:text-indigo-400 transition-colors">{isExtractingMaterial ? "Mengekstrak Teks..." : "Upload PDF, Word, atau PPT"}</p>
-                            <p className="text-[9px] font-medium text-slate-400 mt-0.5">Atau paste teks langsung di bawah</p>
+                            <p className="text-xs font-bold text-slate-600 dark:text-slate-400 group-hover:text-indigo-700 dark:group-hover:text-indigo-400 transition-colors">{isExtractingMaterial ? "Mengekstrak Teks..." : "Upload PDF, Word, atau PPT"}</p>
+                            <p className="text-xs font-medium text-slate-400 mt-0.5">Atau paste teks langsung di bawah</p>
                           </div>
                           <input type="file" className="hidden" accept=".pdf,.docx,.docm,.pptx,.ppt,.png,.jpg,.jpeg" onChange={handleAIMaterialUpload} disabled={isExtractingMaterial} />
                         </label>
@@ -8110,7 +8116,7 @@ Aturan:
                       
                       <div className="relative">
                         <textarea value={aiMaterialText} onChange={(e) => setAiMaterialText(e.target.value.substring(0, 4000))} placeholder="Paste teks materi atau artikel di sini..." className="w-full min-h-[90px] p-3.5 pb-7 rounded-xl bg-slate-50/50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-700 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-xs resize-none text-slate-700 dark:text-slate-300 placeholder:text-slate-400 transition-all shadow-sm focus:bg-white dark:focus:bg-slate-900" />
-                        {aiMaterialText && <p className="absolute bottom-2.5 right-3 text-[10px] font-bold text-slate-400">{aiMaterialText.length}/4000</p>}
+                        {aiMaterialText && <p className="absolute bottom-2.5 right-3 text-xs font-bold text-slate-400">{aiMaterialText.length}/4000</p>}
                       </div>
                     </div>
                   </div>
@@ -8119,14 +8125,14 @@ Aturan:
                 {/* Kolom Kanan: Pengaturan Output */}
                 <div className="space-y-6">
                   <div>
-                    <h4 className="text-[11px] font-black uppercase tracking-widest text-slate-400 mb-4 flex items-center gap-2">
+                    <h4 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-4 flex items-center gap-2">
                       <div className="w-2 h-2 rounded-full bg-amber-500 shadow-sm shadow-amber-500/50"></div> Format Output
                     </h4>
                     
                     <div className="grid grid-cols-2 gap-4 mb-4">
                       <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Tipe Soal</label>
-                        <select value={aiType} onChange={(e) => setAiType(e.target.value)} className="w-full h-10 px-3 rounded-xl text-xs font-bold bg-slate-50/50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-700 focus:ring-2 focus:ring-indigo-500/20 outline-none text-slate-700 dark:text-slate-200 shadow-sm focus:bg-white dark:focus:bg-slate-900 transition-colors">
+                        <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Tipe Soal</label>
+                        <select value={aiType} onChange={(e) => setAiType(e.target.value)} className="w-full h-11 px-3 rounded-xl text-xs font-bold bg-slate-50/50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-700 focus:ring-2 focus:ring-indigo-500/20 outline-none text-slate-700 dark:text-slate-200 shadow-sm focus:bg-white dark:focus:bg-slate-900 transition-colors">
                           {allowedTypes.pilihan_ganda && <option value="pilihan_ganda">Pilihan Ganda</option>}
                           {allowedTypes.pilihan_ganda_kompleks && <option value="pilihan_ganda_kompleks">PG Kompleks</option>}
                           {allowedTypes.benar_salah && <option value="benar_salah">Benar / Salah</option>}
@@ -8138,7 +8144,7 @@ Aturan:
                         </select>
                       </div>
                       <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Jumlah Soal</label>
+                        <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Jumlah Soal</label>
                         <div className="flex items-center h-10 bg-slate-50/50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-700 rounded-xl px-2 focus-within:ring-2 focus-within:ring-indigo-500/20 focus-within:border-indigo-500 transition-all shadow-sm focus-within:bg-white dark:focus-within:bg-slate-900">
                           <button onClick={() => setAiCount(Math.max(1, aiCount - 1))} className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 font-black text-sm transition-colors">-</button>
                           <input type="number" value={aiCount || ""} onChange={(e) => setAiCount(e.target.value === "" ? 1 : parseInt(e.target.value, 10) || 1)} className="flex-1 text-center bg-transparent font-black text-slate-800 dark:text-white outline-none text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
@@ -8149,32 +8155,32 @@ Aturan:
 
                     <div className="space-y-2 mb-4 bg-slate-50/50 dark:bg-slate-800/30 p-3.5 rounded-2xl border border-slate-200/60 dark:border-slate-700/60">
                       <div className="flex items-center justify-between mb-1">
-                        <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Taksonomi Bloom</label>
-                        <span className="text-[10px] font-semibold text-slate-400 bg-white dark:bg-slate-800 px-1.5 py-0.5 rounded shadow-sm">Level Kognitif</span>
+                        <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Taksonomi Bloom</label>
+                        <span className="text-xs font-semibold text-slate-400 bg-white dark:bg-slate-800 px-1.5 py-0.5 rounded shadow-sm">Level Kognitif</span>
                       </div>
                       <div className="grid grid-cols-3 gap-1.5">
                         {([['lots', 'LOTS (C1-C3)'], ['campuran', 'Mix'], ['hots', 'HOTS (C4-C6)']] as [string, string][]).map(([key, label]) => (
-                          <button key={key} onClick={() => setTaxonomyPreset(key as "lots" | "hots" | "campuran")} className={`py-2 rounded-xl text-[10px] font-bold transition-all shadow-sm ${getTaxonomyPreset() === key ? 'bg-white dark:bg-slate-700 text-indigo-700 dark:text-indigo-400 border border-slate-300 dark:border-slate-600 ring-1 ring-indigo-500/20' : 'text-slate-500 hover:bg-slate-200/50 dark:hover:bg-slate-700/50 border border-transparent bg-slate-100/50 dark:bg-slate-800/50'}`}>{label}</button>
+                          <button key={key} onClick={() => setTaxonomyPreset(key as "lots" | "hots" | "campuran")} className={`py-2 rounded-xl text-xs font-bold transition-all shadow-sm ${getTaxonomyPreset() === key ? 'bg-white dark:bg-slate-700 text-indigo-700 dark:text-indigo-400 border border-slate-300 dark:border-slate-600 ring-1 ring-indigo-500/20' : 'text-slate-500 hover:bg-slate-200/50 dark:hover:bg-slate-700/50 border border-transparent bg-slate-100/50 dark:bg-slate-800/50'}`}>{label}</button>
                         ))}
                       </div>
                       <div className="grid grid-cols-6 gap-1 pt-1.5">
                         {(['C1', 'C2', 'C3', 'C4', 'C5', 'C6'] as string[]).map((c) => (
-                          <button key={c} onClick={() => toggleTaxonomy(c)} className={`py-1.5 rounded-lg text-[10px] font-black transition-all border ${aiTaxonomy.includes(c) ? 'bg-indigo-500 text-white border-indigo-600 shadow-sm shadow-indigo-500/30' : 'bg-white dark:bg-slate-800 text-slate-400 border-slate-200 dark:border-slate-700 hover:border-indigo-300'}`}>{c}</button>
+                          <button key={c} onClick={() => toggleTaxonomy(c)} className={`py-1.5 rounded-lg text-xs font-black transition-all border ${aiTaxonomy.includes(c) ? 'bg-indigo-500 text-white border-indigo-600 shadow-sm shadow-indigo-500/30' : 'bg-white dark:bg-slate-800 text-slate-400 border-slate-200 dark:border-slate-700 hover:border-indigo-300'}`}>{c}</button>
                         ))}
                       </div>
                     </div>
                     
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1.5">
-                         <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Tingkat Kesulitan</label>
+                         <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Tingkat Kesulitan</label>
                          <div className="grid grid-cols-3 gap-1 bg-slate-50/80 dark:bg-slate-800/50 p-1 rounded-xl border border-slate-200/80 dark:border-slate-700/80">
                            {['mudah', 'sedang', 'sulit'].map((d) => (
-                             <button key={d} onClick={() => setAiDifficulty(d)} className={`py-2 rounded-lg text-[10px] font-bold capitalize transition-all shadow-sm ${aiDifficulty === d ? 'bg-white dark:bg-slate-700 text-slate-800 dark:text-white border border-slate-200 dark:border-slate-600' : 'text-slate-500 hover:bg-slate-200/50 dark:hover:bg-slate-700/50 border border-transparent'}`}>{d}</button>
+                             <button key={d} onClick={() => setAiDifficulty(d)} className={`py-2 rounded-lg text-xs font-bold capitalize transition-all shadow-sm ${aiDifficulty === d ? 'bg-white dark:bg-slate-700 text-slate-800 dark:text-white border border-slate-200 dark:border-slate-600' : 'text-slate-500 hover:bg-slate-200/50 dark:hover:bg-slate-700/50 border border-transparent'}`}>{d}</button>
                            ))}
                          </div>
                       </div>
                       <div className="space-y-1.5">
-                         <label className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center justify-between">
+                         <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center justify-between">
                             Mode Literasi
                             <label className="relative inline-flex items-center cursor-pointer">
                               <input type="checkbox" className="sr-only peer" checked={isAiLiteracy} onChange={(e) => setIsAiLiteracy(e.target.checked)} />
@@ -8184,12 +8190,12 @@ Aturan:
                          {isAiLiteracy ? (
                            <div className="grid grid-cols-3 gap-1 bg-slate-50/80 dark:bg-slate-800/50 p-1 rounded-xl border border-slate-200/80 dark:border-slate-700/80 h-[38px]">
                              {['pendek', 'sedang', 'panjang'].map((len) => (
-                               <button key={len} type="button" onClick={() => setAiPassageLength(len)} className={`rounded-lg text-[10px] font-bold capitalize transition-all ${aiPassageLength === len ? 'bg-indigo-500 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-200/50 dark:hover:bg-slate-700/50'}`}>{len}</button>
+                               <button key={len} type="button" onClick={() => setAiPassageLength(len)} className={`rounded-lg text-xs font-bold capitalize transition-all ${aiPassageLength === len ? 'bg-indigo-500 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-200/50 dark:hover:bg-slate-700/50'}`}>{len}</button>
                              ))}
                            </div>
                          ) : (
                            <div className="h-[38px] flex items-center px-3 bg-slate-50/80 dark:bg-slate-800/50 rounded-xl border border-slate-200/80 dark:border-slate-700/80">
-                              <span className="text-[10px] font-semibold text-slate-500 flex items-center gap-1.5"><BookOpen className="w-3.5 h-3.5" /> Buat Teks Bacaan</span>
+                              <span className="text-xs font-semibold text-slate-500 flex items-center gap-1.5"><BookOpen className="w-3.5 h-3.5" /> Buat Teks Bacaan</span>
                            </div>
                          )}
                       </div>
@@ -8203,7 +8209,7 @@ Aturan:
                         <div className="w-6 h-6 rounded-md bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center">
                            <Target className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
                         </div>
-                        <p className="text-[11px] font-black uppercase tracking-widest text-blue-800 dark:text-blue-300">Indikator Pembelajaran</p>
+                        <p className="text-xs font-black uppercase tracking-widest text-blue-800 dark:text-blue-300">Indikator Pembelajaran</p>
                         {isFetchingObjectives && <RefreshCw className="w-3.5 h-3.5 text-blue-400 animate-spin ml-auto" />}
                       </div>
                       {aiObjectives.length > 0 && (
@@ -8213,8 +8219,8 @@ Aturan:
                             const cLevel = cMatch ? cMatch[1] : "";
                             const text = cMatch ? obj.replace(/^C[1-6]\s*[:\-]\s*/, "") : obj;
                             return (
-                              <li key={idx} className="flex items-start gap-2.5 text-[11px] font-medium leading-relaxed text-blue-950/80 dark:text-blue-200/80">
-                                {cLevel ? <span className="shrink-0 px-2 py-0.5 rounded-md bg-white dark:bg-blue-900/60 shadow-sm border border-blue-100 dark:border-blue-800/50 text-[9px] font-black mt-0.5 text-blue-700 dark:text-blue-300">{cLevel}</span> : <div className="w-1.5 h-1.5 rounded-full bg-blue-400 mt-1.5 shrink-0"></div>}
+                              <li key={idx} className="flex items-start gap-2.5 text-xs font-medium leading-relaxed text-blue-950/80 dark:text-blue-200/80">
+                                {cLevel ? <span className="shrink-0 px-2.5 py-1 rounded-full bg-white dark:bg-blue-900/60 shadow-sm border border-blue-100 dark:border-blue-800/50 text-xs font-black mt-0.5 text-blue-700 dark:text-blue-300">{cLevel}</span> : <div className="w-1.5 h-1.5 rounded-full bg-blue-400 mt-1.5 shrink-0"></div>}
                                 <span>{text}</span>
                               </li>
                             );
@@ -8235,9 +8241,9 @@ Aturan:
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-black text-indigo-600 dark:text-indigo-400 flex items-center gap-2 tracking-tight">
                       <Sparkles className="w-4 h-4 animate-pulse text-purple-500" />
-                      {aiProgress < 40 ? "Merancang kerangka soal terstruktur..." : aiProgress < 80 ? "Memproses konteks & validasi keilmuan..." : "Menyusun format JSON akhir..."} <span className="text-slate-400 ml-1 font-medium text-[10px]">({aiProgress}%)</span>
+                      {aiProgress < 40 ? "Merancang kerangka soal terstruktur..." : aiProgress < 80 ? "Memproses konteks & validasi keilmuan..." : "Menyusun format JSON akhir..."} <span className="text-slate-400 ml-1 font-medium text-xs">({aiProgress}%)</span>
                     </span>
-                    <button onClick={cancelAIGeneration} className="text-[11px] font-bold text-rose-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-500/10 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5"><X className="w-3.5 h-3.5" /> Batalkan</button>
+                    <button onClick={cancelAIGeneration} className="text-xs font-bold text-rose-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-500/10 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5"><X className="w-3.5 h-3.5" /> Batalkan</button>
                   </div>
                   <div className="w-full h-2.5 bg-slate-200/80 dark:bg-slate-800 rounded-full overflow-hidden shadow-inner p-0.5">
                     <div className="h-full bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-500 rounded-full transition-all duration-300 relative bg-[length:200%_auto] animate-gradient" style={{ width: `${aiProgress}%` }}>
@@ -8251,13 +8257,13 @@ Aturan:
                     <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center shrink-0">
                       <Info className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                     </div>
-                    <p className="text-[9px] font-medium text-slate-500 dark:text-slate-400 leading-tight">
+                    <p className="text-xs font-medium text-slate-500 dark:text-slate-400 leading-tight">
                       Proses akan memakan waktu <span className="font-bold text-slate-700 dark:text-slate-300">beberapa detik</span> karena AI merakit seluruh JSON secara akurat & paralel di belakang layar.
                     </p>
                   </div>
                   <div className="flex gap-2.5 w-full sm:w-auto ml-auto">
                     <Button variant="ghost" onClick={() => setIsAIModalOpen(false)} className="rounded-xl text-xs font-bold px-5 h-11 hover:bg-slate-200/50 dark:hover:bg-slate-800">Batal</Button>
-                    <Button onClick={handleAIGenerate} disabled={isAIGenerating || !aiTopic.trim()} className="flex-1 sm:flex-none rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white shadow-xl shadow-indigo-500/25 text-xs font-black px-6 h-11 gap-2 border-0 group overflow-hidden relative">
+                    <Button onClick={handleAIGenerate} disabled={isAIGenerating || !aiTopic.trim()} className="flex-1 sm:flex-none rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white shadow-sm shadow-indigo-500/25 text-xs font-black px-6 h-11 gap-2 border-0 group overflow-hidden relative">
                       <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-out"></div>
                       <Wand2 className="w-4 h-4 relative z-10" />
                       <span className="relative z-10">Generate {aiCount} Soal</span>
@@ -8276,9 +8282,9 @@ Aturan:
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <h3 className="text-sm font-black text-slate-800 dark:text-slate-100 uppercase tracking-tighter">Hasil Ekstraksi Cerdas</h3>
-                    <span className="bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800/40">{parsedResults.length} Butir</span>
+                    <span className="bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 text-xs font-semibold px-2.5 py-1 rounded-full border border-emerald-200 dark:border-emerald-800/40">{parsedResults.length} Butir</span>
                   </div>
-                  <Button variant="ghost" size="sm" onClick={() => setParsedResults([])} className="h-8 text-[10px] font-black uppercase text-slate-400 hover:text-rose-500 transition-colors">Ulangi Proses</Button>
+                  <Button variant="ghost" size="sm" onClick={() => setParsedResults([])} className="h-8 text-xs font-black uppercase text-slate-400 hover:text-rose-500 transition-colors">Ulangi Proses</Button>
                 </div>
               ) : (
                 <div className="flex items-center gap-3">
@@ -8330,7 +8336,7 @@ Aturan:
                   {importMode === 'generate' && (
                     <div className="grid grid-cols-2 gap-4 animate-in slide-in-from-top-2 duration-300">
                       <div className="space-y-2">
-                        <label className="text-[10px] font-black uppercase text-slate-400">Jumlah Soal</label>
+                        <label className="text-xs font-black uppercase text-slate-400">Jumlah Soal</label>
                         <Select value={importCount.toString()} onChange={(e) => setImportCount(parseInt(e.target.value))}>
                           {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => (
                             <option key={n} value={n.toString()}>{n} Soal</option>
@@ -8338,7 +8344,7 @@ Aturan:
                         </Select>
                       </div>
                       <div className="space-y-2">
-                        <label className="text-[10px] font-black uppercase text-slate-400">Tipe Soal</label>
+                        <label className="text-xs font-black uppercase text-slate-400">Tipe Soal</label>
                         <Select value={importType} onChange={(e) => setImportType(e.target.value)}>
                           <option value="pilihan_ganda">Pilihan Ganda</option>
                           <option value="pilihan_ganda_kompleks">Ganda Kompleks</option>
@@ -8363,13 +8369,13 @@ Aturan:
                         </label>
                       </div>
                       <div className="text-slate-400 text-xs font-bold">ATAU</div>
-                      <div className="flex-1 text-[10px] text-slate-500 font-medium italic">
+                      <div className="flex-1 text-xs text-slate-500 font-medium italic">
                         {importMode === 'extract' ? "Tempel soal-soal mentah di bawah ini" : "Tempel materi bacaan/artikel di bawah ini"}
                       </div>
                     </div>
                   )}
 
-                  <div className="p-5 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/10 dark:to-indigo-900/10 border border-blue-100/50 dark:border-blue-800/40 rounded-3xl relative overflow-hidden group">
+                  <div className="p-4 sm:p-6 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/10 dark:to-indigo-900/10 border border-blue-100/50 dark:border-blue-800/40 rounded-2xl relative overflow-hidden group">
                     <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:scale-110 transition-transform">
                       <Sparkles className="w-24 h-24 text-blue-600" />
                     </div>
@@ -8379,59 +8385,59 @@ Aturan:
                       </div>
                       <div>
                         <p className="text-sm font-bold text-blue-800 dark:text-blue-300">Cara Menggunakan:</p>
-                        <ul className="text-[11px] text-blue-600/80 dark:text-blue-400/80 mt-1.5 space-y-1.5 list-none">
+                        <ul className="text-xs text-blue-600/80 dark:text-blue-400/80 mt-1.5 space-y-1.5 list-none">
                           {importMode === 'extract' ? (
                             <>
                               <li className="flex items-start gap-2">
-                                <span className="w-4 h-4 rounded-full bg-blue-100 dark:bg-blue-800 text-[10px] flex items-center justify-center font-bold shrink-0 mt-0.5">1</span>
+                                <span className="w-4 h-4 rounded-full bg-blue-100 dark:bg-blue-800 text-xs flex items-center justify-center font-bold shrink-0 mt-0.5">1</span>
                                 <span>Salin seluruh naskah soal dari Word/PDF (Ctrl+A {'->'} Ctrl+C).</span>
                               </li>
                               <li className="flex items-start gap-2">
-                                <span className="w-4 h-4 rounded-full bg-blue-100 dark:bg-blue-800 text-[10px] flex items-center justify-center font-bold shrink-0 mt-0.5">2</span>
+                                <span className="w-4 h-4 rounded-full bg-blue-100 dark:bg-blue-800 text-xs flex items-center justify-center font-bold shrink-0 mt-0.5">2</span>
                                 <span>Tempel di kotak bawah. AI akan mendeteksi puluhan soal sekaligus secara otomatis.</span>
                               </li>
                               <li className="flex items-start gap-2">
-                                <span className="w-4 h-4 rounded-full bg-blue-100 dark:bg-blue-800 text-[10px] flex items-center justify-center font-bold shrink-0 mt-0.5">3</span>
+                                <span className="w-4 h-4 rounded-full bg-blue-100 dark:bg-blue-800 text-xs flex items-center justify-center font-bold shrink-0 mt-0.5">3</span>
                                 <span>Tinjau hasil deteksi, lalu klik "Simpan" untuk memasukkannya ke sistem.</span>
                               </li>
                             </>
                           ) : importMode === 'json' ? (
                             <>
                               <li className="flex items-start gap-2">
-                                <span className="w-4 h-4 rounded-full bg-orange-100 dark:bg-orange-800 text-[10px] flex items-center justify-center font-bold shrink-0 mt-0.5">1</span>
+                                <span className="w-4 h-4 rounded-full bg-orange-100 dark:bg-orange-800 text-xs flex items-center justify-center font-bold shrink-0 mt-0.5">1</span>
                                 <span>Tempel data JSON hasil export atau buat manual sesuai format.</span>
                               </li>
                               <li className="flex items-start gap-2">
-                                <span className="w-4 h-4 rounded-full bg-orange-100 dark:bg-orange-800 text-[10px] flex items-center justify-center font-bold shrink-0 mt-0.5">2</span>
+                                <span className="w-4 h-4 rounded-full bg-orange-100 dark:bg-orange-800 text-xs flex items-center justify-center font-bold shrink-0 mt-0.5">2</span>
                                 <span>Klik "Parse JSON" - tidak memerlukan AI, langsung diproses.</span>
                               </li>
                               <li className="flex items-start gap-2">
-                                <span className="w-4 h-4 rounded-full bg-orange-100 dark:bg-orange-800 text-[10px] flex items-center justify-center font-bold shrink-0 mt-0.5">3</span>
+                                <span className="w-4 h-4 rounded-full bg-orange-100 dark:bg-orange-800 text-xs flex items-center justify-center font-bold shrink-0 mt-0.5">3</span>
                                 <span>Format: {`[{"text":"...","choices":{"a":{"text":"...","isCorrect":true},...},"answerKey":"a"}]`}</span>
                               </li>
                             </>
                           ) : (
                             <>
                               <li className="flex items-start gap-2">
-                                <span className="w-4 h-4 rounded-full bg-blue-100 dark:bg-blue-800 text-[10px] flex items-center justify-center font-bold shrink-0 mt-0.5">1</span>
+                                <span className="w-4 h-4 rounded-full bg-blue-100 dark:bg-blue-800 text-xs flex items-center justify-center font-bold shrink-0 mt-0.5">1</span>
                                 <span>Tempelkan materi pelajaran, artikel, atau bacaan apa saja.</span>
                               </li>
                               <li className="flex items-start gap-2">
-                                <span className="w-4 h-4 rounded-full bg-blue-100 dark:bg-blue-800 text-[10px] flex items-center justify-center font-bold shrink-0 mt-0.5">2</span>
+                                <span className="w-4 h-4 rounded-full bg-blue-100 dark:bg-blue-800 text-xs flex items-center justify-center font-bold shrink-0 mt-0.5">2</span>
                                 <span>Tentukan jumlah soal, lalu klik tombol "Buat Soal" di bawah.</span>
                               </li>
                               <li className="flex items-start gap-2">
-                                <span className="w-4 h-4 rounded-full bg-blue-100 dark:bg-blue-800 text-[10px] flex items-center justify-center font-bold shrink-0 mt-0.5">3</span>
+                                <span className="w-4 h-4 rounded-full bg-blue-100 dark:bg-blue-800 text-xs flex items-center justify-center font-bold shrink-0 mt-0.5">3</span>
                                 <span>Soal-soal baru akan muncul dan siap disimpan ke bank soal.</span>
                               </li>
                             </>
                           )}
                           <li className="flex items-start gap-2">
-                            <span className="w-4 h-4 rounded-full bg-blue-100 dark:bg-blue-800 text-[10px] flex items-center justify-center font-bold shrink-0 mt-0.5">3</span>
+                            <span className="w-4 h-4 rounded-full bg-blue-100 dark:bg-blue-800 text-xs flex items-center justify-center font-bold shrink-0 mt-0.5">3</span>
                             <span>Teks stimulus / literasi pembuka akan otomatis dipisahkan (Mode Literasi).</span>
                           </li>
                           <li className="flex items-start gap-2">
-                            <span className="w-4 h-4 rounded-full bg-blue-100 dark:bg-blue-800 text-[10px] flex items-center justify-center font-bold shrink-0 mt-0.5">4</span>
+                            <span className="w-4 h-4 rounded-full bg-blue-100 dark:bg-blue-800 text-xs flex items-center justify-center font-bold shrink-0 mt-0.5">4</span>
                             <span>Mendukung rumus Matematika (LaTeX), potongan kode program, soal Isian & Uraian.</span>
                           </li>
                         </ul>
@@ -8440,7 +8446,7 @@ Aturan:
                   </div>
                   <div className="relative group">
                     <textarea
-                      className="w-full h-[400px] p-6 bg-slate-50/50 dark:bg-slate-900/40 border-2 border-slate-100 dark:border-slate-800 rounded-[2.5rem] text-xs font-mono focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 outline-none transition-all resize-none shadow-inner"
+                      className="w-full h-[400px] p-6 bg-slate-50/50 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-800 rounded-2xl text-xs font-mono focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 outline-none transition-all resize-none shadow-inner"
                       placeholder={importMode === 'json' ? '[{"text":"Pertanyaan...","choices":{"a":{"text":"Jawaban A","isCorrect":true},"b":{"text":"Jawaban B","isCorrect":false}},"answerKey":"a"}]' : "Contoh: Buatkan 5 soal literasi tentang ekosistem laut... atau tempelkan naskah soal Anda di sini."}
                       value={importText}
                       onChange={(e) => setImportText(e.target.value)}
@@ -8459,7 +8465,7 @@ Aturan:
                 <div className="space-y-4 animate-in slide-in-from-bottom-4 duration-500">
                   <div className="space-y-4 pb-6">
                     {parsedResults.map((q, idx) => (
-                      <div key={idx} className="p-5 border border-slate-200/60 dark:border-slate-800 rounded-3xl bg-card hover:border-indigo-200 dark:hover:border-indigo-900/40 transition-colors shadow-sm">
+                      <div key={idx} className="p-4 sm:p-6 border border-slate-200/60 dark:border-slate-800 rounded-2xl bg-card hover:border-indigo-200 dark:hover:border-indigo-900/40 transition-colors shadow-sm">
                         <div className="flex gap-4">
                           <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-xs font-black text-slate-400 shrink-0">
                             {idx + 1}
@@ -8467,10 +8473,10 @@ Aturan:
                           <div className="space-y-4 flex-1">
                             {q.groupText && (
                               <div className="p-4 bg-indigo-50/30 dark:bg-indigo-950/20 border-l-4 border-indigo-500 rounded-r-2xl mb-2">
-                                <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-2 flex items-center gap-1.5">
+                                <p className="text-xs font-black text-indigo-500 uppercase tracking-widest mb-2 flex items-center gap-1.5">
                                   <Plus className="w-3 h-3" /> Literasi / Stimulus Khusus
                                 </p>
-                                <MathText content={q.groupText} className="text-[11px] text-slate-700 dark:text-slate-300 leading-relaxed font-medium line-clamp-4 italic" />
+                                <MathText content={q.groupText} className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed font-medium line-clamp-4 italic" />
                               </div>
                             )}
                             <MathText content={q.text} className="text-sm font-bold text-slate-800 dark:text-slate-100 leading-normal" />
@@ -8481,7 +8487,7 @@ Aturan:
                             )}
                             {/* Type badge */}
                             {q.type && q.type !== "pilihan_ganda" && (
-                              <span className={`inline-block text-[9px] font-bold px-2 py-0.5 rounded-full border ${q.type === "pilihan_ganda_kompleks" ? "bg-blue-50 text-blue-600 border-blue-200" :
+                              <span className={`inline-block text-xs font-semibold px-2.5 py-1 rounded-full border ${q.type === "pilihan_ganda_kompleks" ? "bg-blue-50 text-blue-600 border-blue-200" :
                                   q.type === "benar_salah" ? "bg-green-50 text-green-600 border-green-200" :
                                     q.type === "menjodohkan" ? "bg-purple-50 text-purple-600 border-purple-200" :
                                       q.type === "isian_singkat" ? "bg-amber-50 text-amber-600 border-amber-200" :
@@ -8504,19 +8510,19 @@ Aturan:
                                 <table className="w-full text-left border-collapse">
                                   <thead>
                                     <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
-                                      <th className="p-2.5 text-xs font-bold text-slate-700 dark:text-slate-300">Pernyataan</th>
-                                      <th className="w-24 p-2.5 text-center text-xs font-black text-emerald-600 uppercase">Kunci</th>
+                                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-700 dark:text-slate-300">Pernyataan</th>
+                                      <th className="w-24 px-4 py-3 text-center text-xs font-semibold text-emerald-600 uppercase tracking-wide">Kunci</th>
                                     </tr>
                                   </thead>
                                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                                     {q.statements.map((s: any, sIdx: number) => (
-                                      <tr key={s.id || sIdx}>
-                                        <td className="p-2.5 text-xs text-slate-700 dark:text-slate-300">
+                                      <tr key={s.id || sIdx} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                                        <td className="px-4 py-3 text-xs text-slate-700 dark:text-slate-300">
                                           <span className="font-bold mr-1.5 text-slate-400">{sIdx + 1}.</span>
                                           <MathText content={s.text} disableJustify={true} className="inline !p-0 [&_p]:inline" />
                                         </td>
-                                        <td className="p-2.5 text-center">
-                                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${s.answer === "benar" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400" : "bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400"}`}>
+                                        <td className="px-4 py-3 text-center">
+                                          <span className={`px-2.5 py-1 rounded-full text-xs font-black uppercase ${s.answer === "benar" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400" : "bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400"}`}>
                                             {s.answer || "benar"}
                                           </span>
                                         </td>
@@ -8531,10 +8537,10 @@ Aturan:
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 mt-2">
                                 {Object.entries(q.choices).map(([key, val]: [string, any]) => (
                                   <div key={key} className={`p-2.5 rounded-xl border flex items-center gap-3 transition-all ${val.isCorrect ? 'bg-emerald-50 border-emerald-200 dark:bg-emerald-950/20 dark:border-emerald-800/40 text-emerald-700 dark:text-emerald-400' : 'bg-slate-50/50 dark:bg-slate-800/40 border-slate-100 dark:border-slate-700 text-slate-500 dark:text-slate-400'}`}>
-                                    <div className={`w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-black uppercase shrink-0 ${val.isCorrect ? 'bg-emerald-500 text-white shadow-md' : 'bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-800'}`}>
+                                    <div className={`w-6 h-6 rounded-lg flex items-center justify-center text-xs font-black uppercase shrink-0 ${val.isCorrect ? 'bg-emerald-500 text-white shadow-md' : 'bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-800'}`}>
                                       {key}
                                     </div>
-                                    <MathText content={val.text} className="text-[11px] font-semibold" />
+                                    <MathText content={val.text} className="text-xs font-semibold" />
                                     {val.isCorrect && <Check className="w-3.5 h-3.5 ml-auto text-emerald-500 stroke-[3px]" />}
                                   </div>
                                 ))}
@@ -8545,10 +8551,10 @@ Aturan:
                               <div className="space-y-2 mt-2">
                                 {q.pairs.map((p: any, pIdx: number) => (
                                   <div key={p.id || pIdx} className="flex items-center gap-2 p-2 rounded-xl bg-purple-50/50 dark:bg-purple-950/20 border border-purple-100 dark:border-purple-800/40">
-                                    <span className="w-5 h-5 rounded bg-purple-600 text-white flex items-center justify-center text-[9px] font-black shrink-0">{pIdx + 1}</span>
-                                    <span className="flex-1 text-[11px] font-semibold text-slate-700 dark:text-slate-300">{p.left}</span>
+                                    <span className="w-5 h-5 rounded bg-purple-600 text-white flex items-center justify-center text-xs font-black shrink-0">{pIdx + 1}</span>
+                                    <span className="flex-1 text-xs font-semibold text-slate-700 dark:text-slate-300">{p.left}</span>
                                     <Forward className="w-3.5 h-3.5 text-purple-400 shrink-0" />
-                                    <span className="flex-1 text-[11px] font-bold text-purple-600 dark:text-purple-400">{p.right}</span>
+                                    <span className="flex-1 text-xs font-bold text-purple-600 dark:text-purple-400">{p.right}</span>
                                   </div>
                                 ))}
                               </div>
@@ -8558,8 +8564,8 @@ Aturan:
                               <div className="space-y-1.5 mt-2">
                                 {q.items.map((item: any, iIdx: number) => (
                                   <div key={item.id || iIdx} className={`flex items-center gap-2 p-2 rounded-xl ${q.type === "urutkan" ? "bg-orange-50/50 border border-orange-100" : "bg-cyan-50/50 border border-cyan-100"}`}>
-                                    <span className={`w-5 h-5 rounded ${q.type === "urutkan" ? "bg-orange-600" : "bg-cyan-600"} text-white flex items-center justify-center text-[9px] font-black shrink-0`}>{iIdx + 1}</span>
-                                    <span className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">{item.text}</span>
+                                    <span className={`w-5 h-5 rounded ${q.type === "urutkan" ? "bg-orange-600" : "bg-cyan-600"} text-white flex items-center justify-center text-xs font-black shrink-0`}>{iIdx + 1}</span>
+                                    <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">{item.text}</span>
                                   </div>
                                 ))}
                               </div>
@@ -8567,8 +8573,8 @@ Aturan:
                             {/* Answer key (isian singkat / uraian) */}
                             {(q.type === "isian_singkat" || q.type === "uraian") && q.answerKey && (
                               <div className="mt-2 p-3 rounded-xl bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/40">
-                                <p className="text-[9px] font-black text-amber-500 uppercase tracking-widest mb-1">{q.type === "isian_singkat" ? "Kunci Jawaban" : "Pedoman Penilaian"}</p>
-                                <p className="text-[11px] font-bold text-amber-700 dark:text-amber-300">{q.answerKey}</p>
+                                <p className="text-xs font-black text-amber-500 uppercase tracking-widest mb-1">{q.type === "isian_singkat" ? "Kunci Jawaban" : "Pedoman Penilaian"}</p>
+                                <p className="text-xs font-bold text-amber-700 dark:text-amber-300">{q.answerKey}</p>
                               </div>
                             )}
                           </div>
@@ -8585,7 +8591,7 @@ Aturan:
                 <Button
                   onClick={handleAIParse}
                   disabled={isParsing || !importText.trim()}
-                  className={`w-full h-14 rounded-[1.5rem] font-black uppercase text-xs tracking-widest shadow-xl transition-all active:scale-95 ${importMode === 'json'
+                  className={`w-full h-14 rounded-2xl font-black uppercase text-xs tracking-widest shadow-sm transition-all active:scale-95 ${importMode === 'json'
                       ? "bg-orange-600 hover:bg-orange-700 text-white shadow-orange-200/50"
                       : importMode === 'extract'
                         ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-200/50"
@@ -8595,10 +8601,10 @@ Aturan:
                   {isParsing ? (
                     <div className="flex flex-col items-center gap-2 w-full py-1">
                       <div className="flex items-center justify-between w-full px-2">
-                        <span className="text-[10px] font-black uppercase tracking-widest">
+                        <span className="text-xs font-black uppercase tracking-widest">
                           {importMode === 'extract' ? "Memilah..." : "Membangun..."} {aiProgress}%
                         </span>
-                        <button onClick={cancelAIGeneration} className="px-3 py-1 rounded-lg bg-white/20 text-[10px] font-bold border border-white/30 hover:bg-white/30 transition-colors">
+                        <button onClick={cancelAIGeneration} className="px-3 py-1 rounded-lg bg-white/20 text-xs font-bold border border-white/30 hover:bg-white/30 transition-colors">
                           Batalkan
                         </button>
                       </div>
@@ -8618,14 +8624,14 @@ Aturan:
                   <Button
                     variant="outline"
                     onClick={() => setIsAIImportOpen(false)}
-                    className="flex-1 h-14 rounded-[1.5rem] font-bold uppercase text-xs tracking-widest border-2 border-slate-200 dark:border-slate-800 hover:bg-slate-100 transition-all font-black"
+                    className="flex-1 h-14 rounded-2xl font-bold uppercase text-xs tracking-widest border border-slate-200 dark:border-slate-800 hover:bg-slate-100 transition-all font-black"
                   >
                     Batal
                   </Button>
                   <Button
                     onClick={handleSaveAIImport}
                     disabled={isParsing}
-                    className="flex-[2] h-14 bg-indigo-600 hover:bg-indigo-700 text-white rounded-[1.5rem] font-black uppercase text-xs tracking-widest shadow-xl shadow-indigo-200/50 dark:shadow-none transition-all active:scale-95"
+                    className="flex-[2] h-14 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-sm shadow-indigo-200/50 dark:shadow-none transition-all active:scale-95"
                   >
                     {isParsing ? (
                       importProgress > 0 ? `Menyimpan ${importProgress}%` : "Sedang Menyimpan..."
@@ -8679,9 +8685,9 @@ Aturan:
             <div className="p-8 space-y-8 max-h-[65vh] overflow-y-auto custom-scrollbar">
 
               {/* ATURAN UTAMA */}
-              <div className="p-5 rounded-2xl bg-rose-50 dark:bg-rose-900/10 border-2 border-rose-200 dark:border-rose-800/40 space-y-3">
+              <div className="p-5 rounded-2xl bg-rose-50 dark:bg-rose-900/10 border border-rose-200 dark:border-rose-800/40 space-y-3">
                 <h4 className="text-sm font-black text-rose-700 dark:text-rose-400 flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-full bg-rose-600 text-white flex items-center justify-center text-[10px] font-black">!</span>
+                  <span className="w-6 h-6 rounded-full bg-rose-600 text-white flex items-center justify-center text-xs font-black">!</span>
                   ATURAN PENTING
                 </h4>
                 <p className="text-sm text-rose-800/80 dark:text-rose-300 leading-relaxed">
@@ -8689,12 +8695,12 @@ Aturan:
                 </p>
                 <div className="grid grid-cols-2 gap-3 mt-3">
                   <div className="p-3 bg-white dark:bg-slate-900 rounded-xl border border-rose-200 dark:border-rose-800">
-                    <div className="text-[10px] font-black text-rose-500 mb-1.5">Œ SALAH</div>
+                    <div className="text-xs font-black text-rose-500 mb-1.5">Œ SALAH</div>
                     <code className="text-xs font-mono text-slate-600">{"\\frac{a}{b}"}</code>
-                    <div className="mt-2 text-[10px] text-slate-400 italic">Tampil sebagai teks biasa</div>
+                    <div className="mt-2 text-xs text-slate-400 italic">Tampil sebagai teks biasa</div>
                   </div>
                   <div className="p-3 bg-white dark:bg-slate-900 rounded-xl border border-emerald-200 dark:border-emerald-800">
-                    <div className="text-[10px] font-black text-emerald-500 mb-1.5">œ“ BENAR</div>
+                    <div className="text-xs font-black text-emerald-500 mb-1.5">œ“ BENAR</div>
                     <code className="text-xs font-mono text-indigo-600">{"$ \\frac{a}{b} $"}</code>
                     <div className="mt-2"><MathText content="$ \frac{a}{b} $" className="text-sm" /></div>
                   </div>
@@ -8703,14 +8709,14 @@ Aturan:
 
               {/* KAMUS SIMBOL LENGKAP */}
               <div className="space-y-3">
-                <h4 className="text-[10px] font-black text-indigo-500 uppercase tracking-widest">Kamus Simbol (Klik baris untuk menyalin)</h4>
+                <h4 className="text-xs font-black text-indigo-500 uppercase tracking-widest">Kamus Simbol (Klik baris untuk menyalin)</h4>
                 <div className="overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800">
                   <table className="w-full text-xs">
                     <thead className="bg-slate-50 dark:bg-slate-900">
                       <tr>
-                        <th className="text-left p-3 font-bold text-slate-500 text-[10px] uppercase">Nama</th>
-                        <th className="text-left p-3 font-bold text-slate-500 text-[10px] uppercase">Kode (tulis di antara $...$)</th>
-                        <th className="text-left p-3 font-bold text-slate-500 text-[10px] uppercase">Hasil</th>
+                        <th className="text-left px-4 py-3 font-semibold text-slate-500 text-xs uppercase tracking-wide">Nama</th>
+                        <th className="text-left px-4 py-3 font-semibold text-slate-500 text-xs uppercase tracking-wide">Kode (tulis di antara $...$)</th>
+                        <th className="text-left px-4 py-3 font-semibold text-slate-500 text-xs uppercase tracking-wide">Hasil</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -8747,8 +8753,8 @@ Aturan:
                         { name: "Satuan (m/s²)", code: "\\text{m/s}^2", full: "$ \\text{m/s}^2 $" },
                       ].map((item) => (
                         <tr key={item.name} className="group hover:bg-indigo-50 dark:hover:bg-indigo-950/20 cursor-pointer transition-colors" onClick={() => copyToClipboard(item.full, item.name)}>
-                          <td className="p-2.5 font-medium text-slate-700 dark:text-slate-300">{item.name}</td>
-                          <td className="p-2.5 font-mono text-indigo-600 dark:text-indigo-400 text-[10px]">{item.code}</td>
+                          <td className="px-4 py-3 font-medium text-slate-700 dark:text-slate-300">{item.name}</td>
+                          <td className="px-4 py-3 font-mono text-indigo-600 dark:text-indigo-400 text-xs">{item.code}</td>
                           <td className="p-2.5"><MathText content={item.full} className="text-sm" /></td>
                         </tr>
                       ))}
@@ -8759,7 +8765,7 @@ Aturan:
 
               {/* CONTOH SOAL LENGKAP */}
               <div className="space-y-4 pt-4 border-t border-slate-100 dark:border-slate-800">
-                <h4 className="text-[10px] font-black text-indigo-500 uppercase tracking-widest">Contoh Soal per Mata Pelajaran (Klik untuk Salin)</h4>
+                <h4 className="text-xs font-black text-indigo-500 uppercase tracking-widest">Contoh Soal per Mata Pelajaran (Klik untuk Salin)</h4>
                 <div className="space-y-3">
                   {[
                     { label: "MATEMATIKA - Logaritma", code: "Nilai dari $ \\dfrac{{}^{2}\\!\\log \\sqrt{5} + 2 \\cdot {}^{4}\\!\\log 5}{{}^{2}\\!\\log 3 \\cdot {}^{3}\\!\\log 5} $ = ..." },
@@ -8790,11 +8796,11 @@ Aturan:
                   ].map((ex) => (
                     <div key={ex.label} onClick={() => copyToClipboard(ex.code, ex.label)} className={`group p-4 rounded-2xl border cursor-pointer transition-all ${copiedId === ex.label ? "bg-emerald-50 dark:bg-emerald-950/20 border-emerald-300" : "bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 hover:border-indigo-300"}`}>
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-[10px] font-black text-slate-400 uppercase">{ex.label}</span>
-                        <span className={`text-[9px] font-bold px-2 py-0.5 rounded ${copiedId === ex.label ? "bg-emerald-500 text-white" : "bg-slate-200 text-slate-500 opacity-0 group-hover:opacity-100"}`}>{copiedId === ex.label ? "TERSALIN!" : "KLIK SALIN"}</span>
+                        <span className="text-xs font-black text-slate-400 uppercase">{ex.label}</span>
+                        <span className={`text-xs font-bold px-2 py-0.5 rounded ${copiedId === ex.label ? "bg-emerald-500 text-white" : "bg-slate-200 text-slate-500 opacity-0 group-hover:opacity-100"}`}>{copiedId === ex.label ? "TERSALIN!" : "KLIK SALIN"}</span>
                       </div>
                       <MathText content={ex.code} className="text-sm font-serif leading-relaxed" />
-                      <code className="block mt-2 text-[9px] font-mono text-slate-400 break-all">{ex.code}</code>
+                      <code className="block mt-2 text-xs font-mono text-slate-400 break-all">{ex.code}</code>
                     </div>
                   ))}
                 </div>
@@ -8802,8 +8808,8 @@ Aturan:
 
               {/* TIPS */}
               <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/40 space-y-2">
-                <h4 className="text-[10px] font-black text-amber-700 uppercase tracking-widest">Tips Penting</h4>
-                <ul className="text-[11px] text-amber-800/80 dark:text-amber-300 space-y-1.5">
+                <h4 className="text-xs font-black text-amber-700 uppercase tracking-widest">Tips Penting</h4>
+                <ul className="text-xs text-amber-800/80 dark:text-amber-300 space-y-1.5">
                   <li> Gunakan <code className="font-mono bg-amber-100 dark:bg-amber-900/30 px-1 rounded">{"\\dfrac"}</code> untuk pecahan besar yang lebih mudah dibaca</li>
                   <li> Untuk teks biasa di dalam rumus, bungkus dengan <code className="font-mono bg-amber-100 dark:bg-amber-900/30 px-1 rounded">{"\\text{...}"}</code></li>
                   <li> Import dari Word otomatis mengkonversi equation ke LaTeX</li>
@@ -8815,7 +8821,7 @@ Aturan:
             </div>
 
             <DialogFooter className="p-6 bg-slate-50 dark:bg-slate-900/50 border-t border-slate-100 dark:border-slate-800">
-              <Button onClick={() => setIsMathGuideOpen(false)} className="w-full h-12 bg-slate-900 hover:bg-black text-white rounded-xl font-bold transition-all shadow-xl shadow-slate-200 dark:shadow-none">
+              <Button onClick={() => setIsMathGuideOpen(false)} className="w-full h-12 bg-slate-900 hover:bg-black text-white rounded-xl font-bold transition-all shadow-sm shadow-slate-200 dark:shadow-none">
                 Tutup Dokumentasi
               </Button>
             </DialogFooter>

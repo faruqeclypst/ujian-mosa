@@ -1185,7 +1185,7 @@ const MonitoringPage = () => {
   if (monitoringLocked) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4 animate-in fade-in duration-500">
-        <div className="w-20 h-20 bg-amber-100 dark:bg-amber-900/20 rounded-3xl flex items-center justify-center">
+        <div className="w-20 h-20 bg-amber-100 dark:bg-amber-900/20 rounded-2xl flex items-center justify-center">
           <svg className="w-10 h-10 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
           </svg>
@@ -1204,7 +1204,7 @@ const MonitoringPage = () => {
   return (
     <div className="space-y-5 animate-in fade-in duration-500">
       {/* HEADER SECTION - Clean & Professional */}
-      <div className="bg-card p-5 rounded-3xl border border-slate-200/60 dark:border-slate-800 shadow-sm transition-all duration-300">
+      <div className="bg-card p-4 sm:p-6 rounded-2xl border border-slate-200/60 dark:border-slate-800 shadow-sm transition-all duration-300">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-4">
             <Button
@@ -1223,7 +1223,7 @@ const MonitoringPage = () => {
                 {!isLoading && (
                   <div className="flex items-center gap-1.5 px-2 py-0.5 bg-emerald-50 dark:bg-emerald-900/20 rounded-md border border-emerald-100 dark:border-emerald-800/40">
                     <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                    <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">Live</span>
+                    <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">Live</span>
                   </div>
                 )}
               </div>
@@ -1243,7 +1243,7 @@ const MonitoringPage = () => {
                     if (isLoading || !monitorRoom) return <Skeleton className="h-4 w-20 rounded-md" />;
 
                     const ids = Array.isArray(monitorRoom.classId) ? monitorRoom.classId : String(monitorRoom.classId || "").split(",");
-                    if (monitorRoom.allClasses) return <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400">Semua Kelas</span>;
+                    if (monitorRoom.allClasses) return <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400">Semua Kelas</span>;
 
                     const names = ids.map(id => examClasses.find(c => c.id === id)?.name).filter(Boolean);
                     return names.length > 0 ? (
@@ -1263,14 +1263,14 @@ const MonitoringPage = () => {
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                     <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                   </span>
-                  <span className="text-[10px] font-semibold text-slate-600 dark:text-slate-300">
+                  <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">
                     Auto-Sync
                   </span>
-                  <span className="text-[10px] font-mono font-bold text-blue-600 dark:text-blue-400">
+                  <span className="text-xs font-mono font-bold text-blue-600 dark:text-blue-400">
                     {isLoading ? "--" : `${monitorTimeLeft}s`}
                   </span>
                 </div>
-                <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium leading-none mt-1">
+                <span className="text-xs text-slate-400 dark:text-slate-500 font-medium leading-none mt-1">
                   {lastSyncTime ? `Diperbarui ${lastSyncTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}` : "Menghubungkan..."}
                 </span>
               </div>
@@ -1339,13 +1339,13 @@ const MonitoringPage = () => {
         return (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
             {/* Total Peserta */}
-            <div className="group bg-card p-4 rounded-3xl border border-slate-200/60 dark:border-slate-800 shadow-sm hover:border-blue-500/30 transition-all flex items-center justify-between">
+            <div className="group bg-card p-4 sm:p-6 rounded-2xl border border-slate-200/60 dark:border-slate-800 shadow-sm hover:border-blue-500/30 transition-all flex items-center justify-between">
               <div className="flex items-center gap-3.5">
                 <div className="p-3 rounded-2xl bg-blue-50 dark:bg-blue-900/10 text-blue-600 dark:text-blue-400 group-hover:scale-110 transition-transform">
                   <Users className="h-5 w-5" />
                 </div>
                 <div>
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-0.5">Total Peserta</p>
+                  <p className="text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-0.5">Total Peserta</p>
                   <h4 className="text-xl font-black text-slate-800 dark:text-white leading-none">
                     {isLoading ? <Skeleton className="h-6 w-12" /> : eligibleStudents.length}
                   </h4>
@@ -1354,13 +1354,13 @@ const MonitoringPage = () => {
             </div>
 
             {/* Sedang Ujian */}
-            <div className="group bg-card p-4 rounded-3xl border border-slate-200/60 dark:border-slate-800 shadow-sm hover:border-emerald-500/30 transition-all flex items-center justify-between">
+            <div className="group bg-card p-4 sm:p-6 rounded-2xl border border-slate-200/60 dark:border-slate-800 shadow-sm hover:border-emerald-500/30 transition-all flex items-center justify-between">
               <div className="flex items-center gap-3.5">
                 <div className="p-3 rounded-2xl bg-emerald-50 dark:bg-emerald-900/10 text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform">
                   <Monitor className="h-5 w-5" />
                 </div>
                 <div>
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-0.5">Sedang Ujian</p>
+                  <p className="text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-0.5">Sedang Ujian</p>
                   <h4 className="text-xl font-black text-emerald-600 dark:text-emerald-400 leading-none">
                     {isLoading ? <Skeleton className="h-6 w-8" /> : dispOngoing}
                   </h4>
@@ -1369,13 +1369,13 @@ const MonitoringPage = () => {
             </div>
 
             {/* Selesai */}
-            <div className="group relative bg-card p-4 rounded-3xl border border-slate-200/60 dark:border-slate-800 shadow-sm hover:border-blue-500/30 transition-all flex items-center justify-between cursor-default">
+            <div className="group relative bg-card p-4 sm:p-6 rounded-2xl border border-slate-200/60 dark:border-slate-800 shadow-sm hover:border-blue-500/30 transition-all flex items-center justify-between cursor-default">
               <div className="flex items-center gap-3.5">
                 <div className="p-3 rounded-2xl bg-blue-50 dark:bg-blue-900/10 text-blue-600 dark:text-blue-400 group-hover:scale-110 transition-transform">
                   <CheckCircle2 className="h-5 w-5" />
                 </div>
                 <div>
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-0.5">Selesai</p>
+                  <p className="text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-0.5">Selesai</p>
                   {isLoading ? <Skeleton className="h-6 w-16" /> : (
                     <h4 className="text-xl font-black text-blue-600 dark:text-blue-400 leading-none">
                       {dispFinished}<span className="text-sm font-bold text-slate-400">/{eligibleStudents.length}</span>
@@ -1386,8 +1386,8 @@ const MonitoringPage = () => {
 
               {/* Hover popup — siswa belum ujian */}
               {!isLoading && absentList.length > 0 && (
-                <div className="absolute bottom-full left-0 mb-2 w-72 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl p-3 z-50 opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-200 translate-y-1 group-hover:translate-y-0">
-                  <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 px-1">
+                <div className="absolute bottom-full left-0 mb-2 w-72 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-sm p-3 z-50 opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-200 translate-y-1 group-hover:translate-y-0">
+                  <p className="text-xs font-black text-slate-500 uppercase tracking-widest mb-2 px-1">
                     Belum Ujian ({absentList.length} siswa)
                   </p>
                   <div className="max-h-52 overflow-y-auto space-y-1 pr-1">
@@ -1396,7 +1396,7 @@ const MonitoringPage = () => {
                       return (
                         <div key={s.id} className="flex items-center justify-between px-2.5 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-800">
                           <span className="text-xs font-semibold text-slate-700 dark:text-slate-200 truncate max-w-[160px]">{s.name}</span>
-                          <span className="text-[10px] font-bold text-slate-400 shrink-0 ml-2">{cls}</span>
+                          <span className="text-xs font-bold text-slate-400 shrink-0 ml-2">{cls}</span>
                         </div>
                       );
                     })}
@@ -1406,13 +1406,13 @@ const MonitoringPage = () => {
             </div>
 
             {/* Terkunci */}
-            <div className="group bg-card p-4 rounded-3xl border border-slate-200/60 dark:border-slate-800 shadow-sm hover:border-rose-500/30 transition-all flex items-center justify-between">
+            <div className="group bg-card p-4 sm:p-6 rounded-2xl border border-slate-200/60 dark:border-slate-800 shadow-sm hover:border-rose-500/30 transition-all flex items-center justify-between">
               <div className="flex items-center gap-3.5">
                 <div className="p-3 rounded-2xl bg-rose-50 dark:bg-rose-900/10 text-rose-600 dark:text-rose-400 group-hover:scale-110 transition-transform">
                   <Lock className="h-5 w-5" />
                 </div>
                 <div>
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-0.5">Terkunci</p>
+                  <p className="text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-0.5">Terkunci</p>
                   <h4 className="text-xl font-black text-rose-600 dark:text-rose-400 leading-none">
                     {isLoading ? <Skeleton className="h-6 w-6" /> : lockedCount}
                   </h4>
@@ -1426,9 +1426,9 @@ const MonitoringPage = () => {
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {/* SIDEBAR - Enhanced & Integrated */}
         <div className="lg:col-span-1 space-y-6">
-          <div className="bg-card p-5 rounded-3xl border border-slate-200/60 dark:border-slate-800 shadow-sm space-y-6 h-fit sticky top-6">
+          <div className="bg-card p-4 sm:p-6 rounded-2xl border border-slate-200/60 dark:border-slate-800 shadow-sm space-y-6 h-fit sticky top-6">
             <div>
-              <h3 className="text-[10px] font-bold text-slate-400 dark:text-slate-500 flex items-center gap-2 mb-4 uppercase tracking-widest pl-1 border-l-2 border-blue-500 ml-1">
+              <h3 className="text-xs font-bold text-slate-400 dark:text-slate-500 flex items-center gap-2 mb-4 uppercase tracking-widest pl-1 border-l-2 border-blue-500 ml-1">
                 Panel Filter & Aksi
               </h3>
             </div>
@@ -1486,17 +1486,17 @@ const MonitoringPage = () => {
               <div className="pt-4 border-t border-slate-100 dark:border-slate-800/60 space-y-4">
                 {/* 📊 Kelompok: Navigasi & Live */}
                 <div className="space-y-1.5">
-                  <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest pl-1">Link & Analisis</span>
+                  <span className="text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest pl-1">Link & Analisis</span>
                   <div className="grid grid-cols-2 gap-2">
                     <button
                       onClick={() => { sessionStorage.setItem("activeGradingRoomId", roomId || ""); navigate("/admin/penilaian"); }}
-                      className="w-full rounded-xl bg-indigo-50 hover:bg-indigo-100 border border-indigo-100 dark:bg-indigo-900/20 dark:text-indigo-400 dark:hover:bg-indigo-900/40 dark:border-indigo-800/40 text-indigo-700 font-bold text-[10px] py-2 px-1 shadow-sm transition-all flex items-center justify-center gap-1 whitespace-nowrap tracking-tight"
+                      className="w-full rounded-xl bg-indigo-50 hover:bg-indigo-100 border border-indigo-100 dark:bg-indigo-900/20 dark:text-indigo-400 dark:hover:bg-indigo-900/40 dark:border-indigo-800/40 text-indigo-700 font-bold text-xs py-2 px-1 shadow-sm transition-all flex items-center justify-center gap-1 whitespace-nowrap tracking-tight"
                     >
                       <BookOpen className="h-3.5 w-3.5 shrink-0 text-indigo-500" /> Penilaian
                     </button>
                     <button
                       onClick={() => navigate(`/admin/analisis-butir-soal?roomId=${roomId || ""}&examId=${monitorRoom?.examId || ""}`)}
-                      className="w-full col-span-2 rounded-xl bg-blue-50 hover:bg-blue-100 border border-blue-100 dark:bg-blue-900/20 dark:text-blue-400 dark:hover:bg-blue-900/40 dark:border-blue-800/40 text-blue-700 font-bold text-[10px] py-2 px-2 shadow-sm transition-all flex items-center justify-center gap-1.5 whitespace-nowrap tracking-tight"
+                      className="w-full col-span-2 rounded-xl bg-blue-50 hover:bg-blue-100 border border-blue-100 dark:bg-blue-900/20 dark:text-blue-400 dark:hover:bg-blue-900/40 dark:border-blue-800/40 text-blue-700 font-bold text-xs py-2 px-2 shadow-sm transition-all flex items-center justify-center gap-1.5 whitespace-nowrap tracking-tight"
                     >
                       <BarChart2 className="h-3.5 w-3.5 text-blue-600 shrink-0" /> Analisis Butir Soal (Item Analysis)
                     </button>
@@ -1505,18 +1505,18 @@ const MonitoringPage = () => {
 
                 {/* 📥 Kelompok: Export Laporan */}
                 <div className="space-y-1.5">
-                  <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest pl-1">Unduh Laporan</span>
+                  <span className="text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest pl-1">Unduh Laporan</span>
                   {monitorQuestions.some((q: any) => q.type === "uraian") ? (
                     <div className="grid grid-cols-2 gap-2">
                       <button
                         onClick={handleExportExcel}
-                        className="w-full rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 dark:hover:bg-emerald-900/40 dark:border-emerald-800/40 text-emerald-700 font-bold text-[10px] py-2 px-1 shadow-sm transition-all flex items-center justify-center gap-1 whitespace-nowrap tracking-tight"
+                        className="w-full rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 dark:hover:bg-emerald-900/40 dark:border-emerald-800/40 text-emerald-700 font-bold text-xs py-2 px-1 shadow-sm transition-all flex items-center justify-center gap-1 whitespace-nowrap tracking-tight"
                       >
                         <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-600 shrink-0" /> Excel
                       </button>
                       <button
                         onClick={handleExportEssayExcel}
-                        className="w-full rounded-xl bg-teal-50 hover:bg-teal-100 border border-teal-100 dark:bg-teal-900/20 dark:text-teal-400 dark:hover:bg-teal-900/40 dark:border-teal-800/40 text-teal-700 font-bold text-[10px] py-2 px-1 shadow-sm transition-all flex items-center justify-center gap-1 whitespace-nowrap tracking-tight"
+                        className="w-full rounded-xl bg-teal-50 hover:bg-teal-100 border border-teal-100 dark:bg-teal-900/20 dark:text-teal-400 dark:hover:bg-teal-900/40 dark:border-teal-800/40 text-teal-700 font-bold text-xs py-2 px-1 shadow-sm transition-all flex items-center justify-center gap-1 whitespace-nowrap tracking-tight"
                       >
                         <FileSpreadsheet className="h-3.5 w-3.5 text-teal-600 shrink-0" /> Essay
                       </button>
@@ -1524,7 +1524,7 @@ const MonitoringPage = () => {
                   ) : (
                     <button
                       onClick={handleExportExcel}
-                      className="w-full rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 dark:hover:bg-emerald-900/40 dark:border-emerald-800/40 text-emerald-700 font-bold text-[10px] py-2 px-1.5 shadow-sm transition-all flex items-center justify-center gap-1 whitespace-nowrap tracking-tight"
+                      className="w-full rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 dark:hover:bg-emerald-900/40 dark:border-emerald-800/40 text-emerald-700 font-bold text-xs py-2 px-1.5 shadow-sm transition-all flex items-center justify-center gap-1 whitespace-nowrap tracking-tight"
                     >
                       <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-600 shrink-0" /> Export Excel
                     </button>
@@ -1533,18 +1533,18 @@ const MonitoringPage = () => {
 
                 {/* 📝 Kelompok: Grading & Data */}
                 <div className="space-y-1.5">
-                  <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest pl-1">Penilaian & Siswa</span>
+                  <span className="text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest pl-1">Penilaian & Siswa</span>
                   {(role === "admin" || (role === "teacher" && teacherFullAccess)) && monitorQuestions.some((q: any) => q.type === "uraian") ? (
                     <div className="grid grid-cols-2 gap-2">
                       <button
                         onClick={() => { setQuickGradeOpen(true); }}
-                        className="w-full rounded-xl bg-violet-50 hover:bg-violet-100 border border-violet-100 dark:bg-violet-900/20 dark:text-violet-400 dark:hover:bg-violet-900/40 dark:border-violet-800/40 text-violet-700 font-bold text-[10px] py-2 px-1 shadow-sm transition-all flex items-center justify-center gap-1 whitespace-nowrap tracking-tight"
+                        className="w-full rounded-xl bg-violet-50 hover:bg-violet-100 border border-violet-100 dark:bg-violet-900/20 dark:text-violet-400 dark:hover:bg-violet-900/40 dark:border-violet-800/40 text-violet-700 font-bold text-xs py-2 px-1 shadow-sm transition-all flex items-center justify-center gap-1 whitespace-nowrap tracking-tight"
                       >
                         <Zap className="h-3.5 w-3.5 text-violet-500 shrink-0" /> Quick Grade
                       </button>
                       <button
                         onClick={handleCopyBelumUjian}
-                        className={`w-full rounded-xl border font-bold text-[10px] py-2 px-1 shadow-sm transition-all flex items-center justify-center gap-1 whitespace-nowrap tracking-tight ${waCopied
+                        className={`w-full rounded-xl border font-bold text-xs py-2 px-1 shadow-sm transition-all flex items-center justify-center gap-1 whitespace-nowrap tracking-tight ${waCopied
                           ? "bg-green-100 border-green-300 text-green-700 dark:bg-green-900/30 dark:border-green-700 dark:text-green-400"
                           : "bg-amber-50 hover:bg-amber-100 border-amber-100 dark:bg-amber-900/20 dark:text-amber-400 dark:hover:bg-amber-900/40 dark:border-amber-800/40 text-amber-700"
                           }`}
@@ -1555,7 +1555,7 @@ const MonitoringPage = () => {
                   ) : (
                     <button
                       onClick={handleCopyBelumUjian}
-                      className={`w-full rounded-xl border font-bold text-[10px] py-2 px-2 shadow-sm transition-all flex items-center justify-center gap-1.5 whitespace-nowrap tracking-tight ${waCopied
+                      className={`w-full rounded-xl border font-bold text-xs py-2 px-2 shadow-sm transition-all flex items-center justify-center gap-1.5 whitespace-nowrap tracking-tight ${waCopied
                         ? "bg-green-100 border-green-300 text-green-700 dark:bg-green-900/30 dark:border-green-700 dark:text-green-400"
                         : "bg-amber-50 hover:bg-amber-100 border-amber-100 dark:bg-amber-900/20 dark:text-amber-400 dark:hover:bg-amber-900/40 dark:border-amber-800/40 text-amber-700"
                         }`}
@@ -1568,11 +1568,11 @@ const MonitoringPage = () => {
                 {/* ⚠ Kelompok: Tindakan Massal (Admin/Full Teacher Only) */}
                 {(role === "admin" || (role === "teacher" && teacherFullAccess)) && (
                   <div className="space-y-1.5">
-                    <span className="text-[10px] font-black text-rose-500/80 dark:text-rose-400/80 uppercase tracking-widest pl-1">Zona Bahaya (Aksi Massal)</span>
+                    <span className="text-xs font-black text-rose-500/80 dark:text-rose-400/80 uppercase tracking-widest pl-1">Zona Bahaya (Aksi Massal)</span>
                     <button
                       onClick={handleOpenReopenAllFinishedDialog}
                       disabled={attempts.filter(a => a.status === "finished").length === 0}
-                      className="w-full rounded-xl bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 dark:bg-indigo-950/40 dark:text-indigo-400 dark:border-indigo-800/40 font-bold text-[10px] py-2.5 px-2 shadow-sm transition-all flex items-center justify-center gap-1.5 whitespace-nowrap tracking-tight disabled:opacity-40 disabled:cursor-not-allowed mb-2"
+                      className="w-full rounded-xl bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 dark:bg-indigo-950/40 dark:text-indigo-400 dark:border-indigo-800/40 font-bold text-xs py-2.5 px-2 shadow-sm transition-all flex items-center justify-center gap-1.5 whitespace-nowrap tracking-tight disabled:opacity-40 disabled:cursor-not-allowed mb-2"
                     >
                       <RotateCcw className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
                       Buka Semua yang Selesai ({attempts.filter(a => a.status === "finished").length})
@@ -1580,13 +1580,13 @@ const MonitoringPage = () => {
                     <div className="grid grid-cols-2 gap-2">
                       <button
                         onClick={handleForceSubmitAll}
-                        className="w-full rounded-xl bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-100 dark:bg-rose-950/40 dark:text-rose-400 dark:border-rose-800/30 font-bold text-[10px] py-2.5 px-1 shadow-sm transition-all flex items-center justify-center gap-1 whitespace-nowrap tracking-tight"
+                        className="w-full rounded-xl bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-100 dark:bg-rose-950/40 dark:text-rose-400 dark:border-rose-800/30 font-bold text-xs py-2.5 px-1 shadow-sm transition-all flex items-center justify-center gap-1 whitespace-nowrap tracking-tight"
                       >
                         <Users className="h-3.5 w-3.5 text-rose-500 shrink-0" /> Selesai Semua
                       </button>
                       <button
                         onClick={handleResetAllSessions}
-                        className="w-full rounded-xl bg-orange-50 text-orange-700 hover:bg-orange-100 border border-orange-100 dark:bg-orange-950/40 dark:text-orange-400 dark:border-orange-850/30 font-bold text-[10px] py-2.5 px-1 shadow-sm transition-all flex items-center justify-center gap-1 whitespace-nowrap tracking-tight"
+                        className="w-full rounded-xl bg-orange-50 text-orange-700 hover:bg-orange-100 border border-orange-100 dark:bg-orange-950/40 dark:text-orange-400 dark:border-orange-850/30 font-bold text-xs py-2.5 px-1 shadow-sm transition-all flex items-center justify-center gap-1 whitespace-nowrap tracking-tight"
                       >
                         <RotateCcw className="h-3.5 w-3.5 text-orange-500 shrink-0" /> Reset Sesi
                       </button>
@@ -1606,7 +1606,7 @@ const MonitoringPage = () => {
                 <BookOpen className="w-4 h-4 text-white" />
               </div>
               <div className="flex-1">
-                <p className="font-black text-indigo-700 dark:text-indigo-300 text-[10px] uppercase tracking-widest mb-1">Rumus Penilaian (Bobot 60:40)</p>
+                <p className="font-black text-indigo-700 dark:text-indigo-300 text-xs uppercase tracking-widest mb-1">Rumus Penilaian (Bobot 60:40)</p>
                 <p className="text-indigo-600/80 dark:text-indigo-400/80 font-medium leading-relaxed">
                   <span className="font-bold">Nilai Final</span> = (Skor Objektif × <span className="font-black">60%</span>) + (Skor Subjektif × <span className="font-black">40%</span>)
                   <span className="mx-2 text-indigo-300">•</span>
@@ -1618,7 +1618,7 @@ const MonitoringPage = () => {
             </div>
           )}
 
-          <div className="bg-card rounded-3xl border border-slate-200/60 dark:border-slate-800 shadow-sm overflow-hidden min-h-[500px]">
+          <div className="bg-card rounded-2xl border border-slate-200/60 dark:border-slate-800 shadow-sm overflow-hidden min-h-[500px]">
             <div className="overflow-x-auto">
               <StudentTable
                 students={students}
@@ -1810,7 +1810,7 @@ const MonitoringPage = () => {
 
       {/* 📋 Floating Batch Action Bar */}
       {selectedStudentIds.length > 0 && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white dark:bg-slate-800 px-5 py-3 rounded-2xl shadow-2xl border border-slate-700 flex items-center gap-3.5 animate-in fade-in slide-in-from-bottom-5 duration-200">
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white dark:bg-slate-800 px-5 py-3 rounded-2xl shadow-sm border border-slate-700 flex items-center gap-3.5 animate-in fade-in slide-in-from-bottom-5 duration-200">
           <span className="text-xs font-black tracking-wide text-slate-200 whitespace-nowrap">
             <span className="text-indigo-400 font-black mr-1">{selectedStudentIds.length}</span> Siswa Dipilih
           </span>

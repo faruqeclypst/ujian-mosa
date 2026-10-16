@@ -367,7 +367,7 @@ export default function ExamSimulatePage() {
       {/* ===== Header ala CBT siswa (timer diganti badge, profil diganti Keluar) ===== */}
       <header className="sticky top-0 z-50 bg-white/90 dark:bg-slate-900/90 backdrop-blur-3xl border-b border-slate-100 dark:border-slate-800 min-h-[2.85rem] sm:min-h-[4.5rem] h-auto px-2.5 sm:px-8 py-1 sm:py-0 flex items-center justify-between shadow-sm">
         <div className="flex items-center gap-1.5 sm:gap-3">
-          <span className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-1 sm:py-2 rounded-xl sm:rounded-2xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800/50 text-indigo-700 dark:text-indigo-300 text-[9px] sm:text-xs font-black uppercase tracking-widest">
+          <span className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-1 sm:py-2 rounded-xl sm:rounded-2xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800/50 text-indigo-700 dark:text-indigo-300 text-xs font-black uppercase tracking-widest">
             <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
             Simulasi Guru
           </span>
@@ -375,13 +375,13 @@ export default function ExamSimulatePage() {
 
         <div className="flex-1 text-center min-w-0 px-2 sm:px-4">
           <p className="font-black text-slate-800 dark:text-white uppercase tracking-tight text-xs sm:text-base leading-tight" title={examTitle}>{examTitle}</p>
-          <p className="text-[10px] sm:text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-none mt-0.5 sm:mt-1">Tidak disimpan</p>
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-widest leading-none mt-0.5 sm:mt-1">Tidak disimpan</p>
         </div>
 
         <div className="flex items-center gap-1.5 sm:gap-4 ml-auto relative z-10">
           <button
             onClick={handleExit}
-            className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-1.5 sm:py-2.5 rounded-xl sm:rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/50 text-rose-700 dark:text-rose-300 text-[10px] sm:text-xs font-black uppercase tracking-widest hover:bg-rose-100 dark:hover:bg-rose-950/70 transition-colors active:scale-95"
+            className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-1.5 sm:py-2.5 rounded-xl sm:rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/50 text-rose-700 dark:text-rose-300 text-xs sm:text-xs font-black uppercase tracking-widest hover:bg-rose-100 dark:hover:bg-rose-950/70 transition-colors active:scale-95"
             title="Keluar dari simulasi kapan saja"
           >
             <LogOut className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
@@ -429,11 +429,11 @@ export default function ExamSimulatePage() {
                 <div className="w-2.5 h-2.5 bg-emerald-600 rounded-full animate-pulse" />
                 <h3 className="text-[11px] font-black text-emerald-600 uppercase tracking-[0.2em]">Navigasi Soal</h3>
               </div>
-              <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+              <span className="text-xs font-black px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
                 {answeredCount} / {questions.length}
               </span>
             </div>
-            <div className="flex items-center gap-3 px-1 text-[9px] font-bold text-slate-400">
+            <div className="flex items-center gap-3 px-1 text-xs font-bold text-slate-400">
               <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" /> Lengkap</span>
               <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-500 inline-block" /> Ragu</span>
               <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-slate-300 dark:bg-slate-700 inline-block" /> Kosong</span>
@@ -482,7 +482,7 @@ export default function ExamSimulatePage() {
           type="button"
           disabled={currentIndex === 0}
           onClick={() => goTo(currentIndex - 1)}
-          className="rounded-xl h-10 px-4 sm:h-14 sm:px-6 font-black uppercase text-[10px] sm:text-[12px] tracking-[0.15em] border-2 border-emerald-500/40 bg-emerald-50/50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100/70 active:scale-95 transition-all flex items-center gap-1 focus:outline-none disabled:opacity-30"
+          className="rounded-xl h-10 px-4 sm:h-14 sm:px-6 font-black uppercase text-xs sm:text-[12px] tracking-[0.15em] border-2 border-emerald-500/40 bg-emerald-50/50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100/70 active:scale-95 transition-all flex items-center gap-1 focus:outline-none disabled:opacity-30"
         >
           <ChevronLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
           Back
@@ -498,7 +498,7 @@ export default function ExamSimulatePage() {
           type="button"
           disabled={currentIndex >= questions.length - 1}
           onClick={() => goTo(currentIndex + 1)}
-          className="rounded-xl h-10 px-4 sm:h-14 sm:px-6 text-white font-black uppercase text-[10px] sm:text-[12px] tracking-[0.15em] bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 active:scale-90 transition-all shadow-md shadow-emerald-600/25 flex items-center gap-1 focus:outline-none disabled:opacity-30"
+          className="rounded-xl h-10 px-4 sm:h-14 sm:px-6 text-white font-black uppercase text-xs sm:text-[12px] tracking-[0.15em] bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 active:scale-90 transition-all shadow-md shadow-emerald-600/25 flex items-center gap-1 focus:outline-none disabled:opacity-30"
         >
           Next
           <ChevronRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
@@ -510,7 +510,7 @@ export default function ExamSimulatePage() {
         <DialogContent className="max-w-md rounded-2xl p-8 pointer-events-auto border-none bg-white dark:bg-slate-950 shadow-2xl">
           <div className="flex items-center justify-between mb-6">
             <DialogTitle className="text-xl font-black text-emerald-800 dark:text-emerald-400 uppercase tracking-tighter">Navigasi Soal</DialogTitle>
-            <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+            <span className="text-xs font-black px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
               {answeredCount} / {questions.length}
             </span>
           </div>

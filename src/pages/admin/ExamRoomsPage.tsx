@@ -273,9 +273,9 @@ const ExamRoomsPage = () => {
           </div>
           <div className="flex flex-col gap-0.5 min-w-0">
             <div className="flex items-center gap-2 whitespace-nowrap overflow-hidden">
-              <span className="text-[10px] font-bold text-slate-600 dark:text-slate-400 leading-none">{room.teacherName}</span>
+              <span className="text-xs font-semibold text-slate-600 dark:text-slate-400 leading-none">{room.teacherName}</span>
               <span className="text-slate-300 dark:text-slate-700">|</span>
-              <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 truncate">
+              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 truncate">
                 {room.subjectName || "N/A"}
               </span>
             </div>
@@ -285,7 +285,7 @@ const ExamRoomsPage = () => {
                 e.stopPropagation();
                 handleQuestionsClick(room);
               }}
-              className="text-[10px] font-black text-slate-500 hover:text-blue-600 hover:underline dark:text-slate-400 dark:hover:text-blue-400 truncate text-left"
+              className="text-xs font-bold text-slate-500 hover:text-blue-600 hover:underline dark:text-slate-400 dark:hover:text-blue-400 truncate text-left"
               title="Buka bank soal"
             >
               Bank Soal: {room.examTitle || "Tanpa Nama"}
@@ -322,15 +322,15 @@ const ExamRoomsPage = () => {
         return (
           <div className="flex flex-col gap-1.5">
             <div className="flex items-center gap-1.5 flex-wrap">
-              <span className={cn("inline-flex text-[9px] px-1.5 py-0 rounded font-black uppercase tracking-wider border whitespace-nowrap", statusStyle)}>
+              <span className={cn("inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border whitespace-nowrap", statusStyle)}>
                 {statusLabel}
               </span>
-              <span className={cn("text-[9px] px-1 py-0 rounded font-black uppercase tracking-widest border bg-slate-50 dark:bg-slate-900", getExamTypeColorClass(room.examType || "UMUM"))}>
+              <span className={cn("px-2.5 py-1 rounded-full text-xs font-semibold border", getExamTypeColorClass(room.examType || "UMUM"))}>
                 {room.examType || "UMUM"}
               </span>
               {room.max_questions && room.max_questions > 0 ? (
                 <span className={cn(
-                  "text-[9px] px-1.5 py-0 rounded font-black border whitespace-nowrap",
+                  "px-2.5 py-1 rounded-full text-xs font-semibold border whitespace-nowrap",
                   room.randomize_questions !== false
                     ? "bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/40 dark:text-indigo-400 dark:border-indigo-800/40"
                     : "bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400"
@@ -339,7 +339,7 @@ const ExamRoomsPage = () => {
                 </span>
               ) : (
                 <span className={cn(
-                  "text-[9px] px-1.5 py-0 rounded font-black border whitespace-nowrap",
+                  "px-2.5 py-1 rounded-full text-xs font-semibold border whitespace-nowrap",
                   room.randomize_questions !== false
                     ? "bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/40 dark:text-indigo-400 dark:border-indigo-800/40"
                     : "bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400"
@@ -348,7 +348,7 @@ const ExamRoomsPage = () => {
                 </span>
               )}
             </div>
-            <div className="flex flex-col gap-0.5 text-slate-500 dark:text-slate-400 font-bold text-[10px]">
+            <div className="flex flex-col gap-0.5 text-slate-500 dark:text-slate-400 font-bold text-xs">
               <div className="flex items-center gap-1.5 whitespace-nowrap">
                 <span>
                   {(() => {
@@ -381,17 +381,17 @@ const ExamRoomsPage = () => {
       className: "w-40",
       render: (v: string, room: ExamRoomData) => {
         if (room.allClasses) {
-          return <Badge variant="outline" className="text-[9px] font-black uppercase bg-blue-50/50 text-blue-600 border-blue-100">Semua {terminology.class}</Badge>;
+          return <Badge variant="outline" className="py-1 bg-blue-50/50 text-blue-600 border-blue-100">Semua {terminology.class}</Badge>;
         }
 
         const classList = (v || "").split(", ").filter(Boolean);
-        if (classList.length === 0) return <span className="text-slate-400 text-[10px]">N/A</span>;
+        if (classList.length === 0) return <span className="text-slate-400 text-xs">N/A</span>;
 
         if (classList.length <= 2) {
           return (
             <div className="flex flex-wrap gap-1">
               {classList.map((cls, idx) => (
-                <Badge key={idx} variant="secondary" className="px-1.5 py-0 rounded text-[9px] font-bold bg-slate-100 text-slate-600 border-transparent">{cls}</Badge>
+                <Badge key={idx} variant="secondary" className="py-1 bg-slate-100 text-slate-600 border-transparent">{cls}</Badge>
               ))}
             </div>
           );
@@ -405,13 +405,13 @@ const ExamRoomsPage = () => {
               title="Klik untuk melihat daftar kelas"
             >
               <Users className="h-3.5 w-3.5 text-indigo-500" />
-              <span className="text-[11px] font-bold text-indigo-700 dark:text-indigo-300 whitespace-nowrap">{classList.length} {terminology.class}</span>
+              <span className="text-xs font-bold text-indigo-700 dark:text-indigo-300 whitespace-nowrap">{classList.length} {terminology.class}</span>
             </button>
             {/* Hover tooltip - desktop only with pointer-events-none */}
-            <div className="hidden sm:group-hover:block pointer-events-none absolute z-50 top-full left-0 mt-1 p-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl w-max max-w-xs">
+            <div className="hidden sm:group-hover:block pointer-events-none absolute z-50 top-full left-0 mt-1 p-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm w-max max-w-xs">
               <div className="grid grid-cols-3 gap-1">
                 {classList.map((cls, idx) => (
-                  <span key={idx} className="px-2 py-0.5 rounded-full text-[10px] font-bold text-center bg-indigo-50 text-indigo-700 border border-indigo-100 dark:bg-indigo-950/30 dark:text-indigo-300 dark:border-indigo-800">{cls}</span>
+                  <span key={idx} className="px-2 py-0.5 rounded-full text-xs font-bold text-center bg-indigo-50 text-indigo-700 border border-indigo-100 dark:bg-indigo-950/30 dark:text-indigo-300 dark:border-indigo-800">{cls}</span>
                 ))}
               </div>
             </div>
@@ -1114,8 +1114,8 @@ const ExamRoomsPage = () => {
                         <ChevronDown className="h-3.5 w-3.5 opacity-70" />
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-56 p-1.5 rounded-2xl shadow-xl border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 z-[100]">
-                      <DropdownMenuLabel className="text-[10px] font-bold uppercase tracking-wider text-slate-400 px-2.5 py-1">
+                    <DropdownMenuContent align="end" className="w-56 p-1.5 rounded-2xl shadow-sm border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 z-[100]">
+                      <DropdownMenuLabel className="text-xs font-bold uppercase tracking-wider text-slate-400 px-2.5 py-1">
                         Aksi ({selectedIds.length} Ruang Ujian)
                       </DropdownMenuLabel>
                       
@@ -1232,7 +1232,7 @@ const ExamRoomsPage = () => {
                 {isLoading ? <Skeleton className="h-6 w-24" /> : (
                   <>
                     <code className="text-lg font-mono font-bold text-slate-800 dark:text-slate-100">{universalToken || "---"}</code>
-                    <span className="text-[11px] text-amber-500 dark:text-amber-400 font-medium tracking-wide">({timeLeft})</span>
+                    <span className="text-xs text-amber-500 dark:text-amber-400 font-medium tracking-wide">({timeLeft})</span>
                   </>
                 )}
               </div>
@@ -1252,8 +1252,8 @@ const ExamRoomsPage = () => {
           </div>
           {/* Hover Breakdown Card */}
           <div className="absolute top-full left-0 right-0 mt-2 z-50 invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-all duration-200 scale-95 group-hover:scale-100 pointer-events-none group-hover:pointer-events-auto">
-            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl p-3.5 min-w-[220px] max-h-60 overflow-y-auto ring-1 ring-black/5 dark:ring-white/10">
-              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 border-b border-slate-100 dark:border-slate-800 pb-1.5 flex justify-between items-center">
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm p-3.5 min-w-[220px] max-h-60 overflow-y-auto ring-1 ring-black/5 dark:ring-white/10">
+              <div className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 border-b border-slate-100 dark:border-slate-800 pb-1.5 flex justify-between items-center">
                 <span>Detail Ruangan Live</span>
                 <span className="text-blue-600 dark:text-blue-400 font-bold">{totalOngoing} Total</span>
               </div>
@@ -1268,7 +1268,7 @@ const ExamRoomsPage = () => {
                         <span className="text-slate-600 dark:text-slate-300 font-medium truncate pr-2">
                           {room ? (room.room_name || room.examTitle) : "ID: " + rid}
                         </span>
-                        <span className="bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded-full font-bold text-[11px] min-w-[22px] text-center border border-blue-100 dark:border-blue-900/40">
+                        <span className="bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded-full font-bold text-xs min-w-[22px] text-center border border-blue-100 dark:border-blue-900/40">
                           {liveBreakdown[rid]}
                         </span>
                       </div>
@@ -1297,11 +1297,11 @@ const ExamRoomsPage = () => {
 
       {/* Main Table Section (Matching ExamsPage structure) */}
       {isLoading ? (
-        <Card>
-          <CardHeader className="p-4">
+        <Card className="shadow-sm hover:shadow-sm">
+          <CardHeader className="p-4 sm:p-6">
             <CardTitle className="text-base font-semibold text-slate-800 dark:text-white">Daftar Ruang Ujian</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-4 sm:p-6 pt-0">
             <div className="rounded-xl border border-slate-200/60 dark:border-slate-800 overflow-hidden">
               <Table>
                 <TableHeader className="bg-slate-50/50 dark:bg-slate-900/50">
@@ -1340,11 +1340,11 @@ const ExamRoomsPage = () => {
           </CardContent>
         </Card>
       ) : (
-        <Card>
-          <CardHeader className="p-4">
+        <Card className="shadow-sm hover:shadow-sm">
+          <CardHeader className="p-4 sm:p-6">
             <CardTitle className="text-base font-semibold text-slate-800 dark:text-white">Daftar Ruang Ujian</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-4 sm:p-6 pt-0">
             <DataTable
               data={filteredRooms}
               columns={columns}
@@ -1438,7 +1438,7 @@ const ExamRoomsPage = () => {
               <h2 className="text-sm font-bold text-slate-800 dark:text-white leading-tight">
                 {dialogMode === "edit" ? "Edit Ruang Ujian" : "Buka Ruang Ujian"}
               </h2>
-              <p className="text-[11px] text-slate-400">Bank soal · jadwal · kelas · aturan & parameter</p>
+              <p className="text-xs text-slate-400">Bank soal · jadwal · kelas · aturan & parameter</p>
             </div>
             <Button type="submit" form="room-form" className="h-10 px-6 rounded-xl font-bold text-xs shadow-md">
               {dialogMode === "edit" ? "Perbarui Ruangan" : "Buka Ruangan"}
@@ -1457,15 +1457,15 @@ const ExamRoomsPage = () => {
             {/* Row 1: Search + Nama Ruang */}
             <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
               <div className="md:col-span-5">
-                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Cari Bank Soal</p>
+                <p className="text-sm font-semibold text-slate-400 mb-1.5">Cari Bank Soal</p>
                 <div className="relative">
                   <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
-                  <Input placeholder="Nama soal / mapel / guru" value={examSearch} onChange={(e) => setExamSearch(e.target.value)} disabled={isEditRestricted} className="pl-8 h-9 text-xs rounded-xl" />
+                  <Input placeholder="Nama soal / mapel / guru" value={examSearch} onChange={(e) => setExamSearch(e.target.value)} disabled={isEditRestricted} className="pl-8 h-11 text-xs rounded-xl" />
                 </div>
               </div>
               <div className="md:col-span-7">
-                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Nama Ruang Ujian</p>
-                <Input placeholder="Contoh: Gelombang 1 / Kelas X" value={formValues.room_name} onChange={(e) => setFormValues({ ...formValues, room_name: e.target.value })} required className="h-9 text-xs rounded-xl" />
+                <p className="text-sm font-semibold text-slate-400 mb-1.5">Nama Ruang Ujian</p>
+                <Input placeholder="Contoh: Gelombang 1 / Kelas X" value={formValues.room_name} onChange={(e) => setFormValues({ ...formValues, room_name: e.target.value })} required className="h-11 text-xs rounded-xl" />
               </div>
             </div>
 
@@ -1474,10 +1474,13 @@ const ExamRoomsPage = () => {
 
               {/* Kiri: Bank Soal */}
               <div className="md:col-span-5">
-                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Bank Soal <span className="font-normal normal-case text-slate-400">({filteredExams.length} tersedia)</span></p>
+                <p className="text-sm font-semibold text-slate-400 mb-1.5">Bank Soal <span className="font-normal normal-case text-slate-400">({filteredExams.length} tersedia)</span></p>
                 <div className={`space-y-1.5 max-h-[360px] overflow-y-auto pr-1 ${isEditRestricted ? "opacity-60 pointer-events-none" : ""}`}>
                   {filteredExams.length === 0 ? (
-                    <div className="rounded-xl border-2 border-dashed border-slate-200 dark:border-slate-700 py-12 text-center text-xs text-slate-400">Tidak ditemukan</div>
+                    <div className="rounded-xl border-2 border-dashed border-slate-200 dark:border-slate-700 py-12 text-center">
+                      <Search className="h-8 w-8 mx-auto text-slate-300 dark:text-slate-600 mb-2" />
+                      <p className="text-xs text-slate-400 font-medium">Tidak ditemukan</p>
+                    </div>
                   ) : visibleExamOptions.map((e) => {
                     const subjectName = subjects.find((m: any) => m.id === (e.subjectId || e.subjectid))?.name || "-";
                     const teacherName = masterTeachers.find((t: any) => t.id === (e.teacherId || e.teacherid))?.name || "-";
@@ -1492,9 +1495,9 @@ const ExamRoomsPage = () => {
                       >
                         <div className="flex items-center justify-between gap-2">
                           <span className={cn("text-xs font-bold truncate", selected ? "text-blue-700 dark:text-blue-300" : "text-slate-800 dark:text-slate-200")}>{e.title}</span>
-                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 shrink-0">{e.examType || "PAS"}</span>
+                          <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-500 shrink-0">{e.examType || "PAS"}</span>
                         </div>
-                        <p className="text-[10.5px] text-slate-400 truncate mt-0.5">
+                        <p className="text-xs text-slate-400 truncate mt-0.5">
                           {subjectName} · {teacherName} {qCount !== undefined ? `· ${qCount} Soal` : ""}
                         </p>
                       </button>
@@ -1508,11 +1511,11 @@ const ExamRoomsPage = () => {
 
                 {/* Jadwal */}
                 <div>
-                  <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide mb-1">Jadwal</p>
+                  <p className="text-sm font-semibold text-slate-400 mb-1">Jadwal</p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                     <div>
-                      <p className="text-[10px] text-slate-400 mb-1">Waktu Mulai</p>
-                      <Input type="datetime-local" value={formValues.start_time} onChange={(e) => handleStartTimeChange(e.target.value)} required className="h-8 text-xs" />
+                      <p className="text-sm font-semibold text-slate-400 mb-1">Waktu Mulai</p>
+                      <Input type="datetime-local" value={formValues.start_time} onChange={(e) => handleStartTimeChange(e.target.value)} required className="h-11 text-xs rounded-xl" />
                       <div className="flex flex-wrap gap-1 mt-1">
                         {[
                           { label: "Skrg", handler: handleSetNow },
@@ -1526,37 +1529,37 @@ const ExamRoomsPage = () => {
                               const s = new Date(); s.setHours(p.h!, p.m!, 0, 0);
                               setFormValues(prev => ({ ...prev, start_time: formatLocalDateTime(s), end_time: formatLocalDateTime(new Date(s.getTime() + prev.duration * 60000)) }));
                             })}
-                            className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-blue-100 hover:text-blue-700 border border-slate-200 dark:border-slate-700 transition-colors"
+                            className="px-1.5 py-0.5 rounded text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-blue-100 hover:text-blue-700 border border-slate-200 dark:border-slate-700 transition-colors"
                           >{p.label}</button>
                         ))}
                       </div>
                     </div>
                     <div>
-                      <p className="text-[10px] text-slate-400 mb-1">Waktu Berakhir</p>
-                      <Input type="datetime-local" value={formValues.end_time} onChange={(e) => setFormValues({ ...formValues, end_time: e.target.value })} required className="h-8 text-xs" />
-                      <p className="text-[10px] text-amber-500 mt-1">Batas akhir akses</p>
+                      <p className="text-sm font-semibold text-slate-400 mb-1">Waktu Berakhir</p>
+                      <Input type="datetime-local" value={formValues.end_time} onChange={(e) => setFormValues({ ...formValues, end_time: e.target.value })} required className="h-11 text-xs rounded-xl" />
+                      <p className="text-xs text-amber-500 mt-1">Batas akhir akses</p>
                     </div>
                   </div>
                 </div>
 
                 {/* Aturan */}
                 <div>
-                  <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide mb-1">Aturan</p>
+                  <p className="text-sm font-semibold text-slate-400 mb-1">Aturan</p>
                   
                   {/* Baris 1: Durasi, Cheat, Kumpul */}
                   <div className="grid grid-cols-3 gap-2.5 mb-2">
                     <div>
-                      <p className="text-[10px] text-slate-400 mb-1">Durasi (mnt)</p>
-                      <Input type="number" value={formValues.duration || ""} onChange={(e) => handleDurationChange(e.target.value === "" ? 0 : parseInt(e.target.value) || 0)} required className="h-8 text-xs font-medium" />
+                      <p className="text-sm font-semibold text-slate-400 mb-1">Durasi (mnt)</p>
+                      <Input type="number" value={formValues.duration || ""} onChange={(e) => handleDurationChange(e.target.value === "" ? 0 : parseInt(e.target.value) || 0)} required className="h-11 text-xs rounded-xl font-medium" />
                     </div>
                     <div>
-                      <p className="text-[10px] text-slate-400 mb-1">Batas Cheat</p>
-                      <Input type="number" value={formValues.cheat_limit || ""} onChange={(e) => setFormValues({ ...formValues, cheat_limit: e.target.value === "" ? 0 : parseInt(e.target.value) || 0 })} required className="h-8 text-xs font-medium" />
+                      <p className="text-sm font-semibold text-slate-400 mb-1">Batas Cheat</p>
+                      <Input type="number" value={formValues.cheat_limit || ""} onChange={(e) => setFormValues({ ...formValues, cheat_limit: e.target.value === "" ? 0 : parseInt(e.target.value) || 0 })} required className="h-11 text-xs rounded-xl font-medium" />
                     </div>
                     <div>
-                      <p className="text-[10px] text-slate-400 mb-1">Kumpul Dibuka</p>
-                      <Input type="number" placeholder="Kapan saja" value={formValues.submit_window || ""} onChange={(e) => setFormValues({ ...formValues, submit_window: e.target.value === "" ? 0 : parseInt(e.target.value) || 0 })} className="h-8 text-xs font-medium" />
-                      <p className="text-[10px] text-slate-400 mt-0.5">Kosongkan = kapan saja</p>
+                      <p className="text-sm font-semibold text-slate-400 mb-1">Kumpul Dibuka</p>
+                      <Input type="number" placeholder="Kapan saja" value={formValues.submit_window || ""} onChange={(e) => setFormValues({ ...formValues, submit_window: e.target.value === "" ? 0 : parseInt(e.target.value) || 0 })} className="h-11 text-xs rounded-xl font-medium" />
+                      <p className="text-xs text-slate-400 mt-0.5">Kosongkan = kapan saja</p>
                     </div>
                   </div>
 
@@ -1565,9 +1568,9 @@ const ExamRoomsPage = () => {
                     {/* Kolom 1: Jumlah Soal Ditampilkan */}
                     <div>
                       <div className="flex items-center justify-between gap-1 mb-1">
-                        <p className="text-[10px] text-slate-400">Jumlah Soal</p>
+                        <p className="text-sm font-semibold text-slate-400">Jumlah Soal</p>
                         {formValues.examId && examQuestionCounts[formValues.examId] !== undefined && (
-                          <span className="text-[9px] font-bold text-blue-600 dark:text-blue-400">
+                          <span className="text-xs font-bold text-blue-600 dark:text-blue-400">
                             Bank: {examQuestionCounts[formValues.examId]}
                           </span>
                         )}
@@ -1577,9 +1580,9 @@ const ExamRoomsPage = () => {
                         placeholder="0 = Semua"
                         value={formValues.max_questions || ""}
                         onChange={(e) => setFormValues({ ...formValues, max_questions: e.target.value === "" ? 0 : parseInt(e.target.value) || 0 })}
-                        className="h-8 text-xs font-medium"
+                        className="h-11 text-xs rounded-xl font-medium"
                       />
-                      <p className="text-[10px] text-slate-400 mt-0.5">
+                      <p className="text-xs text-slate-400 mt-0.5">
                         {formValues.max_questions && formValues.max_questions > 0
                           ? `Tampilkan ${formValues.max_questions} soal.`
                           : "0 = Semua soal."}
@@ -1588,7 +1591,7 @@ const ExamRoomsPage = () => {
 
                     {/* Kolom 2: Acak Soal & Pilihan Jawaban */}
                     <div>
-                      <p className="text-[10px] text-slate-400 mb-1">Pengacakan</p>
+                      <p className="text-sm font-semibold text-slate-400 mb-1">Pengacakan</p>
                       <label className="flex items-center justify-between h-8 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer transition-colors select-none">
                         <span className="text-xs font-medium text-slate-700 dark:text-slate-200 truncate pr-1">Acak Soal</span>
                         <div className="relative inline-flex items-center shrink-0">
@@ -1596,12 +1599,12 @@ const ExamRoomsPage = () => {
                           <div className="w-9 h-5 bg-slate-300 dark:bg-slate-600 peer-focus:outline-none rounded-full peer peer-checked:bg-blue-600 peer-checked:after:translate-x-4 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all after:shadow-xs" />
                         </div>
                       </label>
-                      <p className="text-[10px] text-slate-400 mt-0.5">Acak butir & opsi A–E</p>
+                      <p className="text-xs text-slate-400 mt-0.5">Acak butir & opsi A–E</p>
                     </div>
 
                     {/* Kolom 3: Tampilkan Hasil Ujian */}
                     <div>
-                      <p className="text-[10px] text-slate-400 mb-1">Hasil Ujian</p>
+                      <p className="text-sm font-semibold text-slate-400 mb-1">Hasil Ujian</p>
                       <label className="flex items-center justify-between h-8 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer transition-colors select-none">
                         <span className="text-xs font-medium text-slate-700 dark:text-slate-200 truncate pr-1">Tampilkan</span>
                         <div className="relative inline-flex items-center shrink-0">
@@ -1609,7 +1612,7 @@ const ExamRoomsPage = () => {
                           <div className="w-9 h-5 bg-slate-300 dark:bg-slate-600 peer-focus:outline-none rounded-full peer peer-checked:bg-blue-600 peer-checked:after:translate-x-4 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all after:shadow-xs" />
                         </div>
                       </label>
-                      <p className="text-[10px] text-slate-400 mt-0.5">Siswa melihat nilai</p>
+                      <p className="text-xs text-slate-400 mt-0.5">Siswa melihat nilai</p>
                     </div>
                   </div>
                 </div>
@@ -1620,8 +1623,8 @@ const ExamRoomsPage = () => {
             {/* Row 3: Target Kelas — full width */}
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Target Kelas</p>
-                <div className="flex rounded-md overflow-hidden border border-slate-200 dark:border-slate-700 text-[11px] font-semibold">
+                <p className="text-sm font-semibold text-slate-400">Target Kelas</p>
+                <div className="flex rounded-md overflow-hidden border border-slate-200 dark:border-slate-700 text-xs font-semibold">
                   <button type="button" onClick={() => setFormValues({ ...formValues, allClasses: true, classId: "" })}
                     className={`px-3 py-1 transition-colors ${formValues.allClasses ? "bg-blue-600 text-white" : "bg-white dark:bg-slate-800 text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-700"}`}>
                     Semua Kelas
@@ -1649,7 +1652,7 @@ const ExamRoomsPage = () => {
                       );
                     })}
                   </div>
-                  <p className="text-[10px] text-slate-400 mt-2">Shift+klik untuk rentang</p>
+                  <p className="text-xs text-slate-400 mt-2">Shift+klik untuk rentang</p>
                 </div>
               )}
             </div>

@@ -471,7 +471,7 @@ const ExamsPage = () => {
           <span className="font-bold text-slate-800 dark:text-slate-100 truncate leading-tight">{v}</span>
           {item.examType && (
             <div className="mt-1">
-              <span className={cn("text-[9px] px-1.5 py-0 rounded font-black uppercase tracking-wider border", getExamTypeColorClass(item.examType))}>
+              <span className={cn("inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border", getExamTypeColorClass(item.examType))}>
                 {item.examType}
               </span>
             </div>
@@ -496,7 +496,7 @@ const ExamsPage = () => {
         return (
           <div className="flex items-center gap-2">
             <Avatar className="h-7 w-7 border border-slate-200 dark:border-slate-800">
-              <AvatarFallback className="bg-gradient-to-br from-indigo-500 to-blue-600 text-white text-[10px] font-bold">
+              <AvatarFallback className="bg-gradient-to-br from-indigo-500 to-blue-600 text-white text-xs font-bold">
                 {teacher?.code || (name || "U").split(" ").map(n => n[0]).join("").substring(0, 2).toUpperCase()}
               </AvatarFallback>
             </Avatar>
@@ -1512,8 +1512,8 @@ const ExamsPage = () => {
                         <ChevronDown className="h-3.5 w-3.5 opacity-70" />
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-56 p-1.5 rounded-2xl shadow-xl border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 z-[100]">
-                      <DropdownMenuLabel className="text-[10px] font-bold uppercase tracking-wider text-slate-400 px-2.5 py-1">
+                    <DropdownMenuContent align="end" className="w-56 p-1.5 rounded-2xl shadow-sm border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 z-[100]">
+                      <DropdownMenuLabel className="text-xs font-bold uppercase tracking-wider text-slate-400 px-2.5 py-1">
                         Aksi ({selectedIds.length} Bank Soal)
                       </DropdownMenuLabel>
                       
@@ -1602,11 +1602,11 @@ const ExamsPage = () => {
       </div>
 
       {isLoading ? (
-        <Card>
-          <CardHeader className="p-4">
+        <Card className="shadow-sm hover:shadow-sm">
+          <CardHeader className="p-4 sm:p-6">
             <CardTitle className="text-base font-semibold text-slate-800 dark:text-white">Daftar Bank Soal</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-4 sm:p-6 pt-0">
             <div className="rounded-xl border border-slate-200/60 dark:border-slate-800 overflow-hidden">
                 <Table>
                   <TableHeader className="bg-slate-50/50 dark:bg-slate-900/50">
@@ -1645,11 +1645,11 @@ const ExamsPage = () => {
           </CardContent>
         </Card>
       ) : (
-        <Card>
-          <CardHeader className="p-4">
+        <Card className="shadow-sm hover:shadow-sm">
+          <CardHeader className="p-4 sm:p-6">
             <CardTitle className="text-base font-semibold text-slate-800 dark:text-white">Daftar Bank Soal</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-4 sm:p-6 pt-0">
             <DataTable
               data={filteredExams}
               columns={columns}
@@ -1742,7 +1742,7 @@ const ExamsPage = () => {
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
             <FormField id="title" label="Judul" error={undefined}>
-              <Input value={formValues.title} onChange={(e) => setFormValues({ ...formValues, title: e.target.value })} required />
+              <Input value={formValues.title} onChange={(e) => setFormValues({ ...formValues, title: e.target.value })} required className="h-11 rounded-xl" />
             </FormField>
 
             <FormField id="examType" label="Jenis Bank Soal" error={undefined}>
@@ -1750,7 +1750,7 @@ const ExamsPage = () => {
                 value={formValues.examType} 
                 onChange={(e) => setFormValues({ ...formValues, examType: e.target.value })} 
                 required
-                className="w-full rounded-md border border-slate-200 dark:border-slate-800 bg-card text-sm p-2"
+                className="w-full h-11 rounded-xl border border-slate-200 dark:border-slate-800 bg-card text-sm px-3"
               >
                 <option value="Latihan">Latihan Biasa</option>
                 <option value="Ulangan">Ulangan Harian</option>
@@ -1766,7 +1766,7 @@ const ExamsPage = () => {
                 value={formValues.subjectId} 
                 onChange={(e) => setFormValues({ ...formValues, subjectId: e.target.value })} 
                 required
-                className="w-full rounded-md border border-slate-200 dark:border-slate-800 bg-card text-sm p-2"
+                className="w-full h-11 rounded-xl border border-slate-200 dark:border-slate-800 bg-card text-sm px-3"
               >
                 <option value="">-- Pilih Mapel --</option>
                 {subjects.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
@@ -1779,7 +1779,7 @@ const ExamsPage = () => {
                   value={formValues.teacherId} 
                   onChange={(e) => setFormValues({ ...formValues, teacherId: e.target.value })} 
                   required
-                  className="w-full rounded-md border border-slate-200 dark:border-slate-800 bg-card text-sm p-2"
+                  className="w-full h-11 rounded-xl border border-slate-200 dark:border-slate-800 bg-card text-sm px-3"
                 >
                   <option value="">-- Pilih {terminology.teacher} --</option>
                   {teachers.map((t: any) => <option key={t.id} value={t.id}>{t.name}</option>)}
@@ -1830,15 +1830,15 @@ const ExamsPage = () => {
             <div className="grid grid-cols-3 gap-2">
               <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-3 text-center border border-slate-100 dark:border-slate-800">
                 <p className="text-lg font-black text-slate-800 dark:text-white">{exams.filter(e => e.status !== "archive").length}</p>
-                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Bank Soal</p>
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Bank Soal</p>
               </div>
               <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-3 text-center border border-slate-100 dark:border-slate-800">
                 <p className="text-lg font-black text-emerald-600 dark:text-emerald-400">{Object.values(questionCounts).reduce((a, b) => a + b, 0)}</p>
-                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Total Soal</p>
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Total Soal</p>
               </div>
               <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-3 text-center border border-slate-100 dark:border-slate-800">
                 <p className="text-lg font-black text-blue-600 dark:text-blue-400">{reportData.length}</p>
-                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Guru Aktif</p>
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Guru Aktif</p>
               </div>
             </div>
 
@@ -1849,11 +1849,11 @@ const ExamsPage = () => {
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
                       <div className="w-7 h-7 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg flex items-center justify-center">
-                        <span className="text-[10px] font-black text-emerald-600 dark:text-emerald-400">{idx + 1}</span>
+                        <span className="text-xs font-black text-emerald-600 dark:text-emerald-400">{idx + 1}</span>
                       </div>
                       <span className="text-sm font-bold text-slate-800 dark:text-white">{t.name}</span>
                     </div>
-                    <Badge variant="outline" className="text-[10px] font-bold border-emerald-200 dark:border-emerald-800 text-emerald-600 dark:text-emerald-400">
+                    <Badge variant="outline" className="py-1 border-emerald-200 dark:border-emerald-800 text-emerald-600 dark:text-emerald-400">
                       {t.totalQuestions} soal
                     </Badge>
                   </div>
@@ -1862,7 +1862,7 @@ const ExamsPage = () => {
                       <div key={eIdx} className="flex items-center gap-2 text-xs">
                         <span className={`w-1.5 h-1.5 rounded-full ${ e.count > 0 ? "bg-emerald-500" : "bg-amber-400" }`}></span>
                         <span className="text-slate-600 dark:text-slate-400 truncate flex-1">{e.title}</span>
-                        <span className="text-slate-400 dark:text-slate-500 text-[10px] font-bold">{e.count}</span>
+                        <span className="text-slate-400 dark:text-slate-500 text-xs font-semibold">{e.count}</span>
                       </div>
                     ))}
                   </div>
@@ -1876,7 +1876,7 @@ const ExamsPage = () => {
                 if (teachersWithout.length === 0) return null;
                 return (
                   <div className="bg-amber-50 dark:bg-amber-950/20 rounded-xl p-3 border border-amber-100 dark:border-amber-800/40">
-                    <p className="text-[10px] font-black text-amber-600 dark:text-amber-400 uppercase tracking-widest mb-2">Belum Membuat Bank Soal</p>
+                    <p className="text-xs font-black text-amber-600 dark:text-amber-400 uppercase tracking-widest mb-2">Belum Membuat Bank Soal</p>
                     <div className="space-y-1">
                       {teachersWithout.map((t: any) => (
                         <div key={t.id} className="flex items-center gap-2 text-xs text-amber-700 dark:text-amber-400">

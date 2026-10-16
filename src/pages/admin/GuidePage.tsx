@@ -18,7 +18,7 @@ import { ExambroGuideModal } from "../../components/dialogs/ExambroGuideModal";
 const DocSection = ({ id, title, icon: Icon, children }: any) => (
   <section id={id} className="scroll-mt-20 sm:scroll-mt-28 space-y-6 sm:space-y-8 py-8 sm:py-12 border-t border-slate-200 dark:border-slate-800 first:border-0 first:pt-0">
     <div className="flex items-center gap-3 sm:gap-4">
-      <div className="w-10 h-10 sm:w-12 sm:h-12 bg-blue-600/10 dark:bg-blue-400/10 rounded-xl sm:rounded-2xl flex items-center justify-center shrink-0 text-blue-600 dark:text-blue-400 shadow-sm border border-blue-100 dark:border-blue-900/30">
+      <div className="w-10 h-10 sm:w-12 sm:h-12 bg-blue-600/10 dark:bg-blue-400/10 rounded-2xl flex items-center justify-center shrink-0 text-blue-600 dark:text-blue-400 shadow-sm border border-blue-100 dark:border-blue-900/30">
         <Icon size={20} className="sm:w-6 sm:h-6" strokeWidth={2.5} />
       </div>
       <div>
@@ -60,7 +60,7 @@ const AlertBox = ({ type = "info", title, children }: any) => {
     danger: <ShieldAlert size={18} className="shrink-0 mt-0.5 text-rose-600 dark:text-rose-400" />
   };
   return (
-    <div className={cn("p-4 sm:p-5 rounded-xl sm:rounded-2xl border flex gap-3 sm:gap-4 my-4 sm:my-6 shadow-sm", styles[type as keyof typeof styles])}>
+    <div className={cn("p-4 sm:p-6 rounded-2xl border flex gap-3 sm:gap-4 my-4 sm:my-6 shadow-sm", styles[type as keyof typeof styles])}>
       {icons[type as keyof typeof icons]}
       <div className="flex-1 min-w-0">
         {title && <h4 className="font-bold text-xs sm:text-sm mb-1 uppercase tracking-wider">{title}</h4>}
@@ -88,7 +88,7 @@ const Step = ({ number, title, children }: any) => (
 const FeatureGrid = ({ items }: { items: { icon: any, label: string, desc: string, color: string }[] }) => (
   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mt-4">
     {items.map((item, idx) => (
-      <div key={idx} className="p-4 sm:p-5 rounded-xl sm:rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800/60 shadow-sm flex gap-3.5 sm:gap-4 transition-all hover:shadow-md hover:border-slate-200 dark:hover:border-slate-700">
+      <div key={idx} className="p-4 sm:p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800/60 shadow-sm flex gap-3.5 sm:gap-4 transition-all hover:shadow-md hover:border-slate-200 dark:hover:border-slate-700">
         <div className={cn("w-9 h-9 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl flex items-center justify-center shrink-0 shadow-sm", item.color)}>
           <item.icon size={18} className="sm:w-5 sm:h-5" />
         </div>
@@ -102,7 +102,7 @@ const FeatureGrid = ({ items }: { items: { icon: any, label: string, desc: strin
 );
 
 const Kbd = ({ children }: { children: React.ReactNode }) => (
-  <kbd className="px-1.5 py-0.5 rounded border border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 text-[10px] font-bold text-slate-600 dark:text-slate-400 shadow-sm">{children}</kbd>
+  <kbd className="px-1.5 py-0.5 rounded border border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-600 dark:text-slate-400 shadow-sm">{children}</kbd>
 );
 
 const GuidePage = () => {
@@ -194,20 +194,20 @@ const GuidePage = () => {
     <div className="max-w-7xl mx-auto space-y-6 sm:space-y-8 pb-24 animate-in fade-in duration-700">
       
       {/* ── Page Hero Header ── */}
-      <div className="bg-white dark:bg-slate-900 rounded-2xl sm:rounded-3xl border border-slate-200 dark:border-slate-800 shadow-md relative overflow-hidden">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden">
         <div className="absolute top-0 right-0 w-80 h-80 sm:w-96 sm:h-96 bg-blue-500/10 dark:bg-blue-400/5 rounded-full blur-[90px] -mr-32 -mt-32 pointer-events-none" />
         <div className="absolute bottom-0 left-0 w-60 h-60 sm:w-64 sm:h-64 bg-indigo-500/10 dark:bg-indigo-400/5 rounded-full blur-[70px] -ml-20 -mb-20 pointer-events-none" />
         
         <div className="p-4 sm:p-7 md:p-10 relative z-10 space-y-6">
           <div className="flex flex-col md:flex-row items-center md:items-start gap-4 sm:gap-6 text-center md:text-left">
-            <div className="w-14 h-14 sm:w-20 sm:h-20 rounded-2xl sm:rounded-3xl bg-blue-600 flex items-center justify-center shadow-xl shadow-blue-500/30 shrink-0 border-2 sm:border-4 border-white dark:border-slate-800 rotate-2 sm:rotate-3 transform transition-transform hover:rotate-0 duration-500">
+            <div className="w-14 h-14 sm:w-20 sm:h-20 rounded-2xl bg-blue-600 flex items-center justify-center shadow-sm shadow-blue-500/30 shrink-0 border-2 sm:border-4 border-white dark:border-slate-800 rotate-2 sm:rotate-3 transform transition-transform hover:rotate-0 duration-500">
               <BookOpen size={28} className="sm:w-10 sm:h-10 text-white" strokeWidth={2.5} />
             </div>
             <div className="space-y-2.5 sm:space-y-3 flex-1 min-w-0">
               <div className="flex flex-wrap items-center justify-center md:justify-start gap-1.5 sm:gap-2">
-                <Badge className="bg-blue-600 text-white border-0 font-black uppercase tracking-widest text-[9px] sm:text-[10px] px-2.5 sm:px-3 py-0.5 sm:py-1">Documentation Hub</Badge>
-                <Badge variant="outline" className="text-slate-400 border-slate-200 dark:border-slate-800 font-black uppercase tracking-widest text-[9px] sm:text-[10px] px-2.5 sm:px-3 py-0.5 sm:py-1 shadow-sm">Version 2.5.4</Badge>
-                <Badge className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-800/50 font-black uppercase tracking-widest text-[9px] sm:text-[10px] px-2.5 sm:px-3 py-0.5 sm:py-1">Online</Badge>
+                <Badge className="bg-blue-600 text-white border-0 font-black uppercase tracking-widest text-xs px-2.5 sm:px-3 py-0.5 sm:py-1">Documentation Hub</Badge>
+                <Badge variant="outline" className="text-slate-400 border-slate-200 dark:border-slate-800 font-black uppercase tracking-widest text-xs px-2.5 sm:px-3 py-0.5 sm:py-1 shadow-sm">Version 2.5.4</Badge>
+                <Badge className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-800/50 font-black uppercase tracking-widest text-xs px-2.5 sm:px-3 py-0.5 sm:py-1">Online</Badge>
               </div>
               <div>
                 <h1 className="text-2xl sm:text-4xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">
@@ -224,7 +224,7 @@ const GuidePage = () => {
           <div className="pt-2 sm:pt-4 border-t border-slate-100 dark:border-slate-800 relative">
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
               <div className="relative flex-1">
-                <div className="flex items-center gap-2 px-3 py-2.5 sm:py-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl sm:rounded-2xl border border-slate-200/80 dark:border-slate-700/60 transition-all focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500">
+                <div className="flex items-center gap-2 px-3 py-2.5 sm:py-3 bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-200/80 dark:border-slate-700/60 transition-all focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500">
                   <Search size={16} className="text-slate-400 shrink-0" />
                   <input 
                     ref={searchInputRef}
@@ -255,10 +255,10 @@ const GuidePage = () => {
                 {showSearchResults && searchQuery.length > 0 && (
                   <div 
                     ref={searchResultsRef}
-                    className="absolute top-full mt-2 left-0 right-0 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200"
+                    className="absolute top-full mt-2 left-0 right-0 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200"
                   >
                     <div className="p-3 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 flex items-center justify-between">
-                      <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Hasil Pencarian ({searchResults.length})</h4>
+                      <h4 className="text-xs font-black uppercase tracking-widest text-slate-400">Hasil Pencarian ({searchResults.length})</h4>
                       <button onClick={() => setShowSearchResults(false)} className="text-slate-400 hover:text-slate-600">
                         <X size={14} />
                       </button>
@@ -276,7 +276,7 @@ const GuidePage = () => {
                             </div>
                             <div className="min-w-0 flex-1">
                               <p className="text-xs font-bold text-slate-900 dark:text-white truncate">{item.label}</p>
-                              <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">{item.keywords}</p>
+                              <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{item.keywords}</p>
                             </div>
                           </button>
                         ))
@@ -307,7 +307,7 @@ const GuidePage = () => {
       </div>
 
       {/* ── Mobile Sticky Chapter Pill Bar (Swipable) ── */}
-      <div className="lg:hidden sticky top-2 z-30 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md p-1.5 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-md">
+      <div className="lg:hidden sticky top-2 z-30 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md p-1.5 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm">
         <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar scroll-smooth">
           {NAV_ITEMS.map((item) => (
             <button
@@ -334,12 +334,12 @@ const GuidePage = () => {
           "lg:col-span-3 lg:sticky lg:top-6 h-fit z-20 transition-all",
           mobileMenuOpen ? "block" : "hidden lg:block"
         )}>
-          <div className="bg-white dark:bg-slate-900 rounded-2xl sm:rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
-            <div className="p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 flex items-center justify-between">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+            <div className="p-4 sm:p-6 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 flex items-center justify-between">
               <h3 className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-400 flex items-center gap-2">
                 <Terminal size={14} /> Knowledge Base
               </h3>
-              <span className="text-[10px] font-bold text-slate-400">{NAV_ITEMS.length} Bab</span>
+              <span className="text-xs font-bold text-slate-400">{NAV_ITEMS.length} Bab</span>
             </div>
             <nav className="p-2.5 space-y-1 overflow-y-auto max-h-[70vh] custom-scrollbar">
               {NAV_ITEMS.map((item) => (
@@ -364,7 +364,7 @@ const GuidePage = () => {
             <div className="p-3 bg-slate-50 dark:bg-slate-950/50 border-t border-slate-100 dark:border-slate-800 flex justify-center">
               <button 
                 onClick={() => setIsExambroGuideOpen(true)}
-                className="text-[10px] font-black uppercase tracking-widest text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1.5"
+                className="text-xs font-black uppercase tracking-widest text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1.5"
               >
                 <Download size={12} /> Panduan & Config Siswa
               </button>
@@ -374,7 +374,7 @@ const GuidePage = () => {
 
         {/* ── Documentation Deep Dive Content ── */}
         <div className="lg:col-span-9 space-y-4">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl sm:rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm p-4 sm:p-8 lg:p-12 relative overflow-hidden">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm p-4 sm:p-6 relative overflow-hidden">
             <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-emerald-600" />
             
             {/* 1. Overview */}
@@ -473,19 +473,19 @@ const GuidePage = () => {
                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="p-4 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50/50">
                          <h6 className="text-[11px] font-black text-emerald-600 mb-1">IMPORT EXCEL</h6>
-                         <p className="text-[10px] text-slate-500 leading-relaxed font-medium">Gunakan template XLSX yang disediakan. Cocok untuk input massal soal pilihan ganda.</p>
+                         <p className="text-xs text-slate-500 leading-relaxed font-medium">Gunakan template XLSX yang disediakan. Cocok untuk input massal soal pilihan ganda.</p>
                       </div>
                       <div className="p-4 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50/50">
                          <h6 className="text-[11px] font-black text-blue-600 mb-1">IMPORT WORD (.DOCX)</h6>
-                         <p className="text-[10px] text-slate-500 leading-relaxed font-medium">Deteksi otomatis soal, kunci jawaban, gambar, tabel, dan rumus (equation) dari file Word.</p>
+                         <p className="text-xs text-slate-500 leading-relaxed font-medium">Deteksi otomatis soal, kunci jawaban, gambar, tabel, dan rumus (equation) dari file Word.</p>
                       </div>
                       <div className="p-4 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50/50">
                          <h6 className="text-[11px] font-black text-orange-600 mb-1">IMPORT / EXPORT JSON</h6>
-                         <p className="text-[10px] text-slate-500 leading-relaxed font-medium">Format data mentah. Bisa export dari satu bank soal lalu import ke bank soal lain. Tanpa AI.</p>
+                         <p className="text-xs text-slate-500 leading-relaxed font-medium">Format data mentah. Bisa export dari satu bank soal lalu import ke bank soal lain. Tanpa AI.</p>
                       </div>
                       <div className="p-4 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50/50">
                          <h6 className="text-[11px] font-black text-indigo-600 mb-1">SMART AI IMPORT</h6>
-                         <p className="text-[10px] text-slate-500 leading-relaxed font-medium">Tempel teks dari manapun, AI akan mendeteksi dan merapikan soal secara otomatis.</p>
+                         <p className="text-xs text-slate-500 leading-relaxed font-medium">Tempel teks dari manapun, AI akan mendeteksi dan merapikan soal secara otomatis.</p>
                       </div>
                    </div>
                 </SubSection>
@@ -494,35 +494,35 @@ const GuidePage = () => {
                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="p-4 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50/50">
                          <h6 className="text-[11px] font-black text-indigo-600 mb-1">PG & PG KOMPLEKS</h6>
-                         <p className="text-[10px] text-slate-500 leading-relaxed font-medium">Pilihan ganda biasa (1 kunci) atau kompleks (boleh memilih lebih dari 1 jawaban benar).</p>
+                         <p className="text-xs text-slate-500 leading-relaxed font-medium">Pilihan ganda biasa (1 kunci) atau kompleks (boleh memilih lebih dari 1 jawaban benar).</p>
                       </div>
                       <div className="p-4 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50/50">
                          <h6 className="text-[11px] font-black text-blue-600 mb-1">MENJODOHKAN</h6>
-                         <p className="text-[10px] text-slate-500 leading-relaxed font-medium">Memasangkan premis di kiri dengan respon di kanan menggunakan dropdown interaktif.</p>
+                         <p className="text-xs text-slate-500 leading-relaxed font-medium">Memasangkan premis di kiri dengan respon di kanan menggunakan dropdown interaktif.</p>
                       </div>
                       <div className="p-4 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50/50">
                          <h6 className="text-[11px] font-black text-emerald-600 mb-1">URUTKAN (ORDERING)</h6>
-                         <p className="text-[10px] text-slate-500 leading-relaxed font-medium">Siswa harus mengurutkan item (teks/gambar) dari atas ke bawah menggunakan drag-and-drop.</p>
+                         <p className="text-xs text-slate-500 leading-relaxed font-medium">Siswa harus mengurutkan item (teks/gambar) dari atas ke bawah menggunakan drag-and-drop.</p>
                       </div>
                       <div className="p-4 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50/50">
                          <h6 className="text-[11px] font-black text-rose-600 mb-1">DRAG & DROP VISUAL</h6>
-                         <p className="text-[10px] text-slate-500 leading-relaxed font-medium">Menyeret label jawaban masuk ke dalam area yang kosong pada teks pertanyaan.</p>
+                         <p className="text-xs text-slate-500 leading-relaxed font-medium">Menyeret label jawaban masuk ke dalam area yang kosong pada teks pertanyaan.</p>
                       </div>
                       <div className="p-4 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50/50">
                          <h6 className="text-[11px] font-black text-violet-600 mb-1">KLASIFIKASI</h6>
-                         <p className="text-[10px] text-slate-500 leading-relaxed font-medium">Tentukan kategori untuk setiap pernyataan. <strong>Cara buat:</strong> (1) Tambah kategori (mis. Ayah, Ibu, Adik), (2) Tambah pernyataan, (3) Pilih kategori benar untuk tiap pernyataan via dropdown. Kategori boleh dipakai berulang. Urutan pernyataan bisa diacak saat ujian. <strong>Contoh:</strong> "Seorang laki-laki yang menjadi kepala keluarga." → Ayah. <strong>Penilaian:</strong> otomatis, skor = pernyataan benar / total pernyataan.</p>
+                         <p className="text-xs text-slate-500 leading-relaxed font-medium">Tentukan kategori untuk setiap pernyataan. <strong>Cara buat:</strong> (1) Tambah kategori (mis. Ayah, Ibu, Adik), (2) Tambah pernyataan, (3) Pilih kategori benar untuk tiap pernyataan via dropdown. Kategori boleh dipakai berulang. Urutan pernyataan bisa diacak saat ujian. <strong>Contoh:</strong> "Seorang laki-laki yang menjadi kepala keluarga." → Ayah. <strong>Penilaian:</strong> otomatis, skor = pernyataan benar / total pernyataan.</p>
                       </div>
                       <div className="p-4 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50/50">
                          <h6 className="text-[11px] font-black text-amber-600 mb-1">HOTSPOT (KLIK GAMBAR)</h6>
-                         <p className="text-[10px] text-slate-500 leading-relaxed font-medium">Siswa klik area pada gambar. <strong>Cara buat:</strong> (1) Upload gambar, (2) Pilih mode: "Satu saja" (cukup kena salah satu area) atau "Semua area" (harus klik semua titik), (3) Tandai area target dengan klik-drag pada gambar, beri label tiap area. <strong>Contoh:</strong> peta Indonesia → tandai pulau Jawa. <strong>Catatan:</strong> tidak didukung generator AI & import Excel — buat manual via editor. Bekerja di HP, tablet, dan laptop.</p>
+                         <p className="text-xs text-slate-500 leading-relaxed font-medium">Siswa klik area pada gambar. <strong>Cara buat:</strong> (1) Upload gambar, (2) Pilih mode: "Satu saja" (cukup kena salah satu area) atau "Semua area" (harus klik semua titik), (3) Tandai area target dengan klik-drag pada gambar, beri label tiap area. <strong>Contoh:</strong> peta Indonesia → tandai pulau Jawa. <strong>Catatan:</strong> tidak didukung generator AI & import Excel — buat manual via editor. Bekerja di HP, tablet, dan laptop.</p>
                       </div>
                       <div className="p-4 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50/50">
                          <h6 className="text-[11px] font-black text-teal-600 mb-1">ISIAN RUMPANG (CLOZE)</h6>
-                         <p className="text-[10px] text-slate-500 leading-relaxed font-medium">Lengkapi kata yang hilang dalam teks. <strong>Cara buat:</strong> tulis teks dengan <code className="px-1 bg-slate-200 dark:bg-slate-700 rounded">[[1]]</code>, <code className="px-1 bg-slate-200 dark:bg-slate-700 rounded">[[2]]</code> untuk bagian rumpang, lalu isi kunci tiap nomor (boleh lebih dari 1 jawaban alternatif, pisah koma). <strong>Contoh:</strong> "Ibu kota Indonesia adalah [[1]]" → kunci: Jakarta. Opsi tidak peka huruf besar/kecil. <strong>Penilaian:</strong> otomatis per rumpang.</p>
+                         <p className="text-xs text-slate-500 leading-relaxed font-medium">Lengkapi kata yang hilang dalam teks. <strong>Cara buat:</strong> tulis teks dengan <code className="px-1 bg-slate-200 dark:bg-slate-700 rounded">[[1]]</code>, <code className="px-1 bg-slate-200 dark:bg-slate-700 rounded">[[2]]</code> untuk bagian rumpang, lalu isi kunci tiap nomor (boleh lebih dari 1 jawaban alternatif, pisah koma). <strong>Contoh:</strong> "Ibu kota Indonesia adalah [[1]]" → kunci: Jakarta. Opsi tidak peka huruf besar/kecil. <strong>Penilaian:</strong> otomatis per rumpang.</p>
                       </div>
                       <div className="p-4 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50/50">
                          <h6 className="text-[11px] font-black text-cyan-600 mb-1">MATRIKS</h6>
-                         <p className="text-[10px] text-slate-500 leading-relaxed font-medium">Tabel pernyataan × kolom opsi. <strong>Cara buat:</strong> (1) Buat kolom (mis. Benar, Salah — bisa custom: Ya/Tidak/Setuju), (2) Tambah pernyataan, (3) Pilih kolom benar untuk tiap baris. <strong>Contoh:</strong> "Air mendidih pada 100°C" → Benar. <strong>Bedanya dengan PG Kompleks:</strong> PG Kompleks = 1 pertanyaan pilih banyak jawaban; Matriks = banyak pernyataan, tiap baris pilih 1 kolom. <strong>Penilaian:</strong> otomatis per baris.</p>
+                         <p className="text-xs text-slate-500 leading-relaxed font-medium">Tabel pernyataan × kolom opsi. <strong>Cara buat:</strong> (1) Buat kolom (mis. Benar, Salah — bisa custom: Ya/Tidak/Setuju), (2) Tambah pernyataan, (3) Pilih kolom benar untuk tiap baris. <strong>Contoh:</strong> "Air mendidih pada 100°C" → Benar. <strong>Bedanya dengan PG Kompleks:</strong> PG Kompleks = 1 pertanyaan pilih banyak jawaban; Matriks = banyak pernyataan, tiap baris pilih 1 kolom. <strong>Penilaian:</strong> otomatis per baris.</p>
                       </div>
                    </div>
                 </SubSection>
@@ -545,28 +545,28 @@ const GuidePage = () => {
                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
                             <div>
                                <p className="font-bold text-slate-700 dark:text-slate-300 mb-2">Fungsi Dasar:</p>
-                               <ul className="space-y-1 text-slate-600 dark:text-slate-400 font-mono text-[10px]">
+                               <ul className="space-y-1 text-slate-600 dark:text-slate-400 font-mono text-xs">
                                   <li>• sin, cos, tan</li>
                                   <li>• cot, sec, csc</li>
                                </ul>
-                               <p className="mt-2 text-[10px] text-slate-500">Contoh: <code className="bg-white dark:bg-slate-800 px-1 rounded">$sin(30°)$</code></p>
+                               <p className="mt-2 text-xs text-slate-500">Contoh: <code className="bg-white dark:bg-slate-800 px-1 rounded">$sin(30°)$</code></p>
                             </div>
                             <div>
                                <p className="font-bold text-slate-700 dark:text-slate-300 mb-2">Fungsi Inverse:</p>
-                               <ul className="space-y-1 text-slate-600 dark:text-slate-400 font-mono text-[10px]">
+                               <ul className="space-y-1 text-slate-600 dark:text-slate-400 font-mono text-xs">
                                   <li>• arcsin, arccos, arctan</li>
                                   <li>• arccot, arcsec, arccsc</li>
                                </ul>
-                               <p className="mt-2 text-[10px] text-slate-500">Contoh: <code className="bg-white dark:bg-slate-800 px-1 rounded">$arcsin(0.5)$</code></p>
+                               <p className="mt-2 text-xs text-slate-500">Contoh: <code className="bg-white dark:bg-slate-800 px-1 rounded">$arcsin(0.5)$</code></p>
                             </div>
                             <div>
                                <p className="font-bold text-slate-700 dark:text-slate-300 mb-2">Fungsi Hiperbolik:</p>
-                               <ul className="space-y-1 text-slate-600 dark:text-slate-400 font-mono text-[10px]">
+                               <ul className="space-y-1 text-slate-600 dark:text-slate-400 font-mono text-xs">
                                   <li>• sinh, cosh, tanh</li>
                                   <li>• coth, sech, csch</li>
                                   <li>• arcsinh, arccosh, arctanh</li>
                                </ul>
-                               <p className="mt-2 text-[10px] text-slate-500">Contoh: <code className="bg-white dark:bg-slate-800 px-1 rounded">$sinh(x)$</code></p>
+                               <p className="mt-2 text-xs text-slate-500">Contoh: <code className="bg-white dark:bg-slate-800 px-1 rounded">$sinh(x)$</code></p>
                             </div>
                          </div>
                       </div>
@@ -578,21 +578,21 @@ const GuidePage = () => {
                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
                             <div>
                                <p className="font-bold text-slate-700 dark:text-slate-300 mb-2">Kalkulus & Operator:</p>
-                               <ul className="space-y-1 text-slate-600 dark:text-slate-400 font-mono text-[10px]">
+                               <ul className="space-y-1 text-slate-600 dark:text-slate-400 font-mono text-xs">
                                   <li>• int (integral), sum (sigma), prod (produk)</li>
                                   <li>• lim (limit), infty (tak hingga)</li>
                                   <li>• partial (turunan parsial), nabla (del)</li>
                                </ul>
-                               <p className="mt-2 text-[10px] text-slate-500">Contoh: <code className="bg-white dark:bg-slate-800 px-1 rounded">$\int_0^\infty$</code></p>
+                               <p className="mt-2 text-xs text-slate-500">Contoh: <code className="bg-white dark:bg-slate-800 px-1 rounded">$\int_0^\infty$</code></p>
                             </div>
                             <div>
                                <p className="font-bold text-slate-700 dark:text-slate-300 mb-2">Fungsi Lainnya:</p>
-                               <ul className="space-y-1 text-slate-600 dark:text-slate-400 font-mono text-[10px]">
+                               <ul className="space-y-1 text-slate-600 dark:text-slate-400 font-mono text-xs">
                                   <li>• sqrt (akar), log, ln, exp</li>
                                   <li>• max, min, sup, inf</li>
                                   <li>• det, dim, deg, gcd, lcm, mod</li>
                                </ul>
-                               <p className="mt-2 text-[10px] text-slate-500">Contoh: <code className="bg-white dark:bg-slate-800 px-1 rounded">{'$\\sqrt{x^2+y^2}$'}</code></p>
+                               <p className="mt-2 text-xs text-slate-500">Contoh: <code className="bg-white dark:bg-slate-800 px-1 rounded">{'$\\sqrt{x^2+y^2}$'}</code></p>
                             </div>
                          </div>
                       </div>
@@ -604,17 +604,17 @@ const GuidePage = () => {
                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
                             <div>
                                <p className="font-bold text-slate-700 dark:text-slate-300 mb-2">Huruf Yunani Kecil:</p>
-                               <p className="text-slate-600 dark:text-slate-400 font-mono text-[10px] leading-relaxed">
+                               <p className="text-slate-600 dark:text-slate-400 font-mono text-xs leading-relaxed">
                                   alpha, beta, gamma, delta, epsilon, theta, lambda, mu, pi, sigma, tau, phi, omega, dll.
                                </p>
-                               <p className="mt-2 text-[10px] text-slate-500">Contoh: <code className="bg-white dark:bg-slate-800 px-1 rounded">$\alpha + \beta = \gamma$</code></p>
+                               <p className="mt-2 text-xs text-slate-500">Contoh: <code className="bg-white dark:bg-slate-800 px-1 rounded">$\alpha + \beta = \gamma$</code></p>
                             </div>
                             <div>
                                <p className="font-bold text-slate-700 dark:text-slate-300 mb-2">Huruf Yunani Besar:</p>
-                               <p className="text-slate-600 dark:text-slate-400 font-mono text-[10px] leading-relaxed">
+                               <p className="text-slate-600 dark:text-slate-400 font-mono text-xs leading-relaxed">
                                   Gamma, Delta, Theta, Lambda, Pi, Sigma, Phi, Omega
                                </p>
-                               <p className="mt-2 text-[10px] text-slate-500">Contoh: <code className="bg-white dark:bg-slate-800 px-1 rounded">$\Delta x$</code></p>
+                               <p className="mt-2 text-xs text-slate-500">Contoh: <code className="bg-white dark:bg-slate-800 px-1 rounded">$\Delta x$</code></p>
                             </div>
                          </div>
                       </div>
@@ -624,16 +624,16 @@ const GuidePage = () => {
                             ➗ OPERATOR & RELASI
                          </h6>
                          <div className="text-xs space-y-2">
-                            <p className="text-slate-600 dark:text-slate-400 font-mono text-[10px]">
+                            <p className="text-slate-600 dark:text-slate-400 font-mono text-xs">
                               <strong>Aritmatika:</strong> times (×), div (÷), pm (±), mp (∓), cdot (·), frac (pecahan)
                             </p>
-                            <p className="text-slate-600 dark:text-slate-400 font-mono text-[10px]">
+                            <p className="text-slate-600 dark:text-slate-400 font-mono text-xs">
                               <strong>Relasi:</strong> leq (≤), geq (≥), neq (≠), approx (≈), equiv (≡), propto (∝)
                             </p>
-                            <p className="text-slate-600 dark:text-slate-400 font-mono text-[10px]">
+                            <p className="text-slate-600 dark:text-slate-400 font-mono text-xs">
                               <strong>Himpunan:</strong> subset (⊂), supset (⊃), in (∈), notin (∉), cup (∪), cap (∩)
                             </p>
-                            <p className="mt-2 text-[10px] text-slate-500">Contoh: <code className="bg-white dark:bg-slate-800 px-1 rounded">{'$x \\leq y$'}</code> atau <code className="bg-white dark:bg-slate-800 px-1 rounded">{'$\\frac{a}{b}$'}</code></p>
+                            <p className="mt-2 text-xs text-slate-500">Contoh: <code className="bg-white dark:bg-slate-800 px-1 rounded">{'$x \\leq y$'}</code> atau <code className="bg-white dark:bg-slate-800 px-1 rounded">{'$\\frac{a}{b}$'}</code></p>
                          </div>
                       </div>
                    </div>
@@ -660,7 +660,7 @@ const GuidePage = () => {
                    </h4>
                    <p className="text-sm">Buka menu <strong>Magic AI</strong>, ketik instruksi spesifik. AI akan secara mandiri merangkai soal, pilihan jawaban, hingga analisis kunci jawaban berdasarkan basis pengetahuan yang dimilikinya.</p>
                    <div className="p-5 rounded-2xl bg-orange-50/30 dark:bg-orange-950/10 border border-orange-100 dark:border-orange-800/60">
-                      <span className="text-[10px] font-black uppercase text-orange-600 tracking-widest block mb-2">Contoh Prompt Efektif:</span>
+                      <span className="text-xs font-black uppercase text-orange-600 tracking-widest block mb-2">Contoh Prompt Efektif:</span>
                       <p className="text-xs font-mono text-orange-800/80 dark:text-orange-300 italic">"Buatkan 10 soal pilihan ganda tentang Hukum Newton II dengan tingkat kesulitan sulit (HOTS) untuk kelas 11 SMA."</p>
                    </div>
                 </div>
@@ -675,17 +675,17 @@ const GuidePage = () => {
                       <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 space-y-2">
                          <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold text-xs">01</div>
                          <h6 className="text-[11px] font-black uppercase tracking-tight">Ekstraksi (Detect)</h6>
-                         <p className="text-[10px] text-slate-500 leading-relaxed font-medium">Tempel naskah soal mentah. AI mendeteksi nomor soal, pilihan jawaban, dan kunci jawaban.</p>
+                         <p className="text-xs text-slate-500 leading-relaxed font-medium">Tempel naskah soal mentah. AI mendeteksi nomor soal, pilihan jawaban, dan kunci jawaban.</p>
                       </div>
                       <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 space-y-2">
                          <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-xs">02</div>
                          <h6 className="text-[11px] font-black uppercase tracking-tight">Generate dari Materi</h6>
-                         <p className="text-[10px] text-slate-500 leading-relaxed font-medium">Tempel materi/artikel. AI membuat soal baru berdasarkan konten yang Anda berikan.</p>
+                         <p className="text-xs text-slate-500 leading-relaxed font-medium">Tempel materi/artikel. AI membuat soal baru berdasarkan konten yang Anda berikan.</p>
                       </div>
                       <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 space-y-2">
                          <div className="w-8 h-8 rounded-lg bg-orange-100 text-orange-600 flex items-center justify-center font-bold text-xs">03</div>
                          <h6 className="text-[11px] font-black uppercase tracking-tight">Import JSON (Tanpa AI)</h6>
-                         <p className="text-[10px] text-slate-500 leading-relaxed font-medium">Tempel data JSON langsung. Tidak memerlukan AI — diproses instan tanpa kuota token.</p>
+                         <p className="text-xs text-slate-500 leading-relaxed font-medium">Tempel data JSON langsung. Tidak memerlukan AI — diproses instan tanpa kuota token.</p>
                       </div>
                    </div>
 
@@ -826,12 +826,12 @@ const GuidePage = () => {
                             <span className="text-xs font-black text-blue-600 dark:text-blue-400 uppercase tracking-wider flex items-center gap-1.5">
                                <Percent size={16} /> 1. Tingkat Kesukaran (P)
                             </span>
-                            <Badge variant="outline" className="text-[9px] font-bold">P = B / N</Badge>
+                            <Badge variant="outline" className="text-xs font-bold">P = B / N</Badge>
                          </div>
                          <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-                            Mengukur proporsi seluruh peserta yang berhasil menjawab butir soal dengan benar (<code className="font-mono text-[10px] bg-slate-100 dark:bg-slate-800 px-1 py-0.5 rounded">B</code> = jumlah siswa benar, <code className="font-mono text-[10px] bg-slate-100 dark:bg-slate-800 px-1 py-0.5 rounded">N</code> = total peserta ujian).
+                            Mengukur proporsi seluruh peserta yang berhasil menjawab butir soal dengan benar (<code className="font-mono text-xs bg-slate-100 dark:bg-slate-800 px-1 py-0.5 rounded">B</code> = jumlah siswa benar, <code className="font-mono text-xs bg-slate-100 dark:bg-slate-800 px-1 py-0.5 rounded">N</code> = total peserta ujian).
                          </p>
-                         <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 text-[10px] space-y-1 font-medium text-slate-600 dark:text-slate-300">
+                         <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 text-xs space-y-1 font-medium text-slate-600 dark:text-slate-300">
                             <div>• <strong>P &gt; 0.70</strong> : Mudah (Asesmen Awal / Matrikulasi)</div>
                             <div>• <strong>0.30 ≤ P ≤ 0.70</strong> : Sedang (Ideal / Sumatif CP)</div>
                             <div>• <strong>P &lt; 0.30</strong> : Sukar (Tantangan / Penalaran Lanjut)</div>
@@ -844,13 +844,13 @@ const GuidePage = () => {
                             <span className="text-xs font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-wider flex items-center gap-1.5">
                                <TrendingUp size={16} /> 2. Daya Pembeda (D)
                             </span>
-                            <Badge variant="outline" className="text-[9px] font-bold">Metode 27% Kelley</Badge>
+                            <Badge variant="outline" className="text-xs font-bold">Metode 27% Kelley</Badge>
                          </div>
                          <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-                            Mengukur kemampuan soal dalam membedakan siswa kelompok atas (27% ranking tertinggi, <code className="font-mono text-[10px] bg-slate-100 dark:bg-slate-800 px-1 py-0.5 rounded">Bₐ</code>) dan kelompok bawah (27% ranking terendah, <code className="font-mono text-[10px] bg-slate-100 dark:bg-slate-800 px-1 py-0.5 rounded">Bᵦ</code>): <br />
-                            <code className="font-mono text-[10px] font-bold text-indigo-600 dark:text-indigo-400">D = (Bₐ - Bᵦ) / n</code>
+                            Mengukur kemampuan soal dalam membedakan siswa kelompok atas (27% ranking tertinggi, <code className="font-mono text-xs bg-slate-100 dark:bg-slate-800 px-1 py-0.5 rounded">Bₐ</code>) dan kelompok bawah (27% ranking terendah, <code className="font-mono text-xs bg-slate-100 dark:bg-slate-800 px-1 py-0.5 rounded">Bᵦ</code>): <br />
+                            <code className="font-mono text-xs font-bold text-indigo-600 dark:text-indigo-400">D = (Bₐ - Bᵦ) / n</code>
                          </p>
-                         <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 text-[10px] space-y-1 font-medium text-slate-600 dark:text-slate-300">
+                         <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 text-xs space-y-1 font-medium text-slate-600 dark:text-slate-300">
                             <div>• <strong>D ≥ 0.40</strong> : Sangat Baik (Sangat Membedakan)</div>
                             <div>• <strong>0.30 ≤ D &lt; 0.40</strong> : Baik (Layak Bank Soal)</div>
                             <div>• <strong>0.20 ≤ D &lt; 0.30</strong> : Cukup (Revisi Redaksi/Opsi)</div>
@@ -865,12 +865,12 @@ const GuidePage = () => {
                             <span className="text-xs font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
                                <Target size={16} /> 3. Analisis Pengecoh
                             </span>
-                            <Badge variant="outline" className="text-[9px] font-bold">Distractor Analysis</Badge>
+                            <Badge variant="outline" className="text-xs font-bold">Distractor Analysis</Badge>
                          </div>
                          <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
                             Menganalisis sebaran pemilih pada tiap pilihan opsi salah (A, B, C, D, E). Opsi pengecoh yang baik dipilih minimal 5% peserta dan lebih banyak dipilih oleh kelompok bawah.
                          </p>
-                         <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 text-[10px] space-y-1 font-medium text-slate-600 dark:text-slate-300">
+                         <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 text-xs space-y-1 font-medium text-slate-600 dark:text-slate-300">
                             <div>• <strong>🟢 Berfungsi Baik</strong> : Dipilih ≥ 5% &amp; Kel. Bawah &gt; Atas</div>
                             <div>• <strong>⚠️ Tidak Efektif / Mati</strong> : Dipilih &lt; 5% / 0% siswa</div>
                             <div>• <strong>🚩 Menyesatkan</strong> : Dipilih lebih banyak oleh Kel. Atas</div>
@@ -891,7 +891,7 @@ const GuidePage = () => {
                             <BookOpen size={16} /> Asesmen Awal &amp; Matrikulasi Fondasional
                          </h6>
                          <p className="text-xs text-blue-900/80 dark:text-blue-300/80 leading-relaxed">
-                            Pada tes diagnostik awal (seperti tes literasi dan numerasi dasar), soal sengaja dirancang berdaya kesukaran mudah (<code className="font-mono text-[10px]">P &gt; 0.80</code>). Rendahnya daya pembeda (<code className="font-mono text-[10px]">D ≈ 0.10</code>) adalah <strong>hal yang wajar dan diharapkan</strong> karena membuktikan bahwa kompetensi prasyarat telah dikuasai tuntas oleh mayoritas siswa (<em>Mastery Learning</em>).
+                            Pada tes diagnostik awal (seperti tes literasi dan numerasi dasar), soal sengaja dirancang berdaya kesukaran mudah (<code className="font-mono text-xs">P &gt; 0.80</code>). Rendahnya daya pembeda (<code className="font-mono text-xs">D ≈ 0.10</code>) adalah <strong>hal yang wajar dan diharapkan</strong> karena membuktikan bahwa kompetensi prasyarat telah dikuasai tuntas oleh mayoritas siswa (<em>Mastery Learning</em>).
                          </p>
                       </div>
 
@@ -900,7 +900,7 @@ const GuidePage = () => {
                             <Layers size={16} /> Asesmen Sumatif &amp; Pembelajaran Mendalam
                          </h6>
                          <p className="text-xs text-indigo-900/80 dark:text-indigo-300/80 leading-relaxed">
-                            Pada penilaian capaian pembelajaran akhir, digunakan soal berbasis stimulus literasi konteks nyata. Di sinilah daya pembeda tinggi (<code className="font-mono text-[10px]">D ≥ 0.30</code>) menjadi tolok ukur utama untuk membedakan siswa yang memiliki pemahaman konsep mendalam (<em>Deep Understanding</em>) dengan yang sekadar mengingat hafalan (<em>Surface Learning</em>).
+                            Pada penilaian capaian pembelajaran akhir, digunakan soal berbasis stimulus literasi konteks nyata. Di sinilah daya pembeda tinggi (<code className="font-mono text-xs">D ≥ 0.30</code>) menjadi tolok ukur utama untuk membedakan siswa yang memiliki pemahaman konsep mendalam (<em>Deep Understanding</em>) dengan yang sekadar mengingat hafalan (<em>Surface Learning</em>).
                          </p>
                       </div>
                    </div>
@@ -931,12 +931,12 @@ const GuidePage = () => {
                 <p>Panel Kontrol utama bagi Administrator untuk mengelola ekosistem aplikasi institusi.</p>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                   <div className="p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl space-y-4">
+                   <div className="p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl space-y-4">
                       <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center"><Globe size={20} /></div>
                       <h6 className="font-bold text-slate-900 dark:text-white">Branding & Identitas</h6>
                       <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Ubah logo sekolah dan nama institusi yang tampil di seluruh antarmuka aplikasi. Gunakan file gambar berformat PNG/JPG transparan untuk hasil terbaik.</p>
                    </div>
-                   <div className="p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl space-y-4">
+                   <div className="p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl space-y-4">
                       <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center"><Laptop size={20} /></div>
                       <h6 className="font-bold text-slate-900 dark:text-white">Wajib Exambro (Native App)</h6>
                       <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Aktifkan fitur ini jika Anda ingin memaksa siswa hanya bisa login melalui Aplikasi Android/Windows resmi EXAMKU. Login via Chrome/Safari biasa akan diblokir.</p>
@@ -953,13 +953,13 @@ const GuidePage = () => {
                    </AlertBox>
                 </div>
 
-                <div className="p-6 bg-slate-900 rounded-[2rem] border border-slate-800 text-white relative overflow-hidden">
+                <div className="p-6 bg-slate-900 rounded-2xl border border-slate-800 text-white relative overflow-hidden">
                    <Terminal size={100} className="absolute right-0 top-0 opacity-5 rotate-12 -translate-y-6" />
                    <h5 className="font-bold mb-4 flex items-center gap-2 text-indigo-400 uppercase tracking-widest text-xs">
                       <Cpu size={16} /> Konfigurasi AI Engine
                    </h5>
                    <p className="text-xs font-medium text-slate-400 leading-relaxed mb-6">Untuk menggunakan Magic AI & PDF Extraction, Anda harus menghubungkan API Provider eksternal:</p>
-                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-[10px] font-black uppercase tracking-tighter">
+                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs font-black uppercase tracking-tighter">
                       <div className="p-2 border border-slate-800 rounded-xl bg-slate-800/50 text-center">Groq Cloud</div>
                       <div className="p-2 border border-slate-800 rounded-xl bg-slate-800/50 text-center">OpenRouter</div>
                       <div className="p-2 border border-slate-800 rounded-xl bg-slate-800/50 text-center">Google Gemini</div>
@@ -971,8 +971,8 @@ const GuidePage = () => {
 
             {/* 10. Pengembang */}
             <DocSection id="pengembang" title="Tim Pengembang" icon={User}>
-              <div className="bg-slate-50/70 dark:bg-slate-800/30 p-5 sm:p-8 md:p-10 rounded-2xl sm:rounded-3xl border border-slate-200 dark:border-slate-800 flex flex-col md:flex-row items-center gap-6 sm:gap-8">
-                <div className="w-28 h-36 sm:w-36 sm:h-48 rounded-2xl overflow-hidden shadow-xl border-2 sm:border-4 border-white dark:border-slate-700 shrink-0 relative group">
+              <div className="bg-slate-50/70 dark:bg-slate-800/30 p-5 sm:p-8 md:p-10 rounded-2xl border border-slate-200 dark:border-slate-800 flex flex-col md:flex-row items-center gap-6 sm:gap-8">
+                <div className="w-28 h-36 sm:w-36 sm:h-48 rounded-2xl overflow-hidden shadow-sm border-2 sm:border-4 border-white dark:border-slate-700 shrink-0 relative group">
                   <img
                     src="https://www.sman-modalbangsa.sch.id/wp-content/uploads/2021/09/alfaruqasri-300x400.jpeg"
                     alt="Alfaruq Asri"
@@ -982,11 +982,11 @@ const GuidePage = () => {
                 </div>
                 <div className="text-center md:text-left space-y-4">
                   <div>
-                    <Badge className="bg-blue-600 text-white border-0 font-black uppercase tracking-widest text-[9px] px-2.5 py-0.5 mb-2.5">Master Developer</Badge>
+                    <Badge className="bg-blue-600 text-white border-0 font-black uppercase tracking-widest text-xs px-2.5 py-0.5 mb-2.5">Master Developer</Badge>
                     <h3 className="text-xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight">Alfaruq Asri, S.Pd., Gr.</h3>
                     <div className="flex flex-wrap items-center justify-center md:justify-start gap-1.5 sm:gap-2 mt-2">
-                       <Badge variant="outline" className="text-slate-400 border-slate-200 dark:border-slate-800 font-bold text-[9px] px-2 py-0.5 uppercase tracking-tighter">Informatics Engineer</Badge>
-                       <Badge variant="outline" className="text-slate-400 border-slate-200 dark:border-slate-800 font-bold text-[9px] px-2 py-0.5 uppercase tracking-tighter">Tim IT {terminology.school}</Badge>
+                       <Badge variant="outline" className="text-slate-400 border-slate-200 dark:border-slate-800 font-bold text-xs px-2 py-0.5 uppercase tracking-tighter">Informatics Engineer</Badge>
+                       <Badge variant="outline" className="text-slate-400 border-slate-200 dark:border-slate-800 font-bold text-xs px-2 py-0.5 uppercase tracking-tighter">Tim IT {terminology.school}</Badge>
                     </div>
                   </div>
                   <p className="text-xs sm:text-sm md:text-base text-slate-600 dark:text-slate-400 font-medium leading-relaxed max-w-xl">
@@ -1006,18 +1006,18 @@ const GuidePage = () => {
               <div className="mt-12 sm:mt-16 pt-8 sm:pt-10 border-t border-slate-200 dark:border-slate-800 text-center space-y-3">
                 <div className="flex items-center justify-center gap-3">
                    <div className="w-12 h-[1px] bg-slate-200 dark:bg-slate-800" />
-                   <Badge variant="outline" className="text-slate-400 border-slate-200 dark:border-slate-800 font-black uppercase tracking-[0.2em] px-5 py-2 text-[10px]">
+                   <Badge variant="outline" className="text-slate-400 border-slate-200 dark:border-slate-800 font-black uppercase tracking-[0.2em] px-5 py-2 text-xs">
                      EXAMKU Platform Hub
                    </Badge>
                    <div className="w-12 h-[1px] bg-slate-200 dark:bg-slate-800" />
                 </div>
-                <p className="text-[10px] font-bold text-slate-400 dark:text-slate-600 uppercase tracking-tighter">
+                <p className="text-xs font-bold text-slate-400 dark:text-slate-600 uppercase tracking-tighter">
                   © 2026 Alfaruq Asri. Hak Cipta Dilindungi Undang-Undang. Dokumentasi ini bersifat internal institusi.
                 </p>
                 <div className="flex items-center gap-3 mt-2">
-                  <a href="/privacy-policy.html" target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold text-blue-500 hover:text-blue-700 transition-colors">Privacy Policy</a>
+                  <a href="/privacy-policy.html" target="_blank" rel="noopener noreferrer" className="text-xs font-bold text-blue-500 hover:text-blue-700 transition-colors">Privacy Policy</a>
                   <span className="text-slate-300">·</span>
-                  <a href="/terms-of-service.html" target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold text-blue-500 hover:text-blue-700 transition-colors">Terms of Service</a>
+                  <a href="/terms-of-service.html" target="_blank" rel="noopener noreferrer" className="text-xs font-bold text-blue-500 hover:text-blue-700 transition-colors">Terms of Service</a>
                 </div>
               </div>
             </DocSection>

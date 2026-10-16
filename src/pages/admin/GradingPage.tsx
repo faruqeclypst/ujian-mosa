@@ -292,7 +292,7 @@ const GradingPage = () => {
   return (
     <div className="space-y-6 pb-20 max-w-7xl mx-auto animate-in fade-in duration-500">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 px-5 py-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 px-4 sm:px-6 py-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" onClick={() => navigate("/admin/monitoring")} className="rounded-xl">
             <ArrowLeft className="w-5 h-5" />
@@ -316,7 +316,7 @@ const GradingPage = () => {
       </div>
 
       {/* Formula Card */}
-      <div className="bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-800/40 rounded-2xl p-5">
+      <div className="bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-800/40 rounded-2xl p-4 sm:p-6">
         <div className="flex items-center gap-3 mb-3">
           <div className="w-8 h-8 rounded-xl bg-indigo-600 flex items-center justify-center"><BookOpen className="w-4 h-4 text-white" /></div>
           <h2 className="font-black text-indigo-700 dark:text-indigo-300 text-sm uppercase tracking-widest">Rumus Penilaian</h2>
@@ -344,12 +344,12 @@ const GradingPage = () => {
           <Table>
             <TableHeader className="bg-slate-50 dark:bg-slate-800/50">
               <TableRow>
-                <TableHead className="w-10 text-center text-[10px]">No</TableHead>
-                <TableHead className="text-[10px]">Nama</TableHead>
-                <TableHead className="text-center text-[10px] w-20">Kelas</TableHead>
-                <TableHead className="text-center text-[10px] w-24 text-blue-600">Objektif</TableHead>
-                <TableHead className="text-center text-[10px] w-24 text-purple-600">Subjektif</TableHead>
-                <TableHead className="text-center text-[10px] w-20 font-black">Final</TableHead>
+                <TableHead className="w-10 text-center text-xs">No</TableHead>
+                <TableHead className="text-xs">Nama</TableHead>
+                <TableHead className="text-center text-xs w-20">Kelas</TableHead>
+                <TableHead className="text-center text-xs w-24 text-blue-600">Objektif</TableHead>
+                <TableHead className="text-center text-xs w-24 text-purple-600">Subjektif</TableHead>
+                <TableHead className="text-center text-xs w-20 font-black">Final</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -363,13 +363,13 @@ const GradingPage = () => {
                     <TableCell className="text-center text-xs text-slate-400">{idx + 1}</TableCell>
                     <TableCell>
                       <span className="font-bold text-sm text-indigo-600 dark:text-indigo-400 hover:underline">{std.name}</span>
-                      <span className="block text-[10px] text-slate-400">{(std as any).nisn}</span>
+                      <span className="block text-xs text-slate-400">{(std as any).nisn}</span>
                     </TableCell>
                     <TableCell className="text-center text-xs">{className}</TableCell>
                     <TableCell className="text-center">
                       <div className="flex flex-col items-center">
                         <span className={`text-sm font-black ${objScore >= 75 ? "text-emerald-600" : objScore >= 50 ? "text-amber-600" : "text-rose-600"}`}>{objScore}</span>
-                        <span className="text-[9px] text-slate-400">{objCorrect}/{objTotal}</span>
+                        <span className="text-xs text-slate-400">{objCorrect}/{objTotal}</span>
                       </div>
                     </TableCell>
                     <TableCell className="text-center">
@@ -378,7 +378,7 @@ const GradingPage = () => {
                           <span className={`text-sm font-black ${essGraded < essTotal ? "text-amber-500" : essScore >= 75 ? "text-emerald-600" : essScore >= 50 ? "text-amber-600" : "text-rose-600"}`}>
                             {essGraded < essTotal ? `${essGraded}/${essTotal}` : essScore}
                           </span>
-                          <span className="text-[9px] text-slate-400">{essGraded < essTotal ? "belum dinilai" : `${essCorrect}/${essTotal}`}</span>
+                          <span className="text-xs text-slate-400">{essGraded < essTotal ? "belum dinilai" : `${essCorrect}/${essTotal}`}</span>
                         </div>
                       ) : <span className="text-xs text-slate-300">-</span>}
                     </TableCell>
@@ -388,6 +388,15 @@ const GradingPage = () => {
                   </TableRow>
                 );
               })}
+              {filteredStudents.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center py-12">
+                    <Search className="w-8 h-8 mx-auto mb-3 text-slate-300 dark:text-slate-600" />
+                    <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">Tidak ada siswa ditemukan</p>
+                    <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Coba ubah kata kunci pencarian.</p>
+                  </TableCell>
+                </TableRow>
+              )}
             </TableBody>
           </Table>
         </div>

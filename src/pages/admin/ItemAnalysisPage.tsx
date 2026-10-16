@@ -168,7 +168,7 @@ const MetricInfoTooltip: React.FC<{ type: MetricInfoType; side?: "top" | "bottom
         align="start"
         sideOffset={8}
         collisionPadding={16}
-        className="w-[320px] max-w-[calc(100vw-32px)] p-3.5 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 text-xs rounded-2xl shadow-xl shadow-slate-900/10 dark:shadow-2xl border border-slate-200/90 dark:border-slate-800 backdrop-blur-md z-50 animate-in fade-in-0 zoom-in-95"
+        className="w-[320px] max-w-[calc(100vw-32px)] p-3.5 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 text-xs rounded-2xl shadow-sm shadow-slate-900/10 dark:shadow-sm border border-slate-200/90 dark:border-slate-800 backdrop-blur-md z-50 animate-in fade-in-0 zoom-in-95"
       >
         <div className="space-y-2.5">
           {/* Header */}
@@ -187,7 +187,7 @@ const MetricInfoTooltip: React.FC<{ type: MetricInfoType; side?: "top" | "bottom
                 {info.title}
               </span>
             </div>
-            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-mono tracking-tight shrink-0">
+            <span className="text-xs font-bold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-mono tracking-tight shrink-0">
               {info.reference}
             </span>
           </div>
@@ -197,14 +197,14 @@ const MetricInfoTooltip: React.FC<{ type: MetricInfoType; side?: "top" | "bottom
             <div className="font-mono text-blue-600 dark:text-emerald-400 font-black text-xs">
               {info.formula}
             </div>
-            <div className="text-[10px] text-slate-500 dark:text-slate-300 mt-1 leading-relaxed">
+            <div className="text-xs text-slate-500 dark:text-slate-300 mt-1 leading-relaxed">
               {info.formulaDesc}
             </div>
           </div>
 
           {/* Kriteria & Klasifikasi */}
           <div className="space-y-1">
-            <div className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+            <div className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
               Kriteria Standar:
             </div>
             <div className="grid grid-cols-1 gap-1">
@@ -214,7 +214,7 @@ const MetricInfoTooltip: React.FC<{ type: MetricInfoType; side?: "top" | "bottom
                   className="flex items-center justify-between text-[11px] bg-slate-50/70 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800/80 px-2 py-1 rounded-lg"
                 >
                   <span className="font-semibold text-slate-700 dark:text-slate-200">{r.label}</span>
-                  <span className="font-mono text-[10px] font-bold text-slate-500 dark:text-slate-400">{r.value}</span>
+                  <span className="font-mono text-xs font-bold text-slate-500 dark:text-slate-400">{r.value}</span>
                 </div>
               ))}
             </div>
@@ -1634,7 +1634,7 @@ export const ItemAnalysisPage: React.FC = () => {
               Sistem Penjaminan Mutu &amp; Analisis Psikometri Classical Test Theory (CTT)
             </p>
           </div>
-          <div className="text-right text-[10px] text-slate-500">
+          <div className="text-right text-xs text-slate-500">
             <div>Dicetak: {new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}</div>
             <div>EXAMKU • Platform CBT Terstandar</div>
           </div>
@@ -1663,19 +1663,19 @@ export const ItemAnalysisPage: React.FC = () => {
         {/* Statistik Ringkas Cetak: Layer 1 CTT & Keputusan */}
         <div className="grid grid-cols-4 gap-2 mt-3 text-center text-xs">
           <div className="p-2 border border-slate-300 rounded bg-white">
-            <div className="text-[10px] text-slate-500 uppercase font-bold">Rata-rata Kesukaran (P)</div>
+            <div className="text-xs text-slate-500 uppercase font-bold">Rata-rata Kesukaran (P)</div>
             <div className="text-sm font-black text-slate-900">{stats.avgP.toFixed(2)} ({getDifficultyCategory(stats.avgP)})</div>
           </div>
           <div className="p-2 border border-slate-300 rounded bg-white">
-            <div className="text-[10px] text-slate-500 uppercase font-bold">Rata-rata Daya Beda (D)</div>
+            <div className="text-xs text-slate-500 uppercase font-bold">Rata-rata Daya Beda (D)</div>
             <div className="text-sm font-black text-slate-900">{stats.avgD >= 0 ? `+${stats.avgD.toFixed(2)}` : stats.avgD.toFixed(2)} ({getDiscriminationCategory(stats.avgD)})</div>
           </div>
           <div className="p-2 border border-slate-300 rounded bg-white">
-            <div className="text-[10px] text-slate-500 uppercase font-bold">Rata-rata Point-Biserial (r_pb)</div>
+            <div className="text-xs text-slate-500 uppercase font-bold">Rata-rata Point-Biserial (r_pb)</div>
             <div className="text-sm font-black text-slate-900">{stats.avgRpb >= 0 ? `+${stats.avgRpb.toFixed(2)}` : stats.avgRpb.toFixed(2)} ({getPointBiserialCategory(stats.avgRpb)})</div>
           </div>
           <div className="p-2 border border-slate-300 rounded bg-white">
-            <div className="text-[10px] text-slate-500 uppercase font-bold">Efektivitas Pengecoh (DE)</div>
+            <div className="text-xs text-slate-500 uppercase font-bold">Efektivitas Pengecoh (DE)</div>
             <div className="text-sm font-black text-slate-900">{stats.avgDE}% Rata-rata</div>
           </div>
         </div>
@@ -1683,23 +1683,23 @@ export const ItemAnalysisPage: React.FC = () => {
         {/* Keputusan Kelayakan Cetak */}
         <div className="grid grid-cols-5 gap-1.5 mt-2 text-center text-xs">
           <div className="p-1.5 border border-emerald-300 rounded bg-emerald-50 text-emerald-900">
-            <div className="text-[9px] uppercase font-bold">Diterima</div>
+            <div className="text-xs uppercase font-bold">Diterima</div>
             <div className="font-black">{stats.acceptedCount} ({stats.acceptedPercent}%)</div>
           </div>
           <div className="p-1.5 border border-yellow-300 rounded bg-yellow-50 text-yellow-900">
-            <div className="text-[9px] uppercase font-bold">Revisi Kecil</div>
+            <div className="text-xs uppercase font-bold">Revisi Kecil</div>
             <div className="font-black">{stats.minorRevisionCount} ({stats.minorRevisionPercent}%)</div>
           </div>
           <div className="p-1.5 border border-amber-300 rounded bg-amber-50 text-amber-900">
-            <div className="text-[9px] uppercase font-bold">Revisi</div>
+            <div className="text-xs uppercase font-bold">Revisi</div>
             <div className="font-black">{stats.revisionCount} ({stats.revisionPercent}%)</div>
           </div>
           <div className="p-1.5 border border-orange-300 rounded bg-orange-50 text-orange-900">
-            <div className="text-[9px] uppercase font-bold">Revisi Total</div>
+            <div className="text-xs uppercase font-bold">Revisi Total</div>
             <div className="font-black">{stats.totalRevisionCount} ({stats.totalRevisionPercent}%)</div>
           </div>
           <div className="p-1.5 border border-rose-300 rounded bg-rose-50 text-rose-900">
-            <div className="text-[9px] uppercase font-bold">Ditolak</div>
+            <div className="text-xs uppercase font-bold">Ditolak</div>
             <div className="font-black">{stats.rejectedCount} ({stats.rejectedPercent}%)</div>
           </div>
         </div>
@@ -1727,7 +1727,7 @@ export const ItemAnalysisPage: React.FC = () => {
                 <h1 className="text-lg sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
                   Analisis Butir Soal &amp; Daya Pembeda
                 </h1>
-                <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300 border-blue-200 font-bold text-[10px] uppercase tracking-wider">
+                <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300 border-blue-200 font-bold text-xs uppercase tracking-wider">
                   Psikometri Arikunto &amp; Depdiknas
                 </Badge>
               </div>
@@ -1749,7 +1749,7 @@ export const ItemAnalysisPage: React.FC = () => {
                   <ChevronDown className="h-3.5 w-3.5 opacity-70 ml-0.5" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-64 p-1.5 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 z-50">
+              <DropdownMenuContent align="end" className="w-64 p-1.5 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 z-50">
                 <DropdownMenuItem
                   onClick={() => setShowGuideModal(true)}
                   className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-blue-50 dark:hover:bg-blue-950/40 hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer"
@@ -1759,7 +1759,7 @@ export const ItemAnalysisPage: React.FC = () => {
                   </div>
                   <div>
                     <span className="block font-bold">Panduan &amp; Rumus</span>
-                    <span className="text-[10px] text-slate-400 font-normal">Kriteria Ebel &amp; Arikunto</span>
+                    <span className="text-xs text-slate-400 font-normal">Kriteria Ebel &amp; Arikunto</span>
                   </div>
                 </DropdownMenuItem>
 
@@ -1773,7 +1773,7 @@ export const ItemAnalysisPage: React.FC = () => {
                   </div>
                   <div>
                     <span className="block font-bold">Refresh Data</span>
-                    <span className="text-[10px] text-slate-400 font-normal">Kalkulasi ulang psikometri</span>
+                    <span className="text-xs text-slate-400 font-normal">Kalkulasi ulang psikometri</span>
                   </div>
                 </DropdownMenuItem>
 
@@ -1789,7 +1789,7 @@ export const ItemAnalysisPage: React.FC = () => {
                   </div>
                   <div>
                     <span className="block font-bold">Cetak Laporan</span>
-                    <span className="text-[10px] text-slate-400 font-normal">Format resmi A4 siap print</span>
+                    <span className="text-xs text-slate-400 font-normal">Format resmi A4 siap print</span>
                   </div>
                 </DropdownMenuItem>
 
@@ -1803,7 +1803,7 @@ export const ItemAnalysisPage: React.FC = () => {
                   </div>
                   <div>
                     <span className="block font-bold text-emerald-800 dark:text-emerald-300">Ekspor Excel Lengkap</span>
-                    <span className="text-[10px] text-emerald-600/80 dark:text-emerald-400/80 font-normal">3 Sheet + Pilihan Jawaban A-E</span>
+                    <span className="text-xs text-emerald-600/80 dark:text-emerald-400/80 font-normal">3 Sheet + Pilihan Jawaban A-E</span>
                   </div>
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -1859,7 +1859,7 @@ export const ItemAnalysisPage: React.FC = () => {
                 <FileText className="h-3.5 w-3.5" />
               </div>
               <div>
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
                   Ujian / Paket
                 </span>
                 <span className="text-xs font-bold text-slate-800 dark:text-slate-100" title={examMeta.title}>
@@ -1876,7 +1876,7 @@ export const ItemAnalysisPage: React.FC = () => {
                 <BookOpen className="h-3.5 w-3.5" />
               </div>
               <div>
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
                   Mata Pelajaran &amp; Guru
                 </span>
                 <span className="text-xs font-bold text-slate-800 dark:text-slate-100">
@@ -1893,7 +1893,7 @@ export const ItemAnalysisPage: React.FC = () => {
           <div className="flex items-center gap-2.5 bg-slate-50 dark:bg-slate-800/60 px-3.5 py-1.5 rounded-xl border border-slate-200/60 dark:border-slate-700/60 text-slate-700 dark:text-slate-300">
             <Users className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
             <div>
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
                 Sampel Peserta (Kelley 27%)
               </span>
               <span className="text-xs font-black text-slate-900 dark:text-white">
@@ -1926,7 +1926,7 @@ export const ItemAnalysisPage: React.FC = () => {
               <span className="text-2xl font-black text-slate-900 dark:text-white">
                 {stats.avgP.toFixed(2)}
               </span>
-              <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 font-bold text-[10px]">
+              <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 font-bold text-xs">
                 {getDifficultyCategory(stats.avgP)}
               </Badge>
             </div>
@@ -1953,7 +1953,7 @@ export const ItemAnalysisPage: React.FC = () => {
                 {stats.avgD >= 0 ? `+${stats.avgD.toFixed(2)}` : stats.avgD.toFixed(2)}
               </span>
               <Badge className={cn(
-                "font-bold text-[10px]",
+                "font-bold text-xs",
                 stats.avgD >= 0.40
                   ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300"
                   : stats.avgD >= 0.30
@@ -1986,7 +1986,7 @@ export const ItemAnalysisPage: React.FC = () => {
                 {stats.avgRpb >= 0 ? `+${stats.avgRpb.toFixed(2)}` : stats.avgRpb.toFixed(2)}
               </span>
               <Badge className={cn(
-                "font-bold text-[10px]",
+                "font-bold text-xs",
                 stats.avgRpb >= 0.30
                   ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300"
                   : stats.avgRpb >= 0.20
@@ -2016,7 +2016,7 @@ export const ItemAnalysisPage: React.FC = () => {
               <span className="text-2xl font-black text-slate-900 dark:text-white">
                 {stats.avgDE}%
               </span>
-              <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 font-bold text-[10px]">
+              <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 font-bold text-xs">
                 DE Rata-rata
               </Badge>
             </div>
@@ -2065,7 +2065,7 @@ export const ItemAnalysisPage: React.FC = () => {
                 <span className="text-[11px] font-black text-emerald-800 dark:text-emerald-300 uppercase">🟢 Diterima</span>
                 <span className="text-lg font-black text-emerald-700 dark:text-emerald-400">{stats.acceptedCount}</span>
               </div>
-              <span className="text-[10px] text-emerald-700/80 dark:text-emerald-400/80 font-medium mt-1">
+              <span className="text-xs text-emerald-700/80 dark:text-emerald-400/80 font-medium mt-1">
                 {stats.acceptedPercent}% • Item Sangat Baik
               </span>
             </button>
@@ -2084,7 +2084,7 @@ export const ItemAnalysisPage: React.FC = () => {
                 <span className="text-[11px] font-black text-yellow-800 dark:text-yellow-300 uppercase">🟡 Revisi Kecil</span>
                 <span className="text-lg font-black text-yellow-700 dark:text-yellow-400">{stats.minorRevisionCount}</span>
               </div>
-              <span className="text-[10px] text-yellow-700/80 dark:text-yellow-400/80 font-medium mt-1">
+              <span className="text-xs text-yellow-700/80 dark:text-yellow-400/80 font-medium mt-1">
                 {stats.minorRevisionPercent}% • Cek 1 Pengecoh
               </span>
             </button>
@@ -2103,7 +2103,7 @@ export const ItemAnalysisPage: React.FC = () => {
                 <span className="text-[11px] font-black text-amber-800 dark:text-amber-300 uppercase">🟠 Revisi</span>
                 <span className="text-lg font-black text-amber-700 dark:text-amber-400">{stats.revisionCount}</span>
               </div>
-              <span className="text-[10px] text-amber-700/80 dark:text-amber-400/80 font-medium mt-1">
+              <span className="text-xs text-amber-700/80 dark:text-amber-400/80 font-medium mt-1">
                 {stats.revisionPercent}% • Kesukaran / Opsi
               </span>
             </button>
@@ -2122,7 +2122,7 @@ export const ItemAnalysisPage: React.FC = () => {
                 <span className="text-[11px] font-black text-orange-800 dark:text-orange-300 uppercase">🔴 Revisi Total</span>
                 <span className="text-lg font-black text-orange-700 dark:text-orange-400">{stats.totalRevisionCount}</span>
               </div>
-              <span className="text-[10px] text-orange-700/80 dark:text-orange-400/80 font-medium mt-1">
+              <span className="text-xs text-orange-700/80 dark:text-orange-400/80 font-medium mt-1">
                 {stats.totalRevisionPercent}% • D Rendah &lt; 0.20
               </span>
             </button>
@@ -2141,7 +2141,7 @@ export const ItemAnalysisPage: React.FC = () => {
                 <span className="text-[11px] font-black text-rose-800 dark:text-rose-300 uppercase">⛔ Ditolak</span>
                 <span className="text-lg font-black text-rose-700 dark:text-rose-400">{stats.rejectedCount}</span>
               </div>
-              <span className="text-[10px] text-rose-700/80 dark:text-rose-400/80 font-medium mt-1">
+              <span className="text-xs text-rose-700/80 dark:text-rose-400/80 font-medium mt-1">
                 {stats.rejectedPercent}% • D Negatif / Kunci
               </span>
             </button>
@@ -2367,24 +2367,24 @@ export const ItemAnalysisPage: React.FC = () => {
                     </div>
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 flex-wrap mb-1">
-                        <Badge variant="outline" className="text-[10px] font-bold uppercase tracking-wider bg-white dark:bg-slate-800 print:border-slate-400">
+                        <Badge variant="outline" className="text-xs font-bold uppercase tracking-wider bg-white dark:bg-slate-800 print:border-slate-400">
                           {q.type.replace(/_/g, " ")}
                         </Badge>
                         {q.groupId && (
-                          <Badge variant="secondary" className="text-[10px] font-bold bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300 print:hidden">
+                          <Badge variant="secondary" className="text-xs font-bold bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300 print:hidden">
                             Paket Literasi
                           </Badge>
                         )}
                         {q.type === "benar_salah" && q.statements && q.statements.length > 0 ? (
-                          <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300 border-emerald-200 text-[10px] font-bold print:border-slate-400">
+                          <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300 border-emerald-200 text-xs font-bold print:border-slate-400">
                             Kunci: {q.statements.map((s, idx) => `${idx + 1}:${(s.answer || "benar").toUpperCase().charAt(0)}`).join(" ")}
                           </Badge>
                         ) : q.type === "pilihan_ganda_kompleks" && q.choices ? (
-                          <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300 border-emerald-200 text-[10px] font-bold print:border-slate-400">
+                          <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300 border-emerald-200 text-xs font-bold print:border-slate-400">
                             Kunci: {Object.keys(q.choices).filter(k => q.choices![k]?.isCorrect).map(k => k.toUpperCase()).sort().join(", ") || q.answerKey || "-"}
                           </Badge>
                         ) : q.answerKey ? (
-                          <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300 border-emerald-200 text-[10px] font-bold print:border-slate-400">
+                          <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300 border-emerald-200 text-xs font-bold print:border-slate-400">
                             Kunci: {q.answerKey}
                           </Badge>
                         ) : null}
@@ -2401,11 +2401,11 @@ export const ItemAnalysisPage: React.FC = () => {
                   <div className="flex items-center gap-3 shrink-0 self-end md:self-center flex-wrap">
                     {/* Kesukaran */}
                     <div className="text-right">
-                      <span className="text-[10px] text-slate-400 block font-bold uppercase">Kesukaran (P)</span>
+                      <span className="text-xs text-slate-400 block font-bold uppercase">Kesukaran (P)</span>
                       <span className="text-xs font-black text-slate-800 dark:text-slate-200">
                         {q.difficultyIndex.toFixed(2)}{" "}
                         <span className={cn(
-                          "text-[10px] font-bold",
+                          "text-xs font-bold",
                           q.difficultyCategory === "Sedang" ? "text-emerald-600" : (q.difficultyCategory === "Mudah" ? "text-blue-600" : "text-amber-600")
                         )}>
                           ({q.difficultyCategory})
@@ -2415,7 +2415,7 @@ export const ItemAnalysisPage: React.FC = () => {
 
                     {/* Daya Pembeda */}
                     <div className="text-right">
-                      <span className="text-[10px] text-slate-400 block font-bold uppercase">Daya Beda (D)</span>
+                      <span className="text-xs text-slate-400 block font-bold uppercase">Daya Beda (D)</span>
                       <span className={cn(
                         "text-xs font-black",
                         q.discriminationIndex >= 0.40
@@ -2427,16 +2427,16 @@ export const ItemAnalysisPage: React.FC = () => {
                           : "text-rose-600 dark:text-rose-400"
                       )}>
                         {q.discriminationIndex >= 0 ? `+${q.discriminationIndex.toFixed(2)}` : q.discriminationIndex.toFixed(2)}{" "}
-                        <span className="text-[10px] font-bold">({q.discriminationCategory})</span>
+                        <span className="text-xs font-bold">({q.discriminationCategory})</span>
                       </span>
                     </div>
 
                     {/* Point-Biserial */}
                     <div className="text-right hidden sm:block">
-                      <span className="text-[10px] text-slate-400 block font-bold uppercase">Point-Biserial</span>
+                      <span className="text-xs text-slate-400 block font-bold uppercase">Point-Biserial</span>
                       <span className="text-xs font-black text-slate-800 dark:text-slate-200">
                         {q.pointBiserial >= 0 ? `+${q.pointBiserial.toFixed(2)}` : q.pointBiserial.toFixed(2)}{" "}
-                        <span className="text-[10px] font-bold text-slate-500">({q.pointBiserialCategory})</span>
+                        <span className="text-xs font-bold text-slate-500">({q.pointBiserialCategory})</span>
                       </span>
                     </div>
 
@@ -2457,7 +2457,7 @@ export const ItemAnalysisPage: React.FC = () => {
                   <div className="space-y-3">
                     {q.groupText && (
                       <div className="p-3.5 bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-900/40 rounded-xl text-xs text-indigo-950 dark:text-indigo-200 leading-relaxed print:bg-slate-50 print:border-slate-300">
-                        <span className="font-bold block text-[10px] text-indigo-600 uppercase tracking-widest mb-1 print:text-black">
+                        <span className="font-bold block text-xs text-indigo-600 uppercase tracking-widest mb-1 print:text-black">
                           Materi Stimulus / Teks Wacana
                         </span>
                         <MathText content={q.groupText} />
@@ -2479,7 +2479,7 @@ export const ItemAnalysisPage: React.FC = () => {
                               <div className="flex-1">
                                 <MathText content={ch.text} />
                               </div>
-                              {isCorr && <span className="ml-1 text-[9px] uppercase font-black text-emerald-700 shrink-0">[Kunci]</span>}
+                              {isCorr && <span className="ml-1 text-xs uppercase font-black text-emerald-700 shrink-0">[Kunci]</span>}
                             </div>
                           );
                         })}
@@ -2514,7 +2514,7 @@ export const ItemAnalysisPage: React.FC = () => {
                                 </div>
                                 <Badge
                                   className={cn(
-                                    "font-black text-[10px] uppercase tracking-wider px-2.5 py-0.5 rounded-md shrink-0 shadow-2xs",
+                                    "font-black text-xs uppercase tracking-wider px-2.5 py-0.5 rounded-md shrink-0 shadow-2xs",
                                     isBenar
                                       ? "bg-emerald-600 text-white hover:bg-emerald-600"
                                       : "bg-rose-600 text-white hover:bg-rose-600"
@@ -2539,7 +2539,7 @@ export const ItemAnalysisPage: React.FC = () => {
                   {/* 2. LAPISAN 1: STATISTIK ITEM CTT (Item Statistics) */}
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block">
+                      <span className="text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block">
                         Lapisan 1: Statistik Psikometri Butir Soal (CTT)
                       </span>
                       <button
@@ -2556,7 +2556,7 @@ export const ItemAnalysisPage: React.FC = () => {
                       <div className="bg-white dark:bg-slate-900/80 p-3 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-2xs hover:border-blue-200 dark:hover:border-blue-900/50 transition-all flex flex-col justify-between">
                         <div>
                           <div className="flex items-center justify-between gap-1.5">
-                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Tingkat Kesukaran (P)</span>
+                            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Tingkat Kesukaran (P)</span>
                             <MetricInfoTooltip type="difficulty" side="bottom" />
                           </div>
                           <div className="flex items-baseline gap-1.5 mt-1">
@@ -2564,7 +2564,7 @@ export const ItemAnalysisPage: React.FC = () => {
                               P = {q.difficultyIndex.toFixed(2)}
                             </span>
                             <span className={cn(
-                              "text-[10px] font-bold px-1.5 py-0.5 rounded",
+                              "text-xs font-bold px-1.5 py-0.5 rounded",
                               q.difficultyCategory === "Sedang" ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300" : (q.difficultyCategory === "Mudah" ? "bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300" : "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300")
                             )}>
                               {q.difficultyCategory}
@@ -2580,7 +2580,7 @@ export const ItemAnalysisPage: React.FC = () => {
                       <div className="bg-white dark:bg-slate-900/80 p-3 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-2xs hover:border-blue-200 dark:hover:border-blue-900/50 transition-all flex flex-col justify-between">
                         <div>
                           <div className="flex items-center justify-between gap-1.5">
-                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Daya Pembeda (D)</span>
+                            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Daya Pembeda (D)</span>
                             <MetricInfoTooltip type="discrimination" side="bottom" />
                           </div>
                           <div className="flex items-baseline gap-1.5 mt-1">
@@ -2591,7 +2591,7 @@ export const ItemAnalysisPage: React.FC = () => {
                               D = {q.discriminationIndex >= 0 ? `+${q.discriminationIndex.toFixed(2)}` : q.discriminationIndex.toFixed(2)}
                             </span>
                             <span className={cn(
-                              "text-[10px] font-bold px-1.5 py-0.5 rounded",
+                              "text-xs font-bold px-1.5 py-0.5 rounded",
                               q.discriminationIndex >= 0.40 ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300" : (q.discriminationIndex >= 0.30 ? "bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300" : (q.discriminationIndex >= 0.20 ? "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300" : "bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300"))
                             )}>
                               {q.discriminationCategory}
@@ -2607,7 +2607,7 @@ export const ItemAnalysisPage: React.FC = () => {
                       <div className="bg-white dark:bg-slate-900/80 p-3 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-2xs hover:border-blue-200 dark:hover:border-blue-900/50 transition-all flex flex-col justify-between">
                         <div>
                           <div className="flex items-center justify-between gap-1.5">
-                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Point-Biserial (r_pb)</span>
+                            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Point-Biserial (r_pb)</span>
                             <MetricInfoTooltip type="point_biserial" side="bottom" />
                           </div>
                           <div className="flex items-baseline gap-1.5 mt-1">
@@ -2615,7 +2615,7 @@ export const ItemAnalysisPage: React.FC = () => {
                               r_pb = {q.pointBiserial >= 0 ? `+${q.pointBiserial.toFixed(2)}` : q.pointBiserial.toFixed(2)}
                             </span>
                             <span className={cn(
-                              "text-[10px] font-bold px-1.5 py-0.5 rounded",
+                              "text-xs font-bold px-1.5 py-0.5 rounded",
                               q.pointBiserial >= 0.30 ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300" : (q.pointBiserial >= 0.20 ? "bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300" : (q.pointBiserial >= 0 ? "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300" : "bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300"))
                             )}>
                               {q.pointBiserialCategory}
@@ -2631,7 +2631,7 @@ export const ItemAnalysisPage: React.FC = () => {
                       <div className="bg-white dark:bg-slate-900/80 p-3 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-2xs hover:border-blue-200 dark:hover:border-blue-900/50 transition-all flex flex-col justify-between">
                         <div>
                           <div className="flex items-center justify-between gap-1.5">
-                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Efektivitas Pengecoh</span>
+                            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Efektivitas Pengecoh</span>
                             <MetricInfoTooltip type="distractor" side="bottom" />
                           </div>
                           <div className="flex items-baseline gap-1.5 mt-1">
@@ -2639,7 +2639,7 @@ export const ItemAnalysisPage: React.FC = () => {
                               DE = {q.distractorEfficiency}%
                             </span>
                             <span className={cn(
-                              "text-[10px] font-bold px-1.5 py-0.5 rounded",
+                              "text-xs font-bold px-1.5 py-0.5 rounded",
                               q.distractorEfficiency >= 66 ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300" : (q.distractorEfficiency >= 33 ? "bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300" : "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300")
                             )}>
                               {q.effectiveDistractorCount}/{q.totalDistractorCount} Efektif
@@ -2655,7 +2655,7 @@ export const ItemAnalysisPage: React.FC = () => {
 
                   {/* 3. LAPISAN 2: DIAGNOSIS MASALAH PSIKOMETRI (Diagnostic Engine) */}
                   <div className="space-y-2">
-                    <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block">
+                    <span className="text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block">
                       Lapisan 2: Diagnosis Masalah &amp; Anomali Butir Soal
                     </span>
                     <div className="bg-slate-50 dark:bg-slate-800/40 rounded-xl p-3.5 border border-slate-200/80 dark:border-slate-800 space-y-2.5">
@@ -2666,7 +2666,7 @@ export const ItemAnalysisPage: React.FC = () => {
                             <Badge
                               key={flIdx}
                               className={cn(
-                                "text-[10px] font-bold uppercase tracking-wider px-2 py-0.5",
+                                "text-xs font-bold uppercase tracking-wider px-2 py-0.5",
                                 flag.includes("NEGATIF") || flag.includes("KUNCI")
                                   ? "bg-rose-100 text-rose-800 dark:bg-rose-900/50 dark:text-rose-200 border-rose-300"
                                   : flag.includes("RENDAH") || flag.includes("MENYESATKAN")
@@ -2678,7 +2678,7 @@ export const ItemAnalysisPage: React.FC = () => {
                             </Badge>
                           ))
                         ) : (
-                          <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200 font-bold text-[10px]">
+                          <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200 font-bold text-xs">
                             ✓ TIDAK ADA ANOMALI PSIKOMETRI
                           </Badge>
                         )}
@@ -2698,7 +2698,7 @@ export const ItemAnalysisPage: React.FC = () => {
 
                   {/* 4. LAPISAN 3: KEPUTUSAN KELAYAKAN & REKOMENDASI GURU (Decision Engine) */}
                   <div className="space-y-2">
-                    <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block">
+                    <span className="text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block">
                       Lapisan 3: Keputusan CTT &amp; Tindak Lanjut Guru
                     </span>
                     <div className={cn("rounded-2xl border p-5 space-y-4 transition-all shadow-xs print:border-slate-300 print:p-3 print:bg-slate-50", alertBg)}>
@@ -2712,7 +2712,7 @@ export const ItemAnalysisPage: React.FC = () => {
                                 {verdictInfo.summaryTitle}
                               </h4>
                               {verdictInfo.keyAlert && (
-                                <Badge className="bg-rose-600 text-white font-bold text-[9px] uppercase tracking-wider animate-bounce">
+                                <Badge className="bg-rose-600 text-white font-bold text-xs uppercase tracking-wider animate-bounce">
                                   Kritis: Cek Kunci Jawaban
                                 </Badge>
                               )}
@@ -2779,7 +2779,7 @@ export const ItemAnalysisPage: React.FC = () => {
 
                       <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
                         <table className="w-full text-xs text-left">
-                          <thead className="bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 font-bold uppercase text-[10px] border-b border-slate-200 dark:border-slate-700">
+                          <thead className="bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 font-bold uppercase text-xs border-b border-slate-200 dark:border-slate-700">
                             <tr>
                               <th className="py-2.5 px-3 w-12 text-center">Opsi</th>
                               <th className="py-2.5 px-3">Teks Pilihan Jawaban</th>
@@ -2807,7 +2807,7 @@ export const ItemAnalysisPage: React.FC = () => {
                                     <MathText content={dis.text || "-"} />
                                   </td>
                                   <td className="py-2 px-3 text-center font-bold">
-                                    {dis.totalCount} <span className="text-[10px] text-slate-400 font-normal">({dis.totalPercent}%)</span>
+                                    {dis.totalCount} <span className="text-xs text-slate-400 font-normal">({dis.totalPercent}%)</span>
                                     <div className="w-16 bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full mx-auto mt-1 overflow-hidden">
                                       <div
                                         className={cn("h-full rounded-full", dis.isCorrect ? "bg-emerald-500" : (dis.status === "Menyesatkan" ? "bg-rose-500" : "bg-blue-500"))}
@@ -2816,22 +2816,22 @@ export const ItemAnalysisPage: React.FC = () => {
                                     </div>
                                   </td>
                                   <td className="py-2 px-3 text-center font-bold text-slate-700 dark:text-slate-300">
-                                    {dis.upperCount} <span className="text-[10px] text-slate-400 font-normal">({dis.upperPercent}%)</span>
+                                    {dis.upperCount} <span className="text-xs text-slate-400 font-normal">({dis.upperPercent}%)</span>
                                   </td>
                                   <td className="py-2 px-3 text-center font-bold text-slate-700 dark:text-slate-300">
-                                    {dis.lowerCount} <span className="text-[10px] text-slate-400 font-normal">({dis.lowerPercent}%)</span>
+                                    {dis.lowerCount} <span className="text-xs text-slate-400 font-normal">({dis.lowerPercent}%)</span>
                                   </td>
                                   <td className="py-2 px-3 text-center font-bold">
                                     {dis.isCorrect ? (
-                                      <span className="text-emerald-600 font-black text-[10px]">KUNCI</span>
+                                      <span className="text-emerald-600 font-black text-xs">KUNCI</span>
                                     ) : dis.effective ? (
-                                      <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300 text-[9px] font-bold">YA</Badge>
+                                      <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300 text-xs font-bold">YA</Badge>
                                     ) : (
-                                      <Badge className="bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 text-[9px] font-bold">TIDAK</Badge>
+                                      <Badge className="bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 text-xs font-bold">TIDAK</Badge>
                                     )}
                                   </td>
                                   <td className="py-2 px-3 text-center">
-                                    <Badge className={cn("text-[10px] font-bold px-2 py-0.5", badgeColor)}>
+                                    <Badge className={cn("text-xs font-bold px-2 py-0.5", badgeColor)}>
                                       {dis.status}
                                     </Badge>
                                   </td>
@@ -2863,7 +2863,7 @@ export const ItemAnalysisPage: React.FC = () => {
                       {q.statementsAnalysis && q.statementsAnalysis.length > 0 ? (
                         <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
                           <table className="w-full text-xs text-left">
-                            <thead className="bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 font-bold uppercase text-[10px] border-b border-slate-200 dark:border-slate-700">
+                            <thead className="bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 font-bold uppercase text-xs border-b border-slate-200 dark:border-slate-700">
                               <tr>
                                 <th className="py-2.5 px-3 w-10 text-center">No</th>
                                 <th className="py-2.5 px-3">Teks Pernyataan</th>
@@ -2895,7 +2895,7 @@ export const ItemAnalysisPage: React.FC = () => {
                                     </td>
                                     <td className="py-2 px-3 text-center">
                                       <Badge className={cn(
-                                        "text-[10px] font-black uppercase px-2 py-0.5",
+                                        "text-xs font-black uppercase px-2 py-0.5",
                                         st.correctAnswer === "benar" 
                                           ? "bg-emerald-600 text-white" 
                                           : "bg-rose-600 text-white"
@@ -2905,9 +2905,9 @@ export const ItemAnalysisPage: React.FC = () => {
                                     </td>
                                     <td className="py-2 px-3 text-center">
                                       <div className="flex items-center justify-center gap-1.5 font-bold">
-                                        <span className="text-emerald-700 dark:text-emerald-400">{st.totalBenar} B <span className="text-[10px] text-slate-400 font-normal">({st.totalBenarPercent}%)</span></span>
+                                        <span className="text-emerald-700 dark:text-emerald-400">{st.totalBenar} B <span className="text-xs text-slate-400 font-normal">({st.totalBenarPercent}%)</span></span>
                                         <span className="text-slate-300 dark:text-slate-600">/</span>
-                                        <span className="text-rose-600 dark:text-rose-400">{st.totalSalah} S <span className="text-[10px] text-slate-400 font-normal">({st.totalSalahPercent}%)</span></span>
+                                        <span className="text-rose-600 dark:text-rose-400">{st.totalSalah} S <span className="text-xs text-slate-400 font-normal">({st.totalSalahPercent}%)</span></span>
                                       </div>
                                       <div className="w-24 bg-rose-100 dark:bg-rose-950/40 h-1.5 rounded-full mx-auto mt-1 overflow-hidden flex">
                                         <div
@@ -2917,10 +2917,10 @@ export const ItemAnalysisPage: React.FC = () => {
                                       </div>
                                     </td>
                                     <td className="py-2 px-3 text-center font-bold text-slate-700 dark:text-slate-300">
-                                      {st.upperBenar} <span className="text-[10px] text-slate-400 font-normal">({st.upperBenarPercent}%)</span>
+                                      {st.upperBenar} <span className="text-xs text-slate-400 font-normal">({st.upperBenarPercent}%)</span>
                                     </td>
                                     <td className="py-2 px-3 text-center font-bold text-slate-700 dark:text-slate-300">
-                                      {st.lowerBenar} <span className="text-[10px] text-slate-400 font-normal">({st.lowerBenarPercent}%)</span>
+                                      {st.lowerBenar} <span className="text-xs text-slate-400 font-normal">({st.lowerBenarPercent}%)</span>
                                     </td>
                                     <td className="py-2 px-3 text-center font-black text-slate-800 dark:text-slate-200">
                                       {st.difficultyIndex.toFixed(2)}
@@ -2939,7 +2939,7 @@ export const ItemAnalysisPage: React.FC = () => {
                                       </span>
                                     </td>
                                     <td className="py-2 px-3 text-center">
-                                      <Badge className={cn("text-[10px] px-2 py-0.5 whitespace-nowrap", badgeColor)}>
+                                      <Badge className={cn("text-xs px-2 py-0.5 whitespace-nowrap", badgeColor)}>
                                         {st.status}
                                       </Badge>
                                     </td>
@@ -2973,7 +2973,7 @@ export const ItemAnalysisPage: React.FC = () => {
           <p className="font-bold text-slate-900 mt-0.5">Kepala Sekolah</p>
           <div className="h-20" />
           <p className="font-bold text-slate-900 underline underline-offset-4">( ................................................................ )</p>
-          <p className="text-[10px] text-slate-500 mt-0.5">NIP. ................................................................</p>
+          <p className="text-xs text-slate-500 mt-0.5">NIP. ................................................................</p>
         </div>
         <div>
           <p className="text-slate-600">
@@ -2984,7 +2984,7 @@ export const ItemAnalysisPage: React.FC = () => {
           <p className="font-bold text-slate-900 underline underline-offset-4">
             ( {examMeta.teacherName !== "-" ? examMeta.teacherName : "................................................................"} )
           </p>
-          <p className="text-[10px] text-slate-500 mt-0.5">NIP. ................................................................</p>
+          <p className="text-xs text-slate-500 mt-0.5">NIP. ................................................................</p>
         </div>
       </div>
 

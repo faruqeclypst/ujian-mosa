@@ -3607,12 +3607,12 @@ const QuestionFormPage = () => {
           <MathText content={item.text} className="line-clamp-2 text-sm font-serif text-slate-800 dark:text-slate-200 leading-relaxed ql-editor !p-0 [&_p]:m-0 [&_ol]:list-decimal [&_ul]:list-disc [&_ol]:pl-4 [&_ul]:pl-4" />
           <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
             {(item.imageUrl || item.text.includes("<img")) && (
-              <span className="p-1 px-1.5 rounded-md bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400 flex items-center gap-1 font-bold text-[9px] border border-blue-200 dark:border-blue-800/40 uppercase tracking-tight">
+              <span className="p-1 px-1.5 rounded-md bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400 flex items-center gap-1 font-bold text-xs border border-blue-200 dark:border-blue-800/40 uppercase tracking-tight">
                 Bergambar
               </span>
             )}
             {item.groupId && (
-              <span className="p-1 px-1.5 rounded-md bg-amber-50 text-amber-600 dark:bg-amber-950/20 dark:text-amber-400 flex items-center gap-1 font-bold text-[9px] border border-amber-200 dark:border-amber-800/40 uppercase tracking-tight">
+              <span className="p-1 px-1.5 rounded-md bg-amber-50 text-amber-600 dark:bg-amber-950/20 dark:text-amber-400 flex items-center gap-1 font-bold text-xs border border-amber-200 dark:border-amber-800/40 uppercase tracking-tight">
                 Paket: {item.groupId}
                 {questions.findIndex(q => q.groupId === item.groupId) === questions.indexOf(item) && <span className="ml-1 px-1 py-0.5 rounded bg-amber-500 text-white text-[7px] font-black">MAIN</span>}
               </span>
@@ -3641,7 +3641,7 @@ const QuestionFormPage = () => {
           hotspot: "Hotspot"
         };
         return (
-          <span className="p-1 px-2 rounded-md bg-indigo-50 text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400 text-[10px] font-bold border border-indigo-200 dark:border-indigo-800/40 uppercase whitespace-nowrap">
+          <span className="p-1 px-2 rounded-md bg-indigo-50 text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400 text-xs font-bold border border-indigo-200 dark:border-indigo-800/40 uppercase whitespace-nowrap">
             {typeLabels[item.type || "pilihan_ganda"]}
           </span>
         );
@@ -3666,13 +3666,13 @@ const QuestionFormPage = () => {
                   className="flex items-center gap-1 p-1 px-1.5 rounded-md bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-800 whitespace-nowrap cursor-help"
                   title={stList.map((s: any, idx: number) => `${idx + 1}. ${s.text ? s.text.replace(/<[^>]*>/g, '').trim() : 'Pernyataan'}: ${(s.answer || 'benar').toUpperCase()}`).join("\n")}
                 >
-                  <span className="text-[10px] text-slate-500 dark:text-slate-400 font-bold mr-0.5">Kunci:</span>
+                  <span className="text-xs text-slate-500 dark:text-slate-400 font-bold mr-0.5">Kunci:</span>
                   {stList.map((s: any, idx: number) => {
                     const isBenar = (s.answer || "benar").toLowerCase() === "benar";
                     return (
                       <span
                         key={s.id || idx}
-                        className={`inline-flex items-center justify-center px-1.5 py-0.2 rounded text-[10px] font-black font-mono shadow-xs ${isBenar
+                        className={`inline-flex items-center justify-center px-1.5 py-0.2 rounded text-xs font-black font-mono shadow-xs ${isBenar
                             ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700/50"
                             : "bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-300 dark:border-rose-700/50"
                           }`}
@@ -3699,7 +3699,7 @@ const QuestionFormPage = () => {
                   {keys.length} Opsi
                 </span>
                 {correctCount > 0 && (
-                  <span className="p-1 px-2 text-[11px] font-bold rounded-md bg-green-50 text-green-600 dark:bg-green-950/40 dark:text-green-400 border border-green-200 dark:border-green-800/40 whitespace-nowrap">
+                  <span className="p-1 px-2 text-xs font-bold rounded-md bg-green-50 text-green-600 dark:bg-green-950/40 dark:text-green-400 border border-green-200 dark:border-green-800/40 whitespace-nowrap">
                     Kunci: {correctKeys}
                   </span>
                 )}
@@ -3725,7 +3725,7 @@ const QuestionFormPage = () => {
                 </span>
                 {cols.length > 0 && (
                   <span
-                    className="p-1 px-2 rounded-md bg-slate-50 text-slate-600 dark:bg-slate-800/60 dark:text-slate-300 text-[11px] border border-slate-200 dark:border-slate-800 whitespace-nowrap cursor-help"
+                    className="p-1 px-2 rounded-md bg-slate-50 text-slate-600 dark:bg-slate-800/60 dark:text-slate-300 text-xs border border-slate-200 dark:border-slate-800 whitespace-nowrap cursor-help"
                     title={cols.map((c: any) => c.text).join(" | ")}
                   >
                     {cols.map((c: any) => c.text).join(" / ").slice(0, 30)}
@@ -3752,7 +3752,7 @@ const QuestionFormPage = () => {
                 </span>
                 {cats.length > 0 && (
                   <span
-                    className="p-1 px-2 rounded-md bg-slate-50 text-slate-600 dark:bg-slate-800/60 dark:text-slate-300 text-[11px] border border-slate-200 dark:border-slate-800 whitespace-nowrap cursor-help"
+                    className="p-1 px-2 rounded-md bg-slate-50 text-slate-600 dark:bg-slate-800/60 dark:text-slate-300 text-xs border border-slate-200 dark:border-slate-800 whitespace-nowrap cursor-help"
                     title={cats.map((c: any) => c.text).join(" | ")}
                   >
                     {cats.map((c: any) => c.text).join(" / ").slice(0, 30)}
@@ -3779,7 +3779,7 @@ const QuestionFormPage = () => {
                 </span>
                 {blanks.length > 0 && (
                   <span
-                    className="p-1 px-2 rounded-md bg-slate-50 text-slate-600 dark:bg-slate-800/60 dark:text-slate-300 text-[11px] border border-slate-200 dark:border-slate-800 whitespace-nowrap cursor-help"
+                    className="p-1 px-2 rounded-md bg-slate-50 text-slate-600 dark:bg-slate-800/60 dark:text-slate-300 text-xs border border-slate-200 dark:border-slate-800 whitespace-nowrap cursor-help"
                     title={blanks.map((b: any) => `[[${b.id}]]: ${(b.answers || []).join(" / ")}`).join("\n")}
                   >
                     {blanks.map((b: any) => `[[${b.id}]]`).join(" ").slice(0, 30)}
@@ -3803,7 +3803,7 @@ const QuestionFormPage = () => {
               <span className="p-1 px-2 rounded-md bg-sky-50 text-sky-700 dark:bg-sky-950/40 dark:text-sky-300 text-xs font-semibold border border-sky-200 dark:border-sky-800/40 whitespace-nowrap">
                 {areas.length} Area
               </span>
-              <span className="p-1 px-2 rounded-md bg-slate-50 text-slate-600 dark:bg-slate-800/60 dark:text-slate-300 text-[11px] border border-slate-200 dark:border-slate-800 whitespace-nowrap">
+              <span className="p-1 px-2 rounded-md bg-slate-50 text-slate-600 dark:bg-slate-800/60 dark:text-slate-300 text-xs border border-slate-200 dark:border-slate-800 whitespace-nowrap">
                 {mode === "all" ? "Semua area" : "Satu saja"}
               </span>
             </div>
@@ -3820,7 +3820,7 @@ const QuestionFormPage = () => {
             <div className="flex items-center gap-1.5 flex-wrap">
               <span className="p-1 px-2 rounded-md bg-slate-50 text-slate-600 dark:bg-slate-800/60 dark:text-slate-300 text-xs border border-slate-200 dark:border-slate-800 whitespace-nowrap">{keys.length} Opsi</span>
               {correctCount > 0 && (
-                <span className="p-1 px-2 text-[11px] font-bold rounded-md bg-green-50 text-green-600 dark:bg-green-950/40 dark:text-green-400 border border-green-200 dark:border-green-800/40 whitespace-nowrap">
+                <span className="p-1 px-2 text-xs font-bold rounded-md bg-green-50 text-green-600 dark:bg-green-950/40 dark:text-green-400 border border-green-200 dark:border-green-800/40 whitespace-nowrap">
                   Kunci: {correctKeys}
                 </span>
               )}
@@ -5066,10 +5066,10 @@ const QuestionFormPage = () => {
             </button>
             <div className="min-w-0">
               <div className="flex items-center gap-2 mb-0.5">
-                <span className="px-2 py-0.5 text-[10px] font-bold tracking-wider uppercase rounded-md bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 border border-indigo-200/60 dark:border-indigo-800/40">
+                <span className="px-2 py-0.5 text-xs font-bold tracking-wider uppercase rounded-md bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 border border-indigo-200/60 dark:border-indigo-800/40">
                   {dialogMode === "edit" ? "Mode Edit" : "Mode Tambah"}
                 </span>
-                <span className="text-[11px] font-semibold text-slate-400 dark:text-slate-500 hidden sm:inline">
+                <span className="text-xs font-semibold text-slate-400 dark:text-slate-500 hidden sm:inline">
                   Bank Soal
                 </span>
               </div>
@@ -5107,7 +5107,7 @@ const QuestionFormPage = () => {
 
             <form onSubmit={(e) => handleSubmit(e, false)} className="flex-1 flex flex-col min-h-0 overflow-hidden">
               {/* Scrollable Form Body */}
-              <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5 bg-white dark:bg-slate-950">
+              <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 sm:space-y-6 bg-white dark:bg-slate-950">
                 {/* Row 1: Pengaturan Tipe Soal & Stimulus Literasi (Menyatu, Rapi & Tidak Mengambang) */}
                 <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/50 shadow-xs overflow-hidden">
                   <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-slate-200 dark:divide-slate-800">
@@ -5118,7 +5118,7 @@ const QuestionFormPage = () => {
                           <Layers className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
                           <span>Jenis / Tipe Soal</span>
                         </label>
-                        <span className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Format Jawaban</span>
+                        <span className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Format Jawaban</span>
                       </div>
 
                       <div className="relative">
@@ -5175,7 +5175,7 @@ const QuestionFormPage = () => {
                         <ChevronDown className="w-4 h-4 text-slate-400 dark:text-slate-500 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                       </div>
 
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-tight">
+                      <p className="text-xs text-slate-500 dark:text-slate-400 leading-tight">
                         Pilih format lembar jawaban siswa yang sesuai.
                       </p>
                     </div>
@@ -5187,7 +5187,7 @@ const QuestionFormPage = () => {
                           <BookOpen className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
                           <span>Paket Stimulus / Literasi</span>
                         </label>
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md border transition-colors ${isLiterasiActive
+                        <span className={`text-xs font-bold px-2 py-0.5 rounded-md border transition-colors ${isLiterasiActive
                             ? "bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-950/60 dark:text-blue-300 dark:border-blue-800"
                             : "bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700"
                           }`}>
@@ -5218,7 +5218,7 @@ const QuestionFormPage = () => {
                         </div>
                       </button>
 
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-tight">
+                      <p className="text-xs text-slate-500 dark:text-slate-400 leading-tight">
                         Hubungkan soal dengan bahan bacaan atau literasi bersama.
                       </p>
                     </div>
@@ -5314,7 +5314,7 @@ const QuestionFormPage = () => {
                         {/* Pratinjau Terkunci */}
                         {literasiMode === "select" && formValues.groupId && existingLiteracies[formValues.groupId] && (
                           <div className="mt-2 bg-white dark:bg-slate-900/60 p-3 rounded-lg border border-slate-200/80 dark:border-slate-800 flex flex-col gap-1.5 shadow-xs">
-                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
                               Pratinjau Literasi Terpilih (Read-Only)
                             </span>
                             <MathText
@@ -5355,7 +5355,7 @@ const QuestionFormPage = () => {
                                 placeholder="Ketikkan teks stimulus / literasi di sini..."
                                 modules={quillModules}
                                 formats={quillFormats}
-                                className="[&_.ql-editor]:min-h-[180px] [&_.ql-editor_p]:leading-[1.8] [&_.ql-editor_p]:text-justify [&_.ql-container]:border-none [&_.ql-toolbar]:border-none [&_.ql-toolbar]:border-b"
+                                className="[&_.ql-editor]:min-h-[180px] [&_.ql-editor_p]:leading-[1.8] [&_.ql-editor_p]:text-justify [&_.ql-container]:border-none [&_.ql-toolbar]:border-none [&_.ql-toolbar]:border-b [&_.ql-toolbar]:overflow-x-auto"
                               />
                             </div>
                           </div>
@@ -5368,10 +5368,10 @@ const QuestionFormPage = () => {
                 {/* Row 2: Editor Pertanyaan Utama */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <label htmlFor="text" className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                    <label htmlFor="text" className="text-sm font-semibold text-slate-700 dark:text-slate-300">
                       Pertanyaan Utama
                     </label>
-                    <span className="text-[11px] text-slate-400">
+                    <span className="text-xs text-slate-400">
                       Mendukung rumus LaTeX, teks kaya, dan tabel
                     </span>
                   </div>
@@ -5389,7 +5389,7 @@ const QuestionFormPage = () => {
                       placeholder="Tuliskan pertanyaan disini..."
                       modules={quillModules}
                       formats={quillFormats}
-                      className="[&_.ql-editor]:min-h-[130px] [&_.ql-container]:border-none [&_.ql-toolbar]:border-none [&_.ql-toolbar]:border-b [&_.ql-toolbar]:bg-slate-50/50 dark:[&_.ql-toolbar]:bg-slate-900/30"
+                      className="[&_.ql-editor]:min-h-[130px] [&_.ql-container]:border-none [&_.ql-toolbar]:border-none [&_.ql-toolbar]:border-b [&_.ql-toolbar]:bg-slate-50/50 dark:[&_.ql-toolbar]:bg-slate-900/30 [&_.ql-toolbar]:overflow-x-auto"
                     />
 
                     {/* Pratinjau Tampilan (Sesuai Ujian) - Muncul jika showPreview === true */}
@@ -5398,11 +5398,11 @@ const QuestionFormPage = () => {
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             <span className="flex h-2 w-2 rounded-full bg-indigo-600 animate-pulse" />
-                            <p className="text-[10px] font-black text-indigo-700 dark:text-indigo-400 uppercase tracking-widest">
+                            <p className="text-xs font-black text-indigo-700 dark:text-indigo-400 uppercase tracking-widest">
                               Pratinjau Tampilan Lembar Soal (Siswa)
                             </p>
                           </div>
-                          <span className="text-[10px] text-slate-400 italic">Sesuai tampilan ujian siswa</span>
+                          <span className="text-xs text-slate-400 italic">Sesuai tampilan ujian siswa</span>
                         </div>
                         <div className="p-3.5 bg-white dark:bg-slate-950 rounded-lg border border-slate-200/80 dark:border-slate-800 shadow-xs">
                           <MathText
@@ -5419,10 +5419,10 @@ const QuestionFormPage = () => {
                 {/* Row 3: Gambar Cover Soal */}
                 <div className="p-3.5 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/40 dark:bg-slate-900/20 space-y-2">
                   <div>
-                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block">
+                    <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 block">
                       Gambar Cover / Ilustrasi Soal (Opsional)
                     </label>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
                       Gambar ini tampil tepat di atas teks pertanyaan utama pada lembar ujian siswa.
                     </p>
                   </div>
@@ -5450,9 +5450,9 @@ const QuestionFormPage = () => {
                           />
                         </div>
                         <div className="flex flex-col gap-0.5">
-                          <span className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">Gambar Terlampir</span>
+                          <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">Gambar Terlampir</span>
                           {coverSizeInfo && (
-                            <span className="text-[9px] text-emerald-600 font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800/40">
+                            <span className="text-xs text-emerald-600 font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800/40">
                               {coverSizeInfo}
                             </span>
                           )}
@@ -5482,7 +5482,7 @@ const QuestionFormPage = () => {
                         Jawaban & Kunci Penilaian
                       </span>
                     </div>
-                    <span className="text-[11px] text-indigo-700 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-200/80 dark:border-indigo-800/60 px-2.5 py-0.5 rounded-full font-bold">
+                    <span className="text-xs text-indigo-700 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-200/80 dark:border-indigo-800/60 px-2.5 py-1 rounded-full font-semibold">
                       MODE: {formValues.type.replace(/_/g, " ").toUpperCase()}
                     </span>
                   </div>
@@ -5490,7 +5490,7 @@ const QuestionFormPage = () => {
                   {/* RENDER PILIHAN GANDA / PILIHAN GANDA KOMPLEKS */}
                   {(formValues.type === "pilihan_ganda" || formValues.type === "pilihan_ganda_kompleks") && (
                     <div className="space-y-3">
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                      <p className="text-xs text-slate-500 dark:text-slate-400">
                         {formValues.type === "pilihan_ganda"
                           ? "Pilih tepat satu opsi sebagai KUNCI jawaban benar."
                           : "Pilihan Ganda Kompleks: Anda dapat mencentang lebih dari satu opsi sebagai KUNCI jawaban benar."}
@@ -5559,7 +5559,7 @@ const QuestionFormPage = () => {
                                   placeholder={`Jawaban opsi ${letter.toUpperCase()} ...`}
                                   modules={quillModulesChoice}
                                   formats={quillFormatsChoice}
-                                  className="[&_.ql-editor]:min-h-[52px] [&_.ql-editor]:py-2 [&_.ql-editor]:text-left [&_.ql-editor_p]:!text-left [&_.ql-container]:border-none [&_.ql-toolbar]:border-none [&_.ql-toolbar]:border-b [&_.ql-toolbar]:px-2 [&_.ql-toolbar]:py-0.5 [&_.ql-toolbar]:bg-slate-50/70 dark:[&_.ql-toolbar]:bg-slate-800/60"
+                                  className="[&_.ql-editor]:min-h-[52px] [&_.ql-editor]:py-2 [&_.ql-editor]:text-left [&_.ql-editor_p]:!text-left [&_.ql-container]:border-none [&_.ql-toolbar]:border-none [&_.ql-toolbar]:border-b [&_.ql-toolbar]:px-2 [&_.ql-toolbar]:py-0.5 [&_.ql-toolbar]:bg-slate-50/70 dark:[&_.ql-toolbar]:bg-slate-800/60 [&_.ql-toolbar]:overflow-x-auto"
                                 />
 
                                 {/* Pratinjau Opsi jika showPreview aktif */}
@@ -5641,7 +5641,7 @@ const QuestionFormPage = () => {
                                     <X className="w-3 h-3" />
                                   </button>
                                 </div>
-                                <span className="text-[11px] text-slate-400">Gambar opsi {letter.toUpperCase()}</span>
+                                <span className="text-xs text-slate-400">Gambar opsi {letter.toUpperCase()}</span>
                               </div>
                             )}
                           </div>
@@ -5654,10 +5654,10 @@ const QuestionFormPage = () => {
                   {formValues.type === "benar_salah" && (
                     <div className="space-y-3">
                       <div className="flex items-center justify-between px-1">
-                        <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                        <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">
                           Daftar Pernyataan & Kunci Jawaban
                         </span>
-                        <span className="text-[10px] text-emerald-700 dark:text-emerald-400 font-bold bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800">
+                        <span className="text-xs text-emerald-700 dark:text-emerald-400 font-semibold bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-1 rounded-full border border-emerald-200 dark:border-emerald-800">
                           Tabel Matriks ANBK
                         </span>
                       </div>
@@ -5768,14 +5768,14 @@ const QuestionFormPage = () => {
                       {/* Editor Kolom */}
                       <div className="space-y-2.5">
                         <div className="flex items-center justify-between px-1">
-                          <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                          <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">
                             Kolom Pilihan
                           </span>
-                          <span className="text-[10px] text-teal-700 dark:text-teal-400 font-bold bg-teal-50 dark:bg-teal-950/40 px-2.5 py-0.5 rounded-full border border-teal-200 dark:border-teal-800">
+                          <span className="text-xs text-teal-700 dark:text-teal-400 font-semibold bg-teal-50 dark:bg-teal-950/40 px-2.5 py-1 rounded-full border border-teal-200 dark:border-teal-800">
                             Min. 2 Kolom
                           </span>
                         </div>
-                        <p className="text-[11px] text-slate-500 dark:text-slate-400 px-1">
+                        <p className="text-xs text-slate-500 dark:text-slate-400 px-1">
                           Isi nama setiap kolom, mis. <span className="font-semibold text-slate-600 dark:text-slate-300">Setuju / Tidak Setuju</span> atau <span className="font-semibold text-slate-600 dark:text-slate-300">Ya / Tidak / Ragu</span>.
                         </p>
                         <div className="flex flex-wrap gap-2">
@@ -5831,7 +5831,7 @@ const QuestionFormPage = () => {
                       {/* Editor Pernyataan */}
                       <div className="space-y-2.5">
                         <div className="flex items-center justify-between px-1">
-                          <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                          <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">
                             Daftar Pernyataan & Kunci Jawaban
                           </span>
                         </div>
@@ -5919,10 +5919,10 @@ const QuestionFormPage = () => {
                       {/* Editor Kategori */}
                       <div className="space-y-2.5">
                         <div className="flex items-center justify-between px-1">
-                          <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                          <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">
                             Kategori (boleh dipakai berulang)
                           </span>
-                          <span className="text-[10px] text-violet-700 dark:text-violet-400 font-bold bg-violet-50 dark:bg-violet-950/40 px-2.5 py-0.5 rounded-full border border-violet-200 dark:border-violet-800">
+                          <span className="text-xs text-violet-700 dark:text-violet-400 font-semibold bg-violet-50 dark:bg-violet-950/40 px-2.5 py-1 rounded-full border border-violet-200 dark:border-violet-800">
                             Min. 2 Kategori
                           </span>
                         </div>
@@ -5992,7 +5992,7 @@ const QuestionFormPage = () => {
                       {/* Editor Pernyataan */}
                       <div className="space-y-2.5">
                         <div className="flex items-center justify-between px-1">
-                          <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                          <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">
                             Daftar Pernyataan & Kategori Benar
                           </span>
                         </div>
@@ -6079,10 +6079,10 @@ const QuestionFormPage = () => {
                     <div className="space-y-4">
                       <div className="space-y-2">
                         <div className="flex items-center justify-between px-1 flex-wrap gap-1.5">
-                          <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                          <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">
                             Teks Bacaan
                           </span>
-                          <span className="text-[10px] text-lime-700 dark:text-lime-400 font-bold bg-lime-50 dark:bg-lime-950/40 px-2.5 py-0.5 rounded-full border border-lime-200 dark:border-lime-800">
+                          <span className="text-xs text-lime-700 dark:text-lime-400 font-semibold bg-lime-50 dark:bg-lime-950/40 px-2.5 py-1 rounded-full border border-lime-200 dark:border-lime-800">
                             Tulis [[1]], [[2]] untuk rumpang
                           </span>
                         </div>
@@ -6119,10 +6119,10 @@ const QuestionFormPage = () => {
                       {(formValues.isianRumpangBlanks || []).length > 0 && (
                         <div className="space-y-2.5">
                           <div className="px-1">
-                            <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                            <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">
                               Kunci Jawaban per Rumpang
                             </span>
-                            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                            <p className="text-xs text-slate-500 dark:text-slate-400">
                               Pisahkan dengan koma jika ada beberapa jawaban yang diterima (mis. "Rupiah, IDR").
                             </p>
                           </div>
@@ -6156,7 +6156,7 @@ const QuestionFormPage = () => {
                                     }}
                                     className="w-4 h-4 rounded accent-lime-600"
                                   />
-                                  <span className="text-[11px] font-semibold text-slate-600 dark:text-slate-400 whitespace-nowrap" title="Bedakan huruf besar/kecil">
+                                  <span className="text-xs font-semibold text-slate-600 dark:text-slate-400 whitespace-nowrap" title="Bedakan huruf besar/kecil">
                                     Case-sensitive
                                   </span>
                                 </label>
@@ -6174,10 +6174,10 @@ const QuestionFormPage = () => {
                       {/* Upload Gambar */}
                       <div className="space-y-2.5">
                         <div className="flex items-center justify-between px-1">
-                          <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                          <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">
                             Gambar Hotspot <span className="text-rose-500">*</span>
                           </span>
-                          <span className="text-[10px] text-sky-700 dark:text-sky-400 font-bold bg-sky-50 dark:bg-sky-950/40 px-2.5 py-0.5 rounded-full border border-sky-200 dark:border-sky-800">
+                          <span className="text-xs text-sky-700 dark:text-sky-400 font-semibold bg-sky-50 dark:bg-sky-950/40 px-2.5 py-1 rounded-full border border-sky-200 dark:border-sky-800">
                             Wajib ada
                           </span>
                         </div>
@@ -6239,7 +6239,7 @@ const QuestionFormPage = () => {
 
                       {/* Mode */}
                       <div className="space-y-2">
-                        <span className="text-xs font-bold text-slate-700 dark:text-slate-300 px-1">
+                        <span className="text-sm font-semibold text-slate-700 dark:text-slate-300 px-1">
                           Mode Penilaian
                         </span>
                         <div className="flex gap-2">
@@ -6252,7 +6252,7 @@ const QuestionFormPage = () => {
                               }`}
                           >
                             Satu saja
-                            <span className="block text-[10px] font-normal opacity-80 mt-0.5">
+                            <span className="block text-xs font-normal opacity-80 mt-0.5">
                               Cukup klik salah satu area benar
                             </span>
                           </button>
@@ -6265,7 +6265,7 @@ const QuestionFormPage = () => {
                               }`}
                           >
                             Semua area
-                            <span className="block text-[10px] font-normal opacity-80 mt-0.5">
+                            <span className="block text-xs font-normal opacity-80 mt-0.5">
                               Harus klik semua area (skor parsial)
                             </span>
                           </button>
@@ -6275,7 +6275,7 @@ const QuestionFormPage = () => {
                       {/* Editor Area */}
                       {(hotspotFile || formValues.hotspotImageUrl) && (
                         <div className="space-y-2">
-                          <span className="text-xs font-bold text-slate-700 dark:text-slate-300 px-1">
+                          <span className="text-sm font-semibold text-slate-700 dark:text-slate-300 px-1">
                             Area Target
                           </span>
                           <HotspotAreaEditor
@@ -6292,8 +6292,8 @@ const QuestionFormPage = () => {
                   {formValues.type === "menjodohkan" && (
                     <div className="space-y-3">
                       <div className="grid grid-cols-2 gap-4 px-2">
-                        <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Pernyataan (Kiri)</span>
-                        <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Pasangan (Kanan)</span>
+                        <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Pernyataan (Kiri)</span>
+                        <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Pasangan (Kanan)</span>
                       </div>
                       <div className="space-y-2.5">
                         {formValues.pairs.map((pair, index) => (
@@ -6364,7 +6364,7 @@ const QuestionFormPage = () => {
                   {/* RENDER ISIAN SINGKAT / URAIAN */}
                   {(formValues.type === "isian_singkat" || formValues.type === "uraian") && (
                     <div className="space-y-2 bg-slate-50/50 dark:bg-slate-900/30 p-4 rounded-xl border border-slate-200 dark:border-slate-800">
-                      <label htmlFor="answerKey" className="text-xs font-bold text-slate-700 dark:text-slate-300 block">
+                      <label htmlFor="answerKey" className="text-sm font-semibold text-slate-700 dark:text-slate-300 block">
                         {formValues.type === "isian_singkat" ? "Kunci Jawaban Tepat" : "Pedoman / Contoh Jawaban Benar"}
                       </label>
                       <Input
@@ -6375,12 +6375,12 @@ const QuestionFormPage = () => {
                         className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-sm h-10 shadow-xs"
                       />
                       {formValues.type === "isian_singkat" && (
-                        <p className="text-[11px] text-slate-500 dark:text-slate-400 italic">
+                        <p className="text-xs text-slate-500 dark:text-slate-400 italic">
                           * Siswa harus menjawab identik dengan teks di atas untuk memperoleh nilai otomatis.
                         </p>
                       )}
                       {formValues.type === "uraian" && (
-                        <p className="text-[11px] text-amber-600 dark:text-amber-400 italic">
+                        <p className="text-xs text-amber-600 dark:text-amber-400 italic">
                           * Jenis soal uraian / esai memerlukan koreksi dan penilaian manual oleh Guru di lembar penilaian.
                         </p>
                       )}
@@ -6511,7 +6511,7 @@ const QuestionFormPage = () => {
                 {/* CBT Header Replica - FIXED TOP */}
                 <div className="flex-shrink-0 bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 px-6 sm:px-10 py-5 sm:py-6 flex items-center justify-between z-20 backdrop-blur-md bg-white/90 dark:bg-slate-900/90">
                   <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-emerald-600 text-white flex items-center justify-center font-black text-xl sm:text-2xl shadow-xl shadow-emerald-200 dark:shadow-none">
+                    <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-emerald-600 text-white flex items-center justify-center font-black text-xl sm:text-2xl shadow-sm shadow-emerald-200 dark:shadow-none">
                       {questions.findIndex(q => q.id === previewQuestion.id) + 1}
                     </div>
                     <div>
@@ -6519,7 +6519,7 @@ const QuestionFormPage = () => {
                       <div className="flex items-center gap-2">
                         <span className="text-sm sm:text-base font-black text-slate-800 dark:text-white uppercase tracking-tight">Pratinjau Siswa</span>
                         {previewQuestion.groupId && (
-                          <span className="px-2 py-0.5 rounded-md bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800/40 text-[9px] font-black uppercase tracking-widest">Grup: {previewQuestion.groupId}</span>
+                          <span className="px-2 py-0.5 rounded-md bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800/40 text-xs font-black uppercase tracking-widest">Grup: {previewQuestion.groupId}</span>
                         )}
                       </div>
                     </div>
@@ -6565,14 +6565,14 @@ const QuestionFormPage = () => {
                     const firstWithText = questions.find(q => q.groupId === previewQuestion.groupId && q.groupText);
                     if (firstWithText) {
                       return (
-                        <div className="bg-slate-50 dark:bg-slate-950 p-6 sm:p-8 rounded-[30px] border border-slate-200 dark:border-slate-800 mb-10 space-y-4 relative overflow-hidden group">
+                        <div className="bg-slate-50 dark:bg-slate-950 p-6 sm:p-8 rounded-2xl border border-slate-200 dark:border-slate-800 mb-10 space-y-4 relative overflow-hidden group">
                           <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:rotate-12 transition-transform duration-700">
                             <FileText className="w-16 h-16 sm:w-20 sm:h-20 text-emerald-800" />
                           </div>
 
                           <div className="flex items-center gap-3 mb-4 relative z-10">
                             <div className="h-5 sm:h-6 w-1 sm:w-1.5 rounded-full bg-emerald-600"></div>
-                            <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-[0.2em] text-emerald-500 dark:text-emerald-400">Bacaan / Stimulus</span>
+                            <span className="text-xs font-black uppercase tracking-[0.2em] text-emerald-500 dark:text-emerald-400">Bacaan / Stimulus</span>
                           </div>
 
                           <MathText
@@ -6581,7 +6581,7 @@ const QuestionFormPage = () => {
                           />
 
                           <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex justify-end opacity-50 dark:opacity-100 text-right">
-                            <span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest italic">Bacalah teks dengan seksama sebelum memberikan jawaban.</span>
+                            <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest italic">Bacalah teks dengan seksama sebelum memberikan jawaban.</span>
                           </div>
                         </div>
                       );
@@ -6595,10 +6595,10 @@ const QuestionFormPage = () => {
                       <div className="relative inline-block group">
                         <SmartImage
                           src={previewQuestion.imageUrl}
-                          className="max-h-[300px] sm:max-h-[450px] rounded-[30px] border-4 border-white dark:border-slate-800 shadow-2xl transition-all group-hover:brightness-95"
+                          className="max-h-[300px] sm:max-h-[450px] rounded-2xl border-4 border-white dark:border-slate-800 shadow-sm transition-all group-hover:brightness-95"
                           alt="Question"
                         />
-                        <div className="absolute inset-0 bg-black/5 opacity-0 group-hover:opacity-100 transition-opacity rounded-[30px] flex items-center justify-center">
+                        <div className="absolute inset-0 bg-black/5 opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl flex items-center justify-center">
                           <Maximize2 className="w-8 h-8 text-white drop-shadow-lg" />
                         </div>
                       </div>
@@ -6614,7 +6614,7 @@ const QuestionFormPage = () => {
                     {(previewQuestion.type === "pilihan_ganda_kompleks" || previewQuestion.type === "menjodohkan" || previewQuestion.type === "urutkan") && (
                       <div className="flex items-center gap-2 mb-6 px-4 py-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/50 rounded-xl w-fit">
                         <HelpCircle className="w-4 h-4 text-blue-500" />
-                        <span className="text-[10px] sm:text-[11px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest">
+                        <span className="text-xs font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest">
                           {previewQuestion.type === "pilihan_ganda_kompleks" ? "Pilih semua jawaban yang benar" :
                             previewQuestion.type === "menjodohkan" ? "Pasangkan pernyataan di bawah ini" :
                               "Urutkan pernyataan dengan benar"}
@@ -6720,7 +6720,7 @@ const QuestionFormPage = () => {
                           </tbody>
                         </table>
                         <div className="px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-200 dark:border-slate-800">
-                          <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                          <p className="text-xs text-slate-500 dark:text-slate-400">
                             Kategori tersedia: {((previewQuestion as any).options.categories || []).map((c: any) => c.text).join(", ")}
                             {(previewQuestion as any).options.shuffleStatements !== false && " • Urutan pernyataan diacak saat ujian"}
                           </p>
@@ -6728,7 +6728,7 @@ const QuestionFormPage = () => {
                       </div>
                     ) : previewQuestion.type === "isian_rumpang" && (previewQuestion as any).options?.text ? (
                       <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm p-4 sm:p-5">
-                        <p className="text-[10px] font-black text-lime-700 dark:text-lime-400 uppercase tracking-widest mb-3">
+                        <p className="text-xs font-black text-lime-700 dark:text-lime-400 uppercase tracking-widest mb-3">
                           Pratinjau Isian Rumpang
                         </p>
                         <div className="text-sm sm:text-base text-slate-800 dark:text-slate-200 leading-loose">
@@ -6744,7 +6744,7 @@ const QuestionFormPage = () => {
                                     className="h-9 min-w-[100px] text-sm text-center rounded-lg border-2 border-dashed border-lime-300 dark:border-lime-700 bg-lime-50/50 dark:bg-lime-950/20 px-2"
                                   />
                                   {blank && (
-                                    <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 mt-1">
+                                    <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 mt-1">
                                       {(blank.answers || []).join(" / ")}
                                     </span>
                                   )}
@@ -6758,10 +6758,10 @@ const QuestionFormPage = () => {
                     ) : previewQuestion.type === "hotspot" && (previewQuestion as any).options?.imageUrl ? (
                       <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm p-4 sm:p-5 space-y-3">
                         <div className="flex items-center justify-between">
-                          <p className="text-[10px] font-black text-sky-700 dark:text-sky-400 uppercase tracking-widest">
+                          <p className="text-xs font-black text-sky-700 dark:text-sky-400 uppercase tracking-widest">
                             Pratinjau Hotspot
                           </p>
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
+                          <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
                             {(previewQuestion as any).options.mode === "all" ? "Mode: Semua area" : "Mode: Satu saja"} • {((previewQuestion as any).options.areas || []).length} area
                           </span>
                         </div>
@@ -6772,7 +6772,7 @@ const QuestionFormPage = () => {
                             className="w-full h-auto block"
                           />
                         </div>
-                        <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                        <p className="text-xs text-slate-500 dark:text-slate-400">
                           Area target: {((previewQuestion as any).options.areas || []).map((a: any) => a.label).join(", ") || "-"}
                           <span className="italic"> (tidak ditampilkan ke siswa)</span>
                         </p>
@@ -6812,14 +6812,14 @@ const QuestionFormPage = () => {
                         {(previewQuestion.pairs || []).map(p => (
                           <div key={p.id} className="flex flex-col sm:flex-row items-stretch gap-4">
                             <div className="flex-1 p-5 bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 rounded-3xl font-serif text-slate-800 dark:text-slate-200 shadow-sm">
-                              <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Pernyataan</div>
+                              <div className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Pernyataan</div>
                               {p.left}
                             </div>
                             <div className="hidden sm:flex items-center justify-center text-emerald-500">
                               <Forward className="w-8 h-8" />
                             </div>
                             <div className="flex-1 p-5 bg-emerald-50/50 dark:bg-emerald-950/20 border-2 border-dashed border-emerald-400/50 rounded-3xl font-serif text-emerald-800 dark:text-emerald-400 shadow-inner flex flex-col justify-center">
-                              <div className="text-[10px] font-black text-emerald-600/50 uppercase tracking-widest mb-1.5 flex items-center gap-2">
+                              <div className="text-xs font-black text-emerald-600/50 uppercase tracking-widest mb-1.5 flex items-center gap-2">
                                 <CheckCircle2 className="w-3.5 h-3.5" /> Pasangan Benar
                               </div>
                               <div className="text-lg font-black">{p.right}</div>
@@ -6830,17 +6830,17 @@ const QuestionFormPage = () => {
                     )}
 
                     {(previewQuestion.type === "isian_singkat" || previewQuestion.type === "uraian") && (
-                      <div className="p-8 sm:p-10 rounded-[40px] border-2 border-dashed border-blue-200 dark:border-blue-900/40 bg-blue-50/20 dark:bg-blue-950/20 space-y-4">
+                      <div className="p-8 sm:p-10 rounded-2xl border-2 border-dashed border-blue-200 dark:border-blue-900/40 bg-blue-50/20 dark:bg-blue-950/20 space-y-4">
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-lg">
                             <Check className="w-6 h-6 stroke-[3px]" />
                           </div>
                           <div>
                             <span className="text-xs font-black text-blue-600/70 dark:text-blue-400/70 uppercase tracking-widest block">Kunci Jawaban / Pedoman</span>
-                            <span className="text-[10px] text-blue-400 font-bold uppercase tracking-tighter">Hanya terlihat oleh Administrator</span>
+                            <span className="text-xs text-blue-400 font-bold uppercase tracking-tighter">Hanya terlihat oleh Administrator</span>
                           </div>
                         </div>
-                        <div className="text-xl sm:text-2xl font-black text-blue-800 dark:text-blue-300 bg-white dark:bg-slate-900 p-6 sm:p-8 rounded-3xl border border-blue-100 dark:border-blue-800/40 shadow-xl">
+                        <div className="text-xl sm:text-2xl font-black text-blue-800 dark:text-blue-300 bg-white dark:bg-slate-900 p-6 sm:p-8 rounded-3xl border border-blue-100 dark:border-blue-800/40 shadow-sm">
                           {previewQuestion.answerKey || "(Belum diisi)"}
                         </div>
                       </div>
@@ -6850,11 +6850,11 @@ const QuestionFormPage = () => {
                       <div className="space-y-4 pt-2">
                         {(previewQuestion.items || []).map((it, idx) => (
                           <div key={it.id} className="flex items-center gap-5 p-5 rounded-3xl border-2 border-indigo-100 dark:border-indigo-900/40 bg-indigo-50/30 dark:bg-indigo-950/20 shadow-sm group">
-                            <div className="w-12 h-12 rounded-2xl bg-indigo-600 text-white flex items-center justify-center font-black text-xl shadow-xl shadow-indigo-200 dark:shadow-none transition-transform group-hover:rotate-6">
+                            <div className="w-12 h-12 rounded-2xl bg-indigo-600 text-white flex items-center justify-center font-black text-xl shadow-sm shadow-indigo-200 dark:shadow-none transition-transform group-hover:rotate-6">
                               {idx + 1}
                             </div>
                             <div className="flex-1">
-                              <div className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-0.5">Urutan Benar</div>
+                              <div className="text-xs font-black text-indigo-400 uppercase tracking-widest mb-0.5">Urutan Benar</div>
                               <span className="text-xl font-serif font-black text-indigo-800 dark:text-indigo-300 leading-tight">{it.text}</span>
                             </div>
                             <div className="opacity-20"><Menu className="w-6 h-6" /></div>
@@ -6894,7 +6894,7 @@ const QuestionFormPage = () => {
                         >
                           <img src={src} alt="Media" className="max-h-full max-w-full object-contain transition-transform group-hover:scale-110" />
                           <div className="absolute inset-0 bg-indigo-900/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all">
-                            <span className="text-white text-[10px] font-bold bg-indigo-600 px-3 py-1.5 rounded-lg shadow-sm tracking-widest uppercase">Pilih</span>
+                            <span className="text-white text-xs font-bold bg-indigo-600 px-3 py-1.5 rounded-lg shadow-sm tracking-widest uppercase">Pilih</span>
                           </div>
                         </div>
                       ))}
@@ -6921,7 +6921,7 @@ const QuestionFormPage = () => {
                 </div>
                 <div className="flex flex-col items-start">
                   <span className="font-semibold text-xs">Unggah Dari Komputer</span>
-                  <span className="text-[10px] text-slate-400">File foto maksimal 2MB</span>
+                  <span className="text-xs text-slate-400">File foto maksimal 2MB</span>
                 </div>
               </button>
               <button
@@ -6934,7 +6934,7 @@ const QuestionFormPage = () => {
                 </div>
                 <div className="flex flex-col items-start">
                   <span className="font-semibold text-xs">Ambil Dari Galeri</span>
-                  <span className="text-[10px] text-slate-400">Gunakan file yang sudah di-upload</span>
+                  <span className="text-xs text-slate-400">Gunakan file yang sudah di-upload</span>
                 </div>
               </button>
             </div>

@@ -625,7 +625,7 @@ const computeQuestionScore = (q: any, ans: any, overrideVal?: any): number | nul
   if (loading) return (
     <div className="space-y-6 pb-20 max-w-7xl mx-auto">
       {/* Header skeleton */}
-      <div className="bg-white dark:bg-slate-900 px-5 py-4 rounded-2xl border border-slate-200 dark:border-slate-800">
+      <div className="bg-white dark:bg-slate-900 px-4 sm:px-6 py-4 rounded-2xl border border-slate-200 dark:border-slate-800">
         <div className="flex items-center gap-4">
           <Skeleton className="h-9 w-9 rounded-xl" />
           <div className="space-y-2">
@@ -668,13 +668,13 @@ const computeQuestionScore = (q: any, ans: any, overrideVal?: any): number | nul
               const userAns = ans?.[st.id];
               const isMatch = userAns && userAns.toLowerCase() === (st.answer || "benar").toLowerCase();
               return (
-                <div key={st.id} className="text-[11px] flex items-start justify-between gap-2 border-b border-slate-100 dark:border-slate-800/60 pb-1 last:border-0 last:pb-0">
+                <div key={st.id} className="text-xs flex items-start justify-between gap-2 border-b border-slate-100 dark:border-slate-800/60 pb-1 last:border-0 last:pb-0">
                   <div className="flex-1 text-slate-700 dark:text-slate-300">
-                    <MathText content={st.text} className="inline text-[11px] [&_p]:inline [&_p]:m-0" />
+                    <MathText content={st.text} className="inline text-xs [&_p]:inline [&_p]:m-0" />
                   </div>
                   <div className="shrink-0 flex items-center gap-1">
                     {userAns ? (
-                      <span className={`px-1.5 py-0.2 rounded text-[10px] font-bold ${
+                      <span className={`px-1.5 py-0.5 rounded text-xs font-bold ${
                         userAns.toLowerCase() === "benar"
                           ? "bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400"
                           : "bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-950/40 dark:text-rose-400"
@@ -682,10 +682,10 @@ const computeQuestionScore = (q: any, ans: any, overrideVal?: any): number | nul
                         {userAns.toUpperCase()}
                       </span>
                     ) : (
-                      <span className="text-slate-400 italic text-[10px]">-</span>
+                      <span className="text-slate-400 italic text-xs">-</span>
                     )}
                     {userAns && (
-                      isMatch ? <span className="text-emerald-500 font-bold text-[11px]">✓</span> : <span className="text-rose-500 font-bold text-[11px]">✗</span>
+                      isMatch ? <span className="text-emerald-500 font-bold text-xs">✓</span> : <span className="text-rose-500 font-bold text-xs">✗</span>
                     )}
                   </div>
                 </div>
@@ -710,7 +710,7 @@ const computeQuestionScore = (q: any, ans: any, overrideVal?: any): number | nul
           {selected.map((k: string) => {
             const isMatch = correctKeys.includes(k);
             return (
-              <span key={k} className={`px-1.5 py-0.2 rounded text-[10px] font-bold inline-flex items-center gap-0.5 ${
+              <span key={k} className={`px-1.5 py-0.5 rounded text-xs font-bold inline-flex items-center gap-0.5 ${
                 isMatch 
                   ? "bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400"
                   : "bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-950/40 dark:text-rose-400"
@@ -754,19 +754,19 @@ const computeQuestionScore = (q: any, ans: any, overrideVal?: any): number | nul
               const expected = String(st.answer ?? "");
               const isMatch = userVal !== undefined && String(userVal) === expected && userVal !== "";
               return (
-                <div key={st.id} className="text-[11px] flex items-start justify-between gap-2 border-b border-slate-100 dark:border-slate-800/60 pb-1 last:border-0 last:pb-0">
+                <div key={st.id} className="text-xs flex items-start justify-between gap-2 border-b border-slate-100 dark:border-slate-800/60 pb-1 last:border-0 last:pb-0">
                   <div className="flex-1 text-slate-700 dark:text-slate-300">
-                    <MathText content={st.text} className="inline text-[11px] [&_p]:inline [&_p]:m-0" />
+                    <MathText content={st.text} className="inline text-xs [&_p]:inline [&_p]:m-0" />
                   </div>
                   <div className="shrink-0 flex items-center gap-1">
                     {userVal ? (
-                      <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-slate-50 text-slate-700 border border-slate-200 dark:bg-slate-800/40 dark:text-slate-300">
+                      <span className="px-1.5 py-0.5 rounded text-xs font-bold bg-slate-50 text-slate-700 border border-slate-200 dark:bg-slate-800/40 dark:text-slate-300">
                         {stripHtml(catMap[String(userVal)] || String(userVal)).substring(0, 25)}
                       </span>
                     ) : (
-                      <span className="text-slate-400 italic text-[10px]">-</span>
+                      <span className="text-slate-400 italic text-xs">-</span>
                     )}
-                    {userVal && (isMatch ? <span className="text-emerald-500 font-bold text-[11px]">✓</span> : <span className="text-rose-500 font-bold text-[11px]">✗</span>)}
+                    {userVal && (isMatch ? <span className="text-emerald-500 font-bold text-xs">✓</span> : <span className="text-rose-500 font-bold text-xs">✗</span>)}
                   </div>
                 </div>
               );
@@ -795,11 +795,11 @@ const computeQuestionScore = (q: any, ans: any, overrideVal?: any): number | nul
                 }
               }
               return (
-                <div key={bid} className="text-[11px] flex items-start justify-between gap-2 border-b border-slate-100 dark:border-slate-800/60 pb-1 last:border-0 last:pb-0">
+                <div key={bid} className="text-xs flex items-start justify-between gap-2 border-b border-slate-100 dark:border-slate-800/60 pb-1 last:border-0 last:pb-0">
                   <span className="text-slate-500 dark:text-slate-400 font-mono">[{idx + 1}]</span>
                   <div className="flex-1 text-slate-700 dark:text-slate-300 font-medium">{given || <span className="text-slate-400 italic">-</span>}</div>
                   <div className="shrink-0">
-                    {given && (isMatch ? <span className="text-emerald-500 font-bold text-[11px]">✓</span> : <span className="text-rose-500 font-bold text-[11px]">✗</span>)}
+                    {given && (isMatch ? <span className="text-emerald-500 font-bold text-xs">✓</span> : <span className="text-rose-500 font-bold text-xs">✗</span>)}
                   </div>
                 </div>
               );
@@ -828,11 +828,11 @@ const computeQuestionScore = (q: any, ans: any, overrideVal?: any): number | nul
           return hit;
         });
         return (
-          <div className="text-[11px] space-y-1">
+          <div className="text-xs space-y-1">
             <div className="font-medium text-slate-700 dark:text-slate-300">{ans.length} titik diklik — {hitCount}/{areas.length} area kena</div>
             <div className="flex flex-wrap gap-1">
               {ans.map((pt: any, i: number) => (
-                <span key={i} className="px-1.5 py-0.2 rounded text-[10px] font-mono bg-slate-50 text-slate-600 border border-slate-200 dark:bg-slate-800/40 dark:text-slate-300">
+                <span key={i} className="px-1.5 py-0.5 rounded text-xs font-mono bg-slate-50 text-slate-600 border border-slate-200 dark:bg-slate-800/40 dark:text-slate-300">
                   ({Math.round(Number(pt?.x) || 0)}%, {Math.round(Number(pt?.y) || 0)}%)
                 </span>
               ))}
@@ -848,8 +848,8 @@ const computeQuestionScore = (q: any, ans: any, overrideVal?: any): number | nul
           hitLabel = hitAr ? (hitAr.label || "area target") : "";
         }
         return (
-          <div className="text-[11px]">
-            <span className="font-mono bg-slate-50 text-slate-600 border border-slate-200 dark:bg-slate-800/40 dark:text-slate-300 px-1.5 py-0.2 rounded text-[10px]">
+          <div className="text-xs">
+            <span className="font-mono bg-slate-50 text-slate-600 border border-slate-200 dark:bg-slate-800/40 dark:text-slate-300 px-1.5 py-0.5 rounded text-xs">
               ({Math.round(hx || 0)}%, {Math.round(hy || 0)}%)
             </span>
             {hitLabel && <span className="ml-1 text-emerald-600 font-bold">✓ {stripHtml(hitLabel).substring(0, 30)}</span>}
@@ -870,11 +870,11 @@ const computeQuestionScore = (q: any, ans: any, overrideVal?: any): number | nul
             {sts.map((st: any) => {
               const expected = (st.answer || "benar").toUpperCase();
               return (
-                <div key={st.id} className="text-[11px] flex items-start justify-between gap-2 border-b border-slate-100 dark:border-slate-800/60 pb-1 last:border-0 last:pb-0">
+                <div key={st.id} className="text-xs flex items-start justify-between gap-2 border-b border-slate-100 dark:border-slate-800/60 pb-1 last:border-0 last:pb-0">
                   <div className="flex-1 text-slate-500 dark:text-slate-400">
-                    <MathText content={st.text} className="inline text-[11px] [&_p]:inline [&_p]:m-0" />
+                    <MathText content={st.text} className="inline text-xs [&_p]:inline [&_p]:m-0" />
                   </div>
-                  <span className={`px-1.5 py-0.2 rounded text-[10px] font-bold shrink-0 ${
+                  <span className={`px-1.5 py-0.5 rounded text-xs font-bold shrink-0 ${
                     expected === "BENAR"
                       ? "bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400"
                       : "bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-950/40 dark:text-rose-400"
@@ -918,11 +918,11 @@ const computeQuestionScore = (q: any, ans: any, overrideVal?: any): number | nul
         return (
           <div className="space-y-1.5 my-0.5">
             {stmts.map((st: any) => (
-              <div key={st.id} className="text-[11px] flex items-start justify-between gap-2 border-b border-slate-100 dark:border-slate-800/60 pb-1 last:border-0 last:pb-0">
+              <div key={st.id} className="text-xs flex items-start justify-between gap-2 border-b border-slate-100 dark:border-slate-800/60 pb-1 last:border-0 last:pb-0">
                 <div className="flex-1 text-slate-500 dark:text-slate-400">
-                  <MathText content={st.text} className="inline text-[11px] [&_p]:inline [&_p]:m-0" />
+                  <MathText content={st.text} className="inline text-xs [&_p]:inline [&_p]:m-0" />
                 </div>
-                <span className="px-1.5 py-0.2 rounded text-[10px] font-bold shrink-0 bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400">
+                <span className="px-1.5 py-0.5 rounded text-xs font-bold shrink-0 bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400">
                   {stripHtml(catMap[String(st.answer)] || String(st.answer || "-")).substring(0, 25)}
                 </span>
               </div>
@@ -940,7 +940,7 @@ const computeQuestionScore = (q: any, ans: any, overrideVal?: any): number | nul
             {blanks.map((bl: any, idx: number) => {
               const acc = Array.isArray(bl.answers) ? bl.answers : (bl.answers != null ? [bl.answers] : []);
               return (
-                <div key={String(bl.id ?? idx)} className="text-[11px] text-slate-500 dark:text-slate-400">
+                <div key={String(bl.id ?? idx)} className="text-xs text-slate-500 dark:text-slate-400">
                   <span className="font-mono">[{idx + 1}]</span> <span className="font-medium text-emerald-700 dark:text-emerald-400">{acc.map((a: any) => String(a)).join(" / ") || "-"}</span>
                 </div>
               );
@@ -955,11 +955,11 @@ const computeQuestionScore = (q: any, ans: any, overrideVal?: any): number | nul
       const hmode = String(q.hotspotMode || q.choices?.mode || "any").toLowerCase();
       if (Array.isArray(areas) && areas.length > 0) {
         return (
-          <div className="text-[11px] text-slate-500 dark:text-slate-400 space-y-1">
+          <div className="text-xs text-slate-500 dark:text-slate-400 space-y-1">
             <div className="font-medium">{areas.length} area target ({hmode === "all" ? "klik semua" : "klik satu saja"})</div>
             {areas.map((ar: any, i: number) => (
               <div key={String(ar.id ?? i)}>
-                Area {i + 1}{ar.label ? `: ${stripHtml(String(ar.label)).substring(0, 30)}` : ""} <span className="font-mono text-[10px]">(x={ar.x}%, y={ar.y}%, {ar.w}%×{ar.h}%)</span>
+                Area {i + 1}{ar.label ? `: ${stripHtml(String(ar.label)).substring(0, 30)}` : ""} <span className="font-mono text-xs">(x={ar.x}%, y={ar.y}%, {ar.w}%×{ar.h}%)</span>
               </div>
             ))}
           </div>
@@ -989,7 +989,7 @@ const computeQuestionScore = (q: any, ans: any, overrideVal?: any): number | nul
   return (
     <div className="space-y-6 pb-20 max-w-7xl mx-auto animate-in fade-in duration-500">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 px-5 py-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 px-4 sm:px-6 py-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" onClick={() => navigate("/admin/penilaian")} className="rounded-xl">
             <ArrowLeft className="w-5 h-5" />
@@ -998,7 +998,7 @@ const computeQuestionScore = (q: any, ans: any, overrideVal?: any): number | nul
             <div className="flex items-center gap-2 flex-wrap">
               <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">{student?.name || "Siswa"}</h1>
               {bankQuestions.length > questions.length && (
-                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300 border border-purple-200 dark:border-purple-800/50 flex items-center gap-1 shadow-sm">
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300 border border-purple-200 dark:border-purple-800/50 flex items-center gap-1 shadow-sm">
                   <span>🎲</span> {questions.length} Soal Teracak (dari {bankQuestions.length} Bank Soal)
                 </span>
               )}
@@ -1023,53 +1023,53 @@ const computeQuestionScore = (q: any, ans: any, overrideVal?: any): number | nul
 
       {/* Score Summary */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 text-center">
-          <p className="text-[10px] uppercase tracking-widest text-slate-400 mb-1">Nilai Final</p>
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 sm:p-6 text-center">
+          <p className="text-xs uppercase tracking-widest text-slate-400 mb-1">Nilai Final</p>
           <p className={`text-2xl font-black ${finalScore >= 75 ? "text-emerald-600" : finalScore >= 50 ? "text-amber-600" : "text-rose-600"}`}>{attempt ? finalScore : "-"}</p>
-          <p className="text-[10px] text-slate-400">{hasEssay ? "60% obj + 40% essay" : "100% objektif"}</p>
+          <p className="text-xs text-slate-400">{hasEssay ? "60% obj + 40% essay" : "100% objektif"}</p>
         </div>
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-emerald-100 dark:border-emerald-800/30 p-4 text-center">
-          <p className="text-[10px] uppercase tracking-widest text-emerald-500 mb-1">Benar Penuh</p>
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-emerald-100 dark:border-emerald-800/30 p-4 sm:p-6 text-center">
+          <p className="text-xs uppercase tracking-widest text-emerald-500 mb-1">Benar Penuh</p>
           <p className="text-2xl font-black text-emerald-600">{attempt ? questions.filter(q => { const s = getQuestionScore(q); return s !== null && s >= 1; }).length : 0}</p>
-          <p className="text-[10px] text-slate-400">dari {questions.length} soal</p>
+          <p className="text-xs text-slate-400">dari {questions.length} soal</p>
         </div>
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-rose-100 dark:border-rose-800/30 p-4 text-center">
-          <p className="text-[10px] uppercase tracking-widest text-rose-500 mb-1">Salah</p>
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-rose-100 dark:border-rose-800/30 p-4 sm:p-6 text-center">
+          <p className="text-xs uppercase tracking-widest text-rose-500 mb-1">Salah</p>
           <p className="text-2xl font-black text-rose-600">{attempt ? questions.filter(q => { const s = getQuestionScore(q); return s !== null && s === 0; }).length : 0}</p>
-          <p className="text-[10px] text-slate-400">dari {questions.length} soal</p>
+          <p className="text-xs text-slate-400">dari {questions.length} soal</p>
         </div>
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 text-center">
-          <p className="text-[10px] uppercase tracking-widest text-slate-400 mb-1">Objektif</p>
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 sm:p-6 text-center">
+          <p className="text-xs uppercase tracking-widest text-slate-400 mb-1">Objektif</p>
           <p className={`text-2xl font-black ${objScore >= 75 ? "text-emerald-600" : objScore >= 50 ? "text-amber-600" : "text-rose-600"}`}>{objScore}</p>
-          <p className="text-[10px] text-slate-400">{Number(objCorrect.toFixed(1))}/{objectiveQuestions.length} poin</p>
+          <p className="text-xs text-slate-400">{Number(objCorrect.toFixed(1))}/{objectiveQuestions.length} poin</p>
         </div>
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 text-center">
-          <p className="text-[10px] uppercase tracking-widest text-slate-400 mb-1">Subjektif</p>
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 sm:p-6 text-center">
+          <p className="text-xs uppercase tracking-widest text-slate-400 mb-1">Subjektif</p>
           <p className={`text-2xl font-black ${essGraded < essayQuestions.length ? "text-amber-500" : essScore >= 75 ? "text-emerald-600" : essScore >= 50 ? "text-amber-600" : "text-rose-600"}`}>
             {essGraded < essayQuestions.length ? `${essGraded}/${essayQuestions.length}` : essScore}
           </p>
-          <p className="text-[10px] text-slate-400">{essGraded < essayQuestions.length ? "belum selesai" : `${essCorrect}/${essayQuestions.length} benar`}</p>
+          <p className="text-xs text-slate-400">{essGraded < essayQuestions.length ? "belum selesai" : `${essCorrect}/${essayQuestions.length} benar`}</p>
         </div>
       </div>
 
       {/* Questions Detail */}
       {attempt && (
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
-          <div className="px-5 py-3 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+          <div className="px-4 sm:px-6 py-3 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
             <h2 className="text-sm font-bold text-slate-700 dark:text-slate-200">Detail Jawaban</h2>
-            <span className="text-[10px] text-slate-400 font-medium">{questions.length} soal</span>
+            <span className="text-xs text-slate-400 font-medium">{questions.length} soal</span>
           </div>
           <div className="overflow-x-auto">
             <Table>
               <TableHeader className="bg-slate-50/80 dark:bg-slate-800/50">
                 <TableRow>
-                  <TableHead className="w-10 text-center text-[10px] font-bold">No</TableHead>
-                  <TableHead className="text-[10px] font-bold min-w-[220px]">Soal</TableHead>
-                  <TableHead className="text-[10px] font-bold w-20 text-center">Tipe</TableHead>
-                  <TableHead className="text-[10px] font-bold min-w-[140px]">Jawaban Siswa</TableHead>
-                  <TableHead className="text-[10px] font-bold min-w-[140px]">Kunci Jawaban</TableHead>
-                  <TableHead className="text-center text-[10px] font-bold w-16">Status</TableHead>
-                  <TableHead className="text-right text-[10px] font-bold w-28">Aksi</TableHead>
+                  <TableHead className="w-10 text-center text-xs font-bold">No</TableHead>
+                  <TableHead className="text-xs font-bold min-w-[220px]">Soal</TableHead>
+                  <TableHead className="text-xs font-bold w-20 text-center">Tipe</TableHead>
+                  <TableHead className="text-xs font-bold min-w-[140px]">Jawaban Siswa</TableHead>
+                  <TableHead className="text-xs font-bold min-w-[140px]">Kunci Jawaban</TableHead>
+                  <TableHead className="text-center text-xs font-bold w-16">Status</TableHead>
+                  <TableHead className="text-right text-xs font-bold w-28">Aksi</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -1128,29 +1128,29 @@ const computeQuestionScore = (q: any, ans: any, overrideVal?: any): number | nul
                     >
                       <TableCell className="text-center">
                         <div className="flex flex-col items-center gap-0.5">
-                          <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 font-mono">{idx + 1}</span>
+                          <span className="text-xs font-bold text-slate-500 dark:text-slate-400 font-mono">{idx + 1}</span>
                           {bankQuestions.length > questions.length && (
-                            <span className="px-1.5 py-0.2 rounded text-[8px] font-black bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300 border border-purple-200/60 dark:border-purple-800/40 whitespace-nowrap" title={`Soal Bank #${bankNo}`}>
+                            <span className="px-1.5 py-0.5 rounded text-xs font-black bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300 border border-purple-200/60 dark:border-purple-800/40 whitespace-nowrap" title={`Soal Bank #${bankNo}`}>
                               🎲 #{bankNo}
                             </span>
                           )}
                         </div>
                       </TableCell>
                       <TableCell>
-                        <div className="text-[11px] leading-snug text-slate-700 dark:text-slate-300">
-                          <MathText content={q.text} className="text-[11px] [&_p]:m-0" />
+                        <div className="text-xs leading-snug text-slate-700 dark:text-slate-300">
+                          <MathText content={q.text} className="text-xs [&_p]:m-0" />
                         </div>
                       </TableCell>
                       <TableCell className="text-center">
-                        <span className={`text-[9px] px-2 py-0.5 rounded-md font-bold border ${typeColors[q.type] || "bg-slate-50 text-slate-500 border-slate-100"}`}>
+                        <span className={`text-xs px-2 py-0.5 rounded-md font-bold border ${typeColors[q.type] || "bg-slate-50 text-slate-500 border-slate-100"}`}>
                           {typeLabels[q.type] || q.type}
                         </span>
                       </TableCell>
                       <TableCell>
-                        <div className="text-[11px] text-slate-700 dark:text-slate-300 leading-snug whitespace-pre-wrap">{getStudentAnswer(q)}</div>
+                        <div className="text-xs text-slate-700 dark:text-slate-300 leading-snug whitespace-pre-wrap">{getStudentAnswer(q)}</div>
                       </TableCell>
                       <TableCell>
-                        <div className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug whitespace-pre-wrap">{getCorrectAnswer(q)}</div>
+                        <div className="text-xs text-slate-500 dark:text-slate-400 leading-snug whitespace-pre-wrap">{getCorrectAnswer(q)}</div>
                       </TableCell>
                       <TableCell className="text-center">
                         {qScore === null ? (
@@ -1162,7 +1162,7 @@ const computeQuestionScore = (q: any, ans: any, overrideVal?: any): number | nul
                             <CheckCircle2 className="w-3 h-3 text-emerald-500" />
                           </span>
                         ) : isPartialCorrect ? (
-                          <span className="inline-flex items-center justify-center px-1.5 py-0.5 rounded-full bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/30 text-[9px] font-black text-amber-700 dark:text-amber-400" title={`Benar Sebagian (${Math.round(qScore * 100)}%)`}>
+                          <span className="inline-flex items-center justify-center px-1.5 py-0.5 rounded-full bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/30 text-xs font-black text-amber-700 dark:text-amber-400" title={`Benar Sebagian (${Math.round(qScore * 100)}%)`}>
                             {Math.round(qScore * 100)}%
                           </span>
                         ) : (

@@ -546,19 +546,19 @@ const SchoolInvoicePage = () => {
                             {logo && b.bank_code !== "OTHER" ? (
                               <>
                                 <img src={logo} alt={b.bank_name} className="relative z-10 max-h-full max-w-full object-contain bg-white" onError={e => e.currentTarget.style.display = 'none'} />
-                                <span className="absolute inset-0 flex items-center justify-center text-[9px] font-black text-slate-400 uppercase leading-none">{b.bank_name.substring(0,3)}</span>
+                                <span className="absolute inset-0 flex items-center justify-center text-xs font-black text-slate-400 uppercase leading-none">{b.bank_name.substring(0,3)}</span>
                               </>
-                            ) : <span className="text-[9px] font-black text-slate-400 uppercase leading-none">{b.bank_name.substring(0,3)}</span>}
+                            ) : <span className="text-xs font-black text-slate-400 uppercase leading-none">{b.bank_name.substring(0,3)}</span>}
                           </div>
                           <div className="flex flex-col gap-0.5">
                             <span className="font-bold text-slate-800 dark:text-slate-200 text-[11px]">{b.bank_name} - <span className="font-mono text-blue-700 dark:text-blue-400">{b.account_number}</span></span>
-                            <span className="text-[9px] text-slate-500 font-medium">a.n. {b.account_name}</span>
+                            <span className="text-xs text-slate-500 font-medium">a.n. {b.account_name}</span>
                           </div>
                         </div>
                       );
                     })}
                   </div>
-                  <p className="mt-2 text-[10px] text-slate-500 italic">* Setelah transfer, silakan klik tombol Upload di tabel Riwayat Transaksi di bawah.</p>
+                  <p className="mt-2 text-xs text-slate-500 italic">* Setelah transfer, silakan klik tombol Upload di tabel Riwayat Transaksi di bawah.</p>
                 </div>
               )}
           </div>
@@ -643,7 +643,7 @@ const SchoolInvoicePage = () => {
               <div className="min-w-0 flex-1">
                 <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">{s.label}</p>
                 <p className="text-lg font-black text-slate-900 dark:text-white tracking-tight mt-0.5 truncate">{s.value}</p>
-                <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">{s.note}</p>
+                <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">{s.note}</p>
               </div>
             </div>
           );
@@ -779,7 +779,7 @@ const SchoolInvoicePage = () => {
                             ) : (
                               <span className="flex h-9 w-14 items-center justify-center gap-1 text-blue-600 dark:text-blue-400">
                                 <FileText size={14} />
-                                <span className="text-[9px] font-bold">PDF</span>
+                                <span className="text-xs font-bold">PDF</span>
                               </span>
                             )}
                             <span className="absolute inset-0 flex items-center justify-center bg-slate-900/0 group-hover:bg-slate-900/30 transition">
@@ -856,7 +856,7 @@ const SchoolInvoicePage = () => {
                             )}
                           >
                             <p className="text-xs font-bold">{p.label}</p>
-                            <p className="text-[10px] text-slate-400 mt-0.5">{p.note}</p>
+                            <p className="text-xs text-slate-400 mt-0.5">{p.note}</p>
                             <p className="text-[11px] font-extrabold text-blue-600 dark:text-blue-400 mt-1">
                               {formatRupiah(monthly)}<span className="font-medium text-slate-400">/bln</span>
                             </p>
@@ -891,7 +891,7 @@ const SchoolInvoicePage = () => {
                           )}
                         >
                           <p className="text-xs font-bold">{d.label}</p>
-                          <p className="text-[10px] font-extrabold text-blue-600 dark:text-blue-400 mt-0.5">
+                          <p className="text-xs font-extrabold text-blue-600 dark:text-blue-400 mt-0.5">
                             {formatRupiah(calculatePlanInvoice(selectedPlan, d.months).amount)}
                           </p>
                         </button>
@@ -916,7 +916,7 @@ const SchoolInvoicePage = () => {
                   {/* Estimasi total */}
                   <div className="p-3.5 rounded-xl bg-blue-50/60 dark:bg-blue-950/30 border border-blue-200/60 dark:border-blue-900/40 flex items-center justify-between gap-3">
                     <div>
-                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Estimasi total</p>
+                      <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Estimasi total</p>
                       <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
                         {PLAN_PRICING[selectedPlan as keyof typeof PLAN_PRICING]?.label || selectedPlan} · {selectedDuration} bulan
                       </p>
@@ -1014,7 +1014,7 @@ const SchoolInvoicePage = () => {
                 {/* Invoice Breakdown */}
                 <div className="border border-slate-200/60 dark:border-slate-800 rounded-2xl overflow-hidden">
                   <div className="bg-slate-50 dark:bg-slate-900 px-4 py-3 border-b border-slate-100 dark:border-slate-800">
-                    <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Rincian Tagihan</p>
+                    <p className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Rincian Tagihan</p>
                   </div>
                   <div className="divide-y divide-slate-100 dark:divide-slate-800/80">
                     {[
@@ -1191,7 +1191,7 @@ const SchoolInvoicePage = () => {
               </div>
             ) : (
               <div className="space-y-5 animate-in zoom-in-95 duration-300">
-                <div className="w-20 h-20 mx-auto rounded-3xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shadow-lg shadow-emerald-500/10">
+                <div className="w-20 h-20 mx-auto rounded-2xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shadow-sm shadow-emerald-500/10">
                   <CheckCircle2 size={40} className="animate-in zoom-in-75 duration-300" />
                 </div>
 
