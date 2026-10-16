@@ -203,6 +203,8 @@ Hook ini menghitung ulang skor saat attempt `finished` (anti-tamper). **Wajib ta
 
 > ⚠️ **KRITIS:** Audit apa yang dikirim ke client untuk soal. Jika `options` dikirim utuh (berisi `answer`), siswa bisa intip kunci via DevTools. Pola existing: `benar_salah` menyimpan kunci di `options.statements[].answer` — cek bagaimana hook menanganinya. Tipe baru harus ikut pola yang sama (strip atau pisahkan kunci).
 
+> ✅ **HASIL AUDIT (2026-10-16, FASE 1):** `stripAnswerKeys` di `security_fix.pb.js` sudah strip key `answer` rekursif → `options.statements[].answer` (klasifikasi/matriks) otomatis ke-strip. Diperluas untuk tipe baru: key `answers` (→ `options.blanks[].answers` isian_rumpang) dan key `areas` (→ `options.areas` hotspot, karena areas = kunci jawaban) ikut di-strip. Yang tetap dikirim ke siswa: `imageUrl`, `mode`, `categories`, `columns`, `caseSensitive`, teks pernyataan/rumpang. ⚠️ Konsekuensi: skoring client-side untuk hotspot tidak bisa jalan tanpa `areas` — frontend (FASE 3) harus skip/tunda skor hotspot dan andalkan skor server.
+
 ### 2.5 Monitoring
 
 | File | Line | Yang diubah |

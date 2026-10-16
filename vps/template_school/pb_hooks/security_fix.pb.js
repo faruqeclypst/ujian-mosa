@@ -59,7 +59,9 @@ onRecordEnrich((e) => {
     }
     // Hapus kunci jawaban secara rekursif TANPA merusak struktur soal:
     //  - pilihan ganda/kompleks : {a:{text,isCorrect}} -> {a:{text}}
-    //  - benar-salah statements : {statements:[{id,text,answer}]} -> [{id,text}]
+    //  - benar-salah/klasifikasi/matriks statements : [{id,text,answer}] -> [{id,text}]
+    //  - isian_rumpang blanks : [{id,answers:[...],caseSensitive}] -> [{id,caseSensitive}]
+    //  - hotspot areas : di-strip utuh (areas = kunci jawaban); imageUrl & mode tetap dikirim
     //  - menjodohkan/urutan/drag : pairs/items dipertahankan utuh
     function stripAnswerKeys(node) {
         if (Array.isArray(node)) {
@@ -73,7 +75,7 @@ onRecordEnrich((e) => {
             for (let j = 0; j < keys.length; j++) {
                 const k = keys[j];
                 const lk = ("" + k).toLowerCase();
-                if (lk === "iscorrect" || lk === "correctanswer" || lk === "answer") continue;
+                if (lk === "iscorrect" || lk === "correctanswer" || lk === "answer" || lk === "answers" || lk === "areas") continue;
                 obj[k] = stripAnswerKeys(node[k]);
             }
             return obj;
@@ -155,7 +157,11 @@ onRecordCreateRequest((e) => {
             "true_false": "benar_salah", "benar_salah": "benar_salah",
             "matching": "menjodohkan", "menjodohkan": "menjodohkan",
             "ordering": "urutkan", "sequence": "urutkan", "urutkan": "urutkan",
-            "drag_drop": "urutkan"
+            "drag_drop": "urutkan",
+            "klasifikasi": "klasifikasi",
+            "hotspot": "hotspot",
+            "isian_rumpang": "isian_rumpang", "cloze": "isian_rumpang",
+            "matriks": "matriks"
         };
         try {
             let auth = null;
@@ -265,6 +271,78 @@ onRecordCreateRequest((e) => {
                         for (let vi = 0; vi < co.length; vi++) { if (sarr[vi] !== co[vi]) { allOk = false; break; } }
                         if (allOk) objectiveCorrect++;
                     }
+                } else if (t === "klasifikasi" || t === "matriks") {
+                    // klasifikasi/matriks: options.statements=[{id, text, answer}]
+                    // jawaban siswa: {statementId: categoryId/columnId}
+                    const kstmts = options.statements || [];
+                    if (kstmts.length > 0 && studentAns !== null && typeof studentAns === "object" && !Array.isArray(studentAns)) {
+                        let kCorr = 0;
+                        for (let ki = 0; ki < kstmts.length; ki++) {
+                            const kst = kstmts[ki] || {};
+                            const ksid = String(kst.id != null ? kst.id : "");
+                            if (!ksid) continue;
+                            if (String(studentAns[ksid] != null ? studentAns[ksid] : "") === String(kst.answer != null ? kst.answer : "")) kCorr++;
+                        }
+                        objectiveCorrect += kCorr / kstmts.length;
+                    }
+                } else if (t === "isian_rumpang") {
+                    // isian_rumpang: options.blanks=[{id, answers:[...], caseSensitive}]
+                    // jawaban siswa: {blankId: "teks"}
+                    const blanks = options.blanks || [];
+                    if (blanks.length > 0 && studentAns !== null && typeof studentAns === "object" && !Array.isArray(studentAns)) {
+                        let bCorr = 0;
+                        for (let bi = 0; bi < blanks.length; bi++) {
+                            const bl = blanks[bi] || {};
+                            const bid = String(bl.id != null ? bl.id : "");
+                            if (!bid) continue;
+                            let given = String(studentAns[bid] != null ? studentAns[bid] : "").trim();
+                            const cs = bl.caseSensitive === true;
+                            if (!cs) given = given.toLowerCase();
+                            if (!given) continue;
+                            const acc = Array.isArray(bl.answers) ? bl.answers : (bl.answers != null ? [bl.answers] : []);
+                            for (let ai = 0; ai < acc.length; ai++) {
+                                let exp = String(acc[ai] != null ? acc[ai] : "").trim();
+                                if (!cs) exp = exp.toLowerCase();
+                                if (exp && given === exp) { bCorr++; break; }
+                            }
+                        }
+                        objectiveCorrect += bCorr / blanks.length;
+                    }
+                } else if (t === "hotspot") {
+                    // hotspot: options.areas=[{id, x, y, w, h}] (koordinat %)
+                    // mode "any": jawaban {x, y}; mode "all": jawaban [{x,y}, ...]
+                    const areas = options.areas || [];
+                    if (areas.length > 0) {
+                        const inArea = function (px, py, ar) {
+                            const ax = Number(ar.x), ay = Number(ar.y), aw = Number(ar.w), ah = Number(ar.h);
+                            if (isNaN(ax) || isNaN(ay) || isNaN(aw) || isNaN(ah)) return false;
+                            return px >= ax && px <= ax + aw && py >= ay && py <= ay + ah;
+                        };
+                        const hmode = String(options.mode || "any").toLowerCase();
+                        if (hmode === "all") {
+                            const pts = Array.isArray(studentAns) ? studentAns : [];
+                            let hit = 0;
+                            for (let hi = 0; hi < areas.length; hi++) {
+                                const ar = areas[hi] || {};
+                                for (let pti = 0; pti < pts.length; pti++) {
+                                    const pt = pts[pti] || {};
+                                    const px = Number(pt.x), py = Number(pt.y);
+                                    if (!isNaN(px) && !isNaN(py) && inArea(px, py, ar)) { hit++; break; }
+                                }
+                            }
+                            objectiveCorrect += hit / areas.length;
+                        } else {
+                            let hx = NaN, hy = NaN;
+                            if (studentAns !== null && typeof studentAns === "object" && !Array.isArray(studentAns)) {
+                                hx = Number(studentAns.x); hy = Number(studentAns.y);
+                            }
+                            if (!isNaN(hx) && !isNaN(hy)) {
+                                for (let hj = 0; hj < areas.length; hj++) {
+                                    if (inArea(hx, hy, areas[hj] || {})) { objectiveCorrect++; break; }
+                                }
+                            }
+                        }
+                    }
                 }
             });
 
@@ -325,7 +403,11 @@ onRecordUpdateRequest((e) => {
             "true_false": "benar_salah", "benar_salah": "benar_salah",
             "matching": "menjodohkan", "menjodohkan": "menjodohkan",
             "ordering": "urutkan", "sequence": "urutkan", "urutkan": "urutkan",
-            "drag_drop": "urutkan"
+            "drag_drop": "urutkan",
+            "klasifikasi": "klasifikasi",
+            "hotspot": "hotspot",
+            "isian_rumpang": "isian_rumpang", "cloze": "isian_rumpang",
+            "matriks": "matriks"
         };
         try {
             let auth = null;
@@ -432,6 +514,78 @@ onRecordUpdateRequest((e) => {
                         let allOk = true;
                         for (let vi = 0; vi < co.length; vi++) { if (sarr[vi] !== co[vi]) { allOk = false; break; } }
                         if (allOk) objectiveCorrect++;
+                    }
+                } else if (t === "klasifikasi" || t === "matriks") {
+                    // klasifikasi/matriks: options.statements=[{id, text, answer}]
+                    // jawaban siswa: {statementId: categoryId/columnId}
+                    const kstmts = options.statements || [];
+                    if (kstmts.length > 0 && studentAns !== null && typeof studentAns === "object" && !Array.isArray(studentAns)) {
+                        let kCorr = 0;
+                        for (let ki = 0; ki < kstmts.length; ki++) {
+                            const kst = kstmts[ki] || {};
+                            const ksid = String(kst.id != null ? kst.id : "");
+                            if (!ksid) continue;
+                            if (String(studentAns[ksid] != null ? studentAns[ksid] : "") === String(kst.answer != null ? kst.answer : "")) kCorr++;
+                        }
+                        objectiveCorrect += kCorr / kstmts.length;
+                    }
+                } else if (t === "isian_rumpang") {
+                    // isian_rumpang: options.blanks=[{id, answers:[...], caseSensitive}]
+                    // jawaban siswa: {blankId: "teks"}
+                    const blanks = options.blanks || [];
+                    if (blanks.length > 0 && studentAns !== null && typeof studentAns === "object" && !Array.isArray(studentAns)) {
+                        let bCorr = 0;
+                        for (let bi = 0; bi < blanks.length; bi++) {
+                            const bl = blanks[bi] || {};
+                            const bid = String(bl.id != null ? bl.id : "");
+                            if (!bid) continue;
+                            let given = String(studentAns[bid] != null ? studentAns[bid] : "").trim();
+                            const cs = bl.caseSensitive === true;
+                            if (!cs) given = given.toLowerCase();
+                            if (!given) continue;
+                            const acc = Array.isArray(bl.answers) ? bl.answers : (bl.answers != null ? [bl.answers] : []);
+                            for (let ai = 0; ai < acc.length; ai++) {
+                                let exp = String(acc[ai] != null ? acc[ai] : "").trim();
+                                if (!cs) exp = exp.toLowerCase();
+                                if (exp && given === exp) { bCorr++; break; }
+                            }
+                        }
+                        objectiveCorrect += bCorr / blanks.length;
+                    }
+                } else if (t === "hotspot") {
+                    // hotspot: options.areas=[{id, x, y, w, h}] (koordinat %)
+                    // mode "any": jawaban {x, y}; mode "all": jawaban [{x,y}, ...]
+                    const areas = options.areas || [];
+                    if (areas.length > 0) {
+                        const inArea = function (px, py, ar) {
+                            const ax = Number(ar.x), ay = Number(ar.y), aw = Number(ar.w), ah = Number(ar.h);
+                            if (isNaN(ax) || isNaN(ay) || isNaN(aw) || isNaN(ah)) return false;
+                            return px >= ax && px <= ax + aw && py >= ay && py <= ay + ah;
+                        };
+                        const hmode = String(options.mode || "any").toLowerCase();
+                        if (hmode === "all") {
+                            const pts = Array.isArray(studentAns) ? studentAns : [];
+                            let hit = 0;
+                            for (let hi = 0; hi < areas.length; hi++) {
+                                const ar = areas[hi] || {};
+                                for (let pti = 0; pti < pts.length; pti++) {
+                                    const pt = pts[pti] || {};
+                                    const px = Number(pt.x), py = Number(pt.y);
+                                    if (!isNaN(px) && !isNaN(py) && inArea(px, py, ar)) { hit++; break; }
+                                }
+                            }
+                            objectiveCorrect += hit / areas.length;
+                        } else {
+                            let hx = NaN, hy = NaN;
+                            if (studentAns !== null && typeof studentAns === "object" && !Array.isArray(studentAns)) {
+                                hx = Number(studentAns.x); hy = Number(studentAns.y);
+                            }
+                            if (!isNaN(hx) && !isNaN(hy)) {
+                                for (let hj = 0; hj < areas.length; hj++) {
+                                    if (inArea(hx, hy, areas[hj] || {})) { objectiveCorrect++; break; }
+                                }
+                            }
+                        }
                     }
                 }
             });
