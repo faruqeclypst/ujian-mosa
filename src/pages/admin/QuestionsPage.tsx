@@ -630,6 +630,8 @@ const QuestionsPage = () => {
     answerKey: string;
     items: Array<{ id: string; text: string; imageUrl?: string }>;
     statements?: Array<{ id: string; text: string; answer: "benar" | "salah" }>;
+    matrixColumns: Array<{ id: string; text: string }>;
+    matrixStatements: Array<{ id: string; text: string; answer: string }>;
   }>({
     text: "",
     type: "pilihan_ganda",
@@ -649,6 +651,14 @@ const QuestionsPage = () => {
       { id: "1", text: "", answer: "benar" },
       { id: "2", text: "", answer: "salah" },
       { id: "3", text: "", answer: "benar" }
+    ],
+    matrixColumns: [
+      { id: "c1", text: "Benar" },
+      { id: "c2", text: "Salah" }
+    ],
+    matrixStatements: [
+      { id: "s1", text: "", answer: "c1" },
+      { id: "s2", text: "", answer: "c2" }
     ]
   });
 
@@ -2381,6 +2391,14 @@ const QuestionsPage = () => {
         { id: "1", text: "", answer: "benar" },
         { id: "2", text: "", answer: "salah" },
         { id: "3", text: "", answer: "benar" }
+      ],
+      matrixColumns: [
+        { id: "c1", text: "Benar" },
+        { id: "c2", text: "Salah" }
+      ],
+      matrixStatements: [
+        { id: "s1", text: "", answer: "c1" },
+        { id: "s2", text: "", answer: "c2" }
       ]
     });
     setIsLiterasiActive(false);
@@ -2410,11 +2428,19 @@ const QuestionsPage = () => {
       pairs: q.pairs || [{ id: "1", left: "", right: "" }],
       answerKey: q.answerKey || "",
       items: q.items || [{ id: "1", text: "" }],
-      statements: q.statements || (q.options?.statements ? q.options.statements : [
+      statements: (q.type === "matriks" ? undefined : (q.statements || (q.options?.statements ? q.options.statements : undefined))) || [
         { id: "1", text: "", answer: "benar" },
         { id: "2", text: "", answer: "salah" },
         { id: "3", text: "", answer: "benar" }
-      ])
+      ],
+      matrixColumns: q.options?.columns || [
+        { id: "c1", text: "Benar" },
+        { id: "c2", text: "Salah" }
+      ],
+      matrixStatements: q.options?.statements && q.type === "matriks" ? q.options.statements : [
+        { id: "s1", text: "", answer: "c1" },
+        { id: "s2", text: "", answer: "c2" }
+      ]
     });
     // Deteksi apakah ini soal pertama di grupnya agar hanya soal #1 yang bisa edit teks literasi
     const groupItems = questions.filter(item => q.groupId && item.groupId === q.groupId);
@@ -2673,6 +2699,21 @@ const QuestionsPage = () => {
         showAlert("Gagal", "Semua pernyataan Benar / Salah harus memiliki teks.", "danger");
         return;
       }
+    } else if (formValues.type === "matriks") {
+      const cols = formValues.matrixColumns || [];
+      const stmts = formValues.matrixStatements || [];
+      if (cols.length < 2 || cols.some(c => !c.text.trim())) {
+        showAlert("Gagal", "Matriks membutuhkan minimal 2 kolom dan semua kolom harus memiliki nama.", "danger");
+        return;
+      }
+      if (stmts.length < 1 || stmts.some(s => !s.text.trim())) {
+        showAlert("Gagal", "Semua pernyataan Matriks harus memiliki teks.", "danger");
+        return;
+      }
+      if (stmts.some(s => !cols.some(c => c.id === s.answer))) {
+        showAlert("Gagal", "Setiap pernyataan Matriks harus memiliki kolom jawaban yang valid.", "danger");
+        return;
+      }
     } else if (formValues.type === "menjodohkan") {
       if (formValues.pairs.length < 1 || formValues.pairs.some(p => !p.left.trim() || !p.right.trim())) {
         showAlert("Gagal", "Semua pasangan menjodohkan harus diisi.", "danger");
@@ -2802,6 +2843,15 @@ const QuestionsPage = () => {
       } else if (formValues.type === "benar_salah") {
         const validStatements = (formValues.statements || []).filter(s => s.text.trim());
         payload.options = { statements: validStatements };
+        payload.correctAnswer = validStatements.map(s => `${s.id}:${s.answer}`).join(",");
+      } else if (formValues.type === "matriks") {
+        const validColumns = (formValues.matrixColumns || []).filter(c => c.text.trim());
+        const validStatements = (formValues.matrixStatements || []).filter(s => s.text.trim()).map(s => ({
+          id: s.id,
+          text: s.text.trim(),
+          answer: validColumns.some(c => c.id === s.answer) ? s.answer : (validColumns[0]?.id || "")
+        }));
+        payload.options = { columns: validColumns, statements: validStatements };
         payload.correctAnswer = validStatements.map(s => `${s.id}:${s.answer}`).join(",");
       } else if (formValues.type === "menjodohkan") {
         payload.options = { pairs: formValues.pairs };
@@ -3352,7 +3402,8 @@ const QuestionsPage = () => {
           isian_singkat: "Isian Singkat",
           uraian: "Uraian / Esai",
           urutkan: "Urutkan",
-          drag_drop: "Drag and Drop"
+          drag_drop: "Drag and Drop",
+          matriks: "Matriks"
         };
         return (
           <span className="p-1 px-2 rounded-md bg-indigo-50 text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400 text-[10px] font-bold border border-indigo-200 dark:border-indigo-800/40 uppercase whitespace-nowrap">
@@ -3424,6 +3475,33 @@ const QuestionsPage = () => {
           return (
             <span className="p-1 px-2 rounded-md bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 text-xs font-semibold border border-amber-200 dark:border-amber-800/40 whitespace-nowrap">
               Belum ada pernyataan
+            </span>
+          );
+        }
+
+        if (type === "matriks") {
+          const cols = item.options?.columns || [];
+          const stList = item.options?.statements || [];
+          if (stList.length > 0 || cols.length > 0) {
+            return (
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="p-1 px-2 rounded-md bg-teal-50 text-teal-700 dark:bg-teal-950/40 dark:text-teal-300 text-xs font-semibold border border-teal-200 dark:border-teal-800/40 whitespace-nowrap">
+                  {stList.length} Pernyataan × {cols.length} Kolom
+                </span>
+                {cols.length > 0 && (
+                  <span
+                    className="p-1 px-2 rounded-md bg-slate-50 text-slate-600 dark:bg-slate-800/60 dark:text-slate-300 text-[11px] border border-slate-200 dark:border-slate-800 whitespace-nowrap cursor-help"
+                    title={cols.map((c: any) => c.text).join(" | ")}
+                  >
+                    {cols.map((c: any) => c.text).join(" / ").slice(0, 30)}
+                  </span>
+                )}
+              </div>
+            );
+          }
+          return (
+            <span className="p-1 px-2 rounded-md bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 text-xs font-semibold border border-amber-200 dark:border-amber-800/40 whitespace-nowrap">
+              Belum ada data matriks
             </span>
           );
         }
@@ -5298,7 +5376,15 @@ Aturan:
                                 { id: "1", text: "", answer: "benar" },
                                 { id: "2", text: "", answer: "salah" },
                                 { id: "3", text: "", answer: "benar" }
-                              ] : prev.statements
+                              ] : prev.statements,
+                              matrixColumns: newType === "matriks" && (!prev.matrixColumns || prev.matrixColumns.length === 0) ? [
+                                { id: "c1", text: "Benar" },
+                                { id: "c2", text: "Salah" }
+                              ] : prev.matrixColumns,
+                              matrixStatements: newType === "matriks" && (!prev.matrixStatements || prev.matrixStatements.length === 0) ? [
+                                { id: "s1", text: "", answer: "c1" },
+                                { id: "s2", text: "", answer: "c2" }
+                              ] : prev.matrixStatements
                             }));
                           }}
                           className="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm font-semibold h-10 px-3 pr-8 cursor-pointer text-slate-800 dark:text-slate-100 shadow-xs focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all appearance-none"
@@ -5311,6 +5397,7 @@ Aturan:
                           {(allowedTypes.uraian || formValues.type === "uraian") && <option value="uraian">Uraian / Esai</option>}
                           {(allowedTypes.urutkan || formValues.type === "urutkan") && <option value="urutkan">Urutkan (Ordering)</option>}
                           {(allowedTypes.drag_drop || formValues.type === "drag_drop") && <option value="drag_drop">Drag and Drop</option>}
+                          {(allowedTypes.matriks || formValues.type === "matriks") && <option value="matriks">Matriks (Tabel Pilihan Ganda)</option>}
                         </select>
                         <ChevronDown className="w-4 h-4 text-slate-400 dark:text-slate-500 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                       </div>
@@ -5902,6 +5989,154 @@ Aturan:
                     </div>
                   )}
 
+                  {/* RENDER MATRIKS */}
+                  {formValues.type === "matriks" && (
+                    <div className="space-y-4">
+                      {/* Editor Kolom */}
+                      <div className="space-y-2.5">
+                        <div className="flex items-center justify-between px-1">
+                          <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                            Kolom Pilihan
+                          </span>
+                          <span className="text-[10px] text-teal-700 dark:text-teal-400 font-bold bg-teal-50 dark:bg-teal-950/40 px-2.5 py-0.5 rounded-full border border-teal-200 dark:border-teal-800">
+                            Min. 2 Kolom
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {(formValues.matrixColumns || []).map((col, cIdx) => (
+                            <div
+                              key={col.id}
+                              className="flex items-center gap-1.5 p-1.5 pl-2.5 rounded-xl bg-white dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800 shadow-xs"
+                            >
+                              <Input
+                                value={col.text}
+                                onChange={(e) => {
+                                  const updated = [...(formValues.matrixColumns || [])];
+                                  updated[cIdx] = { ...updated[cIdx], text: e.target.value };
+                                  setFormValues(prev => ({ ...prev, matrixColumns: updated }));
+                                }}
+                                placeholder={`Kolom ${cIdx + 1}`}
+                                className="h-8 text-xs w-28 bg-slate-50/50 dark:bg-slate-900 border-slate-200 dark:border-slate-700"
+                              />
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => {
+                                  const updated = (formValues.matrixColumns || []).filter((_, i) => i !== cIdx);
+                                  setFormValues(prev => ({ ...prev, matrixColumns: updated }));
+                                }}
+                                disabled={(formValues.matrixColumns || []).length <= 2}
+                                className="h-8 w-8 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-lg"
+                                title="Hapus Kolom"
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          ))}
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setFormValues(prev => {
+                                const list = prev.matrixColumns || [];
+                                const newId = `c${Date.now().toString(36)}`;
+                                return { ...prev, matrixColumns: [...list, { id: newId, text: "" }] };
+                              });
+                            }}
+                            className="h-11 text-xs border-dashed rounded-xl font-semibold text-teal-600 hover:text-teal-700 hover:bg-teal-50/50 dark:hover:bg-teal-950/20 px-4"
+                          >
+                            <Plus className="h-3.5 w-3.5 mr-1.5" /> Kolom
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* Editor Pernyataan */}
+                      <div className="space-y-2.5">
+                        <div className="flex items-center justify-between px-1">
+                          <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                            Daftar Pernyataan & Kunci Jawaban
+                          </span>
+                        </div>
+                        <div className="space-y-2.5">
+                          {(formValues.matrixStatements || []).map((st, index) => (
+                            <div
+                              key={st.id || index}
+                              className="flex flex-col sm:flex-row gap-2.5 items-start sm:items-center p-3 rounded-xl bg-white dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800 shadow-xs"
+                            >
+                              <div className="flex items-center gap-2.5 w-full sm:w-auto sm:flex-1">
+                                <span className="w-7 h-7 shrink-0 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-black flex items-center justify-center border border-slate-200 dark:border-slate-700">
+                                  {index + 1}
+                                </span>
+                                <Input
+                                  placeholder={`Tuliskan pernyataan ke-${index + 1}...`}
+                                  value={st.text}
+                                  onChange={(e) => {
+                                    const updated = [...(formValues.matrixStatements || [])];
+                                    updated[index] = { ...updated[index], text: e.target.value };
+                                    setFormValues(prev => ({ ...prev, matrixStatements: updated }));
+                                  }}
+                                  className="h-10 text-xs flex-1 bg-slate-50/50 dark:bg-slate-900 border-slate-200 dark:border-slate-700"
+                                />
+                              </div>
+                              <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-auto">
+                                <select
+                                  value={st.answer}
+                                  onChange={(e) => {
+                                    const updated = [...(formValues.matrixStatements || [])];
+                                    updated[index] = { ...updated[index], answer: e.target.value };
+                                    setFormValues(prev => ({ ...prev, matrixStatements: updated }));
+                                  }}
+                                  className="h-9 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-bold px-2.5 cursor-pointer text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500"
+                                >
+                                  {(formValues.matrixColumns || []).map((col) => (
+                                    <option key={col.id} value={col.id}>
+                                      {col.text || `(Kolom ${col.id})`}
+                                    </option>
+                                  ))}
+                                </select>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => {
+                                    const updated = (formValues.matrixStatements || []).filter((_, i) => i !== index);
+                                    setFormValues(prev => ({ ...prev, matrixStatements: updated }));
+                                  }}
+                                  className="h-9 w-9 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-xl"
+                                  disabled={(formValues.matrixStatements || []).length <= 1}
+                                  title="Hapus Pernyataan"
+                                >
+                                  <Trash className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setFormValues(prev => {
+                              const list = prev.matrixStatements || [];
+                              const newId = `s${Date.now().toString(36)}`;
+                              const firstColId = (prev.matrixColumns || [])[0]?.id || "";
+                              return {
+                                ...prev,
+                                matrixStatements: [...list, { id: newId, text: "", answer: firstColId }]
+                              };
+                            });
+                          }}
+                          className="w-full text-xs h-9 border-dashed rounded-xl font-semibold text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50/50 dark:hover:bg-indigo-950/20"
+                        >
+                          <Plus className="h-3.5 w-3.5 mr-1.5" /> Tambah Baris Pernyataan
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
                   {/* RENDER MENJODOHKAN */}
                   {formValues.type === "menjodohkan" && (
                     <div className="space-y-3">
@@ -6263,6 +6498,45 @@ Aturan:
                           </tbody>
                         </table>
                       </div>
+                    ) : previewQuestion.type === "matriks" && (previewQuestion as any).options?.columns ? (
+                      <div className="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
+                        <table className="w-full text-left border-collapse min-w-[320px]">
+                          <thead>
+                            <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
+                              <th className="p-3.5 text-xs font-bold text-slate-700 dark:text-slate-300">Pernyataan</th>
+                              {((previewQuestion as any).options.columns || []).map((col: any) => (
+                                <th key={col.id} className="p-3.5 text-center text-xs font-black text-teal-600 dark:text-teal-400 uppercase whitespace-nowrap">
+                                  {col.text}
+                                </th>
+                              ))}
+                              <th className="w-24 p-3.5 text-center text-xs font-black text-emerald-600 dark:text-emerald-400 uppercase">Kunci</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                            {((previewQuestion as any).options.statements || []).map((s: any, idx: number) => {
+                              const kunciCol = ((previewQuestion as any).options.columns || []).find((c: any) => c.id === s.answer);
+                              return (
+                                <tr key={s.id || idx}>
+                                  <td className="p-3.5 text-xs sm:text-sm text-slate-800 dark:text-slate-200">
+                                    <span className="font-bold mr-2 text-slate-400">{idx + 1}.</span>
+                                    <MathText content={s.text} disableJustify={true} className="inline !p-0 [&_p]:inline" />
+                                  </td>
+                                  {((previewQuestion as any).options.columns || []).map((col: any) => (
+                                    <td key={col.id} className="p-3.5 text-center">
+                                      <span className={`inline-block w-4 h-4 rounded-full border-2 ${col.id === s.answer ? "bg-teal-500 border-teal-600" : "border-slate-300 dark:border-slate-600"}`} />
+                                    </td>
+                                  ))}
+                                  <td className="p-3.5 text-center">
+                                    <span className="px-2.5 py-1 rounded-full text-xs font-black bg-teal-100 text-teal-700 dark:bg-teal-950/40 dark:text-teal-400">
+                                      {kunciCol?.text || "-"}
+                                    </span>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
                     ) : (previewQuestion.type === "pilihan_ganda" || previewQuestion.type === "pilihan_ganda_kompleks" || previewQuestion.type === "benar_salah" || !previewQuestion.type) && (
                       <div className="space-y-3">
                         {Object.keys(previewQuestion.choices || {}).map((cKey, idx) => {
@@ -6414,6 +6688,7 @@ Aturan:
                                 q.type === "isian_singkat" ? "bg-amber-50 text-amber-600 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-800/40" :
                                   q.type === "uraian" ? "bg-rose-50 text-rose-600 border-rose-200 dark:bg-rose-950/30 dark:text-rose-400 dark:border-rose-800/40" :
                                     q.type === "urutkan" ? "bg-orange-50 text-orange-600 border-orange-200 dark:bg-orange-950/30 dark:text-orange-400 dark:border-orange-800/40" :
+                                      q.type === "matriks" ? "bg-teal-50 text-teal-600 border-teal-200 dark:bg-teal-950/30 dark:text-teal-400 dark:border-teal-800/40" :
                                       "bg-cyan-50 text-cyan-600 border-cyan-200 dark:bg-cyan-950/30 dark:text-cyan-400 dark:border-cyan-800/40"
                           }`}>
                           {q.type === "pilihan_ganda_kompleks" ? "PG Kompleks" :
@@ -6422,7 +6697,8 @@ Aturan:
                                 q.type === "isian_singkat" ? "Isian Singkat" :
                                   q.type === "uraian" ? "Uraian" :
                                     q.type === "urutkan" ? "Urutkan" :
-                                      q.type === "drag_drop" ? "Drag & Drop" : q.type}
+                                      q.type === "drag_drop" ? "Drag & Drop" :
+                                        q.type === "matriks" ? "Matriks" : q.type}
                         </span>
                       )}
                     </div>
