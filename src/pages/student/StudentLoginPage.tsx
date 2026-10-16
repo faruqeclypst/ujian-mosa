@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { Capacitor } from "@capacitor/core";
 import { useStudentAuth } from "../../context/StudentAuthContext";
@@ -17,14 +17,15 @@ const StudentLoginPage = () => {
   const { pb, school, setManualSchool, terminology } = useTenant();
   const { actualTheme, toggleTheme } = useTheme();
 
-  const [nisn, setNisn] = useState("");
-  const [password, setPassword] = useState("");
+  // Uncontrolled inputs via ref — cegah re-render tiap ketik (lag di mobile)
+  const nisnRef = useRef<HTMLInputElement>(null);
+  const passwordRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   // For change password modal
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
+  const newPasswordRef = useRef<HTMLInputElement>(null);
+  const confirmPasswordRef = useRef<HTMLInputElement>(null);
   const [changePassError, setChangePassError] = useState("");
   const [isChangingPass, setIsChangingPass] = useState(false);
 
@@ -84,7 +85,7 @@ const StudentLoginPage = () => {
     setLoading(true);
 
     try {
-      await loginStudent(nisn, password);
+      await loginStudent(nisnRef.current?.value || "", passwordRef.current?.value || "");
     } catch (err: any) {
       setError(err.message || `Gagal login. Periksa kembali ${terminology.id} dan password Anda.`);
     } finally {
@@ -95,6 +96,9 @@ const StudentLoginPage = () => {
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setChangePassError("");
+
+    const newPassword = newPasswordRef.current?.value || "";
+    const confirmPassword = confirmPasswordRef.current?.value || "";
 
     if (newPassword.length < 6) {
       setChangePassError("Password baru minimal 6 karakter!");
@@ -233,8 +237,7 @@ const StudentLoginPage = () => {
                   <User size={14} className="text-slate-400 dark:text-slate-500" /> {terminology.id} / Username
                 </label>
                 <Input
-                  value={nisn}
-                  onChange={(e) => setNisn(e.target.value)}
+                  ref={nisnRef}
                   placeholder={`Masukkan nomor induk ${terminology.student.toLowerCase()}`}
                   className="bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 rounded-2xl h-14 px-5 text-base transition-none"
                   disabled={loading}
@@ -253,8 +256,7 @@ const StudentLoginPage = () => {
                 <div className="relative">
                   <Input
                     type={showPassword ? "text" : "password"}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    ref={passwordRef}
                     placeholder="••••••••"
                     className="bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 rounded-2xl h-14 px-5 pr-12 text-base transition-none"
                     disabled={loading}
@@ -335,8 +337,7 @@ const StudentLoginPage = () => {
               <div className="relative">
                 <Input
                   type={showNewPassword ? "text" : "password"}
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
+                  ref={newPasswordRef}
                   placeholder="Minimal 6 karakter"
                   className="rounded-2xl h-12 bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 pr-10 text-slate-900 dark:text-white"
                 />
@@ -355,8 +356,7 @@ const StudentLoginPage = () => {
               <div className="relative">
                 <Input
                   type={showNewPassword ? "text" : "password"}
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  ref={confirmPasswordRef}
                   placeholder="Ulangi password baru"
                   className="rounded-2xl h-12 bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 pr-10 text-slate-900 dark:text-white"
                 />
