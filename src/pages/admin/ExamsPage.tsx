@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Plus, BookOpen, Trash, Edit, Archive, RotateCw, Copy, ClipboardList, Download, Loader2, X, ChevronDown, Eye } from "lucide-react";
+import { Plus, BookOpen, Trash, Edit, Archive, RotateCw, Copy, ClipboardList, Download, Loader2, X, ChevronDown, Eye, MoreHorizontal } from "lucide-react";
 import JSZip from "jszip";
 import { Button } from "../../components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../../components/ui/dialog";
@@ -1485,20 +1485,22 @@ const ExamsPage = () => {
             </>
           ) : (
             <>
-              <div className="flex bg-slate-100 dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-800/80 p-1 rounded-xl text-xs font-semibold">
+              <div className="flex w-full sm:w-auto bg-slate-100 dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-800/80 p-1 rounded-xl text-xs font-semibold">
                 <button 
                   onClick={() => setActiveTab("aktif")} 
-                  className={`min-h-[40px] sm:min-h-0 px-3.5 py-1.5 rounded-lg transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 ${ activeTab === "aktif" ? "bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 shadow-sm" : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200" }`}
+                  className={`flex-1 sm:flex-none min-h-[40px] sm:min-h-0 px-3.5 py-1.5 rounded-lg transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 ${ activeTab === "aktif" ? "bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 shadow-sm" : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200" }`}
                 >
                   Aktif
                 </button>
                 <button 
                   onClick={() => setActiveTab("arsip")} 
-                  className={`min-h-[40px] sm:min-h-0 px-3.5 py-1.5 rounded-lg transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 ${ activeTab === "arsip" ? "bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 shadow-sm" : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200" }`}
+                  className={`flex-1 sm:flex-none min-h-[40px] sm:min-h-0 px-3.5 py-1.5 rounded-lg transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 ${ activeTab === "arsip" ? "bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 shadow-sm" : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200" }`}
                 >
                   Arsip
                 </button>
               </div>
+              {/* DESKTOP (>=sm): aksi masal + Export Batch + Tambah Ujian + Laporan */}
+              <div className="hidden sm:flex flex-wrap items-center gap-2">
               {selectedIds.length > 0 && (
                 <div className="flex items-center gap-1.5 animate-in fade-in zoom-in duration-200">
                   <DropdownMenu>
@@ -1596,6 +1598,54 @@ const ExamsPage = () => {
                   <ClipboardList className="mr-1.5 h-3.5 w-3.5" /> Laporan
                 </Button>
               )}
+              </div>
+              {/* MOBILE (<sm): [+ Tambah Ujian] + menu ⋯ */}
+              <div className="flex sm:hidden items-center gap-2 w-full">
+                <Button onClick={handleCreateClick} size="sm" className="flex-1 rounded-2xl bg-blue-600 hover:bg-blue-700 active:bg-blue-700 text-white font-bold shadow-sm h-10 px-4">
+                  <Plus className="mr-1.5 h-4 w-4" /> Tambah Ujian
+                </Button>
+                {role === "admin" && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        className="h-10 w-10 shrink-0 rounded-2xl bg-slate-100 hover:bg-slate-200 border border-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 dark:border-slate-700 text-slate-700 dark:text-slate-200 shadow-sm"
+                        aria-label="Menu lainnya"
+                      >
+                        <MoreHorizontal className="h-5 w-5" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-72 p-2 rounded-2xl shadow border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 z-[100]">
+                      <DropdownMenuLabel className="text-xs font-bold uppercase tracking-widest text-slate-400 px-3 py-2 text-left">Aksi Lainnya</DropdownMenuLabel>
+                      <DropdownMenuItem
+                        onClick={() => handleBatchExport()}
+                        className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 focus:bg-slate-50 dark:focus:bg-slate-900 transition-colors group"
+                      >
+                        <div className="h-10 w-10 shrink-0 rounded-lg bg-violet-50 dark:bg-violet-900/30 text-violet-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                          <Download className="h-5 w-5" />
+                        </div>
+                        <div className="flex flex-col min-w-0 text-left">
+                          <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">Export Batch</span>
+                          <span className="text-xs text-slate-400 mt-1">Export semua ke ZIP (Word)</span>
+                        </div>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => setIsReportOpen(true)}
+                        className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 focus:bg-slate-50 dark:focus:bg-slate-900 transition-colors group"
+                      >
+                        <div className="h-10 w-10 shrink-0 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                          <ClipboardList className="h-5 w-5" />
+                        </div>
+                        <div className="flex flex-col min-w-0 text-left">
+                          <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">Laporan</span>
+                          <span className="text-xs text-slate-400 mt-1">Laporan progress Bank Soal guru</span>
+                        </div>
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
+              </div>
             </>
           )}
         </div>

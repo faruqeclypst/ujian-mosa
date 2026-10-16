@@ -5085,7 +5085,8 @@ const QuestionsPage = () => {
                       <Skeleton className="h-9 w-24 rounded-2xl" />
                     </div>
                   ) : (
-                    <div className="flex flex-wrap items-center gap-2 justify-start sm:justify-end">
+                    <>
+                    <div className="hidden sm:flex flex-wrap items-center gap-2 justify-start sm:justify-end">
                       {/* OPSI DATA DROPDOWN (Combined Import/Export) */}
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -5491,6 +5492,223 @@ Aturan:
                         </>
                       )}
                     </div>
+                    {/* MOBILE (<sm): [+ Tambah] + menu ⋯ */}
+                    <div className="flex sm:hidden items-center gap-2 w-full">
+                      <Button
+                        onClick={handleCreateClick}
+                        size="sm"
+                        className="flex-1 rounded-2xl bg-blue-600 hover:bg-blue-700 active:bg-blue-700 text-white font-bold shadow-sm transition-all h-10 px-4 dark:bg-blue-600 dark:hover:bg-blue-500 dark:text-white"
+                      >
+                        <Plus className="mr-1.5 h-4 w-4" />
+                        Tambah
+                      </Button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            className="h-10 w-10 shrink-0 rounded-2xl bg-slate-100 hover:bg-slate-200 border border-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 dark:border-slate-700 text-slate-700 dark:text-slate-200 shadow-sm"
+                            aria-label="Menu lainnya"
+                          >
+                            <MoreHorizontal className="h-5 w-5" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-72 p-2 rounded-2xl shadow border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 z-[100]">
+                          <DropdownMenuLabel className="text-xs font-bold uppercase tracking-widest text-slate-400 px-3 py-2 text-left">Kelola Soal</DropdownMenuLabel>
+
+                          <DropdownMenuItem
+                            className="p-2.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-900 transition-all cursor-pointer group flex items-center gap-3"
+                            onClick={() => document.getElementById("unified-import-input")?.click()}
+                          >
+                            <div className="h-10 w-10 shrink-0 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                              <Download className="h-5 w-5 rotate-180" />
+                            </div>
+                            <div className="flex flex-col min-w-0 text-left">
+                              <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">Import Soal</span>
+                              <span className="text-xs text-slate-400 mt-1">Excel, Word, atau JSON</span>
+                            </div>
+                          </DropdownMenuItem>
+
+                          {questions.length > 0 && (
+                            <DropdownMenuItem
+                              onClick={handleExportToWord}
+                              className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 focus:bg-slate-50 dark:focus:bg-slate-900 transition-colors group"
+                            >
+                              <div className="h-10 w-10 shrink-0 rounded-lg bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                <FileText className="h-5 w-5" />
+                              </div>
+                              <div className="flex flex-col min-w-0">
+                                <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight tracking-tight">Export ke Word</span>
+                                <span className="text-xs text-slate-400 mt-1">Simpan naskah & kunci</span>
+                              </div>
+                            </DropdownMenuItem>
+                          )}
+
+                          {questions.length > 0 && (
+                            <DropdownMenuItem
+                              onClick={handleExportToJson}
+                              className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 focus:bg-slate-50 dark:focus:bg-slate-900 transition-colors group"
+                            >
+                              <div className="h-10 w-10 shrink-0 rounded-lg bg-orange-50 dark:bg-orange-900/30 text-orange-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                <FileJson className="h-5 w-5" />
+                              </div>
+                              <div className="flex flex-col min-w-0">
+                                <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight tracking-tight">Export ke JSON</span>
+                                <span className="text-xs text-slate-400 mt-1">Format data mentah</span>
+                              </div>
+                            </DropdownMenuItem>
+                          )}
+
+                          <DropdownMenuSeparator className="my-1 border-slate-100 dark:border-slate-800" />
+                          <DropdownMenuLabel className="text-xs font-bold uppercase tracking-widest text-slate-400 px-3 py-1.5 text-left">Template Format</DropdownMenuLabel>
+
+                          <DropdownMenuItem
+                            onClick={() => downloadQuestionTemplate()}
+                            className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 focus:bg-slate-50 dark:focus:bg-slate-900 transition-colors group"
+                          >
+                            <div className="h-10 w-10 shrink-0 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                              <Download className="h-5 w-5" />
+                            </div>
+                            <div className="flex flex-col min-w-0">
+                              <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">Template Excel</span>
+                              <span className="text-xs text-slate-400 mt-1">Download format standard</span>
+                            </div>
+                          </DropdownMenuItem>
+
+                          <DropdownMenuItem
+                            onClick={() => window.open("/templates/Template_Soal_Tabel.docx")}
+                            className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 focus:bg-slate-50 dark:focus:bg-slate-900 transition-colors group"
+                          >
+                            <div className="h-10 w-10 shrink-0 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                              <FileText className="h-5 w-5" />
+                            </div>
+                            <div className="flex flex-col min-w-0">
+                              <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight tracking-tight">Template Word</span>
+                              <span className="text-xs text-slate-400 mt-0.5">Format tabel + literasi + rumus</span>
+                            </div>
+                          </DropdownMenuItem>
+
+                          <DropdownMenuItem
+                            onClick={() => setIsLiterasiGuideOpen(true)}
+                            className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 focus:bg-slate-50 dark:focus:bg-slate-900 transition-colors group border border-dashed border-sky-200 bg-sky-50/30 mt-2"
+                          >
+                            <div className="h-10 w-10 shrink-0 rounded-lg bg-sky-100 dark:bg-sky-900/30 text-sky-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                              <BookOpen className="h-5 w-5" />
+                            </div>
+                            <div className="flex flex-col min-w-0">
+                              <span className="text-sm font-bold text-sky-700 dark:text-sky-300 leading-tight">Panduan Literasi</span>
+                              <span className="text-xs text-sky-500 mt-1">WAJIB BACA: Cara buat soal AKM</span>
+                            </div>
+                          </DropdownMenuItem>
+
+                          <DropdownMenuSeparator className="my-1 border-slate-100 dark:border-slate-800" />
+                          <DropdownMenuLabel className="text-xs font-bold uppercase tracking-widest text-slate-400 px-3 py-2 text-left">Aksi Lainnya</DropdownMenuLabel>
+
+                          {examId && (
+                            <DropdownMenuItem
+                              onClick={() => navigate(`/admin/simulate/${examId}`)}
+                              className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors"
+                            >
+                              <Eye className="h-4 w-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                              <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">Simulasi Ujian</span>
+                            </DropdownMenuItem>
+                          )}
+                          {role === "admin" && (
+                            <DropdownMenuItem
+                              onClick={() => setIsRepoDialogOpen(true)}
+                              className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors"
+                            >
+                              <Database className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                              <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">Bank / Wayground</span>
+                            </DropdownMenuItem>
+                          )}
+                          {questions.length > 0 && selectedIds.length === 0 && (
+                            <DropdownMenuItem
+                              onClick={() => setDeleteAllDialogOpen(true)}
+                              className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
+                            >
+                              <Trash className="h-4 w-4 text-rose-600 dark:text-rose-400 shrink-0" />
+                              <span className="text-sm font-semibold text-rose-600 dark:text-rose-400">Hapus Semua Soal</span>
+                            </DropdownMenuItem>
+                          )}
+
+                          {(role === "admin" || (role === "teacher" && (user?.ai_api_key || teacherAIAccess))) && (
+                            <>
+                              <DropdownMenuSeparator className="my-1 border-slate-100 dark:border-slate-800" />
+                              <DropdownMenuLabel className="text-xs font-bold uppercase tracking-widest text-slate-400 px-3 py-1.5 text-left">Fitur Cerdas AI</DropdownMenuLabel>
+                              <DropdownMenuItem
+                                onClick={() => setIsAIModalOpen(true)}
+                                className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 focus:bg-slate-50 dark:focus:bg-slate-900 transition-colors group"
+                              >
+                                <div className="h-10 w-10 shrink-0 rounded-lg bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 flex items-center justify-center group-hover:scale-110 transition-transform shadow-sm">
+                                  <Sparkles className="h-5 w-5" />
+                                </div>
+                                <div className="flex flex-col min-w-0 text-left">
+                                  <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">Generasi AI</span>
+                                  <span className="text-xs text-slate-400 mt-1">Buat soal otomatis dari materi</span>
+                                </div>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => setIsAIImportOpen(true)}
+                                className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 focus:bg-slate-50 dark:focus:bg-slate-900 transition-colors group"
+                              >
+                                <div className="h-10 w-10 shrink-0 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 flex items-center justify-center group-hover:scale-110 transition-transform shadow-sm">
+                                  <FileText className="h-5 w-5" />
+                                </div>
+                                <div className="flex flex-col min-w-0 text-left">
+                                  <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">Smart AI Import (PDF)</span>
+                                  <span className="text-xs text-slate-400 mt-1">Ekstrak soal otomatis dari PDF</span>
+                                </div>
+                              </DropdownMenuItem>
+                            </>
+                          )}
+
+                          {questions.length > 0 && selectedIds.length > 0 && (
+                            <>
+                              <DropdownMenuSeparator className="my-1 border-slate-100 dark:border-slate-800" />
+                              <DropdownMenuLabel className="text-xs font-bold uppercase tracking-widest text-slate-400 px-3 py-1.5 text-left">Soal Terpilih ({selectedIds.length})</DropdownMenuLabel>
+                              <DropdownMenuItem
+                                onClick={() => setBulkDeleteDialogOpen(true)}
+                                className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors group"
+                              >
+                                <div className="h-10 w-10 shrink-0 rounded-lg bg-orange-100 dark:bg-orange-900/30 text-orange-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                  <Trash className="h-5 w-5" />
+                                </div>
+                                <div className="flex flex-col min-w-0 text-left">
+                                  <span className="text-sm font-bold text-rose-600 dark:text-rose-400 leading-tight">Hapus Terpilih ({selectedIds.length})</span>
+                                  <span className="text-xs text-slate-400 mt-1">Hapus soal yang dicentang</span>
+                                </div>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={handleExportSelectedToWord}
+                                className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors group"
+                              >
+                                <div className="h-10 w-10 shrink-0 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                  <FileText className="h-5 w-5" />
+                                </div>
+                                <div className="flex flex-col min-w-0 text-left">
+                                  <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">Export Terpilih ke Word</span>
+                                  <span className="text-xs text-slate-400 mt-1">Naskah & kunci soal terpilih</span>
+                                </div>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={handleExportSelectedToJson}
+                                className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors group"
+                              >
+                                <div className="h-10 w-10 shrink-0 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                  <FileJson className="h-5 w-5" />
+                                </div>
+                                <div className="flex flex-col min-w-0 text-left">
+                                  <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">Export Terpilih ke JSON</span>
+                                  <span className="text-xs text-slate-400 mt-1">Format data mentah</span>
+                                </div>
+                              </DropdownMenuItem>
+                            </>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                    </>
                   )}
                 </div>
               )}
