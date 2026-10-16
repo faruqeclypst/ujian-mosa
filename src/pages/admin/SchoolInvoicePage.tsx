@@ -869,7 +869,7 @@ const SchoolInvoicePage = () => {
                   {/* Pilih Durasi */}
                   <div className="space-y-1.5">
                     <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Durasi Perpanjangan</label>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                         {[
                           { months: 1, label: "1 Bulan", sub: "Fleksibel" },
                           { months: 2, label: "2 Bulan", sub: "Fleksibel" },

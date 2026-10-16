@@ -959,7 +959,7 @@ const GuidePage = () => {
                       <Cpu size={16} /> Konfigurasi AI Engine
                    </h5>
                    <p className="text-xs font-medium text-slate-400 leading-relaxed mb-6">Untuk menggunakan Magic AI & PDF Extraction, Anda harus menghubungkan API Provider eksternal:</p>
-                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs font-black uppercase tracking-tighter">
+                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs font-black uppercase tracking-tighter">
                       <div className="p-2 border border-slate-800 rounded-xl bg-slate-800/50 text-center">Groq Cloud</div>
                       <div className="p-2 border border-slate-800 rounded-xl bg-slate-800/50 text-center">OpenRouter</div>
                       <div className="p-2 border border-slate-800 rounded-xl bg-slate-800/50 text-center">Google Gemini</div>

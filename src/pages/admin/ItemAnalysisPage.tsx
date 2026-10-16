@@ -2728,7 +2728,7 @@ export const ItemAnalysisPage: React.FC = () => {
                       </div>
 
                       {/* Content: Alasan Keputusan & Tindak Lanjut Konkret */}
-                      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 print:grid-cols-12">
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-3.5 print:grid-cols-12">
                         <div className="lg:col-span-6 bg-white dark:bg-slate-900 rounded-xl p-4 border border-slate-200/80 dark:border-slate-800 shadow-2xs space-y-2 print:border-slate-300 print:bg-white print:p-2.5">
                           <div className="flex items-center gap-2 font-bold text-xs uppercase tracking-wider text-slate-700 dark:text-slate-300">
                             <Search className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />

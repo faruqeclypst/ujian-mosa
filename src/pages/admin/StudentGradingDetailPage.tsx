@@ -635,7 +635,7 @@ const computeQuestionScore = (q: any, ans: any, overrideVal?: any): number | nul
         </div>
       </div>
       {/* Score cards skeleton */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[...Array(4)].map((_, i) => (
           <div key={i} className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 space-y-2">
             <Skeleton className="h-3 w-16 mx-auto" />
@@ -1022,7 +1022,7 @@ const computeQuestionScore = (q: any, ans: any, overrideVal?: any): number | nul
       </div>
 
       {/* Score Summary */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 sm:p-6 text-center">
           <p className="text-xs uppercase tracking-widest text-slate-400 mb-1">Nilai Final</p>
           <p className={`text-2xl font-black ${finalScore >= 75 ? "text-emerald-600" : finalScore >= 50 ? "text-amber-600" : "text-rose-600"}`}>{attempt ? finalScore : "-"}</p>

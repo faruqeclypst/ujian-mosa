@@ -694,7 +694,7 @@ const DashboardPage = () => {
   // 2. Actions Panel (4 Quick Shortcuts)
   const renderActionsPanel = () => (
     <div className="p-4 sm:p-5">
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
         <button
           onClick={() => navigate("/admin/monitoring")}
           className="flex items-center justify-between p-3 rounded-xl bg-blue-50/60 dark:bg-blue-950/30 border border-blue-200/70 dark:border-blue-900/40 hover:bg-blue-100/60 dark:hover:bg-blue-900/40 hover:border-blue-300 transition-all text-left group"
@@ -1202,7 +1202,7 @@ const DashboardPage = () => {
   // 5. Master Data Panel (4 Entity Cards)
   const renderMasterDataPanel = () => (
     <div className="p-4 sm:p-5">
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {loading ? (
           Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-16 rounded-xl" />)
         ) : (
