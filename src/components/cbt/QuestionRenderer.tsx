@@ -1373,10 +1373,11 @@ export const QuestionRenderer = (props: QuestionRendererProps) => {
                       });
                     }}
                     placeholder="..."
-                    className="inline-block mx-1 px-2 py-1 rounded-md border border-emerald-400 dark:border-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 text-slate-800 dark:text-slate-200 font-medium shadow-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-200 outline-none transition-all align-middle"
+                    className="inline-block mx-1 px-1.5 py-0.5 rounded-md border border-emerald-400 dark:border-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 text-slate-800 dark:text-slate-200 font-medium shadow-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-200 outline-none transition-all align-middle"
                     style={{
                       width: `${Math.max(3, blankVal.length + 1)}ch`,
-                      fontSize: "16px"
+                      fontSize: "16px",
+                      lineHeight: 1
                     }}
                   />
                 );
@@ -1390,7 +1391,7 @@ export const QuestionRenderer = (props: QuestionRendererProps) => {
 
               return (
                 <div
-                  className="p-5 sm:p-8 rounded-xl sm:rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/90 shadow-sm font-serif leading-loose text-slate-800 dark:text-slate-200"
+                  className="p-5 sm:p-8 rounded-xl sm:rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/90 shadow-sm font-serif leading-normal sm:leading-relaxed text-slate-800 dark:text-slate-200"
                   style={{ fontSize: `${15 * fontSize}px` }}
                 >
                   {parts}
