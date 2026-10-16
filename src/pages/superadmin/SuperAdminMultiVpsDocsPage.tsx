@@ -5,7 +5,7 @@ import {
   ShieldCheck, AlertCircle, CheckCircle2,
   ExternalLink, ArrowRight, Menu, X, ArrowUpRight,
   BookOpen, Users, FileSpreadsheet, Lock, Clock,
-  CreditCard, Terminal, HelpCircle, HardDrive, Zap,
+  CreditCard, Terminal, HelpCircle, HardDrive,
   Monitor, Smartphone, Layers, Activity, KeyRound, Laptop, RotateCcw, Download
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
@@ -937,14 +937,6 @@ Proxy ke localhost:PORT     Proxy ke http://IP_WORKER:PORT
                 </p>
               </div>
 
-              <div className="p-4 rounded-xl border border-slate-200 bg-white shadow-xs space-y-1.5">
-                <p className="font-bold text-slate-900 flex items-center gap-1.5">
-                  <Zap size={14} className="text-amber-500" /> Live Score Proyektor
-                </p>
-                <p className="text-slate-600 leading-relaxed">
-                  Akses rute <code className="font-mono bg-slate-100 px-1 py-0.5 rounded text-slate-800">/livescore-view</code> untuk menampilkan papan skor peringkat hidup siswa pada layar TV atau proyektor aula sekolah.
-                </p>
-              </div>
             </div>
           </section>
 

@@ -24,7 +24,7 @@ import {
   Clock,
   ShieldAlert
 } from "lucide-react";
-import { Sparkles, RotateCcw, Copy, Check, Pencil, Trophy, ClipboardPaste, Zap, BarChart2 } from "lucide-react";
+import { Sparkles, RotateCcw, Copy, Check, Pencil, ClipboardPaste, Zap, BarChart2 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "../../components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../../components/ui/dialog";
@@ -1483,12 +1483,6 @@ const MonitoringPage = () => {
                       className="w-full rounded-xl bg-indigo-50 hover:bg-indigo-100 border border-indigo-100 dark:bg-indigo-900/20 dark:text-indigo-400 dark:hover:bg-indigo-900/40 dark:border-indigo-800/40 text-indigo-700 font-bold text-[10px] py-2 px-1 shadow-sm transition-all flex items-center justify-center gap-1 whitespace-nowrap tracking-tight"
                     >
                       <BookOpen className="h-3.5 w-3.5 shrink-0 text-indigo-500" /> Penilaian
-                    </button>
-                    <button
-                      onClick={() => navigate("/livescore-view")}
-                      className="w-full rounded-xl bg-indigo-50 hover:bg-indigo-100 border border-indigo-100 dark:bg-indigo-900/20 dark:text-indigo-400 dark:hover:bg-indigo-900/40 dark:border-indigo-800/40 text-indigo-700 font-bold text-[10px] py-2 px-1 shadow-sm transition-all flex items-center justify-center gap-1 whitespace-nowrap tracking-tight"
-                    >
-                      <Trophy className="h-3.5 w-3.5 text-amber-500 shrink-0" /> Live Score
                     </button>
                     <button
                       onClick={() => navigate(`/admin/analisis-butir-soal?roomId=${roomId || ""}&examId=${monitorRoom?.examId || ""}`)}

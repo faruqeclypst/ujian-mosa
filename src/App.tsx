@@ -49,7 +49,6 @@ const StudentGradingDetailPage = lazy(() => import("./pages/admin/StudentGrading
 const GuidePage = lazy(() => import("./pages/admin/GuidePage"));
 const ItemAnalysisPage = lazy(() => import("./pages/admin/ItemAnalysisPage"));
 const TokenViewPage = lazy(() => import("./pages/TokenViewPage"));
-const LiveScoreViewPage = lazy(() => import("./pages/LiveScoreViewPage"));
 const SchoolInvoicePage = lazy(() => import("./pages/admin/SchoolInvoicePage"));
 const ServerStatusPage = lazy(() => import("./pages/admin/ServerStatusPage"));
 const DownloadAppsPage = lazy(() => import("./pages/tenant/DownloadAppsPage"));
@@ -212,7 +211,6 @@ const SchoolAppContent = () => {
             {/* Root redirect */}
             <Route path="/" element={<Navigate to="/exam" replace />} />
             <Route path="/token-view" element={<TokenViewPage />} />
-            <Route path="/livescore-view" element={<ExamDataProvider><LiveScoreViewPage /></ExamDataProvider>} />
             <Route path="/unduh" element={<DownloadAppsPage />} />
             <Route path="/download" element={<Navigate to="/unduh" replace />} />
             <Route path="*" element={<NotFoundPage />} />
