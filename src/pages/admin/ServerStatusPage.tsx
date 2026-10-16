@@ -144,10 +144,10 @@ const ServerStatusPage = () => {
             <Server size={20} className="text-white" />
           </div>
           <div>
-            <h1 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white tracking-tight">
+            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
               Status Server & VPS
             </h1>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
               Pemantauan performa real-time dan kesehatan server sekolah Anda.
             </p>
           </div>

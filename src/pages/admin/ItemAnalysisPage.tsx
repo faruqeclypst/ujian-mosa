@@ -1731,7 +1731,7 @@ export const ItemAnalysisPage: React.FC = () => {
                   Psikometri Arikunto &amp; Depdiknas
                 </Badge>
               </div>
-              <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1 max-w-2xl leading-relaxed">
+              <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 max-w-2xl leading-relaxed">
                 Evaluasi komprehensif tingkat kesukaran, daya pembeda, efektivitas pengecoh, serta panduan tindak lanjut guru untuk perbaikan instrumen evaluasi.
               </p>
             </div>

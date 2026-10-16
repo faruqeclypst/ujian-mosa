@@ -5073,7 +5073,7 @@ const QuestionFormPage = () => {
                   Bank Soal
                 </span>
               </div>
-              <h1 className="text-base sm:text-lg font-bold text-slate-800 dark:text-white truncate">
+              <h1 className="text-xl font-bold text-slate-800 dark:text-white truncate">
                 {dialogMode === "edit" ? "Edit Butir Soal" : "Tambah Butir Soal"}
               </h1>
             </div>

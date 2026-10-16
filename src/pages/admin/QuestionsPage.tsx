@@ -5044,13 +5044,13 @@ const QuestionsPage = () => {
         </div>
       )}
 
-      <div className="relative z-20 flex flex-col gap-3 md:flex-row md:items-center md:justify-between bg-card p-4 rounded-2xl border border-slate-200/60 dark:border-slate-800/40 shadow-sm backdrop-blur-sm">
+      <div className="relative z-20 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between bg-card p-4 rounded-2xl border border-slate-200/60 dark:border-slate-800/40 shadow-sm backdrop-blur-sm">
         <div className="flex items-center gap-3 min-w-0">
           <Button variant="ghost" size="icon" className="shrink-0" onClick={() => navigate("/admin/bank-soal")}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div className="min-w-0">
-            <h2 className="text-lg font-bold text-foreground">Daftar Soal</h2>
+            <h2 className="text-xl sm:text-2xl font-bold text-foreground">Daftar Soal</h2>
             <div className="text-sm text-muted-foreground break-words">
               {loading ? (
                 <Skeleton className="h-4 w-64 mt-1" />
@@ -5066,7 +5066,7 @@ const QuestionsPage = () => {
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-2 justify-start md:justify-end">
+        <div className="flex flex-wrap gap-2 justify-start sm:justify-end">
           {loading ? (
             <>
               <Skeleton className="h-9 w-28 rounded-2xl" />
@@ -5085,7 +5085,7 @@ const QuestionsPage = () => {
                       <Skeleton className="h-9 w-24 rounded-2xl" />
                     </div>
                   ) : (
-                    <div className="flex flex-wrap items-center gap-2 justify-start md:justify-end">
+                    <div className="flex flex-wrap items-center gap-2 justify-start sm:justify-end">
                       {/* OPSI DATA DROPDOWN (Combined Import/Export) */}
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>

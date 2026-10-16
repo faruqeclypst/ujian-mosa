@@ -996,14 +996,14 @@ const computeQuestionScore = (q: any, ans: any, overrideVal?: any): number | nul
           </Button>
           <div>
             <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-lg font-bold text-slate-900 dark:text-white">{student?.name || "Siswa"}</h1>
+              <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">{student?.name || "Siswa"}</h1>
               {bankQuestions.length > questions.length && (
                 <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300 border border-purple-200 dark:border-purple-800/50 flex items-center gap-1 shadow-sm">
                   <span>🎲</span> {questions.length} Soal Teracak (dari {bankQuestions.length} Bank Soal)
                 </span>
               )}
             </div>
-            <p className="text-xs text-slate-500">{(student as any)?.nisn || ""} • {className} • {room?.examTitle || "Ujian"}{room?.subjectName ? ` • ${room.subjectName}` : ""}</p>
+            <p className="text-sm text-slate-500 dark:text-slate-400">{(student as any)?.nisn || ""} • {className} • {room?.examTitle || "Ujian"}{room?.subjectName ? ` • ${room.subjectName}` : ""}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">

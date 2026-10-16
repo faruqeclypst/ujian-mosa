@@ -1205,7 +1205,7 @@ const MonitoringPage = () => {
     <div className="space-y-5 animate-in fade-in duration-500">
       {/* HEADER SECTION - Clean & Professional */}
       <div className="bg-card p-5 rounded-3xl border border-slate-200/60 dark:border-slate-800 shadow-sm transition-all duration-300">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-4">
             <Button
               variant="ghost"
@@ -1217,7 +1217,7 @@ const MonitoringPage = () => {
             </Button>
             <div className="space-y-0.5 min-w-0">
               <div className="flex items-center gap-2">
-                <h1 className="text-xl font-bold text-slate-800 dark:text-white tracking-tight">
+                <h1 className="text-xl sm:text-2xl font-bold text-slate-800 dark:text-white tracking-tight">
                   {isLoading ? <Skeleton className="h-7 w-48" /> : `Monitoring: ${monitorRoom?.room_name || "Tanpa Nama"}`}
                 </h1>
                 {!isLoading && (

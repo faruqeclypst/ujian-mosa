@@ -271,8 +271,8 @@ const UsersPage = () => {
             <UserIcon className="h-6 w-6 text-white" />
           </div>
           <div>
-            <h2 className="text-lg font-bold text-slate-800 dark:text-white tracking-tight">Akun Pengguna</h2>
-            <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mt-0.5">Kelola akses login Administrator, {terminology.teacher}, dan {terminology.student}.</p>
+            <h2 className="text-xl sm:text-2xl font-bold text-slate-800 dark:text-white tracking-tight">Akun Pengguna</h2>
+            <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mt-0.5">Kelola akses login Administrator, {terminology.teacher}, dan {terminology.student}.</p>
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">

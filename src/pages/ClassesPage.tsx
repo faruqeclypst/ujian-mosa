@@ -279,15 +279,15 @@ const ClassesPage = () => {
           e.target.value = "";
         }}
       />
-      <div className="relative z-30 flex flex-col gap-3 md:flex-row md:items-center md:justify-between bg-card p-4 rounded-2xl border border-slate-200/60 dark:border-slate-800/40 shadow-sm backdrop-blur-sm">
+      <div className="relative z-30 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between bg-card p-4 rounded-2xl border border-slate-200/60 dark:border-slate-800/40 shadow-sm backdrop-blur-sm">
         <div>
-          <h2 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
+          <h2 className="text-xl sm:text-2xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
             <LayoutGrid className="h-5 w-5 text-indigo-500" />
             Daftar {terminology.class}
           </h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Kelola daftar {terminology.class.toLowerCase()} untuk pengelompokan {terminology.student.toLowerCase()}.</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Kelola daftar {terminology.class.toLowerCase()} untuk pengelompokan {terminology.student.toLowerCase()}.</p>
         </div>
-        <div className="flex flex-wrap items-stretch sm:items-center gap-2 w-full sm:w-auto">
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
           {loading ? (
              <>
                <Skeleton className="h-9 w-28 rounded-xl" />

@@ -298,8 +298,8 @@ const GradingPage = () => {
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <div>
-            <h1 className="text-lg font-bold text-slate-900 dark:text-white">Detail Penilaian</h1>
-            <p className="text-xs text-slate-500">{room?.examTitle || "Ujian"} • {room?.room_name || ""}</p>
+            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">Detail Penilaian</h1>
+            <p className="text-sm text-slate-500">{room?.examTitle || "Ujian"} • {room?.room_name || ""}</p>
           </div>
         </div>
         <div className="flex items-center gap-2 flex-wrap">

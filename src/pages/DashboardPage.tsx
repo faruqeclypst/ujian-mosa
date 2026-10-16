@@ -1310,7 +1310,7 @@ const DashboardPage = () => {
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3.5">
           {/* Sisi Kiri: Judul & Tanggal */}
           <div className="flex items-center gap-2.5 flex-wrap">
-            <h1 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white leading-tight tracking-tight">
+            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white leading-tight tracking-tight">
               Dashboard
             </h1>
             <span className="w-1 h-1 rounded-full bg-slate-300 dark:bg-slate-700 hidden sm:inline-block" />
