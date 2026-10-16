@@ -300,7 +300,47 @@ export const getQuestionStatus = (q: Question, ans: any): QuestionStatusInfo => 
     }
   }
 
-  // 6. ISIAN_SINGKAT / URAIAN
+  // 6. KLASIFIKASI
+  if (type === "klasifikasi") {
+    const statements = q.statements || [];
+    if (statements.length > 0) {
+      const currentAns = (typeof ans === "object" && ans !== null && !Array.isArray(ans)) ? ans : {};
+      const answeredStatements = statements.filter(
+        s => currentAns[s.id] !== undefined && currentAns[s.id] !== ""
+      );
+
+      if (answeredStatements.length === statements.length) {
+        return {
+          isComplete: true,
+          isPartiallyAnswered: false,
+          isUnanswered: false,
+          typeLabel: "Klasifikasi",
+          missingDetail: "",
+          summaryText: `Lengkap (${statements.length}/${statements.length} pernyataan)`
+        };
+      } else if (answeredStatements.length === 0) {
+        return {
+          isComplete: false,
+          isPartiallyAnswered: false,
+          isUnanswered: true,
+          typeLabel: "Klasifikasi",
+          missingDetail: `Belum dijawab (${statements.length} pernyataan)`,
+          summaryText: "Belum dijawab"
+        };
+      } else {
+        return {
+          isComplete: false,
+          isPartiallyAnswered: true,
+          isUnanswered: false,
+          typeLabel: "Klasifikasi",
+          missingDetail: `Baru ${answeredStatements.length}/${statements.length} pernyataan diklasifikasikan`,
+          summaryText: `Belum lengkap (${answeredStatements.length}/${statements.length})`
+        };
+      }
+    }
+  }
+
+  // 7. ISIAN_SINGKAT / URAIAN
   if (type === "isian_singkat" || type === "uraian") {
     const isFilled = typeof ans === "string" && ans.trim().length > 0;
     return {
@@ -806,6 +846,7 @@ const CBTPage = () => {
   const [choicesOrder, setChoicesOrder] = useState<Record<string, string[]>>({});
   const [itemsOrder, setItemsOrder] = useState<Record<string, string[]>>({});
   const [matchingOptions, setMatchingOptions] = useState<Record<string, string[]>>({});
+  const [klasifikasiOrder, setKlasifikasiOrder] = useState<Record<string, string[]>>({});
   const [draggingOption, setDraggingOption] = useState<string | null>(null);
   const [dragOverSlot, setDragOverSlot] = useState<string | null>(null);
   const [flaggedQuestions, setFlaggedQuestions] = useState<Record<string, boolean>>({});
@@ -1173,6 +1214,9 @@ const CBTPage = () => {
         } else if (mappedType === "matriks") {
           statements = rawOptions.statements || [];
           columns = rawOptions.columns || [];
+        } else if (mappedType === "klasifikasi") {
+          statements = rawOptions.statements || [];
+          columns = rawOptions.categories || [];
         } else {
           // Choice-based types: options = {a: {text, isCorrect, imageUrl}, b: {...}, ...}
           choices = { ...rawOptions };
@@ -1183,7 +1227,7 @@ const CBTPage = () => {
           });
         }
 
-        return { id: q.id, type: mappedType, text: q.text, imageUrl: qImg, groupId: q.groupId, groupText: q.groupText, choices, pairs, items, statements, columns, answerKey: q.answerKey || q.correctAnswer };
+        return { id: q.id, type: mappedType, text: q.text, imageUrl: qImg, groupId: q.groupId, groupText: q.groupText, choices, pairs, items, statements, columns, shuffleStatements: rawOptions.shuffleStatements !== false, answerKey: q.answerKey || q.correctAnswer };
       });
 
       const pr = `${student.nisn}_${roomId}`;
@@ -1199,6 +1243,7 @@ const CBTPage = () => {
         const nC: Record<string, string[]> = {};
         const nI: Record<string, string[]> = {};
         const nM: Record<string, string[]> = {};
+        const nK: Record<string, string[]> = {};
 
         loaded.forEach((q: any) => {
           if (q.choices) {
@@ -1231,8 +1276,18 @@ const CBTPage = () => {
             }
             nM[q.id] = rO as string[];
           }
+          if (q.statements && q.type === "klasifikasi" && q.shuffleStatements !== false) {
+            const sIds = q.statements.map((s: any) => s.id);
+            if (isRandom) {
+              for (let i = sIds.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [sIds[i], sIds[j]] = [sIds[j], sIds[i]];
+              }
+            }
+            nK[q.id] = sIds;
+          }
         });
-        return { nC, nI, nM };
+        return { nC, nI, nM, nK };
       };
 
       // Helper pengacak cluster kelompok literasi
@@ -1453,6 +1508,7 @@ const CBTPage = () => {
           let sC = sessionStorage.getItem(`choices_${pr}`);
           let sI = sessionStorage.getItem(`items_${pr}`);
           let sM = sessionStorage.getItem(`match_${pr}`);
+          let sK = sessionStorage.getItem(`klasifikasi_${pr}`);
 
           if (!sC && att?.answers?.__choices__) {
             try { sC = JSON.stringify(att.answers.__choices__); sessionStorage.setItem(`choices_${pr}`, sC); } catch (e) { }
@@ -1463,16 +1519,22 @@ const CBTPage = () => {
           if (!sM && att?.answers?.__match__) {
             try { sM = JSON.stringify(att.answers.__match__); sessionStorage.setItem(`match_${pr}`, sM); } catch (e) { }
           }
+          if (!sK && att?.answers?.__klasifikasi__) {
+            try { sK = JSON.stringify(att.answers.__klasifikasi__); sessionStorage.setItem(`klasifikasi_${pr}`, sK); } catch (e) { }
+          }
 
           const nCRestored: Record<string, string[]> = {};
           const nIRestored: Record<string, string[]> = {};
           const nMRestored: Record<string, string[]> = {};
+          const nKRestored: Record<string, string[]> = {};
           if (sC) try { Object.assign(nCRestored, JSON.parse(sC)); } catch (e) { }
           if (sI) try { Object.assign(nIRestored, JSON.parse(sI)); } catch (e) { }
           if (sM) try { Object.assign(nMRestored, JSON.parse(sM)); } catch (e) { }
+          if (sK) try { Object.assign(nKRestored, JSON.parse(sK)); } catch (e) { }
 
           setChoicesOrder(nCRestored);
           setItemsOrder(nIRestored);
+          setKlasifikasiOrder(nKRestored);
           setMatchingOptions(nMRestored);
 
         } else {
@@ -1503,23 +1565,26 @@ const CBTPage = () => {
 
             // 1. Hitung acakan opsi dan urutan soal SEBELUM create attempt
             setLoadingMessage("Mempersiapkan lembar soal...");
-            const { nC, nI, nM } = generateChoicesAndItemOrders();
+            const { nC, nI, nM, nK } = generateChoicesAndItemOrders();
             order = generateQuestionOrder();
 
             sessionStorage.setItem(`choices_${pr}`, JSON.stringify(nC));
             sessionStorage.setItem(`items_${pr}`, JSON.stringify(nI));
             sessionStorage.setItem(`match_${pr}`, JSON.stringify(nM));
+            sessionStorage.setItem(`klasifikasi_${pr}`, JSON.stringify(nK));
             sessionStorage.setItem(`order_${pr}`, JSON.stringify(order));
 
             setChoicesOrder(nC);
             setItemsOrder(nI);
             setMatchingOptions(nM);
+            setKlasifikasiOrder(nK);
 
             const initialAnswers = {
               __order__: order,
               __choices__: nC,
               __items__: nI,
               __match__: nM,
+              __klasifikasi__: nK,
               __meta: {
                 questionOrder: order,
                 totalQuestions: order.length,
@@ -2120,6 +2185,18 @@ const CBTPage = () => {
               if (String(sa[sid] != null ? sa[sid] : "") === String(st.answer != null ? st.answer : "")) mCorrect++;
             });
             objectiveCorrect += (mCorrect / sts.length);
+          }
+        }
+        else if (t === "klasifikasi") {
+          const sts = q.statements || [];
+          if (sts.length > 0 && sa !== null && typeof sa === "object" && !Array.isArray(sa)) {
+            let kCorrect = 0;
+            sts.forEach((st: any) => {
+              const sid = String(st.id != null ? st.id : "");
+              if (!sid) return;
+              if (String(sa[sid] != null ? sa[sid] : "") === String(st.answer != null ? st.answer : "")) kCorrect++;
+            });
+            objectiveCorrect += (kCorrect / sts.length);
           }
         }
       });
@@ -3178,6 +3255,72 @@ const CBTPage = () => {
                               </tbody>
                             </table>
                           </div>
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()
+                )}
+                {currentQuestion.type === "klasifikasi" && (
+                  (() => {
+                    const allStatements = currentQuestion.statements || [];
+                    const categories = currentQuestion.columns || [];
+                    const currentAnswers = (typeof answers[currentQuestion.id] === "object" && answers[currentQuestion.id] !== null)
+                      ? answers[currentQuestion.id]
+                      : {};
+
+                    // Gunakan urutan acak jika ada, jika tidak pakai urutan asli
+                    const orderIds = klasifikasiOrder[currentQuestion.id];
+                    const statements = orderIds && orderIds.length > 0
+                      ? orderIds.map(id => allStatements.find((s: any) => s.id === id)).filter(Boolean)
+                      : allStatements;
+
+                    if (statements.length > 0 && categories.length > 0) {
+                      return (
+                        <div className="space-y-3">
+                          {statements.map((s: any, idx: number) => {
+                            const selected = currentAnswers[s.id] || "";
+                            return (
+                              <div
+                                key={s.id || idx}
+                                className="p-4 sm:p-5 rounded-xl sm:rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/90 shadow-sm"
+                              >
+                                <div className="flex items-start gap-3 mb-3">
+                                  <span
+                                    className="inline-flex shrink-0 w-6 h-6 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-bold items-center justify-center mt-0.5"
+                                    style={{ fontSize: `${Math.max(10, Math.round(11 * fontSize))}px` }}
+                                  >
+                                    {idx + 1}
+                                  </span>
+                                  <div className="flex-1 min-w-0" style={{ fontSize: `${15 * fontSize}px` }}>
+                                    <MathText
+                                      content={s.text}
+                                      disableJustify={true}
+                                      className="cbt-choice-text text-left font-serif leading-relaxed !p-0 [&_p]:m-0 text-slate-800 dark:text-slate-200"
+                                    />
+                                  </div>
+                                </div>
+                                <select
+                                  value={selected}
+                                  onChange={(e) => {
+                                    handleAnswerSelect(currentQuestion.id, {
+                                      ...currentAnswers,
+                                      [s.id]: e.target.value
+                                    });
+                                  }}
+                                  className="w-full p-3 rounded-xl border-2 border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-medium focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 outline-none transition-all"
+                                  style={{ fontSize: "16px" }}
+                                >
+                                  <option value="">-- Pilih kategori --</option>
+                                  {categories.map((cat: any) => (
+                                    <option key={cat.id} value={cat.id}>
+                                      {cat.text}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                            );
+                          })}
                         </div>
                       );
                     }
