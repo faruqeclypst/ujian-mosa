@@ -5378,7 +5378,20 @@ Aturan:
                       )}
 
                       {isOwner && (
-                        <DropdownMenu>
+                        <>
+                          {examId && (
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => navigate(`/admin/simulate/${examId}`)}
+                              title="Coba ujian seperti tampilan siswa (tidak menyimpan nilai)"
+                              className="rounded-2xl bg-indigo-50 hover:bg-indigo-100 border border-indigo-100 dark:bg-indigo-900/20 dark:text-indigo-400 dark:hover:bg-indigo-900/40 dark:border-indigo-800/40 text-indigo-700 font-bold shadow-sm transition-all h-9 px-4"
+                            >
+                              <Eye className="mr-1.5 h-3.5 w-3.5" />
+                              Simulasi
+                            </Button>
+                          )}
+                          <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button
                               variant="secondary"
@@ -5389,8 +5402,7 @@ Aturan:
                               Tambah
                               <ChevronDown className="ml-1.5 h-3 w-3 opacity-50" />
                             </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-72 p-2 rounded-2xl shadow-2xl border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 z-[100]">
+                          </DropdownMenuTrigger><DropdownMenuContent align="end" className="w-72 p-2 rounded-2xl shadow-2xl border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 z-[100]">
                             <DropdownMenuLabel className="text-[10px] font-bold uppercase tracking-widest text-slate-400 px-3 py-2 text-left">Opsi Pembuatan</DropdownMenuLabel>
 
                             <DropdownMenuItem
@@ -5458,6 +5470,7 @@ Aturan:
                             )}
                           </DropdownMenuContent>
                         </DropdownMenu>
+                        </>
                       )}
                     </div>
                   )}

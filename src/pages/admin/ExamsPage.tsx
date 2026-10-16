@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Plus, BookOpen, Trash, Edit, Archive, RotateCw, Copy, ClipboardList, Download, Loader2, X, ChevronDown } from "lucide-react";
+import { Plus, BookOpen, Trash, Edit, Archive, RotateCw, Copy, ClipboardList, Download, Loader2, X, ChevronDown, Eye } from "lucide-react";
 import JSZip from "jszip";
 import { Button } from "../../components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../../components/ui/dialog";
@@ -1657,6 +1657,16 @@ const ExamsPage = () => {
               emptyMessage={`Belum ada bank soal ${ activeTab }.`}
               actions={(exam: any) => (
                 <div className="flex justify-end gap-1.5 items-center whitespace-nowrap">
+                  <button
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-lg dark:bg-emerald-900/20 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-800/40 transition-all hover:shadow-sm"
+                    onClick={() => {
+                      navigate(`/admin/simulate/${exam.id}`);
+                    }}
+                    title="Coba Ujian (Simulasi seperti tampilan siswa)"
+                  >
+                    <Eye className="h-3.5 w-3.5" />
+                    <span className="text-xs font-black hidden xl:inline">Coba</span>
+                  </button>
                   <button 
                     className="flex items-center gap-1.5 px-2.5 py-1.5 bg-purple-50 text-purple-700 hover:bg-purple-100 rounded-lg dark:bg-purple-900/20 dark:text-purple-400 border border-purple-100 dark:border-purple-800/40 transition-all hover:shadow-sm" 
                     onClick={() => {

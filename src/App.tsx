@@ -51,6 +51,7 @@ const ItemAnalysisPage = lazy(() => import("./pages/admin/ItemAnalysisPage"));
 const TokenViewPage = lazy(() => import("./pages/TokenViewPage"));
 const SchoolInvoicePage = lazy(() => import("./pages/admin/SchoolInvoicePage"));
 const ServerStatusPage = lazy(() => import("./pages/admin/ServerStatusPage"));
+const ExamSimulatePage = lazy(() => import("./pages/admin/ExamSimulatePage"));
 const DownloadAppsPage = lazy(() => import("./pages/tenant/DownloadAppsPage"));
 
 // Landing & SaaS pages
@@ -213,6 +214,8 @@ const SchoolAppContent = () => {
             <Route path="/token-view" element={<TokenViewPage />} />
             <Route path="/unduh" element={<DownloadAppsPage />} />
             <Route path="/download" element={<Navigate to="/unduh" replace />} />
+            {/* Simulasi ujian untuk guru — full-screen seperti CBT siswa, guard di dalam komponen */}
+            <Route path="/admin/simulate/:examId" element={<ExamSimulatePage />} />
             <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </Suspense>
