@@ -12,7 +12,8 @@ import {
   ChevronDown,
   FileText,
   Upload,
-  KeyRound
+  KeyRound,
+  MoreHorizontal
 } from "lucide-react";
 import { 
   DropdownMenu, 
@@ -512,7 +513,7 @@ const TeachersPage = () => {
           </h2>
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Kelola daftar {terminology.teacher.toLowerCase()} dan {terminology.subject.toLowerCase()} pengampu.</p>
         </div>
-        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+        <div className="hidden sm:flex flex-wrap items-center gap-2 w-full sm:w-auto">
           {loading ? (
              <>
                <Skeleton className="h-9 w-28 rounded-xl" />
@@ -647,6 +648,91 @@ const TeachersPage = () => {
               />
             </DialogContent>
           </Dialog>
+            </>
+          )}
+        </div>
+        {/* Mobile: judul + 1 tombol primary + menu ⋯ */}
+        <div className="flex sm:hidden items-center gap-2 w-full">
+          {loading ? (
+            <>
+              <Skeleton className="h-11 flex-1 rounded-2xl" />
+              <Skeleton className="h-11 w-12 rounded-2xl" />
+            </>
+          ) : (
+            <>
+              <Button
+                onClick={() => { setSelectedTeacher(null); setIsDialogOpen(true); }}
+                size="sm"
+                className="flex-1 rounded-2xl bg-blue-50 hover:bg-blue-100 active:bg-blue-50 border border-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 dark:active:bg-blue-900/30 dark:border-blue-800/40 text-blue-700 font-bold shadow-sm h-11 px-4"
+              >
+                <Plus className="mr-1.5 h-4 w-4" />
+                Tambah {terminology.teacher}
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="rounded-2xl h-11 w-12 px-0 shrink-0">
+                    <MoreHorizontal className="h-5 w-5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-64 p-2 rounded-2xl shadow-2xl border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 z-[100]">
+                  <DropdownMenuLabel className="text-[10px] font-bold uppercase tracking-widest text-slate-400 px-3 py-2 text-left">Kelola {terminology.teacher}</DropdownMenuLabel>
+                  <DropdownMenuItem
+                    className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 focus:bg-slate-50 dark:focus:bg-slate-900 transition-colors group"
+                    onClick={() => {
+                      const input = document.getElementById("teacher-import-input") as HTMLInputElement;
+                      if (input) input.click();
+                    }}
+                  >
+                    <div className="h-10 w-10 shrink-0 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <Upload className="h-5 w-5" />
+                    </div>
+                    <div className="flex flex-col min-w-0">
+                      <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">
+                        {isImporting ? "Mengimport..." : "Import dari Excel"}
+                      </span>
+                      <span className="text-[10px] text-slate-400 mt-1">Unggah file data {terminology.teacher.toLowerCase()}</span>
+                    </div>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={handleExportTeachers}
+                    className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 focus:bg-slate-50 dark:focus:bg-slate-900 transition-colors group"
+                  >
+                    <div className="h-10 w-10 shrink-0 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <Download className="h-5 w-5" />
+                    </div>
+                    <div className="flex flex-col min-w-0">
+                      <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">Export ke Excel</span>
+                      <span className="text-[10px] text-slate-400 mt-1">Unduh daftar {terminology.teacher.toLowerCase()}</span>
+                    </div>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator className="my-1 border-slate-100 dark:border-slate-800" />
+                  <DropdownMenuItem
+                    onClick={() => downloadTeacherImportTemplate()}
+                    className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 focus:bg-slate-50 dark:focus:bg-slate-900 transition-colors group"
+                  >
+                    <div className="h-10 w-10 shrink-0 rounded-lg bg-sky-50 dark:bg-sky-900/30 text-sky-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <FileText className="h-5 w-5" />
+                    </div>
+                    <div className="flex flex-col min-w-0">
+                      <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">Unduh Template</span>
+                      <span className="text-[10px] text-slate-400 mt-1">Format file import Excel {terminology.teacher.toLowerCase()}</span>
+                    </div>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator className="my-1 border-slate-100 dark:border-slate-800" />
+                  <DropdownMenuItem
+                    onClick={handleSyncAllUsers}
+                    className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 focus:bg-slate-50 dark:focus:bg-slate-900 transition-colors group"
+                  >
+                    <div className="h-10 w-10 shrink-0 rounded-lg bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <Users className="h-5 w-5" />
+                    </div>
+                    <div className="flex flex-col min-w-0">
+                      <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">Sinkronkan Akun</span>
+                      <span className="text-[10px] text-slate-400 mt-1">Pulihkan akun login yang hilang</span>
+                    </div>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </>
           )}
         </div>
