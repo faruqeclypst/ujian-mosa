@@ -274,7 +274,7 @@ export const QuestionRepositoryDialog: React.FC<QuestionRepositoryDialogProps> =
   // Toggle selection satu butir soal
   const toggleQuestionSelect = (id: string) => {
     // Jangan izinkan pilih soal yang tidak didukung
-    const item = activeQuestionsList.find((q: any) => q.id === id);
+    const item = activeQuestionsList.find((q: any) => q.id === id) as any;
     if (item?.skipReason) return;
     setSelectedQuestionIds(prev => {
       const next = new Set(prev);
