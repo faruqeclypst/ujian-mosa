@@ -495,7 +495,6 @@ const QuestionFormPage = () => {
     urutkan: true,
     drag_drop: true,
     uraian: true,
-    klasifikasi: true,
     hotspot: true,
     isian_rumpang: true,
     matriks: true,
@@ -5054,8 +5053,8 @@ const QuestionFormPage = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
-      {/* Page Header - sticky */}
-      <div className="sticky top-0 z-30 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 shadow-sm">
+      {/* Page Header */}
+      <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
             <button
@@ -5170,7 +5169,6 @@ const QuestionFormPage = () => {
                           {(allowedTypes.urutkan || formValues.type === "urutkan") && <option value="urutkan">Urutkan (Ordering)</option>}
                           {(allowedTypes.drag_drop || formValues.type === "drag_drop") && <option value="drag_drop">Drag and Drop</option>}
                           {(allowedTypes.matriks || formValues.type === "matriks") && <option value="matriks">Matriks (Tabel Pilihan Ganda)</option>}
-                          {(allowedTypes.klasifikasi || formValues.type === "klasifikasi") && <option value="klasifikasi">Klasifikasi / Kategorisasi</option>}
                           {(allowedTypes.isian_rumpang || formValues.type === "isian_rumpang") && <option value="isian_rumpang">Isian Rumpang (Cloze)</option>}
                           {(allowedTypes.hotspot || formValues.type === "hotspot") && <option value="hotspot">Hotspot (Klik Gambar)</option>}
                         </select>

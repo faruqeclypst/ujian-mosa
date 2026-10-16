@@ -72,7 +72,7 @@ export function downloadQuestionTemplate(filename = "Template_Soal_Baru.xlsx") {
     ],
     [
       "Tentukan kategori yang sesuai untuk setiap pernyataan berikut.",
-      "klasifikasi",
+      "matriks",
       "",
       "",
       "",
@@ -160,7 +160,6 @@ export function downloadQuestionTemplate(filename = "Template_Soal_Baru.xlsx") {
     ["   - benar_salah: Benar/Salah (isi Opsi A=Benar, Opsi B=Salah)"],
     ["   - isian_singkat: Isian singkat (kunci jawaban di kolom Kunci Jawaban)"],
     ["   - uraian: Uraian/Essay (kunci jawaban opsional)"],
-    ["   - klasifikasi: Klasifikasi (kategori di kolom 'Kategori / Kolom' pisah |, pernyataan di 'Pernyataan & Kunci' format: pernyataan => kategori, pisah baris baru)"],
     ["   - matriks: Matriks (kolom di 'Kategori / Kolom' pisah |, pernyataan di 'Pernyataan & Kunci' format: pernyataan => kolom, pisah baris baru)"],
     ["   - isian_rumpang: Isian rumpang (tulis teks dengan [[1]], [[2]] di kolom Pertanyaan, kunci di 'Kunci Rumpang' format: 1=Jakarta; 2=Rupiah/Rp)"],
     ["   - hotspot: TIDAK didukung via Excel — gunakan editor soal di aplikasi (butuh gambar + tandai area)"],
@@ -198,8 +197,6 @@ const TYPE_MAP: Record<string, { type: string; field: string }> = {
   isian: { type: "isian_singkat", field: "short_answer" },
   uraian: { type: "uraian", field: "essay" },
   essay: { type: "uraian", field: "essay" },
-  klasifikasi: { type: "klasifikasi", field: "klasifikasi" },
-  "klasifikasi / categorization": { type: "klasifikasi", field: "klasifikasi" },
   matriks: { type: "matriks", field: "matriks" },
   "matriks pilihan ganda": { type: "matriks", field: "matriks" },
   isian_rumpang: { type: "isian_rumpang", field: "isian_rumpang" },
@@ -234,8 +231,8 @@ export async function parseQuestionImportExcel(file: File): Promise<any[]> {
         throw new Error(`Baris "${qText.substring(0, 40)}...": tipe hotspot tidak didukung via Excel. Gunakan editor soal di aplikasi untuk upload gambar dan menandai area.`);
       }
 
-      // klasifikasi & matriks: kolom "Kategori / Kolom" + "Pernyataan & Kunci"
-      if (typeInfo.type === "klasifikasi" || typeInfo.type === "matriks") {
+      // matriks: kolom "Kategori / Kolom" + "Pernyataan & Kunci"
+      if (typeInfo.type === "matriks") {
         const catCol = String(cleanRow["Kategori / Kolom"] || "").trim();
         const stmtCol = String(cleanRow["Pernyataan & Kunci"] || "").trim();
         if (!catCol) throw new Error(`Baris "${qText.substring(0, 40)}...": kolom "Kategori / Kolom" wajib diisi untuk tipe ${typeInfo.type}.`);
@@ -261,9 +258,7 @@ export async function parseQuestionImportExcel(file: File): Promise<any[]> {
 
         if (statements.length === 0) throw new Error(`Baris "${qText.substring(0, 40)}...": tidak ada pernyataan valid.`);
 
-        const options = typeInfo.type === "klasifikasi"
-          ? { categories: labelIds, statements, shuffleStatements: true }
-          : { columns: labelIds, statements };
+        const options = { columns: labelIds, statements };
 
         return {
           text: qText,

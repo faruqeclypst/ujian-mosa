@@ -900,7 +900,6 @@ const _generateQuestionsAIInternal = async (
       menjodohkan: "Menjodohkan/Matching (pasangkan item kiri dengan kanan)",
       urutkan: "Mengurutkan/Sequencing (susun item dalam urutan benar)",
       drag_drop: "Drag & Drop (susun/kelompokkan item ke posisi benar)",
-      klasifikasi: "Klasifikasi (tentukan kategori untuk setiap pernyataan)",
       matriks: "Matriks (tabel pernyataan x kolom Benar/Salah)",
       isian_rumpang: "Isian Rumpang/Cloze (lengkapi kata yang hilang dalam teks)"
     };
@@ -1170,7 +1169,6 @@ const _generateSingleQuestionInternal = async (
       menjodohkan: "Menjodohkan/Matching (4-6 pasangan kiri-kanan)",
       urutkan: "Mengurutkan/Sequencing (4-6 item disusun urut)",
       drag_drop: "Drag & Drop (4-6 item disusun/dikelompokkan)",
-      klasifikasi: "Klasifikasi (kategori untuk setiap pernyataan)",
       matriks: "Matriks (tabel pernyataan x kolom opsi)",
       isian_rumpang: "Isian Rumpang/Cloze (lengkapi kata hilang dalam teks)"
     };
@@ -1556,7 +1554,6 @@ export const generateFromMaterialAI = async (
       menjodohkan: "Menjodohkan/Matching (4-6 pasangan kiri-kanan)",
       urutkan: "Mengurutkan/Sequencing (4-6 item disusun urut)",
       drag_drop: "Drag & Drop (4-6 item disusun/dikelompokkan)",
-      klasifikasi: "Klasifikasi (kategori untuk setiap pernyataan)",
       matriks: "Matriks (tabel pernyataan x kolom opsi)",
       isian_rumpang: "Isian Rumpang/Cloze (lengkapi kata hilang)",
     };
