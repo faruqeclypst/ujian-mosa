@@ -457,6 +457,12 @@ const QuestionFormPage = () => {
   // Load question data in edit mode
   const [formLoading, setFormLoading] = useState(isEditMode);
   const [formLoadError, setFormLoadError] = useState("");
+
+  const { user, role, teacherId } = useAuth();
+  const { school, pb, terminology } = useTenant();
+  const { addToast } = useToast();
+  const { subjects, teachers, teacherFullAccess, teacherAIAccess } = useExamData();
+
   useEffect(() => {
     if (!isEditMode || !questionId || !pb) return;
     let cancelled = false;
@@ -478,11 +484,6 @@ const QuestionFormPage = () => {
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEditMode, questionId, pb]);
-
-  const { user, role, teacherId } = useAuth();
-  const { school, pb, terminology } = useTenant();
-  const { addToast } = useToast();
-  const { subjects, teachers, teacherFullAccess, teacherAIAccess } = useExamData();
 
   // Manage Allowed Question Types
   const [allowedTypes, setAllowedTypes] = useState<Record<string, boolean>>({
