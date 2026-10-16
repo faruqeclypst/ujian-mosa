@@ -218,6 +218,46 @@ const StudentsPage = () => {
     setAlertDialog({ isOpen: true, title, description, type, onConfirm, showCancel, confirmLabel });
   };
 
+  // ── "Pilih Semua" lintas halaman (server-side pagination) ──
+  // Header checkbox tabel hanya mencakup 50 baris yang tampil; tombol ini
+  // mengambil SEMUA id siswa yang sesuai filter aktif (hanya field id, ringan).
+  const [selectAllLoading, setSelectAllLoading] = useState(false);
+  const [selectAllActive, setSelectAllActive] = useState(false);
+
+  const handleSelectAllFiltered = useCallback(async () => {
+    if (!pb) return;
+    setSelectAllLoading(true);
+    try {
+      const recs = await pb.collection("students").getFullList({
+        filter: buildStudentFilter(),
+        fields: "id",
+      });
+      setSelectedIds(recs.map((r: any) => r.id));
+      setSelectAllActive(true);
+    } catch (err) {
+      console.error("Gagal memilih semua siswa:", err);
+      showAlert("Gagal", "Tidak dapat memuat daftar siswa. Coba lagi.", "danger");
+    } finally {
+      setSelectAllLoading(false);
+    }
+  }, [pb, buildStudentFilter]);
+
+  const handleClearSelection = useCallback(() => {
+    setSelectedIds([]);
+    setSelectAllActive(false);
+  }, []);
+
+  // Interaksi manual di tabel (centang per baris / header) membatalkan status "pilih semua"
+  const handleTableSelectChange = useCallback((ids: string[]) => {
+    setSelectedIds(ids);
+    setSelectAllActive(false);
+  }, []);
+
+  // Filter/search berubah -> himpunan "semua" tidak lagi valid, reset statusnya
+  useEffect(() => {
+    setSelectAllActive(false);
+  }, [filterClassId, tableSearch, classes]);
+
   const handleCreateClick = () => {
     setDialogMode("create");
     setSelectedStudent(null);
@@ -1254,11 +1294,45 @@ const StudentsPage = () => {
           </CardContent>
         </Card>
       ) : (
-        <StudentTable
+        <>
+          {selectedIds.length > 0 && (
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm dark:border-blue-800/40 dark:bg-blue-950/30">
+              <span className="font-semibold text-blue-800 dark:text-blue-300">
+                {selectAllActive
+                  ? `${selectedIds.length.toLocaleString("id-ID")} siswa terpilih (semua yang sesuai filter)`
+                  : `${selectedIds.length} siswa terpilih di halaman ini`}
+              </span>
+              <div className="flex items-center gap-2">
+                {!selectAllActive && (
+                  <button
+                    onClick={handleSelectAllFiltered}
+                    disabled={selectAllLoading}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-700 disabled:opacity-60 transition-all active:scale-95"
+                  >
+                    {selectAllLoading ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Check className="h-3.5 w-3.5" />
+                    )}
+                    {selectAllLoading
+                      ? "Memuat..."
+                      : `Pilih semua ${(tableTotal ?? 0).toLocaleString("id-ID")} siswa`}
+                  </button>
+                )}
+                <button
+                  onClick={handleClearSelection}
+                  className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-blue-100 dark:text-slate-300 dark:hover:bg-blue-900/40 transition-all"
+                >
+                  Batalkan pilihan
+                </button>
+              </div>
+            </div>
+          )}
+          <StudentTable
           students={tableRows}
           classes={classes}
           selectedIds={selectedIds}
-          onSelectChange={setSelectedIds}
+          onSelectChange={handleTableSelectChange}
           onEdit={handleEditClick}
           onDelete={handleDeleteClick}
           onResetPassword={role === "admin" ? handleResetPassword : undefined}
@@ -1298,6 +1372,7 @@ const StudentsPage = () => {
             </div>
           }
         />
+        </>
       )}
 
       <ConfirmationDialog
