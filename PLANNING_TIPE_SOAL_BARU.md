@@ -388,3 +388,54 @@ Fase 7: Release
 ```
 
 **Estimasi:** ~21 file, 60+ titik edit. Rekomendasi dikerjakan bertahap per fase, bukan sekaligus.
+
+---
+
+## 6. Keamanan di Semua Device (Mobile / Tablet / Desktop)
+
+> Prinsip: semua tipe baru harus berfungsi penuh di HP Android (aplikasi Exambro + browser), tablet, dan laptop. Tidak boleh ada yang hanya jalan di desktop.
+
+### 6.1 Hotspot (paling rawan device)
+
+| Masalah | Solusi |
+|---------|--------|
+| Ukuran gambar beda per device | Koordinat **selalu % relatif** (0–100) terhadap bounding box gambar, bukan px. Hitung via `getBoundingClientRect()` saat klik/tap |
+| Touch vs mouse | Pakai `onClick` (bekerja untuk tap & klik) — jangan `onMouseDown` saja. Pastikan tidak ada hover-dependent UI |
+| Gambar ter-zoom / scroll | Koordinat dihitung dari posisi gambar di viewport saat event, bukan posisi absolut halaman |
+| Gambar gagal load (offline/lemot) | Tampilkan placeholder + pesan "gambar gagal dimuat, hubungi pengawas". Jangan biarkan soal kosong tanpa penjelasan |
+| Marker terlalu kecil di HP | Marker minimal 24px touch target; tampilkan nomor urut klik untuk mode "all" |
+| Double-tap zoom di HP | Cegah zoom ganda pada area gambar via `touch-action: manipulation` |
+
+### 6.2 Klasifikasi / Matriks
+
+| Masalah | Solusi |
+|---------|--------|
+| Dropdown `<select>` sempit di HP | Pakai radio grup vertikal atau select full-width; tiap baris pernyataan jelas terpisah |
+| Tabel matriks overflow di HP | Tabel scroll horizontal dalam container, atau ubah jadi kartu per pernyataan di layar kecil (stacked layout) |
+| Pernyataan panjang | Text wrap, jangan potong; tinggi baris fleksibel |
+
+### 6.3 Isian Rumpang
+
+| Masalah | Solusi |
+|---------|--------|
+| Input inline terlalu kecil di HP | `min-width` 80px, font-size ≥16px (cegah auto-zoom iOS), tap target nyaman |
+| Keyboard menutupi input | Tidak perlu handling khusus (native behavior), tapi pastikan input tidak di dalam container dengan `overflow: hidden` yang aneh |
+
+### 6.4 Umum (semua tipe)
+
+- **Autosave:** format jawaban object/array harus stabil di semua device — jangan andalkan urutan key object
+- **No hover-only:** semua aksi penting harus bisa di-tap, bukan cuma hover
+- **Font & kontras:** teks pernyataan minimal 14px, kontras cukup di layar HP outdoor
+- **Offline:** jika siswa offline sesaat, jawaban tersimpan di `answersRef` seperti biasa — tidak ada logika khusus per tipe
+- **Test matrix sebelum release:** Chrome desktop, Chrome Android, Exambro APK, Safari iOS (jika tersedia)
+
+### 6.5 Checklist verifikasi per device
+
+```
+[ ] Hotspot: tap tepat di dalam/di luar area → skor benar di HP & desktop
+[ ] Hotspot mode "all": 3x tap → 3 marker muncul, skor parsial benar
+[ ] Klasifikasi: pilih kategori per pernyataan di HP (tidak kepotong)
+[ ] Matriks: tabel tidak overflow / stacked layout tampil benar di HP
+[ ] Isian rumpang: input inline bisa diketik di HP tanpa auto-zoom
+[ ] Semua: jawaban tersimpan & skor server = skor client
+```
