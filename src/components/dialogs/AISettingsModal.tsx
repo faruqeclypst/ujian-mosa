@@ -187,7 +187,7 @@ export const AISettingsModal = ({ isOpen, onClose }: AISettingsModalProps) => {
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-[450px] p-0 overflow-hidden border-0 bg-white dark:bg-gray-900 shadow-2xl rounded-[2rem]">
+      <DialogContent className="sm:max-w-md p-0 overflow-hidden border-0 bg-white dark:bg-gray-900 shadow-2xl rounded-2xl">
         <div className="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-700 z-50" />
 
         <DialogHeader className="pt-8 px-8 pb-4">

@@ -5194,7 +5194,7 @@ const QuestionsPage = () => {
 
                       {/* MODAL PANDUAN LITERASI */}
                       <Dialog open={isLiterasiGuideOpen} onOpenChange={setIsLiterasiGuideOpen}>
-                        <DialogContent className="max-w-2xl rounded-3xl overflow-hidden p-0 border-none shadow-2xl">
+                        <DialogContent className="max-w-2xl rounded-2xl overflow-hidden p-0 border-none shadow-2xl">
                           <div className="bg-gradient-to-br from-sky-600 to-indigo-700 p-8 text-white relative">
                             <BookOpen className="h-16 w-16 opacity-10 absolute right-8 top-8" />
                             <h2 className="text-2xl font-bold mb-2">Panduan Soal Literasi</h2>
@@ -7052,7 +7052,7 @@ Aturan:
 
         {/* Dialog Preview Soal (CBT Look) */}
         <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
-          <DialogContent className="max-w-4xl p-0 h-[92vh] sm:h-[95vh] w-[95vw] sm:w-full bg-white dark:bg-slate-900 rounded-[32px] sm:rounded-[40px] shadow-2xl flex flex-col overflow-hidden border border-slate-100 dark:border-slate-800 animate-in fade-in zoom-in-95 duration-300" hideClose>
+          <DialogContent className="max-w-4xl p-0 h-[92vh] sm:h-[95vh] w-[95vw] sm:w-full bg-white dark:bg-slate-900 rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-slate-100 dark:border-slate-800 animate-in fade-in zoom-in-95 duration-300" hideClose>
             {previewQuestion && (
               <>
                 {/* CBT Header Replica - FIXED TOP */}
@@ -8014,7 +8014,7 @@ Aturan:
 
         {/* MODAL GENERASI AI */}
         <Dialog open={isAIModalOpen} onOpenChange={setIsAIModalOpen}>
-          <DialogContent className="max-w-2xl rounded-3xl p-0 overflow-hidden border border-slate-200/60 dark:border-slate-800/60 shadow-[0_20px_50px_-12px_rgba(0,0,0,0.2)] dark:shadow-[0_20px_50px_-12px_rgba(0,0,0,0.5)] bg-white dark:bg-slate-900">
+          <DialogContent className="max-w-2xl rounded-2xl p-0 overflow-hidden border border-slate-200/60 dark:border-slate-800/60 shadow-[0_20px_50px_-12px_rgba(0,0,0,0.2)] dark:shadow-[0_20px_50px_-12px_rgba(0,0,0,0.5)] bg-white dark:bg-slate-900">
             {/* Header dengan efek glow */}
             <div className="relative px-6 py-5 overflow-hidden border-b border-slate-100 dark:border-slate-800/80 bg-gradient-to-r from-indigo-50/50 via-white to-purple-50/50 dark:from-indigo-950/20 dark:via-slate-900 dark:to-purple-950/20">
               <div className="absolute top-0 right-0 -translate-y-1/2 translate-x-1/3 w-48 h-48 bg-purple-400/20 dark:bg-purple-600/20 rounded-full blur-3xl opacity-60 mix-blend-multiply dark:mix-blend-lighten pointer-events-none"></div>
@@ -8669,7 +8669,7 @@ Aturan:
         <BatchProgressDialog progress={batchProgress} colorClass="bg-indigo-600" />
         {/* MODAL PUSAT BANTUAN PENULISAN STEM */}
         <Dialog open={isMathGuideOpen} onOpenChange={setIsMathGuideOpen}>
-          <DialogContent className="max-w-3xl rounded-[1.5rem] overflow-hidden p-0 border-none shadow-2xl bg-white dark:bg-slate-950">
+          <DialogContent className="max-w-2xl rounded-2xl overflow-hidden p-0 border-none shadow-2xl bg-white dark:bg-slate-950">
             <div className="bg-slate-900 p-8 text-white relative">
               <BookOpen className="h-16 w-16 opacity-5 absolute right-8 top-8" />
               <h2 className="text-2xl font-bold mb-1 tracking-tight">Panduan Penulisan Rumus</h2>

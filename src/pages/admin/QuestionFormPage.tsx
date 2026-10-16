@@ -6505,7 +6505,7 @@ const QuestionFormPage = () => {
       {/* Preview Dialog - kept */}
       {/* Dialog Preview Soal (CBT Look) */}
         <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
-          <DialogContent className="max-w-4xl p-0 h-[92vh] sm:h-[95vh] w-[95vw] sm:w-full bg-white dark:bg-slate-900 rounded-[32px] sm:rounded-[40px] shadow-2xl flex flex-col overflow-hidden border border-slate-100 dark:border-slate-800 animate-in fade-in zoom-in-95 duration-300" hideClose>
+          <DialogContent className="max-w-4xl p-0 h-[92vh] sm:h-[95vh] w-[95vw] sm:w-full bg-white dark:bg-slate-900 rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-slate-100 dark:border-slate-800 animate-in fade-in zoom-in-95 duration-300" hideClose>
             {previewQuestion && (
               <>
                 {/* CBT Header Replica - FIXED TOP */}

@@ -91,7 +91,7 @@ const StudentInterestDialog = ({ isOpen, onClose, studentId, studentName }: Stud
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-[1200px] w-[95vw] p-0 overflow-hidden rounded-[2.5rem] border-none shadow-2xl max-h-[90vh] flex flex-col bg-[#f8fafc] text-slate-800 font-sans tracking-tight" hideClose>
+      <DialogContent className="max-w-4xl w-[95vw] p-0 overflow-hidden rounded-2xl border-none shadow-2xl max-h-[90vh] flex flex-col bg-[#f8fafc] text-slate-800 font-sans tracking-tight" hideClose>
 
         {/* Header - Fixed */}
         <DialogHeader className="px-6 py-4 lg:px-10 lg:py-6 bg-white/80 backdrop-blur-md border-b border-slate-200/60 sticky top-0 z-50 flex flex-row items-center justify-between shrink-0">
@@ -106,7 +106,7 @@ const StudentInterestDialog = ({ isOpen, onClose, studentId, studentName }: Stud
               <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest mt-1.5">{studentName}</p>
             </div>
           </div>
-          <Button variant="ghost" onClick={onClose} className="h-10 w-10 rounded-full hover:bg-rose-50 hover:text-rose-600 shrink-0">
+          <Button variant="ghost" onClick={onClose} className="h-11 w-11 rounded-full hover:bg-rose-50 hover:text-rose-600 shrink-0">
             <span className="sr-only">Tutup</span>
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
           </Button>

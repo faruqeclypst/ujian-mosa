@@ -20,7 +20,7 @@ export const BatchProgressDialog = ({ progress, colorClass = "bg-blue-600" }: Ba
 
   return (
     <Dialog open={progress.isOpen} onOpenChange={() => {}}>
-      <DialogContent className="max-w-md bg-card border-none shadow-2xl p-0 overflow-hidden rounded-3xl" hideClose>
+      <DialogContent className="max-w-md bg-card border-none shadow-2xl p-0 overflow-hidden rounded-2xl" hideClose>
         <div className={`${colorClass} p-6 text-white flex items-center justify-between`}>
           <div className="flex items-center gap-3">
             <div className="bg-white/20 p-2 rounded-xl">
@@ -46,7 +46,7 @@ export const BatchProgressDialog = ({ progress, colorClass = "bg-blue-600" }: Ba
             <Progress value={percentage} className="h-3 bg-slate-100 dark:bg-slate-800" />
           </div>
 
-          <p className="text-[10px] text-center text-slate-400 font-medium italic">
+          <p className="text-xs text-center text-slate-400 font-medium italic">
             * Jangan menutup atau merefresh halaman ini selama proses berlangsung.
           </p>
         </div>

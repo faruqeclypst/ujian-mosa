@@ -1430,7 +1430,7 @@ const ExamRoomsPage = () => {
 
       {/* Dialog Create/Edit */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-5xl w-[95vw] max-h-[92vh] overflow-y-auto bg-card p-0 rounded-2xl border-slate-200/70 dark:border-slate-800 shadow-2xl">
+        <DialogContent className="max-w-4xl w-[95vw] max-h-[92vh] overflow-y-auto bg-card p-0 rounded-2xl border-slate-200/70 dark:border-slate-800 shadow-2xl">
 
           {/* Header dengan tombol simpan di kanan */}
           <div className="flex items-center justify-between px-6 py-3.5 border-b border-slate-100 dark:border-slate-800 sticky top-0 bg-card z-10">
@@ -1684,7 +1684,7 @@ const ExamRoomsPage = () => {
 
       {/* Modal Daftar Kelas (Jika banyak) */}
       <Dialog open={!!showClassesRoom} onOpenChange={(open) => !open && setShowClassesRoom(null)}>
-        <DialogContent className="max-w-sm bg-card rounded-3xl overflow-hidden p-0 border-none shadow-2xl">
+        <DialogContent className="max-w-sm bg-card rounded-2xl overflow-hidden p-0 border-none shadow-2xl">
           <div className="bg-gradient-to-br from-indigo-600 to-blue-700 p-6 text-white relative">
             <Users className="h-12 w-12 opacity-10 absolute right-4 top-4" />
             <h3 className="text-lg font-bold mb-1">Daftar {terminology.class}</h3>

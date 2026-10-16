@@ -2990,7 +2990,7 @@ export const ItemAnalysisPage: React.FC = () => {
 
       {/* 6. MODAL PANDUAN & RUMUS PSIKOMETRI (CLASSICAL TEST THEORY 3 LAPISAN) */}
       <Dialog open={showGuideModal} onOpenChange={setShowGuideModal}>
-        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto rounded-2xl p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl">
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto rounded-2xl p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl">
           <DialogHeader>
             <DialogTitle className="text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
               <BookOpen className="h-5 w-5 text-blue-600" />

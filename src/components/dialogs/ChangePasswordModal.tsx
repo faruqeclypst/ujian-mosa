@@ -166,7 +166,7 @@ export const ChangePasswordModal = ({ isOpen, onClose, defaultTab = "profile" }:
         onClose();
       }
     }}>
-      <DialogContent className="sm:max-w-[450px] p-0 overflow-hidden border-0 bg-white dark:bg-gray-900 shadow-2xl rounded-[2rem]">
+      <DialogContent className="sm:max-w-md p-0 overflow-hidden border-0 bg-white dark:bg-gray-900 shadow-2xl rounded-2xl">
         <div className="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-blue-500 via-indigo-600 to-purple-700 z-50" />
         
         <DialogHeader className="pt-6 px-6 pb-2">

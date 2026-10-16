@@ -507,7 +507,7 @@ export default function ExamSimulatePage() {
 
       {/* Dialog navigasi mobile ala CBT */}
       <Dialog open={showGrid} onOpenChange={setShowGrid}>
-        <DialogContent className="max-w-[calc(100%-2rem)] rounded-3xl p-8 pointer-events-auto border-none bg-white dark:bg-slate-950 shadow-2xl">
+        <DialogContent className="max-w-md rounded-2xl p-8 pointer-events-auto border-none bg-white dark:bg-slate-950 shadow-2xl">
           <div className="flex items-center justify-between mb-6">
             <DialogTitle className="text-xl font-black text-emerald-800 dark:text-emerald-400 uppercase tracking-tighter">Navigasi Soal</DialogTitle>
             <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
