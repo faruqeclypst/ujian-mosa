@@ -632,6 +632,9 @@ const QuestionsPage = () => {
     statements?: Array<{ id: string; text: string; answer: "benar" | "salah" }>;
     matrixColumns: Array<{ id: string; text: string }>;
     matrixStatements: Array<{ id: string; text: string; answer: string }>;
+    klasifikasiCategories: Array<{ id: string; text: string }>;
+    klasifikasiStatements: Array<{ id: string; text: string; answer: string }>;
+    klasifikasiShuffle: boolean;
   }>({
     text: "",
     type: "pilihan_ganda",
@@ -659,7 +662,16 @@ const QuestionsPage = () => {
     matrixStatements: [
       { id: "s1", text: "", answer: "c1" },
       { id: "s2", text: "", answer: "c2" }
-    ]
+    ],
+    klasifikasiCategories: [
+      { id: "k1", text: "" },
+      { id: "k2", text: "" }
+    ],
+    klasifikasiStatements: [
+      { id: "s1", text: "", answer: "k1" },
+      { id: "s2", text: "", answer: "k2" }
+    ],
+    klasifikasiShuffle: true
   });
 
   const [isLiterasiActive, setIsLiterasiActive] = useState(false);
@@ -2399,7 +2411,16 @@ const QuestionsPage = () => {
       matrixStatements: [
         { id: "s1", text: "", answer: "c1" },
         { id: "s2", text: "", answer: "c2" }
-      ]
+      ],
+      klasifikasiCategories: [
+        { id: "k1", text: "" },
+        { id: "k2", text: "" }
+      ],
+      klasifikasiStatements: [
+        { id: "s1", text: "", answer: "k1" },
+        { id: "s2", text: "", answer: "k2" }
+      ],
+      klasifikasiShuffle: true
     });
     setIsLiterasiActive(false);
     setLiterasiMode("select");
@@ -2428,19 +2449,37 @@ const QuestionsPage = () => {
       pairs: q.pairs || [{ id: "1", left: "", right: "" }],
       answerKey: q.answerKey || "",
       items: q.items || [{ id: "1", text: "" }],
-      statements: (q.type === "matriks" ? undefined : (q.statements || (q.options?.statements ? q.options.statements : undefined))) || [
+      statements: (q.type === "matriks" || q.type === "klasifikasi" ? undefined : (q.statements || (q.options?.statements ? q.options.statements : undefined))) || [
         { id: "1", text: "", answer: "benar" },
         { id: "2", text: "", answer: "salah" },
         { id: "3", text: "", answer: "benar" }
       ],
-      matrixColumns: q.options?.columns || [
+      matrixColumns: q.type === "matriks" ? (q.options?.columns || [
+        { id: "c1", text: "Benar" },
+        { id: "c2", text: "Salah" }
+      ]) : [
         { id: "c1", text: "Benar" },
         { id: "c2", text: "Salah" }
       ],
       matrixStatements: q.options?.statements && q.type === "matriks" ? q.options.statements : [
         { id: "s1", text: "", answer: "c1" },
         { id: "s2", text: "", answer: "c2" }
-      ]
+      ],
+      klasifikasiCategories: q.type === "klasifikasi" ? (q.options?.categories || [
+        { id: "k1", text: "" },
+        { id: "k2", text: "" }
+      ]) : [
+        { id: "k1", text: "" },
+        { id: "k2", text: "" }
+      ],
+      klasifikasiStatements: q.type === "klasifikasi" ? (q.options?.statements || [
+        { id: "s1", text: "", answer: "k1" },
+        { id: "s2", text: "", answer: "k2" }
+      ]) : [
+        { id: "s1", text: "", answer: "k1" },
+        { id: "s2", text: "", answer: "k2" }
+      ],
+      klasifikasiShuffle: q.type === "klasifikasi" ? (q.options?.shuffleStatements !== false) : true
     });
     // Deteksi apakah ini soal pertama di grupnya agar hanya soal #1 yang bisa edit teks literasi
     const groupItems = questions.filter(item => q.groupId && item.groupId === q.groupId);
@@ -2714,6 +2753,21 @@ const QuestionsPage = () => {
         showAlert("Gagal", "Setiap pernyataan Matriks harus memiliki kolom jawaban yang valid.", "danger");
         return;
       }
+    } else if (formValues.type === "klasifikasi") {
+      const cats = formValues.klasifikasiCategories || [];
+      const stmts = formValues.klasifikasiStatements || [];
+      if (cats.length < 2 || cats.some(c => !c.text.trim())) {
+        showAlert("Gagal", "Klasifikasi membutuhkan minimal 2 kategori dan semua kategori harus memiliki nama.", "danger");
+        return;
+      }
+      if (stmts.length < 1 || stmts.some(s => !s.text.trim())) {
+        showAlert("Gagal", "Semua pernyataan Klasifikasi harus memiliki teks.", "danger");
+        return;
+      }
+      if (stmts.some(s => !cats.some(c => c.id === s.answer))) {
+        showAlert("Gagal", "Setiap pernyataan Klasifikasi harus memiliki kategori jawaban yang valid.", "danger");
+        return;
+      }
     } else if (formValues.type === "menjodohkan") {
       if (formValues.pairs.length < 1 || formValues.pairs.some(p => !p.left.trim() || !p.right.trim())) {
         showAlert("Gagal", "Semua pasangan menjodohkan harus diisi.", "danger");
@@ -2852,6 +2906,19 @@ const QuestionsPage = () => {
           answer: validColumns.some(c => c.id === s.answer) ? s.answer : (validColumns[0]?.id || "")
         }));
         payload.options = { columns: validColumns, statements: validStatements };
+        payload.correctAnswer = validStatements.map(s => `${s.id}:${s.answer}`).join(",");
+      } else if (formValues.type === "klasifikasi") {
+        const validCategories = (formValues.klasifikasiCategories || []).filter(c => c.text.trim());
+        const validStatements = (formValues.klasifikasiStatements || []).filter(s => s.text.trim()).map(s => ({
+          id: s.id,
+          text: s.text.trim(),
+          answer: validCategories.some(c => c.id === s.answer) ? s.answer : (validCategories[0]?.id || "")
+        }));
+        payload.options = {
+          categories: validCategories,
+          statements: validStatements,
+          shuffleStatements: !!formValues.klasifikasiShuffle
+        };
         payload.correctAnswer = validStatements.map(s => `${s.id}:${s.answer}`).join(",");
       } else if (formValues.type === "menjodohkan") {
         payload.options = { pairs: formValues.pairs };
@@ -3403,7 +3470,8 @@ const QuestionsPage = () => {
           uraian: "Uraian / Esai",
           urutkan: "Urutkan",
           drag_drop: "Drag and Drop",
-          matriks: "Matriks"
+          matriks: "Matriks",
+          klasifikasi: "Klasifikasi"
         };
         return (
           <span className="p-1 px-2 rounded-md bg-indigo-50 text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400 text-[10px] font-bold border border-indigo-200 dark:border-indigo-800/40 uppercase whitespace-nowrap">
@@ -3502,6 +3570,33 @@ const QuestionsPage = () => {
           return (
             <span className="p-1 px-2 rounded-md bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 text-xs font-semibold border border-amber-200 dark:border-amber-800/40 whitespace-nowrap">
               Belum ada data matriks
+            </span>
+          );
+        }
+
+        if (type === "klasifikasi") {
+          const cats = item.options?.categories || [];
+          const stList = item.options?.statements || [];
+          if (stList.length > 0 || cats.length > 0) {
+            return (
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="p-1 px-2 rounded-md bg-violet-50 text-violet-700 dark:bg-violet-950/40 dark:text-violet-300 text-xs font-semibold border border-violet-200 dark:border-violet-800/40 whitespace-nowrap">
+                  {stList.length} Pernyataan × {cats.length} Kategori
+                </span>
+                {cats.length > 0 && (
+                  <span
+                    className="p-1 px-2 rounded-md bg-slate-50 text-slate-600 dark:bg-slate-800/60 dark:text-slate-300 text-[11px] border border-slate-200 dark:border-slate-800 whitespace-nowrap cursor-help"
+                    title={cats.map((c: any) => c.text).join(" | ")}
+                  >
+                    {cats.map((c: any) => c.text).join(" / ").slice(0, 30)}
+                  </span>
+                )}
+              </div>
+            );
+          }
+          return (
+            <span className="p-1 px-2 rounded-md bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 text-xs font-semibold border border-amber-200 dark:border-amber-800/40 whitespace-nowrap">
+              Belum ada data klasifikasi
             </span>
           );
         }
@@ -5384,7 +5479,15 @@ Aturan:
                               matrixStatements: newType === "matriks" && (!prev.matrixStatements || prev.matrixStatements.length === 0) ? [
                                 { id: "s1", text: "", answer: "c1" },
                                 { id: "s2", text: "", answer: "c2" }
-                              ] : prev.matrixStatements
+                              ] : prev.matrixStatements,
+                              klasifikasiCategories: newType === "klasifikasi" && (!prev.klasifikasiCategories || prev.klasifikasiCategories.length === 0) ? [
+                                { id: "k1", text: "" },
+                                { id: "k2", text: "" }
+                              ] : prev.klasifikasiCategories,
+                              klasifikasiStatements: newType === "klasifikasi" && (!prev.klasifikasiStatements || prev.klasifikasiStatements.length === 0) ? [
+                                { id: "s1", text: "", answer: "k1" },
+                                { id: "s2", text: "", answer: "k2" }
+                              ] : prev.klasifikasiStatements
                             }));
                           }}
                           className="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm font-semibold h-10 px-3 pr-8 cursor-pointer text-slate-800 dark:text-slate-100 shadow-xs focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all appearance-none"
@@ -5398,6 +5501,7 @@ Aturan:
                           {(allowedTypes.urutkan || formValues.type === "urutkan") && <option value="urutkan">Urutkan (Ordering)</option>}
                           {(allowedTypes.drag_drop || formValues.type === "drag_drop") && <option value="drag_drop">Drag and Drop</option>}
                           {(allowedTypes.matriks || formValues.type === "matriks") && <option value="matriks">Matriks (Tabel Pilihan Ganda)</option>}
+                          {(allowedTypes.klasifikasi || formValues.type === "klasifikasi") && <option value="klasifikasi">Klasifikasi / Kategorisasi</option>}
                         </select>
                         <ChevronDown className="w-4 h-4 text-slate-400 dark:text-slate-500 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                       </div>
@@ -6137,6 +6241,167 @@ Aturan:
                     </div>
                   )}
 
+                  {/* RENDER KLASIFIKASI */}
+                  {formValues.type === "klasifikasi" && (
+                    <div className="space-y-4">
+                      {/* Editor Kategori */}
+                      <div className="space-y-2.5">
+                        <div className="flex items-center justify-between px-1">
+                          <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                            Kategori (boleh dipakai berulang)
+                          </span>
+                          <span className="text-[10px] text-violet-700 dark:text-violet-400 font-bold bg-violet-50 dark:bg-violet-950/40 px-2.5 py-0.5 rounded-full border border-violet-200 dark:border-violet-800">
+                            Min. 2 Kategori
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {(formValues.klasifikasiCategories || []).map((cat, cIdx) => (
+                            <div
+                              key={cat.id}
+                              className="flex items-center gap-1.5 p-1.5 pl-2.5 rounded-xl bg-white dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800 shadow-xs"
+                            >
+                              <Input
+                                value={cat.text}
+                                onChange={(e) => {
+                                  const updated = [...(formValues.klasifikasiCategories || [])];
+                                  updated[cIdx] = { ...updated[cIdx], text: e.target.value };
+                                  setFormValues(prev => ({ ...prev, klasifikasiCategories: updated }));
+                                }}
+                                placeholder={`Kategori ${cIdx + 1}`}
+                                className="h-8 text-xs w-28 bg-slate-50/50 dark:bg-slate-900 border-slate-200 dark:border-slate-700"
+                              />
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => {
+                                  const updated = (formValues.klasifikasiCategories || []).filter((_, i) => i !== cIdx);
+                                  setFormValues(prev => ({ ...prev, klasifikasiCategories: updated }));
+                                }}
+                                disabled={(formValues.klasifikasiCategories || []).length <= 2}
+                                className="h-8 w-8 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-lg"
+                                title="Hapus Kategori"
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          ))}
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setFormValues(prev => {
+                                const list = prev.klasifikasiCategories || [];
+                                const newId = `k${Date.now().toString(36)}`;
+                                return { ...prev, klasifikasiCategories: [...list, { id: newId, text: "" }] };
+                              });
+                            }}
+                            className="h-11 text-xs border-dashed rounded-xl font-semibold text-violet-600 hover:text-violet-700 hover:bg-violet-50/50 dark:hover:bg-violet-950/20 px-4"
+                          >
+                            <Plus className="h-3.5 w-3.5 mr-1.5" /> Kategori
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* Toggle Acak */}
+                      <label className="flex items-center gap-2.5 px-1 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={!!formValues.klasifikasiShuffle}
+                          onChange={(e) => setFormValues(prev => ({ ...prev, klasifikasiShuffle: e.target.checked }))}
+                          className="w-4 h-4 rounded accent-violet-600"
+                        />
+                        <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                          Acak urutan pernyataan saat ujian
+                        </span>
+                      </label>
+
+                      {/* Editor Pernyataan */}
+                      <div className="space-y-2.5">
+                        <div className="flex items-center justify-between px-1">
+                          <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                            Daftar Pernyataan & Kategori Benar
+                          </span>
+                        </div>
+                        <div className="space-y-2.5">
+                          {(formValues.klasifikasiStatements || []).map((st, index) => (
+                            <div
+                              key={st.id || index}
+                              className="flex flex-col sm:flex-row gap-2.5 items-start sm:items-center p-3 rounded-xl bg-white dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800 shadow-xs"
+                            >
+                              <div className="flex items-center gap-2.5 w-full sm:w-auto sm:flex-1">
+                                <span className="w-7 h-7 shrink-0 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-black flex items-center justify-center border border-slate-200 dark:border-slate-700">
+                                  {index + 1}
+                                </span>
+                                <Input
+                                  placeholder={`Tuliskan pernyataan ke-${index + 1}...`}
+                                  value={st.text}
+                                  onChange={(e) => {
+                                    const updated = [...(formValues.klasifikasiStatements || [])];
+                                    updated[index] = { ...updated[index], text: e.target.value };
+                                    setFormValues(prev => ({ ...prev, klasifikasiStatements: updated }));
+                                  }}
+                                  className="h-10 text-xs flex-1 bg-slate-50/50 dark:bg-slate-900 border-slate-200 dark:border-slate-700"
+                                />
+                              </div>
+                              <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-auto">
+                                <select
+                                  value={st.answer}
+                                  onChange={(e) => {
+                                    const updated = [...(formValues.klasifikasiStatements || [])];
+                                    updated[index] = { ...updated[index], answer: e.target.value };
+                                    setFormValues(prev => ({ ...prev, klasifikasiStatements: updated }));
+                                  }}
+                                  className="h-9 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-bold px-2.5 cursor-pointer text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 max-w-[160px]"
+                                >
+                                  {(formValues.klasifikasiCategories || []).map((cat) => (
+                                    <option key={cat.id} value={cat.id}>
+                                      {cat.text || `(Kategori ${cat.id})`}
+                                    </option>
+                                  ))}
+                                </select>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => {
+                                    const updated = (formValues.klasifikasiStatements || []).filter((_, i) => i !== index);
+                                    setFormValues(prev => ({ ...prev, klasifikasiStatements: updated }));
+                                  }}
+                                  className="h-9 w-9 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-xl"
+                                  disabled={(formValues.klasifikasiStatements || []).length <= 1}
+                                  title="Hapus Pernyataan"
+                                >
+                                  <Trash className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setFormValues(prev => {
+                              const list = prev.klasifikasiStatements || [];
+                              const newId = `s${Date.now().toString(36)}`;
+                              const firstCatId = (prev.klasifikasiCategories || [])[0]?.id || "";
+                              return {
+                                ...prev,
+                                klasifikasiStatements: [...list, { id: newId, text: "", answer: firstCatId }]
+                              };
+                            });
+                          }}
+                          className="w-full text-xs h-9 border-dashed rounded-xl font-semibold text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50/50 dark:hover:bg-indigo-950/20"
+                        >
+                          <Plus className="h-3.5 w-3.5 mr-1.5" /> Tambah Baris Pernyataan
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
                   {/* RENDER MENJODOHKAN */}
                   {formValues.type === "menjodohkan" && (
                     <div className="space-y-3">
@@ -6537,6 +6802,41 @@ Aturan:
                           </tbody>
                         </table>
                       </div>
+                    ) : previewQuestion.type === "klasifikasi" && (previewQuestion as any).options?.categories ? (
+                      <div className="overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
+                        <table className="w-full text-left border-collapse">
+                          <thead>
+                            <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
+                              <th className="p-3.5 text-xs font-bold text-slate-700 dark:text-slate-300">Pernyataan</th>
+                              <th className="w-36 p-3.5 text-center text-xs font-black text-emerald-600 dark:text-emerald-400 uppercase">Kategori Benar</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                            {((previewQuestion as any).options.statements || []).map((s: any, idx: number) => {
+                              const kunciCat = ((previewQuestion as any).options.categories || []).find((c: any) => c.id === s.answer);
+                              return (
+                                <tr key={s.id || idx}>
+                                  <td className="p-3.5 text-xs sm:text-sm text-slate-800 dark:text-slate-200">
+                                    <span className="font-bold mr-2 text-slate-400">{idx + 1}.</span>
+                                    <MathText content={s.text} disableJustify={true} className="inline !p-0 [&_p]:inline" />
+                                  </td>
+                                  <td className="p-3.5 text-center">
+                                    <span className="px-2.5 py-1 rounded-full text-xs font-black bg-violet-100 text-violet-700 dark:bg-violet-950/40 dark:text-violet-400">
+                                      {kunciCat?.text || "-"}
+                                    </span>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                        <div className="px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-200 dark:border-slate-800">
+                          <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                            Kategori tersedia: {((previewQuestion as any).options.categories || []).map((c: any) => c.text).join(", ")}
+                            {(previewQuestion as any).options.shuffleStatements !== false && " • Urutan pernyataan diacak saat ujian"}
+                          </p>
+                        </div>
+                      </div>
                     ) : (previewQuestion.type === "pilihan_ganda" || previewQuestion.type === "pilihan_ganda_kompleks" || previewQuestion.type === "benar_salah" || !previewQuestion.type) && (
                       <div className="space-y-3">
                         {Object.keys(previewQuestion.choices || {}).map((cKey, idx) => {
@@ -6689,6 +6989,7 @@ Aturan:
                                   q.type === "uraian" ? "bg-rose-50 text-rose-600 border-rose-200 dark:bg-rose-950/30 dark:text-rose-400 dark:border-rose-800/40" :
                                     q.type === "urutkan" ? "bg-orange-50 text-orange-600 border-orange-200 dark:bg-orange-950/30 dark:text-orange-400 dark:border-orange-800/40" :
                                       q.type === "matriks" ? "bg-teal-50 text-teal-600 border-teal-200 dark:bg-teal-950/30 dark:text-teal-400 dark:border-teal-800/40" :
+                                      q.type === "klasifikasi" ? "bg-violet-50 text-violet-600 border-violet-200 dark:bg-violet-950/30 dark:text-violet-400 dark:border-violet-800/40" :
                                       "bg-cyan-50 text-cyan-600 border-cyan-200 dark:bg-cyan-950/30 dark:text-cyan-400 dark:border-cyan-800/40"
                           }`}>
                           {q.type === "pilihan_ganda_kompleks" ? "PG Kompleks" :
@@ -6698,7 +6999,8 @@ Aturan:
                                   q.type === "uraian" ? "Uraian" :
                                     q.type === "urutkan" ? "Urutkan" :
                                       q.type === "drag_drop" ? "Drag & Drop" :
-                                        q.type === "matriks" ? "Matriks" : q.type}
+                                        q.type === "matriks" ? "Matriks" :
+                                          q.type === "klasifikasi" ? "Klasifikasi" : q.type}
                         </span>
                       )}
                     </div>
