@@ -58,11 +58,13 @@ Guru upload 1 gambar + definisikan 1..n area target (koordinat relatif 0–100%)
 
 ```jsonc
 // format jawaban siswa (answers[questionId])
-{ "x": 25.5, "y": 33.1 }   // koordinat klik dalam % relatif terhadap gambar
-// ATAU untuk mode "all": [{x,y}, {x,y}, ...]
+// mode "any": { "x": 25.5, "y": 33.1 }   // satu titik klik dalam %
+// mode "all": [{ "x": 25.5, "y": 33.1 }, { "x": 60.2, "y": 41.0 }]  // satu titik per area
 ```
 
-**Skoring v1:** 1 jika titik klik berada dalam bounding box salah satu area, 0 jika tidak.
+**Skoring:**
+- mode `"any"`: 1 jika titik klik berada dalam bounding box salah satu area, 0 jika tidak.
+- mode `"all"`: `area_terkena / total_area` — tiap area dihitung kena jika ada titik klik di dalamnya (skor parsial).
 **Catatan:** gambar harus lewat R2/image_proxy agar tampil di siswa (cek `image_proxy.pb.js`).
 
 ### 1.3 `isian_rumpang` (Cloze / Fill-in-the-blank dalam teks)
@@ -163,7 +165,7 @@ File terbesar (~7000 baris). Lokasi kunci (berdasarkan pola `urutkan`/`drag_drop
 
 **Yang harus dibuat per tipe (editor):**
 - `klasifikasi`: editor daftar kategori (tambah/hapus) + daftar pernyataan + dropdown kategori benar per pernyataan + toggle acak urutan
-- `hotspot`: upload gambar + editor area (klik-drag di gambar untuk buat kotak, atau input koordinat manual) + label per area
+- `hotspot`: upload gambar + pilih mode ("satu saja"/"semua area") + editor area (klik-drag di gambar untuk buat kotak, atau input koordinat manual) + label per area
 - `isian_rumpang`: textarea dengan sintaks `[[n]]` + auto-detect rumpang + input jawaban benar per rumpang (bisa multiple, pisah koma)
 - `matriks`: editor kolom (tambah/hapus/rename) + daftar pernyataan + radio/select kolom benar per pernyataan
 
@@ -183,7 +185,7 @@ File terbesar (~7000 baris). Lokasi kunci (berdasarkan pola `urutkan`/`drag_drop
 
 **Komponen render siswa yang harus dibuat:**
 - `klasifikasi`: daftar pernyataan, tiap baris ada `<select>`/radio grup berisi kategori (acak urutan pernyataan jika `shuffleStatements`)
-- `hotspot`: tampilkan gambar responsif, onClick catat koordinat % → tampilkan marker; tombol "hapus titik"
+- `hotspot`: tampilkan gambar responsif; mode "any": 1x klik → tampilkan marker, klik lagi untuk pindah; mode "all": klik beberapa kali (satu per area) → tampilkan semua marker; tombol "hapus semua titik"
 - `isian_rumpang`: render teks dengan `<input>` inline di posisi `[[n]]`
 - `matriks`: tabel HTML — baris = pernyataan, kolom = opsi, radio per sel
 
