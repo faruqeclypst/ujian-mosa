@@ -5164,7 +5164,7 @@ const QuestionFormPage = () => {
                           {(allowedTypes.pilihan_ganda !== false || formValues.type === "pilihan_ganda") && <option value="pilihan_ganda">Pilihan Ganda (Single Choice)</option>}
                           {(allowedTypes.pilihan_ganda_kompleks || formValues.type === "pilihan_ganda_kompleks") && <option value="pilihan_ganda_kompleks">Pilihan Ganda Kompleks (Multi Response)</option>}
                           {(allowedTypes.menjodohkan || formValues.type === "menjodohkan") && <option value="menjodohkan">Menjodohkan (Matching)</option>}
-                          {(allowedTypes.benar_salah || formValues.type === "benar_salah") && <option value="benar_salah">Benar / Salah (Matriks ANBK)</option>}
+                          {formValues.type === "benar_salah" && <option value="benar_salah">Benar / Salah (Legacy)</option>}
                           {(allowedTypes.isian_singkat || formValues.type === "isian_singkat") && <option value="isian_singkat">Isian Singkat</option>}
                           {(allowedTypes.uraian || formValues.type === "uraian") && <option value="uraian">Uraian / Esai</option>}
                           {(allowedTypes.urutkan || formValues.type === "urutkan") && <option value="urutkan">Urutkan (Ordering)</option>}
@@ -5179,6 +5179,9 @@ const QuestionFormPage = () => {
 
                       <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-tight">
                         Pilih format lembar jawaban siswa yang sesuai.
+                      </p>
+                      <p className="text-[11px] text-amber-600 dark:text-amber-400 leading-tight">
+                        Tipe Benar / Salah sudah digantikan oleh Matriks untuk soal baru.
                       </p>
                     </div>
 
