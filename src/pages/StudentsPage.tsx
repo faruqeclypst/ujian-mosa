@@ -160,20 +160,6 @@ const StudentsPage = () => {
 
   useEffect(() => { fetchStudentTable(); }, [fetchStudentTable]);
 
-  // Refresh tabel saat ada perubahan data siswa dari sumber lain (debounced)
-  const fetchTableRef = useRef(fetchStudentTable);
-  fetchTableRef.current = fetchStudentTable;
-  useEffect(() => {
-    if (!pb) return;
-    let timer: ReturnType<typeof setTimeout> | null = null;
-    let unsub: (() => void) | null = null;
-    pb.collection("students").subscribe("*", () => {
-      if (timer) clearTimeout(timer);
-      timer = setTimeout(() => fetchTableRef.current(), 800);
-    }).then((u) => { unsub = u as any; }).catch(() => {});
-    return () => { if (timer) clearTimeout(timer); if (unsub) (unsub as any)(); };
-  }, [pb]);
-
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [dialogMode, setDialogMode] = useState<"create" | "edit">("create");
   const [selectedStudent, setSelectedStudent] = useState<StudentData | null>(null);
