@@ -1096,53 +1096,6 @@ const StudentsPage = () => {
               )}
 
               {role === "admin" && (
-                <Button
-                  onClick={handleExportAllScores}
-                  disabled={isExportingScores}
-                  size="sm"
-                  className="rounded-xl bg-indigo-50 hover:bg-indigo-100 active:bg-indigo-50 border border-indigo-200/80 dark:bg-indigo-950/40 dark:text-indigo-300 dark:hover:bg-indigo-900/50 dark:border-indigo-800/50 text-indigo-700 font-bold shadow-sm h-9 px-3.5"
-                >
-                  {isExportingScores ? (
-                    <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <FileSpreadsheet className="mr-1.5 h-3.5 w-3.5" />
-                  )}
-                  Export Nilai
-                </Button>
-              )}
-
-              {/* Tombol Upload Foto Massal */}
-              {role === "admin" && (
-                <Button
-                  onClick={() => setIsBatchPhotoOpen(true)}
-                  size="sm"
-                  className="rounded-2xl bg-purple-600 hover:bg-purple-700 text-white font-bold shadow-sm h-9 px-3.5 gap-1.5 active:scale-95 transition-all"
-                  title="Upload pas foto banyak siswa sekaligus (ZIP / Multi-foto)"
-                >
-                  <Camera className="h-4 w-4" />
-                  <span>Upload Foto Massal</span>
-                </Button>
-              )}
-
-              {/* Tombol Cetak Kartu Ujian Utama */}
-              <Button
-                onClick={() => {
-                  setSingleStudentForCard(null);
-                  setPrintCardsOpen(true);
-                }}
-                size="sm"
-                className="rounded-2xl bg-amber-500 hover:bg-amber-600 text-white font-bold shadow-sm h-9 px-3.5 gap-1.5 active:scale-95 transition-all"
-              >
-                <Printer className="h-4 w-4" />
-                <span>Cetak Kartu Ujian</span>
-                {selectedIds.length > 0 && (
-                  <span className="ml-0.5 px-1.5 py-0.5 bg-black/20 rounded-full text-[10px]">
-                    {selectedIds.length}
-                  </span>
-                )}
-              </Button>
-
-              {role === "admin" && (
                 <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                   <DialogTrigger asChild>
                     <Button onClick={handleCreateClick} size="sm" className="rounded-2xl bg-blue-50 hover:bg-blue-100 active:bg-blue-50 border border-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 dark:active:bg-blue-900/30 dark:border-blue-800/40 text-blue-700 font-bold shadow-sm h-9 px-4">

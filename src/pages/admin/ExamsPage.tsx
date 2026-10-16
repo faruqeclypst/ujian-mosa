@@ -1582,22 +1582,46 @@ const ExamsPage = () => {
               )}
 
               {role === "admin" && (
-                <Button
-                  onClick={() => handleBatchExport()}
-                  size="sm"
-                  className="rounded-xl bg-violet-50 hover:bg-violet-100 active:bg-violet-50 border border-violet-200/80 dark:bg-violet-950/40 dark:text-violet-300 dark:hover:bg-violet-900/50 dark:border-violet-800/50 text-violet-700 font-bold shadow-sm h-9 px-3.5"
-                >
-                  <Download className="mr-1.5 h-3.5 w-3.5" /> Export Batch
-                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" className="rounded-xl font-bold shadow-sm transition-all h-9 px-3" aria-label="Aksi lainnya">
+                      <MoreHorizontal className="h-4 w-4" />
+                      <span className="ml-1.5 hidden lg:inline">Lainnya</span>
+                      <ChevronDown className="ml-1 h-3 w-3 opacity-50" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-64 p-2 rounded-2xl shadow-2xl border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 z-[100]">
+                    <DropdownMenuLabel className="text-[10px] font-bold uppercase tracking-widest text-slate-400 px-3 py-2 text-left">Aksi Lainnya</DropdownMenuLabel>
+                    <DropdownMenuItem
+                      onClick={() => handleBatchExport()}
+                      className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 focus:bg-slate-50 dark:focus:bg-slate-900 transition-colors group"
+                    >
+                      <div className="h-10 w-10 shrink-0 rounded-lg bg-violet-50 dark:bg-violet-900/30 text-violet-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <Download className="h-5 w-5" />
+                      </div>
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">Export Batch</span>
+                        <span className="text-[10px] text-slate-400 mt-1">Export semua ke ZIP (Word)</span>
+                      </div>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => setIsReportOpen(true)}
+                      className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 focus:bg-slate-50 dark:focus:bg-slate-900 transition-colors group"
+                    >
+                      <div className="h-10 w-10 shrink-0 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <ClipboardList className="h-5 w-5" />
+                      </div>
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">Laporan</span>
+                        <span className="text-[10px] text-slate-400 mt-1">Laporan progress Bank Soal guru</span>
+                      </div>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               )}
               <Button onClick={handleCreateClick} size="sm" className="rounded-2xl bg-blue-50 hover:bg-blue-100 active:bg-blue-50 border border-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 dark:active:bg-blue-900/30 dark:border-blue-800/40 text-blue-700 font-bold shadow-sm h-9 px-4">
                 <Plus className="mr-1.5 h-3.5 w-3.5" /> Tambah Ujian
               </Button>
-              {role === "admin" && (
-                <Button onClick={() => setIsReportOpen(true)} size="sm" variant="softSuccess" className="rounded-xl font-bold shadow-sm h-9 px-3.5">
-                  <ClipboardList className="mr-1.5 h-3.5 w-3.5" /> Laporan
-                </Button>
-              )}
               </div>
               {/* MOBILE (<sm): [+ Tambah Ujian] + menu ⋯ */}
               <div className="flex sm:hidden items-center gap-2 w-full">
