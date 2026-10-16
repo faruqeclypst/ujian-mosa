@@ -1057,11 +1057,11 @@ export const QuestionRenderer = (props: QuestionRendererProps) => {
                         [blankId]: e.target.value
                       });
                     }}
-                    placeholder={`[${blankId}]`}
-                    className="inline-block mx-1 px-3 py-2.5 rounded-lg border-2 border-emerald-400 dark:border-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 text-slate-800 dark:text-slate-200 font-medium shadow-sm focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 outline-none transition-all align-middle min-h-[44px]"
+                    placeholder="..."
+                    className="inline-block mx-1 px-3 py-1.5 rounded-lg border-2 border-emerald-400 dark:border-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 text-slate-800 dark:text-slate-200 font-medium shadow-sm focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 outline-none transition-all align-middle min-h-[44px]"
                     style={{
-                      minWidth: "100px",
-                      width: `${Math.max(100, (blankVal.length || 4) * 12)}px`,
+                      minWidth: "60px",
+                      width: `${Math.max(60, (blankVal.length || 3) * 10)}px`,
                       fontSize: "16px"
                     }}
                   />
