@@ -261,7 +261,7 @@ routerAdd("GET", "/api/leaderboard", (e) => {
             ).all(rqRows);
             if (rqRows.length > 0) examId = String(rqRows[0].eid || "");
         } catch (err) {}
-        if (!examId) return e.json(400, { error: "exam tidak ditemukan untuk room ini" });
+        if (!examId) console.error("[MONITOR] examId tidak ketemu untuk room:", roomId);
 
         // 2. Ambil questions (hanya field yang dipakai untuk scoring)
         const qTpl = new DynamicModel({ id: "", data: "" });
