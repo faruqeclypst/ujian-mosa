@@ -950,8 +950,11 @@ export const QuestionRenderer = (props: QuestionRendererProps) => {
                     >
                       {String.fromCharCode(65 + idx)}
                     </div>
-                    <div className="flex-1 overflow-hidden min-w-0">
-                      <div style={{ fontSize: `${15 * fontSize}px` }}>
+                    <div className="flex-1 overflow-hidden min-w-0 mt-0.5">
+                      <div
+                        className="min-h-[28px] sm:min-h-[36px] flex flex-col justify-center"
+                        style={{ fontSize: `${15 * fontSize}px` }}
+                      >
                         <MathText
                           content={c.text}
                           disableJustify={true}

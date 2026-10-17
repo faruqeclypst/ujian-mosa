@@ -2418,6 +2418,7 @@ const QuestionsPage = () => {
 
   const handleCreateClick = () => {
     // Navigasi ke halaman form (bukan modal lagi)
+    if (examId) sessionStorage.setItem("activeQuestionsExamId", examId);
     navigate("/admin/bank-soal/questions/new");
     return;
     setDialogMode("create");
@@ -2476,6 +2477,8 @@ const QuestionsPage = () => {
 
   const handleEditClick = (q: QuestionData) => {
     // Navigasi ke halaman form edit (bukan modal lagi)
+    const targetExamId = examId || q.examId || (exam && exam.id);
+    if (targetExamId) sessionStorage.setItem("activeQuestionsExamId", targetExamId);
     navigate(`/admin/bank-soal/questions/${q.id}/edit`);
     return;
     setDialogMode("edit");

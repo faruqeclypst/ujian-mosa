@@ -108,6 +108,7 @@ const unwrapTablesForStorage = (html: string): string => {
 
 const getAbsoluteUrl = (url: string): string => {
   if (!url) return "";
+  if (url.startsWith("file://")) return "";
   if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("data:")) {
     return url;
   }
@@ -439,6 +440,96 @@ const hasUnbalancedRumpang = (text: string): boolean => {
 
 
 
+// Reverse mapping dari format database ke QuestionType frontend
+export const typeMapReverse: Record<string, QuestionType> = {
+  multiple_choice: "pilihan_ganda",
+  complex_choice: "pilihan_ganda_kompleks",
+  matching: "menjodohkan",
+  true_false: "benar_salah",
+  short_answer: "isian_singkat",
+  essay: "uraian",
+  sequence: "urutkan",
+  drag_drop: "drag_drop",
+  matriks: "matriks",
+  klasifikasi: "klasifikasi",
+  hotspot: "hotspot",
+  isian_rumpang: "isian_rumpang"
+};
+
+// Helper untuk menormalisasi record mentah PocketBase menjadi QuestionData yang lengkap
+export const mapRawQuestionToQuestionData = (q: any): QuestionData => {
+  if (!q) return q;
+  const rawType = q.field || q.type || "multiple_choice";
+  const mappedType = (typeMapReverse[rawType] || rawType || "pilihan_ganda") as QuestionType;
+  const options = q.options || {};
+
+  const correctAnswersList = (q.correctAnswer || q.answerKey || "")
+    .toString()
+    .split(",")
+    .map((s: string) => s.trim().toLowerCase())
+    .filter(Boolean);
+
+  const rawChoices = (mappedType === "pilihan_ganda" || mappedType === "pilihan_ganda_kompleks" || (mappedType === "benar_salah" && !options.statements))
+    ? (q.choices || options || {})
+    : (q.choices || {});
+
+  const defaultKeys = ["a", "b", "c", "d", "e"];
+  const allChoiceKeys = Array.from(new Set([...defaultKeys, ...Object.keys(rawChoices || {})]));
+
+  const mappedChoices: Record<string, { text: string; imageUrl?: string; isCorrect: boolean }> = {};
+  allChoiceKeys.forEach((k) => {
+    const lowerKey = k.toLowerCase();
+    const val = rawChoices[k] ?? rawChoices[lowerKey] ?? rawChoices[k.toUpperCase()];
+    if (!val && !defaultKeys.includes(lowerKey)) return;
+
+    let textVal = "";
+    let imgVal: string | undefined = undefined;
+    let isCorrectVal = false;
+
+    if (typeof val === "string") {
+      textVal = val;
+    } else if (val && typeof val === "object") {
+      textVal = val.text || "";
+      imgVal = val.imageUrl;
+      isCorrectVal = typeof val.isCorrect === "boolean" ? val.isCorrect : false;
+    }
+
+    if (!isCorrectVal && correctAnswersList.includes(lowerKey)) {
+      isCorrectVal = true;
+    }
+
+    mappedChoices[lowerKey] = {
+      text: textVal,
+      imageUrl: imgVal,
+      isCorrect: isCorrectVal
+    };
+  });
+
+  return {
+    ...q,
+    id: q.id,
+    examId: q.examId || q.exam_id || "",
+    type: mappedType,
+    text: q.text || "",
+    imageUrl: q.imageUrl || "",
+    groupId: q.groupId || q.group_id || "",
+    groupText: q.groupText || q.group_text || "",
+    choices: mappedChoices,
+    pairs: q.pairs || options.pairs || (mappedType === "menjodohkan" ? [{ id: "1", left: "", right: "" }] : undefined),
+    items: q.items || options.items || (mappedType === "urutkan" || mappedType === "drag_drop" ? [{ id: "1", text: "" }] : undefined),
+    statements: mappedType === "benar_salah"
+      ? (q.statements || options.statements || (Array.isArray(options) ? options : undefined) || [
+        { id: "1", text: "", answer: "benar" },
+        { id: "2", text: "", answer: "salah" },
+        { id: "3", text: "", answer: "benar" }
+      ])
+      : undefined,
+    options: options,
+    answerKey: q.correctAnswer || q.answerKey || "",
+    order: q.order
+  };
+};
+
 const QuestionFormPage = () => {
   const navigate = useNavigate();
   const { questionId } = useParams<{ questionId: string }>();
@@ -448,11 +539,11 @@ const QuestionFormPage = () => {
   const [examId, setExamId] = useState<string | null>(() => sessionStorage.getItem("activeQuestionsExamId"));
 
   useEffect(() => {
-    if (!examId) {
-      // Jika nyasar kesini tanpa ID, balikin ke daftar bank soal
+    // Hanya redirect jika bukan mode edit dan examId tidak ada
+    if (!isEditMode && !examId) {
       navigate("/admin/bank-soal", { replace: true });
     }
-  }, [examId, navigate]);
+  }, [examId, isEditMode, navigate]);
 
   // Load question data in edit mode
   const [formLoading, setFormLoading] = useState(isEditMode);
@@ -470,11 +561,19 @@ const QuestionFormPage = () => {
       setFormLoading(true);
       setFormLoadError("");
       try {
-        const q: any = await pb.collection("questions").getOne(questionId);
+        const raw: any = await pb.collection("questions").getOne(questionId);
         if (cancelled) return;
-        setSelectedQuestion(q);
-        // Populate form - reuse handleEditClick logic
-        handleEditClick(q);
+
+        // Pastikan examId tersimpan
+        const targetExamId = raw.examId || raw.exam_id;
+        if (targetExamId) {
+          setExamId(targetExamId);
+          sessionStorage.setItem("activeQuestionsExamId", targetExamId);
+        }
+
+        const mapped = mapRawQuestionToQuestionData(raw);
+        setSelectedQuestion(mapped);
+        handleEditClick(mapped);
       } catch (e: any) {
         if (!cancelled) setFormLoadError(e?.message || "Gagal memuat soal.");
       } finally {
@@ -1008,8 +1107,13 @@ const QuestionFormPage = () => {
   const [confirmModal, setConfirmModal] = useState<any>({ isOpen: false, title: "", description: "", type: "info", confirmLabel: "Ok", onConfirm: () => { } });
 
   const showAlert = (title: string, description: string, type: "success" | "danger" | "warning" | "info" = "info", onConfirm?: () => void, showCancel: boolean = false, confirmLabel: string = "OK") => {
-    if (!onConfirm && !showCancel && (type === "success" || type === "info")) {
-      addToast({ type, title, description, duration: 3000 });
+    if (!onConfirm && !showCancel) {
+      addToast({
+        type: type === "danger" ? "error" : type,
+        title,
+        description,
+        duration: 4000
+      });
       return;
     }
     setConfirmModal({
@@ -2265,41 +2369,7 @@ const QuestionFormPage = () => {
         sort: 'order,created'
       });
 
-      const typeMapReverse: Record<string, string> = {
-        multiple_choice: "pilihan_ganda",
-        complex_choice: "pilihan_ganda_kompleks",
-        matching: "menjodohkan",
-        true_false: "benar_salah",
-        short_answer: "isian_singkat",
-        essay: "uraian",
-        sequence: "urutkan",
-        drag_drop: "drag_drop"
-      };
-
-      const mapped = loaded.map(q => {
-        const rawType = q.field || q.type || "pilihan_ganda";
-        const mappedType = (typeMapReverse[rawType] || rawType) as any;
-        const options = q.options || {};
-
-        return {
-          ...q,
-          id: q.id,
-          type: mappedType,
-          text: q.text,
-          imageUrl: q.imageUrl,
-          // Harmonize snake_case to camelCase
-          groupId: q.groupId || q.group_id || "",
-          groupText: q.groupText || q.group_text || "",
-          // Ensure choices, pairs, items are identified correctly
-          choices: (mappedType === "pilihan_ganda" || mappedType === "pilihan_ganda_kompleks")
-            ? options : (mappedType === "benar_salah" && !options.statements ? options : undefined),
-          pairs: mappedType === "menjodohkan" ? options.pairs : undefined,
-          items: (mappedType === "urutkan" || mappedType === "drag_drop") ? options.items : undefined,
-          statements: mappedType === "benar_salah" ? (options.statements || q.statements || (Array.isArray(options) ? options : undefined)) : undefined,
-          options: options,
-          answerKey: q.correctAnswer || q.answerKey
-        };
-      });
+      const mapped = loaded.map(q => mapRawQuestionToQuestionData(q));
 
       // Group-aware sorting: keep questions with same groupId together
       const grouped: any[] = [];
@@ -2497,7 +2567,8 @@ const QuestionFormPage = () => {
     setShowPreview(false);
   };
 
-  const handleEditClick = (q: QuestionData) => {
+  const handleEditClick = (rawQ: QuestionData | any) => {
+    const q = mapRawQuestionToQuestionData(rawQ);
     setSelectedQuestion(q);
     setQuestionFile(null);
     setHotspotFile(null);
@@ -2514,6 +2585,7 @@ const QuestionFormPage = () => {
         c: { text: q.choices?.c?.text || "", imageUrl: q.choices?.c?.imageUrl, isCorrect: !!q.choices?.c?.isCorrect },
         d: { text: q.choices?.d?.text || "", imageUrl: q.choices?.d?.imageUrl, isCorrect: !!q.choices?.d?.isCorrect },
         e: { text: q.choices?.e?.text || "", imageUrl: q.choices?.e?.imageUrl, isCorrect: !!q.choices?.e?.isCorrect },
+        ...(q.choices || {})
       },
       pairs: q.pairs || [{ id: "1", left: "", right: "" }],
       answerKey: q.answerKey || "",
@@ -3018,7 +3090,7 @@ const QuestionFormPage = () => {
       };
 
       const payload: any = {
-        examId,
+        examId: examId || selectedQuestion?.examId || (exam && exam.id) || "",
         text: textToSave,
         field: typeMap[formValues.type] || "multiple_choice",
         options: {},
@@ -3173,8 +3245,9 @@ const QuestionFormPage = () => {
           navigate("/admin/bank-soal/questions");
         }
       }
-    } catch (error) {
-      showAlert("Gagal", "Gagal menyimpan soal ke PocketBase.", "danger");
+    } catch (error: any) {
+      console.error("Gagal menyimpan soal:", error);
+      showAlert("Gagal", error?.message || "Gagal menyimpan soal ke PocketBase.", "danger");
     } finally {
       setIsSavingQuestion(false);
     }
@@ -6940,6 +7013,20 @@ const QuestionFormPage = () => {
             </div>
           </DialogContent>
         </Dialog>
+
+        <ConfirmationDialog
+          isOpen={confirmModal.isOpen}
+          onClose={() => setConfirmModal((prev: any) => ({ ...prev, isOpen: false }))}
+          onConfirm={() => {
+            if (confirmModal.onConfirm) confirmModal.onConfirm();
+            setConfirmModal((prev: any) => ({ ...prev, isOpen: false }));
+          }}
+          title={confirmModal.title}
+          description={confirmModal.description}
+          type={confirmModal.type}
+          confirmLabel={confirmModal.confirmLabel || "OK"}
+          showCancel={confirmModal.showCancel}
+        />
 
         <input
           type="file"
