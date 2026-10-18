@@ -1004,35 +1004,28 @@ const SettingsPage = () => {
   };
 
   return (
-    <div className="space-y-6 pb-20 animate-in fade-in duration-500">
+    <div className="space-y-5 pb-20 animate-in fade-in duration-500">
 
       {/* ── Page Header ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 px-5 py-4 sm:px-6 sm:py-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none" />
-
-        <div className="flex items-center gap-4 relative z-10">
-          <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center flex-shrink-0 shadow-md shadow-blue-500/20">
-            <Settings size={20} className="text-white" />
-          </div>
-          <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
-              Pengaturan Sistem
-            </h1>
-            <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mt-0.5">
-              Kelola branding institusi, konfigurasi server, dan pencadangan.
-            </p>
-          </div>
+      <div className="relative z-30 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between bg-card p-4 rounded-2xl border border-slate-200/60 dark:border-slate-800/40 shadow-sm backdrop-blur-sm">
+        <div>
+          <h2 className="text-xl sm:text-2xl font-bold text-slate-800 dark:text-white">
+            Pengaturan Sistem
+          </h2>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+            Kelola branding institusi, konfigurasi server, dan pencadangan.
+          </p>
         </div>
 
-        <div className="relative z-10 flex shrink-0">
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
           {loading ? (
-            <Skeleton className="h-10 w-40 rounded-xl" />
+            <Skeleton className="h-9 w-40 rounded-xl" />
           ) : (
             <Button
               form="settings-form"
               type="submit"
               disabled={saving}
-              className="w-full sm:w-auto rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-sm shadow-blue-500/20 h-10 px-5 transition-all active:scale-95"
+              className="w-full sm:w-auto rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-sm shadow-blue-500/20 h-9 px-4 transition-all active:scale-95"
             >
               {saving ? (
                 <><RefreshCw className="mr-2 h-4 w-4 animate-spin" /> Menyimpan...</>

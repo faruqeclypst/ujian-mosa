@@ -264,16 +264,11 @@ const UsersPage = () => {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between bg-card p-4 rounded-3xl border border-slate-200/60 dark:border-slate-800/40 shadow-sm backdrop-blur-sm">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-600 to-blue-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
-            <UserIcon className="h-6 w-6 text-white" />
-          </div>
-          <div>
-            <h2 className="text-xl sm:text-2xl font-bold text-slate-800 dark:text-white tracking-tight">Akun Pengguna</h2>
-            <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mt-0.5">Kelola akses login Administrator, {terminology.teacher}, dan {terminology.student}.</p>
-          </div>
+    <div className="space-y-5">
+      <div className="relative z-30 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between bg-card p-4 rounded-2xl border border-slate-200/60 dark:border-slate-800/40 shadow-sm backdrop-blur-sm">
+        <div>
+          <h2 className="text-xl sm:text-2xl font-bold text-slate-800 dark:text-white">Akun Pengguna</h2>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Kelola akses login Administrator, {terminology.teacher}, dan {terminology.student}.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Badge variant="outline" className="bg-white/50 dark:bg-slate-900/50 text-[10px] font-bold px-3 py-1.5 border-slate-200 dark:border-slate-800 rounded-xl">

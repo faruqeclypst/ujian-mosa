@@ -51,6 +51,11 @@ import BatchProgressDialog from "../components/dialogs/BatchProgressDialog";
 import PrintExamCardsDialog from "../components/dialogs/PrintExamCardsDialog";
 import BatchStudentPhotoDialog from "../components/dialogs/BatchStudentPhotoDialog";
 
+let studentTableCache: {
+  rows: StudentData[];
+  total: number;
+} | null = null;
+
 const StudentsPage = () => {
   const navigate = useNavigate();
   const { role } = useAuth();
@@ -61,7 +66,7 @@ const StudentsPage = () => {
   const quota = isOffline ? 999999 : (subscriptionStatus?.effectiveQuota || school?.student_quota || (school?.plan === "free" ? 50 : 250));
   const planName = isOffline ? "Offline Mandiri" : (school?.plan ? school.plan.charAt(0).toUpperCase() + school.plan.slice(1) : "Free");
   // Total siswa dari server (diisi fetch tabel); fallback ke context saat belum load
-  const [tableTotal, setTableTotal] = useState<number | null>(null);
+  const [tableTotal, setTableTotal] = useState<number | null>(() => studentTableCache?.total ?? null);
   const studentCount = tableTotal ?? students.length;
   const quotaUsedPercent = isOffline ? 0 : Math.min(100, Math.round((studentCount / Math.max(1, quota)) * 100));
   const isQuotaFull = isOffline ? false : studentCount >= quota;
@@ -102,9 +107,9 @@ const StudentsPage = () => {
   const [tableSearchInput, setTableSearchInput] = useState("");
   const [tableSearch, setTableSearch] = useState(""); // debounced
   const [tableSort, setTableSort] = useState<{ column: string; direction: "asc" | "desc" }>({ column: "name", direction: "asc" });
-  const [tableRows, setTableRows] = useState<StudentData[]>([]);
+  const [tableRows, setTableRows] = useState<StudentData[]>(() => studentTableCache?.rows || []);
   const [tableLoading, setTableLoading] = useState(false);
-  const [tableLoadedOnce, setTableLoadedOnce] = useState(false);
+  const [tableLoadedOnce, setTableLoadedOnce] = useState(() => !studentTableCache);
 
   // Debounce search 400ms agar tidak spam request per ketikan;
   // sekalian reset ke halaman 1 (dibatch dalam satu render -> 1x fetch)
@@ -142,10 +147,16 @@ const StudentsPage = () => {
         filter: buildStudentFilter(),
         fields: STUDENT_LIST_FIELDS,
       });
-      if (fetchIdRef.current !== fid) return; // abaikan response basi (pindah halaman cepat)
-      setTableRows(res.items.map(mapStudentRow));
+      const mappedRows = res.items.map(mapStudentRow);
+      setTableRows(mappedRows);
       setTableTotal(res.totalItems);
       setTableLoadedOnce(true);
+      if (tablePage === 1 && filterClassId === "ALL" && !tableSearch) {
+        studentTableCache = {
+          rows: mappedRows,
+          total: res.totalItems,
+        };
+      }
     } catch (err) {
       console.error("Gagal memuat daftar siswa:", err);
     } finally {
@@ -857,12 +868,13 @@ const StudentsPage = () => {
   };
 
   return (
-    <div className="space-y-5">
+    <>
       <input
         id="student-import-input"
         type="file"
         accept=".xlsx,.xls"
         className="hidden"
+        hidden
         onChange={(e) => {
           const file = e.target.files?.[0];
           if (file) {
@@ -871,10 +883,10 @@ const StudentsPage = () => {
           e.target.value = "";
         }}
       />
-      <div className="relative z-30 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between bg-card p-4 rounded-2xl border border-slate-200/60 dark:border-slate-800/40 shadow-sm backdrop-blur-sm">
+      <div className="space-y-5">
+        <div className="relative z-30 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between bg-card p-4 rounded-2xl border border-slate-200/60 dark:border-slate-800/40 shadow-sm backdrop-blur-sm">
         <div>
-          <h2 className="text-xl sm:text-2xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
-            <Users2 className="h-5 w-5 text-indigo-500" />
+          <h2 className="text-xl sm:text-2xl font-bold text-slate-800 dark:text-white">
             Manajemen {terminology.student} Aktif
           </h2>
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Kelola daftar {terminology.student} aktif dan penempatan {terminology.class.toLowerCase()}.</p>
@@ -1554,6 +1566,7 @@ const StudentsPage = () => {
         }}
       />
     </div>
+    </>
   );
 };
 

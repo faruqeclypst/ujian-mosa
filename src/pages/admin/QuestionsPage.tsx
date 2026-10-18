@@ -439,11 +439,19 @@ const hasUnbalancedRumpang = (text: string): boolean => {
 
 
 
+interface QuestionCacheEntry {
+  exam: any;
+  questions: QuestionData[];
+  timestamp: number;
+}
+const questionsPageCache = new Map<string, QuestionCacheEntry>();
+
 const QuestionsPage = () => {
   const navigate = useNavigate();
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [canDrag, setCanDrag] = useState(false);
   const [examId, setExamId] = useState<string | null>(() => sessionStorage.getItem("activeQuestionsExamId"));
+  const cachedData = examId ? questionsPageCache.get(examId) : null;
 
   useEffect(() => {
     if (!examId) {
@@ -498,9 +506,9 @@ const QuestionsPage = () => {
 
 
 
-  const [exam, setExam] = useState<any>(null);
-  const [questions, setQuestions] = useState<QuestionData[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [exam, setExam] = useState<any>(() => cachedData?.exam || null);
+  const [questions, setQuestions] = useState<QuestionData[]>(() => cachedData?.questions || []);
+  const [loading, setLoading] = useState(() => !cachedData);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(null);
@@ -2298,12 +2306,22 @@ const QuestionsPage = () => {
       });
 
       setQuestions(grouped as any);
+      if (examId) {
+        const prev = questionsPageCache.get(examId);
+        questionsPageCache.set(examId, {
+          exam: prev?.exam || null,
+          questions: grouped as any,
+          timestamp: Date.now()
+        });
+      }
     } catch (e) {
-      setQuestions([]);
+      if (!questionsPageCache.has(examId)) {
+        setQuestions([]);
+      }
     } finally {
       setLoading(false);
     }
-  }, [examId]);
+  }, [examId, pb]);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -2374,12 +2392,17 @@ const QuestionsPage = () => {
         const subjectObj = subjects.find((s: any) => s.id === examData.subjectId);
         const teacherObj = teachers.find((t: any) => t.id === examData.teacherId);
 
-        setExam({
+        const examObj = {
           ...examData,
           subject: subjectObj ? subjectObj.name : "",
           teacherName: teacherObj ? teacherObj.name : "",
           teacherCode: teacherObj ? teacherObj.code || "" : ""
-        });
+        };
+        setExam(examObj);
+        if (examId) {
+          const entry = questionsPageCache.get(examId);
+          if (entry) entry.exam = examObj;
+        }
 
         // 2. Load Questions
         await loadQuestions();
@@ -2404,7 +2427,7 @@ const QuestionsPage = () => {
     };
 
     init();
-  }, [examId, subjects, teachers, loadQuestions]);
+  }, [examId, pb, loadQuestions]);
 
   const isOwner = useMemo(() => {
     if (role === "admin") return true;

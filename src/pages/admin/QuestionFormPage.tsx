@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Plus, Edit, Trash, Check, Copy, Image, ChevronDown, FileText, Download, Eye, EyeOff, FolderOpen, Sparkles, Wand2, RefreshCw, BookOpen, Loader2, FileSpreadsheet, Search, X, Bookmark, Forward, CheckCircle2, Menu, Maximize2, HelpCircle, FileJson, GripVertical, ChevronLeft, ChevronRight, Database, Key, Layers, Target, Info } from "lucide-react";
+import { ArrowLeft, Plus, Edit, Trash, Check, Copy, Image, ChevronDown, FileText, Download, Eye, EyeOff, FolderOpen, Sparkles, Wand2, RefreshCw, BookOpen, Loader2, FileSpreadsheet, Search, X, Bookmark, Forward, CheckCircle2, Menu, Maximize2, HelpCircle, FileJson, GripVertical, ChevronLeft, ChevronRight, Database, Key, Layers, Target, Info, User, Hash } from "lucide-react";
 import { Reorder } from "framer-motion";
 import { MathText } from "../../components/ui/MathText";
 import { SmartImage } from "../../components/ui/smart-image";
@@ -530,6 +530,20 @@ export const mapRawQuestionToQuestionData = (q: any): QuestionData => {
   };
 };
 
+const QUESTION_TYPE_LABELS: Record<string, string> = {
+  pilihan_ganda: "Pilihan Ganda",
+  pilihan_ganda_kompleks: "PG Kompleks",
+  menjodohkan: "Menjodohkan",
+  benar_salah: "Benar / Salah",
+  isian_singkat: "Isian Singkat",
+  uraian: "Uraian / Esai",
+  urutkan: "Urutkan",
+  drag_drop: "Drag & Drop",
+  matriks: "Matriks",
+  isian_rumpang: "Isian Rumpang",
+  hotspot: "Hotspot",
+};
+
 const QuestionFormPage = () => {
   const navigate = useNavigate();
   const { questionId } = useParams<{ questionId: string }>();
@@ -759,6 +773,20 @@ const QuestionFormPage = () => {
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const dialogMode = isEditMode ? "edit" : "create";
+  const currentQuestionIndex = useMemo(() => {
+    if (!isEditMode || !questionId) return -1;
+    return questions.findIndex(q => q.id === questionId);
+  }, [isEditMode, questionId, questions]);
+
+  const questionNumberBadge = useMemo(() => {
+    if (dialogMode === "edit") {
+      if (currentQuestionIndex !== -1 && questions.length > 0) {
+        return `Soal #${currentQuestionIndex + 1} dari ${questions.length}`;
+      }
+      return "Mode Edit";
+    }
+    return questions.length > 0 ? `Soal #${questions.length + 1} (Baru)` : "Soal Baru";
+  }, [dialogMode, currentQuestionIndex, questions.length]);
   const [selectedQuestion, setSelectedQuestion] = useState<QuestionData | null>(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [previewQuestion, setPreviewQuestion] = useState<QuestionData | null>(null);
@@ -5125,56 +5153,153 @@ const QuestionFormPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
-      {/* Page Header */}
-      <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3 min-w-0">
+    <div className="space-y-4 sm:space-y-5 relative w-full pb-16">
+      {/* Header Card (Mirip dengan kartu soal & fluid w-full) */}
+      <div className="relative z-20 flex flex-col gap-3 bg-card p-4 sm:p-5 rounded-2xl border border-slate-200/60 dark:border-slate-800/40 shadow-sm backdrop-blur-sm transition-colors w-full">
+        {/* Breadcrumbs Row */}
+        <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-xs text-muted-foreground overflow-x-auto no-scrollbar py-0.5">
+          <button
+            type="button"
+            onClick={() => navigate("/admin/bank-soal")}
+            className="hover:text-indigo-600 dark:hover:text-indigo-400 font-medium transition-colors shrink-0"
+          >
+            Bank Soal
+          </button>
+          <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/60 shrink-0" />
+          <button
+            type="button"
+            onClick={() => {
+              if (examId) sessionStorage.setItem("activeQuestionsExamId", examId);
+              navigate("/admin/bank-soal/questions");
+            }}
+            className="hover:text-indigo-600 dark:hover:text-indigo-400 font-medium transition-colors truncate max-w-[200px] sm:max-w-xs shrink-0"
+            title={exam?.title || "Daftar Soal"}
+          >
+            {exam?.title || "Daftar Soal"}
+          </button>
+          <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/60 shrink-0" />
+          <span className="font-semibold text-foreground shrink-0">
+            {dialogMode === "edit" ? "Edit Butir Soal" : "Tambah Butir Soal"}
+          </span>
+        </nav>
+
+        {/* Main Header Row */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-0.5">
+          {/* Left: Back Button + Title Block */}
+          <div className="flex items-start sm:items-center gap-3 min-w-0 flex-1">
             <button
-              onClick={() => navigate("/admin/bank-soal/questions")}
-              className="shrink-0 w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+              type="button"
+              onClick={() => {
+                if (examId) sessionStorage.setItem("activeQuestionsExamId", examId);
+                navigate("/admin/bank-soal/questions");
+              }}
+              className="shrink-0 w-10 h-10 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-300 flex items-center justify-center transition-all focus:outline-hidden focus:ring-2 focus:ring-indigo-500/30 active:scale-95"
               title="Kembali ke daftar soal"
+              aria-label="Kembali ke daftar soal"
             >
               <ArrowLeft className="h-5 w-5" />
             </button>
-            <div className="min-w-0">
-              <div className="flex items-center gap-2 mb-0.5">
-                <span className="px-2 py-0.5 text-xs font-bold tracking-wider uppercase rounded-md bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 border border-indigo-200/60 dark:border-indigo-800/40">
-                  {dialogMode === "edit" ? "Mode Edit" : "Mode Tambah"}
+
+            <div className="min-w-0 flex-1">
+              {/* Title + Badges */}
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="text-xl sm:text-2xl font-bold text-foreground tracking-tight truncate">
+                  {dialogMode === "edit" ? "Edit Butir Soal" : "Tambah Butir Soal"}
+                </h1>
+
+                {/* Mode & Number Badge */}
+                <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold border transition-colors ${
+                  dialogMode === "edit"
+                    ? "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800/50"
+                    : "bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/40 dark:text-indigo-300 dark:border-indigo-800/50"
+                }`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${dialogMode === "edit" ? "bg-amber-500" : "bg-indigo-500"}`} />
+                  {questionNumberBadge}
                 </span>
-                <span className="text-xs font-semibold text-slate-400 dark:text-slate-500 hidden sm:inline">
-                  Bank Soal
-                </span>
+
+                {/* Dynamic Question Type Pill */}
+                {QUESTION_TYPE_LABELS[formValues.type] && (
+                  <span className="hidden md:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200/80 dark:border-slate-700/80">
+                    <Layers className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400" />
+                    {QUESTION_TYPE_LABELS[formValues.type]}
+                  </span>
+                )}
               </div>
-              <h1 className="text-xl font-bold text-slate-800 dark:text-white truncate">
-                {dialogMode === "edit" ? "Edit Butir Soal" : "Tambah Butir Soal"}
-              </h1>
+
+              {/* Meta context: Subject, Teacher, Questions Count */}
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-xs text-muted-foreground">
+                {exam?.subject && (
+                  <span className="inline-flex items-center gap-1 font-medium text-foreground">
+                    <BookOpen className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400 shrink-0" />
+                    <span className="truncate max-w-[180px]">{exam.subject}</span>
+                  </span>
+                )}
+                {exam?.teacherName && (
+                  <span className="inline-flex items-center gap-1 hidden sm:inline-flex">
+                    <User className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                    <span className="truncate max-w-[160px]">{exam.teacherName}</span>
+                  </span>
+                )}
+                {questions.length > 0 && (
+                  <span className="inline-flex items-center gap-1 text-muted-foreground hidden md:inline-flex">
+                    <Hash className="w-3 h-3 shrink-0" />
+                    Total {questions.length} soal tersimpan
+                  </span>
+                )}
+              </div>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={() => setShowPreview(!showPreview)}
-            className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all border shadow-xs active:scale-95 ${showPreview
-                ? "bg-indigo-600 text-white border-indigo-600 shadow-indigo-500/20"
-                : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700/60"
+
+          {/* Right: Actions Toolbar */}
+          <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+            {/* Preview Toggle Button */}
+            <button
+              type="button"
+              onClick={() => setShowPreview(!showPreview)}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all border shadow-xs active:scale-95 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 ${
+                showPreview
+                  ? "bg-indigo-600 hover:bg-indigo-700 text-white border-indigo-600 shadow-indigo-500/20"
+                  : "bg-background hover:bg-slate-100 dark:hover:bg-slate-800 text-foreground border-slate-200 dark:border-slate-700"
               }`}
-            title={showPreview ? "Matikan pratinjau tampilan ujian siswa" : "Aktifkan pratinjau tampilan ujian siswa"}
-          >
-            {showPreview ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5 text-slate-400" />}
-            <span className="hidden md:inline">{showPreview ? "Pratinjau: AKTIF" : "Pratinjau: OFF"}</span>
-          </button>
+              title={showPreview ? "Matikan pratinjau tampilan ujian siswa" : "Aktifkan pratinjau tampilan ujian siswa"}
+              aria-pressed={showPreview}
+            >
+              {showPreview ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4 text-slate-400" />}
+              <span>{showPreview ? "Pratinjau: ON" : "Pratinjau: OFF"}</span>
+            </button>
+
+            {/* Quick Save Header Button */}
+            <button
+              type="button"
+              onClick={(e) => handleSubmit(e, false)}
+              disabled={isSavingQuestion}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed transition-all shadow-xs shadow-indigo-500/20 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/30"
+              title="Simpan soal"
+            >
+              {isSavingQuestion ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span>Menyimpan...</span>
+                </>
+              ) : (
+                <>
+                  <Check className="w-3.5 h-3.5" />
+                  <span>{dialogMode === "edit" ? "Perbarui" : "Simpan"}</span>
+                </>
+              )}
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Form Content */}
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 pb-24">
-        {formLoading ? (
-          <div className="flex items-center justify-center py-20">
-            <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
-            <span className="ml-3 text-slate-600 dark:text-slate-400">Memuat soal...</span>
-          </div>
-        ) : (
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+      {/* Form Content (Fluid Width matching Header Card) */}
+      {formLoading ? (
+        <div className="flex items-center justify-center py-20 bg-card rounded-2xl border border-slate-200/60 dark:border-slate-800/40 shadow-sm">
+          <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
+          <span className="ml-3 text-muted-foreground">Memuat soal...</span>
+        </div>
+      ) : (
+        <div className="bg-card rounded-2xl border border-slate-200/60 dark:border-slate-800/40 shadow-sm overflow-hidden w-full">
         {/* Form - converted from dialog to page */}
           <div className="p-0 gap-0 flex flex-col">
 
@@ -6573,7 +6698,6 @@ const QuestionFormPage = () => {
           </div>
           </div>
         )}
-      </div>
 
       {/* Preview Dialog - kept */}
       {/* Dialog Preview Soal (CBT Look) */}

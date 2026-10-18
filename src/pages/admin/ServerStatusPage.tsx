@@ -134,31 +134,24 @@ const ServerStatusPage = () => {
   };
 
   return (
-    <div className="space-y-6 pb-20 animate-in fade-in duration-500">
+    <div className="space-y-5 pb-20 animate-in fade-in duration-500">
       {/* ── Page Header ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 px-5 py-4 sm:px-6 sm:py-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-40 h-40 bg-blue-500/5 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none" />
-
-        <div className="flex items-center gap-4 relative z-10">
-          <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center flex-shrink-0 shadow-sm shadow-blue-500/20">
-            <Server size={20} className="text-white" />
-          </div>
-          <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
-              Status Server & VPS
-            </h1>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
-              Pemantauan performa real-time dan kesehatan server sekolah Anda.
-            </p>
-          </div>
+      <div className="relative z-30 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between bg-card p-4 rounded-2xl border border-slate-200/60 dark:border-slate-800/40 shadow-sm backdrop-blur-sm">
+        <div>
+          <h2 className="text-xl sm:text-2xl font-bold text-slate-800 dark:text-white">
+            Status Server & VPS
+          </h2>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+            Pemantauan performa real-time dan kesehatan server sekolah Anda.
+          </p>
         </div>
 
-        <div className="flex items-center gap-2.5 relative z-10">
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
           <button
             type="button"
             onClick={() => setAutoRefresh(!autoRefresh)}
             className={cn(
-              "px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all flex items-center gap-1.5",
+              "px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all flex items-center gap-1.5 h-9",
               autoRefresh
                 ? "bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400"
                 : "bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-100"
@@ -173,7 +166,7 @@ const ServerStatusPage = () => {
             type="button"
             onClick={() => fetchStatus(true)}
             disabled={loading}
-            className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-sm transition-all disabled:opacity-50"
+            className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-sm transition-all disabled:opacity-50 h-9"
           >
             <RefreshCw size={13} className={cn(loading && "animate-spin")} />
             <span>Segarkan</span>

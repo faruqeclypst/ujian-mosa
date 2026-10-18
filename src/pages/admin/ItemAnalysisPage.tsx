@@ -1601,7 +1601,6 @@ export const ItemAnalysisPage: React.FC = () => {
 
   return (
     <TooltipProvider delayDuration={150}>
-    <div className="space-y-6 pb-16 print:p-0 print:space-y-4">
       {/* PRINT STYLESHEET OVERRIDE */}
       <style>{`
         @media print {
@@ -1623,7 +1622,7 @@ export const ItemAnalysisPage: React.FC = () => {
       `}</style>
 
       {/* 0. DOKUMEN RESMI KOP SURAT & SUMMARY SAAT DICETAK (Print Only) */}
-      <div className="hidden print:block mb-6 pb-4 border-b-2 border-slate-900 text-black">
+      <div hidden className="hidden print:block mb-6 pb-4 border-b-2 border-slate-900 text-black">
         {/* Kop Surat Sekolah */}
         <div className="flex items-center justify-between gap-4 pb-3 border-b border-slate-300">
           <div>
@@ -1705,44 +1704,29 @@ export const ItemAnalysisPage: React.FC = () => {
         </div>
       </div>
 
-      {/* 1. TOP HEADER & BREADCRUMB (Screen Only) */}
-      <div className="flex flex-col gap-4 print:hidden">
-        {/* Breadcrumb */}
-        <div className="flex items-center gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400">
-          <Link to="/admin" className="hover:text-blue-600 transition-colors">Dashboard</Link>
-          <ChevronRight className="h-3.5 w-3.5 text-slate-400" />
-          <Link to="/admin/ruang-ujian" className="hover:text-blue-600 transition-colors">Ruang Ujian</Link>
-          <ChevronRight className="h-3.5 w-3.5 text-slate-400" />
-          <span className="text-slate-900 dark:text-white font-bold">Analisis Butir Soal</span>
-        </div>
-
+      <div className="space-y-5 pb-16 print:p-0 print:space-y-4">
         {/* Page Title & Responsive Main Actions */}
-        <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-5 bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs">
-          <div className="flex items-start gap-4">
-            <div className="p-3 rounded-2xl bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800/60 shadow-2xs shrink-0 mt-0.5">
-              <BarChart2 className="h-6 w-6 sm:h-7 sm:w-7" />
+        <div className="relative z-30 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between bg-card p-4 rounded-2xl border border-slate-200/60 dark:border-slate-800/40 shadow-sm backdrop-blur-sm print:hidden">
+          <div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h2 className="text-xl sm:text-2xl font-bold text-slate-800 dark:text-white">
+                Analisis Butir Soal &amp; Daya Pembeda
+              </h2>
+              <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300 border-blue-200 font-bold text-xs uppercase tracking-wider">
+                Psikometri Arikunto &amp; Depdiknas
+              </Badge>
             </div>
-            <div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-lg sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
-                  Analisis Butir Soal &amp; Daya Pembeda
-                </h1>
-                <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300 border-blue-200 font-bold text-xs uppercase tracking-wider">
-                  Psikometri Arikunto &amp; Depdiknas
-                </Badge>
-              </div>
-              <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 max-w-2xl leading-relaxed">
-                Evaluasi komprehensif tingkat kesukaran, daya pembeda, efektivitas pengecoh, serta panduan tindak lanjut guru untuk perbaikan instrumen evaluasi.
-              </p>
-            </div>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5 leading-relaxed">
+              Evaluasi komprehensif tingkat kesukaran, daya pembeda, efektivitas pengecoh, serta panduan tindak lanjut guru untuk perbaikan instrumen evaluasi.
+            </p>
           </div>
 
           {/* Action Buttons Toolbar: Single Dropdown Menu */}
-          <div className="self-start xl:self-center shrink-0">
+          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
-                  className="rounded-xl font-bold text-xs h-10 px-4 bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 shadow-sm flex items-center gap-2 transition-all cursor-pointer"
+                  className="rounded-xl font-bold text-xs h-9 px-4 bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 shadow-sm flex items-center gap-2 transition-all cursor-pointer"
                 >
                   <SlidersHorizontal className="h-4 w-4 text-blue-400 dark:text-blue-600" />
                   <span>Menu Aksi &amp; Laporan</span>
@@ -1810,7 +1794,6 @@ export const ItemAnalysisPage: React.FC = () => {
             </DropdownMenu>
           </div>
         </div>
-      </div>
 
       {/* 2. RUANG UJIAN SELECTOR & EXAM METADATA (Screen Only, Clean & Uncluttered) */}
       <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 sm:p-5 shadow-xs print:hidden space-y-4">

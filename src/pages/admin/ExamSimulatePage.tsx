@@ -9,6 +9,7 @@ import {
   AlertCircle, Eye, Bookmark
 } from "lucide-react";
 import { QuestionRenderer } from "../../components/cbt/QuestionRenderer";
+import LoadingScreen from "../../components/layout/LoadingScreen";
 
 /* ============================================================
    Tipe data soal (disederhanakan dari CBTPage)
@@ -298,14 +299,7 @@ export default function ExamSimulatePage() {
   }
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 rounded-full border-4 border-emerald-500/30 border-t-emerald-600 animate-spin" />
-          <p className="text-sm font-medium text-slate-500">Memuat soal...</p>
-        </div>
-      </div>
-    );
+    return <LoadingScreen />;
   }
 
   if (error || questions.length === 0) {

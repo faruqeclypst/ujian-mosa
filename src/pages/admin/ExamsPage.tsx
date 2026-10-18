@@ -294,26 +294,33 @@ const convertToPngBase64 = async (
   });
 };
 
+interface ExamsCacheData {
+  exams: any[];
+  questionCounts: Record<string, number>;
+  activeExamIds: string[];
+}
+let examsCache: ExamsCacheData | null = null;
+
 const ExamsPage = () => {
   const navigate = useNavigate();
   const { pb, terminology } = useTenant();
   const { user, role, teacherId } = useAuth();
   const { addToast } = useToast();
   const { subjects, teachers, teacherFullAccess, loading: dataLoading } = useExamData();
-  const [exams, setExams] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const isLoading = loading || dataLoading;
+  const [exams, setExams] = useState<any[]>(() => examsCache?.exams || []);
+  const [loading, setLoading] = useState(() => !examsCache);
+  const isLoading = loading || (dataLoading && !examsCache);
   const [activeTab, setActiveTab] = useState<"aktif" | "arsip">("aktif");
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [dialogMode, setDialogMode] = useState<"create" | "edit">("create");
   const [selectedExam, setSelectedExam] = useState<ExamData | null>(null);
-  const [activeExamIds, setActiveExamIds] = useState<string[]>([]);
+  const [activeExamIds, setActiveExamIds] = useState<string[]>(() => examsCache?.activeExamIds || []);
   const [formValues, setFormValues] = useState({ title: "", subjectId: "", teacherId: "", examType: "Latihan" });
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [examToDelete, setExamToDelete] = useState<ExamData | null>(null);
-  const [questionCounts, setQuestionCounts] = useState<Record<string, number>>({});
+  const [questionCounts, setQuestionCounts] = useState<Record<string, number>>(() => examsCache?.questionCounts || {});
   const [isDeleting, setIsDeleting] = useState(false);
   const [isReportOpen, setIsReportOpen] = useState(false);
   const [reportCopied, setReportCopied] = useState(false);
@@ -741,7 +748,9 @@ const ExamsPage = () => {
           requestKey: null
         });
         const activeRooms = rooms.filter(r => r.status !== "archive" && r.isActive !== false && !r.isDisabled);
-        setActiveExamIds(activeRooms.map(r => r.examId).filter(Boolean));
+        const ids = activeRooms.map(r => r.examId).filter(Boolean);
+        setActiveExamIds(ids);
+        if (examsCache) examsCache.activeExamIds = ids;
       } catch (e) {
         console.error("Gagal load data ruang ujian:", e);
       }
@@ -806,6 +815,11 @@ const ExamsPage = () => {
 
         setExams(mapped);
         setLoading(false);
+        examsCache = {
+          exams: mapped,
+          questionCounts: counts && typeof counts === 'object' ? counts : (examsCache?.questionCounts || {}),
+          activeExamIds: examsCache?.activeExamIds || [],
+        };
       } catch (e) {
         console.error("Gagal load data ujian:", e);
         setLoading(false);
@@ -1471,8 +1485,7 @@ const ExamsPage = () => {
     <div className="space-y-5">
       <div className="relative z-30 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between bg-card p-4 rounded-2xl border border-slate-200/60 dark:border-slate-800/40 shadow-sm backdrop-blur-sm">
         <div>
-          <h2 className="text-xl sm:text-2xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
-            <BookOpen className="h-5 w-5 text-indigo-500" />
+          <h2 className="text-xl sm:text-2xl font-bold text-slate-800 dark:text-white">
             Bank Soal (Ujian)
           </h2>
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Kelola master ujian dan rincian soal Bank Soal.</p>

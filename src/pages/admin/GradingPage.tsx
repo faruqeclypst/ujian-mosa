@@ -290,16 +290,16 @@ const GradingPage = () => {
   );
 
   return (
-    <div className="space-y-6 pb-20 animate-in fade-in duration-500">
+    <div className="space-y-5 pb-20 animate-in fade-in duration-500">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 px-4 sm:px-6 py-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+      <div className="relative z-30 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between bg-card p-4 rounded-2xl border border-slate-200/60 dark:border-slate-800/40 shadow-sm backdrop-blur-sm">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" onClick={() => navigate("/admin/monitoring")} className="rounded-xl">
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">Detail Penilaian</h1>
-            <p className="text-sm text-slate-500">{room?.examTitle || "Ujian"} • {room?.room_name || ""}</p>
+            <h2 className="text-xl sm:text-2xl font-bold text-slate-800 dark:text-white">Detail Penilaian</h2>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">{room?.examTitle || "Ujian"} • {room?.room_name || ""}</p>
           </div>
         </div>
         <div className="flex items-center gap-2 flex-wrap">

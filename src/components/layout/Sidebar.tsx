@@ -213,6 +213,44 @@ const Sidebar = () => {
     { to: "/admin/panduan", label: "Panduan", icon: HelpCircle, badge: null }
   ], [terminology, unpaidCount]);
   
+  const prefetchRoute = React.useCallback((to: string) => {
+    switch (to) {
+      case "/admin/bank-soal":
+        import("../../pages/admin/ExamsPage");
+        break;
+      case "/admin/bank-soal/questions":
+        import("../../pages/admin/QuestionsPage");
+        break;
+      case "/admin/classes":
+        import("../../pages/ClassesPage");
+        break;
+      case "/admin/subjects":
+        import("../../pages/SubjectsPage");
+        break;
+      case "/admin/teachers":
+        import("../../pages/TeachersPage");
+        break;
+      case "/admin/student":
+        import("../../pages/StudentsPage");
+        break;
+      case "/admin/ruang-ujian":
+        import("../../pages/admin/ExamRoomsPage");
+        break;
+      default:
+        break;
+    }
+  }, []);
+
+  React.useEffect(() => {
+    const t = setTimeout(() => {
+      import("../../pages/admin/ExamsPage");
+      import("../../pages/ClassesPage");
+      import("../../pages/SubjectsPage");
+      import("../../pages/StudentsPage");
+    }, 1200);
+    return () => clearTimeout(t);
+  }, []);
+
   const [expandedMenus, setExpandedMenus] = React.useState<Record<string, boolean>>(() => 
     navigation.reduce((acc, item) => {
       if (item.children) acc[item.label] = true;
@@ -403,7 +441,13 @@ const Sidebar = () => {
                         const count = getCount(child.label);
 
                         return (
-                          <NavLink key={child.to} to={child.to} onClick={closeMobile} end>
+                          <NavLink
+                            key={child.to}
+                            to={child.to}
+                            onClick={closeMobile}
+                            onMouseEnter={() => prefetchRoute(child.to)}
+                            end
+                          >
                             {({ isActive }) => (
                               <div className={cn(
                                 "group relative flex items-center gap-3 rounded-lg px-3 py-2.5 ml-[36px] mr-1 text-[13px] font-semibold transition-all duration-200",
@@ -438,7 +482,13 @@ const Sidebar = () => {
             }
 
             return (
-              <NavLink key={item.to} to={item.to ?? "#"} onClick={closeMobile} end>
+              <NavLink
+                key={item.to}
+                to={item.to ?? "#"}
+                onClick={closeMobile}
+                onMouseEnter={() => prefetchRoute(item.to ?? "")}
+                end
+              >
                 {({ isActive }) => (
                   <div className={cn(
                     "group relative flex items-center gap-3.5 rounded-xl px-3 py-3 mx-1 text-sm font-semibold transition-all duration-200",

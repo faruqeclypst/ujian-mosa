@@ -402,16 +402,11 @@ const SchoolInvoicePage = () => {
     <div className="space-y-5">
       {/* ── Page Header ─────────────────────────────────────────── */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between bg-card p-4 rounded-2xl border border-slate-200/60 dark:border-slate-800/40 shadow-sm">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-blue-600/10 dark:bg-blue-400/10 rounded-xl flex items-center justify-center flex-shrink-0 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/30">
-            <FileText size={20} />
-          </div>
-          <div>
-            <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">Tagihan & Langganan</h2>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
-              Kelola faktur resmi, pembayaran QRIS, dan permohonan perpanjangan layanan sekolah
-            </p>
-          </div>
+        <div>
+          <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">Tagihan & Langganan</h2>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+            Kelola faktur resmi, pembayaran QRIS, dan permohonan perpanjangan layanan sekolah
+          </p>
         </div>
         <div className="flex items-center gap-2 self-start sm:self-auto">
           <button

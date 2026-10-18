@@ -1,6 +1,14 @@
 import { motion } from "framer-motion";
 
-const LoadingScreen = () => {
+interface LoadingScreenProps {
+  message?: string;
+  submessage?: string;
+}
+
+const LoadingScreen = ({
+  message = "EXAMKU System",
+  submessage = "Menyiapkan Dashboard...",
+}: LoadingScreenProps = {}) => {
   return (
     <div className="fixed inset-0 z-[999] flex flex-col items-center justify-center gap-6 bg-slate-50 dark:bg-slate-950 font-sans">
       <div className="relative">
@@ -14,8 +22,8 @@ const LoadingScreen = () => {
         />
       </div>
       <div className="flex flex-col items-center gap-2 relative z-10">
-        <p className="text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-[0.5em] animate-pulse">EXAMKU System</p>
-        <p className="text-[12px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Menyiapkan Dashboard...</p>
+        <p className="text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-[0.5em] animate-pulse">{message}</p>
+        <p className="text-[12px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">{submessage}</p>
       </div>
     </div>
   );
