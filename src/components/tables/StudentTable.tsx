@@ -222,13 +222,21 @@ export const StudentTable = ({
       key: "hasChangedPassword",
       label: "Password",
       sortable: true,
-      className: "w-[140px]",
+      className: "w-[150px]",
       render: (_: any, student: StudentData) => {
         const hasChanged = student.hasChangedPassword;
+        const isResetReq = !!student.resetRequested;
         return (
-          <span className={cn("text-[10px] font-semibold px-2 py-1 rounded-lg inline-flex items-center gap-1", hasChanged ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-800/40" : "bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400 border border-amber-100 dark:border-amber-800/40")}>
-            {hasChanged ? "✓ Diubah" : "⚠ Default"}
-          </span>
+          <div className="flex flex-col gap-1 items-start">
+            {isResetReq && (
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-md inline-flex items-center gap-1 bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-300 dark:border-rose-800 animate-pulse">
+                <KeyRound className="h-3 w-3" /> Minta Reset
+              </span>
+            )}
+            <span className={cn("text-[10px] font-semibold px-2 py-0.5 rounded-lg inline-flex items-center gap-1", hasChanged ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-800/40" : "bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400 border border-amber-100 dark:border-amber-800/40")}>
+              {hasChanged ? "✓ Diubah" : "⚠ Default"}
+            </span>
+          </div>
         );
       }
     },
@@ -277,9 +285,14 @@ export const StudentTable = ({
             </button>
             {role === "admin" && onResetPassword && (
               <button 
-                className="p-1.5 bg-amber-50 text-amber-600 hover:bg-amber-100 rounded-lg dark:bg-amber-900/10 dark:text-amber-400 border border-amber-100 dark:border-amber-800/40"
+                className={cn(
+                  "p-1.5 rounded-lg border transition-colors",
+                  student.resetRequested
+                    ? "bg-rose-100 text-rose-700 hover:bg-rose-200 dark:bg-rose-950/60 dark:text-rose-300 border-rose-300 dark:border-rose-800 animate-pulse"
+                    : "bg-amber-50 text-amber-600 hover:bg-amber-100 dark:bg-amber-900/10 dark:text-amber-400 border-amber-100 dark:border-amber-800/40"
+                )}
                 onClick={() => onResetPassword(student)}
-                title={`Reset Password ${terminology.student} ke Default (12345678)`}
+                title={student.resetRequested ? "Siswa ini meminta reset password! Klik untuk reset ke 12345678" : `Reset Password ${terminology.student} ke Default (12345678)`}
               >
                 <KeyRound className="h-4 w-4" />
               </button>

@@ -41,6 +41,25 @@ REQUIRED_FIELDS = [
         },
         "TEXT DEFAULT ''",
     ),
+    (
+        "students",
+        "resetRequested",
+        {
+            "name": "resetRequested",
+            "type": "text",
+            "required": False,
+            "presentable": False,
+            "unique": False,
+            "hidden": False,
+            "system": False,
+            "min": 0,
+            "max": 0,
+            "pattern": "",
+            "autogeneratePattern": "",
+            "primaryKey": False,
+        },
+        "TEXT DEFAULT ''",
+    ),
 ]
 
 # Select values yang harus ada: (collection, field_name, required_values)

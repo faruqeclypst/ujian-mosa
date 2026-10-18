@@ -140,6 +140,11 @@ try {
     execSync(`scp vps/migrate-tenant.sh ${VPS_HOST}:/usr/local/bin/migrate-tenant.sh`, { stdio: 'inherit' });
     execSync(`ssh ${VPS_HOST} "chmod +x /usr/local/bin/migrate-tenant.sh && sed -i 's/\\r$//' /usr/local/bin/migrate-tenant.sh"`, { stdio: 'inherit' });
   }
+  if (fs.existsSync('vps/migrate-tenant-schema.py')) {
+    execSync(`scp vps/migrate-tenant-schema.py ${VPS_HOST}:/usr/local/bin/migrate-tenant-schema.py`, { stdio: 'inherit' });
+    execSync(`ssh ${VPS_HOST} "chmod +x /usr/local/bin/migrate-tenant-schema.py && sed -i 's/\\r$//' /usr/local/bin/migrate-tenant-schema.py"`, { stdio: 'inherit' });
+    execSync(`ssh ${VPS_HOST} "scp -o StrictHostKeyChecking=no /usr/local/bin/migrate-tenant-schema.py ${WORKER_HOST}:/usr/local/bin/migrate-tenant-schema.py 2>/dev/null || true"`, { stdio: 'inherit' });
+  }
 
   // ── [4/6] 1-CLICK SYNC KE SELURUH TENANT SEKOLAH AKTIF ──
   console.log('\n🔄 [4/6] Menjalankan 1-Click Sync ke seluruh tenant sekolah aktif...');

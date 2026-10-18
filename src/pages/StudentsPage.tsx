@@ -80,7 +80,7 @@ const StudentsPage = () => {
   // Tabel TIDAK menunggu context memuat 10k siswa; fetch 50/page langsung dari server.
   const STUDENT_PAGE_SIZE = 50;
   const STUDENT_LIST_FIELDS =
-    "id,username,name,email,emailVisibility,verified,classId,gender,birthPlace,birthDate,examNumber,room,session,photo,hasChangedPassword,created,updated";
+    "id,username,name,email,emailVisibility,verified,classId,gender,birthPlace,birthDate,examNumber,room,session,photo,hasChangedPassword,resetRequested,created,updated";
   const STUDENT_SORT_MAP: Record<string, string> = {
     nisn: "username",
     name: "name",
@@ -101,6 +101,7 @@ const StudentsPage = () => {
     room: i.room || "",
     session: i.session || "",
     examNumber: i.examNumber || "",
+    resetRequested: i.resetRequested || "",
   } as StudentData);
 
   const [tablePage, setTablePage] = useState(1);

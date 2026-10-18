@@ -42,6 +42,12 @@ if (Test-Path "vps/sync-all-tenants.sh") {
     scp vps/sync-all-tenants.sh "$VPS_USER@$VPS_IP`:/usr/local/bin/sync-all-tenants.sh"
     ssh "$VPS_USER@$VPS_IP" "chmod +x /usr/local/bin/sync-all-tenants.sh"
 }
+if (Test-Path "vps/migrate-tenant-schema.py") {
+    Write-Host "    Mengupdate migrate-tenant-schema.py di Master VPS..." -ForegroundColor Cyan
+    scp vps/migrate-tenant-schema.py "$VPS_USER@$VPS_IP`:/usr/local/bin/migrate-tenant-schema.py"
+    ssh "$VPS_USER@$VPS_IP" "chmod +x /usr/local/bin/migrate-tenant-schema.py"
+    ssh "$VPS_USER@$VPS_IP" "scp -o StrictHostKeyChecking=no /usr/local/bin/migrate-tenant-schema.py root@43.134.175.87:/usr/local/bin/migrate-tenant-schema.py 2>/dev/null || true"
+}
 
 Write-Host "==> 3. Mengatur permission dan sinkronisasi ke Worker Node (43.134.175.87)..." -ForegroundColor Cyan
 ssh "$VPS_USER@$VPS_IP" "chown -R ubuntu:ubuntu $REMOTE_TEMPLATE; rsync -avz --delete $REMOTE_TEMPLATE/ root@43.134.175.87:$REMOTE_TEMPLATE/; ssh root@43.134.175.87 'chown -R ubuntu:ubuntu $REMOTE_TEMPLATE'"

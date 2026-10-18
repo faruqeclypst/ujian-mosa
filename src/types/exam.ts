@@ -43,6 +43,7 @@ export interface StudentData {
   room?: string;
   session?: string;
   examNumber?: string;
+  resetRequested?: string;
 }
 
 export type StudentPayload = Omit<StudentData, "id" | "createdAt">;

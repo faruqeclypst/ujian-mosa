@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from "react";
-import { Link } from "react-router-dom";
 import { Capacitor } from "@capacitor/core";
 import { useStudentAuth } from "../../context/StudentAuthContext";
 import { Button } from "../../components/ui/button";
@@ -9,7 +8,7 @@ import { Card, CardContent } from "../../components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../../components/ui/dialog";
 import { useTenant } from "../../context/TenantContext";
 import { useTheme } from "../../context/ThemeContext";
-import { User, Lock, GraduationCap, School, Eye, EyeOff, Sun, Moon, HardDrive, Globe, Monitor } from "lucide-react";
+import { User, Lock, GraduationCap, School, Eye, EyeOff, Sun, Moon, HardDrive, Globe, KeyRound, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
 import { isLocalServer } from "../landing/SelectSchoolPage";
 
 const StudentLoginPage = () => {
@@ -35,6 +34,73 @@ const StudentLoginPage = () => {
   const [logoError, setLogoError] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
+
+  // State for Reset Password Request Modal
+  const [isResetModalOpen, setIsResetModalOpen] = useState(false);
+  const [resetNisn, setResetNisn] = useState("");
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetError, setResetError] = useState("");
+  const [resetSuccess, setResetSuccess] = useState<{ studentName: string; nisn: string } | null>(null);
+
+  const handleOpenResetModal = () => {
+    const currentVal = nisnRef.current?.value || "";
+    setResetNisn(currentVal);
+    setResetError("");
+    setResetSuccess(null);
+    setIsResetModalOpen(true);
+  };
+
+  const handleSendResetRequest = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = resetNisn.trim();
+    if (!trimmed) {
+      setResetError(`Silakan masukkan ${terminology.id} atau Username Anda.`);
+      return;
+    }
+    if (!pb) {
+      setResetError("Koneksi ke server belum tersedia.");
+      return;
+    }
+
+    setResetLoading(true);
+    setResetError("");
+
+    try {
+      const res = await fetch(`${pb.baseUrl}/api/student/request-reset`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: trimmed }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        throw new Error(data.message || `Gagal mengajukan reset password (${res.status}).`);
+      }
+
+      setResetSuccess({
+        studentName: data.studentName || "Siswa",
+        nisn: data.nisn || trimmed,
+      });
+    } catch (err: any) {
+      setResetError(err.message || "Terjadi kesalahan saat mengajukan reset password.");
+    } finally {
+      setResetLoading(false);
+    }
+  };
+
+  const handleCloseResetModal = () => {
+    setIsResetModalOpen(false);
+    if (resetSuccess) {
+      if (nisnRef.current && resetSuccess.nisn) {
+        nisnRef.current.value = resetSuccess.nisn;
+      }
+      if (passwordRef.current) {
+        passwordRef.current.value = "";
+        passwordRef.current.focus();
+      }
+    }
+  };
 
   useEffect(() => {
     if (school?.name) {
@@ -276,7 +342,20 @@ const StudentLoginPage = () => {
                 </div>
               </div>
 
-              <div className="pt-4">
+              {/* Link Minta Reset Password */}
+              <div className="flex items-center justify-between text-xs px-1">
+                <span className="text-slate-400 dark:text-slate-500 font-medium">Lupa kata sandi?</span>
+                <button
+                  type="button"
+                  onClick={handleOpenResetModal}
+                  className="font-semibold text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 transition-colors flex items-center gap-1.5 py-1.5 focus:outline-hidden focus:underline min-h-[44px]"
+                >
+                  <KeyRound size={14} className="text-emerald-600 dark:text-emerald-400 shrink-0" />
+                  <span>Minta Reset Password</span>
+                </button>
+              </div>
+
+              <div className="pt-2">
                 <Button
                   type="submit"
                   className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold h-14 rounded-[20px] border-0 text-lg active:scale-[0.98]"
@@ -294,17 +373,6 @@ const StudentLoginPage = () => {
           </CardContent>
         </Card>
 
-                {!Capacitor.isNativePlatform() && (
-        <div className="mt-8 flex flex-col items-center gap-1.5 text-slate-500 text-[13px] font-medium">
-          <div className="bg-white/60 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700 px-4 py-2 rounded-full backdrop-blur-sm flex items-center gap-2 shadow-sm">
-            <Monitor size={14} className="text-emerald-600 dark:text-emerald-400" />
-            <span>Belum punya aplikasi ujian?</span>
-            <Link to="/unduh" className="text-emerald-600 dark:text-emerald-400 font-bold hover:underline">
-              Unduh di sini
-            </Link>
-          </div>
-        </div>
-        )}
 
         <div className="mt-4 flex flex-col items-center gap-1 text-slate-400 dark:text-slate-500 text-xs font-medium">
           <p>© {new Date().getFullYear()} CBT {schoolName}.</p>
@@ -373,6 +441,117 @@ const StudentLoginPage = () => {
               </Button>
             </div>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal Permintaan Reset Password */}
+      <Dialog open={isResetModalOpen} onOpenChange={setIsResetModalOpen}>
+        <DialogContent className="max-w-md bg-white dark:bg-slate-900 rounded-[28px] p-6 sm:p-8 border border-slate-200 dark:border-slate-800 shadow-2xl">
+          {resetSuccess ? (
+            <div className="text-center py-2 space-y-5">
+              <div className="w-16 h-16 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/40 rounded-2xl flex items-center justify-center mx-auto text-emerald-600 dark:text-emerald-400 shadow-xs">
+                <CheckCircle2 size={34} />
+              </div>
+              <div className="space-y-2">
+                <DialogTitle className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
+                  Permintaan Terkirim!
+                </DialogTitle>
+                <p className="text-slate-600 dark:text-slate-300 text-sm leading-relaxed">
+                  Permintaan reset password untuk <strong className="text-slate-900 dark:text-white font-bold">{resetSuccess.studentName}</strong> ({resetSuccess.nisn}) telah masuk ke notifikasi pengawas ujian.
+                </p>
+              </div>
+
+              <div className="p-4 bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-200/80 dark:border-emerald-800/40 rounded-2xl text-left space-y-1.5">
+                <p className="text-xs font-bold text-emerald-800 dark:text-emerald-300 uppercase tracking-wider">
+                  Langkah Selanjutnya:
+                </p>
+                <ol className="text-xs text-emerald-900/90 dark:text-emerald-200/90 space-y-1 list-decimal list-inside font-medium leading-relaxed">
+                  <li>Lapor ke pengawas atau proktor di ruangan Anda.</li>
+                  <li>Pengawas akan menekan tombol setujui reset.</li>
+                  <li>Setelah disetujui, login kembali dengan password:</li>
+                </ol>
+                <div className="mt-2 pt-2 border-t border-emerald-200/60 dark:border-emerald-800/40 text-center">
+                  <span className="inline-block px-3 py-1 font-mono font-black text-base tracking-widest text-emerald-700 dark:text-emerald-300 bg-white dark:bg-slate-900 rounded-lg border border-emerald-200 dark:border-emerald-800">
+                    12345678
+                  </span>
+                </div>
+              </div>
+
+              <Button
+                type="button"
+                onClick={handleCloseResetModal}
+                className="w-full h-12 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-2xl text-base shadow-md shadow-emerald-600/20 active:scale-[0.99]"
+              >
+                Siap, Kembali ke Login
+              </Button>
+            </div>
+          ) : (
+            <div>
+              <DialogHeader className="mb-5 text-center">
+                <div className="w-14 h-14 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/40 rounded-2xl flex items-center justify-center mb-3 mx-auto text-amber-600 dark:text-amber-400">
+                  <KeyRound size={28} />
+                </div>
+                <DialogTitle className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
+                  Minta Reset Password
+                </DialogTitle>
+                <p className="text-slate-500 dark:text-slate-400 text-xs sm:text-sm mt-1 leading-relaxed">
+                  Masukkan {terminology.id} Anda. Permintaan akan dikirimkan ke pengawas ujian untuk mereset password akun menjadi <strong className="font-mono text-amber-600 dark:text-amber-400 font-bold">12345678</strong>.
+                </p>
+              </DialogHeader>
+
+              <form onSubmit={handleSendResetRequest} className="space-y-4">
+                {resetError && (
+                  <div className="bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs sm:text-sm p-3.5 rounded-2xl flex items-start gap-2.5">
+                    <AlertCircle size={18} className="text-rose-600 dark:text-rose-400 shrink-0 mt-0.5" />
+                    <span className="leading-snug">{resetError}</span>
+                  </div>
+                )}
+
+                <div className="space-y-1.5 text-left">
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 ml-1">
+                    {terminology.id} / Username Siswa
+                  </label>
+                  <Input
+                    value={resetNisn}
+                    onChange={(e) => setResetNisn(e.target.value)}
+                    placeholder={`Contoh: 0012345678`}
+                    className="bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white rounded-2xl h-12 px-4 text-base focus:ring-2 focus:ring-emerald-500"
+                    disabled={resetLoading}
+                    autoFocus
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
+                  />
+                </div>
+
+                <div className="pt-2 flex flex-col-reverse sm:flex-row gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setIsResetModalOpen(false)}
+                    disabled={resetLoading}
+                    className="sm:w-1/3 h-12 rounded-2xl font-bold text-slate-600 dark:text-slate-300"
+                  >
+                    Batal
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={resetLoading || !resetNisn.trim()}
+                    className="sm:w-2/3 h-12 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-2xl text-sm gap-2 shadow-md shadow-emerald-600/20"
+                  >
+                    {resetLoading ? (
+                      <>
+                        <Loader2 size={16} className="animate-spin" />
+                        <span>Mengirim...</span>
+                      </>
+                    ) : (
+                      <span>Kirim ke Pengawas</span>
+                    )}
+                  </Button>
+                </div>
+              </form>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

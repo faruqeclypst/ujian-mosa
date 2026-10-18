@@ -11,7 +11,8 @@ onBootstrap((e) => {
             "room",
             "session",
             "examNumber",
-            "fastHash"
+            "fastHash",
+            "resetRequested"
         ];
         
         for (let i = 0; i < requiredCols.length; i++) {

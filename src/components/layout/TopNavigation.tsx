@@ -1,5 +1,5 @@
-import { LogOut, Menu, Search, User, Settings, Clock, Bell, ShieldAlert, Unlock, UserX, Sun, Moon, Monitor, Sparkles } from "lucide-react";
-import { useState, useRef, useEffect } from "react";
+import { LogOut, Menu, Search, User, Settings, Clock, Bell, ShieldAlert, Unlock, UserX, Sun, Moon, Monitor, Sparkles, KeyRound, Check, X, Loader2 } from "lucide-react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
 
 import { useAuth } from "../../context/AuthContext";
@@ -7,6 +7,7 @@ import { useSidebar } from "../../context/SidebarContext";
 import { useExamData } from "../../context/ExamDataContext";
 import { useTenant } from "../../context/TenantContext";
 import { useTheme } from "../../context/ThemeContext";
+import { useToast } from "../ui/toast";
 import { Skeleton } from "../ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 import { Button } from "../ui/button";
@@ -28,6 +29,9 @@ const TopNavigation = () => {
   const [lockedAttempts, setLockedAttempts] = useState<any[]>([]);
   const [examRooms, setExamRooms] = useState<Record<string, any>>({});
   const [currentTime, setCurrentTime] = useState<string>("");
+  const [notifTab, setNotifTab] = useState<"locked" | "reset">("locked");
+  const [isResettingAll, setIsResettingAll] = useState(false);
+  const [resettingId, setResettingId] = useState<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
 
@@ -184,7 +188,91 @@ const TopNavigation = () => {
     }
   };
 
-  const { teachers, students, classes, universalToken, timeLeft } = useExamData();
+  const {
+    teachers,
+    students,
+    classes,
+    universalToken,
+    timeLeft,
+    resetStudentPassword,
+    dismissResetRequest,
+    resetStudentPasswordBatch
+  } = useExamData();
+  const { addToast } = useToast();
+
+  const resetRequests = useMemo(() => {
+    return (students || []).filter((s) => !!s.resetRequested);
+  }, [students]);
+
+  const totalNotifications = lockedAttempts.length + resetRequests.length;
+
+  // Beralih otomatis ke tab yang memiliki notifikasi aktif saat dibuka
+  useEffect(() => {
+    if (isNotifOpen) {
+      if (lockedAttempts.length === 0 && resetRequests.length > 0) {
+        setNotifTab("reset");
+      } else if (lockedAttempts.length > 0 && resetRequests.length === 0) {
+        setNotifTab("locked");
+      }
+    }
+  }, [isNotifOpen, lockedAttempts.length, resetRequests.length]);
+
+  const handleApproveReset = async (st: any) => {
+    if (role !== "admin") return;
+    setResettingId(st.id);
+    try {
+      await resetStudentPassword(st.id);
+      addToast({
+        title: "Password Berhasil Direset",
+        description: `Password untuk ${st.name} (${st.nisn}) berhasil direset ke 12345678.`,
+        type: "success",
+      });
+    } catch (err: any) {
+      addToast({
+        title: "Gagal Mereset Password",
+        description: err.message || "Terjadi kesalahan saat mereset password.",
+        type: "error",
+      });
+    } finally {
+      setResettingId(null);
+    }
+  };
+
+  const handleDismissReset = async (st: any) => {
+    if (role !== "admin") return;
+    try {
+      await dismissResetRequest(st.id);
+      addToast({
+        title: "Permintaan Dihapus",
+        description: `Permintaan reset password untuk ${st.name} telah diabaikan.`,
+        type: "info",
+      });
+    } catch (err: any) {
+      console.error("Gagal menghapus permintaan reset:", err);
+    }
+  };
+
+  const handleResetAll = async () => {
+    if (role !== "admin" || resetRequests.length === 0) return;
+    setIsResettingAll(true);
+    try {
+      const ids = resetRequests.map((r) => r.id);
+      await resetStudentPasswordBatch(ids);
+      addToast({
+        title: "Semua Password Direset",
+        description: `${ids.length} password siswa berhasil direset ke 12345678.`,
+        type: "success",
+      });
+    } catch (err: any) {
+      addToast({
+        title: "Gagal Mereset",
+        description: err.message || "Terjadi kesalahan saat mereset password siswa.",
+        type: "error",
+      });
+    } finally {
+      setIsResettingAll(false);
+    }
+  };
 
   return (
     <header className="flex w-full items-center gap-2 sm:gap-4 border-b bg-card/95 backdrop-blur-sm px-3 sm:px-6 py-2 sm:py-3 shadow-sm shrink-0 relative z-30">
@@ -231,8 +319,8 @@ const TopNavigation = () => {
             )}
             onClick={() => setIsNotifOpen(!isNotifOpen)}
           >
-            <Bell className={cn("h-5 w-5", lockedAttempts.length > 0 ? "text-red-500 animate-pulse-slow" : "text-slate-500")} />
-            {lockedAttempts.length > 0 && (
+            <Bell className={cn("h-5 w-5", totalNotifications > 0 ? "text-red-500 animate-pulse-slow" : "text-slate-500")} />
+            {totalNotifications > 0 && (
               <span className="absolute top-2 right-2 flex h-2.5 w-2.5">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
@@ -243,75 +331,214 @@ const TopNavigation = () => {
 
           {/* Notif Dropdown */}
           {isNotifOpen && (
-            <div className="absolute right-0 mt-2 w-[320px] sm:w-[380px] rounded-2xl border bg-card p-0 text-card-foreground shadow-2xl animate-in fade-in-0 zoom-in-95 z-[100] overflow-hidden">
-              <div className="p-4 border-b flex items-center justify-between bg-slate-50/50 dark:bg-slate-900/40">
-                <div className="flex items-center gap-2">
-                  <ShieldAlert className="h-4 w-4 text-red-500" />
-                  <h3 className="font-bold text-sm">{terminology.student} Terkunci</h3>
-                </div>
-                <span className="text-[10px] bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-400 px-2 py-0.5 rounded-full font-bold">
-                  {lockedAttempts.length} Aktif
-                </span>
-              </div>
-              <div className="max-h-[350px] overflow-y-auto">
-                {lockedAttempts.length === 0 ? (
-                  <div className="p-10 text-center flex flex-col items-center gap-2">
-                    <div className="w-12 h-12 bg-slate-50 dark:bg-slate-800 rounded-full flex items-center justify-center">
-                      <Bell className="h-6 w-6 text-slate-300" />
-                    </div>
-                    <p className="text-xs text-slate-400 font-medium tracking-tight">Tidak ada {terminology.student} yang terkunci saat ini.</p>
-                  </div>
-                ) : (
-                  <div className="divide-y dark:divide-slate-800">
-                    {lockedAttempts.map((a) => {
-                      const room = examRooms[a.roomId];
+            <div className="absolute right-0 mt-2 w-[340px] sm:w-[400px] rounded-2xl border bg-card p-0 text-card-foreground shadow-2xl animate-in fade-in-0 zoom-in-95 z-[100] overflow-hidden">
+              {/* Segmented Header Tabs */}
+              <div className="p-2 border-b flex items-center gap-1.5 bg-slate-50/70 dark:bg-slate-900/40">
+                <button
+                  type="button"
+                  onClick={() => setNotifTab("locked")}
+                  className={cn(
+                    "flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-xl text-xs font-bold transition-all min-h-[36px]",
+                    notifTab === "locked"
+                      ? "bg-white dark:bg-slate-800 text-red-600 dark:text-red-400 shadow-xs border border-slate-200 dark:border-slate-700"
+                      : "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
+                  )}
+                >
+                  <ShieldAlert className="h-4 w-4" />
+                  <span>Terkunci</span>
+                  {lockedAttempts.length > 0 && (
+                    <span className="text-[10px] bg-red-100 text-red-700 dark:bg-red-950/60 dark:text-red-400 px-1.5 py-0.2 rounded-full font-bold">
+                      {lockedAttempts.length}
+                    </span>
+                  )}
+                </button>
 
-                      return (
-                        <div key={a.id} className="p-4 hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
-                          <div className="flex items-start gap-3">
-                            <div className="w-10 h-10 rounded-xl bg-red-50 dark:bg-red-950/30 flex items-center justify-center shrink-0 border border-red-100 dark:border-red-900/30">
-                              <UserX className="h-5 w-5 text-red-600 dark:text-red-400" />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                               <p className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">
-                                 {a.expand?.studentId?.name || students.find(s => s.id === a.studentId)?.name || `${terminology.student} Tidak Dikenal`}
-                               </p>
-                               <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5">
-                                 <span className="text-[10px] font-medium text-slate-500">
-                                   {classes.find(c => c.id === (a.expand?.studentId?.classId || students.find(s => s.id === a.studentId)?.classId))?.name || "-"}
-                                 </span>
-                                 <span className="text-[10px] text-slate-300 dark:text-slate-700">•</span>
-                                 <span className="text-[10px] font-mono text-slate-400 bg-slate-100 dark:bg-slate-800 px-1 rounded">
-                                   {a.nisn !== "N/A" ? a.nisn : (students.find(s => s.id === a.studentId)?.nisn || "-")}
-                                 </span>
-                               </div>
-                               <div className="mt-2 flex items-center gap-1.5 p-1.5 bg-blue-50/50 dark:bg-blue-950/20 rounded-lg border border-blue-100/50 dark:border-blue-900/20">
-                                 <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></div>
-                                 <p className="text-[10px] font-semibold text-blue-700 dark:text-blue-400 truncate">
-                                   {room?.room_name || room?.title || "Ruang Ujian"}
-                                 </p>
-                               </div>
-                              <Button
-                                onClick={() => role === "admin" && handleUnlockStudent(a.id)}
-                                size="sm"
-                                disabled={role !== "admin"}
-                                className="w-full mt-3 h-8 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold gap-1.5 shadow-sm shadow-blue-500/20 disabled:opacity-40 disabled:cursor-not-allowed"
-                                title={role !== "admin" ? "Hanya admin yang dapat membuka kunci" : "Buka kunci siswa"}
-                              >
-                                <Unlock className="h-3.5 w-3.5" />
-                                {role === "admin" ? "Buka Kunci Navigasi" : "Hanya Admin"}
-                              </Button>
+                <button
+                  type="button"
+                  onClick={() => setNotifTab("reset")}
+                  className={cn(
+                    "flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-xl text-xs font-bold transition-all min-h-[36px]",
+                    notifTab === "reset"
+                      ? "bg-white dark:bg-slate-800 text-amber-600 dark:text-amber-400 shadow-xs border border-slate-200 dark:border-slate-700"
+                      : "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
+                  )}
+                >
+                  <KeyRound className="h-4 w-4" />
+                  <span>Reset Password</span>
+                  {resetRequests.length > 0 && (
+                    <span className="text-[10px] bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 px-1.5 py-0.2 rounded-full font-bold">
+                      {resetRequests.length}
+                    </span>
+                  )}
+                </button>
+              </div>
+
+              <div className="max-h-[360px] overflow-y-auto">
+                {notifTab === "locked" ? (
+                  lockedAttempts.length === 0 ? (
+                    <div className="p-8 text-center flex flex-col items-center gap-2">
+                      <div className="w-12 h-12 bg-slate-50 dark:bg-slate-800 rounded-full flex items-center justify-center">
+                        <ShieldAlert className="h-6 w-6 text-slate-300" />
+                      </div>
+                      <p className="text-xs text-slate-400 font-medium tracking-tight">Tidak ada {terminology.student} yang terkunci saat ini.</p>
+                    </div>
+                  ) : (
+                    <div className="divide-y dark:divide-slate-800">
+                      {lockedAttempts.map((a) => {
+                        const room = examRooms[a.roomId];
+
+                        return (
+                          <div key={a.id} className="p-4 hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                            <div className="flex items-start gap-3">
+                              <div className="w-10 h-10 rounded-xl bg-red-50 dark:bg-red-950/30 flex items-center justify-center shrink-0 border border-red-100 dark:border-red-900/30">
+                                <UserX className="h-5 w-5 text-red-600 dark:text-red-400" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">
+                                  {a.expand?.studentId?.name || students.find(s => s.id === a.studentId)?.name || `${terminology.student} Tidak Dikenal`}
+                                </p>
+                                <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5">
+                                  <span className="text-[10px] font-medium text-slate-500">
+                                    {classes.find(c => c.id === (a.expand?.studentId?.classId || students.find(s => s.id === a.studentId)?.classId))?.name || "-"}
+                                  </span>
+                                  <span className="text-[10px] text-slate-300 dark:text-slate-700">•</span>
+                                  <span className="text-[10px] font-mono text-slate-400 bg-slate-100 dark:bg-slate-800 px-1 rounded">
+                                    {a.nisn !== "N/A" ? a.nisn : (students.find(s => s.id === a.studentId)?.nisn || "-")}
+                                  </span>
+                                </div>
+                                <div className="mt-2 flex items-center gap-1.5 p-1.5 bg-blue-50/50 dark:bg-blue-950/20 rounded-lg border border-blue-100/50 dark:border-blue-900/20">
+                                  <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></div>
+                                  <p className="text-[10px] font-semibold text-blue-700 dark:text-blue-400 truncate">
+                                    {room?.room_name || room?.title || "Ruang Ujian"}
+                                  </p>
+                                </div>
+                                <Button
+                                  onClick={() => role === "admin" && handleUnlockStudent(a.id)}
+                                  size="sm"
+                                  disabled={role !== "admin"}
+                                  className="w-full mt-3 h-8 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold gap-1.5 shadow-sm shadow-blue-500/20 disabled:opacity-40 disabled:cursor-not-allowed"
+                                  title={role !== "admin" ? "Hanya admin yang dapat membuka kunci" : "Buka kunci siswa"}
+                                >
+                                  <Unlock className="h-3.5 w-3.5" />
+                                  {role === "admin" ? "Buka Kunci Navigasi" : "Hanya Admin"}
+                                </Button>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      )
-                    })}
-                  </div>
+                        )
+                      })}
+                    </div>
+                  )
+                ) : (
+                  resetRequests.length === 0 ? (
+                    <div className="p-8 text-center flex flex-col items-center gap-2">
+                      <div className="w-12 h-12 bg-slate-50 dark:bg-slate-800 rounded-full flex items-center justify-center">
+                        <KeyRound className="h-6 w-6 text-slate-300" />
+                      </div>
+                      <p className="text-xs text-slate-400 font-medium tracking-tight">Tidak ada permintaan reset password saat ini.</p>
+                    </div>
+                  ) : (
+                    <div className="divide-y dark:divide-slate-800">
+                      {resetRequests.map((st) => {
+                        const studentClass = classes.find((c) => c.id === st.classId)?.name || "-";
+                        let timeStr = "";
+                        if (st.resetRequested) {
+                          try {
+                            const d = new Date(st.resetRequested);
+                            timeStr = d.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
+                          } catch (_) {}
+                        }
+
+                        const isThisResetting = resettingId === st.id;
+
+                        return (
+                          <div key={st.id} className="p-4 hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                            <div className="flex items-start gap-3">
+                              <div className="w-10 h-10 rounded-xl bg-amber-50 dark:bg-amber-950/30 flex items-center justify-center shrink-0 border border-amber-100 dark:border-amber-900/30 text-amber-600 dark:text-amber-400">
+                                <KeyRound className="h-5 w-5" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between gap-1">
+                                  <p className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">
+                                    {st.name}
+                                  </p>
+                                  {timeStr && (
+                                    <span className="text-[10px] text-slate-400 font-mono shrink-0">
+                                      {timeStr}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5">
+                                  <span className="text-[10px] font-medium text-slate-500">
+                                    {studentClass}
+                                  </span>
+                                  <span className="text-[10px] text-slate-300 dark:text-slate-700">•</span>
+                                  <span className="text-[10px] font-mono text-slate-400 bg-slate-100 dark:bg-slate-800 px-1 rounded">
+                                    {st.nisn}
+                                  </span>
+                                </div>
+
+                                <div className="mt-2.5 flex items-center gap-1.5">
+                                  <Button
+                                    onClick={() => handleApproveReset(st)}
+                                    size="sm"
+                                    disabled={role !== "admin" || isThisResetting}
+                                    className="flex-1 h-8 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold gap-1 shadow-sm disabled:opacity-50"
+                                    title="Reset password siswa ini menjadi 12345678"
+                                  >
+                                    {isThisResetting ? (
+                                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                    ) : (
+                                      <Check className="h-3.5 w-3.5" />
+                                    )}
+                                    <span>Reset ke 12345678</span>
+                                  </Button>
+
+                                  <Button
+                                    onClick={() => handleDismissReset(st)}
+                                    size="sm"
+                                    variant="ghost"
+                                    disabled={role !== "admin"}
+                                    className="h-8 px-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg text-xs"
+                                    title="Abaikan permintaan reset ini"
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )
                 )}
               </div>
-              {lockedAttempts.length > 0 && (
-                <div className="p-2 border-t bg-slate-50/50 dark:bg-slate-900/40">
-                  <p className="text-[9px] text-center text-slate-400 font-medium font-bold">Klik buka kunci untuk mengembalikan status {terminology.student} menjadi aktif.</p>
+
+              {notifTab === "locked" && lockedAttempts.length > 0 && (
+                <div className="p-2.5 border-t bg-slate-50/50 dark:bg-slate-900/40">
+                  <p className="text-[10px] text-center text-slate-400 font-medium font-bold">
+                    Klik buka kunci untuk mengembalikan status {terminology.student} menjadi aktif.
+                  </p>
+                </div>
+              )}
+
+              {notifTab === "reset" && resetRequests.length > 0 && (
+                <div className="p-2.5 border-t bg-slate-50/50 dark:bg-slate-900/40 flex items-center justify-between gap-2">
+                  <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">
+                    Password akan diubah menjadi <strong className="font-mono text-emerald-600 dark:text-emerald-400 font-bold">12345678</strong>.
+                  </p>
+                  {resetRequests.length > 1 && role === "admin" && (
+                    <Button
+                      onClick={handleResetAll}
+                      size="sm"
+                      disabled={isResettingAll}
+                      className="h-7 px-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-[10px] font-bold shrink-0 gap-1"
+                    >
+                      {isResettingAll ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
+                      <span>Reset Semua ({resetRequests.length})</span>
+                    </Button>
+                  )}
                 </div>
               )}
             </div>

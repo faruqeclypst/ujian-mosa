@@ -40,6 +40,7 @@ interface ExamDataContextType {
   deleteStudent: (id: string) => Promise<void>;
   resetStudentPassword: (id: string) => Promise<void>;
   resetStudentPasswordBatch: (studentIds: string[], onProgress?: (current: number, total: number) => void) => Promise<void>;
+  dismissResetRequest: (id: string) => Promise<void>;
   resetUserPassword: (userId: string) => Promise<void>;
   deleteStudentsBatch: (studentIds: string[]) => Promise<void>;
   updateStudentClassBatch: (studentIds: string[], newClassId: string) => Promise<void>;
@@ -100,6 +101,7 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
               mapped.gender = item.gender || "L";
               mapped.classId = item.classId || item.classid;
               mapped.hasChangedPassword = item.hasChangedPassword || false;
+              mapped.resetRequested = item.resetRequested || "";
             }
             return mapped;
           }));
@@ -111,7 +113,7 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
   // (fastHash 64 char × N siswa, tokenKey, activeSessionId) dibuang agar
   // fetch 10k siswa tidak memakan bandwidth/memori berlebih.
   const STUDENT_FIELDS =
-    "id,username,name,email,emailVisibility,verified,classId,gender,birthPlace,birthDate,examNumber,room,session,photo,hasChangedPassword,created,updated";
+    "id,username,name,email,emailVisibility,verified,classId,gender,birthPlace,birthDate,examNumber,room,session,photo,hasChangedPassword,resetRequested,created,updated";
 
   // Mapping record students -> StudentData (satu sumber kebenaran, dipakai
   // init critical, background load, dan realtime handler agar konsisten).
@@ -129,6 +131,7 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
       room: i.room || "",
       session: i.session || "",
       examNumber: i.examNumber || "",
+      resetRequested: i.resetRequested || "",
     } as any;
   }, []);
 
@@ -541,8 +544,15 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
       hasChangedPassword: false,
       activeSessionId: "",
       fastHash: "", // Clear agar migrasi otomatis via bcrypt saat login berikutnya
+      resetRequested: "",
     });
-    setStudents(prev => prev.map(item => item.id === id ? { ...item, hasChangedPassword: false } : item));
+    setStudents(prev => prev.map(item => item.id === id ? { ...item, hasChangedPassword: false, resetRequested: "" } : item));
+  };
+  const dismissResetRequest = async (id: string) => {
+    await pb.collection("students").update(id, {
+      resetRequested: "",
+    });
+    setStudents(prev => prev.map(item => item.id === id ? { ...item, resetRequested: "" } : item));
   };
   const resetStudentPasswordBatch = async (studentIds: string[], onProgress?: (current: number, total: number) => void) => {
     const defaultPass = "12345678";
@@ -555,13 +565,14 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
         hasChangedPassword: false,
         activeSessionId: "",
         fastHash: "", // Clear agar migrasi otomatis via bcrypt saat login berikutnya
+        resetRequested: "",
       })));
       if (onProgress) {
         onProgress(Math.min(i + chunkSize, studentIds.length), studentIds.length);
       }
     }
     setStudents(prev => prev.map(student => 
-      studentIds.includes(student.id) ? { ...student, hasChangedPassword: false } : student
+      studentIds.includes(student.id) ? { ...student, hasChangedPassword: false, resetRequested: "" } : student
     ));
   };
   const updateStudentClassBatch = async (studentIds: string[], newClassId: string) => {
@@ -600,7 +611,7 @@ export const ExamDataProvider = ({ children }: { children: ReactNode }) => {
         createTeacher, updateTeacher, deleteTeacher,
         createClass, updateClass, deleteClass,
         createSubject, updateSubject, deleteSubject,
-        createStudent, updateStudent, deleteStudent, resetStudentPassword, resetStudentPasswordBatch, resetUserPassword, updateStudentClassBatch, deleteStudentsBatch,
+        createStudent, updateStudent, deleteStudent, resetStudentPassword, resetStudentPasswordBatch, dismissResetRequest, resetUserPassword, updateStudentClassBatch, deleteStudentsBatch,
         universalToken, timeLeft, teacherFullAccess, teacherAIAccess
       }}
     >
