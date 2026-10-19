@@ -13,7 +13,7 @@ function msGetAuth(info) {
     try {
         if (info && info.auth) return info.auth;
         const headers = info ? (info.headers || {}) : {};
-        let token = headers["authorization"] || headers["x-token"] || "";
+        let token = headers["authorization"] || headers["Authorization"] || headers["x-token"] || headers["X-Token"] || "";
         if (typeof token === "string" && token.indexOf("Bearer ") === 0) {
             token = token.substring(7);
         }
@@ -24,35 +24,22 @@ function msGetAuth(info) {
     return null;
 }
 
-function msRequireAdmin(e) {
+function msRequireAdminOrTeacher(e) {
     const info = e.requestInfo();
     const auth = msGetAuth(info);
-    if (!auth) {
-        return { ok: false, res: e.json(401, { error: "Autentikasi diperlukan." }) };
-    }
+    if (!auth) return null;
     let col = "";
     try { if (auth.collection) col = auth.collection().name; } catch (err) {}
-    if (col !== "_superusers" && col !== "users") {
-        return { ok: false, res: e.json(403, { error: "Akses ditolak." }) };
-    }
-    // users biasa harus punya role admin
-    if (col === "users") {
-        try {
-            const role = auth.get("role") || "";
-            if (role !== "admin" && role !== "superadmin") {
-                return { ok: false, res: e.json(403, { error: "Hanya admin." }) };
-            }
-        } catch (err) {}
-    }
-    return { ok: true, auth: auth };
+    if (col !== "_superusers" && col !== "users") return null;
+    return auth;
 }
 
 // ---------------------------------------------------------------------------
 // 1. GET /api/room-stats
 // ---------------------------------------------------------------------------
 routerAdd("GET", "/api/room-stats", (e) => {
-    const chk = msRequireAdmin(e);
-    if (!chk.ok) return chk.res;
+    const auth = msRequireAdminOrTeacher(e);
+    if (!auth) return e.json(401, { error: "Autentikasi diperlukan." });
     try {
         const tpl = new DynamicModel({ rid: "", st: "", c: 0 });
         const rows = arrayOf(tpl);
@@ -81,8 +68,8 @@ routerAdd("GET", "/api/room-stats", (e) => {
 // 2. GET /api/room-detail-stats?roomId=xxx
 // ---------------------------------------------------------------------------
 routerAdd("GET", "/api/room-detail-stats", (e) => {
-    const chk = msRequireAdmin(e);
-    if (!chk.ok) return chk.res;
+    const auth = msRequireAdminOrTeacher(e);
+    if (!auth) return e.json(401, { error: "Autentikasi diperlukan." });
     try {
         const roomId = String(e.queryParam("roomId") || e.queryParam("roomid") || "");
         if (!roomId) return e.json(400, { error: "roomId wajib diisi" });

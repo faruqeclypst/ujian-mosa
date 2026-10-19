@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Plus, Trash, Edit, Users, Archive, RotateCw, BookOpen, ClipboardList, Lock, Clock, ChevronDown, ChevronRight, Power, PowerOff, Search, ShieldAlert, FileSpreadsheet, BarChart2, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "../../components/ui/button";
@@ -157,6 +157,7 @@ const ExamRoomsPage = () => {
     });
   };
 
+  const [attempts, setAttempts] = useState<any[]>([]);
   const [liveBreakdown, setLiveBreakdown] = useState<Record<string, number>>({});
   const [totalOngoing, setTotalOngoing] = useState(0);
 
@@ -421,44 +422,169 @@ const ExamRoomsPage = () => {
     }
   ], [masterTeachers, liveBreakdown, rooms, selectableRooms, selectedIds, terminology, isOwner, lastSelectedIndex, filteredRooms]);
 
-  // Sync Live Monitoring Progres — via backend agregasi /api/room-stats.
-  // Alasan: subscribe("*") ke attempts saat 10k siswa ujian membanjiri browser
-  // dengan ribuan event/detik (autosave + heartbeat) -> main thread 100%.
-  // Endpoint menghitung COUNT(DISTINCT studentId) di SQL dengan definisi
-  // kanonis yang sama (siswa unik, ongoing, eligible terhadap kelas room).
-  // Polling 15 detik cukup untuk daftar room; hemat resource saat tab hidden.
-  useEffect(() => {
-    if (!pb) return;
-    let cancelled = false;
+  // ── Realtime Active Students Engine (Parity with Dashboard) ──
+  // Menghitung jumlah siswa aktif secara real-time via query & SSE subscription
+  // ke koleksi 'attempts' untuk seluruh ruang ujian aktif.
+  const activeRoomsList = useMemo(() => {
+    return rooms.filter((r) => r.status !== "archive");
+  }, [rooms]);
 
-    const fetchStats = async () => {
+  const activeRoomIdsStr = useMemo(() => {
+    return activeRoomsList.map((r) => r.id).sort().join(",");
+  }, [activeRoomsList]);
+
+  const activeRoomIdsRef = useRef<string[]>([]);
+  useEffect(() => {
+    activeRoomIdsRef.current = activeRoomIdsStr ? activeRoomIdsStr.split(",").filter(Boolean) : [];
+  }, [activeRoomIdsStr]);
+
+  // Recalculate liveBreakdown & totalOngoing dynamically from attempts state
+  useEffect(() => {
+    const allowedRoomIds = new Set(
+      (role === "teacher"
+        ? rooms.filter(r => r.examTeacherId === teacherId && r.status !== "archive")
+        : rooms.filter(r => r.status !== "archive")
+      ).map(r => r.id)
+    );
+
+    const ongoingUnique = new Set<string>();
+    const roomSets: Record<string, Set<string>> = {};
+
+    attempts.forEach((a: any) => {
+      const rId = a.examRoomId || a.exam_room_id;
+      const sId = a.studentId || a.student_id;
+      if (!rId || !sId || !allowedRoomIds.has(rId)) return;
+
+      if (a.status === "ongoing" || a.status === "LOCKED") {
+        ongoingUnique.add(sId);
+        if (!roomSets[rId]) roomSets[rId] = new Set<string>();
+        roomSets[rId].add(sId);
+      }
+    });
+
+    const breakdown: Record<string, number> = {};
+    for (const [rId, set] of Object.entries(roomSets)) {
+      if (set.size > 0) {
+        breakdown[rId] = set.size;
+      }
+    }
+
+    setLiveBreakdown(breakdown);
+    setTotalOngoing(ongoingUnique.size);
+  }, [attempts, rooms, role, teacherId]);
+
+  // Fetch attempts for active rooms
+  const fetchLiveAttempts = useCallback(async () => {
+    if (!pb || !activeRoomIdsStr) {
+      setAttempts([]);
+      return;
+    }
+    const activeIds = activeRoomIdsStr.split(",").filter(Boolean);
+    if (activeIds.length === 0) {
+      setAttempts([]);
+      return;
+    }
+
+    try {
+      const filterStr = activeIds.map((id) => `examRoomId = "${id}"`).join(" || ");
+      const attemptsData = await pb.collection("attempts").getFullList({
+        filter: filterStr,
+        sort: "-updated",
+        fields: "id,status,studentId,student_id,examRoomId,exam_room_id,updated",
+      });
+      setAttempts(attemptsData);
+    } catch (e) {
+      console.warn("Attempts direct fetch fallback in ExamRoomsPage:", e);
+      // Fallback backend agregasi jika query attempts terkendala
       try {
         const res: any = await pb.send("/api/room-stats", { method: "GET" });
-        if (cancelled || !res || typeof res !== "object") return;
-        const breakdown: Record<string, number> = {};
-        let total = 0;
-        for (const [rid, v] of Object.entries(res)) {
-          const n = Number((v as any)?.ongoing) || 0;
-          if (n > 0) breakdown[rid] = n;
-          total += n;
+        if (res && typeof res === "object") {
+          const bd: Record<string, number> = {};
+          let total = 0;
+          for (const [rid, v] of Object.entries(res)) {
+            const n = Number((v as any)?.ongoing) || 0;
+            if (n > 0) bd[rid] = n;
+            total += n;
+          }
+          setLiveBreakdown(bd);
+          setTotalOngoing(total);
         }
-        setLiveBreakdown(breakdown);
-        setTotalOngoing(total);
+      } catch (err) {}
+    }
+  }, [pb, activeRoomIdsStr]);
+
+  // Initial fetch and Real-time SSE subscription
+  useEffect(() => {
+    fetchLiveAttempts();
+  }, [fetchLiveAttempts]);
+
+  useEffect(() => {
+    if (!pb) return;
+    let isSubscribed = true;
+    let currentUnsub: (() => void) | null = null;
+
+    const startSubscribe = async () => {
+      try {
+        const unsub = await pb.collection("attempts").subscribe("*", (e) => {
+          if (!isSubscribed) return;
+
+          const recRoomId = e.record.examRoomId || e.record.exam_room_id || "";
+          if (!activeRoomIdsRef.current.includes(recRoomId)) return;
+
+          if (e.action === "create" || e.action === "update") {
+            setAttempts((prev) => {
+              const idx = prev.findIndex((a) => a.id === e.record.id);
+              const cleanRecord = {
+                id: e.record.id,
+                status: e.record.status,
+                studentId: e.record.studentId || e.record.student_id,
+                student_id: e.record.student_id || e.record.studentId,
+                examRoomId: e.record.examRoomId || e.record.exam_room_id,
+                exam_room_id: e.record.exam_room_id || e.record.examRoomId,
+                updated: e.record.updated,
+              };
+
+              if (idx > -1) {
+                const newArr = [...prev];
+                newArr[idx] = { ...newArr[idx], ...cleanRecord };
+                return newArr;
+              }
+              return [cleanRecord, ...prev];
+            });
+          } else if (e.action === "delete") {
+            setAttempts((prev) => prev.filter((a) => a.id !== e.record.id));
+          }
+        });
+
+        if (!isSubscribed) {
+          unsub();
+        } else {
+          currentUnsub = () => { unsub(); };
+        }
       } catch (err) {
-        // Endpoint belum tersedia (belum release) atau error: pertahankan angka lama.
+        console.error("Attempts realtime subscription error in ExamRoomsPage:", err);
       }
     };
 
-    fetchStats();
+    startSubscribe();
+
+    // Background interval check (every 15s when tab is active) & on tab focus
+    const handleVisibility = () => {
+      if (!document.hidden) fetchLiveAttempts();
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+
     const pollTimer = setInterval(() => {
-      if (!document.hidden) fetchStats();
+      if (!document.hidden) fetchLiveAttempts();
     }, 15000);
 
     return () => {
-      cancelled = true;
+      isSubscribed = false;
+      if (currentUnsub) currentUnsub();
+      document.removeEventListener("visibilitychange", handleVisibility);
       clearInterval(pollTimer);
     };
-  }, [pb]);
+  }, [pb, fetchLiveAttempts]);
 
   // Sync Master Exams for Room creation selection
   useEffect(() => {
@@ -1244,7 +1370,13 @@ const ExamRoomsPage = () => {
             <Users className="h-5 w-5" />
           </div>
           <div>
-            <p className="text-xs text-slate-500 dark:text-slate-400">{terminology.student} Aktif</p>
+            <div className="flex items-center gap-1.5">
+              <p className="text-xs text-slate-500 dark:text-slate-400">{terminology.student} Aktif</p>
+              <span className="inline-flex items-center gap-1 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/70 dark:border-emerald-900/40 px-1.5 py-0.5 rounded-full text-[9px] font-bold text-emerald-600 dark:text-emerald-400">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                Live
+              </span>
+            </div>
             <div className="text-lg font-bold text-slate-800 dark:text-slate-100 mt-0.5 leading-none">
               {isLoading ? <Skeleton className="h-5 w-8" /> : totalOngoing}
             </div>

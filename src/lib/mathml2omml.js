@@ -2341,4 +2341,3 @@ const mml2omml = (mmlString, options) => {
 };
 
 export { mml2omml };
-//# sourceMappingURL=index.js.map

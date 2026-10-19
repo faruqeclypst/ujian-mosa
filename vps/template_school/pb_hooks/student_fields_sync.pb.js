@@ -82,14 +82,96 @@ onBootstrap((e) => {
         try {
             const usersCol = $app.findCollectionByNameOrId("users");
             if (usersCol) {
+                let modUsers = false;
                 const targetViewRule = 'id = @request.auth.id || @request.auth.role = "admin"';
                 if (usersCol.viewRule !== targetViewRule) {
                     usersCol.viewRule = targetViewRule;
-                    $app.save(usersCol);
+                    modUsers = true;
                     console.log("[USER_SYNC] Ensured viewRule on users collection: " + targetViewRule);
+                }
+                const avField = usersCol.fields.getByName("avatar_url");
+                if (avField && (!avField.max || avField.max < 3000000)) {
+                    avField.max = 3000000;
+                    modUsers = true;
+                    console.log("[USER_SYNC] Ensured users.avatar_url max length: 3000000");
+                }
+                if (modUsers) {
+                    $app.save(usersCol);
                 }
             }
         } catch (errUser) {
+            // Notice only
+        }
+
+        // Auto-ensure max character limits on text fields for offline Data URLs / image uploads
+        try {
+            const settingsCol = $app.findCollectionByNameOrId("settings");
+            if (settingsCol) {
+                let modSettings = false;
+                const lField = settingsCol.fields.getByName("logo");
+                if (lField && (!lField.max || lField.max < 3000000)) {
+                    lField.max = 3000000;
+                    modSettings = true;
+                }
+                const luField = settingsCol.fields.getByName("logoUrl");
+                if (luField && (!luField.max || luField.max < 3000000)) {
+                    luField.max = 3000000;
+                    modSettings = true;
+                }
+                if (modSettings) {
+                    $app.save(settingsCol);
+                    console.log("[SCHEMA_SYNC] Ensured settings.logo & logoUrl max length: 3000000");
+                }
+            }
+        } catch (errSet) {
+            // Notice only
+        }
+
+        try {
+            const studentsCol = $app.findCollectionByNameOrId("students");
+            if (studentsCol) {
+                const photoField = studentsCol.fields.getByName("photo");
+                if (photoField && (!photoField.max || photoField.max < 3000000)) {
+                    photoField.max = 3000000;
+                    $app.save(studentsCol);
+                    console.log("[SCHEMA_SYNC] Ensured students.photo max length: 3000000");
+                }
+            }
+        } catch (errPhoto) {
+            // Notice only
+        }
+
+        // Auto-ensure all 12 question types are enabled by default in settings.allowed_types
+        try {
+            const sRecords = $app.findRecordsByFilter("settings", "1=1", "+created", 1);
+            if (sRecords && sRecords.length > 0) {
+                const sRec = sRecords[0];
+                let currentAllowed = sRec.get("allowed_types");
+                if (typeof currentAllowed === "string") {
+                    try { currentAllowed = JSON.parse(currentAllowed); } catch(_) { currentAllowed = {}; }
+                }
+                if (!currentAllowed || typeof currentAllowed !== "object") currentAllowed = {};
+
+                const ALL_TYPES = [
+                    "pilihan_ganda", "pilihan_ganda_kompleks", "menjodohkan", "benar_salah",
+                    "isian_singkat", "urutkan", "drag_drop", "uraian", "klasifikasi",
+                    "hotspot", "isian_rumpang", "matriks"
+                ];
+                let changed = false;
+                for (let i = 0; i < ALL_TYPES.length; i++) {
+                    const t = ALL_TYPES[i];
+                    if (currentAllowed[t] === undefined) {
+                        currentAllowed[t] = true;
+                        changed = true;
+                    }
+                }
+                if (changed) {
+                    sRec.set("allowed_types", currentAllowed);
+                    $app.save(sRec);
+                    console.log("[SETTINGS_SYNC] Ensured all 12 question types enabled in settings.allowed_types");
+                }
+            }
+        } catch (errAllowed) {
             // Notice only
         }
     } catch (e) {

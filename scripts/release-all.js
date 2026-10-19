@@ -154,25 +154,31 @@ try {
   // ── [5/6] PAKET & PUBLIKASIKAN OFFLINE UPDATE (1-CLICK UPDATE) ──
   console.log('\n💾 [5/6] Mengemas dan merilis berkas Offline 1-Click Update...');
   
-  // offline_package/pb_public akan diperbarui melalui proses 1-Click Update dari offline-update.zip
+  // 1. Sinkronkan langsung dist terbaru & pb_hooks ke offline_package lokal
+  console.log('  📂 Menyinkronkan dist & pb_hooks ke folder offline_package lokal...');
+  if (!fs.existsSync('offline_package/pb_public')) fs.mkdirSync('offline_package/pb_public', { recursive: true });
+  execSync('powershell -Command "Copy-Item dist/* offline_package/pb_public/ -Recurse -Force"', { stdio: 'inherit' });
+  if (!fs.existsSync('offline_package/pb_hooks')) fs.mkdirSync('offline_package/pb_hooks', { recursive: true });
+  execSync('powershell -Command "Copy-Item pb_hooks/* offline_package/pb_hooks/ -Recurse -Force; Remove-Item offline_package/pb_hooks/_removed_go_native -Recurse -Force -ErrorAction SilentlyContinue"', { stdio: 'inherit' });
 
-  // Bangun ulang database offline yang bersih (fresh clone dari template VPS)
+  // 2. Bangun ulang database offline yang bersih (fresh clone dari template VPS)
   console.log('  🔄 Membangun ulang database offline dari template VPS...');
   execSync('python scripts/prepare_offline_db.py', { stdio: 'inherit' });
   console.log('  ✅ Database offline package berhasil dibangun ulang dari template VPS.');
 
-  // Tulis version.json
+  // 3. Tulis version.json ke root, dist, dan offline_package
   const pkg = JSON.parse(fs.readFileSync('package.json', 'utf-8'));
   const versionData = {
     version: pkg.version || '1.1.19',
     release_date: dateStr,
     timestamp: now.toISOString(),
-    notes: 'Rilis Resmi v1.1.1: Pembaruan terpadu seluruh sistem (Web, APK Android, Template VPS, dan Paket Offline).'
+    notes: `Rilis Resmi v${pkg.version || '1.1.19'}: Pembaruan terpadu seluruh sistem (Web, APK Android, Template VPS, dan Paket Offline).`
   };
   fs.writeFileSync('version.json', JSON.stringify(versionData, null, 2), 'utf-8');
   if (fs.existsSync('dist')) {
     fs.copyFileSync('version.json', 'dist/version.json');
   }
+  fs.copyFileSync('version.json', 'offline_package/version.json');
 
   // Siapkan folder staging untuk offline-update.zip
   const stagingDir = path.join(process.cwd(), '.temp_offline_update');

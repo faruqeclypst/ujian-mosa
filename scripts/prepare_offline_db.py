@@ -105,8 +105,27 @@ def build_offline_db():
                 "type": "text"
             }
             fields.append(dev_name_field)
-            cur.execute("UPDATE _collections SET fields=? WHERE id=?", (json.dumps(fields), col_id))
-            print("Added 'locked_device_name' to _collections for settings.")
+        # Ensure logo and logoUrl allow up to 3000000 characters for base64 / Data URLs
+        for f in fields:
+            if f.get('name') in ['logo', 'logoUrl']:
+                f['max'] = 3000000
+        cur.execute("UPDATE _collections SET fields=? WHERE id=?", (json.dumps(fields), col_id))
+
+    # 1b. Ensure students.photo and users.avatar_url allow up to 3000000 characters
+    cur.execute("SELECT id, name, fields FROM _collections WHERE name IN ('users', 'students')")
+    for r in cur.fetchall():
+        cid, cname, fjson = r[0], r[1], r[2]
+        cfields = json.loads(fjson)
+        changed = False
+        for f in cfields:
+            if cname == 'users' and f.get('name') == 'avatar_url':
+                f['max'] = 3000000
+                changed = True
+            elif cname == 'students' and f.get('name') == 'photo':
+                f['max'] = 3000000
+                changed = True
+        if changed:
+            cur.execute("UPDATE _collections SET fields=? WHERE id=?", (json.dumps(cfields), cid))
 
     # 2. Add offline_license, offline_license_status, locked_device_id, locked_device_name columns to settings table if missing
     cur.execute("PRAGMA table_info(settings)")
@@ -151,15 +170,30 @@ def build_offline_db():
     print("Configured users: admin@gmail.com (pass: sudahlupa, hasChangedPassword: 1)")
 
     # 4. Configure clean settings
+    all_types_json = json.dumps({
+        "pilihan_ganda": True,
+        "pilihan_ganda_kompleks": True,
+        "menjodohkan": True,
+        "benar_salah": True,
+        "isian_singkat": True,
+        "urutkan": True,
+        "drag_drop": True,
+        "uraian": True,
+        "klasifikasi": True,
+        "hotspot": True,
+        "isian_rumpang": True,
+        "matriks": True
+    })
     cur.execute("""
         UPDATE settings 
         SET name='EXAM AA - Server Lokal',
             logo='',
             logoUrl='',
             offline_license='',
+            allowed_types=?,
             groq_api_key='',
             ai_gateway_key=''
-    """)
+    """, (all_types_json,))
     print("Configured generic settings: 'EXAM AA - Server Lokal'")
 
     # 5. Clean operational tables

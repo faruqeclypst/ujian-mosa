@@ -65,7 +65,11 @@ export interface AIGeneratedQuestion {
   choices?: Record<string, { text: string; isCorrect: boolean }>;
   pairs?: Array<{ id: string; left: string; right: string }>;
   items?: Array<{ id: string; text: string }>;
-  statements?: Array<{ id: string; text: string; answer?: "benar" | "salah" }>;
+  statements?: Array<{ id: string; text: string; answer?: any }>;
+  categories?: Array<{ id: string; text: string }>;
+  columns?: Array<{ id: string; text: string }>;
+  blanks?: Array<{ id: string; answers: string[]; caseSensitive?: boolean }>;
+  shuffleStatements?: boolean;
   answerKey?: string;
   groupId?: string;
   groupText?: string;
@@ -74,7 +78,7 @@ export interface AIGeneratedQuestion {
 // ═══════════════════════════════════════════════════════════════════════════════
 // 🛠️ Robust JSON Parser (with jsonrepair fallback)
 // ═══════════════════════════════════════════════════════════════════════════════
-const robustJSONParse = (text: string): any => {
+export const robustJSONParse = (text: string): any => {
   if (!text || !text.trim()) throw new Error("AI memberikan respon kosong.");
 
   let clean = text.trim();
@@ -122,15 +126,15 @@ const robustJSONParse = (text: string): any => {
 // 📋 AI Models Registry
 // ═══════════════════════════════════════════════════════════════════════════════
 export const AI_MODELS = [
-  // --- GROQ CLOUD (High Speed) ---
-  { id: "openai/gpt-oss-120b", name: "GPT-OSS 120B (Latest Reasoning)", speed: "Powerful", status: "production", provider: "groq", dailyLimit: "~100k token/hari" },
-  { id: "openai/gpt-oss-20b", name: "GPT-OSS 20B (Fast Reasoning)", speed: "Fast", status: "production", provider: "groq", dailyLimit: "~100k token/hari" },
-  { id: "meta-llama/llama-4-maverick-17b-128e-instruct", name: "Llama 4 Maverick 17B", speed: "High Performance", status: "production", provider: "groq", dailyLimit: "~100k token/hari" },
+  // --- GROQ CLOUD (High Speed & Accuracy) ---
+  { id: "llama-3.3-70b-versatile", name: "Llama 3.3 70B (Rekomendasi Utama)", speed: "Super Cepat & Akurat", status: "production", provider: "groq", dailyLimit: "~100k token/hari" },
+  { id: "llama-3.1-8b-instant", name: "Llama 3.1 8B Instant (Ultra Kilat)", speed: "Hyper Fast", status: "production", provider: "groq", dailyLimit: "~500k token/hari" },
   { id: "meta-llama/llama-4-scout-17b-16e-instruct", name: "Llama 4 Scout 17B", speed: "Fast", status: "production", provider: "groq", dailyLimit: "~500k token/hari" },
-  { id: "llama-3.3-70b-versatile", name: "Llama 3.3 70B", speed: "High Performance", status: "production", provider: "groq", dailyLimit: "~100k token/hari" },
+  { id: "meta-llama/llama-4-maverick-17b-128e-instruct", name: "Llama 4 Maverick 17B", speed: "High Performance", status: "production", provider: "groq", dailyLimit: "~100k token/hari" },
   { id: "deepseek-r1-distill-llama-70b", name: "DeepSeek R1 Llama 70B (Reasoning)", speed: "Powerful", status: "production", provider: "groq", dailyLimit: "~100k token/hari" },
   { id: "gemma2-9b-it", name: "Gemma 2 9B", speed: "Fast", status: "production", provider: "groq", dailyLimit: "~500k token/hari" },
-  { id: "llama-3.1-8b-instant", name: "Llama 3.1 8B Instant", speed: "Hyper Fast", status: "production", provider: "groq", dailyLimit: "~500k token/hari" },
+  { id: "openai/gpt-oss-120b", name: "GPT-OSS 120B (Latest Reasoning)", speed: "Powerful", status: "production", provider: "groq", dailyLimit: "~100k token/hari" },
+  { id: "openai/gpt-oss-20b", name: "GPT-OSS 20B (Fast Reasoning)", speed: "Fast", status: "production", provider: "groq", dailyLimit: "~100k token/hari" },
 
   // --- OLLAMA CLOUD ---
   { id: "mistral-large-3:675b", name: "Mistral Large 3 (675B Monster)", speed: "Colossal", status: "production", provider: "ollama" },
@@ -387,7 +391,7 @@ const getAIConfig = async (pb: PocketBase): Promise<AIConfig> => {
 // ═══════════════════════════════════════════════════════════════════════════════
 // 🚀 Unified AI Fetch Helper (eliminates code duplication)
 // ═══════════════════════════════════════════════════════════════════════════════
-interface AIFetchOptions {
+export interface AIFetchOptions {
   pb: PocketBase;
   messages: Array<{ role: string; content: string }>;
   maxTokens?: number;
@@ -395,7 +399,7 @@ interface AIFetchOptions {
   jsonMode?: boolean; // Request JSON output format
 }
 
-const fetchAI = async (opts: AIFetchOptions): Promise<string> => {
+export const fetchAI = async (opts: AIFetchOptions): Promise<string> => {
   const { pb, messages, maxTokens, temperature = 0.7, jsonMode = true } = opts;
   const { apiKey, useProxy, model, baseUrl, provider } = await getAIConfig(pb);
 
@@ -557,6 +561,17 @@ CONTOH OUTPUT BENAR (Eksakta):
   return "";
 };
 
+// Sanitasi teks materi agar hemat token dan cepat diproses AI
+const cleanMaterialPromptText = (text: string): string => {
+  if (!text) return "";
+  return text
+    .replace(/<[^>]*>/g, " ")
+    .replace(/\r\n/g, "\n")
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n\s*\n\s*\n+/g, "\n\n")
+    .trim();
+};
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // ✅ Post-Generation Validation
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -692,55 +707,125 @@ const validateQuestions = (questions: any[], isExactSubject: boolean = false, re
 
     // For klasifikasi: must have categories + statements with valid answers
     if (qType === "klasifikasi") {
-      const cats = q.categories;
-      const stmts = q.statements;
+      let cats = q.categories || q.options?.categories;
+      let stmts = q.statements || q.options?.statements;
       if (!Array.isArray(cats) || cats.length < 2) return false;
       if (!Array.isArray(stmts) || stmts.length < 1) return false;
-      const catIds = new Set(cats.map((c: any) => String(c.id)));
-      // Normalize
-      q.categories = cats.filter((c: any) => c.text?.trim()).map((c: any, i: number) => ({
-        id: String(c.id || `c${i + 1}`),
-        text: String(c.text).trim()
-      }));
-      q.statements = stmts.filter((s: any) => s.text?.trim()).map((s: any, i: number) => ({
-        id: String(s.id || `s${i + 1}`),
-        text: String(s.text).trim(),
-        answer: catIds.has(String(s.answer)) ? String(s.answer) : String(q.categories[0]?.id || "c1")
-      }));
+
+      q.categories = cats.map((c: any, i: number) => {
+        if (typeof c === "string") return { id: `c${i + 1}`, text: c.trim() };
+        return { id: String(c.id || `c${i + 1}`), text: String(c.text || c.name || "").trim() };
+      }).filter((c: any) => c.text);
+
+      if (q.categories.length < 2) return false;
+
+      const catMap = new Map<string, string>();
+      q.categories.forEach((c: any) => {
+        catMap.set(c.id.toLowerCase(), c.id);
+        catMap.set(c.text.toLowerCase(), c.id);
+      });
+
+      q.statements = stmts.map((s: any, i: number) => {
+        const text = typeof s === "string" ? s.trim() : String(s.text || s.statement || "").trim();
+        const rawAns = typeof s === "object" ? String(s.answer || s.category || s.kategori || "").toLowerCase().trim() : "";
+        const matchedId = catMap.get(rawAns) || q.categories[0]?.id || "c1";
+        return {
+          id: String(s.id || `s${i + 1}`),
+          text,
+          answer: matchedId
+        };
+      }).filter((s: any) => s.text);
+
       if (q.statements.length === 0) return false;
     }
 
     // For matriks: must have columns + statements with valid answers
     if (qType === "matriks") {
-      const cols = q.columns;
-      const stmts = q.statements;
-      if (!Array.isArray(cols) || cols.length < 2) return false;
+      let cols = q.columns || q.options?.columns;
+      let stmts = q.statements || q.options?.statements;
+      if (!Array.isArray(cols) || cols.length < 2) {
+        cols = [{ id: "benar", text: "Benar" }, { id: "salah", text: "Salah" }];
+      }
       if (!Array.isArray(stmts) || stmts.length < 1) return false;
-      const colIds = new Set(cols.map((c: any) => String(c.id)));
-      q.columns = cols.filter((c: any) => c.text?.trim()).map((c: any, i: number) => ({
-        id: String(c.id || `col${i + 1}`),
-        text: String(c.text).trim()
-      }));
-      q.statements = stmts.filter((s: any) => s.text?.trim()).map((s: any, i: number) => ({
-        id: String(s.id || `s${i + 1}`),
-        text: String(s.text).trim(),
-        answer: colIds.has(String(s.answer)) ? String(s.answer) : String(q.columns[0]?.id || "col1")
-      }));
+
+      q.columns = cols.map((col: any, i: number) => {
+        if (typeof col === "string") {
+          const lower = col.toLowerCase();
+          const colId = lower.includes("salah") ? "salah" : (lower.includes("benar") ? "benar" : `col${i + 1}`);
+          return { id: colId, text: col.trim() };
+        }
+        return { id: String(col.id || `col${i + 1}`), text: String(col.text || col.name || "").trim() };
+      }).filter((c: any) => c.text);
+
+      if (q.columns.length < 2) return false;
+
+      const colMap = new Map<string, string>();
+      q.columns.forEach((c: any) => {
+        colMap.set(c.id.toLowerCase(), c.id);
+        colMap.set(c.text.toLowerCase(), c.id);
+      });
+      colMap.set("true", "benar");
+      colMap.set("false", "salah");
+
+      q.statements = stmts.map((s: any, i: number) => {
+        const text = typeof s === "string" ? s.trim() : String(s.text || s.statement || "").trim();
+        const rawAns = typeof s === "object" ? String(s.answer || s.jawaban || s.column || "").toLowerCase().trim() : "";
+        const matchedId = colMap.get(rawAns) || q.columns[0]?.id || "col1";
+        return {
+          id: String(s.id || `s${i + 1}`),
+          text,
+          answer: matchedId
+        };
+      }).filter((s: any) => s.text);
+
       if (q.statements.length === 0) return false;
     }
 
     // For isian_rumpang: must have text with [[n]] + blanks
     if (qType === "isian_rumpang") {
-      const txt = String(q.text || q.question || "");
-      const blanks = q.blanks;
+      let txt = String(q.text || q.question || "");
+      let blanks = q.blanks || q.options?.blanks;
+
+      txt = txt.replace(/\[(\d+)\](?!\s*\])/g, '[[$1]]');
+
+      if (!/\[\[\d+\]\]/.test(txt)) {
+        let bCount = 1;
+        txt = txt.replace(/_{3,}|\.{3,}/g, () => `[[${bCount++}]]`);
+      }
+      q.text = txt;
+
       if (!/\[\[\d+\]\]/.test(txt)) return false;
-      if (!Array.isArray(blanks) || blanks.length === 0) return false;
-      q.blanks = blanks.filter((b: any) => b.id && Array.isArray(b.answers) && b.answers.length > 0).map((b: any) => ({
-        id: String(b.id),
-        answers: b.answers.map((a: any) => String(a).trim()).filter(Boolean),
-        caseSensitive: Boolean(b.caseSensitive)
-      }));
-      if (q.blanks.length === 0) return false;
+
+      if (!Array.isArray(blanks) || blanks.length === 0) {
+        if (blanks && typeof blanks === "object") {
+          blanks = Object.keys(blanks).map(k => ({
+            id: k,
+            answers: Array.isArray(blanks[k]) ? blanks[k] : [String(blanks[k])]
+          }));
+        } else if (q.answerKey || q.answers) {
+          const rawAnswers = String(q.answerKey || q.answers || "").split(",").map((a: string) => a.trim()).filter(Boolean);
+          blanks = rawAnswers.map((ans: string, i: number) => ({
+            id: String(i + 1),
+            answers: [ans]
+          }));
+        }
+      }
+
+      if (Array.isArray(blanks)) {
+        q.blanks = blanks.map((b: any, i: number) => {
+          let ansList: string[] = [];
+          if (Array.isArray(b.answers)) ansList = b.answers.map((a: any) => String(a).trim()).filter(Boolean);
+          else if (b.answer) ansList = [String(b.answer).trim()];
+          else if (typeof b === "string") ansList = [b.trim()];
+          return {
+            id: String(b.id || i + 1),
+            answers: ansList.length > 0 ? ansList : ["jawaban"],
+            caseSensitive: Boolean(b.caseSensitive)
+          };
+        }).filter((b: any) => b.answers.length > 0);
+      }
+
+      if (!q.blanks || q.blanks.length === 0) return false;
     }
 
     // For isian_singkat: must have answerKey
@@ -976,8 +1061,9 @@ const _generateQuestionsAIInternal = async (
       const taxonomyInstruction = buildTaxonomyInstruction(taxonomy);
       const objectivesSection = objectives.length > 0 ? `\nTUJUAN PEMBELAJARAN (soal WAJIB mengukur pencapaian tujuan ini):\n${objectives.map((o, i) => `${i + 1}. ${o}`).join("\n")}\n` : "";
 
-      // Jika ada materi referensi, stimulus WAJIB berdasarkan materi tersebut
-      const hasMaterial = materialReference && materialReference.trim().length > 10;
+      // Sanitasi dan optimasi teks referensi materi
+      const cleanMaterial = cleanMaterialPromptText(materialReference);
+      const hasMaterial = cleanMaterial.length > 10;
       const stimulusInstruction = hasMaterial
         ? `1. Buat stimulus/literasi berdasarkan MATERI REFERENSI yang diberikan, sepanjang ${lengthMap[passageLength] || lengthMap.sedang}. Olah materi menjadi artikel/studi kasus menarik yang memuat fakta & informasi dari materi. WAJIB menyinggung isi materi referensi. Format HTML: <h2 style="text-align:center;color:#1e3a8a;margin-bottom:32px;font-weight:900;">[JUDUL]</h2> lalu <p style="text-indent:30px;margin-bottom:24px;line-height:1.8;text-align:justify;">paragraf</p>.`
         : `1. Buat stimulus/literasi bertema "${topic}" sepanjang ${lengthMap[passageLength] || lengthMap.sedang}. Sajikan sebagai artikel/studi kasus menarik (bukan definisi). Format HTML: <h2 style="text-align:center;color:#1e3a8a;margin-bottom:32px;font-weight:900;">[JUDUL]</h2> lalu <p style="text-indent:30px;margin-bottom:24px;line-height:1.8;text-align:justify;">paragraf</p>.`;
@@ -989,27 +1075,33 @@ ${objectivesSection}
 INSTRUKSI:
 ${stimulusInstruction}
 2. Buat ${count} soal ${typeLabel} berdasarkan stimulus.${hasMaterial ? " Soal WAJIB menguji pemahaman terhadap isi materi referensi yang diolah dalam stimulus." : ""} ${litTypeInstructions}
-${formatRules ? `3. FORMAT KHUSUS:\n${formatRules}` : ""}${fewShotLit ? `\n${fewShotLit}` : ""}
+
+STANDAR KUALITAS SOAL & PENGECOH:
+- Pokok soal (stem) harus lugas dan menguji pemahaman makna bacaan (bukan sekadar mencocokkan kata).
+- Pilihan salah (distractor) WAJIB masuk akal dan mencerminkan kemungkinan salah tafsir siswa, bukan jawaban asal-asalan.
+- Panjang opsi A-E harus seimbang. Kunci jawaban tidak boleh tampak paling panjang atau paling mencolok.
+- Pastikan kunci jawaban mutlak benar berdasarkan bacaan.
+${formatRules ? `\nFORMAT KHUSUS:\n${formatRules}` : ""}${fewShotLit ? `\n${fewShotLit}` : ""}
 
 OUTPUT JSON (WAJIB):
 ${litTypeFormat}
 Hanya JSON. Pastikan stimulus SELESAI SEMPURNA (tidak terpotong).`;
 
-      const materialSection = hasMaterial ? `MATERI REFERENSI (WAJIB jadi dasar stimulus & soal):\n${materialReference}\n\n` : "";
+      const materialSection = hasMaterial ? `MATERI REFERENSI (WAJIB jadi dasar stimulus & soal):\n${cleanMaterial}\n\n` : "";
       const topicLower = topic.toLowerCase();
       const isTopicInstruction = topic.length > 50 || topicLower.includes('buat') || topicLower.includes('berikan');
       const userPrompt = isTopicInstruction
         ? `${materialSection}INSTRUKSI: ${topic}\nBuat stimulus berdasarkan materi + ${count} soal sesuai instruksi di atas.`
         : `${materialSection}Topik: "${topic}". Buat stimulus literasi${hasMaterial ? " berdasarkan materi referensi di atas" : ""} + ${count} soal ${typeLabel}.`;
 
-      // Token estimation: stimulus + questions combined
-      const stimulusTokens = ({ pendek: 800, sedang: 1500, panjang: 2500 }[passageLength] || 1500);
-      const questionTokens = count * (ctx.isReligious || ctx.explicitlyWantsArabic ? 900 : 550);
-      const totalTokens = Math.min(stimulusTokens + questionTokens + 300, 32000);
+      // Token estimation: stimulus + questions combined (optimized)
+      const stimulusTokens = ({ pendek: 700, sedang: 1300, panjang: 2200 }[passageLength] || 1300);
+      const questionTokens = count * (ctx.isReligious || ctx.explicitlyWantsArabic ? 750 : 450);
+      const totalTokens = Math.min(stimulusTokens + questionTokens + 300, 16000);
 
       const content = await fetchAI({
         pb, messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userPrompt }],
-        maxTokens: totalTokens, temperature: 0.75
+        maxTokens: totalTokens, temperature: 0.6
       });
 
       const parsed = robustJSONParse(content);
@@ -1071,17 +1163,24 @@ CATATAN: Tulis "text" sebagai kalimat/paragraf dengan [[1]], [[2]], dst untuk ba
     const typeOutputFormat = getTypeOutputFormat(type);
 
     const taxonomyInstruction = buildTaxonomyInstruction(taxonomy);
-    const hasMaterial = materialReference && materialReference.trim().length > 10;
+    const cleanMaterial = cleanMaterialPromptText(materialReference);
+    const hasMaterial = cleanMaterial.length > 10;
     const objectivesSection = objectives.length > 0 ? `\nTUJUAN PEMBELAJARAN (soal WAJIB mengukur pencapaian tujuan ini):\n${objectives.map((o, i) => `${i + 1}. ${o}`).join("\n")}\n` : "";
 
     const systemPrompt = `Buat ${count} soal ${typeLabel}, ${level} - ${subject}, kesulitan ${difficulty}.
 ${taxonomyInstruction}
 ${objectivesSection}${hasMaterial ? "PENTING: Soal WAJIB berdasarkan & menyinggung isi MATERI REFERENSI yang diberikan. Gunakan fakta, konsep, dan informasi dari materi sebagai konteks soal.\n" : ""}Variasi panjang stem.${type === "pilihan_ganda" || type === "pilihan_ganda_kompleks" ? " Opsi A-E ringkas & logis. Kunci jawaban acak." : ""}
+
+STANDAR KUALITAS SOAL & PENGECOH:
+- Pokok soal (stem) harus lugas, jelas, dan kontekstual tanpa multitafsir.
+- Pilihan pengecoh (distractor salah) WAJIB masuk akal dan mencerminkan miskonsepsi umum siswa, bukan pilihan konyol/asal-asalan.
+- Panjang opsi A-E harus seimbang dan gramatikal. Kunci jawaban TIDAK BOLEH dibuat paling panjang atau paling mencolok.
+- Pastikan kunci jawaban mutlak benar dan terverifikasi secara ilmiah/konseptual sebelum menyusun JSON.
 ${formatRules ? `\n${formatRules}\n` : ""}${fewShot ? `\n${fewShot}\n` : ""}
 ${typeOutputFormat}
 Hanya JSON.`;
 
-    const materialSection = hasMaterial ? `MATERI REFERENSI (soal WAJIB berdasarkan isi materi ini):\n${materialReference}\n\n` : "";
+    const materialSection = hasMaterial ? `MATERI REFERENSI (soal WAJIB berdasarkan isi materi ini):\n${cleanMaterial}\n\n` : "";
     const topicLower = topic.toLowerCase();
     const isTopicInstruction = topic.length > 50 || topic.includes(',') || topicLower.includes('buat') || topicLower.includes('berikan') || topicLower.includes('pakai');
 
@@ -1089,12 +1188,26 @@ Hanya JSON.`;
       ? `${materialSection}INSTRUKSI PENGGUNA: ${topic}\nBuat ${count} soal ${typeLabel}, ${level} - ${subject}. Soal harus menyinggung isi materi.`
       : `${materialSection}Topik: "${topic}". Buat ${count} soal ${typeLabel}, ${level} - ${subject}.${hasMaterial ? " Soal WAJIB berdasarkan & menyinggung isi materi referensi di atas." : " Variasi panjang stem & tipe pertanyaan."}`;
 
-    const baseTokens = (ctx.isReligious || ctx.explicitlyWantsArabic) ? 900 : 500;
-    const maxTokens = Math.min(Math.max(count * baseTokens, 2500), 32000);
+    // Token estimation: tailored per question type
+    const typeTokensMap: Record<string, number> = {
+      pilihan_ganda: 420,
+      pilihan_ganda_kompleks: 450,
+      benar_salah: 320,
+      isian_singkat: 220,
+      uraian: 380,
+      menjodohkan: 450,
+      urutkan: 400,
+      drag_drop: 400,
+      klasifikasi: 450,
+      matriks: 420,
+      isian_rumpang: 380
+    };
+    const basePerQuestion = (typeTokensMap[type] || 420) + (ctx.isReligious || ctx.explicitlyWantsArabic ? 350 : 0);
+    const maxTokens = Math.min(Math.max(count * basePerQuestion + 400, 1800), 20000);
 
     const content = await fetchAI({
       pb, messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userPrompt }],
-      maxTokens, temperature: 0.8
+      maxTokens, temperature: 0.6
     });
 
     const parsed = robustJSONParse(content);
@@ -1207,7 +1320,12 @@ const _generateSingleQuestionInternal = async (
     const typeFormat = getSingleTypeFormat(type);
 
     const systemPrompt = `Buat 1 soal ${typeLabel}, ${level} - ${subject}, kesulitan ${difficulty}.
-${formatRules ? `FORMAT: ${formatRules}` : ""}${type === "pilihan_ganda" || type === "pilihan_ganda_kompleks" ? " Opsi A-E ringkas. Kunci jawaban acak." : ""}
+STANDAR KUALITAS SOAL:
+- Pokok soal (stem) harus lugas dan kontekstual.
+- Pilihan pengecoh WAJIB masuk akal dan mencerminkan miskonsepsi umum siswa, bukan jawaban asal-asalan.
+- Panjang opsi harus seimbang. Kunci jawaban tidak boleh tampak paling mencolok atau paling panjang.
+- Pastikan kunci jawaban mutlak benar.
+${formatRules ? `\nFORMAT: ${formatRules}` : ""}${type === "pilihan_ganda" || type === "pilihan_ganda_kompleks" ? " Opsi A-E ringkas & logis. Kunci jawaban acak." : ""}
 ${typeFormat}
 Hanya JSON.`;
 
@@ -1215,11 +1333,11 @@ Hanya JSON.`;
       ? `STIMULUS LITERASI:\n${existingLiterasi}\n\nBuat 1 soal ${typeLabel} baru dari stimulus di atas. Jangan tanya definisi. Variasi bentuk pertanyaan.`
       : `Topik: "${topic}". Buat 1 soal ${typeLabel}. Variasi bentuk pertanyaan.`;
 
-    const maxTokens = ctx.isReligious ? 900 : (type === "menjodohkan" || type === "urutkan" || type === "drag_drop" || type === "uraian" || type === "klasifikasi" || type === "matriks" || type === "isian_rumpang") ? 800 : 600;
+    const maxTokens = ctx.isReligious ? 850 : (type === "menjodohkan" || type === "urutkan" || type === "drag_drop" || type === "uraian" || type === "klasifikasi" || type === "matriks" || type === "isian_rumpang") ? 700 : 500;
 
     const content = await fetchAI({
       pb, messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userPrompt }],
-      maxTokens, temperature: 0.8
+      maxTokens, temperature: 0.6
     });
 
     const result = robustJSONParse(content);
@@ -1245,6 +1363,11 @@ Hanya JSON.`;
       })(),
       pairs: result.pairs,
       items: result.items,
+      categories: result.categories || (result.options?.categories ? result.options.categories : undefined),
+      statements: result.statements || (result.options?.statements ? result.options.statements : undefined),
+      columns: result.columns || (result.options?.columns ? result.options.columns : undefined),
+      blanks: result.blanks || (result.options?.blanks ? result.options.blanks : undefined),
+      shuffleStatements: result.shuffleStatements !== undefined ? result.shuffleStatements : undefined,
       answerKey: result.answerKey || result.answer_key || result.correctAnswer || "",
       groupId: "",
       groupText: existingLiterasi
@@ -1601,6 +1724,8 @@ columns: 2-3 kolom opsi. statements: 3-5 pernyataan dengan "answer" = id kolom b
 
     const materialTypeFormat = getMaterialTypeFormat(type);
 
+    const cleanMaterial = cleanMaterialPromptText(material);
+
     const systemPrompt = `Anda adalah Spesialis Kurikulum & Evaluasi Pendidikan.
 Tugas: Buat ${count} soal ${typeDesc} berdasarkan MATERI yang diberikan.
 Jenjang: ${level}, Mapel: ${subject}, Kesulitan: ${difficulty}.
@@ -1610,12 +1735,18 @@ KETENTUAN:
 2. HOTS & VARIASI: Wajib variasi pola (analisis, evaluasi, kreasi, skenario kasus). DILARANG pola seragam.
 ${type === "pilihan_ganda" || type === "pilihan_ganda_kompleks" ? "3. OPSI: 5 pilihan (A-E) variatif, logis, diawali huruf kapital." : "3. Pastikan format sesuai tipe soal."}
 4. LITERASI: Jika diminta, masukkan stimulus literasi ke "groupText" (BUKAN "text"). Berikan "groupId" sama untuk soal satu paket literasi.
+
+STANDAR KUALITAS SOAL & PENGECOH:
+- Pokok soal (stem) harus lugas, jelas, dan kontekstual tanpa multitafsir.
+- Pilihan pengecoh (distractor) WAJIB masuk akal dan mencerminkan kemungkinan salah paham terhadap materi, bukan jawaban asal-asalan.
+- Panjang opsi harus seimbang dan gramatikal. Kunci jawaban TIDAK BOLEH dibuat paling panjang atau paling mencolok.
+- Pastikan kunci jawaban mutlak benar berdasarkan isi materi.
 ${formatRules ? `\n${formatRules}` : ""}${fewShot ? `\n${fewShot}` : ""}
 
 ${materialTypeFormat}
 Hanya JSON murni.`;
 
-    const userPrompt = `MATERI:\n\n${material}\n\nBuat ${count} soal ${typeDesc}, kesulitan ${difficulty}. WAJIB variasi pola pertanyaan. Jika ada instruksi spesifik dalam materi, ikuti sebagai prioritas.`;
+    const userPrompt = `MATERI:\n\n${cleanMaterial}\n\nBuat ${count} soal ${typeDesc}, kesulitan ${difficulty}. WAJIB variasi pola pertanyaan. Jika ada instruksi spesifik dalam materi, ikuti sebagai prioritas.`;
 
     // Parallel batch for large counts
     if (count > 7) {
@@ -1624,10 +1755,10 @@ Hanya JSON murni.`;
 
       const results = await Promise.allSettled(
         batches.map(batchCount => {
-          const batchUserPrompt = `MATERI:\n\n${material}\n\nBuat ${batchCount} soal ${typeDesc}, kesulitan ${difficulty}. WAJIB variasi pola pertanyaan.`;
+          const batchUserPrompt = `MATERI:\n\n${cleanMaterial}\n\nBuat ${batchCount} soal ${typeDesc}, kesulitan ${difficulty}. WAJIB variasi pola pertanyaan.`;
           return fetchAI({
             pb, messages: [{ role: "system", content: systemPrompt }, { role: "user", content: batchUserPrompt }],
-            maxTokens: batchCount * 1400, temperature: 0.7
+            maxTokens: batchCount * 600 + 400, temperature: 0.6
           }).then(content => {
             const parsed = robustJSONParse(content);
             let raw = parsed.questions || parsed.data || parsed.soal || (Array.isArray(parsed) ? parsed : []);
@@ -1647,7 +1778,7 @@ Hanya JSON murni.`;
 
     const content = await fetchAI({
       pb, messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userPrompt }],
-      maxTokens: Math.min(count * 1400, 32000), temperature: 0.7
+      maxTokens: Math.min(Math.max(count * 500 + 400, 1800), 20000), temperature: 0.6
     });
 
     const parsed = robustJSONParse(content);

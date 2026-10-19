@@ -16,6 +16,8 @@ import { Separator } from "../../components/ui/separator";
 import FormField from "../../components/forms/FormField";
 import { uploadInventoryImage, deleteImageFromStorage, deleteImagesFromStorage, safeDeleteImage, safeDeleteImages, getR2WorkerUrl, getR2PublicBaseUrl } from "../../lib/storage";
 import { compressImage } from "../../lib/imageCompression";
+import { SharedGalleryModal } from "../../components/dialogs/SharedGalleryModal";
+import { autoFindValidatedImage, insertImageIntoQuestionText } from "../../lib/imageSearch";
 import { ImportButton } from "../../components/ui/import-button";
 import { parseQuestionsFromWord } from "../../lib/questionWordParser";
 import { Select } from "../../components/ui/select";
@@ -413,8 +415,12 @@ export interface QuestionData {
   answerKey?: string;
   // Urutkan / Drag & Drop
   items?: Array<{ id: string; text: string; imageUrl?: string }>;
-  // Benar / Salah Statement Matrix
-  statements?: Array<{ id: string; text: string; answer?: "benar" | "salah" }>;
+  // Benar / Salah Statement Matrix / Matriks / Klasifikasi
+  statements?: Array<{ id: string; text: string; answer?: any }>;
+  categories?: Array<{ id: string; text: string }>;
+  columns?: Array<{ id: string; text: string }>;
+  blanks?: Array<{ id: string; answers: string[]; caseSensitive?: boolean }>;
+  shuffleStatements?: boolean;
   options?: any;
   order?: number;
 }
@@ -475,6 +481,7 @@ const QuestionsPage = () => {
     urutkan: true,
     drag_drop: true,
     uraian: true,
+    klasifikasi: true,
     hotspot: true,
     isian_rumpang: true,
     matriks: true,
@@ -490,7 +497,7 @@ const QuestionsPage = () => {
         if (records.length > 0) {
           const data = records[0];
           const types = data.allowed_types || data.allowed_question_types;
-          if (types) setAllowedTypes(types);
+          if (types) setAllowedTypes(prev => ({ ...prev, ...types }));
 
           setActiveAIConfig({
             model: data.ai_model || "llama-3.3-70b-versatile",
@@ -573,6 +580,31 @@ const QuestionsPage = () => {
               optionsToSave = { pairs: q.pairs || [] };
             } else if (qType === "urutkan" || qType === "drag_drop") {
               optionsToSave = { items: q.items || [] };
+            } else if (qType === "klasifikasi") {
+              optionsToSave = {
+                categories: q.categories || [],
+                statements: q.statements || [],
+                shuffleStatements: q.shuffleStatements !== false
+              };
+              if (!correctAnswer && q.statements) {
+                correctAnswer = q.statements.map((s: any) => `${s.id}:${s.answer}`).join(",");
+              }
+            } else if (qType === "matriks") {
+              optionsToSave = {
+                columns: q.columns || [],
+                statements: q.statements || []
+              };
+              if (!correctAnswer && q.statements) {
+                correctAnswer = q.statements.map((s: any) => `${s.id}:${s.answer}`).join(",");
+              }
+            } else if (qType === "isian_rumpang") {
+              optionsToSave = {
+                text: q.text,
+                blanks: q.blanks || []
+              };
+              if (!correctAnswer && q.blanks) {
+                correctAnswer = q.blanks.map((b: any) => `${b.id}:${(b.answers || []).join("|")}`).join(";");
+              }
             }
 
             let qText = q.text || "";
@@ -595,6 +627,9 @@ const QuestionsPage = () => {
               choices: optionsToSave,
               pairs: q.pairs || [],
               items: q.items || [],
+              categories: q.categories || [],
+              columns: q.columns || [],
+              blanks: q.blanks || [],
               answerKey: correctAnswer,
               answer: correctAnswer,
               correctAnswer: correctAnswer,
@@ -749,7 +784,14 @@ const QuestionsPage = () => {
 
   const [isGalleryOpen, setIsGalleryOpen] = useState(false);
   const [galleryGroups, setGalleryGroups] = useState<{ title: string; images: string[] }[]>([]);
-  const [galleryTarget, setGalleryTarget] = useState<{ type: "cover" | "choice" | "batch" | "quill" | "hotspot"; letter?: string; index?: number; quillInstance?: any; quillIndex?: number } | null>(null);
+  const [galleryTarget, setGalleryTarget] = useState<{
+    type: "cover" | "choice" | "batch" | "quill" | "hotspot";
+    letter?: string;
+    index?: number;
+    quillInstance?: any;
+    quillIndex?: number;
+    field?: "text" | "groupText" | "choice";
+  } | null>(null);
 
   // AI Import State
   const [isAIImportOpen, setIsAIImportOpen] = useState(false);
@@ -873,35 +915,83 @@ const QuestionsPage = () => {
     if (!galleryTarget) return;
 
     if (galleryTarget.type === "cover") {
-      setFormValues((prev) => ({ ...prev, imageUrl: url }));
-      setQuestionFile(null); // Reset file picker
-      setCoverSizeInfo("(Dari Galeri)");
+      setFormValues((prev) => ({
+        ...prev,
+        text: insertImageIntoQuestionText(prev.text, url),
+        imageUrl: ""
+      }));
+      setQuestionFile(null);
+      setCoverSizeInfo("");
     } else if (galleryTarget.type === "choice" && galleryTarget.letter) {
       const letter = galleryTarget.letter;
       handleChoiceChange(letter, "imageUrl", url);
       setChoiceFiles((prev) => ({ ...prev, [letter]: null }));
       setChoicesSizeInfo((prev) => ({ ...prev, [letter]: "(Dari Galeri)" }));
     } else if (galleryTarget.type === "batch" && galleryTarget.index !== undefined) {
-      updateBatchItem(galleryTarget.index, "imageUrl", url);
-      updateBatchItem(galleryTarget.index, "imageFile", null); // Reset file jika ada
+      const currentItem = batchQuestions[galleryTarget.index];
+      if (currentItem) {
+        const updatedText = insertImageIntoQuestionText(currentItem.text, url);
+        updateBatchItem(galleryTarget.index, "text", updatedText);
+        updateBatchItem(galleryTarget.index, "imageUrl", "");
+        updateBatchItem(galleryTarget.index, "imageFile", null);
+      }
     } else if (galleryTarget.type === "hotspot") {
       setFormValues((prev) => ({ ...prev, hotspotImageUrl: url }));
       setHotspotFile(null);
-    } else if (galleryTarget.type === "quill" && galleryTarget.quillInstance) {
-      const q = galleryTarget.quillInstance;
-      const targetIndex = galleryTarget.quillIndex !== undefined ? galleryTarget.quillIndex : (q.getSelection()?.index || 0);
-      q.insertEmbed(targetIndex, "image", url);
-      setTimeout(() => {
+    } else if (galleryTarget.type === "quill") {
+      const q = galleryTarget.quillInstance || (galleryTarget.field === "text" ? quillRef.current?.getEditor() : null);
+      const field = galleryTarget.field || "text";
+      const letter = galleryTarget.letter;
+
+      if (q) {
+        const qLength = q.getLength();
+        const targetIndex = galleryTarget.quillIndex !== undefined
+          ? Math.min(Math.max(0, galleryTarget.quillIndex), qLength)
+          : (q.getSelection()?.index ?? qLength);
+
+        q.insertEmbed(targetIndex, "image", url, "user");
+
         const imgs = q.root.querySelectorAll('img');
         imgs.forEach((img: any) => {
           if (img.getAttribute('src') === url) {
             img.setAttribute('width', '350');
             img.style.display = 'block';
-            img.style.margin = '10px auto';
+            img.style.margin = '12px auto';
+            img.style.borderRadius = '12px';
+            img.style.maxHeight = '340px';
+            img.style.maxWidth = '100%';
+            img.style.boxShadow = '0 2px 8px rgba(0,0,0,0.06)';
           }
         });
-      }, 10);
-      q.setSelection(targetIndex + 1);
+        q.setSelection(targetIndex + 1, 0, "user");
+
+        let updatedHtml = q.root.innerHTML;
+        if (!updatedHtml.includes(url)) {
+          if (field === "text") {
+            updatedHtml = insertImageIntoQuestionText(formValues.text, url);
+          } else if (field === "groupText") {
+            updatedHtml = insertImageIntoQuestionText(formValues.groupText || "", url);
+          } else if (field === "choice" && letter && formValues.choices?.[letter]) {
+            updatedHtml = insertImageIntoQuestionText(formValues.choices[letter].text || "", url);
+          }
+        }
+
+        if (field === "groupText") {
+          setFormValues((prev) => ({ ...prev, groupText: updatedHtml }));
+        } else if (field === "choice" && letter) {
+          handleChoiceChange(letter, "text", updatedHtml);
+        } else {
+          setFormValues((prev) => ({ ...prev, text: updatedHtml }));
+        }
+      } else {
+        if (field === "groupText") {
+          setFormValues((prev) => ({ ...prev, groupText: insertImageIntoQuestionText(prev.groupText || "", url) }));
+        } else if (field === "choice" && letter) {
+          handleChoiceChange(letter, "text", insertImageIntoQuestionText(formValues.choices?.[letter]?.text || "", url));
+        } else {
+          setFormValues((prev) => ({ ...prev, text: insertImageIntoQuestionText(prev.text, url) }));
+        }
+      }
     }
 
     setIsGalleryOpen(false);
@@ -940,29 +1030,64 @@ const QuestionsPage = () => {
     } else if (galleryTarget.type === "batch" && galleryTarget.index !== undefined) {
       updateBatchItem(galleryTarget.index, "imageFile", fileToUpload);
       updateBatchItem(galleryTarget.index, "imageUrl", "");
-    } else if (galleryTarget.type === "hotspot") {
-      setHotspotFile(fileToUpload);
-      setFormValues((prev) => ({ ...prev, hotspotImageUrl: "" }));
-    } else if (galleryTarget.type === "quill" && galleryTarget.quillInstance) {
+    } else if (galleryTarget.type === "quill") {
+      const q = galleryTarget.quillInstance || (galleryTarget.field === "text" ? quillRef.current?.getEditor() : null);
+      const field = galleryTarget.field || "text";
+      const letter = galleryTarget.letter;
+
       const reader = new FileReader();
       reader.readAsDataURL(fileToUpload);
       reader.onload = () => {
         const base64 = reader.result as string;
-        const q = galleryTarget.quillInstance;
-        const targetIndex = galleryTarget.quillIndex !== undefined ? galleryTarget.quillIndex : (q.getSelection()?.index || 0);
-        q.insertEmbed(targetIndex, "image", base64);
+        if (q) {
+          const qLength = q.getLength();
+          const targetIndex = galleryTarget.quillIndex !== undefined
+            ? Math.min(Math.max(0, galleryTarget.quillIndex), qLength)
+            : (q.getSelection()?.index ?? qLength);
 
-        setTimeout(() => {
+          q.insertEmbed(targetIndex, "image", base64, "user");
+
           const imgs = q.root.querySelectorAll('img');
           imgs.forEach((img: any) => {
             if (img.getAttribute('src') === base64) {
               img.setAttribute('width', '350');
               img.style.display = 'block';
-              img.style.margin = '10px auto';
+              img.style.margin = '12px auto';
+              img.style.borderRadius = '12px';
+              img.style.maxHeight = '340px';
+              img.style.maxWidth = '100%';
+              img.style.boxShadow = '0 2px 8px rgba(0,0,0,0.06)';
             }
           });
-        }, 10);
-        q.setSelection(targetIndex + 1);
+          q.setSelection(targetIndex + 1, 0, "user");
+
+          let updatedHtml = q.root.innerHTML;
+          if (!updatedHtml.includes(base64)) {
+            if (field === "text") {
+              updatedHtml = insertImageIntoQuestionText(formValues.text, base64);
+            } else if (field === "groupText") {
+              updatedHtml = insertImageIntoQuestionText(formValues.groupText || "", base64);
+            } else if (field === "choice" && letter && formValues.choices?.[letter]) {
+              updatedHtml = insertImageIntoQuestionText(formValues.choices[letter].text || "", base64);
+            }
+          }
+
+          if (field === "groupText") {
+            setFormValues((prev) => ({ ...prev, groupText: updatedHtml }));
+          } else if (field === "choice" && letter) {
+            handleChoiceChange(letter, "text", updatedHtml);
+          } else {
+            setFormValues((prev) => ({ ...prev, text: updatedHtml }));
+          }
+        } else {
+          if (field === "groupText") {
+            setFormValues((prev) => ({ ...prev, groupText: insertImageIntoQuestionText(prev.groupText || "", base64) }));
+          } else if (field === "choice" && letter) {
+            handleChoiceChange(letter, "text", insertImageIntoQuestionText(formValues.choices?.[letter]?.text || "", base64));
+          } else {
+            setFormValues((prev) => ({ ...prev, text: insertImageIntoQuestionText(prev.text, base64) }));
+          }
+        }
       };
     }
 
@@ -1053,6 +1178,7 @@ const QuestionsPage = () => {
   const [isExtractingMaterial, setIsExtractingMaterial] = useState(false);
   const [aiObjectives, setAiObjectives] = useState<string[]>([]); // tujuan pembelajaran dari AI
   const [isFetchingObjectives, setIsFetchingObjectives] = useState(false);
+  const [aiAutoFindImages, setAiAutoFindImages] = useState(false);
 
   const toggleTaxonomy = (level: string) => {
     setAiTaxonomy(prev => {
@@ -1323,6 +1449,11 @@ const QuestionsPage = () => {
           answerKey: q.answerKey || "",
           pairs: q.pairs || (qType === "menjodohkan" ? [] : undefined),
           items: q.items || (qType === "urutkan" || qType === "drag_drop" ? [] : undefined),
+          categories: q.categories || (qType === "klasifikasi" ? [] : undefined),
+          statements: q.statements || (qType === "klasifikasi" || qType === "matriks" || qType === "benar_salah" ? [] : undefined),
+          columns: q.columns || (qType === "matriks" ? [] : undefined),
+          blanks: q.blanks || (qType === "isian_rumpang" ? [] : undefined),
+          shuffleStatements: q.shuffleStatements,
           groupId: q.groupId || "",
           groupText: q.groupText || "",
           isFromAI: true
@@ -1402,9 +1533,17 @@ const QuestionsPage = () => {
       const updatedRow = {
         ...q,
         text: regenerated.text,
+        type: regenerated.type || q.type,
         choices: choicesBatch,
         correctKey: correctKey,
         answerKey: regenerated.answerKey || "",
+        pairs: regenerated.pairs || q.pairs,
+        items: regenerated.items || q.items,
+        categories: regenerated.categories || q.categories,
+        statements: regenerated.statements || q.statements,
+        columns: regenerated.columns || q.columns,
+        blanks: regenerated.blanks || q.blanks,
+        shuffleStatements: regenerated.shuffleStatements !== undefined ? regenerated.shuffleStatements : q.shuffleStatements,
         isFromAI: true
       };
 
@@ -1662,6 +1801,22 @@ const QuestionsPage = () => {
             });
           }
           options = { items: localizedItems };
+        } else if (type === "klasifikasi") {
+          options = {
+            categories: q.categories || (q.options?.categories ? q.options.categories : []),
+            statements: q.statements || (q.options?.statements ? q.options.statements : []),
+            shuffleStatements: q.shuffleStatements !== undefined ? q.shuffleStatements : true
+          };
+        } else if (type === "matriks") {
+          options = {
+            columns: q.columns || (q.options?.columns ? q.options.columns : []),
+            statements: q.statements || (q.options?.statements ? q.options.statements : [])
+          };
+        } else if (type === "isian_rumpang") {
+          options = {
+            text: q.text,
+            blanks: q.blanks || (q.options?.blanks ? q.options.blanks : [])
+          };
         }
 
         let correctAnswer = "";
@@ -1682,6 +1837,7 @@ const QuestionsPage = () => {
 
         const createPayload: any = {
           examId,
+          type,
           text: localizedQText,
           field,
           options,
@@ -1788,11 +1944,43 @@ const QuestionsPage = () => {
           choices: choicesBatch,
           correctKey: correctKey,
           answerKey: q.answerKey || "",
+          pairs: q.pairs || (q.type === "menjodohkan" ? [] : undefined),
+          items: q.items || (q.type === "urutkan" || q.type === "drag_drop" ? [] : undefined),
+          categories: q.categories || (q.type === "klasifikasi" ? [] : undefined),
+          statements: q.statements || (q.type === "klasifikasi" || q.type === "matriks" || q.type === "benar_salah" ? [] : undefined),
+          columns: q.columns || (q.type === "matriks" ? [] : undefined),
+          blanks: q.blanks || (q.type === "isian_rumpang" ? [] : undefined),
+          shuffleStatements: q.shuffleStatements,
           groupId: q.groupId || "",
           groupText: q.groupText || "",
-          isFromAI: true
+          isFromAI: true,
+          imageUrl: q.imageUrl || ""
         };
       });
+
+      // Jika opsi auto cari gambar aktif, cari & validasi gambar edukasi dengan AI
+      if (aiAutoFindImages) {
+        setAiProgress(92);
+        for (let i = 0; i < questionsForReview.length; i++) {
+          const qItem = questionsForReview[i];
+          try {
+            const match = await autoFindValidatedImage(
+              pb,
+              qItem.text,
+              aiTopic,
+              aiSubject || (exam?.subject || ""),
+              Object.values(qItem.choices || {}).map((c: any) => c.text),
+              qItem.correctKey
+            );
+            if (match && match.image?.url) {
+              qItem.text = insertImageIntoQuestionText(qItem.text, match.image.url, match.image.title);
+              (qItem as any).imageUrl = "";
+            }
+          } catch (e) {
+            console.warn("Auto find image notice for item", i, e);
+          }
+        }
+      }
 
       setBatchQuestions(questionsForReview);
       setIsAIModalOpen(false);
@@ -1880,6 +2068,7 @@ const QuestionsPage = () => {
       if (qType === "menjodohkan") return false; // pairs can be edited in batch modal
       if (qType === "urutkan" || qType === "drag_drop") return false; // items can be edited in batch modal
       if (qType === "isian_singkat" || qType === "uraian") return false;
+      if (qType === "klasifikasi" || qType === "matriks" || qType === "isian_rumpang") return false;
       if (!q.correctKey) return true;
 
       // For pilihan_ganda_kompleks, correctKey is comma-separated
@@ -1978,11 +2167,31 @@ const QuestionsPage = () => {
           // Essay/Short answer: no options, just answerKey
           optionsToSave = {};
           correctAnswer = q.answerKey || "";
+        } else if (qType === "klasifikasi") {
+          optionsToSave = {
+            categories: q.categories || [],
+            statements: q.statements || [],
+            shuffleStatements: q.shuffleStatements ?? true
+          };
+          correctAnswer = "";
+        } else if (qType === "matriks") {
+          optionsToSave = {
+            columns: q.columns || [],
+            statements: q.statements || []
+          };
+          correctAnswer = "";
+        } else if (qType === "isian_rumpang") {
+          optionsToSave = {
+            text: q.text,
+            blanks: q.blanks || []
+          };
+          correctAnswer = "";
         }
 
         const payload: any = {
           examId,
           text: await uploadInlineBase64Images(q.isFromAI ? q.text : `<p>${q.text}</p>`),
+          type: qType,
           field: typeMap[qType] || "multiple_choice",
           options: optionsToSave,
           correctAnswer: correctAnswer,
@@ -2081,7 +2290,29 @@ const QuestionsPage = () => {
     // Alih-alih pakai native browser <input>, kita pakai Custom Gallery UI kita
     const range = quill.getSelection();
     const cursorIndex = range ? range.index : quill.getLength();
-    setGalleryTarget({ type: "quill", quillInstance: quill, quillIndex: cursorIndex });
+
+    // Deteksi field target berdasarkan placeholder
+    let field: "text" | "groupText" | "choice" = "text";
+    let letter: string | undefined = undefined;
+
+    const placeholder = (quill.root?.getAttribute("data-placeholder") || "").toLowerCase();
+    if (placeholder.includes("stimulus") || placeholder.includes("literasi")) {
+      field = "groupText";
+    } else if (placeholder.includes("jawaban opsi")) {
+      field = "choice";
+      const match = placeholder.match(/jawaban opsi ([a-z])/i);
+      if (match) letter = match[1].toLowerCase();
+    } else {
+      field = "text";
+    }
+
+    setGalleryTarget({
+      type: "quill",
+      quillInstance: quill,
+      quillIndex: cursorIndex,
+      field,
+      letter
+    });
     setIsPickerOpen(true);
   }, []);
 
@@ -5961,16 +6192,17 @@ Aturan:
                           className="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm font-semibold h-11 px-3 pr-8 cursor-pointer text-slate-800 dark:text-slate-100 shadow-xs focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all appearance-none"
                         >
                           {(allowedTypes.pilihan_ganda !== false || formValues.type === "pilihan_ganda") && <option value="pilihan_ganda">Pilihan Ganda (Single Choice)</option>}
-                          {(allowedTypes.pilihan_ganda_kompleks || formValues.type === "pilihan_ganda_kompleks") && <option value="pilihan_ganda_kompleks">Pilihan Ganda Kompleks (Multi Response)</option>}
-                          {(allowedTypes.menjodohkan || formValues.type === "menjodohkan") && <option value="menjodohkan">Menjodohkan (Matching)</option>}
-                          {(allowedTypes.benar_salah || formValues.type === "benar_salah") && <option value="benar_salah">Benar / Salah (Matriks ANBK)</option>}
-                          {(allowedTypes.isian_singkat || formValues.type === "isian_singkat") && <option value="isian_singkat">Isian Singkat</option>}
-                          {(allowedTypes.uraian || formValues.type === "uraian") && <option value="uraian">Uraian / Esai</option>}
-                          {(allowedTypes.urutkan || formValues.type === "urutkan") && <option value="urutkan">Urutkan (Ordering)</option>}
-                          {(allowedTypes.drag_drop || formValues.type === "drag_drop") && <option value="drag_drop">Drag and Drop</option>}
-                          {(allowedTypes.matriks || formValues.type === "matriks") && <option value="matriks">Matriks (Tabel Pilihan Ganda)</option>}
-                          {(allowedTypes.isian_rumpang || formValues.type === "isian_rumpang") && <option value="isian_rumpang">Isian Rumpang (Cloze)</option>}
-                          {(allowedTypes.hotspot || formValues.type === "hotspot") && <option value="hotspot">Hotspot (Klik Gambar)</option>}
+                          {(allowedTypes.pilihan_ganda_kompleks !== false || formValues.type === "pilihan_ganda_kompleks") && <option value="pilihan_ganda_kompleks">Pilihan Ganda Kompleks (Multi Response)</option>}
+                          {(allowedTypes.menjodohkan !== false || formValues.type === "menjodohkan") && <option value="menjodohkan">Menjodohkan (Matching)</option>}
+                          {(allowedTypes.benar_salah !== false || formValues.type === "benar_salah") && <option value="benar_salah">Benar / Salah (Matriks ANBK)</option>}
+                          {(allowedTypes.isian_singkat !== false || formValues.type === "isian_singkat") && <option value="isian_singkat">Isian Singkat</option>}
+                          {(allowedTypes.uraian !== false || formValues.type === "uraian") && <option value="uraian">Uraian / Esai</option>}
+                          {(allowedTypes.urutkan !== false || formValues.type === "urutkan") && <option value="urutkan">Urutkan (Ordering)</option>}
+                          {(allowedTypes.drag_drop !== false || formValues.type === "drag_drop") && <option value="drag_drop">Drag and Drop</option>}
+                          {(allowedTypes.klasifikasi !== false || formValues.type === "klasifikasi") && <option value="klasifikasi">Klasifikasi (Pengelompokan Kategori)</option>}
+                          {(allowedTypes.matriks !== false || formValues.type === "matriks") && <option value="matriks">Matriks (Tabel Pilihan Ganda)</option>}
+                          {(allowedTypes.isian_rumpang !== false || formValues.type === "isian_rumpang") && <option value="isian_rumpang">Isian Rumpang (Cloze)</option>}
+                          {(allowedTypes.hotspot !== false || formValues.type === "hotspot") && <option value="hotspot">Hotspot (Klik Gambar)</option>}
                         </select>
                         <ChevronDown className="w-4 h-4 text-slate-400 dark:text-slate-500 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                       </div>
@@ -6211,64 +6443,6 @@ Aturan:
                             className="text-sm font-serif ql-editor !p-0 text-slate-800 dark:text-slate-200 leading-relaxed"
                           />
                         </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Row 3: Gambar Cover Soal */}
-                <div className="p-3.5 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/40 dark:bg-slate-900/20 space-y-2">
-                  <div>
-                    <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 block">
-                      Gambar Cover / Ilustrasi Soal (Opsional)
-                    </label>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">
-                      Gambar ini tampil tepat di atas teks pertanyaan utama pada lembar ujian siswa.
-                    </p>
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-3 pt-1">
-                    <button
-                      type="button"
-                      className="flex items-center gap-2 cursor-pointer bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg h-9 text-xs px-3.5 border border-slate-200 dark:border-slate-700 transition-all font-semibold shadow-xs"
-                      onClick={() => {
-                        setGalleryTarget({ type: "cover" });
-                        setIsPickerOpen(true);
-                      }}
-                    >
-                      <Image className="w-4 h-4 text-slate-400" />
-                      <span>{questionFile || formValues.imageUrl ? "Ganti Gambar Cover" : "Tambah Gambar Cover"}</span>
-                    </button>
-
-                    {(questionFile || formValues.imageUrl) && (
-                      <div className="flex items-center gap-2.5 bg-white dark:bg-slate-900 p-1.5 pr-3 rounded-lg border border-slate-200 dark:border-slate-800 shadow-xs">
-                        <div className="relative">
-                          <img
-                            src={questionFile ? URL.createObjectURL(questionFile) : formValues.imageUrl}
-                            alt="Pratinjau Cover Soal"
-                            className="h-12 w-auto max-w-[120px] object-cover rounded-md border border-slate-200 dark:border-slate-700"
-                          />
-                        </div>
-                        <div className="flex flex-col gap-0.5">
-                          <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">Gambar Terlampir</span>
-                          {coverSizeInfo && (
-                            <span className="text-xs text-emerald-600 font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800/40">
-                              {coverSizeInfo}
-                            </span>
-                          )}
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setFormValues((prev) => ({ ...prev, imageUrl: "" }));
-                            setQuestionFile(null);
-                            setCoverSizeInfo("");
-                          }}
-                          className="ml-auto w-6 h-6 rounded-md bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/30 text-rose-600 dark:text-rose-400 flex items-center justify-center transition-colors"
-                          title="Hapus gambar"
-                        >
-                          <X className="w-3.5 h-3.5" />
-                        </button>
                       </div>
                     )}
                   </div>
@@ -7808,33 +7982,16 @@ Aturan:
                     <div className="flex items-center gap-3 px-1">
                       <button
                         type="button"
-                        className="flex items-center gap-2 cursor-pointer bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-xl py-2 px-4 border border-slate-200 dark:border-slate-700 font-bold text-xs uppercase tracking-widest transition-all shadow-sm"
+                        className="flex items-center gap-1.5 cursor-pointer bg-purple-50 dark:bg-purple-950/40 hover:bg-purple-100 dark:hover:bg-purple-900/50 text-purple-700 dark:text-purple-300 rounded-xl py-2 px-3.5 border border-purple-200 dark:border-purple-800/50 font-bold text-xs transition-all shadow-sm"
                         onClick={() => {
                           setGalleryTarget({ type: "batch", index });
-                          setIsPickerOpen(true);
+                          setIsGalleryOpen(true);
                         }}
+                        title="Buka galeri sekolah atau cari gambar online dengan AI dan sisipkan ke teks pertanyaan"
                       >
-                        <Image className="h-3.5 w-3.5 text-indigo-500" />
-                        <span>{q.imageFile || q.imageUrl ? "Ubah Gambar" : "Sisipkan Gambar"}</span>
+                        <Sparkles className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
+                        <span>Sisipkan Gambar (Galeri / Cari AI)</span>
                       </button>
-                      {(q.imageFile || q.imageUrl) && (
-                        <div className="flex items-center gap-2 animate-in zoom-in-95 duration-300">
-                          <div className="relative group">
-                            <img src={q.imageFile ? URL.createObjectURL(q.imageFile) : q.imageUrl} className="h-10 w-auto rounded-xl border border-indigo-100 object-cover shadow-md" alt="Preview" />
-                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 rounded-xl transition-all flex items-center justify-center">
-                              <span className="text-xs text-white font-bold uppercase">Gambar</span>
-                            </div>
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => { updateBatchItem(index, 'imageFile', null); updateBatchItem(index, 'imageUrl', ''); }}
-                            className="h-8 w-8 text-red-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 p-0 rounded-xl"
-                          >
-                            <Trash className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      )}
                     </div>
                   </div>
 
@@ -8101,6 +8258,372 @@ Aturan:
                       )}
                     </div>
                   )}
+
+                  {q.type === "klasifikasi" && (
+                    <div className="space-y-4 pt-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="w-1.5 h-6 bg-violet-500 rounded-full"></div>
+                          <p className="text-xs font-black text-slate-400 uppercase tracking-widest">
+                            Klasifikasi (Kategori & Pernyataan)
+                          </p>
+                        </div>
+                        <label className="flex items-center gap-1.5 text-xs text-slate-500 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={q.shuffleStatements !== false}
+                            onChange={(e) => updateBatchItem(index, 'shuffleStatements', e.target.checked)}
+                            className="rounded accent-violet-600 w-3.5 h-3.5"
+                          />
+                          Acak Urutan
+                        </label>
+                      </div>
+
+                      {/* Categories */}
+                      <div className="space-y-1.5">
+                        <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                          Kategori Pilihan
+                        </span>
+                        <div className="flex flex-wrap gap-2">
+                          {(q.categories || []).map((cat: any, cIdx: number) => (
+                            <div key={cat.id || cIdx} className="flex items-center gap-1 bg-violet-50 dark:bg-violet-950/30 border border-violet-200 dark:border-violet-800/50 rounded-xl px-2 py-1">
+                              <input
+                                type="text"
+                                value={cat.text}
+                                onChange={(e) => {
+                                  const newCats = [...(q.categories || [])];
+                                  newCats[cIdx] = { ...newCats[cIdx], text: e.target.value };
+                                  updateBatchItem(index, 'categories', newCats);
+                                }}
+                                placeholder={`Kategori ${cIdx + 1}`}
+                                className="text-xs font-bold bg-transparent outline-none text-violet-800 dark:text-violet-300 w-28"
+                              />
+                              {(q.categories || []).length > 2 && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const newCats = (q.categories || []).filter((_: any, i: number) => i !== cIdx);
+                                    updateBatchItem(index, 'categories', newCats);
+                                  }}
+                                  className="text-violet-400 hover:text-red-500 transition-colors"
+                                >
+                                  <X className="w-3 h-3" />
+                                </button>
+                              )}
+                            </div>
+                          ))}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const newCats = [...(q.categories || [])];
+                              const newId = `c${newCats.length + 1}`;
+                              newCats.push({ id: newId, text: "" });
+                              updateBatchItem(index, 'categories', newCats);
+                            }}
+                            className="text-xs text-violet-600 font-bold px-2.5 py-1 rounded-xl border border-dashed border-violet-300 dark:border-violet-700 hover:bg-violet-50 dark:hover:bg-violet-950/20"
+                          >
+                            + Kategori
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Statements */}
+                      <div className="space-y-2">
+                        <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                          Daftar Pernyataan & Kunci Kategori
+                        </span>
+                        {(!q.statements || q.statements.length === 0) ? (
+                          <div className="text-center py-3 text-xs text-slate-400 italic">
+                            Belum ada pernyataan.
+                            <Button variant="outline" size="sm" className="ml-2 text-xs" onClick={() => {
+                              const firstCatId = q.categories?.[0]?.id || "c1";
+                              updateBatchItem(index, 'statements', [
+                                { id: "s1", text: "", answer: firstCatId },
+                                { id: "s2", text: "", answer: firstCatId }
+                              ]);
+                            }}>+ Tambah 2 Pernyataan</Button>
+                          </div>
+                        ) : (
+                          q.statements.map((st: any, sIdx: number) => (
+                            <div key={st.id || sIdx} className="flex items-center gap-2 p-2 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-800">
+                              <span className="w-6 h-6 rounded-lg bg-violet-600 text-white flex items-center justify-center text-xs font-black flex-shrink-0">
+                                {sIdx + 1}
+                              </span>
+                              <input
+                                type="text"
+                                value={st.text}
+                                onChange={(e) => {
+                                  const newSts = [...(q.statements || [])];
+                                  newSts[sIdx] = { ...newSts[sIdx], text: e.target.value };
+                                  updateBatchItem(index, 'statements', newSts);
+                                }}
+                                placeholder={`Pernyataan ${sIdx + 1}...`}
+                                className="flex-1 text-xs p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 outline-none focus:ring-1 focus:ring-violet-500"
+                              />
+                              <select
+                                value={st.answer}
+                                onChange={(e) => {
+                                  const newSts = [...(q.statements || [])];
+                                  newSts[sIdx] = { ...newSts[sIdx], answer: e.target.value };
+                                  updateBatchItem(index, 'statements', newSts);
+                                }}
+                                className="text-xs font-bold p-1.5 rounded-lg border border-violet-200 dark:border-violet-800 bg-violet-50/50 dark:bg-violet-950/20 text-violet-800 dark:text-violet-300 outline-none max-w-[140px]"
+                              >
+                                {(q.categories || []).map((cat: any) => (
+                                  <option key={cat.id} value={cat.id}>
+                                    {cat.text || `Kategori ${cat.id}`}
+                                  </option>
+                                ))}
+                              </select>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const newSts = (q.statements || []).filter((_: any, i: number) => i !== sIdx);
+                                  updateBatchItem(index, 'statements', newSts);
+                                }}
+                                className="text-red-300 hover:text-red-500 transition-colors flex-shrink-0"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          ))
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-xs text-violet-600 font-bold"
+                          onClick={() => {
+                            const newSts = [...(q.statements || [])];
+                            const firstCatId = q.categories?.[0]?.id || "c1";
+                            newSts.push({ id: `s${newSts.length + 1}`, text: "", answer: firstCatId });
+                            updateBatchItem(index, 'statements', newSts);
+                          }}
+                        >
+                          + Tambah Pernyataan
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {q.type === "matriks" && (
+                    <div className="space-y-4 pt-2">
+                      <div className="flex items-center gap-2">
+                        <div className="w-1.5 h-6 bg-teal-500 rounded-full"></div>
+                        <p className="text-xs font-black text-slate-400 uppercase tracking-widest">
+                          Matriks (Kolom Pilihan & Pernyataan)
+                        </p>
+                      </div>
+
+                      {/* Columns */}
+                      <div className="space-y-1.5">
+                        <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                          Kolom Pilihan (Opsi Matriks)
+                        </span>
+                        <div className="flex flex-wrap gap-2">
+                          {(q.columns || []).map((col: any, cIdx: number) => (
+                            <div key={col.id || cIdx} className="flex items-center gap-1 bg-teal-50 dark:bg-teal-950/30 border border-teal-200 dark:border-teal-800/50 rounded-xl px-2 py-1">
+                              <input
+                                type="text"
+                                value={col.text}
+                                onChange={(e) => {
+                                  const newCols = [...(q.columns || [])];
+                                  newCols[cIdx] = { ...newCols[cIdx], text: e.target.value };
+                                  updateBatchItem(index, 'columns', newCols);
+                                }}
+                                placeholder={`Kolom ${cIdx + 1}`}
+                                className="text-xs font-bold bg-transparent outline-none text-teal-800 dark:text-teal-300 w-24"
+                              />
+                              {(q.columns || []).length > 2 && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const newCols = (q.columns || []).filter((_: any, i: number) => i !== cIdx);
+                                    updateBatchItem(index, 'columns', newCols);
+                                  }}
+                                  className="text-teal-400 hover:text-red-500 transition-colors"
+                                >
+                                  <X className="w-3 h-3" />
+                                </button>
+                              )}
+                            </div>
+                          ))}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const newCols = [...(q.columns || [])];
+                              const newId = `c${newCols.length + 1}`;
+                              newCols.push({ id: newId, text: "" });
+                              updateBatchItem(index, 'columns', newCols);
+                            }}
+                            className="text-xs text-teal-600 font-bold px-2.5 py-1 rounded-xl border border-dashed border-teal-300 dark:border-teal-700 hover:bg-teal-50 dark:hover:bg-teal-950/20"
+                          >
+                            + Kolom
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Statements */}
+                      <div className="space-y-2">
+                        <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                          Daftar Pernyataan & Kunci Pilihan
+                        </span>
+                        {(!q.statements || q.statements.length === 0) ? (
+                          <div className="text-center py-3 text-xs text-slate-400 italic">
+                            Belum ada baris pernyataan matriks.
+                            <Button variant="outline" size="sm" className="ml-2 text-xs" onClick={() => {
+                              const firstColId = q.columns?.[0]?.id || "c1";
+                              updateBatchItem(index, 'statements', [
+                                { id: "s1", text: "", answer: firstColId },
+                                { id: "s2", text: "", answer: firstColId }
+                              ]);
+                            }}>+ Tambah 2 Pernyataan</Button>
+                          </div>
+                        ) : (
+                          q.statements.map((st: any, sIdx: number) => (
+                            <div key={st.id || sIdx} className="flex items-center gap-2 p-2 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-800">
+                              <span className="w-6 h-6 rounded-lg bg-teal-600 text-white flex items-center justify-center text-xs font-black flex-shrink-0">
+                                {sIdx + 1}
+                              </span>
+                              <input
+                                type="text"
+                                value={st.text}
+                                onChange={(e) => {
+                                  const newSts = [...(q.statements || [])];
+                                  newSts[sIdx] = { ...newSts[sIdx], text: e.target.value };
+                                  updateBatchItem(index, 'statements', newSts);
+                                }}
+                                placeholder={`Pernyataan ${sIdx + 1}...`}
+                                className="flex-1 text-xs p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 outline-none focus:ring-1 focus:ring-teal-500"
+                              />
+                              <select
+                                value={st.answer}
+                                onChange={(e) => {
+                                  const newSts = [...(q.statements || [])];
+                                  newSts[sIdx] = { ...newSts[sIdx], answer: e.target.value };
+                                  updateBatchItem(index, 'statements', newSts);
+                                }}
+                                className="text-xs font-bold p-1.5 rounded-lg border border-teal-200 dark:border-teal-800 bg-teal-50/50 dark:bg-teal-950/20 text-teal-800 dark:text-teal-300 outline-none max-w-[140px]"
+                              >
+                                {(q.columns || []).map((col: any) => (
+                                  <option key={col.id} value={col.id}>
+                                    {col.text || `Kolom ${col.id}`}
+                                  </option>
+                                ))}
+                              </select>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const newSts = (q.statements || []).filter((_: any, i: number) => i !== sIdx);
+                                  updateBatchItem(index, 'statements', newSts);
+                                }}
+                                className="text-red-300 hover:text-red-500 transition-colors flex-shrink-0"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          ))
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-xs text-teal-600 font-bold"
+                          onClick={() => {
+                            const newSts = [...(q.statements || [])];
+                            const firstColId = q.columns?.[0]?.id || "c1";
+                            newSts.push({ id: `s${newSts.length + 1}`, text: "", answer: firstColId });
+                            updateBatchItem(index, 'statements', newSts);
+                          }}
+                        >
+                          + Tambah Pernyataan
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {q.type === "isian_rumpang" && (
+                    <div className="space-y-4 pt-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="w-1.5 h-6 bg-lime-500 rounded-full"></div>
+                          <p className="text-xs font-black text-slate-400 uppercase tracking-widest">
+                            Kunci Jawaban Isian Rumpang
+                          </p>
+                        </div>
+                        <span className="text-[11px] text-lime-700 dark:text-lime-400 bg-lime-50 dark:bg-lime-950/30 px-2 py-0.5 rounded-full border border-lime-200 dark:border-lime-800">
+                          Format teks: [[1]], [[2]], dst.
+                        </span>
+                      </div>
+
+                      {(!q.blanks || q.blanks.length === 0) ? (
+                        <div className="text-center py-3 text-xs text-slate-400 italic">
+                          Belum ada kunci rumpang. Tambahkan manual atau pastikan teks pertanyaan berisi tanda [[1]].
+                          <Button variant="outline" size="sm" className="ml-2 text-xs" onClick={() => {
+                            updateBatchItem(index, 'blanks', [
+                              { id: "1", answers: [""], caseSensitive: false }
+                            ]);
+                          }}>+ Tambah Kunci Rumpang [[1]]</Button>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          {q.blanks.map((b: any, bIdx: number) => (
+                            <div key={b.id || bIdx} className="flex items-center gap-2 p-2 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-800">
+                              <span className="px-2 py-1 rounded-lg bg-lime-100 dark:bg-lime-950/40 text-lime-800 dark:text-lime-300 text-xs font-black border border-lime-200 dark:border-lime-800/40 font-mono flex-shrink-0">
+                                [[{b.id}]]
+                              </span>
+                              <input
+                                type="text"
+                                value={Array.isArray(b.answers) ? b.answers.join(", ") : (b.answersText || "")}
+                                onChange={(e) => {
+                                  const answers = e.target.value.split(",").map((s: string) => s.trim()).filter(Boolean);
+                                  const newBlanks = [...(q.blanks || [])];
+                                  newBlanks[bIdx] = { ...newBlanks[bIdx], answers, answersText: e.target.value };
+                                  updateBatchItem(index, 'blanks', newBlanks);
+                                }}
+                                placeholder="Jawaban diterima (pisahkan koma bila lebih dari 1)..."
+                                className="flex-1 text-xs p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 outline-none focus:ring-1 focus:ring-lime-500"
+                              />
+                              <label className="flex items-center gap-1 text-[11px] font-semibold text-slate-500 cursor-pointer select-none px-1">
+                                <input
+                                  type="checkbox"
+                                  checked={!!b.caseSensitive}
+                                  onChange={(e) => {
+                                    const newBlanks = [...(q.blanks || [])];
+                                    newBlanks[bIdx] = { ...newBlanks[bIdx], caseSensitive: e.target.checked };
+                                    updateBatchItem(index, 'blanks', newBlanks);
+                                  }}
+                                  className="rounded accent-lime-600 w-3.5 h-3.5"
+                                />
+                                Case-sensitive
+                              </label>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const newBlanks = (q.blanks || []).filter((_: any, i: number) => i !== bIdx);
+                                  updateBatchItem(index, 'blanks', newBlanks);
+                                }}
+                                className="text-red-300 hover:text-red-500 transition-colors flex-shrink-0"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          ))}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-xs text-lime-600 font-bold"
+                            onClick={() => {
+                              const newBlanks = [...(q.blanks || [])];
+                              const nextId = String(newBlanks.length + 1);
+                              newBlanks.push({ id: nextId, answers: [""], caseSensitive: false });
+                              updateBatchItem(index, 'blanks', newBlanks);
+                            }}
+                          >
+                            + Tambah Kunci Rumpang
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               ))}
 
@@ -8179,44 +8702,31 @@ Aturan:
           confirmLabel={confirmModal.confirmLabel}
           showCancel={confirmModal.showCancel}
         />
-        <Dialog open={isGalleryOpen} onOpenChange={setIsGalleryOpen}>
-          <DialogContent className="max-w-4xl bg-card max-h-[80vh] overflow-hidden flex flex-col p-0">
-            <DialogHeader className="p-6 border-b border-slate-100 dark:border-slate-800">
-              <DialogTitle>Galeri Media Bersama</DialogTitle>
-              <p className="text-xs text-slate-500">Pilih gambar yang pernah diunggah oleh Anda atau rekan guru lainnya.</p>
-            </DialogHeader>
-            <div className="flex-1 overflow-y-auto p-6 space-y-8 scrollbar-thin">
-              {galleryGroups.length === 0 ? (
-                <div className="text-center py-12 px-4">
-                  <Image className="w-10 h-10 mx-auto text-slate-300 dark:text-slate-600 mb-3" />
-                  <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">Belum ada gambar yang bisa digunakan di server ini.</p>
-                </div>
-              ) : (
-                galleryGroups.map((group, gIdx) => (
-                  <div key={gIdx} className="space-y-3">
-                    <h3 className="text-xs font-black uppercase text-indigo-500 tracking-widest pl-2 border-l-2 border-indigo-500 flex items-center gap-2">
-                      {group.title} <span className="text-slate-400 font-medium ml-1">({group.images.length} gambar)</span>
-                    </h3>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-3">
-                      {group.images.map((src, idx) => (
-                        <div
-                          key={idx}
-                          onClick={() => handlePickGallery(src)}
-                          className="group relative border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden cursor-pointer hover:border-indigo-500 dark:hover:border-indigo-400 transition-all bg-slate-50 dark:bg-slate-900 flex items-center justify-center p-2 h-24 shadow-sm"
-                        >
-                          <img src={src} alt="Media" className="max-h-full max-w-full object-contain transition-transform group-hover:scale-110" />
-                          <div className="absolute inset-0 bg-indigo-900/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all">
-                            <span className="text-white text-xs font-bold bg-indigo-600 px-3 py-1.5 rounded-lg shadow-sm tracking-widest uppercase">Pilih</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </DialogContent>
-        </Dialog>
+        <SharedGalleryModal
+          isOpen={isGalleryOpen}
+          onClose={() => setIsGalleryOpen(false)}
+          onSelectImage={handlePickGallery}
+          pb={pb!}
+          school={school}
+          currentUser={user}
+          currentQuestionContext={
+            galleryTarget?.type === "batch" && galleryTarget.index !== undefined && batchQuestions[galleryTarget.index]
+              ? {
+                  text: batchQuestions[galleryTarget.index].text,
+                  topic: aiTopic || exam?.title,
+                  subject: aiSubject || exam?.subject,
+                  options: Object.values(batchQuestions[galleryTarget.index].choices || {}).map((c: any) => c.text),
+                  correctAnswer: batchQuestions[galleryTarget.index].correctKey,
+                }
+              : {
+                  text: formValues.text,
+                  topic: exam?.title,
+                  subject: exam?.subject,
+                  options: Object.values(formValues.choices || {}).map((c: any) => c.text),
+                  correctAnswer: formValues.answerKey,
+                }
+          }
+        />
         <Dialog open={isPickerOpen} onOpenChange={setIsPickerOpen}>
           <DialogContent className="max-w-sm bg-card p-4">
             <DialogHeader>
@@ -8385,6 +8895,9 @@ Aturan:
                           {allowedTypes.urutkan && <option value="urutkan">Mengurutkan</option>}
                           {allowedTypes.drag_drop && <option value="drag_drop">Drag & Drop</option>}
                           {allowedTypes.uraian && <option value="uraian">Uraian / Essay</option>}
+                          {allowedTypes.klasifikasi && <option value="klasifikasi">Klasifikasi</option>}
+                          {allowedTypes.matriks && <option value="matriks">Matriks (Tabel Pernyataan)</option>}
+                          {allowedTypes.isian_rumpang && <option value="isian_rumpang">Isian Rumpang</option>}
                         </select>
                       </div>
                       <div className="space-y-1.5">
@@ -8444,6 +8957,29 @@ Aturan:
                          )}
                       </div>
                     </div>
+
+                    {/* Opsi Cari Gambar Otomatis (Validasi AI) */}
+                    <label className="flex items-center justify-between p-3 rounded-2xl bg-purple-50/60 dark:bg-purple-950/20 border border-purple-200/80 dark:border-purple-800/40 cursor-pointer hover:bg-purple-100/40 dark:hover:bg-purple-950/40 transition-colors">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-xl bg-purple-100 dark:bg-purple-900/50 flex items-center justify-center text-purple-600 dark:text-purple-400">
+                          <Image className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                            Cari Gambar Edukatif <span className="px-1.5 py-0.5 rounded-md bg-purple-200/70 dark:bg-purple-900/60 text-[9px] font-black uppercase text-purple-800 dark:text-purple-300">Validasi AI</span>
+                          </p>
+                          <p className="text-[11px] text-slate-500 font-medium">
+                            Cari gambar dari Web Internet & validasi anti-bocor kunci jawaban
+                          </p>
+                        </div>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={aiAutoFindImages}
+                        onChange={(e) => setAiAutoFindImages(e.target.checked)}
+                        className="w-4 h-4 rounded text-purple-600 focus:ring-purple-500 cursor-pointer"
+                      />
+                    </label>
                   </div>
 
                   {(aiObjectives.length > 0 || isFetchingObjectives) && (
@@ -8598,6 +9134,9 @@ Aturan:
                           <option value="urutkan">Mengurutkan</option>
                           <option value="drag_drop">Drag & Drop</option>
                           <option value="uraian">Uraian / Essay</option>
+                          <option value="klasifikasi">Klasifikasi</option>
+                          <option value="matriks">Matriks (Tabel)</option>
+                          <option value="isian_rumpang">Isian Rumpang</option>
                         </Select>
                       </div>
                     </div>

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTenant } from "../context/TenantContext";
 import { masterPb } from "../lib/pocketbase";
-import { uploadInventoryImage, deleteImageFromStorage } from "../lib/storage";
+import { uploadInventoryImage, deleteImageFromStorage, isOfflineEnvironment } from "../lib/storage";
 import { compressImage } from "../lib/imageCompression";
 import { AI_MODELS, testAIConnection } from "../lib/ai";
 import { Skeleton } from "../components/ui/skeleton";
@@ -16,6 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Badge } from "../components/ui/badge";
 import { cn } from "../lib/utils";
 import { APP_VERSION } from "../utils/version";
+import { SharedGalleryModal } from "../components/dialogs/SharedGalleryModal";
 import {
   Upload,
   Save,
@@ -45,8 +46,10 @@ import {
   ChevronUp,
   Server,
   Activity,
-  ArrowRight
+  ArrowRight,
+  RotateCw
 } from "lucide-react";
+import { forceHardReload } from "../utils/hardReload";
 import { getSchoolDomain, getSchoolUrl } from "../utils/domainHelper";
 import { ExambroGuideModal } from "../components/dialogs/ExambroGuideModal";
 
@@ -154,9 +157,10 @@ const SettingsPage = () => {
   });
 
   // 🔄 Offline 1-Click Update States
-  const isOfflineServer = school?.plan === "offline" || school?.id === "local_server" || (typeof window !== "undefined" && (/^(localhost|127\.|0\.0\.0\.0$|\[::1\])/.test(window.location.hostname) || /^(192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.)/.test(window.location.hostname)));
+  const isOfflineServer = school?.plan === "offline" || school?.id === "local_server" || school?.slug === "local" || isOfflineEnvironment();
   const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
   const [isApplyingUpdate, setIsApplyingUpdate] = useState(false);
+  const [isReloading, setIsReloading] = useState(false);
   const [updateAvailable, setUpdateAvailable] = useState<{ version: string; release_date?: string; notes?: string } | null>(null);
 
   const handleCheckUpdate = async () => {
@@ -197,11 +201,15 @@ const SettingsPage = () => {
         });
       } else if (data && data.version) {
         setUpdateAvailable(null);
+        setIsReloading(true);
         addToast({
           title: "Sistem Mutakhir",
-          description: `Aplikasi CBT Anda sudah menggunakan versi paling mutakhir (v${currentVer}).`,
+          description: `Aplikasi CBT Anda sudah menggunakan versi mutakhir (v${currentVer}). Menyegarkan halaman & cache...`,
           type: "success"
         });
+        setTimeout(async () => {
+          await forceHardReload();
+        }, 1000);
       } else {
         throw new Error("Gagal mengambil data versi dari server pusat.");
       }
@@ -225,14 +233,15 @@ const SettingsPage = () => {
     try {
       const res = await pb.send("/api/offline-update-apply", { method: "POST" });
       if (res?.ok || res?.message) {
+        setIsReloading(true);
         addToast({
           title: "Pembaruan Berhasil!",
-          description: "Sistem telah diperbarui. Memuat ulang halaman...",
+          description: "Sistem telah diperbarui. Memuat ulang halaman & membersihkan cache...",
           type: "success"
         });
-        setTimeout(() => {
-          window.location.reload();
-        }, 2000);
+        setTimeout(async () => {
+          await forceHardReload();
+        }, 1200);
       } else {
         throw new Error(res?.error || "Gagal menerapkan pembaruan.");
       }
@@ -290,8 +299,8 @@ const SettingsPage = () => {
         setSchoolLogo(logoUrl);
         setLogoPreview(logoUrl);
 
-        if (data.allowed_types) setAllowedTypes(data.allowed_types);
-        else if (data.allowed_question_types) setAllowedTypes(data.allowed_question_types);
+        if (data.allowed_types) setAllowedTypes(prev => ({ ...prev, ...data.allowed_types }));
+        else if (data.allowed_question_types) setAllowedTypes(prev => ({ ...prev, ...data.allowed_question_types }));
       } else {
         // Tenant baru: belum ada record settings, pakai nama dari registry
         setSchoolName(school?.name || "EXAMKU");
@@ -584,7 +593,7 @@ const SettingsPage = () => {
   }, [aiProvider, aiGatewayKey, groqApiKey, aiGatewayUrl, loading]);
 
   const compressLogo = (file: File): Promise<File> =>
-    compressImage(file, { maxWidth: 800, maxHeight: 800, quality: 0.90 });
+    compressImage(file, { maxWidth: 512, maxHeight: 512, quality: 0.85 });
 
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -670,9 +679,9 @@ const SettingsPage = () => {
         setSettingsId(created.id);
       }
 
-      // 🔄 SYNC TO MASTER REGISTRY (SaaS SaaS Multi-Tenant Support)
+      // 🔄 SYNC TO MASTER REGISTRY (SaaS Multi-Tenant Support)
       const currentSlug = school?.slug || window.location.hostname.split('.')[0];
-      if (currentSlug && currentSlug !== 'localhost' && currentSlug !== 'ujian') {
+      if (!isOfflineServer && currentSlug && currentSlug !== 'localhost' && currentSlug !== 'ujian' && currentSlug !== 'local') {
         try {
           console.log("Attempting sync to Master Registry for slug:", currentSlug);
           const masterRecords = await masterPb.collection("schools").getList(1, 1, {
@@ -717,7 +726,12 @@ const SettingsPage = () => {
           type: "error"
         });
       } else {
-        addToast({ title: "Gagal", description: "Terjadi kesalahan saat menyimpan.", type: "error" });
+        const detail = err?.data?.message || err?.message || (err?.data ? JSON.stringify(err.data) : "");
+        addToast({
+          title: "Gagal",
+          description: detail ? `Gagal menyimpan: ${detail}` : "Terjadi kesalahan saat menyimpan.",
+          type: "error"
+        });
       }
     } finally {
       setSaving(false);
@@ -1312,7 +1326,7 @@ const SettingsPage = () => {
                       <label className="relative inline-flex items-center cursor-pointer">
                         <input
                           type="checkbox" className="sr-only peer"
-                          checked={allowedTypes[type.id] || false}
+                          checked={allowedTypes[type.id] !== false}
                           onChange={(e) => setAllowedTypes(prev => ({ ...prev, [type.id]: e.target.checked }))}
                         />
                         <div className="w-9 h-5 bg-slate-200 dark:bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
@@ -1655,19 +1669,40 @@ const SettingsPage = () => {
                     )}
                   </Button>
                 ) : (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    disabled={isCheckingUpdate}
-                    onClick={handleCheckUpdate}
-                    className="w-full h-9 rounded-xl text-xs font-bold text-blue-600 dark:text-blue-400 hover:bg-blue-100/60 dark:hover:bg-blue-950/40 border-blue-200 dark:border-blue-800 bg-white dark:bg-slate-800"
-                  >
-                    {isCheckingUpdate ? (
-                      <><RefreshCw size={13} className="animate-spin mr-1.5" /> Memeriksa ke Server Pusat...</>
-                    ) : (
-                      <><RefreshCw size={13} className="mr-1.5" /> Cek Pembaruan Sistem</>
-                    )}
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={isCheckingUpdate || isReloading}
+                      onClick={handleCheckUpdate}
+                      className="flex-1 h-9 rounded-xl text-xs font-bold text-blue-600 dark:text-blue-400 hover:bg-blue-100/60 dark:hover:bg-blue-950/40 border-blue-200 dark:border-blue-800 bg-white dark:bg-slate-800"
+                    >
+                      {isCheckingUpdate ? (
+                        <><RefreshCw size={13} className="animate-spin mr-1.5" /> Memeriksa ke Server Pusat...</>
+                      ) : isReloading ? (
+                        <><RefreshCw size={13} className="animate-spin mr-1.5" /> Menyegarkan Sistem...</>
+                      ) : (
+                        <><RefreshCw size={13} className="mr-1.5" /> Cek Pembaruan Sistem</>
+                      )}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={isCheckingUpdate || isReloading}
+                      onClick={() => {
+                        addToast({
+                          title: "Hard Reload",
+                          description: "Membersihkan cache browser dan memuat ulang...",
+                          type: "info"
+                        });
+                        setTimeout(() => forceHardReload(), 400);
+                      }}
+                      className="h-9 px-3 rounded-xl text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 border-slate-200 dark:border-slate-700 shrink-0"
+                      title="Paksa muat ulang browser untuk membersihkan cache tampilan"
+                    >
+                      <RotateCw size={13} className="mr-1 text-slate-500" /> Hard Reload
+                    </Button>
+                  </div>
                 )}
               </div>
 
@@ -1820,39 +1855,14 @@ const SettingsPage = () => {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={isGalleryOpen} onOpenChange={setIsGalleryOpen}>
-        <DialogContent className="max-w-3xl rounded-3xl p-0 border border-slate-200 dark:border-slate-800 shadow-xl bg-white dark:bg-slate-900 overflow-hidden flex flex-col">
-          <div className="p-6 border-b border-slate-100 dark:border-slate-800">
-            <DialogTitle className="text-sm font-bold flex items-center gap-2">
-              <FolderOpen size={16} className="text-blue-500" /> Galeri Gambar Server
-            </DialogTitle>
-            <DialogDescription className="text-[10px] sm:text-xs text-slate-500 mt-1 font-medium">Gambar dari koleksi soal-soal di server Anda.</DialogDescription>
-          </div>
-          <div className="p-6 bg-slate-50/50 dark:bg-slate-950/40 max-h-[60vh] overflow-y-auto custom-scrollbar space-y-8">
-            {galleryGroups.length === 0 ? (
-              <div className="text-center py-10 font-bold text-slate-400 text-xs">Belum ada media gambar tersimpan di server.</div>
-            ) : (
-              galleryGroups.map((group, gIdx) => (
-                <div key={gIdx} className="space-y-4">
-                  <h3 className="text-[10px] sm:text-xs font-black uppercase tracking-widest text-indigo-500 pl-2 border-l-2 border-indigo-500 flex items-center gap-2">
-                    {group.title} <span className="text-slate-400 font-medium">({group.images.length})</span>
-                  </h3>
-                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
-                    {group.images.map((src, idx) => (
-                      <div key={idx} className="aspect-square bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden cursor-pointer group relative shadow-sm" onClick={() => handlePickGallery(src)}>
-                        <img src={src} className="w-full h-full object-contain p-2" alt="Media" />
-                        <div className="absolute inset-0 bg-blue-600/90 items-center justify-center hidden group-hover:flex transition-all">
-                          <span className="text-white text-[10px] font-black tracking-widest uppercase">Pilih</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
+      <SharedGalleryModal
+        isOpen={isGalleryOpen}
+        onClose={() => setIsGalleryOpen(false)}
+        onSelectImage={handlePickGallery}
+        pb={pb!}
+        school={school}
+        currentUser={{ name: "Admin", role: "admin" }}
+      />
 
       <Dialog open={isImportConfirmOpen} onOpenChange={(val) => { if (!isBackupLoading) setIsImportConfirmOpen(val); }}>
         <DialogContent className="z-[100] max-w-sm rounded-[2rem] p-6 text-center border-0 shadow-2xl bg-white dark:bg-slate-900">

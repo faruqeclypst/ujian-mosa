@@ -16,6 +16,8 @@ import { Separator } from "../../components/ui/separator";
 import FormField from "../../components/forms/FormField";
 import { uploadInventoryImage, deleteImageFromStorage, deleteImagesFromStorage, safeDeleteImage, safeDeleteImages, getR2WorkerUrl, getR2PublicBaseUrl } from "../../lib/storage";
 import { compressImage } from "../../lib/imageCompression";
+import { SharedGalleryModal } from "../../components/dialogs/SharedGalleryModal";
+import { insertImageIntoQuestionText } from "../../lib/imageSearch";
 import { ImportButton } from "../../components/ui/import-button";
 import { parseQuestionsFromWord } from "../../lib/questionWordParser";
 import { Select } from "../../components/ui/select";
@@ -608,6 +610,7 @@ const QuestionFormPage = () => {
     urutkan: true,
     drag_drop: true,
     uraian: true,
+    klasifikasi: true,
     hotspot: true,
     isian_rumpang: true,
     matriks: true,
@@ -623,7 +626,7 @@ const QuestionFormPage = () => {
         if (records.length > 0) {
           const data = records[0];
           const types = data.allowed_types || data.allowed_question_types;
-          if (types) setAllowedTypes(types);
+          if (types) setAllowedTypes(prev => ({ ...prev, ...types }));
 
           setActiveAIConfig({
             model: data.ai_model || "llama-3.3-70b-versatile",
@@ -896,7 +899,14 @@ const QuestionFormPage = () => {
 
   const [isGalleryOpen, setIsGalleryOpen] = useState(false);
   const [galleryGroups, setGalleryGroups] = useState<{ title: string; images: string[] }[]>([]);
-  const [galleryTarget, setGalleryTarget] = useState<{ type: "cover" | "choice" | "batch" | "quill" | "hotspot"; letter?: string; index?: number; quillInstance?: any; quillIndex?: number } | null>(null);
+  const [galleryTarget, setGalleryTarget] = useState<{
+    type: "cover" | "choice" | "batch" | "quill" | "hotspot";
+    letter?: string;
+    index?: number;
+    quillInstance?: any;
+    quillIndex?: number;
+    field?: "text" | "groupText" | "choice";
+  } | null>(null);
 
   // AI Import State
   const [isAIImportOpen, setIsAIImportOpen] = useState(false);
@@ -1020,9 +1030,13 @@ const QuestionFormPage = () => {
     if (!galleryTarget) return;
 
     if (galleryTarget.type === "cover") {
-      setFormValues((prev) => ({ ...prev, imageUrl: url }));
+      setFormValues((prev) => ({
+        ...prev,
+        text: insertImageIntoQuestionText(prev.text, url),
+        imageUrl: ""
+      }));
       setQuestionFile(null); // Reset file picker
-      setCoverSizeInfo("(Dari Galeri)");
+      setCoverSizeInfo("");
     } else if (galleryTarget.type === "choice" && galleryTarget.letter) {
       const letter = galleryTarget.letter;
       handleChoiceChange(letter, "imageUrl", url);
@@ -1034,21 +1048,60 @@ const QuestionFormPage = () => {
     } else if (galleryTarget.type === "hotspot") {
       setFormValues((prev) => ({ ...prev, hotspotImageUrl: url }));
       setHotspotFile(null);
-    } else if (galleryTarget.type === "quill" && galleryTarget.quillInstance) {
-      const q = galleryTarget.quillInstance;
-      const targetIndex = galleryTarget.quillIndex !== undefined ? galleryTarget.quillIndex : (q.getSelection()?.index || 0);
-      q.insertEmbed(targetIndex, "image", url);
-      setTimeout(() => {
+    } else if (galleryTarget.type === "quill") {
+      const q = galleryTarget.quillInstance || (galleryTarget.field === "text" ? quillRef.current?.getEditor() : null);
+      const field = galleryTarget.field || "text";
+      const letter = galleryTarget.letter;
+
+      if (q) {
+        const qLength = q.getLength();
+        const targetIndex = galleryTarget.quillIndex !== undefined
+          ? Math.min(Math.max(0, galleryTarget.quillIndex), qLength)
+          : (q.getSelection()?.index ?? qLength);
+
+        q.insertEmbed(targetIndex, "image", url, "user");
+
         const imgs = q.root.querySelectorAll('img');
         imgs.forEach((img: any) => {
           if (img.getAttribute('src') === url) {
             img.setAttribute('width', '350');
             img.style.display = 'block';
-            img.style.margin = '10px auto';
+            img.style.margin = '12px auto';
+            img.style.borderRadius = '12px';
+            img.style.maxHeight = '340px';
+            img.style.maxWidth = '100%';
+            img.style.boxShadow = '0 2px 8px rgba(0,0,0,0.06)';
           }
         });
-      }, 10);
-      q.setSelection(targetIndex + 1);
+        q.setSelection(targetIndex + 1, 0, "user");
+
+        let updatedHtml = q.root.innerHTML;
+        if (!updatedHtml.includes(url)) {
+          if (field === "text") {
+            updatedHtml = insertImageIntoQuestionText(formValues.text, url);
+          } else if (field === "groupText") {
+            updatedHtml = insertImageIntoQuestionText(formValues.groupText || "", url);
+          } else if (field === "choice" && letter && formValues.choices?.[letter]) {
+            updatedHtml = insertImageIntoQuestionText(formValues.choices[letter].text || "", url);
+          }
+        }
+
+        if (field === "groupText") {
+          setFormValues((prev) => ({ ...prev, groupText: updatedHtml }));
+        } else if (field === "choice" && letter) {
+          handleChoiceChange(letter, "text", updatedHtml);
+        } else {
+          setFormValues((prev) => ({ ...prev, text: updatedHtml }));
+        }
+      } else {
+        if (field === "groupText") {
+          setFormValues((prev) => ({ ...prev, groupText: insertImageIntoQuestionText(prev.groupText || "", url) }));
+        } else if (field === "choice" && letter) {
+          handleChoiceChange(letter, "text", insertImageIntoQuestionText(formValues.choices?.[letter]?.text || "", url));
+        } else {
+          setFormValues((prev) => ({ ...prev, text: insertImageIntoQuestionText(prev.text, url) }));
+        }
+      }
     }
 
     setIsGalleryOpen(false);
@@ -1090,26 +1143,64 @@ const QuestionFormPage = () => {
     } else if (galleryTarget.type === "hotspot") {
       setHotspotFile(fileToUpload);
       setFormValues((prev) => ({ ...prev, hotspotImageUrl: "" }));
-    } else if (galleryTarget.type === "quill" && galleryTarget.quillInstance) {
+    } else if (galleryTarget.type === "quill") {
+      const q = galleryTarget.quillInstance || (galleryTarget.field === "text" ? quillRef.current?.getEditor() : null);
+      const field = galleryTarget.field || "text";
+      const letter = galleryTarget.letter;
+
       const reader = new FileReader();
       reader.readAsDataURL(fileToUpload);
       reader.onload = () => {
         const base64 = reader.result as string;
-        const q = galleryTarget.quillInstance;
-        const targetIndex = galleryTarget.quillIndex !== undefined ? galleryTarget.quillIndex : (q.getSelection()?.index || 0);
-        q.insertEmbed(targetIndex, "image", base64);
+        if (q) {
+          const qLength = q.getLength();
+          const targetIndex = galleryTarget.quillIndex !== undefined
+            ? Math.min(Math.max(0, galleryTarget.quillIndex), qLength)
+            : (q.getSelection()?.index ?? qLength);
 
-        setTimeout(() => {
+          q.insertEmbed(targetIndex, "image", base64, "user");
+
           const imgs = q.root.querySelectorAll('img');
           imgs.forEach((img: any) => {
             if (img.getAttribute('src') === base64) {
               img.setAttribute('width', '350');
               img.style.display = 'block';
-              img.style.margin = '10px auto';
+              img.style.margin = '12px auto';
+              img.style.borderRadius = '12px';
+              img.style.maxHeight = '340px';
+              img.style.maxWidth = '100%';
+              img.style.boxShadow = '0 2px 8px rgba(0,0,0,0.06)';
             }
           });
-        }, 10);
-        q.setSelection(targetIndex + 1);
+          q.setSelection(targetIndex + 1, 0, "user");
+
+          let updatedHtml = q.root.innerHTML;
+          if (!updatedHtml.includes(base64)) {
+            if (field === "text") {
+              updatedHtml = insertImageIntoQuestionText(formValues.text, base64);
+            } else if (field === "groupText") {
+              updatedHtml = insertImageIntoQuestionText(formValues.groupText || "", base64);
+            } else if (field === "choice" && letter && formValues.choices?.[letter]) {
+              updatedHtml = insertImageIntoQuestionText(formValues.choices[letter].text || "", base64);
+            }
+          }
+
+          if (field === "groupText") {
+            setFormValues((prev) => ({ ...prev, groupText: updatedHtml }));
+          } else if (field === "choice" && letter) {
+            handleChoiceChange(letter, "text", updatedHtml);
+          } else {
+            setFormValues((prev) => ({ ...prev, text: updatedHtml }));
+          }
+        } else {
+          if (field === "groupText") {
+            setFormValues((prev) => ({ ...prev, groupText: insertImageIntoQuestionText(prev.groupText || "", base64) }));
+          } else if (field === "choice" && letter) {
+            handleChoiceChange(letter, "text", insertImageIntoQuestionText(formValues.choices?.[letter]?.text || "", base64));
+          } else {
+            setFormValues((prev) => ({ ...prev, text: insertImageIntoQuestionText(prev.text, base64) }));
+          }
+        }
       };
     }
 
@@ -2032,6 +2123,7 @@ const QuestionFormPage = () => {
       if (qType === "menjodohkan") return false; // pairs can be edited in batch modal
       if (qType === "urutkan" || qType === "drag_drop") return false; // items can be edited in batch modal
       if (qType === "isian_singkat" || qType === "uraian") return false;
+      if (qType === "klasifikasi" || qType === "matriks" || qType === "isian_rumpang") return false;
       if (!q.correctKey) return true;
 
       // For pilihan_ganda_kompleks, correctKey is comma-separated
@@ -2130,11 +2222,31 @@ const QuestionFormPage = () => {
           // Essay/Short answer: no options, just answerKey
           optionsToSave = {};
           correctAnswer = q.answerKey || "";
+        } else if (qType === "klasifikasi") {
+          optionsToSave = {
+            categories: q.categories || [],
+            statements: q.statements || [],
+            shuffleStatements: q.shuffleStatements ?? true
+          };
+          correctAnswer = "";
+        } else if (qType === "matriks") {
+          optionsToSave = {
+            columns: q.columns || [],
+            statements: q.statements || []
+          };
+          correctAnswer = "";
+        } else if (qType === "isian_rumpang") {
+          optionsToSave = {
+            text: q.text,
+            blanks: q.blanks || []
+          };
+          correctAnswer = "";
         }
 
         const payload: any = {
           examId,
           text: await uploadInlineBase64Images(q.isFromAI ? q.text : `<p>${q.text}</p>`),
+          type: qType,
           field: typeMap[qType] || "multiple_choice",
           options: optionsToSave,
           correctAnswer: correctAnswer,
@@ -2233,7 +2345,29 @@ const QuestionFormPage = () => {
     // Alih-alih pakai native browser <input>, kita pakai Custom Gallery UI kita
     const range = quill.getSelection();
     const cursorIndex = range ? range.index : quill.getLength();
-    setGalleryTarget({ type: "quill", quillInstance: quill, quillIndex: cursorIndex });
+
+    // Deteksi field target berdasarkan placeholder
+    let field: "text" | "groupText" | "choice" = "text";
+    let letter: string | undefined = undefined;
+
+    const placeholder = (quill.root?.getAttribute("data-placeholder") || "").toLowerCase();
+    if (placeholder.includes("stimulus") || placeholder.includes("literasi")) {
+      field = "groupText";
+    } else if (placeholder.includes("jawaban opsi")) {
+      field = "choice";
+      const match = placeholder.match(/jawaban opsi ([a-z])/i);
+      if (match) letter = match[1].toLowerCase();
+    } else {
+      field = "text";
+    }
+
+    setGalleryTarget({
+      type: "quill",
+      quillInstance: quill,
+      quillIndex: cursorIndex,
+      field,
+      letter
+    });
     setIsPickerOpen(true);
   }, []);
 
@@ -2601,10 +2735,14 @@ const QuestionFormPage = () => {
     setQuestionFile(null);
     setHotspotFile(null);
     setChoiceFiles({});
+    let initialText = wrapTablesForQuill(q.text || "");
+    if (q.imageUrl && !initialText.includes(q.imageUrl)) {
+      initialText = insertImageIntoQuestionText(initialText, q.imageUrl);
+    }
     setFormValues({
-      text: wrapTablesForQuill(q.text),
+      text: initialText,
       type: q.type || "pilihan_ganda",
-      imageUrl: q.imageUrl,
+      imageUrl: "",
       groupId: q.groupId || "",
       groupText: q.groupText || "",
       choices: {
@@ -5359,16 +5497,17 @@ const QuestionFormPage = () => {
                           className="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm font-semibold h-10 px-3 pr-8 cursor-pointer text-slate-800 dark:text-slate-100 shadow-xs focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all appearance-none"
                         >
                           {(allowedTypes.pilihan_ganda !== false || formValues.type === "pilihan_ganda") && <option value="pilihan_ganda">Pilihan Ganda (Single Choice)</option>}
-                          {(allowedTypes.pilihan_ganda_kompleks || formValues.type === "pilihan_ganda_kompleks") && <option value="pilihan_ganda_kompleks">Pilihan Ganda Kompleks (Multi Response)</option>}
-                          {(allowedTypes.menjodohkan || formValues.type === "menjodohkan") && <option value="menjodohkan">Menjodohkan (Matching)</option>}
-                          {(allowedTypes.benar_salah || formValues.type === "benar_salah") && <option value="benar_salah">Benar / Salah (Matriks ANBK)</option>}
-                          {(allowedTypes.isian_singkat || formValues.type === "isian_singkat") && <option value="isian_singkat">Isian Singkat</option>}
-                          {(allowedTypes.uraian || formValues.type === "uraian") && <option value="uraian">Uraian / Esai</option>}
-                          {(allowedTypes.urutkan || formValues.type === "urutkan") && <option value="urutkan">Urutkan (Ordering)</option>}
-                          {(allowedTypes.drag_drop || formValues.type === "drag_drop") && <option value="drag_drop">Drag and Drop</option>}
-                          {(allowedTypes.matriks || formValues.type === "matriks") && <option value="matriks">Matriks (Tabel Pilihan Ganda)</option>}
-                          {(allowedTypes.isian_rumpang || formValues.type === "isian_rumpang") && <option value="isian_rumpang">Isian Rumpang (Cloze)</option>}
-                          {(allowedTypes.hotspot || formValues.type === "hotspot") && <option value="hotspot">Hotspot (Klik Gambar)</option>}
+                          {(allowedTypes.pilihan_ganda_kompleks !== false || formValues.type === "pilihan_ganda_kompleks") && <option value="pilihan_ganda_kompleks">Pilihan Ganda Kompleks (Multi Response)</option>}
+                          {(allowedTypes.menjodohkan !== false || formValues.type === "menjodohkan") && <option value="menjodohkan">Menjodohkan (Matching)</option>}
+                          {(allowedTypes.benar_salah !== false || formValues.type === "benar_salah") && <option value="benar_salah">Benar / Salah (Matriks ANBK)</option>}
+                          {(allowedTypes.isian_singkat !== false || formValues.type === "isian_singkat") && <option value="isian_singkat">Isian Singkat</option>}
+                          {(allowedTypes.uraian !== false || formValues.type === "uraian") && <option value="uraian">Uraian / Esai</option>}
+                          {(allowedTypes.urutkan !== false || formValues.type === "urutkan") && <option value="urutkan">Urutkan (Ordering)</option>}
+                          {(allowedTypes.drag_drop !== false || formValues.type === "drag_drop") && <option value="drag_drop">Drag and Drop</option>}
+                          {(allowedTypes.klasifikasi !== false || formValues.type === "klasifikasi") && <option value="klasifikasi">Klasifikasi (Pengelompokan Kategori)</option>}
+                          {(allowedTypes.matriks !== false || formValues.type === "matriks") && <option value="matriks">Matriks (Tabel Pilihan Ganda)</option>}
+                          {(allowedTypes.isian_rumpang !== false || formValues.type === "isian_rumpang") && <option value="isian_rumpang">Isian Rumpang (Cloze)</option>}
+                          {(allowedTypes.hotspot !== false || formValues.type === "hotspot") && <option value="hotspot">Hotspot (Klik Gambar)</option>}
                         </select>
                         <ChevronDown className="w-4 h-4 text-slate-400 dark:text-slate-500 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                       </div>
@@ -5609,64 +5748,6 @@ const QuestionFormPage = () => {
                             className="text-sm font-serif ql-editor !p-0 text-slate-800 dark:text-slate-200 leading-relaxed"
                           />
                         </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Row 3: Gambar Cover Soal */}
-                <div className="p-3.5 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/40 dark:bg-slate-900/20 space-y-2">
-                  <div>
-                    <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 block">
-                      Gambar Cover / Ilustrasi Soal (Opsional)
-                    </label>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">
-                      Gambar ini tampil tepat di atas teks pertanyaan utama pada lembar ujian siswa.
-                    </p>
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-3 pt-1">
-                    <button
-                      type="button"
-                      className="flex items-center gap-2 cursor-pointer bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl h-11 text-xs px-4 border border-slate-200 dark:border-slate-700 transition-all font-semibold shadow-xs"
-                      onClick={() => {
-                        setGalleryTarget({ type: "cover" });
-                        setIsPickerOpen(true);
-                      }}
-                    >
-                      <Image className="w-4 h-4 text-slate-400" />
-                      <span>{questionFile || formValues.imageUrl ? "Ganti Gambar Cover" : "Tambah Gambar Cover"}</span>
-                    </button>
-
-                    {(questionFile || formValues.imageUrl) && (
-                      <div className="flex items-center gap-2.5 bg-white dark:bg-slate-900 p-1.5 pr-3 rounded-lg border border-slate-200 dark:border-slate-800 shadow-xs">
-                        <div className="relative">
-                          <img
-                            src={questionFile ? URL.createObjectURL(questionFile) : formValues.imageUrl}
-                            alt="Pratinjau Cover Soal"
-                            className="h-12 w-auto max-w-[120px] object-cover rounded-md border border-slate-200 dark:border-slate-700"
-                          />
-                        </div>
-                        <div className="flex flex-col gap-0.5">
-                          <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">Gambar Terlampir</span>
-                          {coverSizeInfo && (
-                            <span className="text-xs text-emerald-600 font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800/40">
-                              {coverSizeInfo}
-                            </span>
-                          )}
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setFormValues((prev) => ({ ...prev, imageUrl: "" }));
-                            setQuestionFile(null);
-                            setCoverSizeInfo("");
-                          }}
-                          className="ml-auto w-6 h-6 rounded-md bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/30 text-rose-600 dark:text-rose-400 flex items-center justify-center transition-colors"
-                          title="Hapus gambar"
-                        >
-                          <X className="w-3.5 h-3.5" />
-                        </button>
                       </div>
                     )}
                   </div>
@@ -7067,41 +7148,31 @@ const QuestionFormPage = () => {
           </DialogContent>
         </Dialog>
 
-        <Dialog open={isGalleryOpen} onOpenChange={setIsGalleryOpen}>
-          <DialogContent className="max-w-4xl bg-card max-h-[80vh] overflow-hidden flex flex-col p-0">
-            <DialogHeader className="p-6 border-b border-slate-100 dark:border-slate-800">
-              <DialogTitle>Galeri Media Bersama</DialogTitle>
-              <p className="text-xs text-slate-500">Pilih gambar yang pernah diunggah oleh Anda atau rekan guru lainnya.</p>
-            </DialogHeader>
-            <div className="flex-1 overflow-y-auto p-6 space-y-8 scrollbar-thin">
-              {galleryGroups.length === 0 ? (
-                <div className="text-center p-12 text-slate-400 text-sm">Belum ada gambar yang bisa digunakan di server ini.</div>
-              ) : (
-                galleryGroups.map((group, gIdx) => (
-                  <div key={gIdx} className="space-y-3">
-                    <h3 className="text-xs font-black uppercase text-indigo-500 tracking-widest pl-2 border-l-2 border-indigo-500 flex items-center gap-2">
-                      {group.title} <span className="text-slate-400 font-medium ml-1">({group.images.length} gambar)</span>
-                    </h3>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-3">
-                      {group.images.map((src, idx) => (
-                        <div
-                          key={idx}
-                          onClick={() => handlePickGallery(src)}
-                          className="group relative border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden cursor-pointer hover:border-indigo-500 dark:hover:border-indigo-400 transition-all bg-slate-50 dark:bg-slate-900 flex items-center justify-center p-2 h-24 shadow-sm"
-                        >
-                          <img src={src} alt="Media" className="max-h-full max-w-full object-contain transition-transform group-hover:scale-110" />
-                          <div className="absolute inset-0 bg-indigo-900/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all">
-                            <span className="text-white text-xs font-bold bg-indigo-600 px-3 py-1.5 rounded-lg shadow-sm tracking-widest uppercase">Pilih</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </DialogContent>
-        </Dialog>
+        <SharedGalleryModal
+          isOpen={isGalleryOpen}
+          onClose={() => setIsGalleryOpen(false)}
+          onSelectImage={handlePickGallery}
+          pb={pb!}
+          school={school}
+          currentUser={user}
+          currentQuestionContext={
+            galleryTarget?.type === "batch" && galleryTarget.index !== undefined && batchQuestions[galleryTarget.index]
+              ? {
+                  text: batchQuestions[galleryTarget.index].text,
+                  topic: exam?.title,
+                  subject: exam?.subject,
+                  options: Object.values(batchQuestions[galleryTarget.index].choices || {}).map((c: any) => c.text),
+                  correctAnswer: batchQuestions[galleryTarget.index].correctKey,
+                }
+              : {
+                  text: formValues.text,
+                  topic: exam?.title,
+                  subject: exam?.subject,
+                  options: Object.values(formValues.choices || {}).map((c: any) => c.text),
+                  correctAnswer: formValues.answerKey,
+                }
+          }
+        />
         <Dialog open={isPickerOpen} onOpenChange={setIsPickerOpen}>
           <DialogContent className="max-w-sm bg-card p-4">
             <DialogHeader>

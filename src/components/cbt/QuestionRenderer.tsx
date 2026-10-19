@@ -827,7 +827,7 @@ export const QuestionRenderer = (props: QuestionRendererProps) => {
             {bookmarkButton}
           </div>
 
-          {question.imageUrl && (
+          {question.imageUrl && !question.text?.includes(question.imageUrl) && (
             <div className="relative group cursor-zoom-in select-none" onClick={() => onPreviewImage?.(question.imageUrl!)}>
               <SmartImage
                 src={question.imageUrl}
