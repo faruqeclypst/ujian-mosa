@@ -1,19 +1,38 @@
 import { useState, useEffect } from "react";
 import { Capacitor } from "@capacitor/core";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Lock, User, Eye, EyeOff, Sparkles, Shield, School, Sun, Moon } from "lucide-react";
+import {
+  Lock,
+  User,
+  Eye,
+  EyeOff,
+  School,
+  Sun,
+  Moon,
+  LogIn,
+  ShieldCheck,
+  CheckCircle2,
+  AlertCircle,
+  Loader2,
+  HardDrive,
+  BarChart2
+} from "lucide-react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { motion } from "framer-motion";
 
-import FormField from "../components/forms/FormField";
 import { Button } from "../components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../components/ui/dialog";
 import { Input } from "../components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription
+} from "../components/ui/dialog";
 import { useAuth } from "../context/AuthContext";
 import { useTenant } from "../context/TenantContext";
 import { useTheme } from "../context/ThemeContext";
+import { APP_DISPLAY_VERSION } from "../utils/version";
 
 const loginSchema = z.object({
   username: z.string().min(3, "Username minimal 3 karakter"),
@@ -27,11 +46,12 @@ const LoginPage = () => {
   const { pb: tenantPb, school, setManualSchool } = useTenant();
   const { actualTheme, toggleTheme } = useTheme();
   const pb = tenantPb;
+
   const [formError, setFormError] = useState<string | null>(null);
   const [infoMessage, setInfoMessage] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
 
-  // Setelah ganti password wajib → dipaksa logout → tampilkan info saat balik ke login
+  // Setelah ganti password wajib -> dipaksa logout -> tampilkan info saat balik ke login
   useEffect(() => {
     if (sessionStorage.getItem("pw_changed_relogin") === "1") {
       sessionStorage.removeItem("pw_changed_relogin");
@@ -39,7 +59,7 @@ const LoginPage = () => {
     }
   }, []);
 
-  // For change password modal (Guru)
+  // For change password modal (Guru & Proktor)
   const [currentPassword, setCurrentPassword] = useState("");
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [newPassword, setNewPassword] = useState("");
@@ -58,7 +78,10 @@ const LoginPage = () => {
       if (school?.name) {
         setSchoolName(school.name);
       }
-      if (!pb) { setLogoLoading(false); return; }
+      if (!pb) {
+        setLogoLoading(false);
+        return;
+      }
       try {
         setLogoLoading(true);
         const records = await pb.collection("settings").getFullList({
@@ -71,7 +94,7 @@ const LoginPage = () => {
           setSchoolName(data.name && data.name !== "EXAMKU CBT" ? data.name : (school?.name || "EXAMKU CBT"));
 
           let logoUrl = data.logoUrl || data.logo || "";
-          if (logoUrl && !logoUrl.startsWith('http') && !logoUrl.startsWith('data:')) {
+          if (logoUrl && !logoUrl.startsWith("http") && !logoUrl.startsWith("data:")) {
             logoUrl = pb.files.getUrl(data, logoUrl);
           }
           setSchoolLogo(logoUrl);
@@ -79,7 +102,7 @@ const LoginPage = () => {
           setSchoolName(school.name);
         }
       } catch (err) {
-        console.error("Gagal memuat logo (Cek API Rules koleksi settings di PocketBase):", err);
+        console.error("Gagal memuat logo sekolah:", err);
         if (school?.name) setSchoolName(school.name);
         setLogoError(true);
       } finally {
@@ -117,327 +140,365 @@ const LoginPage = () => {
       const raw = error.message || "";
       // Terjemahkan pesan teknis PocketBase ke bahasa Indonesia yang mudah dipahami
       const friendly = /failed to authenticate/i.test(raw)
-        ? "Password salah, silakan coba lagi."
-        : raw || "Gagal login. Periksa kembali username dan password.";
+        ? "Password salah, silakan periksa kembali."
+        : raw || "Gagal masuk. Periksa kembali username dan password Anda.";
       setFormError(friendly);
     }
   };
 
   return (
-    <div className="relative flex min-h-[100dvh] flex-col items-center justify-center overflow-y-auto px-4 py-8 bg-gradient-to-br from-blue-50 via-blue-100 to-blue-200 dark:from-gray-900 dark:via-blue-900/20 dark:to-blue-800/20">
-      {/* Floating Change School Button (Android Only) */}
-      {Capacitor.getPlatform() === 'android' && (
-        <div className="absolute top-6 left-6 z-50">
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={() => setManualSchool(null)}
-            className="flex items-center gap-2 px-4 py-2 bg-white/80 backdrop-blur-md border border-slate-200 rounded-full text-sm font-semibold text-slate-600 hover:text-blue-600 hover:border-blue-200 transition-all shadow-sm dark:bg-slate-800/80 dark:border-slate-700 dark:text-slate-300"
-          >
-            <School size={16} />
-            <span>Ganti Sekolah</span>
-          </motion.button>
-        </div>
-      )}
-      {/* Theme Toggle - Fixed Position */}
-      <div className="absolute top-6 right-6 z-50">
-        <button
-          onClick={toggleTheme}
-          className="flex items-center justify-center w-11 h-11 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-slate-200 dark:border-slate-800 rounded-full text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-200 dark:hover:border-blue-900/50 transition-all shadow-sm group"
-          title={actualTheme === 'dark' ? "Mode Terang" : "Mode Gelap"}
-        >
-          {actualTheme === 'dark' ? (
-            <Sun size={20} className="group-hover:rotate-45 transition-transform duration-300" />
-          ) : (
-            <Moon size={20} className="group-hover:-rotate-12 transition-transform duration-300" />
-          )}
-        </button>
-      </div>
-      {/* Animated Background Elements */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <motion.div
-          animate={{
-            scale: [1, 1.2, 1],
-            rotate: [0, 180, 360],
-          }}
-          transition={{
-            duration: 20,
-            repeat: Infinity,
-            ease: "linear",
-          }}
-          className="absolute -top-40 -right-40 h-80 w-80 rounded-full bg-gradient-to-br from-blue-400/20 to-blue-600/20 blur-3xl"
-        />
-        <motion.div
-          animate={{
-            scale: [1.2, 1, 1.2],
-            rotate: [360, 180, 0],
-          }}
-          transition={{
-            duration: 25,
-            repeat: Infinity,
-            ease: "linear",
-          }}
-          className="absolute -bottom-40 -left-40 h-80 w-80 rounded-full bg-gradient-to-br from-blue-500/20 to-blue-700/20 blur-3xl"
-        />
-        <motion.div
-          animate={{
-            y: [-20, 20, -20],
-            x: [-10, 10, -10],
-          }}
-          transition={{
-            duration: 15,
-            repeat: Infinity,
-            ease: "easeInOut",
-          }}
-          className="absolute top-1/4 right-1/4 h-32 w-32 rounded-full bg-gradient-to-br from-blue-300/10 to-blue-500/10 blur-2xl"
-        />
-      </div>
+    <div className="min-h-[100dvh] flex flex-col lg:flex-row bg-[#FBF9F5] dark:bg-slate-950 text-slate-900 dark:text-slate-100 selection:bg-blue-500/20">
+      {/* ========================================================
+          LEFT PANEL: BRAND & CBT HIGHLIGHTS (DESKTOP ONLY)
+          ======================================================== */}
+      <aside className="hidden lg:flex lg:w-[420px] xl:w-[480px] 2xl:w-[540px] shrink-0 bg-slate-900 text-white p-8 sm:p-10 xl:p-14 2xl:p-16 flex-col justify-between border-r border-slate-800/80 relative overflow-hidden">
+        {/* Subtle Ambient Glow */}
+        <div className="absolute -top-24 -left-24 w-80 h-80 bg-blue-600/15 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-0 right-0 w-80 h-80 bg-indigo-600/10 rounded-full blur-3xl pointer-events-none" />
 
-      {/* Floating Particles */}
-      {[...Array(6)].map((_, i) => (
-        <motion.div
-          key={i}
-          animate={{
-            y: [-100, -120, -100],
-            opacity: [0.3, 0.8, 0.3],
-          }}
-          transition={{
-            duration: 3 + i,
-            repeat: Infinity,
-            delay: i * 0.5,
-          }}
-          className="absolute h-2 w-2 rounded-full bg-blue-500/40 pointer-events-none"
+        {/* Educational Doodle Pattern (Brand Aside) */}
+        <div
+          className="absolute inset-0 bg-repeat invert opacity-[0.08] pointer-events-none select-none z-0"
           style={{
-            left: `${20 + i * 15}%`,
-            top: `${30 + i * 10}%`,
+            backgroundImage: "url('/login-pattern.png')",
+            backgroundSize: "320px 320px",
           }}
         />
-      ))}
 
-      <motion.div
-        initial={{ opacity: 0, y: 20, scale: 0.95 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{
-          duration: 0.5,
-          type: "spring",
-          stiffness: 100,
-          damping: 15
-        }}
-        className="relative z-10 w-full max-w-md my-auto"
-      >
-        <Card className="relative overflow-hidden rounded-2xl sm:rounded-3xl border-0 bg-white/85 shadow-2xl backdrop-blur-xl dark:bg-gray-900/85">
-          {/* Card Header Decoration */}
-          <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-blue-500 via-blue-600 to-blue-700" />
-
-          <CardHeader className="relative space-y-2 sm:space-y-4 pb-4 sm:pb-8 pt-6 sm:pt-8 text-center">
-            <motion.div
-              initial={{ scale: 0, rotate: -180 }}
-              animate={{ scale: 1, rotate: 0 }}
-              transition={{
-                delay: 0.2,
-                type: "spring",
-                stiffness: 200,
-                damping: 15
-              }}
-              className="mx-auto flex items-center justify-center gap-4 py-1"
-            >
+        {/* Top: Brand Header */}
+        <div className="relative z-10 space-y-7">
+          {/* Logo Brand Line */}
+          <div className="flex items-center gap-3.5">
+            <div className="h-11 w-11 rounded-2xl bg-white/10 border border-white/15 p-2 flex items-center justify-center shrink-0 shadow-sm">
               {logoLoading ? (
-                <div className="flex items-center justify-center h-16 w-16 sm:h-24 sm:w-24 bg-slate-100 dark:bg-slate-800 rounded-2xl animate-pulse">
-                  <div className="h-6 w-6 sm:h-8 sm:w-8 rounded-full border-2 border-blue-500 border-t-transparent animate-spin" />
-                </div>
+                <div className="h-4 w-4 rounded-full border-2 border-blue-400 border-t-transparent animate-spin" />
+              ) : schoolLogo && !logoError ? (
+                <img
+                  src={schoolLogo}
+                  alt="Logo Sekolah"
+                  className="h-full w-full object-contain filter drop-shadow-2xs"
+                  onError={() => setLogoError(true)}
+                />
               ) : (
-                <div className="flex items-center justify-center">
-                  {schoolLogo && !logoError ? (
-                    <div className="h-16 w-16 sm:h-24 sm:w-24 md:h-32 md:w-32 flex items-center justify-center p-1">
-                      <img
-                        src={schoolLogo}
-                        alt="Logo Sekolah"
-                        className="h-full w-full object-contain filter drop-shadow-md"
-                        onError={() => setLogoError(true)}
-                      />
-                    </div>
-                  ) : (
-                    <div className="h-14 w-14 sm:h-20 sm:w-20 md:h-24 md:w-24 flex items-center justify-center p-1">
-                      <img
-                        src="/logo-default.webp"
-                        alt="Logo Default"
-                        className="h-full w-full object-contain"
-                        onError={(e) => { (e.target as HTMLImageElement).src = "/logo-default.png"; }}
-                      />
-                    </div>
-                  )}
-                </div>
+                <img
+                  src="/logo-default.webp"
+                  alt="Logo Examku"
+                  className="h-full w-full object-contain"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = "/logo-default.png";
+                  }}
+                />
               )}
-            </motion.div>
+            </div>
+            <div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-2xl font-black tracking-tight text-white">
+                  Examku
+                </span>
+                <span className="h-2 w-2 rounded-full bg-blue-500 shrink-0" />
+              </div>
+              <span className="text-xs font-semibold text-slate-400 block -mt-0.5">
+                by alfaprojects
+              </span>
+            </div>
+          </div>
 
-            <motion.div
-              initial={{ opacity: 0, y: 15 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 }}
-            >
-              <CardTitle className="text-xl sm:text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent dark:from-white dark:to-gray-300">
-                Selamat Datang Kembali
-              </CardTitle>
-              <p className="text-xs sm:text-sm font-semibold text-blue-600 dark:text-blue-400 mt-1">
-                {schoolName || school?.name || "Portal Administrasi CBT"}
+          {/* Subtitle / School Identity */}
+          <div className="space-y-1.5">
+            <h2 className="text-xl sm:text-2xl xl:text-3xl font-extrabold text-white tracking-tight leading-snug">
+              {schoolName || school?.name || "Sistem Asesmen Berbasis Komputer"}
+            </h2>
+            <p className="text-xs sm:text-sm text-slate-300/90 leading-relaxed font-normal">
+              Platform evaluasi modern terintegrasi untuk proktor, guru pengampu, dan tim kurikulum sekolah.
+            </p>
+          </div>
+        </div>
+
+        {/* Middle: Feature Highlights (Kenari Card List Style) */}
+        <div className="relative z-10 my-8 space-y-6 xl:space-y-7">
+          {/* Feature 1: Keamanan & Kiosk */}
+          <div className="flex items-start gap-4">
+            <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-blue-400 shrink-0 mt-0.5 shadow-2xs">
+              <ShieldCheck className="h-5 w-5" />
+            </div>
+            <div className="space-y-1">
+              <h3 className="text-sm font-bold text-white tracking-wide">
+                Keamanan Kiosk &amp; Anti-Kecurangan
+              </h3>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Proteksi penuh terhadap pergantian tab, pembagian layar, dan peretasan sesi ujian siswa.
               </p>
-              <CardDescription className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                Masuk ke dashboard dengan akun admin / proktor Anda
-              </CardDescription>
-            </motion.div>
-          </CardHeader>
+            </div>
+          </div>
 
-          <CardContent className="space-y-4 sm:space-y-6 px-5 sm:px-8 pb-6 sm:pb-8">
-            <motion.form
-              onSubmit={handleSubmit(onSubmit)}
-              className="space-y-3.5 sm:space-y-5"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.4 }}
+          {/* Feature 2: Server Lokal & Hybrid */}
+          <div className="flex items-start gap-4">
+            <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-emerald-400 shrink-0 mt-0.5 shadow-2xs">
+              <HardDrive className="h-5 w-5" />
+            </div>
+            <div className="space-y-1">
+              <h3 className="text-sm font-bold text-white tracking-wide">
+                Server Mandiri &amp; Mode Offline
+              </h3>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Kinerja lancar untuk ratusan siswa serentak, baik di jaringan lokal (LAN) maupun VPS Cloud.
+              </p>
+            </div>
+          </div>
+
+          {/* Feature 3: Analisis Butir & Psikometri */}
+          <div className="flex items-start gap-4">
+            <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-amber-400 shrink-0 mt-0.5 shadow-2xs">
+              <BarChart2 className="h-5 w-5" />
+            </div>
+            <div className="space-y-1">
+              <h3 className="text-sm font-bold text-white tracking-wide">
+                Analisis Psikometri &amp; AI CTT
+              </h3>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Otomatisasi kalkulasi daya pembeda (D), tingkat kesukaran (P), dan efektivitas pengecoh.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Bottom: Left Footer */}
+        <div className="relative z-10 pt-5 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400 font-medium">
+          <span>examku.my.id &copy; {new Date().getFullYear()}</span>
+          <span className="font-semibold text-slate-300">{APP_DISPLAY_VERSION}</span>
+        </div>
+      </aside>
+
+      {/* ========================================================
+          RIGHT PANEL: AUTHENTICATION CANVAS (KENARI-INSPIRED)
+          ======================================================== */}
+      <section className="flex-1 min-h-[100dvh] flex flex-col justify-between p-6 sm:p-12 xl:p-16 relative overflow-y-auto">
+        {/* Educational Doodle Pattern (Adaptive Watermark) */}
+        <div
+          className="absolute inset-0 bg-repeat opacity-[0.07] dark:invert dark:opacity-[0.08] pointer-events-none select-none z-0"
+          style={{
+            backgroundImage: "url('/login-pattern.png')",
+            backgroundSize: "360px 360px",
+          }}
+        />
+
+        {/* Top-Right Floating Controls (Pinned Elegantly in Corner) */}
+        <div className="absolute top-5 sm:top-6 right-5 sm:right-6 z-20 flex items-center gap-2">
+          {Capacitor.getPlatform() === "android" && (
+            <button
+              type="button"
+              onClick={() => setManualSchool(null)}
+              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold bg-white/90 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 shadow-2xs backdrop-blur-sm transition-colors cursor-pointer"
             >
-              {/* Username Field */}
-              <motion.div
-                initial={{ x: -20, opacity: 0 }}
-                animate={{ x: 0, opacity: 1 }}
-                transition={{ delay: 0.5 }}
-              >
-                <FormField id="username" label="Email atau Username" error={errors.username}>
-                  <div className="relative">
-                    <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-                    <Input
-                      id="username"
-                      placeholder="proktor@exam.local atau admin"
-                      autoComplete="username"
-                      className="pl-10 rounded-xl border-gray-200 bg-gray-50/50 transition-all focus:bg-white focus:ring-2 focus:ring-blue-500/20 dark:border-gray-700 dark:bg-gray-800/50 dark:focus:bg-gray-800"
-                      {...register("username")}
-                    />
-                  </div>
-                </FormField>
-              </motion.div>
+              <School className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+              <span>Ganti Sekolah</span>
+            </button>
+          )}
 
-              {/* Password Field */}
-              <motion.div
-                initial={{ x: -20, opacity: 0 }}
-                animate={{ x: 0, opacity: 1 }}
-                transition={{ delay: 0.6 }}
-              >
-                <FormField id="password" label="Password" error={errors.password}>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-                    <Input
-                      id="password"
-                      type={showPassword ? "text" : "password"}
-                      autoComplete="current-password"
-                      placeholder="Masukkan password"
-                      className="pl-10 pr-10 rounded-xl border-gray-200 bg-gray-50/50 transition-all focus:bg-white focus:ring-2 focus:ring-blue-500/20 dark:border-gray-700 dark:bg-gray-800/50 dark:focus:bg-gray-800"
-                      {...register("password")}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
-                    >
-                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </button>
-                  </div>
-                </FormField>
-              </motion.div>
+          <button
+            type="button"
+            onClick={toggleTheme}
+            className="flex items-center justify-center w-10 h-10 rounded-full bg-white/90 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 shadow-2xs backdrop-blur-sm hover:scale-105 active:scale-95 transition-all cursor-pointer"
+            title={actualTheme === "dark" ? "Mode Terang" : "Mode Gelap"}
+            aria-label="Toggle Theme"
+          >
+            {actualTheme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+          </button>
+        </div>
 
-              {/* Info Message (mis. setelah ganti password wajib) */}
-              {infoMessage && !formError && (
-                <motion.div
-                  initial={{ opacity: 0, y: -10, scale: 0.95 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  className="rounded-xl bg-emerald-50 border border-emerald-200 p-3 dark:bg-emerald-900/20 dark:border-emerald-800"
+        {/* Center: Sign In Form Box */}
+        <div className="w-full max-w-[460px] xl:max-w-[490px] mx-auto my-auto space-y-6 xl:space-y-7 relative z-10">
+          {/* Mobile Branding (Matching Kenari Screenshot: Logo centered above Sign In) */}
+          <div className="flex flex-col items-center justify-center text-center pt-4 lg:hidden">
+            <div className="flex items-center gap-2 mb-1">
+              <div className="h-10 w-10 rounded-xl bg-slate-900 dark:bg-slate-800 p-1.5 flex items-center justify-center shadow-xs">
+                {schoolLogo && !logoError ? (
+                  <img
+                    src={schoolLogo}
+                    alt="Logo Sekolah"
+                    className="h-full w-full object-contain filter drop-shadow-2xs"
+                    onError={() => setLogoError(true)}
+                  />
+                ) : (
+                  <img
+                    src="/logo-default.webp"
+                    alt="Logo Examku"
+                    className="h-full w-full object-contain"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = "/logo-default.png";
+                    }}
+                  />
+                )}
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="text-2xl font-black tracking-tight text-slate-900 dark:text-white">
+                  examku
+                </span>
+                <span className="h-2 w-2 rounded-full bg-blue-600 shrink-0" />
+              </div>
+            </div>
+            {schoolName && (
+              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                {schoolName}
+              </span>
+            )}
+          </div>
+
+          {/* Sign In Header */}
+          <div className="space-y-2">
+            <h1 className="text-3xl sm:text-4xl font-black text-slate-900 dark:text-white tracking-tight">
+              Masuk ke Akun
+            </h1>
+            <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">
+              Gunakan akun administrator / guru untuk masuk.
+            </p>
+          </div>
+
+          {/* Form Card Container */}
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 p-7 sm:p-9 xl:p-10 shadow-[0_4px_25px_rgba(0,0,0,0.035)] dark:shadow-[0_12px_36px_rgba(0,0,0,0.35)]">
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+              {/* Field: Username / Email */}
+              <div className="space-y-1.5">
+                <label
+                  htmlFor="username"
+                  className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400"
                 >
-                  <p className="text-sm font-medium text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
-                    <Shield className="h-4 w-4" />
-                    {infoMessage}
+                  Email atau Username
+                </label>
+                <div className="relative group">
+                  <Input
+                    id="username"
+                    placeholder="Isi username / email"
+                    autoComplete="username"
+                    className="h-12 sm:h-12.5 rounded-xl border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white placeholder:text-slate-400 text-sm font-medium px-4 focus:border-blue-600 dark:focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
+                    {...register("username")}
+                  />
+                </div>
+                {errors.username && (
+                  <p className="text-xs text-rose-600 dark:text-rose-400 font-semibold flex items-center gap-1.5 mt-1.5">
+                    <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                    <span>{errors.username.message}</span>
                   </p>
-                </motion.div>
+                )}
+              </div>
+
+              {/* Field: Password */}
+              <div className="space-y-1.5">
+                <label
+                  htmlFor="password"
+                  className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400"
+                >
+                  Password
+                </label>
+                <div className="relative group">
+                  <Input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    autoComplete="current-password"
+                    placeholder="Minimal 6 karakter"
+                    className="h-12 sm:h-12.5 pr-11 rounded-xl border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white placeholder:text-slate-400 text-sm font-medium px-4 focus:border-blue-600 dark:focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
+                    {...register("password")}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1.5 cursor-pointer transition-colors"
+                    tabIndex={-1}
+                    aria-label={showPassword ? "Sembunyikan password" : "Tampilkan password"}
+                  >
+                    {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                  </button>
+                </div>
+                {errors.password && (
+                  <p className="text-xs text-rose-600 dark:text-rose-400 font-semibold flex items-center gap-1.5 mt-1.5">
+                    <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                    <span>{errors.password.message}</span>
+                  </p>
+                )}
+              </div>
+
+              {/* Info Message */}
+              {infoMessage && !formError && (
+                <div className="rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/80 p-3.5">
+                  <p className="text-xs font-semibold text-emerald-800 dark:text-emerald-300 flex items-start gap-2 leading-relaxed">
+                    <CheckCircle2 className="h-4 w-4 shrink-0 mt-0.5 text-emerald-600 dark:text-emerald-400" />
+                    <span>{infoMessage}</span>
+                  </p>
+                </div>
               )}
 
               {/* Error Message */}
               {formError && (
-                <motion.div
-                  initial={{ opacity: 0, y: -10, scale: 0.95 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  className="rounded-xl bg-red-50 border border-red-200 p-3 dark:bg-red-900/20 dark:border-red-800"
-                >
-                  <p className="text-sm font-medium text-red-600 dark:text-red-400 flex items-center gap-2">
-                    <Shield className="h-4 w-4" />
-                    {formError}
+                <div className="rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/80 p-3.5">
+                  <p className="text-xs font-semibold text-rose-800 dark:text-rose-300 flex items-start gap-2 leading-relaxed">
+                    <AlertCircle className="h-4 w-4 shrink-0 mt-0.5 text-rose-600 dark:text-rose-400" />
+                    <span>{formError}</span>
                   </p>
-                </motion.div>
+                </div>
               )}
 
-              {/* Submit Button */}
-              <motion.div
-                initial={{ y: 20, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                transition={{ delay: 0.7 }}
+              {/* Primary Action Button (Examku Blue) */}
+              <Button
+                type="submit"
+                className="group w-full h-12 sm:h-12.5 rounded-xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-bold text-sm sm:text-base shadow-md shadow-blue-600/20 hover:shadow-lg hover:shadow-blue-600/30 transition-all cursor-pointer flex items-center justify-center gap-2.5 disabled:opacity-50 mt-2"
+                disabled={isSubmitting}
               >
-                <Button
-                  type="submit"
-                  className="w-full rounded-xl bg-gradient-to-r from-blue-600 to-blue-800 py-3 font-semibold text-white shadow-lg transition-all hover:from-blue-700 hover:to-blue-900 hover:shadow-xl hover:scale-[1.02] disabled:opacity-50 disabled:scale-100"
-                  disabled={isSubmitting}
-                >
-                  <motion.div
-                    className="flex items-center justify-center gap-2"
-                    animate={isSubmitting ? { scale: [1, 1.05, 1] } : {}}
-                    transition={{ duration: 1, repeat: isSubmitting ? Infinity : 0 }}
-                  >
-                    {isSubmitting && <Sparkles className="h-4 w-4 animate-spin" />}
-                    {isSubmitting ? "Memproses..." : "Masuk Sekarang"}
-                  </motion.div>
-                </Button>
-              </motion.div>
-            </motion.form>
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    <span>Memverifikasi Akun...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Masuk ke Dashboard</span>
+                    <LogIn className="h-5 w-5 transition-transform group-hover:translate-x-0.5" />
+                  </>
+                )}
+              </Button>
+            </form>
 
-            {/* Register Link */}
-            {/* <motion.div
-              className="text-center"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.8 }}
-            >
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                Belum punya akun admin?{" "}
-                <Link
-                  to="/admin/register"
-                  className="font-semibold text-blue-600 hover:text-blue-700 hover:underline transition-colors dark:text-blue-400 dark:hover:text-blue-300"
-                >
-                  Daftar di sini
-                </Link>
-              </p>
-            </motion.div> */}
-          </CardContent>
-        </Card>
-      </motion.div>
-
-      {/* Mandatory Change Password Dialog — berlaku semua role termasuk admin.
-          Tanpa ini, akun admin yang hasChangedPassword=false akan stuck di loop login:
-          route /admin menolak masuk dashboard tapi dialog ganti password tidak pernah muncul. */}
-      <Dialog open={!!(user && !user.hasChangedPassword)} onOpenChange={() => { }}>
-        <DialogContent className="sm:max-w-md bg-white dark:bg-slate-900 rounded-[32px] p-8 border-none shadow-2xl" onPointerDownOutside={(e) => e.preventDefault()}>
-          <DialogHeader className="mb-6">
-            <div className="w-16 h-16 bg-blue-50 dark:bg-blue-900/20 rounded-2xl flex items-center justify-center mb-4 mx-auto">
-              <Lock className="text-blue-600 animate-pulse" size={32} />
+            {/* Security Footnote */}
+            <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-center gap-2 text-xs text-slate-400 dark:text-slate-500 font-medium">
+              <ShieldCheck className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+              <span>Sesi terenkripsi &amp; aman</span>
             </div>
-            <DialogTitle className="text-center text-2xl font-extrabold text-slate-900 dark:text-white">Ganti Password Wajib!</DialogTitle>
-            <p className="text-slate-500 text-center mt-2 font-medium">
-              Ini adalah login pertama Anda (atau password di-reset). Demi keamanan, silakan perbarui password Anda.
-            </p>
+          </div>
+        </div>
+
+        {/* Bottom Right Footer */}
+        <div className="w-full max-w-[460px] xl:max-w-[490px] mx-auto text-center pt-6 text-xs text-slate-400 dark:text-slate-500 relative z-10">
+          <p>Butuh bantuan login? Hubungi Proktor Utama atau Tim IT Sekolah.</p>
+        </div>
+      </section>
+
+      {/* ========================================================
+          MANDATORY CHANGE PASSWORD DIALOG
+          ======================================================== */}
+      <Dialog open={!!(user && !user.hasChangedPassword)} onOpenChange={() => { }}>
+        <DialogContent
+          className="w-[94vw] max-w-md bg-white dark:bg-slate-900 rounded-2xl p-6 sm:p-7 border border-slate-200 dark:border-slate-800 shadow-2xl"
+          onPointerDownOutside={(e) => e.preventDefault()}
+        >
+          <DialogHeader className="text-center space-y-2 mb-4">
+            <div className="w-12 h-12 bg-blue-50 dark:bg-blue-950/60 rounded-xl border border-blue-100 dark:border-blue-900/50 flex items-center justify-center mx-auto text-blue-600 dark:text-blue-400">
+              <Lock className="h-5 w-5" />
+            </div>
+            <DialogTitle className="text-lg sm:text-xl font-black text-slate-900 dark:text-white">
+              Ganti Password Wajib
+            </DialogTitle>
+            <DialogDescription className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+              Demi keamanan sistem CBT sekolah, silakan perbarui password default akun Anda sebelum mengakses dashboard.
+            </DialogDescription>
           </DialogHeader>
 
           <form
             onSubmit={async (e) => {
               e.preventDefault();
               setChangePassError("");
-              if (!currentPassword) return setChangePassError("Password saat ini wajib diisi!");
-              if (newPassword.length < 6) return setChangePassError("Password baru minimal 6 karakter!");
-              if (newPassword === currentPassword) return setChangePassError("Password baru tidak boleh sama dengan password saat ini!");
-              if (newPassword !== confirmPassword) return setChangePassError("Konfirmasi password tidak cocok!");
+              if (!currentPassword) return setChangePassError("Password saat ini wajib diisi.");
+              if (newPassword.length < 6) return setChangePassError("Password baru minimal 6 karakter.");
+              if (newPassword === currentPassword) return setChangePassError("Password baru tidak boleh sama dengan password saat ini.");
+              if (newPassword !== confirmPassword) return setChangePassError("Konfirmasi password tidak cocok.");
 
               setIsChangingPass(true);
               try {
@@ -451,82 +512,95 @@ const LoginPage = () => {
                 setIsChangingPass(false);
               }
             }}
-            className="space-y-4"
+            className="space-y-3.5"
           >
             {changePassError && (
-              <div className="bg-red-50 border border-red-100 text-red-600 text-sm px-4 py-3 rounded-2xl flex items-center gap-2">
-                <div className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0" />
+              <div className="p-3 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 text-xs font-semibold text-rose-700 dark:text-rose-300 flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 shrink-0 text-rose-600" />
                 <span>{changePassError}</span>
               </div>
             )}
 
-            <div className="space-y-1.5">
-              <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 ml-1">Password Saat Ini</label>
+            <div className="space-y-1">
+              <label className="text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">
+                Password Saat Ini
+              </label>
               <div className="relative">
                 <Input
                   type={showCurrentPassword ? "text" : "password"}
                   value={currentPassword}
                   onChange={(e) => setCurrentPassword(e.target.value)}
                   placeholder="Password saat ini (default: 12345678)"
-                  className="rounded-2xl h-11 bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-gray-700 pr-10 transition-all focus:ring-2 focus:ring-blue-500/20"
+                  className="rounded-lg h-10 bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 pr-10 text-xs font-medium focus:ring-1 focus:ring-blue-500/30"
                 />
                 <button
                   type="button"
                   onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1"
                 >
-                  {showCurrentPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  {showCurrentPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
             </div>
 
-            <div className="space-y-1.5">
-              <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 ml-1">Password Baru</label>
+            <div className="space-y-1">
+              <label className="text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">
+                Password Baru
+              </label>
               <div className="relative">
                 <Input
                   type={showNewPassword ? "text" : "password"}
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   placeholder="Minimal 6 karakter"
-                  className="rounded-2xl h-11 bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-gray-700 pr-10 transition-all focus:ring-2 focus:ring-blue-500/20"
+                  className="rounded-lg h-10 bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 pr-10 text-xs font-medium focus:ring-1 focus:ring-blue-500/30"
                 />
                 <button
                   type="button"
                   onClick={() => setShowNewPassword(!showNewPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1"
                 >
-                  {showNewPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
             </div>
 
-            <div className="space-y-1.5">
-              <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 ml-1">Konfirmasi Password Baru</label>
+            <div className="space-y-1">
+              <label className="text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">
+                Konfirmasi Password Baru
+              </label>
               <Input
                 type={showNewPassword ? "text" : "password"}
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder="Ulangi password baru"
-                className="rounded-2xl h-11 bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-gray-700 transition-all focus:ring-2 focus:ring-blue-500/20"
+                className="rounded-lg h-10 bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 text-xs font-medium focus:ring-1 focus:ring-blue-500/30"
               />
             </div>
 
-            <div className="pt-2 flex flex-col sm:flex-row gap-2">
+            <div className="pt-2 flex flex-col-reverse sm:flex-row gap-2">
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => signOut()}
-                className="w-full sm:w-1/3 rounded-2xl h-11 text-slate-600 dark:text-slate-300 font-medium"
+                className="w-full sm:w-1/3 rounded-lg h-10 text-xs text-slate-600 dark:text-slate-300 font-semibold border-slate-200 dark:border-slate-700 cursor-pointer"
                 disabled={isChangingPass}
               >
                 Batal / Keluar
               </Button>
               <Button
                 type="submit"
-                className="w-full sm:w-2/3 bg-blue-600 hover:bg-blue-700 text-white font-bold h-11 rounded-2xl text-base transition-all shadow-lg hover:shadow-blue-200 dark:hover:shadow-none"
+                className="w-full sm:w-2/3 bg-blue-600 hover:bg-blue-700 text-white font-bold h-10 rounded-lg text-xs shadow-md shadow-blue-500/20 cursor-pointer"
                 disabled={isChangingPass}
               >
-                {isChangingPass ? "Menyimpan..." : "Simpan & Masuk"}
+                {isChangingPass ? (
+                  <span className="flex items-center gap-1.5">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    Menyimpan...
+                  </span>
+                ) : (
+                  "Simpan Password Baru"
+                )}
               </Button>
             </div>
           </form>

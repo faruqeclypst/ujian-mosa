@@ -22,9 +22,11 @@ export const OfflineServerGuard: React.FC<{ children: React.ReactNode }> = ({ ch
     setChecking(true);
     let code = school?.offline_license || null;
     const effectiveOrigin = (school?.pb_url || pb?.baseUrl || (typeof window !== "undefined" ? window.location.origin : "")).replace(/\/+$/, "");
+    let isBlocked = false;
+    let blockReason = "";
 
-    // 1. Coba baca dari dedicated endpoint /api/offline-license jika belum ada
-    if (!code && effectiveOrigin) {
+    // 1. Selalu periksa endpoint resmi /api/offline-license (mengeksekusi remote kill-switch & cek status perangkat)
+    if (effectiveOrigin) {
       try {
         const resp = await fetch(`${effectiveOrigin}/api/offline-license`);
         if (resp.ok) {
@@ -32,13 +34,33 @@ export const OfflineServerGuard: React.FC<{ children: React.ReactNode }> = ({ ch
           if (data.license) {
             code = data.license;
           }
+          if (data.isRevoked || data.isDeviceMismatch || data.active === false) {
+            isBlocked = true;
+            blockReason = data.revocation_message || "Lisensi Server Offline telah dicabut atau dinonaktifkan oleh Administrator Pusat.";
+          }
         }
       } catch (err) {
         console.warn("Gagal membaca dari /api/offline-license:", err);
       }
     }
 
-    // 2. Coba baca dari tabel settings database server secara langsung
+    // 2. Cek status lokal dari konteks sekolah
+    if (!isBlocked && (school?.offline_license_status === "revoked" || school?.offline_license_status === "deleted")) {
+      isBlocked = true;
+      blockReason = "Lisensi Server Offline telah dinonaktifkan oleh Administrator Pusat. Database bank soal dan data siswa tetap aman.";
+    }
+
+    if (isBlocked) {
+      setVerification({
+        valid: false,
+        message: blockReason
+      });
+      setLicenseCode(code);
+      setChecking(false);
+      return;
+    }
+
+    // 3. Coba baca dari tabel settings database server secara langsung jika belum ada kode
     if (!code && effectiveOrigin) {
       try {
         const resp = await fetch(`${effectiveOrigin}/api/collections/settings/records?limit=1`);
@@ -46,6 +68,16 @@ export const OfflineServerGuard: React.FC<{ children: React.ReactNode }> = ({ ch
           const data = await resp.json();
           if (data.items && data.items.length > 0 && data.items[0].offline_license) {
             code = data.items[0].offline_license;
+            const itemStat = (data.items[0].offline_license_status || "active").toLowerCase();
+            if (itemStat === "revoked" || itemStat === "deleted") {
+              setVerification({
+                valid: false,
+                message: "Lisensi Server Offline telah dinonaktifkan oleh Administrator Pusat."
+              });
+              setLicenseCode(code);
+              setChecking(false);
+              return;
+            }
           }
         }
       } catch (err) {
@@ -53,7 +85,7 @@ export const OfflineServerGuard: React.FC<{ children: React.ReactNode }> = ({ ch
       }
     }
 
-    // 3. Coba baca via SDK PocketBase
+    // 4. Coba baca via SDK PocketBase jika masih belum ada
     if (!code && pb) {
       try {
         const res = await pb.collection("settings").getList(1, 1);
@@ -64,9 +96,6 @@ export const OfflineServerGuard: React.FC<{ children: React.ReactNode }> = ({ ch
         console.warn("Gagal membaca offline_license dari settings lokal:", err);
       }
     }
-
-    // Catatan: Jangan gunakan fallback localStorage global agar PocketBase yang berbeda
-    // pada port yang sama (localhost:8090) tidak saling tercemar lisensi/sekolah lama.
 
     if (!code) {
       setVerification({
@@ -84,7 +113,6 @@ export const OfflineServerGuard: React.FC<{ children: React.ReactNode }> = ({ ch
         try { localStorage.setItem("exam_offline_license", code); } catch {}
       }
     } else {
-      // Jika kode dari localStorage ternyata tidak valid, bersihkan cache lokal
       if (typeof window !== "undefined") {
         try { localStorage.removeItem("exam_offline_license"); } catch {}
       }

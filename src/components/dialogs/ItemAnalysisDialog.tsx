@@ -7,6 +7,8 @@ import { Skeleton } from "../ui/skeleton";
 import { MathText } from "../ui/MathText";
 import { useTenant } from "../../context/TenantContext";
 import { useExamData } from "../../context/ExamDataContext";
+import { useToast } from "../ui/toast";
+import { AIQuestionRevisionDialog } from "./AIQuestionRevisionDialog";
 import {
   BarChart2,
   CheckCircle2,
@@ -145,6 +147,62 @@ export const ItemAnalysisDialog: React.FC<ItemAnalysisDialogProps> = ({
 
   const [analyzedQuestions, setAnalyzedQuestions] = useState<QuestionAnalysis[]>([]);
   const [expandedQuestionId, setExpandedQuestionId] = useState<string | null>(null);
+
+  // AI Revision State & Handlers
+  const { addToast } = useToast();
+  const [revisionTargetQuestion, setRevisionTargetQuestion] = useState<any | null>(null);
+  const [isRevisionDialogOpen, setIsRevisionDialogOpen] = useState<boolean>(false);
+
+  const handleOpenAIRevision = (q: any) => {
+    setRevisionTargetQuestion(q);
+    setIsRevisionDialogOpen(true);
+  };
+
+  const handleSaveRevisedChoices = async (
+    questionId: string,
+    updatedChoices: Record<string, { text: string; isCorrect: boolean; imageUrl?: string }>,
+    updatedAnswerKey: string
+  ) => {
+    if (!pb) throw new Error("Koneksi database tidak tersedia.");
+
+    await pb.collection("questions").update(questionId, {
+      options: updatedChoices,
+      choices: updatedChoices,
+      correctAnswer: updatedAnswerKey,
+      answerKey: updatedAnswerKey,
+      answer: updatedAnswerKey,
+      correct_answer: updatedAnswerKey
+    });
+
+    const correctKeys = updatedAnswerKey.toLowerCase().split(/[,|; ]+/).map((s) => s.trim()).filter(Boolean);
+
+    setAnalyzedQuestions((prev) =>
+      prev.map((q) => {
+        if (q.id !== questionId) return q;
+
+        const newChoices: Record<string, any> = { ...updatedChoices };
+        const newDistractors = (q.distractors || []).map((dis) => {
+          const lowerKey = dis.key.toLowerCase();
+          const updated = updatedChoices[lowerKey];
+          if (!updated) return dis;
+          const isCorr = correctKeys.includes(lowerKey) || Boolean(updated.isCorrect);
+          return {
+            ...dis,
+            text: updated.text,
+            isCorrect: isCorr,
+            status: isCorr ? ("Kunci" as const) : dis.status
+          };
+        });
+
+        return {
+          ...q,
+          choices: newChoices,
+          answerKey: updatedAnswerKey,
+          distractors: newDistractors
+        };
+      })
+    );
+  };
 
   // Filter & Search
   const [searchQuery, setSearchQuery] = useState("");
@@ -898,9 +956,9 @@ export const ItemAnalysisDialog: React.FC<ItemAnalysisDialogProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-6xl w-[96vw] max-h-[92vh] flex flex-col p-0 gap-0 rounded-2xl overflow-hidden bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 shadow-2xl">
+      <DialogContent className="max-w-6xl w-[96vw] max-h-[92vh] h-[92vh] flex flex-col p-0 gap-0 rounded-2xl overflow-hidden bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 shadow-2xl">
         {/* Header Dialog */}
-        <DialogHeader className="p-5 pb-4 border-b border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 sticky top-0 z-20">
+        <DialogHeader className="px-6 py-5 border-b border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 shrink-0 pr-14">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               <div className="p-2.5 rounded-2xl bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800/60 shadow-xs">
@@ -1378,10 +1436,21 @@ export const ItemAnalysisDialog: React.FC<ItemAnalysisDialogProps> = ({
                             {/* Distractor Analysis Table (jika Pilihan Ganda) */}
                             {q.distractors && q.distractors.length > 0 && (
                               <div className="space-y-2">
-                                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
-                                  <Target className="h-3.5 w-3.5 text-blue-500" />
-                                  Analisis Efektivitas Pilihan Pengecoh (Distractor Analysis):
-                                </span>
+                                <div className="flex items-center justify-between gap-2 flex-wrap">
+                                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                                    <Target className="h-3.5 w-3.5 text-blue-500" />
+                                    Analisis Efektivitas Pilihan Pengecoh (Distractor Analysis):
+                                  </span>
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    onClick={() => handleOpenAIRevision(q)}
+                                    className="rounded-lg text-xs bg-linear-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold shadow-xs flex items-center gap-1.5 h-7 px-2.5 cursor-pointer shrink-0"
+                                  >
+                                    <Sparkles className="h-3 w-3 text-amber-300" />
+                                    <span>Revisi Pilihan AI</span>
+                                  </Button>
+                                </div>
 
                                 <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden bg-white dark:bg-slate-900 shadow-xs">
                                   <table className="w-full text-xs text-left">
@@ -1467,7 +1536,7 @@ export const ItemAnalysisDialog: React.FC<ItemAnalysisDialogProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-center justify-between text-xs text-slate-500">
+        <div className="px-6 py-4.5 border-t border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 shrink-0 flex items-center justify-between text-xs text-slate-500">
           <div className="flex items-center gap-2 flex-wrap">
             <Info className="h-4 w-4 text-blue-500 shrink-0" />
             <span className="text-[11px]">
@@ -1479,6 +1548,17 @@ export const ItemAnalysisDialog: React.FC<ItemAnalysisDialogProps> = ({
           </Button>
         </div>
       </DialogContent>
+
+      {/* DIALOG REVISI PILIHAN JAWABAN DENGAN AI */}
+      <AIQuestionRevisionDialog
+        isOpen={isRevisionDialogOpen}
+        onClose={() => {
+          setIsRevisionDialogOpen(false);
+          setRevisionTargetQuestion(null);
+        }}
+        question={revisionTargetQuestion}
+        onSaveToQuestionBank={handleSaveRevisedChoices}
+      />
     </Dialog>
   );
 };

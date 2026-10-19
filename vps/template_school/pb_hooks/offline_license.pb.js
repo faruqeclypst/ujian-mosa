@@ -135,7 +135,7 @@ routerAdd("GET", "/api/offline-license", (c) => {
                 localRecord = list[0];
                 license = localRecord.get("offline_license") || "";
                 schoolName = localRecord.get("name") || "";
-                isRevokedLocally = (localRecord.get("offline_license_status") || "active") === "revoked";
+                isRevokedLocally = (localRecord.get("offline_license_status") || "active") === "revoked" || (localRecord.get("offline_license_status") || "active") === "deleted";
                 lockedDeviceId = localRecord.get("locked_device_id") || "";
                 lockedDeviceName = localRecord.get("locked_device_name") || "";
             }
@@ -177,7 +177,7 @@ routerAdd("GET", "/api/offline-license", (c) => {
                     } else if (checkRemote && checkRemote.is_device_mismatch) {
                         isDeviceMismatch = true;
                     } else if (checkRemote && checkRemote.status === "active") {
-                        if (localRecord && localRecord.get("offline_license_status") === "revoked") {
+                        if (localRecord && (localRecord.get("offline_license_status") === "revoked" || localRecord.get("offline_license_status") === "deleted")) {
                             localRecord.set("offline_license_status", "active");
                             $app.save(localRecord);
                             isRevokedLocally = false;
@@ -240,7 +240,8 @@ onRecordAuthRequest((e) => {
             const list = $app.findRecordsByFilter("settings", "1=1", "+created", 1);
             if (list && list.length > 0) {
                 license = list[0].get("offline_license") || "";
-                isRevoked = (list[0].get("offline_license_status") || "active") === "revoked";
+                const localStatus = (list[0].get("offline_license_status") || "active").toString().toLowerCase();
+                isRevoked = localStatus === "revoked" || localStatus === "deleted";
                 const lockedDev = list[0].get("locked_device_id") || "";
                 if (license && lockedDev) {
                     const validator = require(`${__hooks}/license_validator.js`);
@@ -257,7 +258,7 @@ onRecordAuthRequest((e) => {
         }
 
         if (isRevoked) {
-            throw new ForbiddenError("Aplikasi CBT Offline telah dinonaktifkan oleh Administrator Pusat karena pelanggaran kebijakan. Seluruh bank soal dan data siswa tetap aman. Hubungi admin@examku.my.id.");
+            throw new ForbiddenError("Aplikasi CBT Offline telah dinonaktifkan oleh Administrator Pusat. Seluruh bank soal dan data siswa tetap aman. Hubungi admin@examku.my.id.");
         }
 
         if (!license) {
@@ -292,7 +293,8 @@ onRecordCreateRequest((e) => {
             const list = $app.findRecordsByFilter("settings", "1=1", "+created", 1);
             if (list && list.length > 0) {
                 license = list[0].get("offline_license") || "";
-                isRevoked = (list[0].get("offline_license_status") || "active") === "revoked";
+                const localStatus = (list[0].get("offline_license_status") || "active").toString().toLowerCase();
+                isRevoked = localStatus === "revoked" || localStatus === "deleted";
                 const lockedDev = list[0].get("locked_device_id") || "";
                 if (license && lockedDev) {
                     const validator = require(`${__hooks}/license_validator.js`);

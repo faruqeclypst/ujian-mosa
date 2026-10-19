@@ -69,6 +69,19 @@ const CustomBrowserPage = lazy(() => import("./pages/browser/CustomBrowserPage")
 import { ExamDataProvider } from "./context/ExamDataContext";
 import CapacitorOverlay from "./components/auth/CapacitorOverlay";
 
+// Helper to smoothly dismiss initial HTML preloader without flickering/restarting
+const hidePreloader = () => {
+  const el = document.getElementById("preloader");
+  if (el && !el.classList.contains("preloader-hidden")) {
+    el.classList.add("preloader-hidden");
+    setTimeout(() => {
+      try {
+        el.remove();
+      } catch (_) { }
+    }, 350);
+  }
+};
+
 // ============================================================
 // Guards
 // ============================================================
@@ -94,6 +107,7 @@ const SchoolAppContent = () => {
   const { student, loading: studentLoading } = useStudentAuth();
   const { school, notFound, inactive, subscriptionStatus, loading: tenantLoading } = useTenant();
   const location = useLocation();
+  const isAdminRoute = location.pathname.startsWith("/admin");
 
   useEffect(() => {
     if (school) {
@@ -104,10 +118,18 @@ const SchoolAppContent = () => {
     }
   }, [school]);
 
-  if (tenantLoading) return <LoadingScreen />;
-  if (notFound || inactive) return <SchoolNotFoundPage />;
+  const isGlobalLoading = adminLoading || studentLoading;
 
-  const isAdminRoute = location.pathname.startsWith("/admin");
+  useEffect(() => {
+    if (!tenantLoading && (!isGlobalLoading || isAdminRoute)) {
+      hidePreloader();
+    }
+  }, [tenantLoading, isGlobalLoading, isAdminRoute]);
+
+  if (tenantLoading) {
+    return document.getElementById("preloader") ? null : <LoadingScreen />;
+  }
+  if (notFound || inactive) return <SchoolNotFoundPage />;
 
   // Jika sekolah dalam status ditangguhkan (> H+3 masa tenggang lewat atau dinonaktifkan):
   // Rute siswa diarahkan ke SchoolSuspendedPage. Rute admin tetap terbuka agar admin bisa bayar invoice.
@@ -128,12 +150,10 @@ const SchoolAppContent = () => {
     }
   }
 
-  const isGlobalLoading = adminLoading || studentLoading;
-
   return (
     <OfflineServerGuard>
       {isGlobalLoading && !isAdminRoute ? (
-        <LoadingScreen />
+        document.getElementById("preloader") ? null : <LoadingScreen />
       ) : (
         <Suspense fallback={<LoadingScreen />}>
           <Routes>
@@ -244,6 +264,7 @@ const LandingContent = () => {
     if (Capacitor.isNativePlatform()) {
       SplashScreen.hide().catch(() => { });
     }
+    hidePreloader();
   }, []);
 
   return (
@@ -294,7 +315,9 @@ const AppRouter = () => {
     });
   }, []);
 
-  if (loading) return <LoadingScreen />;
+  if (loading) {
+    return document.getElementById("preloader") ? null : <LoadingScreen />;
+  }
 
   if (isBrowserAppMode || location.pathname === '/browser') {
     return (
@@ -328,6 +351,14 @@ const AppRouter = () => {
 };
 
 const App = () => {
+  useEffect(() => {
+    // Safety fallback: ensure preloader is removed even if error occurs
+    const timer = setTimeout(() => {
+      hidePreloader();
+    }, 3500);
+    return () => clearTimeout(timer);
+  }, []);
+
   return (
     <IconContext.Provider
       value={{

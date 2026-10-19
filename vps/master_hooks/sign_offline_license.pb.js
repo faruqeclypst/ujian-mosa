@@ -225,8 +225,8 @@ routerAdd("POST", "/api/multi-vps/toggle-offline-license-status", (c) => {
         const info = c.requestInfo();
         const body = info.body || {};
         const id = (body["id"] || "").toString().trim();
-        const status = (body["status"] || "active").toString().trim().toLowerCase(); // 'active' | 'revoked'
-        const reason = (body["reason"] || "Pelanggaran kebijakan penggunaan sistem CBT offline.").toString().trim();
+        const status = (body["status"] || "active").toString().trim().toLowerCase(); // 'active' | 'revoked' | 'deleted'
+        const reason = (body["reason"] || "").toString().trim();
 
         if (!id) {
             return c.json(400, { success: false, error: "ID lisensi diperlukan" });
@@ -243,12 +243,19 @@ routerAdd("POST", "/api/multi-vps/toggle-offline-license-status", (c) => {
         }
         $app.save(rec);
 
+        let msg = "Status lisensi berhasil diperbarui.";
+        if (status === "deleted") {
+            msg = "Lisensi berhasil dipindahkan ke Tempat Sampah. Server offline akan terkunci saat terhubung online.";
+        } else if (status === "revoked") {
+            msg = "Lisensi berhasil dinonaktifkan (diblokir). Server offline akan terkunci saat mendeteksi koneksi online.";
+        } else if (status === "active") {
+            msg = "Lisensi berhasil dipulihkan dan diaktifkan kembali.";
+        }
+
         return c.json(200, {
             success: true,
             status: status,
-            message: status === "revoked"
-                ? "Lisensi berhasil dinonaktifkan (diblokir). Server offline akan terkunci saat mendeteksi koneksi online."
-                : "Lisensi berhasil diaktifkan kembali."
+            message: msg
         });
     } catch (err) {
         console.error("[ToggleOfflineLicenseStatus] Error:", err);
@@ -340,12 +347,14 @@ const handleLicenseStatusCheck = (c) => {
 
         if (rec) {
             const currentStatus = (rec.get("status") || "active").toString().toLowerCase();
-            if (currentStatus === "revoked") {
+            if (currentStatus === "revoked" || currentStatus === "deleted") {
                 return c.json(200, {
                     success: true,
                     status: "revoked",
                     is_revoked: true,
-                    message: "Lisensi Server Offline ini telah dinonaktifkan oleh Administrator Pusat karena pelanggaran kebijakan. Database bank soal dan data siswa Anda tetap aman.",
+                    message: currentStatus === "deleted"
+                        ? "Lisensi Server Offline ini telah dihapus oleh Administrator Pusat ke Tempat Sampah."
+                        : "Lisensi Server Offline ini telah dinonaktifkan oleh Administrator Pusat. Database bank soal dan data siswa Anda tetap aman.",
                     school_name: rec.get("school_name")
                 });
             }
@@ -381,12 +390,12 @@ const handleLicenseStatusCheck = (c) => {
             });
         }
 
-        // Jika lisensi tidak terdaftar di database pusat
+        // Jika lisensi tidak terdaftar di database pusat (misal dihapus permanen atau belum dibuat)
         return c.json(200, {
             success: true,
-            status: "active",
-            is_revoked: false,
-            message: "Lisensi tidak ditemukan dalam daftar blokir pusat."
+            status: "revoked",
+            is_revoked: true,
+            message: "Lisensi Server Offline ini tidak terdaftar atau telah dihapus permanen oleh Administrator Pusat."
         });
     } catch (err) {
         console.error("[CheckOfflineLicenseStatus] Error:", err);

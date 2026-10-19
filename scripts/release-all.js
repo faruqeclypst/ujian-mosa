@@ -39,7 +39,7 @@ try {
       let remoteHash = '';
       try {
         remoteHash = execSync(`ssh ${VPS_HOST} "cat ${REMOTE_TEMPLATE}/.go_src_hash 2>/dev/null || echo none"`, { encoding: 'utf-8' }).trim();
-      } catch {}
+      } catch { }
       if (localHash !== remoteHash) {
         console.log('   Source berubah, akan build di Main VPS...');
         needBuild = true;
@@ -99,7 +99,7 @@ try {
       if (remoteSize > 25000000) {
         needCopy = false;
       }
-    } catch {}
+    } catch { }
     if (needCopy) {
       console.log('  ⬇️ Mengunduh binary pocketbase Linux dari Worker VPS ke Master VPS...');
       execSync(`ssh ${VPS_HOST} "scp -o StrictHostKeyChecking=no ${WORKER_HOST}:/opt/pocketbase/schools/template/pocketbase ${REMOTE_TEMPLATE}/pocketbase"`, { stdio: 'inherit' });
@@ -153,7 +153,7 @@ try {
 
   // ── [5/6] PAKET & PUBLIKASIKAN OFFLINE UPDATE (1-CLICK UPDATE) ──
   console.log('\n💾 [5/6] Mengemas dan merilis berkas Offline 1-Click Update...');
-  
+
   // 1. Sinkronkan langsung dist terbaru & pb_hooks ke offline_package lokal
   console.log('  📂 Menyinkronkan dist & pb_hooks ke folder offline_package lokal...');
   if (!fs.existsSync('offline_package/pb_public')) fs.mkdirSync('offline_package/pb_public', { recursive: true });
@@ -203,7 +203,7 @@ try {
         console.log('  ♻️ pocketbase.exe sudah di-cache lokal, skip download 43MB');
         needDownload = false;
       }
-    } catch {}
+    } catch { }
   }
   if (needDownload) {
     execSync(`scp -o StrictHostKeyChecking=no ${VPS_HOST}:/opt/pocketbase/schools/template/pocketbase.exe ${stagingDir}/pocketbase.exe`, { stdio: 'inherit' });
@@ -211,7 +211,7 @@ try {
     try {
       fs.mkdirSync(path.dirname(pbExeCache), { recursive: true });
       fs.copyFileSync(path.join(stagingDir, 'pocketbase.exe'), pbExeCache);
-    } catch {}
+    } catch { }
   } else {
     fs.copyFileSync(pbExeCache, path.join(stagingDir, 'pocketbase.exe'));
   }
@@ -242,7 +242,7 @@ try {
   execSync(`scp version.json ${VPS_HOST}:${VPS_DOWNLOADS}/version.json`, { stdio: 'inherit' });
   execSync(`ssh ${VPS_HOST} "test -f ${VPS_DOWNLOADS}/version.json || (echo 'GAGAL: version.json tidak terupload' && exit 1)"`, { stdio: 'inherit' });
   execSync(`ssh ${VPS_HOST} "chmod 644 ${VPS_DOWNLOADS}/${updateZipName} ${VPS_DOWNLOADS}/version.json && chown -R caddy:caddy ${VPS_DOWNLOADS} && echo 'Downloads OK'"`, { stdio: 'inherit' });
-  
+
   if (fs.existsSync(updateZipName)) fs.unlinkSync(updateZipName);
   if (fs.existsSync('version.json')) fs.unlinkSync('version.json');
 
@@ -253,7 +253,7 @@ try {
       execSync(`powershell -Command "Remove-Item offline_package/pb_hooks/fast_login.pb.js -Force -ErrorAction SilentlyContinue"`, { stdio: 'ignore' });
       execSync(`powershell -Command "Copy-Item dist/* offline_package/pb_public/ -Recurse -Force"`, { stdio: 'ignore' });
       console.log('✅ Sinkronisasi otomatis ke offline_package lokal berhasil!');
-    } catch {}
+    } catch { }
   }
   console.log('✅ Berkas Offline 1-Click Update berhasil dipublikasikan di CDN Examku!');
 
@@ -267,7 +267,7 @@ try {
     const nameMatch = gradleContent.match(/versionName\s+"([^"]+)"/);
     if (codeMatch) apkVersionCode = codeMatch[1];
     if (nameMatch) apkVersionName = nameMatch[1];
-  } catch (e) {}
+  } catch (e) { }
 
   if (skipApk) {
     console.log('\n⏩ [6/6] Dilewati: Build APK dilewati (--skip-apk / --quick).');

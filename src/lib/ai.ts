@@ -1878,3 +1878,242 @@ Balas HANYA dengan JSON: {"isCorrect":true,"score":80,"feedback":"umpan balik si
     throw new Error("Gagal menilai dengan AI: " + (err.message || ""));
   }
 };
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 🎯 Psychometric AI Revision for Question Options & Distractors
+// ═══════════════════════════════════════════════════════════════════════════════
+export interface AIReviseOptionsRequest {
+  pb: PocketBase;
+  questionId: string;
+  questionIndex?: number;
+  questionText: string;
+  literasiText?: string;
+  type: string;
+  answerKey: string;
+  currentChoices: Record<string, { text: string; isCorrect?: boolean; imageUrl?: string }>;
+  distractorAnalysis?: Array<{
+    key: string;
+    text: string;
+    isCorrect: boolean;
+    totalPercent: number;
+    upperPercent: number;
+    lowerPercent: number;
+    status: string;
+    note: string;
+  }>;
+  difficultyIndex?: number;
+  discriminationIndex?: number;
+  pointBiserial?: number;
+  teacherNote?: string;
+}
+
+export interface AIReviseOptionsChoice {
+  text: string;
+  isCorrect: boolean;
+  originalText?: string;
+  status: "revised" | "kept" | "refined";
+  rationale?: string;
+}
+
+export interface AIReviseOptionsResult {
+  analysis: string;
+  choices: Record<string, AIReviseOptionsChoice>;
+  answerKey: string;
+  pedagogicalTip?: string;
+}
+
+export const reviseQuestionOptionsAI = async (
+  request: AIReviseOptionsRequest
+): Promise<AIReviseOptionsResult> => {
+  const {
+    pb,
+    questionText,
+    literasiText,
+    type,
+    answerKey,
+    currentChoices,
+    distractorAnalysis,
+    difficultyIndex,
+    discriminationIndex,
+    pointBiserial,
+    teacherNote
+  } = request;
+
+  const cleanHtml = (s: string) => (s || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+
+  // Format distractor analysis breakdown
+  let distractorBreakdown = "";
+  if (distractorAnalysis && distractorAnalysis.length > 0) {
+    distractorBreakdown = distractorAnalysis.map(dis => {
+      const corrBadge = dis.isCorrect ? "[KUNCI JAWABAN]" : "[PENGECOH]";
+      return `- Opsi ${dis.key.toUpperCase()} ${corrBadge}: "${cleanHtml(dis.text)}"\n  Status: ${dis.status} (Dipilih ${dis.totalPercent}% siswa | Kelompok Atas: ${dis.upperPercent}%, Kelompok Bawah: ${dis.lowerPercent}%)\n  Evaluasi Psikometri: ${dis.note || "-"}`;
+    }).join("\n\n");
+  } else {
+    distractorBreakdown = Object.entries(currentChoices).map(([k, c]) => {
+      const isCorr = Boolean(c.isCorrect || answerKey.toLowerCase().split(/[,|; ]+/).includes(k.toLowerCase()));
+      return `- Opsi ${k.toUpperCase()} ${isCorr ? "[KUNCI JAWABAN]" : "[PENGECOH]"}: "${cleanHtml(c.text)}"`;
+    }).join("\n");
+  }
+
+  const pStr = difficultyIndex !== undefined ? `P = ${difficultyIndex.toFixed(2)} (${difficultyIndex > 0.70 ? "Mudah / Terlalu Mudah" : difficultyIndex < 0.30 ? "Sukar / Terlalu Sukar" : "Sedang (Ideal)"})` : "Belum dihitung";
+  const dStr = discriminationIndex !== undefined ? `D = ${discriminationIndex >= 0 ? "+" : ""}${discriminationIndex.toFixed(2)} (${discriminationIndex >= 0.40 ? "Sangat Baik" : discriminationIndex >= 0.30 ? "Baik" : discriminationIndex >= 0.20 ? "Cukup" : "Rendah / Kurang Mampu Membedakan Siswa"})` : "Belum dihitung";
+  const rpbStr = pointBiserial !== undefined ? `r_pb = ${pointBiserial >= 0 ? "+" : ""}${pointBiserial.toFixed(2)}` : "-";
+
+  const systemPrompt = `Anda adalah pakar psikometri evaluasi pendidikan Classical Test Theory (CTT) dan penyusun butir soal HOTS terstandar.
+Tugas Anda: Merevisi dan menyempurnakan pilihan jawaban (khususnya opsi pengecoh/distraktor) butir soal agar memiliki daya pembeda (D) tinggi, efektivitas pengecoh (DE) optimal, dan validitas isi yang kuat.
+
+PEDOMAN REVISI OPSI JAWABAN BERBASIS PSIKOMETRI:
+1. PERTAHANKAN KUNCI JAWABAN:
+   - Opsi yang menjadi kunci jawaban HARUS tetap benar secara konsep dan substansi.
+   - Perbaiki redaksinya jika sebelumnya membingungkan atau kurang baku, tetapi JANGAN ubah esensi jawaban yang benar.
+   - Tandai isCorrect: true pada opsi kunci.
+2. PERBAIKI PENGECOH PASIF / MATI (Fo < 5% pemilih):
+   - Pengecoh yang hampir tidak ada pemilihnya (<5%) adalah pengecoh mati yang tidak berfungsi.
+   - GANTI dengan opsi pengecoh baru yang masuk akal (plausible), bersumber dari teks/stimulus soal, dan menargetkan miskonsepsi umum (common misconception) atau kekeliruan bernalar yang biasa dialami peserta didik.
+   - Opsi pengecoh baru harus cukup memikat bagi siswa kelompok bawah yang belum paham materi, namun tidak dipilih siswa kelompok atas yang benar-benar paham.
+3. PERBAIKI PENGECOH MENYESATKAN (Kelompok Atas > Kelompok Bawah):
+   - Jika siswa pandai (kelompok atas) lebih banyak terjebak daripada kelompok bawah, berarti ada ambiguitas kata, frasa bersayap, atau distraktor yang terlalu mirip dengan kebenaran faktual.
+   - Redaksikan ulang agar tidak ambigu dan tidak mengecoh siswa yang menguasai materi.
+4. HOMOGENITAS & KESEIMBANGAN STRUKTUR OPSI:
+   - Seluruh pilihan jawaban (A sampai E) harus seimbang dalam:
+     a) Panjang kalimat (hindari kunci jawaban paling panjang atau paling pendek).
+     b) Struktur gramatikal (misal: jika kunci adalah frasa nomina, pengecoh juga berupa frasa nomina).
+     c) Gaya bahasa, nada, dan terminologi yang setara.
+   - Jangan ada "clue" gramatikal yang memudahkan tebakan acak.
+5. INSTRUKSI GURU:
+   - Jika guru memberikan catatan khusus, terapkan arahan tersebut sebagai prioritas utama.
+
+FORMAT KELUARAN (WAJIB JSON MURNI TANPA MARKDOWN):
+{
+  "analysis": "Penjelasan singkat (2-3 kalimat) mengenai kelemahan psikometri opsi lama dan strategi perbaikan yang dilakukan.",
+  "choices": {
+    "a": {
+      "text": "Teks opsi A yang baru atau disempurnakan",
+      "isCorrect": false,
+      "status": "revised", // "revised" (dirombak total), "refined" (disempurnakan redaksinya), atau "kept" (dipertahankan)
+      "rationale": "Alasan pedagogis/miskonsepsi yang ditargetkan opsi ini"
+    },
+    "b": {
+      "text": "...",
+      "isCorrect": false,
+      "status": "revised",
+      "rationale": "..."
+    },
+    "c": {
+      "text": "...",
+      "isCorrect": false,
+      "status": "revised",
+      "rationale": "..."
+    },
+    "d": {
+      "text": "...",
+      "isCorrect": true,
+      "status": "kept",
+      "rationale": "Kunci jawaban resmi yang benar secara konsep"
+    },
+    "e": {
+      "text": "...",
+      "isCorrect": false,
+      "status": "revised",
+      "rationale": "..."
+    }
+  },
+  "answerKey": "d",
+  "pedagogicalTip": "Tips ringkas untuk guru mengenai miskonsepsi materi ini saat dibahas di kelas."
+}`;
+
+  const userPrompt = `DATA BUTIR SOAL YANG DIANALISIS:
+${literasiText ? `[WACANA / STIMULUS LITERASI]:\n${cleanHtml(literasiText)}\n\n` : ""}[TEKS PERTANYAAN SOAL]:
+${cleanHtml(questionText)}
+
+TIPE SOAL: ${type === "pilihan_ganda_kompleks" ? "Pilihan Ganda Kompleks" : "Pilihan Ganda Tunggal"}
+KUNCI JAWABAN SAAT INI: ${answerKey.toUpperCase()}
+
+METRIK PSIKOMETRI EMPIRIS BUTIR SOAL:
+- Tingkat Kesukaran (P): ${pStr}
+- Daya Pembeda (D): ${dStr}
+- Korelasi Point-Biserial (r_pb): ${rpbStr}
+
+RINCIAN & ANOMALI OPSI JAWABAN SAAT INI:
+${distractorBreakdown}
+
+${teacherNote?.trim() ? `CATATAN KHUSUS / PERMINTAAN DARI GURU:\n"${teacherNote.trim()}"\n` : ""}
+Lakukan revisi dan perbaikan pada pilihan jawaban di atas agar butir soal memenuhi kaidah psikometri yang ideal. Pastikan seluruh opsi (A sampai E) tersedia lengkap dalam format JSON yang diminta.`;
+
+  let content = "";
+  try {
+    content = await fetchAI({
+      pb,
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt }
+      ],
+      maxTokens: 1200,
+      temperature: 0.4,
+      jsonMode: true
+    });
+  } catch (err: any) {
+    if (err.message?.includes("AI_RATE_LIMIT")) throw err;
+    // Fallback without strict json_object
+    content = await fetchAI({
+      pb,
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt }
+      ],
+      maxTokens: 1200,
+      temperature: 0.4,
+      jsonMode: false
+    });
+  }
+
+  const parsed = robustJSONParse(content);
+  if (!parsed || typeof parsed !== "object") {
+    throw new Error("AI tidak menghasilkan struktur JSON yang valid.");
+  }
+
+  const rawChoices = parsed.choices || parsed.options || {};
+  const cleanedChoices: Record<string, AIReviseOptionsChoice> = {};
+
+  // Standardize keys (a, b, c, d, e)
+  const targetKeys = Object.keys(currentChoices).length > 0
+    ? Object.keys(currentChoices).map(k => k.toLowerCase())
+    : ["a", "b", "c", "d", "e"];
+
+  targetKeys.forEach(k => {
+    const rawC = rawChoices[k] || rawChoices[k.toUpperCase()] || {};
+    const origC = currentChoices[k] || currentChoices[k.toUpperCase()] || { text: "", isCorrect: false };
+
+    // Determine isCorrect
+    let isCorr = false;
+    if (rawC.isCorrect !== undefined) {
+      isCorr = Boolean(rawC.isCorrect);
+    } else if (parsed.answerKey) {
+      const keys = String(parsed.answerKey).toLowerCase().split(/[,|; ]+/).map(s => s.trim());
+      isCorr = keys.includes(k);
+    } else {
+      isCorr = Boolean(origC.isCorrect);
+    }
+
+    cleanedChoices[k] = {
+      text: typeof rawC.text === "string" && rawC.text.trim() ? rawC.text.trim() : (origC.text || ""),
+      isCorrect: isCorr,
+      originalText: origC.text || "",
+      status: rawC.status || (isCorr ? "kept" : (rawC.text !== origC.text ? "revised" : "kept")),
+      rationale: rawC.rationale || rawC.alasan || (isCorr ? "Kunci jawaban benar" : "Pengecoh disesuaikan")
+    };
+  });
+
+  // Calculate final answer key string
+  const correctKeys = Object.entries(cleanedChoices)
+    .filter(([_, c]) => c.isCorrect)
+    .map(([k]) => k)
+    .join(",");
+
+  return {
+    analysis: parsed.analysis || parsed.ringkasan || "Pilihan jawaban berhasil dianalisis dan disempurnakan berdasarkan kaidah psikometri CTT.",
+    choices: cleanedChoices,
+    answerKey: correctKeys || (parsed.answerKey ? String(parsed.answerKey).toLowerCase() : answerKey.toLowerCase()),
+    pedagogicalTip: parsed.pedagogicalTip || parsed.tips || parsed.saran || ""
+  };
+};

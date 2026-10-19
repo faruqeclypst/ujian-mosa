@@ -13,6 +13,7 @@ import {
   ChevronDown,
   ChevronUp,
   RefreshCw,
+  RotateCcw,
   FileSpreadsheet,
   BookOpen,
   Sparkles,
@@ -49,6 +50,8 @@ import {
   DropdownMenuSeparator
 } from "../../components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "../../components/ui/dialog";
+import { useToast } from "../../components/ui/toast";
+import { AIQuestionRevisionDialog } from "../../components/dialogs/AIQuestionRevisionDialog";
 import { useTenant } from "../../context/TenantContext";
 import { useAuth } from "../../context/AuthContext";
 import { useExamData } from "../../context/ExamDataContext";
@@ -282,6 +285,64 @@ export const ItemAnalysisPage: React.FC = () => {
   const [analyzedQuestions, setAnalyzedQuestions] = useState<QuestionAnalysis[]>([]);
   const [expandedQuestionIds, setExpandedQuestionIds] = useState<Record<string, boolean>>({});
 
+  // AI Revision State & Handlers
+  const { addToast } = useToast();
+  const [revisionTargetQuestion, setRevisionTargetQuestion] = useState<QuestionAnalysis | null>(null);
+  const [isRevisionDialogOpen, setIsRevisionDialogOpen] = useState<boolean>(false);
+
+  const handleOpenAIRevision = (q: QuestionAnalysis) => {
+    setRevisionTargetQuestion(q);
+    setIsRevisionDialogOpen(true);
+  };
+
+  const handleSaveRevisedChoices = async (
+    questionId: string,
+    updatedChoices: Record<string, { text: string; isCorrect: boolean; imageUrl?: string }>,
+    updatedAnswerKey: string
+  ) => {
+    if (!pb) throw new Error("Koneksi database tidak tersedia.");
+
+    // Update PocketBase question record
+    await pb.collection("questions").update(questionId, {
+      options: updatedChoices,
+      choices: updatedChoices,
+      correctAnswer: updatedAnswerKey,
+      answerKey: updatedAnswerKey,
+      answer: updatedAnswerKey,
+      correct_answer: updatedAnswerKey
+    });
+
+    // Update local analyzedQuestions state immediately
+    const correctKeys = updatedAnswerKey.toLowerCase().split(/[,|; ]+/).map((s) => s.trim()).filter(Boolean);
+
+    setAnalyzedQuestions((prev) =>
+      prev.map((q) => {
+        if (q.id !== questionId) return q;
+
+        const newChoices: Record<string, any> = { ...updatedChoices };
+        const newDistractors = (q.distractors || []).map((dis) => {
+          const lowerKey = dis.key.toLowerCase();
+          const updated = updatedChoices[lowerKey];
+          if (!updated) return dis;
+          const isCorr = correctKeys.includes(lowerKey) || Boolean(updated.isCorrect);
+          return {
+            ...dis,
+            text: updated.text,
+            isCorrect: isCorr,
+            status: isCorr ? ("Kunci" as const) : dis.status
+          };
+        });
+
+        return {
+          ...q,
+          choices: newChoices,
+          answerKey: updatedAnswerKey,
+          distractors: newDistractors
+        };
+      })
+    );
+  };
+
   // Filter & Search
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
@@ -290,6 +351,26 @@ export const ItemAnalysisPage: React.FC = () => {
   const [discriminationFilter, setDiscriminationFilter] = useState<string>("all");
   const [rpbFilter, setRpbFilter] = useState<string>("all");
   const [showGuideModal, setShowGuideModal] = useState(false);
+
+  const activeFiltersCount = useMemo(() => {
+    return [
+      typeFilter !== "all",
+      verdictFilter !== "all",
+      difficultyFilter !== "all",
+      discriminationFilter !== "all",
+      rpbFilter !== "all",
+      Boolean(searchQuery.trim())
+    ].filter(Boolean).length;
+  }, [typeFilter, verdictFilter, difficultyFilter, discriminationFilter, rpbFilter, searchQuery]);
+
+  const handleResetAllFilters = useCallback(() => {
+    setSearchQuery("");
+    setTypeFilter("all");
+    setVerdictFilter("all");
+    setDifficultyFilter("all");
+    setDiscriminationFilter("all");
+    setRpbFilter("all");
+  }, []);
 
   // 1. Fetch Daftar Ruangan Ujian untuk Dropdown Selector
   useEffect(() => {
@@ -1804,7 +1885,7 @@ export const ItemAnalysisPage: React.FC = () => {
               <Layers className="h-4 w-4" />
             </div>
             <div>
-              <span className="text-xs font-bold text-slate-800 dark:text-slate-100 block">
+              <span className="text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-100 block">
                 Pilih Ruang Ujian yang Dianalisis
               </span>
               <span className="text-[11px] text-slate-400 font-medium">
@@ -1833,348 +1914,371 @@ export const ItemAnalysisPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Bottom: Clean Integrated Metadata Badges (No messy squished boxes, just clean airy inline summary) */}
-        <div className="pt-3.5 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3 text-xs">
-          <div className="flex flex-wrap items-center gap-3 sm:gap-5">
+        {/* Bottom: Clean Integrated Metadata Badges */}
+        <div className="pt-3.5 border-t border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-5 min-w-0">
             {/* Meta 1: Ujian / Paket */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 min-w-0">
               <div className="w-7 h-7 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
                 <FileText className="h-3.5 w-3.5" />
               </div>
-              <div>
-                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
+              <div className="min-w-0">
+                <span className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-wider block">
                   Ujian / Paket
                 </span>
-                <span className="text-xs font-bold text-slate-800 dark:text-slate-100" title={examMeta.title}>
+                <span className="text-xs font-bold text-slate-800 dark:text-slate-100 block truncate max-w-[240px] sm:max-w-xs md:max-w-sm" title={examMeta.title}>
                   {examMeta.title || "-"}
                 </span>
               </div>
             </div>
 
-            <div className="hidden sm:block h-6 w-px bg-slate-200 dark:bg-slate-800" />
+            <div className="hidden sm:block h-6 w-px bg-slate-200 dark:bg-slate-800 shrink-0" />
 
             {/* Meta 2: Mata Pelajaran & Guru */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 min-w-0">
               <div className="w-7 h-7 rounded-lg bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
                 <BookOpen className="h-3.5 w-3.5" />
               </div>
-              <div>
-                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
+              <div className="min-w-0">
+                <span className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-wider block">
                   Mata Pelajaran &amp; Guru
                 </span>
-                <span className="text-xs font-bold text-slate-800 dark:text-slate-100">
+                <span className="text-xs font-bold text-slate-800 dark:text-slate-100 truncate block max-w-[200px] sm:max-w-xs">
                   {examMeta.subjectName || "-"}
-                </span>
-                <span className="text-[11px] text-slate-500 dark:text-slate-400 ml-1.5 font-normal">
-                  ({examMeta.teacherName || "-"})
+                  <span className="text-[11px] text-slate-500 dark:text-slate-400 ml-1.5 font-normal">
+                    ({examMeta.teacherName || "-"})
+                  </span>
                 </span>
               </div>
             </div>
           </div>
 
           {/* Meta 3: Sampel Peserta */}
-          <div className="flex items-center gap-2.5 bg-slate-50 dark:bg-slate-800/60 px-3.5 py-1.5 rounded-xl border border-slate-200/60 dark:border-slate-700/60 text-slate-700 dark:text-slate-300">
-            <Users className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-            <div>
-              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
-                Sampel Peserta (Kelley 27%)
-              </span>
-              <span className="text-xs font-black text-slate-900 dark:text-white">
-                {examMeta.totalParticipants} Siswa
-              </span>
-              <span className="text-[11px] text-slate-500 dark:text-slate-400 ml-1.5 font-normal">
-                (Kel. Atas/Bawah: {examMeta.upperCount} Siswa)
-              </span>
+          <div className="flex items-center gap-2.5 bg-slate-50 dark:bg-slate-800/60 px-3 sm:px-3.5 py-1.5 rounded-xl border border-slate-200/60 dark:border-slate-700/60 text-slate-700 dark:text-slate-300 w-full sm:w-auto shrink-0 justify-between sm:justify-start">
+            <div className="flex items-center gap-2">
+              <Users className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+              <div>
+                <span className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-wider block">
+                  Sampel Peserta (Kelley 27%)
+                </span>
+                <span className="text-xs font-black text-slate-900 dark:text-white">
+                  {examMeta.totalParticipants} Siswa
+                  <span className="text-[11px] text-slate-500 dark:text-slate-400 ml-1.5 font-normal">
+                    (Atas/Bawah: {examMeta.upperCount} Siswa)
+                  </span>
+                </span>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* 3. EXECUTIVE SUMMARY / KPI CARDS (Screen Only) */}
-      <div className="space-y-4 print:hidden">
-        {/* Top 4 KPI Metrics: Layer 1 CTT Statistics */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* KPI 1: Tingkat Kesukaran Rata-Rata */}
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 shadow-2xs relative overflow-hidden">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Tingkat Kesukaran (P)</span>
-                <MetricInfoTooltip type="difficulty" side="bottom" />
-              </div>
-              <div className="w-8 h-8 rounded-xl bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold text-xs">
-                %
-              </div>
+      {/* 3. EXECUTIVE SUMMARY / PSYCHOMETRIC OVERVIEW & STATUS FILTER (Screen Only) */}
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 sm:p-5 shadow-xs print:hidden space-y-4">
+        {/* Row 1: 4 Key Metric Pillars */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 pb-3.5 sm:pb-4 border-b border-slate-100 dark:border-slate-800/80">
+          {/* P */}
+          <div className="space-y-1">
+            <div className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
+              <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider">Kesukaran (P)</span>
+              <MetricInfoTooltip type="difficulty" side="bottom" />
             </div>
-            <div className="mt-2 flex items-baseline gap-2">
-              <span className="text-2xl font-black text-slate-900 dark:text-white">
+            <div className="flex items-baseline gap-1.5 sm:gap-2">
+              <span className="text-xl sm:text-2xl font-black tracking-tight text-slate-900 dark:text-white">
                 {stats.avgP.toFixed(2)}
               </span>
-              <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 font-bold text-xs">
+              <span className="text-[10px] sm:text-xs font-bold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 px-1.5 sm:px-2 py-0.5 rounded-md">
                 {getDifficultyCategory(stats.avgP)}
-              </Badge>
+              </span>
             </div>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-2 font-medium">
-              Distribusi: <span className="text-emerald-600 font-bold">{stats.pDist.mudah} Mudah</span> •{" "}
-              <span className="text-blue-600 font-bold">{stats.pDist.sedang} Sedang</span> •{" "}
-              <span className="text-rose-600 font-bold">{stats.pDist.sukar} Sukar</span>
+            <p className="text-[10px] sm:text-[11px] text-slate-400 font-medium">
+              {stats.pDist.mudah} Mudah · {stats.pDist.sedang} Sedang · {stats.pDist.sukar} Sukar
             </p>
           </div>
 
-          {/* KPI 2: Daya Pembeda Rata-Rata */}
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 shadow-2xs relative overflow-hidden">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Daya Pembeda (D)</span>
-                <MetricInfoTooltip type="discrimination" side="bottom" />
-              </div>
-              <div className="w-8 h-8 rounded-xl bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold text-xs">
-                <TrendingUp className="h-4 w-4" />
-              </div>
+          {/* D */}
+          <div className="space-y-1">
+            <div className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
+              <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider">Daya Pembeda (D)</span>
+              <MetricInfoTooltip type="discrimination" side="bottom" />
             </div>
-            <div className="mt-2 flex items-baseline gap-2">
-              <span className="text-2xl font-black text-slate-900 dark:text-white">
+            <div className="flex items-baseline gap-1.5 sm:gap-2">
+              <span className={cn(
+                "text-xl sm:text-2xl font-black tracking-tight",
+                stats.avgD >= 0.40
+                  ? "text-emerald-600 dark:text-emerald-400"
+                  : stats.avgD >= 0.30
+                  ? "text-blue-600 dark:text-blue-400"
+                  : stats.avgD >= 0.20
+                  ? "text-amber-600 dark:text-amber-400"
+                  : "text-rose-600 dark:text-rose-400"
+              )}>
                 {stats.avgD >= 0 ? `+${stats.avgD.toFixed(2)}` : stats.avgD.toFixed(2)}
               </span>
-              <Badge className={cn(
-                "font-bold text-xs",
-                stats.avgD >= 0.40
-                  ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300"
-                  : stats.avgD >= 0.30
-                  ? "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300"
-                  : stats.avgD >= 0.20
-                  ? "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
-                  : "bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300"
-              )}>
+              <span className="text-[10px] sm:text-xs font-bold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 px-1.5 sm:px-2 py-0.5 rounded-md">
                 {getDiscriminationCategory(stats.avgD)}
-              </Badge>
+              </span>
             </div>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-2 font-medium">
-              Metode 27% Kelley ({examMeta.upperCount} Atas vs {examMeta.lowerCount} Bawah).
+            <p className="text-[10px] sm:text-[11px] text-slate-400 font-medium truncate sm:whitespace-normal">
+              Kelley 27% ({examMeta.upperCount} Atas / {examMeta.lowerCount} Bawah)
             </p>
           </div>
 
-          {/* KPI 3: Point-Biserial Rata-Rata */}
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 shadow-2xs relative overflow-hidden">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Point-Biserial (r_pb)</span>
-                <MetricInfoTooltip type="point_biserial" side="bottom" />
-              </div>
-              <div className="w-8 h-8 rounded-xl bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 flex items-center justify-center font-bold text-xs">
-                <BarChart2 className="h-4 w-4" />
-              </div>
+          {/* r_pb */}
+          <div className="space-y-1">
+            <div className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
+              <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider">Point-Biserial (r_pb)</span>
+              <MetricInfoTooltip type="point_biserial" side="bottom" />
             </div>
-            <div className="mt-2 flex items-baseline gap-2">
-              <span className="text-2xl font-black text-slate-900 dark:text-white">
+            <div className="flex items-baseline gap-1.5 sm:gap-2">
+              <span className="text-xl sm:text-2xl font-black tracking-tight text-slate-900 dark:text-white">
                 {stats.avgRpb >= 0 ? `+${stats.avgRpb.toFixed(2)}` : stats.avgRpb.toFixed(2)}
               </span>
-              <Badge className={cn(
-                "font-bold text-xs",
-                stats.avgRpb >= 0.30
-                  ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300"
-                  : stats.avgRpb >= 0.20
-                  ? "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300"
-                  : "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
-              )}>
+              <span className="text-[10px] sm:text-xs font-bold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 px-1.5 sm:px-2 py-0.5 rounded-md">
                 {getPointBiserialCategory(stats.avgRpb)}
-              </Badge>
+              </span>
             </div>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-2 font-medium">
-              Corrected Item-Total Pearson Correlation.
+            <p className="text-[10px] sm:text-[11px] text-slate-400 font-medium">
+              Item-Total Pearson Correlation
             </p>
           </div>
 
-          {/* KPI 4: Efektivitas Pengecoh Rata-Rata */}
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 shadow-2xs relative overflow-hidden">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Efektivitas Pengecoh</span>
-                <MetricInfoTooltip type="distractor" side="bottom" />
-              </div>
-              <div className="w-8 h-8 rounded-xl bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold text-xs">
-                <Layers className="h-4 w-4" />
-              </div>
+          {/* Distractor Efficiency */}
+          <div className="space-y-1">
+            <div className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
+              <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider">Efektivitas Pengecoh</span>
+              <MetricInfoTooltip type="distractor" side="bottom" />
             </div>
-            <div className="mt-2 flex items-baseline gap-2">
-              <span className="text-2xl font-black text-slate-900 dark:text-white">
+            <div className="flex items-baseline gap-1.5 sm:gap-2">
+              <span className="text-xl sm:text-2xl font-black tracking-tight text-slate-900 dark:text-white">
                 {stats.avgDE}%
               </span>
-              <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 font-bold text-xs">
-                DE Rata-rata
-              </Badge>
+              <span className="text-[10px] sm:text-xs font-bold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 px-1.5 sm:px-2 py-0.5 rounded-md">
+                Rata-rata
+              </span>
             </div>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-2 font-medium">
-              Pengecoh berfungsi jika Fo ≥ 5% &amp; nBB &gt; nBA.
+            <p className="text-[10px] sm:text-[11px] text-slate-400 font-medium">
+              Syarat: Fo ≥ 5% &amp; nBB &gt; nBA
             </p>
           </div>
         </div>
 
-        {/* Bottom Banner: Layer 3 Decision Engine 5-Tier Breakdown */}
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 shadow-xs">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-3">
-            <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold text-xs">
-                <CheckCircle2 className="h-4 w-4" />
-              </div>
-              <div>
-                <h3 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-wider">
-                  Decision Engine: Rekapitulasi Keputusan CTT
-                </h3>
-                <span className="text-[11px] text-slate-400 font-medium">
-                  Klik kategori untuk memfilter butir soal secara langsung
-                </span>
-              </div>
-            </div>
-
+        {/* Row 2: Status CTT Interactive Filter Tabs */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-0.5">
+          <div className="flex items-center justify-between sm:justify-start gap-2 flex-wrap">
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+              Status Keputusan CTT:
+            </span>
             {stats.keyAlertCount > 0 && (
-              <Badge className="bg-rose-600 text-white font-bold text-xs px-3 py-1 animate-pulse">
-                ⚠️ {stats.keyAlertCount} Butir Indikasi Kunci Salah
-              </Badge>
+              <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/40 px-2.5 py-0.5 rounded-md border border-rose-200 dark:border-rose-900/40">
+                <AlertTriangle className="h-3.5 w-3.5" />
+                {stats.keyAlertCount} Perlu Cek Kunci
+              </span>
             )}
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
-            {/* Tier 1: Diterima */}
+          {/* Interactive Filter Pills */}
+          <div className="flex items-center gap-1.5 flex-wrap">
             <button
+              type="button"
+              onClick={() => setVerdictFilter("all")}
+              className={cn(
+                "px-2.5 py-1.5 sm:py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5",
+                verdictFilter === "all"
+                  ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 shadow-2xs"
+                  : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+              )}
+            >
+              <span>Semua</span>
+              <span className="text-[11px] opacity-70">({analyzedQuestions.length})</span>
+            </button>
+
+            <button
+              type="button"
               onClick={() => setVerdictFilter(verdictFilter === "Diterima" ? "all" : "Diterima")}
               className={cn(
-                "p-3 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between",
+                "px-2.5 py-1.5 sm:py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 border",
                 verdictFilter === "Diterima"
-                  ? "bg-emerald-100 dark:bg-emerald-950/60 border-emerald-500 ring-2 ring-emerald-500/20 shadow-sm"
-                  : "bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200/70 dark:border-emerald-900/40 hover:bg-emerald-100/60"
+                  ? "bg-emerald-600 text-white border-emerald-600 shadow-2xs"
+                  : "border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-emerald-300 hover:bg-emerald-50/50 dark:hover:bg-emerald-950/20"
               )}
             >
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-black text-emerald-800 dark:text-emerald-300 uppercase">🟢 Diterima</span>
-                <span className="text-lg font-black text-emerald-700 dark:text-emerald-400">{stats.acceptedCount}</span>
-              </div>
-              <span className="text-xs text-emerald-700/80 dark:text-emerald-400/80 font-medium mt-1">
-                {stats.acceptedPercent}% • Item Sangat Baik
-              </span>
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+              <span>Diterima</span>
+              <span className="text-[11px] opacity-75">({stats.acceptedCount})</span>
             </button>
 
-            {/* Tier 2: Revisi Kecil */}
             <button
+              type="button"
               onClick={() => setVerdictFilter(verdictFilter === "Revisi Kecil" ? "all" : "Revisi Kecil")}
               className={cn(
-                "p-3 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between",
+                "px-2.5 py-1.5 sm:py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 border",
                 verdictFilter === "Revisi Kecil"
-                  ? "bg-yellow-100 dark:bg-yellow-950/60 border-yellow-500 ring-2 ring-yellow-500/20 shadow-sm"
-                  : "bg-yellow-50/50 dark:bg-yellow-950/20 border-yellow-200/70 dark:border-yellow-900/40 hover:bg-yellow-100/60"
+                  ? "bg-amber-600 text-white border-amber-600 shadow-2xs"
+                  : "border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-amber-300 hover:bg-amber-50/50 dark:hover:bg-amber-950/20"
               )}
             >
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-black text-yellow-800 dark:text-yellow-300 uppercase">🟡 Revisi Kecil</span>
-                <span className="text-lg font-black text-yellow-700 dark:text-yellow-400">{stats.minorRevisionCount}</span>
-              </div>
-              <span className="text-xs text-yellow-700/80 dark:text-yellow-400/80 font-medium mt-1">
-                {stats.minorRevisionPercent}% • Cek 1 Pengecoh
-              </span>
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
+              <span>Revisi Kecil</span>
+              <span className="text-[11px] opacity-75">({stats.minorRevisionCount})</span>
             </button>
 
-            {/* Tier 3: Revisi */}
             <button
+              type="button"
               onClick={() => setVerdictFilter(verdictFilter === "Revisi" ? "all" : "Revisi")}
               className={cn(
-                "p-3 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between",
+                "px-2.5 py-1.5 sm:py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 border",
                 verdictFilter === "Revisi"
-                  ? "bg-amber-100 dark:bg-amber-950/60 border-amber-500 ring-2 ring-amber-500/20 shadow-sm"
-                  : "bg-amber-50/50 dark:bg-amber-950/20 border-amber-200/70 dark:border-amber-900/40 hover:bg-amber-100/60"
+                  ? "bg-amber-600 text-white border-amber-600 shadow-2xs"
+                  : "border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-amber-300 hover:bg-amber-50/50 dark:hover:bg-amber-950/20"
               )}
             >
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-black text-amber-800 dark:text-amber-300 uppercase">🟠 Revisi</span>
-                <span className="text-lg font-black text-amber-700 dark:text-amber-400">{stats.revisionCount}</span>
-              </div>
-              <span className="text-xs text-amber-700/80 dark:text-amber-400/80 font-medium mt-1">
-                {stats.revisionPercent}% • Kesukaran / Opsi
-              </span>
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
+              <span>Revisi</span>
+              <span className="text-[11px] opacity-75">({stats.revisionCount})</span>
             </button>
 
-            {/* Tier 4: Revisi Total */}
             <button
+              type="button"
               onClick={() => setVerdictFilter(verdictFilter === "Revisi Total" ? "all" : "Revisi Total")}
               className={cn(
-                "p-3 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between",
+                "px-2.5 py-1.5 sm:py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 border",
                 verdictFilter === "Revisi Total"
-                  ? "bg-orange-100 dark:bg-orange-950/60 border-orange-500 ring-2 ring-orange-500/20 shadow-sm"
-                  : "bg-orange-50/50 dark:bg-orange-950/20 border-orange-200/70 dark:border-orange-900/40 hover:bg-orange-100/60"
+                  ? "bg-orange-600 text-white border-orange-600 shadow-2xs"
+                  : "border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-orange-300 hover:bg-orange-50/50 dark:hover:bg-orange-950/20"
               )}
             >
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-black text-orange-800 dark:text-orange-300 uppercase">🔴 Revisi Total</span>
-                <span className="text-lg font-black text-orange-700 dark:text-orange-400">{stats.totalRevisionCount}</span>
-              </div>
-              <span className="text-xs text-orange-700/80 dark:text-orange-400/80 font-medium mt-1">
-                {stats.totalRevisionPercent}% • D Rendah &lt; 0.20
-              </span>
+              <span className="w-1.5 h-1.5 rounded-full bg-orange-500 shrink-0" />
+              <span>Revisi Total</span>
+              <span className="text-[11px] opacity-75">({stats.totalRevisionCount})</span>
             </button>
 
-            {/* Tier 5: Ditolak */}
             <button
+              type="button"
               onClick={() => setVerdictFilter(verdictFilter === "Ditolak" ? "all" : "Ditolak")}
               className={cn(
-                "p-3 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between",
+                "px-2.5 py-1.5 sm:py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 border",
                 verdictFilter === "Ditolak"
-                  ? "bg-rose-100 dark:bg-rose-950/60 border-rose-500 ring-2 ring-rose-500/20 shadow-sm"
-                  : "bg-rose-50/50 dark:bg-rose-950/20 border-rose-200/70 dark:border-rose-900/40 hover:bg-rose-100/60"
+                  ? "bg-rose-600 text-white border-rose-600 shadow-2xs"
+                  : "border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-rose-300 hover:bg-rose-50/50 dark:hover:bg-rose-950/20"
               )}
             >
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-black text-rose-800 dark:text-rose-300 uppercase">⛔ Ditolak</span>
-                <span className="text-lg font-black text-rose-700 dark:text-rose-400">{stats.rejectedCount}</span>
-              </div>
-              <span className="text-xs text-rose-700/80 dark:text-rose-400/80 font-medium mt-1">
-                {stats.rejectedPercent}% • D Negatif / Kunci
-              </span>
+              <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0" />
+              <span>Ditolak</span>
+              <span className="text-[11px] opacity-75">({stats.rejectedCount})</span>
             </button>
           </div>
         </div>
       </div>
 
       {/* 4. FILTER & SEARCH TOOLBAR (Screen Only) */}
-      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 shadow-xs print:hidden">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-3.5 sm:p-4 shadow-2xs space-y-3 print:hidden">
+        {/* Row 1: Search Bar & Global Actions */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-3">
           {/* Search Input */}
-          <div className="relative flex-1">
+          <div className="relative flex-1 min-w-0">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
             <Input
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Cari nomor, teks butir soal, atau materi stimulus..."
-              className="pl-10 h-10 rounded-xl bg-slate-50 dark:bg-slate-800/80 border-slate-200 dark:border-slate-700 text-xs font-medium"
+              placeholder="Cari nomor butir, teks stimulus, atau kata kunci pertanyaan..."
+              className="pl-10 pr-8 h-10 w-full rounded-xl bg-slate-50 dark:bg-slate-800/80 border-slate-200 dark:border-slate-700 text-xs font-medium placeholder:text-slate-400 focus-visible:ring-blue-500/30"
             />
             {searchQuery && (
               <button
+                type="button"
                 onClick={() => setSearchQuery("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs font-bold"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs font-bold p-1 rounded-md"
+                title="Hapus pencarian"
               >
                 ✕
               </button>
             )}
           </div>
 
-          {/* Filter Dropdowns */}
-          <div className="flex items-center gap-2 flex-wrap">
-            {/* Keputusan CTT */}
+          {/* Action Buttons: Reset & Expand/Collapse */}
+          <div className="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto shrink-0">
+            {activeFiltersCount > 0 && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={handleResetAllFilters}
+                className="h-9 px-2.5 sm:px-3 rounded-xl text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 hover:text-rose-700 border border-rose-200/60 dark:border-rose-900/40 gap-1.5 cursor-pointer"
+                title="Reset semua filter ke kondisi semula"
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+                <span>Reset ({activeFiltersCount})</span>
+              </Button>
+            )}
+
+            <div className="inline-flex items-center rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-800/80 p-0.5">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => toggleExpandAll(true)}
+                className="h-8 px-2 sm:px-2.5 rounded-lg text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 hover:text-blue-600 shadow-2xs gap-1 cursor-pointer"
+                title="Buka semua rincian butir soal"
+              >
+                <ChevronDown className="h-3.5 w-3.5" />
+                <span>Buka</span>
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => toggleExpandAll(false)}
+                className="h-8 px-2 sm:px-2.5 rounded-lg text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 hover:text-blue-600 shadow-2xs gap-1 cursor-pointer"
+                title="Tutup semua rincian butir soal"
+              >
+                <ChevronUp className="h-3.5 w-3.5" />
+                <span>Tutup</span>
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        {/* Row 2: 5 Structured Filter Dropdowns */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-2.5 pt-3 border-t border-slate-100 dark:border-slate-800">
+          {/* 1. Keputusan CTT */}
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block px-0.5">
+              Keputusan CTT
+            </label>
             <select
               value={verdictFilter}
               onChange={(e) => setVerdictFilter(e.target.value)}
-              className="h-10 px-3 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 focus:outline-none"
+              className={cn(
+                "h-9 w-full px-3 rounded-xl border text-xs font-bold transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/20 cursor-pointer",
+                verdictFilter !== "all"
+                  ? "bg-blue-50/70 border-blue-300 text-blue-700 dark:bg-blue-950/40 dark:border-blue-800 dark:text-blue-300"
+                  : "bg-slate-50 dark:bg-slate-800/80 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200"
+              )}
             >
-              <option value="all">Semua Keputusan CTT</option>
-              <option value="Diterima">🟢 Diterima ({stats.acceptedCount})</option>
-              <option value="Revisi Kecil">🟡 Revisi Kecil ({stats.minorRevisionCount})</option>
-              <option value="Revisi">🟠 Revisi ({stats.revisionCount})</option>
-              <option value="Revisi Total">🔴 Revisi Total ({stats.totalRevisionCount})</option>
-              <option value="Ditolak">⛔ Ditolak ({stats.rejectedCount})</option>
+              <option value="all">Semua Keputusan</option>
+              <option value="Diterima">Diterima ({stats.acceptedCount})</option>
+              <option value="Revisi Kecil">Revisi Kecil ({stats.minorRevisionCount})</option>
+              <option value="Revisi">Revisi ({stats.revisionCount})</option>
+              <option value="Revisi Total">Revisi Total ({stats.totalRevisionCount})</option>
+              <option value="Ditolak">Ditolak ({stats.rejectedCount})</option>
             </select>
+          </div>
 
-            {/* Tipe Soal */}
+          {/* 2. Tipe Soal */}
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block px-0.5">
+              Tipe Soal
+            </label>
             <select
               value={typeFilter}
               onChange={(e) => setTypeFilter(e.target.value)}
-              className="h-10 px-3 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 focus:outline-none"
+              className={cn(
+                "h-9 w-full px-3 rounded-xl border text-xs font-bold transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/20 cursor-pointer",
+                typeFilter !== "all"
+                  ? "bg-blue-50/70 border-blue-300 text-blue-700 dark:bg-blue-950/40 dark:border-blue-800 dark:text-blue-300"
+                  : "bg-slate-50 dark:bg-slate-800/80 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200"
+              )}
             >
               <option value="all">Semua Tipe Soal</option>
               <option value="pilihan_ganda">Pilihan Ganda</option>
@@ -2184,30 +2288,50 @@ export const ItemAnalysisPage: React.FC = () => {
               <option value="isian_singkat">Isian Singkat</option>
               <option value="uraian">Uraian</option>
               <option value="urutkan">Urutkan</option>
-              <option value="drag_drop">Drag & Drop</option>
+              <option value="drag_drop">Drag &amp; Drop</option>
               <option value="klasifikasi">Klasifikasi</option>
               <option value="matriks">Matriks</option>
               <option value="isian_rumpang">Isian Rumpang</option>
               <option value="hotspot">Hotspot</option>
             </select>
+          </div>
 
-            {/* Kesukaran */}
+          {/* 3. Tingkat Kesukaran (P) */}
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block px-0.5">
+              Kesukaran (P)
+            </label>
             <select
               value={difficultyFilter}
               onChange={(e) => setDifficultyFilter(e.target.value)}
-              className="h-10 px-3 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 focus:outline-none"
+              className={cn(
+                "h-9 w-full px-3 rounded-xl border text-xs font-bold transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/20 cursor-pointer",
+                difficultyFilter !== "all"
+                  ? "bg-blue-50/70 border-blue-300 text-blue-700 dark:bg-blue-950/40 dark:border-blue-800 dark:text-blue-300"
+                  : "bg-slate-50 dark:bg-slate-800/80 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200"
+              )}
             >
               <option value="all">Semua Kesukaran (P)</option>
               <option value="mudah">Mudah (P &gt; 0.70)</option>
-              <option value="sedang">Sedang (0.31 - 0.70)</option>
-              <option value="sukar">Sukar (P ≤ 0.30)</option>
+              <option value="sedang">Sedang (0.30 - 0.70)</option>
+              <option value="sukar">Sukar (P &lt; 0.30)</option>
             </select>
+          </div>
 
-            {/* Daya Pembeda */}
+          {/* 4. Daya Pembeda (D) */}
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block px-0.5">
+              Daya Pembeda (D)
+            </label>
             <select
               value={discriminationFilter}
               onChange={(e) => setDiscriminationFilter(e.target.value)}
-              className="h-10 px-3 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 focus:outline-none"
+              className={cn(
+                "h-9 w-full px-3 rounded-xl border text-xs font-bold transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/20 cursor-pointer",
+                discriminationFilter !== "all"
+                  ? "bg-blue-50/70 border-blue-300 text-blue-700 dark:bg-blue-950/40 dark:border-blue-800 dark:text-blue-300"
+                  : "bg-slate-50 dark:bg-slate-800/80 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200"
+              )}
             >
               <option value="all">Semua Daya Beda (D)</option>
               <option value="sangat_baik">Sangat Baik (D ≥ 0.40)</option>
@@ -2216,42 +2340,30 @@ export const ItemAnalysisPage: React.FC = () => {
               <option value="rendah">Rendah (0.00 ≤ D &lt; 0.20)</option>
               <option value="negatif">Negatif (D &lt; 0.00)</option>
             </select>
+          </div>
 
-            {/* Point-Biserial */}
+          {/* 5. Point-Biserial (r_pb) */}
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block px-0.5">
+              Point-Biserial (r_pb)
+            </label>
             <select
               value={rpbFilter}
               onChange={(e) => setRpbFilter(e.target.value)}
-              className="h-10 px-3 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 focus:outline-none"
+              className={cn(
+                "h-9 w-full px-3 rounded-xl border text-xs font-bold transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/20 cursor-pointer",
+                rpbFilter !== "all"
+                  ? "bg-blue-50/70 border-blue-300 text-blue-700 dark:bg-blue-950/40 dark:border-blue-800 dark:text-blue-300"
+                  : "bg-slate-50 dark:bg-slate-800/80 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200"
+              )}
             >
-              <option value="all">Semua Point-Biserial (r_pb)</option>
+              <option value="all">Semua Point-Biserial</option>
               <option value="sangat_baik">Sangat Baik (r_pb ≥ 0.40)</option>
               <option value="baik">Baik (0.30 ≤ r_pb &lt; 0.40)</option>
               <option value="cukup">Cukup (0.20 ≤ r_pb &lt; 0.30)</option>
               <option value="rendah">Rendah (0.00 ≤ r_pb &lt; 0.20)</option>
               <option value="negatif">Negatif (r_pb &lt; 0.00)</option>
             </select>
-
-            {/* Expand / Collapse All */}
-            <div className="flex items-center gap-1 border-l border-slate-200 dark:border-slate-700 pl-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => toggleExpandAll(true)}
-                className="h-10 px-2.5 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
-                title="Buka semua rincian butir soal"
-              >
-                Buka Semua
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => toggleExpandAll(false)}
-                className="h-10 px-2.5 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
-                title="Tutup semua rincian butir soal"
-              >
-                Tutup Semua
-              </Button>
-            </div>
           </div>
         </div>
       </div>
@@ -2302,524 +2414,573 @@ export const ItemAnalysisPage: React.FC = () => {
           </div>
         ) : (
           filteredQuestions.map((q) => {
-            const isExpanded = !!expandedQuestionIds[q.id];
-            const verdictInfo = q.verdictDetail;
+          const isExpanded = !!expandedQuestionIds[q.id];
+          const verdictInfo = q.verdictDetail;
 
-            // Warna kartu callout Layer 3 Keputusan (5 Discrete Tiers)
-            let alertBg = "bg-emerald-50/70 border-emerald-200 text-emerald-950 dark:bg-emerald-950/20 dark:border-emerald-800/60 dark:text-emerald-200";
-            let alertIcon = <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />;
-            let badgeBg = "bg-emerald-600 text-white";
-
-            if (verdictInfo.verdict === "Revisi Kecil") {
-              alertBg = "bg-yellow-50/80 border-yellow-200 text-yellow-950 dark:bg-yellow-950/20 dark:border-yellow-800/60 dark:text-yellow-200";
-              alertIcon = <AlertTriangle className="h-5 w-5 text-yellow-600 dark:text-yellow-400 shrink-0 mt-0.5" />;
-              badgeBg = "bg-yellow-500 text-slate-900 font-black";
-            } else if (verdictInfo.verdict === "Revisi") {
-              alertBg = "bg-amber-50/80 border-amber-200 text-amber-950 dark:bg-amber-950/20 dark:border-amber-800/60 dark:text-amber-200";
-              alertIcon = <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />;
-              badgeBg = "bg-amber-600 text-white font-black";
-            } else if (verdictInfo.verdict === "Revisi Total") {
-              alertBg = "bg-orange-50/80 border-orange-200 text-orange-950 dark:bg-orange-950/20 dark:border-orange-800/60 dark:text-orange-200";
-              alertIcon = <AlertTriangle className="h-5 w-5 text-orange-600 dark:text-orange-400 shrink-0 mt-0.5" />;
-              badgeBg = "bg-orange-600 text-white font-black";
-            } else if (verdictInfo.verdict === "Ditolak") {
-              alertBg = "bg-rose-50/80 border-rose-200 text-rose-950 dark:bg-rose-950/20 dark:border-rose-800/60 dark:text-rose-200";
-              alertIcon = <XCircle className="h-5 w-5 text-rose-600 dark:text-rose-400 shrink-0 mt-0.5" />;
-              badgeBg = "bg-rose-600 text-white font-black";
+          // Clean, purposeful verdict styling (no neon slop)
+          const getVerdictBadgeClass = (verdict: string) => {
+            switch (verdict) {
+              case "Diterima":
+                return "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/60";
+              case "Revisi Kecil":
+                return "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 border-amber-200 dark:border-amber-800/60";
+              case "Revisi":
+                return "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 border-amber-200 dark:border-amber-800/60";
+              case "Revisi Total":
+                return "bg-orange-50 text-orange-700 dark:bg-orange-950/40 dark:text-orange-300 border-orange-200 dark:border-orange-800/60";
+              case "Ditolak":
+                return "bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300 border-rose-200 dark:border-rose-800/60";
+              default:
+                return "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border-slate-200 dark:border-slate-700";
             }
+          };
 
-            return (
+          return (
+            <div
+              key={q.id}
+              className={cn(
+                "print-card bg-white dark:bg-slate-900 rounded-xl border transition-all duration-150 overflow-hidden shadow-2xs",
+                "print:border-slate-300 print:shadow-none print:mb-4 print:bg-white",
+                verdictInfo.keyAlert
+                  ? "border-rose-300/80 dark:border-rose-800/70"
+                  : "border-slate-200/80 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700"
+              )}
+            >
+              {/* Header Butir Soal */}
               <div
-                key={q.id}
-                className={cn(
-                  "print-card bg-white dark:bg-slate-900 rounded-2xl border transition-all duration-200 overflow-hidden shadow-xs",
-                  "print:border-slate-300 print:shadow-none print:mb-4 print:bg-white",
-                  verdictInfo.keyAlert
-                    ? "border-rose-300 dark:border-rose-800/70 ring-1 ring-rose-200 dark:ring-rose-900/40"
-                    : "border-slate-200/80 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700"
-                )}
+                onClick={() => toggleExpand(q.id)}
+                className="p-3.5 sm:p-4.5 flex flex-col md:flex-row md:items-center justify-between gap-3 cursor-pointer select-none bg-white dark:bg-slate-900 hover:bg-slate-50/70 dark:hover:bg-slate-800/30 transition-colors print:bg-white print:p-2"
               >
-                {/* Header Butir Soal */}
-                <div
-                  onClick={() => toggleExpand(q.id)}
-                  className="p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 cursor-pointer select-none bg-slate-50/50 dark:bg-slate-900/40 hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors print:bg-white print:p-2"
-                >
-                  <div className="flex items-start gap-3 min-w-0">
-                    <div className="w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center font-black text-sm text-slate-800 dark:text-slate-200 shrink-0 print:border-slate-400">
-                      {q.index}
-                    </div>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap mb-1">
-                        <Badge variant="outline" className="text-xs font-bold uppercase tracking-wider bg-white dark:bg-slate-800 print:border-slate-400">
-                          {q.type.replace(/_/g, " ")}
-                        </Badge>
-                        {q.groupId && (
-                          <Badge variant="secondary" className="text-xs font-bold bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300 print:hidden">
-                            Paket Literasi
-                          </Badge>
-                        )}
-                        {q.type === "benar_salah" && q.statements && q.statements.length > 0 ? (
-                          <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300 border-emerald-200 text-xs font-bold print:border-slate-400">
-                            Kunci: {q.statements.map((s, idx) => `${idx + 1}:${(s.answer || "benar").toUpperCase().charAt(0)}`).join(" ")}
-                          </Badge>
-                        ) : q.type === "pilihan_ganda_kompleks" && q.choices ? (
-                          <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300 border-emerald-200 text-xs font-bold print:border-slate-400">
-                            Kunci: {Object.keys(q.choices).filter(k => q.choices![k]?.isCorrect).map(k => k.toUpperCase()).sort().join(", ") || q.answerKey || "-"}
-                          </Badge>
-                        ) : q.answerKey ? (
-                          <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300 border-emerald-200 text-xs font-bold print:border-slate-400">
-                            Kunci: {q.answerKey}
-                          </Badge>
-                        ) : null}
-                      </div>
-                      {!isExpanded && (
-                        <div className="text-xs text-slate-600 dark:text-slate-400 line-clamp-1 max-w-3xl font-medium mt-0.5 print:hidden">
-                          <MathText content={q.text || "Tanpa teks pertanyaan"} />
-                        </div>
+                <div className="flex items-start sm:items-center gap-2.5 sm:gap-3 min-w-0">
+                  <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center font-bold text-xs text-slate-800 dark:text-slate-200 shrink-0">
+                    #{q.index}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                        {q.type.replace(/_/g, " ")}
+                      </span>
+                      {q.groupId && (
+                        <span className="text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/30 px-1.5 py-0.5 rounded border border-indigo-200/60 dark:border-indigo-900/40">
+                          Literasi
+                        </span>
+                      )}
+                      {q.type === "benar_salah" && q.statements && q.statements.length > 0 ? (
+                        <span className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                          Kunci: {q.statements.map((s, idx) => `${idx + 1}:${(s.answer || "benar").toUpperCase().charAt(0)}`).join(" ")}
+                        </span>
+                      ) : q.type === "pilihan_ganda_kompleks" && q.choices ? (
+                        <span className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                          Kunci: {Object.keys(q.choices).filter(k => q.choices![k]?.isCorrect).map(k => k.toUpperCase()).sort().join(", ") || q.answerKey || "-"}
+                        </span>
+                      ) : q.answerKey ? (
+                        <span className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                          Kunci: {q.answerKey}
+                        </span>
+                      ) : null}
+
+                      {verdictInfo.keyAlert && (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/40 px-2 py-0.5 rounded-md border border-rose-200 dark:border-rose-900/40">
+                          <AlertTriangle className="h-3 w-3" />
+                          Cek Kunci
+                        </span>
                       )}
                     </div>
-                  </div>
 
-                  {/* Metrik Mini di Header: Statistik Terpisah dari Keputusan */}
-                  <div className="flex items-center gap-3 shrink-0 self-end md:self-center flex-wrap">
-                    {/* Kesukaran */}
-                    <div className="text-right">
-                      <span className="text-xs text-slate-400 block font-bold uppercase">Kesukaran (P)</span>
-                      <span className="text-xs font-black text-slate-800 dark:text-slate-200">
+                    {!isExpanded && (
+                      <div className="text-xs text-slate-600 dark:text-slate-400 line-clamp-1 max-w-2xl font-normal mt-1 print:hidden">
+                        <MathText content={q.text || "Tanpa teks pertanyaan"} />
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Metrik Mini di Header (Reflow 2 Baris di Mobile, 1 Baris di Layar Lebar) */}
+                <div className="flex items-center justify-between md:justify-end gap-2 sm:gap-3 shrink-0 w-full md:w-auto pt-2 md:pt-0 border-t md:border-t-0 border-slate-100 dark:border-slate-800/80">
+                  <div className="flex items-center gap-2 sm:gap-3">
+                    <div className="text-left md:text-right text-xs">
+                      <span className="text-[10px] text-slate-400 font-semibold uppercase block">P (Sukar)</span>
+                      <span className="font-bold text-slate-800 dark:text-slate-200">
                         {q.difficultyIndex.toFixed(2)}{" "}
                         <span className={cn(
-                          "text-xs font-bold",
+                          "text-[10px] font-semibold",
                           q.difficultyCategory === "Sedang" ? "text-emerald-600" : (q.difficultyCategory === "Mudah" ? "text-blue-600" : "text-amber-600")
                         )}>
-                          ({q.difficultyCategory})
+                          {q.difficultyCategory}
                         </span>
                       </span>
                     </div>
 
-                    {/* Daya Pembeda */}
-                    <div className="text-right">
-                      <span className="text-xs text-slate-400 block font-bold uppercase">Daya Beda (D)</span>
+                    <div className="h-6 w-px bg-slate-200 dark:bg-slate-800" />
+
+                    <div className="text-left md:text-right text-xs">
+                      <span className="text-[10px] text-slate-400 font-semibold uppercase block">D (Beda)</span>
                       <span className={cn(
-                        "text-xs font-black",
-                        q.discriminationIndex >= 0.40
-                          ? "text-emerald-600 dark:text-emerald-400"
-                          : q.discriminationIndex >= 0.30
-                          ? "text-blue-600 dark:text-blue-400"
-                          : q.discriminationIndex >= 0.20
-                          ? "text-amber-600 dark:text-amber-400"
-                          : "text-rose-600 dark:text-rose-400"
+                        "font-bold",
+                        q.discriminationIndex >= 0.40 ? "text-emerald-600 dark:text-emerald-400" : (q.discriminationIndex >= 0.30 ? "text-blue-600 dark:text-blue-400" : (q.discriminationIndex >= 0.20 ? "text-amber-600 dark:text-amber-400" : "text-rose-600 dark:text-rose-400"))
                       )}>
-                        {q.discriminationIndex >= 0 ? `+${q.discriminationIndex.toFixed(2)}` : q.discriminationIndex.toFixed(2)}{" "}
-                        <span className="text-xs font-bold">({q.discriminationCategory})</span>
+                        {q.discriminationIndex >= 0 ? `+${q.discriminationIndex.toFixed(2)}` : q.discriminationIndex.toFixed(2)}
                       </span>
                     </div>
 
-                    {/* Point-Biserial */}
-                    <div className="text-right hidden sm:block">
-                      <span className="text-xs text-slate-400 block font-bold uppercase">Point-Biserial</span>
-                      <span className="text-xs font-black text-slate-800 dark:text-slate-200">
-                        {q.pointBiserial >= 0 ? `+${q.pointBiserial.toFixed(2)}` : q.pointBiserial.toFixed(2)}{" "}
-                        <span className="text-xs font-bold text-slate-500">({q.pointBiserialCategory})</span>
+                    <div className="h-6 w-px bg-slate-200 dark:bg-slate-800 hidden sm:block" />
+
+                    <div className="text-left md:text-right text-xs hidden sm:block">
+                      <span className="text-[10px] text-slate-400 font-semibold uppercase block">r_pb</span>
+                      <span className="font-bold text-slate-700 dark:text-slate-300">
+                        {q.pointBiserial >= 0 ? `+${q.pointBiserial.toFixed(2)}` : q.pointBiserial.toFixed(2)}
                       </span>
                     </div>
+                  </div>
 
-                    {/* Keputusan Badge (Decision Engine Verdict) */}
-                    <Badge className={cn("font-black text-[11px] px-2.5 py-1 rounded-xl shadow-xs print:border print:border-slate-400", badgeBg)}>
+                  <div className="flex items-center gap-2">
+                    {/* Verdict badge */}
+                    <span className={cn("text-[11px] sm:text-xs font-semibold px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-lg border whitespace-nowrap", getVerdictBadgeClass(verdictInfo.verdict))}>
                       {verdictInfo.badgeLabel}
-                    </Badge>
+                    </span>
 
-                    <div className="text-slate-400 hover:text-slate-600 p-1 print:hidden">
+                    <div className="text-slate-400 hover:text-slate-600 p-1 print:hidden shrink-0">
                       {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                     </div>
                   </div>
                 </div>
+              </div>
 
-                {/* Konten Rinci Butir Soal (Expanded pada layar, selalu tampil penuh saat dicetak) */}
-                <div className={cn("p-5 border-t border-slate-200/80 dark:border-slate-800 space-y-5 print:p-3 print:space-y-3", !isExpanded && "hidden print:block")}>
-                  {/* 1. Teks Soal & Stimulus Lengkap */}
-                  <div className="space-y-3">
-                    {q.groupText && (
-                      <div className="p-3.5 bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-900/40 rounded-xl text-xs text-indigo-950 dark:text-indigo-200 leading-relaxed print:bg-slate-50 print:border-slate-300">
-                        <span className="font-bold block text-xs text-indigo-600 uppercase tracking-widest mb-1 print:text-black">
-                          Materi Stimulus / Teks Wacana
-                        </span>
-                        <MathText content={q.groupText} />
-                      </div>
-                    )}
-
-                    <div className="text-sm text-slate-800 dark:text-slate-200 font-medium leading-relaxed">
-                      <MathText content={q.text} />
+              {/* Konten Rinci Butir Soal */}
+              <div className={cn("p-3.5 sm:p-5 border-t border-slate-100 dark:border-slate-800 space-y-3.5 sm:space-y-4 print:p-3 print:space-y-3", !isExpanded && "hidden print:block")}>
+                {/* 1. Teks Stimulus & Soal */}
+                <div className="space-y-3">
+                  {q.groupText && (
+                    <div className="p-3.5 bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs text-slate-800 dark:text-slate-200 leading-relaxed print:bg-slate-50 print:border-slate-300">
+                      <span className="font-bold block text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
+                        Materi Stimulus / Teks Wacana
+                      </span>
+                      <MathText content={q.groupText} />
                     </div>
+                  )}
 
-                    {/* Teks Opsi Jawaban (Print Only View) */}
-                    {q.choices && (
-                      <div className="hidden print:grid grid-cols-2 gap-1.5 text-[11px] pt-2">
-                        {Object.entries(q.choices).map(([key, ch]) => {
-                          const isCorr = ch.isCorrect || (q.answerKey && q.answerKey.toUpperCase().includes(key.toUpperCase()));
+                  <div className="text-sm text-slate-800 dark:text-slate-200 font-medium leading-relaxed">
+                    <MathText content={q.text} />
+                  </div>
+
+                  {/* Teks Opsi Jawaban (Print Only View) */}
+                  {q.choices && (
+                    <div className="hidden print:grid grid-cols-2 gap-1.5 text-[11px] pt-2">
+                      {Object.entries(q.choices).map(([key, ch]) => {
+                        const isCorr = ch.isCorrect || (q.answerKey && q.answerKey.toUpperCase().includes(key.toUpperCase()));
+                        return (
+                          <div key={key} className={cn("p-2 rounded border text-left flex items-start gap-1.5", isCorr ? "border-slate-900 font-bold bg-slate-100" : "border-slate-200")}>
+                            <span className="font-bold shrink-0">{key.toUpperCase()}.</span>
+                            <div className="flex-1">
+                              <MathText content={ch.text} />
+                            </div>
+                            {isCorr && <span className="ml-1 text-xs uppercase font-bold text-emerald-700 shrink-0">[Kunci]</span>}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Teks Pernyataan Benar/Salah (Tampil Penuh di Layar & Cetak) */}
+                  {q.type === "benar_salah" && q.statements && q.statements.length > 0 && (
+                    <div className="mt-3 p-3.5 sm:p-4 bg-slate-50/80 dark:bg-slate-800/40 rounded-xl border border-slate-200/80 dark:border-slate-700/80 space-y-2.5 print:bg-white print:border-slate-300 print:p-2.5">
+                      <div className="flex items-center justify-between pb-2 border-b border-slate-200/80 dark:border-slate-700/80">
+                        <span className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                          <CheckSquare className="h-3.5 w-3.5 text-emerald-600" />
+                          Daftar Pernyataan &amp; Kunci Jawaban
+                        </span>
+                        <span className="text-[11px] text-slate-400 font-medium">
+                          {q.statements.length} Pernyataan
+                        </span>
+                      </div>
+                      <div className="space-y-2 pt-0.5">
+                        {q.statements.map((st, sIdx) => {
+                          const isBenar = (st.answer || "benar").toLowerCase() === "benar";
                           return (
-                            <div key={key} className={cn("p-2 rounded border text-left flex items-start gap-1.5", isCorr ? "border-slate-900 font-bold bg-slate-100" : "border-slate-200")}>
-                              <span className="font-black shrink-0">{key.toUpperCase()}.</span>
-                              <div className="flex-1">
-                                <MathText content={ch.text} />
+                            <div
+                              key={st.id || sIdx}
+                              className="p-2.5 sm:p-3 rounded-lg border border-slate-200/80 dark:border-slate-700/80 bg-white dark:bg-slate-900 flex items-start gap-2.5 sm:gap-3 shadow-2xs print:border-slate-300 print:p-2"
+                            >
+                              <span className="font-bold text-xs px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 shrink-0">
+                                #{sIdx + 1}
+                              </span>
+                              <div className="flex-1 text-xs text-slate-800 dark:text-slate-200 font-medium leading-relaxed">
+                                <MathText content={st.text} />
                               </div>
-                              {isCorr && <span className="ml-1 text-xs uppercase font-black text-emerald-700 shrink-0">[Kunci]</span>}
+                              <span
+                                className={cn(
+                                  "font-bold text-xs uppercase tracking-wider px-2.5 py-0.5 rounded-md shrink-0 border",
+                                  isBenar
+                                    ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/60"
+                                    : "bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300 border-rose-200 dark:border-rose-800/60"
+                                )}
+                              >
+                                {isBenar ? "BENAR" : "SALAH"}
+                              </span>
                             </div>
                           );
                         })}
                       </div>
-                    )}
+                    </div>
+                  )}
 
-                    {/* Teks Pernyataan Benar/Salah (Tampil Penuh di Layar & Cetak) */}
-                    {q.type === "benar_salah" && q.statements && q.statements.length > 0 && (
-                      <div className="mt-3 p-4 bg-slate-50/90 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700/80 space-y-2.5 print:bg-white print:border-slate-300 print:p-2.5">
-                        <div className="flex items-center justify-between pb-2 border-b border-slate-200/80 dark:border-slate-700/80">
-                          <span className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
-                            <CheckSquare className="h-3.5 w-3.5 text-emerald-600" />
-                            Daftar Pernyataan &amp; Kunci Jawaban
-                          </span>
-                          <span className="text-[11px] text-slate-500 font-medium">
-                            {q.statements.length} Pernyataan
-                          </span>
-                        </div>
-                        <div className="space-y-2 pt-0.5">
-                          {q.statements.map((st, sIdx) => {
-                            const isBenar = (st.answer || "benar").toLowerCase() === "benar";
-                            return (
-                              <div
-                                key={st.id || sIdx}
-                                className="p-3 rounded-lg border border-slate-200/80 dark:border-slate-700 bg-white dark:bg-slate-900 flex items-start gap-3 shadow-2xs print:border-slate-300 print:p-2"
-                              >
-                                <span className="font-black text-xs px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 shrink-0">
-                                  #{sIdx + 1}
-                                </span>
-                                <div className="flex-1 text-xs text-slate-800 dark:text-slate-200 font-medium leading-relaxed">
-                                  <MathText content={st.text} />
-                                </div>
-                                <Badge
-                                  className={cn(
-                                    "font-black text-xs uppercase tracking-wider px-2.5 py-0.5 rounded-md shrink-0 shadow-2xs",
-                                    isBenar
-                                      ? "bg-emerald-600 text-white hover:bg-emerald-600"
-                                      : "bg-rose-600 text-white hover:bg-rose-600"
-                                  )}
-                                >
-                                  Kunci: {isBenar ? "BENAR" : "SALAH"}
-                                </Badge>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
+                  {q.imageUrl && (
+                    <div className="max-w-md pt-2">
+                      <SmartImage src={q.imageUrl} alt={`Gambar Soal ${q.index}`} className="rounded-xl border border-slate-200 dark:border-slate-700 max-h-64 object-contain" />
+                    </div>
+                  )}
+                </div>
 
-                    {q.imageUrl && (
-                      <div className="max-w-md pt-2">
-                        <SmartImage src={q.imageUrl} alt={`Gambar Soal ${q.index}`} className="rounded-xl border border-slate-200 dark:border-slate-700 max-h-64 object-contain" />
-                      </div>
-                    )}
-                  </div>
-
-                  {/* 2. LAPISAN 1: STATISTIK ITEM CTT (Item Statistics) */}
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block">
-                        Lapisan 1: Statistik Psikometri Butir Soal (CTT)
+                {/* 2. RINGKASAN METRIK PSIKOMETRI BUTIR (CTT) */}
+                <div className="bg-slate-50/80 dark:bg-slate-800/40 rounded-xl p-3 sm:p-3.5 border border-slate-200/60 dark:border-slate-800 grid grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-3 text-xs">
+                  {/* P */}
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-1 text-slate-500 dark:text-slate-400">
+                      <span className="text-[11px] font-bold uppercase tracking-wider">Kesukaran (P)</span>
+                      <MetricInfoTooltip type="difficulty" side="bottom" />
+                    </div>
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-sm font-bold text-slate-900 dark:text-white">
+                        {q.difficultyIndex.toFixed(2)}
                       </span>
-                      <button
-                        type="button"
-                        onClick={() => setShowGuideModal(true)}
-                        className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:underline cursor-pointer"
-                      >
-                        <BookOpen className="h-3 w-3" />
-                        Panduan Parameter
-                      </button>
+                      <span className={cn(
+                        "text-[11px] font-bold",
+                        q.difficultyCategory === "Sedang" ? "text-emerald-600 dark:text-emerald-400" : (q.difficultyCategory === "Mudah" ? "text-blue-600 dark:text-blue-400" : "text-amber-600 dark:text-amber-400")
+                      )}>
+                        {q.difficultyCategory}
+                      </span>
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 bg-slate-50 dark:bg-slate-800/40 p-3 rounded-2xl border border-slate-200/60 dark:border-slate-700/60 print:bg-white print:border-slate-300">
-                      {/* P */}
-                      <div className="bg-white dark:bg-slate-900/80 p-3 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-2xs hover:border-blue-200 dark:hover:border-blue-900/50 transition-all flex flex-col justify-between">
-                        <div>
-                          <div className="flex items-center justify-between gap-1.5">
-                            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Tingkat Kesukaran (P)</span>
-                            <MetricInfoTooltip type="difficulty" side="bottom" />
-                          </div>
-                          <div className="flex items-baseline gap-1.5 mt-1">
-                            <span className="text-base font-black text-slate-900 dark:text-white">
-                              P = {q.difficultyIndex.toFixed(2)}
-                            </span>
-                            <span className={cn(
-                              "text-xs font-bold px-1.5 py-0.5 rounded",
-                              q.difficultyCategory === "Sedang" ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300" : (q.difficultyCategory === "Mudah" ? "bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300" : "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300")
-                            )}>
-                              {q.difficultyCategory}
-                            </span>
-                          </div>
-                        </div>
-                        <span className="text-[11px] text-slate-500 dark:text-slate-400 block mt-2 pt-2 border-t border-slate-100 dark:border-slate-800/60">
-                          B / N = {q.totalCorrect} / {q.totalAnswered} Siswa ({Math.round(q.difficultyIndex * 100)}%)
-                        </span>
-                      </div>
-
-                      {/* D */}
-                      <div className="bg-white dark:bg-slate-900/80 p-3 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-2xs hover:border-blue-200 dark:hover:border-blue-900/50 transition-all flex flex-col justify-between">
-                        <div>
-                          <div className="flex items-center justify-between gap-1.5">
-                            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Daya Pembeda (D)</span>
-                            <MetricInfoTooltip type="discrimination" side="bottom" />
-                          </div>
-                          <div className="flex items-baseline gap-1.5 mt-1">
-                            <span className={cn(
-                              "text-base font-black",
-                              q.discriminationIndex >= 0.40 ? "text-emerald-600" : (q.discriminationIndex >= 0.30 ? "text-blue-600" : (q.discriminationIndex >= 0.20 ? "text-amber-600" : "text-rose-600"))
-                            )}>
-                              D = {q.discriminationIndex >= 0 ? `+${q.discriminationIndex.toFixed(2)}` : q.discriminationIndex.toFixed(2)}
-                            </span>
-                            <span className={cn(
-                              "text-xs font-bold px-1.5 py-0.5 rounded",
-                              q.discriminationIndex >= 0.40 ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300" : (q.discriminationIndex >= 0.30 ? "bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300" : (q.discriminationIndex >= 0.20 ? "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300" : "bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300"))
-                            )}>
-                              {q.discriminationCategory}
-                            </span>
-                          </div>
-                        </div>
-                        <span className="text-[11px] text-slate-500 dark:text-slate-400 block mt-2 pt-2 border-t border-slate-100 dark:border-slate-800/60 truncate" title={`Ba: ${q.upperGroupCorrect}/${examMeta.upperCount} vs Bb: ${q.lowerGroupCorrect}/${examMeta.lowerCount}`}>
-                          Ba: {q.upperGroupCorrect}/{examMeta.upperCount} vs Bb: {q.lowerGroupCorrect}/{examMeta.lowerCount} (Δ {q.upperGroupCorrect - q.lowerGroupCorrect})
-                        </span>
-                      </div>
-
-                      {/* r_pb */}
-                      <div className="bg-white dark:bg-slate-900/80 p-3 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-2xs hover:border-blue-200 dark:hover:border-blue-900/50 transition-all flex flex-col justify-between">
-                        <div>
-                          <div className="flex items-center justify-between gap-1.5">
-                            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Point-Biserial (r_pb)</span>
-                            <MetricInfoTooltip type="point_biserial" side="bottom" />
-                          </div>
-                          <div className="flex items-baseline gap-1.5 mt-1">
-                            <span className="text-base font-black text-slate-900 dark:text-white">
-                              r_pb = {q.pointBiserial >= 0 ? `+${q.pointBiserial.toFixed(2)}` : q.pointBiserial.toFixed(2)}
-                            </span>
-                            <span className={cn(
-                              "text-xs font-bold px-1.5 py-0.5 rounded",
-                              q.pointBiserial >= 0.30 ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300" : (q.pointBiserial >= 0.20 ? "bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300" : (q.pointBiserial >= 0 ? "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300" : "bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300"))
-                            )}>
-                              {q.pointBiserialCategory}
-                            </span>
-                          </div>
-                        </div>
-                        <span className="text-[11px] text-slate-500 dark:text-slate-400 block mt-2 pt-2 border-t border-slate-100 dark:border-slate-800/60 truncate" title="Corrected Item-Total Pearson (Yi vs X - Yi)">
-                          Corrected Item-Total Pearson
-                        </span>
-                      </div>
-
-                      {/* Distractor Efficiency */}
-                      <div className="bg-white dark:bg-slate-900/80 p-3 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-2xs hover:border-blue-200 dark:hover:border-blue-900/50 transition-all flex flex-col justify-between">
-                        <div>
-                          <div className="flex items-center justify-between gap-1.5">
-                            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Efektivitas Pengecoh</span>
-                            <MetricInfoTooltip type="distractor" side="bottom" />
-                          </div>
-                          <div className="flex items-baseline gap-1.5 mt-1">
-                            <span className="text-base font-black text-slate-900 dark:text-white">
-                              DE = {q.distractorEfficiency}%
-                            </span>
-                            <span className={cn(
-                              "text-xs font-bold px-1.5 py-0.5 rounded",
-                              q.distractorEfficiency >= 66 ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300" : (q.distractorEfficiency >= 33 ? "bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300" : "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300")
-                            )}>
-                              {q.effectiveDistractorCount}/{q.totalDistractorCount} Efektif
-                            </span>
-                          </div>
-                        </div>
-                        <span className="text-[11px] text-slate-500 dark:text-slate-400 block mt-2 pt-2 border-t border-slate-100 dark:border-slate-800/60 truncate" title="Syarat: Fo ≥ 5% & nBB > nBA">
-                          Syarat: Fo ≥ 5% &amp; nBB &gt; nBA
-                        </span>
-                      </div>
-                    </div>
+                    <p className="text-[11px] text-slate-400">
+                      B/N: {q.totalCorrect}/{q.totalAnswered} Siswa ({Math.round(q.difficultyIndex * 100)}%)
+                    </p>
                   </div>
 
-                  {/* 3. LAPISAN 2: DIAGNOSIS MASALAH PSIKOMETRI (Diagnostic Engine) */}
-                  <div className="space-y-2">
-                    <span className="text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block">
-                      Lapisan 2: Diagnosis Masalah &amp; Anomali Butir Soal
-                    </span>
-                    <div className="bg-slate-50 dark:bg-slate-800/40 rounded-xl p-3.5 border border-slate-200/80 dark:border-slate-800 space-y-2.5">
-                      {/* Diagnostic Flags Tag Bar */}
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        {q.flags && q.flags.length > 0 ? (
-                          q.flags.map((flag, flIdx) => (
-                            <Badge
-                              key={flIdx}
-                              className={cn(
-                                "text-xs font-bold uppercase tracking-wider px-2 py-0.5",
-                                flag.includes("NEGATIF") || flag.includes("KUNCI")
-                                  ? "bg-rose-100 text-rose-800 dark:bg-rose-900/50 dark:text-rose-200 border-rose-300"
-                                  : flag.includes("RENDAH") || flag.includes("MENYESATKAN")
-                                  ? "bg-orange-100 text-orange-800 dark:bg-orange-900/50 dark:text-orange-200 border-orange-300"
-                                  : "bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-200 border-amber-300"
-                              )}
-                            >
-                              ⚠️ {flag}
-                            </Badge>
-                          ))
-                        ) : (
-                          <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200 font-bold text-xs">
-                            ✓ TIDAK ADA ANOMALI PSIKOMETRI
-                          </Badge>
-                        )}
-                      </div>
+                  {/* D */}
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-1 text-slate-500 dark:text-slate-400">
+                      <span className="text-[11px] font-bold uppercase tracking-wider">Daya Beda (D)</span>
+                      <MetricInfoTooltip type="discrimination" side="bottom" />
+                    </div>
+                    <div className="flex items-baseline gap-1.5">
+                      <span className={cn(
+                        "text-sm font-bold",
+                        q.discriminationIndex >= 0.40 ? "text-emerald-600 dark:text-emerald-400" : (q.discriminationIndex >= 0.30 ? "text-blue-600 dark:text-blue-400" : (q.discriminationIndex >= 0.20 ? "text-amber-600 dark:text-amber-400" : "text-rose-600 dark:text-rose-400"))
+                      )}>
+                        {q.discriminationIndex >= 0 ? `+${q.discriminationIndex.toFixed(2)}` : q.discriminationIndex.toFixed(2)}
+                      </span>
+                      <span className="text-[11px] font-semibold text-slate-500">
+                        {q.discriminationCategory}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-400 truncate" title={`Ba: ${q.upperGroupCorrect}/${examMeta.upperCount} vs Bb: ${q.lowerGroupCorrect}/${examMeta.lowerCount}`}>
+                      Ba: {q.upperGroupCorrect} vs Bb: {q.lowerGroupCorrect} (Δ {q.upperGroupCorrect - q.lowerGroupCorrect})
+                    </p>
+                  </div>
 
-                      {/* Temuan Rinci */}
-                      <ul className="space-y-1.5 text-xs text-slate-700 dark:text-slate-300">
+                  {/* r_pb */}
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-1 text-slate-500 dark:text-slate-400">
+                      <span className="text-[11px] font-bold uppercase tracking-wider">Point-Biserial</span>
+                      <MetricInfoTooltip type="point_biserial" side="bottom" />
+                    </div>
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-sm font-bold text-slate-900 dark:text-white">
+                        {q.pointBiserial >= 0 ? `+${q.pointBiserial.toFixed(2)}` : q.pointBiserial.toFixed(2)}
+                      </span>
+                      <span className="text-[11px] font-semibold text-slate-500">
+                        {q.pointBiserialCategory}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-400 truncate">
+                      Item-Total Pearson
+                    </p>
+                  </div>
+
+                  {/* DE */}
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-1 text-slate-500 dark:text-slate-400">
+                      <span className="text-[11px] font-bold uppercase tracking-wider">Efektivitas Pengecoh</span>
+                      <MetricInfoTooltip type="distractor" side="bottom" />
+                    </div>
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-sm font-bold text-slate-900 dark:text-white">
+                        {q.distractorEfficiency}%
+                      </span>
+                      <span className="text-[11px] font-semibold text-slate-500">
+                        {q.effectiveDistractorCount}/{q.totalDistractorCount} Efektif
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-400 truncate">
+                      Fo ≥ 5% &amp; nBB &gt; nBA
+                    </p>
+                  </div>
+                </div>
+
+                {/* 3. EVALUASI PSIKOMETRI & TINDAK LANJUT GURU (Consolidated) */}
+                <div className="rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900/60 p-3.5 sm:p-4 space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-2.5 border-b border-slate-100 dark:border-slate-800">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {verdictInfo.verdict === "Diterima" ? (
+                        <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                      ) : verdictInfo.verdict === "Ditolak" ? (
+                        <XCircle className="h-4 w-4 text-rose-600 dark:text-rose-400 shrink-0" />
+                      ) : (
+                        <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0" />
+                      )}
+
+                      <h4 className="text-xs font-bold text-slate-900 dark:text-white">
+                        {verdictInfo.summaryTitle}
+                      </h4>
+
+                      {/* Anomaly flags tags (clean, no emojis) */}
+                      {q.flags && q.flags.length > 0 ? (
+                        q.flags.map((flag, flIdx) => (
+                          <span
+                            key={flIdx}
+                            className={cn(
+                              "text-[10px] font-semibold px-2 py-0.5 rounded-md",
+                              flag.includes("NEGATIF") || flag.includes("KUNCI")
+                                ? "bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300 border border-rose-200 dark:border-rose-900/40"
+                                : "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 border border-amber-200 dark:border-amber-900/40"
+                            )}
+                          >
+                            {flag}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-900/40">
+                          Parameter Normal
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Primary Action Button: Revisi Pilihan AI */}
+                    {q.type !== "benar_salah" && q.choices && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={() => handleOpenAIRevision(q)}
+                        className="w-full sm:w-auto h-8 sm:h-7 px-3 sm:px-2.5 rounded-lg text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-white dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200 flex items-center justify-center gap-1.5 cursor-pointer shrink-0 shadow-2xs"
+                      >
+                        <Sparkles className="h-3.5 w-3.5 text-amber-400 dark:text-amber-600" />
+                        <span>Revisi Pilihan AI</span>
+                      </Button>
+                    )}
+                  </div>
+
+                  {/* Body: Temuan & Tindak Lanjut */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                    {/* Temuan Analisis */}
+                    <div className="space-y-1.5 bg-slate-50/60 dark:bg-slate-800/30 p-3 rounded-lg border border-slate-100 dark:border-slate-800/60">
+                      <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 block">
+                        Temuan Analisis Psikometri:
+                      </span>
+                      <ul className="space-y-1 text-slate-600 dark:text-slate-300">
                         {verdictInfo.findings.map((f, fIdx) => (
-                          <li key={fIdx} className="flex items-start gap-2 leading-relaxed">
-                            <span className="w-1.5 h-1.5 rounded-full bg-blue-500 mt-1.5 shrink-0" />
+                          <li key={fIdx} className="flex items-start gap-1.5 leading-relaxed text-[11px]">
+                            <span className="w-1.5 h-1.5 rounded-full bg-slate-400 mt-1.5 shrink-0" />
                             <span>{f}</span>
                           </li>
                         ))}
                       </ul>
                     </div>
-                  </div>
 
-                  {/* 4. LAPISAN 3: KEPUTUSAN KELAYAKAN & REKOMENDASI GURU (Decision Engine) */}
-                  <div className="space-y-2">
-                    <span className="text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block">
-                      Lapisan 3: Keputusan CTT &amp; Tindak Lanjut Guru
-                    </span>
-                    <div className={cn("rounded-2xl border p-5 space-y-4 transition-all shadow-xs print:border-slate-300 print:p-3 print:bg-slate-50", alertBg)}>
-                      {/* Top Bar: Title, Badge, and Subtitle */}
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-3.5 border-b border-black/10 dark:border-white/10 print:pb-2">
-                        <div className="flex items-center gap-2.5">
-                          {alertIcon}
-                          <div>
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <h4 className="text-sm sm:text-base font-black tracking-tight text-slate-900 dark:text-white">
-                                {verdictInfo.summaryTitle}
-                              </h4>
-                              {verdictInfo.keyAlert && (
-                                <Badge className="bg-rose-600 text-white font-bold text-xs uppercase tracking-wider animate-bounce">
-                                  Kritis: Cek Kunci Jawaban
-                                </Badge>
-                              )}
-                            </div>
-                            <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-0.5">
-                              Keputusan Psikometri: <strong className="underline decoration-current underline-offset-2 text-slate-800 dark:text-slate-200">{verdictInfo.badgeLabel}</strong> (Classical Test Theory)
-                            </p>
-                          </div>
-                        </div>
-                        <Badge className={cn("font-black text-[11px] px-3 py-1 rounded-xl shadow-xs shrink-0 self-start sm:self-center print:border print:border-slate-400", badgeBg)}>
-                          {verdictInfo.badgeLabel}
-                        </Badge>
-                      </div>
-
-                      {/* Content: Alasan Keputusan & Tindak Lanjut Konkret */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-3.5 print:grid-cols-12">
-                        <div className="lg:col-span-6 bg-white dark:bg-slate-900 rounded-xl p-4 border border-slate-200/80 dark:border-slate-800 shadow-2xs space-y-2 print:border-slate-300 print:bg-white print:p-2.5">
-                          <div className="flex items-center gap-2 font-bold text-xs uppercase tracking-wider text-slate-700 dark:text-slate-300">
-                            <Search className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
-                            <span>Dasar Pertimbangan Keputusan</span>
-                          </div>
-                          <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed font-medium bg-slate-50 dark:bg-slate-800/60 p-3 rounded-lg border border-slate-200/60 dark:border-slate-700/60">
-                            {verdictInfo.verdict === "Diterima"
-                              ? "Item berfungsi memuaskan (D ≥ 0.40), kunci jawaban terverifikasi valid, dan memiliki konsistensi internal yang baik. Tidak ditemukan masalah substansi kritis."
-                              : verdictInfo.verdict === "Revisi Kecil"
-                              ? "Secara empiris butir soal memiliki daya pisah baik (0.30 ≤ D < 0.40), namun terdapat opsi pengecoh yang pasif/mati. Cukup perbaiki pilihan jawaban yang tidak bekerja tanpa merombak soal."
-                              : verdictInfo.verdict === "Revisi"
-                              ? "Butir soal memiliki daya pisah cukup (0.20 ≤ D < 0.30) atau tingkat kesukaran ekstrem (sangat mudah/sulit). Butir soal masih dapat diselamatkan melalui kalibrasi redaksi."
-                              : verdictInfo.verdict === "Revisi Total"
-                              ? "Daya pembeda rendah (0.00 ≤ D < 0.20) atau terdapat ambiguitas konstruksi soal yang signifikan. Disarankan merombak stimulus dan pilihan jawaban secara menyeluruh."
-                              : "Daya pembeda negatif (D < 0) mengindikasikan siswa kelompok bawah lebih banyak menjawab benar daripada kelompok atas. Sangat mungkin kunci jawaban salah atau butir soal sangat menyesatkan."}
-                          </p>
-                        </div>
-
-                        <div className="lg:col-span-6 bg-white dark:bg-slate-900 rounded-xl p-4 border border-slate-200/80 dark:border-slate-800 shadow-2xs space-y-2 print:border-slate-300 print:bg-white print:p-2.5">
-                          <div className="flex items-center gap-2 font-bold text-xs uppercase tracking-wider text-slate-700 dark:text-slate-300">
-                            <FileText className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-                            <span>Tindak Lanjut &amp; Rekomendasi Guru</span>
-                          </div>
-                          <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed font-medium bg-slate-50 dark:bg-slate-800/60 p-3 rounded-lg border border-slate-200/60 dark:border-slate-700/60">
-                            {verdictInfo.actionPlan}
-                          </p>
-                        </div>
-                      </div>
+                    {/* Rekomendasi Guru */}
+                    <div className="space-y-1.5 bg-slate-50/60 dark:bg-slate-800/30 p-3 rounded-lg border border-slate-100 dark:border-slate-800/60">
+                      <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 block">
+                        Rekomendasi Tindak Lanjut:
+                      </span>
+                      <p className="text-[11px] text-slate-700 dark:text-slate-200 leading-relaxed font-medium">
+                        {verdictInfo.actionPlan}
+                      </p>
                     </div>
                   </div>
+                </div>
 
-                  {/* 5A. TABEL DISTRIBUSI PENGECOH (PILIHAN GANDA & KOMPLEKS) (Screen Only) */}
-                  {q.type !== "benar_salah" && q.distractors && q.distractors.length > 0 && (
-                    <div className="space-y-2.5 pt-2 print:hidden">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-black text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
-                          <Layers className="h-4 w-4 text-blue-600" />
+                {/* 4. TABEL DISTRIBUSI PENGECOH (PILIHAN GANDA & KOMPLEKS) (Screen Only) */}
+                {q.type !== "benar_salah" && q.distractors && q.distractors.length > 0 && (
+                  <div className="space-y-2 pt-1 print:hidden">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-2">
+                      <span className="text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                        <Layers className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                        <span>
                           {q.type === "pilihan_ganda_kompleks"
-                            ? "Distribusi Opsi & Analisis Pengecoh (Pilihan Ganda Kompleks)"
-                            : "Distribusi Pemilih & Analisis Pengecoh"}
+                            ? "Distribusi Pilihan & Evaluasi Pengecoh (Kompleks)"
+                            : "Distribusi Pemilih & Evaluasi Pengecoh"}
                         </span>
-                        <span className="text-[11px] text-slate-400 font-medium">
-                          {q.type === "pilihan_ganda_kompleks"
-                            ? "Multi-Pilihan • Pengecoh Efektif: Fo ≥ 5% & Kelompok Bawah > Kelompok Atas"
-                            : "Pengecoh Efektif: Fo ≥ 5% & Kelompok Bawah > Kelompok Atas"}
-                        </span>
-                      </div>
+                      </span>
+                      <span className="text-[11px] text-slate-400 font-normal">
+                        Kriteria Efektif: Pemilih ≥ 5% &amp; Kelompok Bawah &gt; Kelompok Atas
+                      </span>
+                    </div>
 
-                      <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
-                        <table className="w-full text-xs text-left">
-                          <thead className="bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 font-bold uppercase text-xs border-b border-slate-200 dark:border-slate-700">
+                    <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800 -mx-1 sm:mx-0">
+                      <table className="w-full text-xs text-left min-w-[620px]">
+                        <thead className="bg-slate-50 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 font-bold uppercase text-[11px] border-b border-slate-200 dark:border-slate-700">
+                          <tr>
+                            <th className="py-2.5 px-3 w-12 text-center whitespace-nowrap">Opsi</th>
+                            <th className="py-2.5 px-3 min-w-[160px]">Teks Pilihan Jawaban</th>
+                            <th className="py-2.5 px-3 text-center whitespace-nowrap">Total Pemilih</th>
+                            <th className="py-2.5 px-3 text-center whitespace-nowrap">Kel. Atas (Ba)</th>
+                            <th className="py-2.5 px-3 text-center whitespace-nowrap">Kel. Bawah (Bb)</th>
+                            <th className="py-2.5 px-3 text-center whitespace-nowrap">Status</th>
+                            <th className="py-2.5 px-3 min-w-[160px]">Catatan Evaluasi Pengecoh</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-medium">
+                          {q.distractors.map((dis) => {
+                            let badgeStyle = "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border-slate-200 dark:border-slate-700";
+                            let statusLabel = dis.status;
+                            if (dis.isCorrect) {
+                              badgeStyle = "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/60";
+                              statusLabel = "Kunci";
+                            } else if (dis.status === "Menyesatkan") {
+                              badgeStyle = "bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300 border-rose-200 dark:border-rose-800/60";
+                            } else if (dis.effective) {
+                              badgeStyle = "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/60";
+                              statusLabel = "Efektif";
+                            } else {
+                              badgeStyle = "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border-slate-200 dark:border-slate-700";
+                              statusLabel = "Tidak Efektif";
+                            }
+
+                            return (
+                              <tr key={dis.key} className={cn("hover:bg-slate-50/60 dark:hover:bg-slate-800/40", dis.isCorrect && "bg-emerald-50/30 dark:bg-emerald-950/10")}>
+                                <td className="py-2 px-3 text-center font-bold text-slate-800 dark:text-slate-200 whitespace-nowrap">
+                                  {dis.key}
+                                </td>
+                                <td className="py-2 px-3 text-slate-700 dark:text-slate-300 min-w-[160px] max-w-xs">
+                                  <MathText content={dis.text || "-"} />
+                                </td>
+                                <td className="py-2 px-3 text-center font-semibold whitespace-nowrap">
+                                  {dis.totalCount} <span className="text-[11px] text-slate-400 font-normal">({dis.totalPercent}%)</span>
+                                  <div className="w-16 bg-slate-100 dark:bg-slate-800 h-1 rounded-full mx-auto mt-1 overflow-hidden">
+                                    <div
+                                      className={cn("h-full rounded-full", dis.isCorrect ? "bg-emerald-500" : (dis.status === "Menyesatkan" ? "bg-rose-500" : "bg-slate-400"))}
+                                      style={{ width: `${Math.min(100, dis.totalPercent)}%` }}
+                                    />
+                                  </div>
+                                </td>
+                                <td className="py-2 px-3 text-center font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                                  {dis.upperCount} <span className="text-[11px] text-slate-400 font-normal">({dis.upperPercent}%)</span>
+                                </td>
+                                <td className="py-2 px-3 text-center font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                                  {dis.lowerCount} <span className="text-[11px] text-slate-400 font-normal">({dis.lowerPercent}%)</span>
+                                </td>
+                                <td className="py-2 px-3 text-center whitespace-nowrap">
+                                  <span className={cn("text-[11px] font-semibold px-2 py-0.5 rounded-md border inline-block whitespace-nowrap", badgeStyle)}>
+                                    {statusLabel}
+                                  </span>
+                                </td>
+                                <td className="py-2 px-3 text-slate-600 dark:text-slate-400 text-[11px] leading-snug min-w-[160px]">
+                                  {dis.note}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* 5. TABEL DISTRIBUSI & ANALISIS PERNYATAAN (BENAR / SALAH) (Screen Only) */}
+                {q.type === "benar_salah" && (
+                  <div className="space-y-2 pt-1 print:hidden">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-2">
+                      <span className="text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                        <CheckSquare className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                        <span>Distribusi Respon &amp; Analisis Pernyataan (Benar / Salah)</span>
+                      </span>
+                      <span className="text-[11px] text-slate-400 font-normal">
+                        Kriteria Baik: Daya Beda D ≥ +0.20 &amp; Kesukaran (0.20 ≤ P ≤ 0.90)
+                      </span>
+                    </div>
+
+                    {q.statementsAnalysis && q.statementsAnalysis.length > 0 ? (
+                      <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800 -mx-1 sm:mx-0">
+                        <table className="w-full text-xs text-left min-w-[720px]">
+                          <thead className="bg-slate-50 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 font-bold uppercase text-[11px] border-b border-slate-200 dark:border-slate-700">
                             <tr>
-                              <th className="py-2.5 px-3 w-12 text-center">Opsi</th>
-                              <th className="py-2.5 px-3">Teks Pilihan Jawaban</th>
-                              <th className="py-2.5 px-3 text-center">Total Pemilih</th>
-                              <th className="py-2.5 px-3 text-center">Kel. Atas (Ba)</th>
-                              <th className="py-2.5 px-3 text-center">Kel. Bawah (Bb)</th>
-                              <th className="py-2.5 px-3 text-center">Efektif?</th>
-                              <th className="py-2.5 px-3 text-center">Status</th>
-                              <th className="py-2.5 px-3">Catatan Evaluasi Pengecoh</th>
+                              <th className="py-2.5 px-3 w-10 text-center whitespace-nowrap">No</th>
+                              <th className="py-2.5 px-3 min-w-[180px]">Teks Pernyataan</th>
+                              <th className="py-2.5 px-3 text-center whitespace-nowrap">Kunci</th>
+                              <th className="py-2.5 px-3 text-center whitespace-nowrap">Respon (Benar / Salah)</th>
+                              <th className="py-2.5 px-3 text-center whitespace-nowrap">Kel. Atas (Ba)</th>
+                              <th className="py-2.5 px-3 text-center whitespace-nowrap">Kel. Bawah (Bb)</th>
+                              <th className="py-2.5 px-3 text-center whitespace-nowrap">Kesukaran (P)</th>
+                              <th className="py-2.5 px-3 text-center whitespace-nowrap">Daya Beda (D)</th>
+                              <th className="py-2.5 px-3 text-center whitespace-nowrap">Status</th>
+                              <th className="py-2.5 px-3 min-w-[160px]">Catatan Evaluasi Pernyataan</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-medium">
-                            {q.distractors.map((dis) => {
-                              let badgeColor = "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300";
-                              if (dis.status === "Kunci") badgeColor = "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300 font-black";
-                              else if (dis.status === "Menyesatkan") badgeColor = "bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300 font-black";
-                              else if (dis.status === "Tidak Efektif") badgeColor = "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300";
+                            {q.statementsAnalysis.map((st) => {
+                              let badgeColor = "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border-slate-200 dark:border-slate-700";
+                              if (st.status === "Menyesatkan") badgeColor = "bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300 border-rose-200 dark:border-rose-900/40";
+                              else if (st.status === "Terlalu Mudah" || st.status === "Terlalu Sukar") badgeColor = "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 border-amber-200 dark:border-amber-900/40";
+                              else if (st.status === "Berfungsi Baik") badgeColor = "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/60";
 
                               return (
-                                <tr key={dis.key} className={cn("hover:bg-slate-50/60 dark:hover:bg-slate-800/40", dis.isCorrect && "bg-emerald-50/30 dark:bg-emerald-950/10")}>
-                                  <td className="py-2 px-3 text-center font-black text-slate-800 dark:text-slate-200">
-                                    {dis.key}
+                                <tr key={st.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40">
+                                  <td className="py-2 px-3 text-center font-bold text-slate-800 dark:text-slate-200 whitespace-nowrap">
+                                    {st.index}
                                   </td>
-                                  <td className="py-2 px-3 text-slate-700 dark:text-slate-300 max-w-xs">
-                                    <MathText content={dis.text || "-"} />
+                                  <td className="py-2 px-3 text-slate-700 dark:text-slate-300 min-w-[180px] max-w-sm">
+                                    <MathText content={st.text || "-"} />
                                   </td>
-                                  <td className="py-2 px-3 text-center font-bold">
-                                    {dis.totalCount} <span className="text-xs text-slate-400 font-normal">({dis.totalPercent}%)</span>
-                                    <div className="w-16 bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full mx-auto mt-1 overflow-hidden">
+                                  <td className="py-2 px-3 text-center whitespace-nowrap">
+                                    <span className={cn(
+                                      "text-[11px] font-semibold uppercase px-2 py-0.5 rounded-md border",
+                                      st.correctAnswer === "benar" 
+                                        ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/60" 
+                                        : "bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300 border-rose-200 dark:border-rose-800/60"
+                                    )}>
+                                      {st.correctAnswer}
+                                    </span>
+                                  </td>
+                                  <td className="py-2 px-3 text-center whitespace-nowrap">
+                                    <div className="flex items-center justify-center gap-1.5 font-semibold text-xs">
+                                      <span className="text-emerald-700 dark:text-emerald-400">{st.totalBenar} B <span className="text-[10px] text-slate-400 font-normal">({st.totalBenarPercent}%)</span></span>
+                                      <span className="text-slate-300 dark:text-slate-600">/</span>
+                                      <span className="text-rose-600 dark:text-rose-400">{st.totalSalah} S <span className="text-[10px] text-slate-400 font-normal">({st.totalSalahPercent}%)</span></span>
+                                    </div>
+                                    <div className="w-20 bg-rose-100 dark:bg-rose-950/40 h-1 rounded-full mx-auto mt-1 overflow-hidden flex">
                                       <div
-                                        className={cn("h-full rounded-full", dis.isCorrect ? "bg-emerald-500" : (dis.status === "Menyesatkan" ? "bg-rose-500" : "bg-blue-500"))}
-                                        style={{ width: `${Math.min(100, dis.totalPercent)}%` }}
+                                        className="bg-emerald-500 h-full"
+                                        style={{ width: `${st.totalBenarPercent}%` }}
                                       />
                                     </div>
                                   </td>
-                                  <td className="py-2 px-3 text-center font-bold text-slate-700 dark:text-slate-300">
-                                    {dis.upperCount} <span className="text-xs text-slate-400 font-normal">({dis.upperPercent}%)</span>
+                                  <td className="py-2 px-3 text-center font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                                    {st.upperBenar} <span className="text-[11px] text-slate-400 font-normal">({st.upperBenarPercent}%)</span>
                                   </td>
-                                  <td className="py-2 px-3 text-center font-bold text-slate-700 dark:text-slate-300">
-                                    {dis.lowerCount} <span className="text-xs text-slate-400 font-normal">({dis.lowerPercent}%)</span>
+                                  <td className="py-2 px-3 text-center font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                                    {st.lowerBenar} <span className="text-[11px] text-slate-400 font-normal">({st.lowerBenarPercent}%)</span>
                                   </td>
-                                  <td className="py-2 px-3 text-center font-bold">
-                                    {dis.isCorrect ? (
-                                      <span className="text-emerald-600 font-black text-xs">KUNCI</span>
-                                    ) : dis.effective ? (
-                                      <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300 text-xs font-bold">YA</Badge>
-                                    ) : (
-                                      <Badge className="bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 text-xs font-bold">TIDAK</Badge>
-                                    )}
+                                  <td className="py-2 px-3 text-center font-bold text-slate-800 dark:text-slate-200 whitespace-nowrap">
+                                    {st.difficultyIndex.toFixed(2)}
                                   </td>
-                                  <td className="py-2 px-3 text-center">
-                                    <Badge className={cn("text-xs font-bold px-2 py-0.5", badgeColor)}>
-                                      {dis.status}
-                                    </Badge>
+                                  <td className="py-2 px-3 text-center font-bold whitespace-nowrap">
+                                    <span className={cn(
+                                      st.discriminationIndex >= 0.30
+                                        ? "text-emerald-600 dark:text-emerald-400"
+                                        : st.discriminationIndex >= 0.20
+                                        ? "text-blue-600 dark:text-blue-400"
+                                        : st.discriminationIndex >= 0
+                                        ? "text-amber-600 dark:text-amber-400"
+                                        : "text-rose-600 dark:text-rose-400"
+                                    )}>
+                                      {st.discriminationIndex >= 0 ? `+${st.discriminationIndex.toFixed(2)}` : st.discriminationIndex.toFixed(2)}
+                                    </span>
                                   </td>
-                                  <td className="py-2 px-3 text-slate-600 dark:text-slate-400 text-[11px] leading-snug">
-                                    {dis.note}
+                                  <td className="py-2 px-3 text-center whitespace-nowrap">
+                                    <span className={cn("text-[11px] font-semibold px-2 py-0.5 rounded-md border whitespace-nowrap", badgeColor)}>
+                                      {st.status}
+                                    </span>
+                                  </td>
+                                  <td className="py-2 px-3 text-slate-600 dark:text-slate-400 text-[11px] leading-snug min-w-[160px]">
+                                    {st.note}
                                   </td>
                                 </tr>
                               );
@@ -2827,127 +2988,19 @@ export const ItemAnalysisPage: React.FC = () => {
                           </tbody>
                         </table>
                       </div>
-                    </div>
-                  )}
-
-                  {/* 5B. TABEL DISTRIBUSI & ANALISIS PERNYATAAN (BENAR / SALAH) (Screen Only) */}
-                  {q.type === "benar_salah" && (
-                    <div className="space-y-2.5 pt-2 print:hidden">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-black text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
-                          <CheckSquare className="h-4 w-4 text-emerald-600" />
-                          Distribusi Respon &amp; Analisis Pernyataan (Benar / Salah)
-                        </span>
-                        <span className="text-[11px] text-slate-400 font-medium">
-                          Kriteria Pernyataan Baik: Daya Beda D ≥ +0.20 &amp; Kesukaran Proporsional (0.20 ≤ P ≤ 0.90)
-                        </span>
+                    ) : (
+                      <div className="p-4 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200 dark:border-slate-700 text-center text-xs text-slate-500">
+                        Data analisis respon siswa untuk setiap butir pernyataan akan tampil saat siswa mulai mengerjakan ujian.
                       </div>
-
-                      {q.statementsAnalysis && q.statementsAnalysis.length > 0 ? (
-                        <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
-                          <table className="w-full text-xs text-left">
-                            <thead className="bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 font-bold uppercase text-xs border-b border-slate-200 dark:border-slate-700">
-                              <tr>
-                                <th className="py-2.5 px-3 w-10 text-center">No</th>
-                                <th className="py-2.5 px-3">Teks Pernyataan</th>
-                                <th className="py-2.5 px-3 text-center">Kunci</th>
-                                <th className="py-2.5 px-3 text-center">Distribusi Respon (Benar / Salah)</th>
-                                <th className="py-2.5 px-3 text-center">Kel. Atas (Ba)</th>
-                                <th className="py-2.5 px-3 text-center">Kel. Bawah (Bb)</th>
-                                <th className="py-2.5 px-3 text-center">Kesukaran (P)</th>
-                                <th className="py-2.5 px-3 text-center">Daya Beda (D)</th>
-                                <th className="py-2.5 px-3 text-center">Status</th>
-                                <th className="py-2.5 px-3">Catatan Evaluasi Pernyataan</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-medium">
-                              {q.statementsAnalysis.map((st) => {
-                                let badgeColor = "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300 font-bold";
-                                if (st.status === "Menyesatkan") badgeColor = "bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300 font-black";
-                                else if (st.status === "Terlalu Mudah") badgeColor = "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300 font-bold";
-                                else if (st.status === "Terlalu Sukar") badgeColor = "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 font-bold";
-                                else if (st.status === "Cukup") badgeColor = "bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-300 font-bold";
-
-                                return (
-                                  <tr key={st.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40">
-                                    <td className="py-2 px-3 text-center font-black text-slate-800 dark:text-slate-200">
-                                      {st.index}
-                                    </td>
-                                    <td className="py-2 px-3 text-slate-700 dark:text-slate-300 max-w-sm">
-                                      <MathText content={st.text || "-"} />
-                                    </td>
-                                    <td className="py-2 px-3 text-center">
-                                      <Badge className={cn(
-                                        "text-xs font-black uppercase px-2 py-0.5",
-                                        st.correctAnswer === "benar" 
-                                          ? "bg-emerald-600 text-white" 
-                                          : "bg-rose-600 text-white"
-                                      )}>
-                                        {st.correctAnswer}
-                                      </Badge>
-                                    </td>
-                                    <td className="py-2 px-3 text-center">
-                                      <div className="flex items-center justify-center gap-1.5 font-bold">
-                                        <span className="text-emerald-700 dark:text-emerald-400">{st.totalBenar} B <span className="text-xs text-slate-400 font-normal">({st.totalBenarPercent}%)</span></span>
-                                        <span className="text-slate-300 dark:text-slate-600">/</span>
-                                        <span className="text-rose-600 dark:text-rose-400">{st.totalSalah} S <span className="text-xs text-slate-400 font-normal">({st.totalSalahPercent}%)</span></span>
-                                      </div>
-                                      <div className="w-24 bg-rose-100 dark:bg-rose-950/40 h-1.5 rounded-full mx-auto mt-1 overflow-hidden flex">
-                                        <div
-                                          className="bg-emerald-500 h-full"
-                                          style={{ width: `${st.totalBenarPercent}%` }}
-                                        />
-                                      </div>
-                                    </td>
-                                    <td className="py-2 px-3 text-center font-bold text-slate-700 dark:text-slate-300">
-                                      {st.upperBenar} <span className="text-xs text-slate-400 font-normal">({st.upperBenarPercent}%)</span>
-                                    </td>
-                                    <td className="py-2 px-3 text-center font-bold text-slate-700 dark:text-slate-300">
-                                      {st.lowerBenar} <span className="text-xs text-slate-400 font-normal">({st.lowerBenarPercent}%)</span>
-                                    </td>
-                                    <td className="py-2 px-3 text-center font-black text-slate-800 dark:text-slate-200">
-                                      {st.difficultyIndex.toFixed(2)}
-                                    </td>
-                                    <td className="py-2 px-3 text-center font-black">
-                                      <span className={cn(
-                                        st.discriminationIndex >= 0.30
-                                          ? "text-emerald-600 dark:text-emerald-400"
-                                          : st.discriminationIndex >= 0.20
-                                          ? "text-blue-600 dark:text-blue-400"
-                                          : st.discriminationIndex >= 0
-                                          ? "text-amber-600 dark:text-amber-400"
-                                          : "text-rose-600 dark:text-rose-400"
-                                      )}>
-                                        {st.discriminationIndex >= 0 ? `+${st.discriminationIndex.toFixed(2)}` : st.discriminationIndex.toFixed(2)}
-                                      </span>
-                                    </td>
-                                    <td className="py-2 px-3 text-center">
-                                      <Badge className={cn("text-xs px-2 py-0.5 whitespace-nowrap", badgeColor)}>
-                                        {st.status}
-                                      </Badge>
-                                    </td>
-                                    <td className="py-2 px-3 text-slate-600 dark:text-slate-400 text-[11px] leading-snug">
-                                      {st.note}
-                                    </td>
-                                  </tr>
-                                );
-                              })}
-                            </tbody>
-                          </table>
-                        </div>
-                      ) : (
-                        <div className="p-4 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200 dark:border-slate-700 text-center text-xs text-slate-500">
-                          Data analisis respon siswa untuk setiap butir pernyataan akan tampil saat siswa mulai mengerjakan ujian.
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
+                    )}
+                  </div>
+                )}
               </div>
-            );
-          })
-        )}
-      </div>
+            </div>
+          );
+        })
+      )}
+    </div>
 
       {/* TANDA TANGAN PENGESAHAN LAPORAN (Print Only) */}
       <div className="hidden print:grid grid-cols-2 gap-8 mt-12 pt-6 text-xs text-center print-card text-black">
@@ -3100,6 +3153,17 @@ export const ItemAnalysisPage: React.FC = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* DIALOG REVISI PILIHAN JAWABAN DENGAN AI */}
+      <AIQuestionRevisionDialog
+        isOpen={isRevisionDialogOpen}
+        onClose={() => {
+          setIsRevisionDialogOpen(false);
+          setRevisionTargetQuestion(null);
+        }}
+        question={revisionTargetQuestion}
+        onSaveToQuestionBank={handleSaveRevisedChoices}
+      />
     </div>
     </TooltipProvider>
   );

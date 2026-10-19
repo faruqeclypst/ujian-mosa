@@ -639,3 +639,23 @@ input[type="email"],
   user-select: text !important;
   pointer-events: auto !important;
 }
+
+/* Unified Squircle Loading Spinner Animation */
+@keyframes squircleSpin {
+  0% {
+    transform: rotate(0deg);
+    border-radius: 32px;
+  }
+  50% {
+    border-radius: 16px;
+  }
+  100% {
+    transform: rotate(360deg);
+    border-radius: 32px;
+  }
+}
+
+.animate-squircle {
+  animation: squircleSpin 1.5s ease-in-out infinite;
+}
+

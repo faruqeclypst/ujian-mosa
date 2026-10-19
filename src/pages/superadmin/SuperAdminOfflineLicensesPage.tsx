@@ -64,7 +64,7 @@ export interface OfflineLicenseRecord {
   updated: string;
 }
 
-type FilterStatus = "all" | "unused" | "used" | "active" | "expiring_soon" | "expired" | "revoked";
+type FilterStatus = "all" | "unused" | "used" | "active" | "expiring_soon" | "expired" | "revoked" | "trash";
 type SortOption = "newest_issued" | "nearest_expiry" | "name_asc";
 
 const SchoolAvatar = ({ name, logoUrl, className }: { name: string; logoUrl?: string; className?: string }) => {
@@ -127,7 +127,9 @@ export default function SuperAdminOfflineLicensesPage() {
   // Modal Konfirmasi Hapus
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<OfflineLicenseRecord | null>(null);
+  const [isPermanentDelete, setIsPermanentDelete] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isRestoring, setIsRestoring] = useState(false);
 
   // State feedback copy
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -297,15 +299,21 @@ export default function SuperAdminOfflineLicensesPage() {
 
   // Statistik Ringkasan
   const stats = useMemo(() => {
-    let total = licenses.length;
+    let total = 0;
     let active = 0;
     let expiringSoon = 0;
     let expired = 0;
     let used = 0;
     let unused = 0;
     let revoked = 0;
+    let trash = 0;
 
     licenses.forEach((lic) => {
+      if (lic.status === "deleted") {
+        trash++;
+        return;
+      }
+      total++;
       const exp = getExpiryDetails(lic.valid_until);
       if (lic.status === "revoked") {
         revoked++;
@@ -325,7 +333,7 @@ export default function SuperAdminOfflineLicensesPage() {
       }
     });
 
-    return { total, active, expiringSoon, expired, used, unused, revoked };
+    return { total, active, expiringSoon, expired, used, unused, revoked, trash };
   }, [licenses]);
 
   // Data Terfilter dan Terurut
@@ -343,7 +351,15 @@ export default function SuperAdminOfflineLicensesPage() {
 
         if (!matchesQuery) return false;
 
-        // Filter Status
+        // Filter Status Tempat Sampah
+        if (filterStatus === "trash") {
+          return item.status === "deleted";
+        }
+        // Jangan tampilkan rekor yang masuk sampah di tab reguler
+        if (item.status === "deleted") {
+          return false;
+        }
+
         const exp = getExpiryDetails(item.valid_until);
         const isItemExpired = exp.isExpired;
         const isItemRevoked = item.status === "revoked";
@@ -580,34 +596,91 @@ export default function SuperAdminOfflineLicensesPage() {
     setDetailModalOpen(true);
   };
 
-  // Buka Konfirmasi Hapus
-  const handleOpenDeleteConfirm = (lic: OfflineLicenseRecord) => {
+  // Buka Konfirmasi Hapus (permanent = true untuk hard delete di tab sampah)
+  const handleOpenDeleteConfirm = (lic: OfflineLicenseRecord, permanent = false) => {
     setItemToDelete(lic);
+    setIsPermanentDelete(permanent);
     setDeleteConfirmOpen(true);
   };
 
-  // Eksekusi Hapus Rekor
+  // Eksekusi Hapus Rekor (Soft Delete atau Hapus Permanen)
   const handleExecuteDelete = async () => {
     if (!itemToDelete) return;
     setIsDeleting(true);
     try {
-      await masterPb.collection("offline_licenses").delete(itemToDelete.id);
-      addToast({
-        title: "Lisensi Dihapus",
-        description: `Rekor lisensi ${itemToDelete.school_name} berhasil dihapus dari database pusat.`,
-        type: "success"
-      });
+      if (isPermanentDelete) {
+        await masterPb.collection("offline_licenses").delete(itemToDelete.id);
+        addToast({
+          title: "Lisensi Dihapus Permanen",
+          description: `Rekor lisensi ${itemToDelete.school_name} berhasil dihapus selamanya dari database pusat.`,
+          type: "success"
+        });
+      } else {
+        // Soft delete: tandai status sebagai deleted
+        await fetch("https://examku.my.id/api/multi-vps/toggle-offline-license-status", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id: itemToDelete.id,
+            status: "deleted",
+            reason: "Dipindahkan ke Tempat Sampah oleh Super Admin."
+          })
+        });
+        await masterPb.collection("offline_licenses").update(itemToDelete.id, { status: "deleted" });
+        addToast({
+          title: "Dipindahkan ke Tempat Sampah",
+          description: `Lisensi ${itemToDelete.school_name} dinonaktifkan. Anda dapat memulihkannya kapan saja dari tab Sampah.`,
+          type: "success"
+        });
+      }
       setDeleteConfirmOpen(false);
       setItemToDelete(null);
       fetchLicenses(true);
     } catch (err: any) {
       addToast({
-        title: "Gagal Menghapus",
-        description: err?.message || "Terjadi kesalahan saat menghapus rekor lisensi.",
+        title: "Gagal Memproses",
+        description: err?.message || "Terjadi kesalahan saat memproses lisensi.",
         type: "error"
       });
     } finally {
       setIsDeleting(false);
+    }
+  };
+
+  // Aksi Pulihkan Lisensi dari Tempat Sampah
+  const handleRestore = async (lic: OfflineLicenseRecord) => {
+    setIsRestoring(true);
+    try {
+      await fetch("https://examku.my.id/api/multi-vps/toggle-offline-license-status", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: lic.id,
+          status: "active",
+          reason: "Dipulihkan dari Tempat Sampah oleh Super Admin."
+        })
+      });
+      await masterPb.collection("offline_licenses").update(lic.id, { status: "active" });
+      addToast({
+        title: "Lisensi Berhasil Dipulihkan",
+        description: `Lisensi ${lic.school_name} kini aktif kembali. Server offline sekolah dapat beroperasi normal saat tersambung.`,
+        type: "success"
+      });
+      await fetchLicenses(true);
+      if (activeLicenseDetail && activeLicenseDetail.id === lic.id) {
+        setActiveLicenseDetail({
+          ...activeLicenseDetail,
+          status: "active"
+        });
+      }
+    } catch (err: any) {
+      addToast({
+        title: "Gagal Memulihkan",
+        description: err?.message || "Terjadi kesalahan saat memulihkan lisensi.",
+        type: "error"
+      });
+    } finally {
+      setIsRestoring(false);
     }
   };
 
@@ -785,6 +858,18 @@ export default function SuperAdminOfflineLicensesPage() {
             >
               Dinonaktifkan ({stats.revoked})
             </button>
+            <button
+              onClick={() => setFilterStatus("trash")}
+              className={cn(
+                "px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5",
+                filterStatus === "trash"
+                  ? "bg-rose-100 text-rose-800 shadow-2xs font-extrabold border border-rose-200"
+                  : "text-slate-600 hover:text-rose-700"
+              )}
+            >
+              <Trash2 size={13} className={filterStatus === "trash" ? "text-rose-600" : "text-slate-400"} />
+              <span>Sampah ({stats.trash})</span>
+            </button>
           </div>
 
           {/* Search & Sort */}
@@ -941,7 +1026,15 @@ export default function SuperAdminOfflineLicensesPage() {
                           <td className="py-4 px-4">
                             <div className="space-y-1.5">
                               <div>
-                                {lic.status === "revoked" ? (
+                                {lic.status === "deleted" ? (
+                                  <span
+                                    className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-100 text-rose-800 border border-rose-300 shadow-2xs"
+                                    title="Lisensi ini berada di Tempat Sampah. Server offline otomatis terkunci saat tersambung online."
+                                  >
+                                    <Trash2 size={12} className="text-rose-600 shrink-0" />
+                                    Di Tempat Sampah
+                                  </span>
+                                ) : lic.status === "revoked" ? (
                                   <span
                                     className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-100 text-rose-800 border border-rose-300 shadow-2xs"
                                     title="Lisensi ini dinonaktifkan (diblokir) oleh Super Admin. Server offline otomatis terkunci saat terdeteksi online."
@@ -968,7 +1061,11 @@ export default function SuperAdminOfflineLicensesPage() {
                                 )}
                               </div>
 
-                              {lic.status === "revoked" ? (
+                              {lic.status === "deleted" ? (
+                                <p className="text-[10px] text-rose-600 font-semibold">
+                                  Terkunci di server lokal
+                                </p>
+                              ) : lic.status === "revoked" ? (
                                 <p className="text-[10px] text-rose-600 font-semibold">
                                   Kill-switch aktif (DB aman)
                                 </p>
@@ -1006,7 +1103,9 @@ export default function SuperAdminOfflineLicensesPage() {
                                 <span
                                   className={cn(
                                     "inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold shadow-2xs",
-                                    lic.status === "revoked"
+                                    lic.status === "deleted"
+                                      ? "bg-rose-100 text-rose-800 border border-rose-300"
+                                      : lic.status === "revoked"
                                       ? "bg-rose-100 text-rose-800 border border-rose-300"
                                       : isExpired
                                       ? "bg-rose-50 text-rose-700 border border-rose-200/80"
@@ -1016,7 +1115,13 @@ export default function SuperAdminOfflineLicensesPage() {
                                   )}
                                 >
                                   <Clock size={10} className="shrink-0" />
-                                  <span>{lic.status === "revoked" ? "Lisensi Dicabut" : exp.text}</span>
+                                  <span>
+                                    {lic.status === "deleted"
+                                      ? "Masuk Sampah"
+                                      : lic.status === "revoked"
+                                      ? "Lisensi Dicabut"
+                                      : exp.text}
+                                  </span>
                                 </span>
                               </div>
                               <p className="text-[10px] text-slate-400 mt-1">
@@ -1051,62 +1156,85 @@ export default function SuperAdminOfflineLicensesPage() {
 
                           {/* Tombol Aksi */}
                           <td className="py-4 px-4 text-right">
-                            <div className="flex items-center justify-end gap-1.5">
-                              {/* Tombol Perpanjang */}
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleOpenRenewModal(lic)}
-                                className="h-8 px-2.5 rounded-xl text-xs font-bold border-purple-200 text-purple-700 bg-purple-50/70 hover:bg-purple-100 hover:text-purple-800 transition-all shadow-2xs whitespace-nowrap flex items-center gap-1 shrink-0"
-                              >
-                                <Calendar size={12} />
-                                <span>Perpanjang</span>
-                              </Button>
-
-                              {/* Action Buttons Toolbar */}
-                              <div className="inline-flex items-center p-0.5 bg-slate-100/90 border border-slate-200/90 rounded-xl shadow-2xs shrink-0">
-                                <button
-                                  onClick={() => handleOpenDetailModal(lic)}
-                                  className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-500 hover:text-purple-600 hover:bg-white hover:shadow-2xs transition-all"
-                                  title="Detail Lisensi & QR"
+                            {lic.status === "deleted" ? (
+                              <div className="flex items-center justify-end gap-1.5">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleRestore(lic)}
+                                  disabled={isRestoring}
+                                  className="h-8 px-2.5 rounded-xl text-xs font-bold border-emerald-300 text-emerald-800 bg-emerald-50 hover:bg-emerald-100 transition-all shadow-2xs flex items-center gap-1 shrink-0"
+                                  title="Pulihkan Lisensi ini kembali ke status aktif"
                                 >
-                                  <Eye size={13} />
-                                </button>
+                                  <RotateCcw size={12} className={cn(isRestoring && "animate-spin")} />
+                                  <span>Pulihkan</span>
+                                </Button>
                                 <button
-                                  onClick={() => handleSendWA(lic)}
-                                  className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-500 hover:text-emerald-600 hover:bg-white hover:shadow-2xs transition-all"
-                                  title="Kirim ke WhatsApp Proktor"
-                                >
-                                  <MessageCircle size={13} />
-                                </button>
-                                {lic.status === "revoked" ? (
-                                  <button
-                                    onClick={() => handleToggleStatus(lic, "active")}
-                                    disabled={isTogglingStatus}
-                                    className="w-7 h-7 rounded-lg flex items-center justify-center text-emerald-600 hover:text-emerald-700 hover:bg-white hover:shadow-2xs transition-all"
-                                    title="Aktifkan Kembali Lisensi (Cabut Pemblokiran)"
-                                  >
-                                    <ShieldCheck size={13} />
-                                  </button>
-                                ) : (
-                                  <button
-                                    onClick={() => handleToggleStatus(lic, "revoked")}
-                                    disabled={isTogglingStatus}
-                                    className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-rose-600 hover:bg-white hover:shadow-2xs transition-all"
-                                    title="Nonaktifkan Key (Blokir Akses Server Offline)"
-                                  >
-                                    <ShieldAlert size={13} />
-                                  </button>
-                                )}
-                                <button
-                                  onClick={() => handleOpenDeleteConfirm(lic)}
-                                  className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-rose-600 hover:bg-white hover:shadow-2xs transition-all"
-                                  title="Hapus Lisensi"
+                                  onClick={() => handleOpenDeleteConfirm(lic, true)}
+                                  className="w-8 h-8 rounded-xl flex items-center justify-center text-rose-600 hover:bg-rose-50 border border-transparent hover:border-rose-200 transition-all shadow-2xs"
+                                  title="Hapus Permanen dari Database"
                                 >
                                   <Trash2 size={13} />
                                 </button>
                               </div>
-                            </div>
+                            ) : (
+                              <div className="flex items-center justify-end gap-1.5">
+                                {/* Tombol Perpanjang */}
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleOpenRenewModal(lic)}
+                                  className="h-8 px-2.5 rounded-xl text-xs font-bold border-purple-200 text-purple-700 bg-purple-50/70 hover:bg-purple-100 hover:text-purple-800 transition-all shadow-2xs whitespace-nowrap flex items-center gap-1 shrink-0"
+                                >
+                                  <Calendar size={12} />
+                                  <span>Perpanjang</span>
+                                </Button>
+
+                                {/* Action Buttons Toolbar */}
+                                <div className="inline-flex items-center p-0.5 bg-slate-100/90 border border-slate-200/90 rounded-xl shadow-2xs shrink-0">
+                                  <button
+                                    onClick={() => handleOpenDetailModal(lic)}
+                                    className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-500 hover:text-purple-600 hover:bg-white hover:shadow-2xs transition-all"
+                                    title="Detail Lisensi & QR"
+                                  >
+                                    <Eye size={13} />
+                                  </button>
+                                  <button
+                                    onClick={() => handleSendWA(lic)}
+                                    className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-500 hover:text-emerald-600 hover:bg-white hover:shadow-2xs transition-all"
+                                    title="Kirim ke WhatsApp Proktor"
+                                  >
+                                    <MessageCircle size={13} />
+                                  </button>
+                                  {lic.status === "revoked" ? (
+                                    <button
+                                      onClick={() => handleToggleStatus(lic, "active")}
+                                      disabled={isTogglingStatus}
+                                      className="w-7 h-7 rounded-lg flex items-center justify-center text-emerald-600 hover:text-emerald-700 hover:bg-white hover:shadow-2xs transition-all"
+                                      title="Aktifkan Kembali Lisensi (Cabut Pemblokiran)"
+                                    >
+                                      <ShieldCheck size={13} />
+                                    </button>
+                                  ) : (
+                                    <button
+                                      onClick={() => handleToggleStatus(lic, "revoked")}
+                                      disabled={isTogglingStatus}
+                                      className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-rose-600 hover:bg-white hover:shadow-2xs transition-all"
+                                      title="Nonaktifkan Key (Blokir Akses Server Offline)"
+                                    >
+                                      <ShieldAlert size={13} />
+                                    </button>
+                                  )}
+                                  <button
+                                    onClick={() => handleOpenDeleteConfirm(lic, false)}
+                                    className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-rose-600 hover:bg-white hover:shadow-2xs transition-all"
+                                    title="Pindahkan ke Tempat Sampah"
+                                  >
+                                    <Trash2 size={13} />
+                                  </button>
+                                </div>
+                              </div>
+                            )}
                           </td>
                         </tr>
                       );
@@ -1162,7 +1290,12 @@ export default function SuperAdminOfflineLicensesPage() {
                           <div className="flex items-center justify-between gap-2">
                             <h4 className="font-bold text-slate-900 text-sm truncate">{lic.school_name}</h4>
                             <div className="flex items-center gap-1 shrink-0">
-                              {lic.status === "revoked" ? (
+                              {lic.status === "deleted" ? (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300 flex items-center gap-1">
+                                  <Trash2 size={10} />
+                                  Di Sampah
+                                </span>
+                              ) : lic.status === "revoked" ? (
                                 <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300">
                                   Diblokir
                                 </span>
@@ -1175,7 +1308,7 @@ export default function SuperAdminOfflineLicensesPage() {
                                   Belum Digunakan
                                 </span>
                               )}
-                              {lic.status !== "revoked" && isExpired ? (
+                              {lic.status !== "revoked" && lic.status !== "deleted" && isExpired ? (
                                 <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
                                   Kadaluarsa
                                 </span>
@@ -1209,7 +1342,9 @@ export default function SuperAdminOfflineLicensesPage() {
                           <span
                             className={cn(
                               "text-[10px] font-bold block",
-                              lic.status === "revoked"
+                              lic.status === "deleted"
+                                ? "text-rose-600 font-extrabold"
+                                : lic.status === "revoked"
                                 ? "text-rose-600 font-extrabold"
                                 : isExpired
                                 ? "text-rose-600"
@@ -1218,7 +1353,7 @@ export default function SuperAdminOfflineLicensesPage() {
                                 : "text-emerald-600"
                             )}
                           >
-                            {lic.status === "revoked" ? "Lisensi Dicabut" : exp.text}
+                            {lic.status === "deleted" ? "Masuk Sampah" : lic.status === "revoked" ? "Lisensi Dicabut" : exp.text}
                           </span>
                         </div>
                       </div>
@@ -1241,33 +1376,66 @@ export default function SuperAdminOfflineLicensesPage() {
                       </div>
 
                       {/* Action buttons on mobile */}
-                      <div className="grid grid-cols-3 gap-2 pt-1">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleOpenDetailModal(lic)}
-                          className="min-h-[38px] rounded-xl text-xs font-bold text-purple-700 border-purple-200 hover:bg-purple-50 flex items-center justify-center gap-1.5 shadow-2xs"
-                        >
-                          <Eye size={13} />
-                          <span>Detail</span>
-                        </Button>
-                        <Button
-                          size="sm"
-                          onClick={() => handleSendWA(lic)}
-                          className="min-h-[38px] rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white flex items-center justify-center gap-1.5 shadow-2xs"
-                        >
-                          <MessageCircle size={13} />
-                          <span>Kirim WA</span>
-                        </Button>
-                        <Button
-                          size="sm"
-                          onClick={() => handleOpenRenewModal(lic)}
-                          className="min-h-[38px] rounded-xl text-xs font-bold bg-purple-600 hover:bg-purple-700 active:bg-purple-800 text-white flex items-center justify-center gap-1.5 shadow-2xs"
-                        >
-                          <Calendar size={13} />
-                          <span>Perpanjang</span>
-                        </Button>
-                      </div>
+                      {lic.status === "deleted" ? (
+                        <div className="grid grid-cols-2 gap-2 pt-1">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleRestore(lic)}
+                            disabled={isRestoring}
+                            className="min-h-[38px] rounded-xl text-xs font-bold border-emerald-300 text-emerald-800 bg-emerald-50 hover:bg-emerald-100 flex items-center justify-center gap-1.5 shadow-2xs"
+                          >
+                            <RotateCcw size={13} className={cn(isRestoring && "animate-spin")} />
+                            <span>Pulihkan Lisensi</span>
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleOpenDeleteConfirm(lic, true)}
+                            className="min-h-[38px] rounded-xl text-xs font-bold border-rose-200 text-rose-700 bg-white hover:bg-rose-50 flex items-center justify-center gap-1.5 shadow-2xs"
+                          >
+                            <Trash2 size={13} />
+                            <span>Hapus Permanen</span>
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-4 gap-1.5 pt-1">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleOpenDetailModal(lic)}
+                            className="min-h-[38px] rounded-xl text-xs font-bold text-purple-700 border-purple-200 hover:bg-purple-50 flex items-center justify-center gap-1 shadow-2xs"
+                          >
+                            <Eye size={12} />
+                            <span>Detail</span>
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={() => handleSendWA(lic)}
+                            className="min-h-[38px] rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white flex items-center justify-center gap-1 shadow-2xs"
+                          >
+                            <MessageCircle size={12} />
+                            <span>WA</span>
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={() => handleOpenRenewModal(lic)}
+                            className="min-h-[38px] rounded-xl text-xs font-bold bg-purple-600 hover:bg-purple-700 active:bg-purple-800 text-white flex items-center justify-center gap-1 shadow-2xs"
+                          >
+                            <Calendar size={12} />
+                            <span>Perpanjang</span>
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleOpenDeleteConfirm(lic, false)}
+                            className="min-h-[38px] rounded-xl text-xs font-bold text-slate-500 hover:text-rose-600 border-slate-200 hover:bg-rose-50 flex items-center justify-center shadow-2xs"
+                            title="Pindahkan ke Tempat Sampah"
+                          >
+                            <Trash2 size={13} />
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -1540,21 +1708,27 @@ export default function SuperAdminOfflineLicensesPage() {
           <DialogContent className="max-w-md rounded-[2rem] p-6 border border-slate-200 shadow-2xl bg-white">
             <DialogHeader className="pb-2">
               <DialogTitle className="text-base font-bold text-slate-900 flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center">
+                <div className={cn("w-8 h-8 rounded-xl flex items-center justify-center", isPermanentDelete ? "bg-rose-100 text-rose-600" : "bg-amber-100 text-amber-700")}>
                   <Trash2 size={16} />
                 </div>
-                Hapus Rekor Lisensi Offline?
+                {isPermanentDelete ? "Hapus Lisensi Secara Permanen?" : "Pindahkan Lisensi ke Tempat Sampah?"}
               </DialogTitle>
               <DialogDescription className="text-xs text-slate-500 mt-1">
-                Tindakan ini akan menghapus riwayat izin lisensi dari database Master VPS.
+                {isPermanentDelete
+                  ? "Tindakan ini permanen dan tidak dapat dibatalkan. Seluruh riwayat lisensi akan dihapus total dari database Master VPS."
+                  : "Lisensi ini akan dinonaktifkan di server proktor dan dipindahkan ke Tempat Sampah. Anda dapat memulihkannya kembali sewaktu-waktu."}
               </DialogDescription>
             </DialogHeader>
 
-            <div className="p-3 bg-rose-50 border border-rose-100 rounded-xl my-3 text-xs text-rose-800">
-              <p className="font-bold">{itemToDelete.school_name}</p>
-              <p className="font-mono text-[11px] text-rose-600 mt-0.5">{itemToDelete.slug}.examku.my.id</p>
-              <p className="text-[11px] text-slate-600 mt-2">
-                Server lokal sekolah yang menggunakan kode ini akan tetap memvalidasi selama kunci tersimpan di PC lokal proktor, namun riwayat pencatatan di dashboard Super Admin akan dihapus.
+            <div className={cn("p-3.5 rounded-xl my-3 text-xs border", isPermanentDelete ? "bg-rose-50 border-rose-200 text-rose-900" : "bg-amber-50 border-amber-200 text-amber-900")}>
+              <div className="flex items-center justify-between">
+                <p className="font-bold">{itemToDelete.school_name}</p>
+                <span className="font-mono text-[10px] text-slate-500">{itemToDelete.slug}.examku.my.id</span>
+              </div>
+              <p className="text-[11px] text-slate-600 mt-2 leading-relaxed">
+                {isPermanentDelete
+                  ? "PERINGATAN: Rekor ini akan dihapus total selamanya. Jika server lokal proktor online, server proktor akan terkunci permanen."
+                  : "Jangan khawatir jika Anda salah menekan tombol hapus: Lisensi ini dapat dipulihkan kembali kapan saja dengan mengklik tombol 'Pulihkan' di tab Sampah."}
               </p>
             </div>
 
@@ -1572,9 +1746,18 @@ export default function SuperAdminOfflineLicensesPage() {
                 size="sm"
                 onClick={handleExecuteDelete}
                 disabled={isDeleting}
-                className="h-9 px-4 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold"
+                className={cn(
+                  "h-9 px-4 rounded-xl text-white text-xs font-bold transition-all shadow-2xs",
+                  isPermanentDelete
+                    ? "bg-rose-600 hover:bg-rose-700"
+                    : "bg-amber-600 hover:bg-amber-700"
+                )}
               >
-                {isDeleting ? "Menghapus..." : "Ya, Hapus Rekor"}
+                {isDeleting
+                  ? "Memproses..."
+                  : isPermanentDelete
+                  ? "Ya, Hapus Permanen"
+                  : "Pindahkan ke Sampah"}
               </Button>
             </div>
           </DialogContent>

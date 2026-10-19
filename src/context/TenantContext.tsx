@@ -63,6 +63,7 @@ export interface SchoolRecord {
   npsn?: string;
   offline_license?: string;
   offline_license_payload?: OfflineLicensePayload;
+  offline_license_status?: string;
 }
 
 import { getSubscriptionStatus, SubscriptionStatusInfo } from '../utils/subscriptionHelper';
@@ -525,6 +526,8 @@ export const TenantProvider = ({ children }: { children: ReactNode }) => {
           type: 'school',
           is_active: true,
           logo_url: sData?.logoUrl || sData?.logo || '',
+          offline_license: (sData as any)?.offline_license || '',
+          offline_license_status: (sData as any)?.offline_license_status || 'active',
         };
         setSchool(localSchool);
         setPb(localPb);
@@ -631,6 +634,7 @@ export const TenantProvider = ({ children }: { children: ReactNode }) => {
           npsn: licensePayload?.npsn || '',
           offline_license: activeLicenseCode,
           offline_license_payload: licensePayload,
+          offline_license_status: (sData as any)?.offline_license_status || 'active',
         }) : prev);
       } catch (e) {
         console.warn('Gagal refresh local server settings:', e);

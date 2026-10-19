@@ -22,3 +22,6 @@ export * from "./QuestionRepositoryDialog";
 export { default as ItemAnalysisDialog } from "./ItemAnalysisDialog";
 export * from "./ItemAnalysisDialog";
 
+export { default as AIQuestionRevisionDialog } from "./AIQuestionRevisionDialog";
+export * from "./AIQuestionRevisionDialog";
+
