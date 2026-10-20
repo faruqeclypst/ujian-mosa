@@ -252,17 +252,6 @@ export const StudentTable: React.FC<StudentTableProps> = (props) => {
   const neonColumns: NeonTableColumn<any>[] = useMemo(() => {
     const cols: NeonTableColumn<any>[] = [
       {
-        key: "index",
-        header: "#",
-        width: "48px",
-        align: "center",
-        render: (_item, index) => (
-          <span className="font-mono text-xs text-neutral-400 dark:text-neutral-500">
-            {index + 1}
-          </span>
-        ),
-      },
-      {
         key: "name",
         header: (
           <div
@@ -277,14 +266,14 @@ export const StudentTable: React.FC<StudentTableProps> = (props) => {
             )}
           </div>
         ),
-        className: "min-w-[240px] max-w-[340px]",
+        className: "min-w-0 max-w-[340px]",
         render: (student) => {
           const isInspected = inspectedStudentId === student.id;
           return (
             <div className="flex flex-col gap-1 py-1 group/name">
               <span
                 className={cn(
-                  "text-[13px] font-bold tracking-tight leading-snug transition-colors",
+                  "text-[13px] font-bold tracking-tight leading-snug transition-colors truncate",
                   isInspected
                     ? "text-emerald-600 dark:text-emerald-400 font-extrabold"
                     : "text-neutral-900 dark:text-neutral-100 group-hover/name:text-emerald-600 dark:group-hover/name:text-emerald-400"
@@ -292,7 +281,7 @@ export const StudentTable: React.FC<StudentTableProps> = (props) => {
               >
                 {student.name}
               </span>
-              <div className="flex items-center gap-1.5 text-[11px] text-neutral-500 dark:text-neutral-400 font-mono">
+              <div className="flex items-center gap-1.5 text-[11px] text-neutral-500 dark:text-neutral-400 font-mono truncate">
                 <span>{student.nisn || "-"}</span>
                 <span>•</span>
                 <span className="px-1.5 py-0.2 rounded bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 font-medium">
@@ -319,7 +308,8 @@ export const StudentTable: React.FC<StudentTableProps> = (props) => {
           </div>
         ),
         align: "center",
-        width: "150px",
+        className: "w-28 sm:w-36 shrink-0",
+        headerClassName: "w-28 sm:w-36",
         render: (student) => {
           const attempt = attempts.find(a => a.studentId === student.id || a.student_id === student.id);
           if (!attempt) {
@@ -397,6 +387,8 @@ export const StudentTable: React.FC<StudentTableProps> = (props) => {
         ),
         align: "center",
         width: "90px",
+        className: "hidden md:table-cell",
+        headerClassName: "hidden md:table-cell",
         render: (student) => {
           const attempt = attempts.find(a => a.studentId === student.id || a.student_id === student.id);
           if (!attempt) return <div className="py-1 text-center"><span className="text-neutral-400 font-mono text-xs">-</span></div>;
@@ -450,6 +442,8 @@ export const StudentTable: React.FC<StudentTableProps> = (props) => {
           header: "Subjektif",
           align: "center",
           width: "90px",
+          className: "hidden md:table-cell",
+          headerClassName: "hidden md:table-cell",
           render: (student) => {
             const attempt = attempts.find(a => a.studentId === student.id || a.student_id === student.id);
             if (!attempt) return <div className="py-1 text-center"><span className="text-neutral-400 font-mono text-xs">-</span></div>;
@@ -550,6 +544,8 @@ export const StudentTable: React.FC<StudentTableProps> = (props) => {
         ),
         align: "center",
         width: "140px",
+        className: "hidden sm:table-cell",
+        headerClassName: "hidden sm:table-cell",
         render: (student) => {
           const attempt = attempts.find(a => a.studentId === student.id || a.student_id === student.id);
           const sisAnswers = (attempt && detailAnswers[attempt.id]) || attempt?.answers || {};

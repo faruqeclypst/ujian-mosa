@@ -2,7 +2,11 @@ import React, { useState, useEffect } from "react";
 import { useTenant } from "../../context/TenantContext";
 import { APP_DISPLAY_VERSION } from "../../utils/version";
 
-const Logo = () => {
+interface LogoProps {
+  isCollapsed?: boolean;
+}
+
+const Logo = ({ isCollapsed = false }: LogoProps) => {
   const { pb, school } = useTenant();
   const [profile, setProfile] = useState({ name: school?.name || "EXAMKU", logoUrl: "" });
   const [logoError, setLogoError] = useState(false);
@@ -59,8 +63,27 @@ const Logo = () => {
     };
   }, [pb, school]);
 
+  if (isCollapsed) {
+    return (
+      <div className="flex items-center justify-center select-none" title={`EXAMKU ${APP_DISPLAY_VERSION} - ${profile.name}`}>
+        <div className="h-7 w-7 rounded-md bg-emerald-600 text-white flex items-center justify-center shrink-0 overflow-hidden shadow-2xs">
+          {profile.logoUrl && !logoError ? (
+            <img
+              src={profile.logoUrl}
+              alt="Logo"
+              className="h-full w-full object-contain p-0.5 bg-white dark:bg-neutral-900"
+              onError={() => setLogoError(true)}
+            />
+          ) : (
+            <span className="font-black text-[11px] tracking-tight">EK</span>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex items-center gap-2.5 min-w-0 select-none">
+    <div className="flex items-center gap-2.5 min-w-0 select-none overflow-hidden">
       {/* Brand Icon */}
       <div className="h-6 w-6 rounded-md bg-emerald-600 text-white flex items-center justify-center shrink-0 overflow-hidden shadow-2xs">
         {profile.logoUrl && !logoError ? (
@@ -76,11 +99,11 @@ const Logo = () => {
       </div>
 
       {/* Brand Name & Version Badge */}
-      <div className="flex items-center gap-1.5 min-w-0">
-        <span className="text-sm font-black tracking-wider text-neutral-900 dark:text-neutral-100 uppercase">
+      <div className="flex items-center gap-1.5 min-w-0 overflow-hidden">
+        <span className="text-sm font-black tracking-wider text-neutral-900 dark:text-neutral-100 uppercase truncate">
           EXAMKU
         </span>
-        <span className="text-[10px] font-mono px-1.5 py-0.2 bg-neutral-100 dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400 rounded font-medium border border-neutral-200/50 dark:border-neutral-700/50">
+        <span className="text-[10px] font-mono px-1.5 py-0.2 bg-neutral-100 dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400 rounded font-medium border border-neutral-200/50 dark:border-neutral-700/50 shrink-0">
           {APP_DISPLAY_VERSION}
         </span>
       </div>

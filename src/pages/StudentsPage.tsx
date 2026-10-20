@@ -67,6 +67,9 @@ import BatchProgressDialog from "../components/dialogs/BatchProgressDialog";
 import PrintExamCardsDialog from "../components/dialogs/PrintExamCardsDialog";
 import BatchStudentPhotoDialog from "../components/dialogs/BatchStudentPhotoDialog";
 import { NeonStatGrid, NeonStatCard } from "../components/ui/NeonStats";
+import { NeonCard } from "../components/ui/NeonCard";
+import { NeonBadge } from "../components/ui/NeonBadge";
+import { NeonProgress } from "../components/ui/NeonProgress";
 
 let studentTableCache: {
   rows: StudentData[];
@@ -1336,84 +1339,118 @@ const StudentsPage = () => {
           )}
         </div>
 
-      {/* ── Indikator Kuota Siswa ── */}
+      {/* ── Indikator Kuota Siswa (Tema Neon) ── */}
       {isOffline ? (
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-2xl border border-slate-200/70 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/50 text-xs shadow-xs">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-600 dark:text-emerald-400 flex-shrink-0">
-              <ShieldCheck size={16} />
+        <NeonCard className="p-3.5 sm:p-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0">
+                <ShieldCheck className="h-4 w-4" />
+              </div>
+              <div>
+                <p className="font-semibold text-neutral-900 dark:text-neutral-100 text-xs">
+                  Server Mandiri Offline: Tanpa Batas Kuota {terminology.student}
+                </p>
+                <p className="text-[11px] text-neutral-500 dark:text-neutral-400 mt-0.5">
+                  Saat ini terdapat <strong className="font-mono text-neutral-800 dark:text-neutral-200">{studentCount.toLocaleString("id-ID")}</strong> {terminology.student.toLowerCase()} terdaftar. Anda dapat menambahkan data siswa sebanyak kapasitas server lokal.
+                </p>
+              </div>
             </div>
-            <div>
-              <p className="font-bold text-slate-800 dark:text-slate-100">
-                Server Mandiri Offline: Tanpa Batas Kuota {terminology.student}
-              </p>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                Saat ini terdapat <strong>{studentCount}</strong> {terminology.student.toLowerCase()} terdaftar. Anda dapat menambahkan data siswa sebanyak kapasitas server lokal.
-              </p>
-            </div>
+            <NeonBadge variant="emerald" pulse mono size="sm" className="self-start sm:self-auto">
+              Unlimited Siswa
+            </NeonBadge>
           </div>
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 font-bold text-xs self-start sm:self-auto">
-            Unlimited Siswa
-          </div>
-        </div>
+        </NeonCard>
       ) : (
-        <div className={cn(
-          "flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-2xl border transition-all text-xs shadow-xs",
+        <NeonCard className={cn(
+          "p-3.5 sm:p-4 border transition-all duration-200",
           isQuotaFull
-            ? "bg-rose-50 dark:bg-rose-950/20 border-rose-200 dark:border-rose-900/50 text-rose-900 dark:text-rose-200"
+            ? "border-rose-500/40 bg-rose-500/5 dark:bg-rose-950/15"
             : isQuotaWarning
-              ? "bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-900/50 text-amber-900 dark:text-amber-200"
-              : "bg-card border-slate-200/60 dark:border-slate-800/40 text-slate-700 dark:text-slate-300"
+              ? "border-amber-500/40 bg-amber-500/5 dark:bg-amber-950/15"
+              : "border-neutral-200/80 dark:border-neutral-800 bg-white dark:bg-[#0f1115]"
         )}>
-          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-            <div className="space-y-1.5">
+          <div className="flex flex-col gap-3">
+            {/* Header row: Status, Metrics & Action */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="font-bold text-slate-900 dark:text-white">
-                  Kapasitas Kuota {terminology.student}: {studentCount} / {quota} Terdaftar
+                <span className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">
+                  Kapasitas Kuota {terminology.student}:
                 </span>
-                <span className={cn(
-                  "px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border",
-                  isQuotaFull
-                    ? "bg-rose-200/80 border-rose-300 text-rose-800 dark:bg-rose-900/60 dark:border-rose-800 dark:text-rose-200"
-                    : isQuotaWarning
-                      ? "bg-amber-200/80 border-amber-300 text-amber-800 dark:bg-amber-900/60 dark:border-amber-800 dark:text-amber-200"
-                      : "bg-blue-100 border-blue-200 text-blue-700 dark:bg-blue-900/40 dark:border-blue-800 dark:text-blue-300"
-                )}>
+                <span className="font-mono font-bold text-xs text-neutral-900 dark:text-neutral-100">
+                  {studentCount.toLocaleString("id-ID")}
+                </span>
+                <span className="text-neutral-400 dark:text-neutral-500 text-xs font-mono">/</span>
+                <span className="font-mono font-bold text-xs text-neutral-600 dark:text-neutral-400">
+                  {quota.toLocaleString("id-ID")}
+                </span>
+                <span className="text-neutral-500 dark:text-neutral-400 text-xs font-medium">Terdaftar</span>
+
+                <NeonBadge
+                  variant={isQuotaFull ? "rose" : isQuotaWarning ? "amber" : "emerald"}
+                  pulse={isQuotaFull || isQuotaWarning}
+                  mono
+                  size="xs"
+                >
                   {quotaUsedPercent}% Terpakai
-                </span>
+                </NeonBadge>
+
                 {school?.plan === "free" && (
-                  <span className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-2 py-0.5 rounded-md font-semibold">
+                  <NeonBadge variant="neutral" size="xs">
                     Free Trial (Maks. 50)
-                  </span>
+                  </NeonBadge>
                 )}
               </div>
-              <div className="w-56 sm:w-80 h-2 bg-slate-200/80 dark:bg-slate-800 rounded-full overflow-hidden">
-                <div
+
+              {role === "admin" && (
+                <button
+                  type="button"
+                  onClick={() => navigate("/admin/invoice")}
                   className={cn(
-                    "h-full transition-all duration-500 rounded-full",
-                    isQuotaFull ? "bg-rose-600" : isQuotaWarning ? "bg-amber-500" : "bg-blue-600"
+                    "px-3 py-1.5 rounded-lg text-xs font-semibold transition-all shadow-2xs self-start sm:self-auto flex items-center gap-1.5 shrink-0 cursor-pointer active:scale-95 focus:outline-hidden focus:ring-2 focus:ring-offset-1",
+                    isQuotaFull
+                      ? "bg-rose-600 hover:bg-rose-500 text-white shadow-rose-600/20 focus:ring-rose-500"
+                      : isQuotaWarning
+                        ? "bg-amber-600 hover:bg-amber-500 text-white shadow-amber-600/20 focus:ring-amber-500"
+                        : "border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-700/80 focus:ring-neutral-400"
                   )}
-                  style={{ width: `${quotaUsedPercent}%` }}
-                />
+                >
+                  <Sparkles className="h-3.5 w-3.5 shrink-0" />
+                  <span>{isQuotaFull ? "Upgrade Kuota Sekarang" : "Tingkatkan Kuota"}</span>
+                </button>
+              )}
+            </div>
+
+            {/* Neon Progress Bar & Subtext */}
+            <div className="space-y-1.5">
+              <NeonProgress
+                value={quotaUsedPercent}
+                variant={isQuotaFull ? "rose" : isQuotaWarning ? "amber" : "emerald"}
+                size="md"
+              />
+              <div className="flex items-center justify-between text-[11px] text-neutral-500 dark:text-neutral-400">
+                <span>
+                  {isQuotaFull ? (
+                    <span className="text-rose-600 dark:text-rose-400 font-semibold">
+                      Kuota siswa telah habis. Tambah kuota untuk mendaftarkan siswa baru.
+                    </span>
+                  ) : (
+                    <>
+                      Tersisa{" "}
+                      <strong className="font-mono font-semibold text-neutral-800 dark:text-neutral-200">
+                        {Math.max(0, quota - studentCount).toLocaleString("id-ID")}
+                      </strong>{" "}
+                      slot {terminology.student.toLowerCase()} aktif
+                    </>
+                  )}
+                </span>
+                <span className="font-mono text-[10px] text-neutral-400 dark:text-neutral-500 shrink-0">
+                  {studentCount.toLocaleString("id-ID")} / {quota.toLocaleString("id-ID")}
+                </span>
               </div>
             </div>
           </div>
-
-          {role === "admin" && (
-            <button
-              onClick={() => navigate("/admin/invoice")}
-              className={cn(
-                "px-3.5 py-1.5 rounded-xl font-bold text-xs transition shadow-xs self-start sm:self-auto flex items-center gap-1.5 flex-shrink-0",
-                isQuotaFull || isQuotaWarning
-                  ? "bg-blue-600 hover:bg-blue-700 text-white"
-                  : "bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200/80 dark:border-slate-700"
-              )}
-            >
-              <Sparkles size={13} />
-              <span>{isQuotaFull ? "Upgrade Kuota Sekarang" : "Tingkatkan Kuota"}</span>
-            </button>
-          )}
-        </div>
+        </NeonCard>
       )}
 
       {selectedIds.length > 0 && (

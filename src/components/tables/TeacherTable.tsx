@@ -50,21 +50,10 @@ export const TeacherTable = ({
   }, [teachers, search]);
 
   const columns: NeonTableColumn<Teacher>[] = useMemo(() => [
-    {
-      key: "index",
-      header: "#",
-      width: "40px",
-      align: "center",
-      render: (_item, index) => (
-        <span className="font-mono text-xs text-neutral-400 dark:text-neutral-500">
-          {index + 1}
-        </span>
-      ),
-    },
     { 
       key: "name", 
       header: `Nama ${terminology.teacher} & Identitas`, 
-      className: "min-w-[200px]",
+      className: "min-w-0",
       render: (teacher) => {
         const initials = teacher.code || (teacher.name || "G").split(" ").map(n => n[0]).join("").substring(0, 2).toUpperCase();
         return (
@@ -88,6 +77,11 @@ export const TeacherTable = ({
                 </span>
                 <span>•</span>
                 <span>Kode: {teacher.code || "-"}</span>
+                {teacher.subjects && teacher.subjects.length > 0 && (
+                  <span className="sm:hidden font-sans text-neutral-600 dark:text-neutral-300 truncate max-w-[120px]">
+                    • {teacher.subjects.join(", ")}
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -122,7 +116,8 @@ export const TeacherTable = ({
     { 
       key: "subjects", 
       header: terminology.subject, 
-      className: "w-52",
+      className: "hidden sm:table-cell w-52",
+      headerClassName: "hidden sm:table-cell w-52",
       render: (teacher) => {
         const subjects = teacher.subjects || [];
         if (subjects.length === 0) {
@@ -145,10 +140,11 @@ export const TeacherTable = ({
     {
       key: "actions",
       header: "Aksi",
-      width: "100px",
+      className: "w-20 sm:w-28 text-right shrink-0",
+      headerClassName: "w-20 sm:w-28 text-right shrink-0",
       align: "right",
       render: (teacher) => (
-        <div className="flex justify-end items-center gap-1 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+        <div className="flex justify-end items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
           <button 
             type="button"
             className="h-7 w-7 rounded-md flex items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shadow-2xs cursor-pointer"
@@ -159,7 +155,7 @@ export const TeacherTable = ({
           </button>
           <button 
             type="button"
-            className="h-7 w-7 rounded-md flex items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shadow-2xs cursor-pointer"
+            className="hidden sm:flex h-7 w-7 rounded-md items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shadow-2xs cursor-pointer"
             onClick={() => onResetPassword(teacher.id)}
             title={`Reset Password ${terminology.teacher} (12345678)`}
           >

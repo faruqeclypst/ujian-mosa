@@ -15,7 +15,8 @@ import {
   Lock,
   Calendar,
   Sparkles,
-  Users
+  Users,
+  MoreHorizontal
 } from "lucide-react";
 
 import { useTenant } from "../context/TenantContext";
@@ -23,6 +24,13 @@ import { useAuth } from "../context/AuthContext";
 import { useToast } from "../components/ui/toast";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "../components/ui/dropdown-menu";
 import {
   Dialog,
   DialogContent,
@@ -398,19 +406,9 @@ const UsersPage = () => {
   // Table Columns (Clean & Compact)
   const neonColumns: NeonTableColumn<AppUser>[] = useMemo(() => [
     {
-      key: "index",
-      header: "#",
-      width: "44px",
-      align: "center",
-      render: (_item, i) => (
-        <span className="font-mono text-xs text-neutral-400 dark:text-neutral-500">
-          {i + 1}
-        </span>
-      ),
-    },
-    {
       key: "name",
       header: "Pengguna & Akun",
+      className: "min-w-0",
       render: (u) => {
         const roleInitialColor =
           u.role === "admin"
@@ -420,20 +418,20 @@ const UsersPage = () => {
               : "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20";
 
         return (
-          <div className="flex items-center gap-3 py-1">
-            <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 border", roleInitialColor)}>
+          <div className="flex items-center gap-2.5 sm:gap-3 py-1 min-w-0">
+            <div className={cn("w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 border", roleInitialColor)}>
               {u.name?.charAt(0)?.toUpperCase() || "U"}
             </div>
             <div className="flex flex-col min-w-0">
               <span className="font-semibold text-xs text-neutral-900 dark:text-neutral-100 truncate">
                 {u.name}
               </span>
-              <div className="flex items-center gap-1.5 text-[11px] text-neutral-500 dark:text-neutral-400">
+              <div className="flex items-center gap-1.5 text-[11px] text-neutral-500 dark:text-neutral-400 truncate">
                 <span className="font-mono">@{u.username || "pengguna"}</span>
                 {u.email && (
                   <>
-                    <span className="text-neutral-300 dark:text-neutral-700">•</span>
-                    <span className="truncate max-w-[180px]">{u.email}</span>
+                    <span className="text-neutral-300 dark:text-neutral-700 hidden sm:inline">•</span>
+                    <span className="truncate max-w-[140px] hidden sm:inline">{u.email}</span>
                   </>
                 )}
               </div>
@@ -445,21 +443,23 @@ const UsersPage = () => {
     {
       key: "role",
       header: "Hak Akses",
-      width: "140px",
+      width: "120px",
       render: (u) => getRoleBadge(u.role)
     },
     {
       key: "passwordStatus",
       header: "Sandi",
-      width: "110px",
+      width: "95px",
+      className: "hidden sm:table-cell",
+      headerClassName: "hidden sm:table-cell",
       render: (u) => (
         u.hasChangedPassword ? (
-          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-medium text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20">
+          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-medium text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 whitespace-nowrap">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
             Diubah
           </span>
         ) : (
-          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-medium text-neutral-600 dark:text-neutral-400 bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-750">
+          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-medium text-neutral-600 dark:text-neutral-400 bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-750 whitespace-nowrap">
             <span className="h-1.5 w-1.5 rounded-full bg-neutral-400 dark:bg-neutral-500 shrink-0" />
             Bawaan
           </span>
@@ -469,9 +469,11 @@ const UsersPage = () => {
     {
       key: "created",
       header: "Terdaftar",
-      width: "120px",
+      width: "110px",
+      className: "hidden md:table-cell",
+      headerClassName: "hidden md:table-cell",
       render: (u) => (
-        <span className="text-[11px] text-neutral-500 dark:text-neutral-400">
+        <span className="text-[11px] text-neutral-500 dark:text-neutral-400 whitespace-nowrap">
           {u.created ? new Date(u.created).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" }) : "-"}
         </span>
       )
@@ -479,12 +481,13 @@ const UsersPage = () => {
     {
       key: "actions",
       header: "Aksi",
-      width: "100px",
+      className: "w-20 sm:w-28 text-right shrink-0",
+      headerClassName: "w-20 sm:w-28 text-right shrink-0",
       align: "right",
       render: (u) => {
         const isSelf = u.id === currentUser?.id;
         return (
-          <div className="flex justify-end items-center gap-1 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+          <div className="flex justify-end items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
             <button
               type="button"
               className="h-7 w-7 rounded-md flex items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shadow-2xs cursor-pointer"
@@ -495,26 +498,51 @@ const UsersPage = () => {
             </button>
             <button
               type="button"
-              className="h-7 w-7 rounded-md flex items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-amber-50 hover:text-amber-600 dark:hover:bg-amber-950/40 dark:hover:text-amber-400 transition-colors shadow-2xs cursor-pointer"
+              className="hidden sm:flex h-7 w-7 rounded-md items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-amber-50 hover:text-amber-600 dark:hover:bg-amber-950/40 dark:hover:text-amber-400 transition-colors shadow-2xs cursor-pointer"
               onClick={() => handleOpenResetDialog(u)}
               title="Reset Sandi ke 12345678"
             >
               <Key className="h-3.5 w-3.5" />
             </button>
-            <button
-              type="button"
-              disabled={isSelf}
-              className={cn(
-                "h-7 w-7 rounded-md flex items-center justify-center border transition-colors shadow-2xs",
-                isSelf
-                  ? "opacity-30 cursor-not-allowed bg-neutral-100 dark:bg-neutral-800 border-neutral-200 dark:border-neutral-700 text-neutral-400"
-                  : "bg-white dark:bg-neutral-850 border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 dark:hover:text-rose-400 cursor-pointer"
-              )}
-              onClick={() => handleOpenDeleteDialog(u)}
-              title={isSelf ? "Tidak bisa menghapus akun sendiri" : "Hapus Akun"}
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-            </button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="h-7 w-7 rounded-md flex items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shadow-2xs cursor-pointer"
+                  title="Menu Lainnya"
+                >
+                  <MoreHorizontal className="h-3.5 w-3.5" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48 p-1 rounded-xl shadow-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 z-[100]">
+                <DropdownMenuItem
+                  onClick={() => handleEditClick(u)}
+                  className="text-xs cursor-pointer gap-2 py-1.5"
+                >
+                  <Edit2 className="h-3.5 w-3.5 text-neutral-500" />
+                  <span>Edit Data Akun</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => handleOpenResetDialog(u)}
+                  className="text-xs cursor-pointer gap-2 py-1.5 sm:hidden"
+                >
+                  <Key className="h-3.5 w-3.5 text-amber-500" />
+                  <span>Reset Password (12345678)</span>
+                </DropdownMenuItem>
+                {!isSelf && (
+                  <>
+                    <DropdownMenuSeparator className="my-1 border-neutral-100 dark:border-neutral-800" />
+                    <DropdownMenuItem
+                      onClick={() => handleOpenDeleteDialog(u)}
+                      className="text-xs cursor-pointer gap-2 py-1.5 text-rose-600 dark:text-rose-400 focus:text-rose-600 focus:bg-rose-50 dark:focus:bg-rose-950/40"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                      <span>Hapus Akun</span>
+                    </DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         );
       }

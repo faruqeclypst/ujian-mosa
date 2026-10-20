@@ -34,6 +34,7 @@ const TopNavigation = () => {
   const [resettingId, setResettingId] = useState<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
+  const [copiedToken, setCopiedToken] = useState(false);
 
   const displayName = (user as any)?.name || (user as any)?.username || usernameFromEmail(user?.email) || "Pengguna";
   const initials = displayName
@@ -196,9 +197,31 @@ const TopNavigation = () => {
     timeLeft,
     resetStudentPassword,
     dismissResetRequest,
-    resetStudentPasswordBatch
+    resetStudentPasswordBatch,
   } = useExamData();
   const { addToast } = useToast();
+
+  const handleCopyToken = async () => {
+    if (!universalToken) return;
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(universalToken);
+      } else {
+        const textarea = document.createElement("textarea");
+        textarea.value = universalToken;
+        textarea.style.position = "fixed";
+        textarea.style.opacity = "0";
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textarea);
+      }
+      setCopiedToken(true);
+      setTimeout(() => setCopiedToken(false), 1800);
+    } catch {
+      // Gagal menyalin (misal diblokir browser)
+    }
+  };
 
   const resetRequests = useMemo(() => {
     return (students || []).filter((s) => !!s.resetRequested);
@@ -310,16 +333,31 @@ const TopNavigation = () => {
           <span>Upgrade</span>
         </Link>
 
-        {/* Universal Token (Neon Console Badge) */}
+        {/* Universal Token (Neon Console Badge - Click to Copy) */}
         {!universalToken && useExamData().loading ? (
           <Skeleton className="h-7 w-20 rounded-md hidden sm:block" />
         ) : universalToken && (
-          <div
-            title="Token Ujian Aktif"
-            className="flex items-center gap-1.5 h-7 px-2 bg-neutral-100 dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-750 rounded-md text-neutral-800 dark:text-neutral-200 select-none shadow-2xs shrink-0"
+          <button
+            type="button"
+            onClick={handleCopyToken}
+            title={copiedToken ? "Tersalin!" : "Klik untuk menyalin token ujian aktif"}
+            aria-label={`Salin token ujian ${universalToken}`}
+            className={cn(
+              "group relative flex items-center gap-1.5 h-7 px-2.5 bg-neutral-100 dark:bg-neutral-850 hover:bg-neutral-200/70 dark:hover:bg-neutral-800 border border-neutral-200 dark:border-neutral-750 hover:border-amber-400/50 dark:hover:border-amber-500/50 rounded-md text-neutral-800 dark:text-neutral-200 select-none shadow-2xs shrink-0 cursor-pointer transition-all active:scale-95 focus:outline-hidden",
+              copiedToken && "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-700/60"
+            )}
           >
-            <span className="flex h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-xs font-mono font-bold tracking-wider text-amber-600 dark:text-amber-400">
+            {copiedToken ? (
+              <Check className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400 animate-in zoom-in duration-150" />
+            ) : (
+              <span className="flex h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            )}
+            <span
+              className={cn(
+                "text-xs font-mono font-bold tracking-wider transition-colors",
+                copiedToken ? "text-emerald-700 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"
+              )}
+            >
               {universalToken}
             </span>
             {timeLeft && (
@@ -327,7 +365,7 @@ const TopNavigation = () => {
                 {timeLeft}
               </span>
             )}
-          </div>
+          </button>
         )}
 
         {/* Live Clock (Neon Console Clean Time) */}

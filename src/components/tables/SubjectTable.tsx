@@ -1,8 +1,15 @@
 import { useState, useMemo } from "react";
 import { NeonTable, type NeonTableColumn } from "../ui/NeonTable";
 import type { SubjectData } from "../../types/exam";
-import { Edit, Trash, BookOpen } from "lucide-react";
+import { Edit, Trash, BookOpen, MoreHorizontal } from "lucide-react";
 import { useTenant } from "../../context/TenantContext";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "../ui/dropdown-menu";
 
 interface SubjectTableProps {
   subjects: SubjectData[];
@@ -35,21 +42,10 @@ export const SubjectTable = ({
   }, [subjects, search]);
 
   const columns: NeonTableColumn<SubjectData>[] = useMemo(() => [
-    {
-      key: "index",
-      header: "#",
-      width: "40px",
-      align: "center",
-      render: (_item, index) => (
-        <span className="font-mono text-xs text-neutral-400 dark:text-neutral-500">
-          {index + 1}
-        </span>
-      ),
-    },
     { 
       key: "name", 
       header: `Nama ${terminology.subject} & Kurikulum`,
-      className: "min-w-[220px]",
+      className: "min-w-0",
       render: (subject) => (
         <div className="flex items-center gap-2.5 py-0.5">
           <div className="h-7 w-7 rounded-md bg-sky-500/10 text-sky-700 dark:text-sky-400 border border-sky-500/20 flex items-center justify-center shrink-0">
@@ -88,10 +84,11 @@ export const SubjectTable = ({
     {
       key: "actions",
       header: "Aksi",
-      width: "90px",
+      className: "w-20 text-right shrink-0",
+      headerClassName: "w-20 text-right shrink-0",
       align: "right",
       render: (subject) => (
-        <div className="flex justify-end items-center gap-1 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+        <div className="flex justify-end items-center gap-1" onClick={(e) => e.stopPropagation()}>
           <button 
             type="button"
             className="h-7 w-7 rounded-md flex items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shadow-2xs cursor-pointer"
@@ -100,14 +97,34 @@ export const SubjectTable = ({
           >
             <Edit className="h-3.5 w-3.5" />
           </button>
-          <button 
-            type="button"
-            className="h-7 w-7 rounded-md flex items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 dark:hover:text-rose-400 transition-colors shadow-2xs cursor-pointer"
-            onClick={() => onDelete(subject)}
-            title={`Hapus ${terminology.subject}`}
-          >
-            <Trash className="h-3.5 w-3.5" />
-          </button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="h-7 w-7 rounded-md flex items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shadow-2xs cursor-pointer"
+                title="Menu Lainnya"
+              >
+                <MoreHorizontal className="h-3.5 w-3.5" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48 p-1 rounded-xl shadow-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 z-[100]">
+              <DropdownMenuItem
+                onClick={() => onEdit(subject)}
+                className="text-xs cursor-pointer gap-2 py-1.5"
+              >
+                <Edit className="h-3.5 w-3.5 text-neutral-500" />
+                <span>Edit {terminology.subject}</span>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator className="my-1 border-neutral-100 dark:border-neutral-800" />
+              <DropdownMenuItem
+                onClick={() => onDelete(subject)}
+                className="text-xs cursor-pointer gap-2 py-1.5 text-rose-600 dark:text-rose-400 focus:text-rose-600 focus:bg-rose-50 dark:focus:bg-rose-950/40"
+              >
+                <Trash className="h-3.5 w-3.5" />
+                <span>Hapus {terminology.subject}</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       )
     }

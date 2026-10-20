@@ -33,7 +33,8 @@ import {
   ClipboardCheck,
   Building2,
   Calendar,
-  SlidersHorizontal
+  SlidersHorizontal,
+  GitBranch,
 } from "lucide-react";
 import * as XLSX from "xlsx-js-style";
 import { Button } from "../../components/ui/button";
@@ -42,6 +43,7 @@ import { Badge } from "../../components/ui/badge";
 import { Skeleton } from "../../components/ui/skeleton";
 import { MathText } from "../../components/ui/MathText";
 import { SmartImage } from "../../components/ui/smart-image";
+import { ExamRoomPicker } from "../../components/common/ExamRoomPicker";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -407,13 +409,10 @@ export const ItemAnalysisPage: React.FC = () => {
 
         if (isMounted) {
           setRoomList(mapped);
-          // Jika belum ada roomId di query string, gunakan roomId pertama
-          if (!currentRoomId && mapped.length > 0) {
-            const first = mapped[0];
-            setSelectedRoomId(first.id);
-            setSearchParams({ roomId: first.id, examId: first.examId }, { replace: true });
-          } else if (currentRoomId) {
+          if (currentRoomId) {
             setSelectedRoomId(currentRoomId);
+          } else {
+            setSelectedRoomId("");
           }
         }
       } catch (err) {
@@ -425,14 +424,19 @@ export const ItemAnalysisPage: React.FC = () => {
 
     loadRooms();
     return () => { isMounted = false; };
-  }, [pb, subjects, teachers]);
+  }, [pb, subjects, teachers, currentRoomId]);
 
   // Handle Switch Ruangan
-  const handleRoomChange = (newRoomId: string) => {
+  const handleRoomChange = (newRoomId: string, examIdHint?: string) => {
     setSelectedRoomId(newRoomId);
+    if (!newRoomId) {
+      setSearchParams({});
+      return;
+    }
     const found = roomList.find(r => r.id === newRoomId);
-    if (found) {
-      setSearchParams({ roomId: found.id, examId: found.examId });
+    const targetExamId = found?.examId || examIdHint;
+    if (targetExamId) {
+      setSearchParams({ roomId: newRoomId, examId: targetExamId });
     } else {
       setSearchParams({ roomId: newRoomId });
     }
@@ -1680,6 +1684,26 @@ export const ItemAnalysisPage: React.FC = () => {
     window.print();
   };
 
+  // Jika belum memilih ruangan, tampilkan ExamRoomPicker terlebih dahulu
+  if (!selectedRoomId && !currentRoomId) {
+    return (
+      <div className="w-full min-h-screen bg-white dark:bg-[#0c0d0e] text-neutral-900 dark:text-neutral-100 font-sans">
+        <div className="max-w-[1520px] mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-6">
+          <ExamRoomPicker
+            title="Analisis Butir Soal &amp; Psikometri"
+            subtitle="Pilih sesi ruang ujian yang ingin dianalisis untuk memuat kalkulasi daya pembeda (D Kelley 27%), tingkat kesukaran (P), efektivitas opsi pengecoh, dan rekomendasi AI."
+            badgeText="Analisis Soal"
+            actionText="Buka Analisis Soal"
+            icon={Sparkles}
+            onSelectRoom={(r) => {
+              handleRoomChange(r.id, r.examId);
+            }}
+          />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <TooltipProvider delayDuration={150}>
       {/* PRINT STYLESHEET OVERRIDE */}
@@ -1802,8 +1826,21 @@ export const ItemAnalysisPage: React.FC = () => {
             </p>
           </div>
 
-          {/* Action Buttons Toolbar: Single Dropdown Menu */}
+          {/* Action Buttons Toolbar: Single Dropdown Menu + Ganti Ruang */}
           <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setSelectedRoomId("");
+                setSearchParams({});
+              }}
+              className="rounded-xl font-bold text-xs h-9 px-3.5 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 shadow-2xs flex items-center gap-2 transition-all cursor-pointer"
+              title="Pilih sesi ruang ujian lain"
+            >
+              <GitBranch className="h-3.5 w-3.5 text-slate-400" />
+              <span>Ganti Ruang</span>
+            </Button>
+
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button

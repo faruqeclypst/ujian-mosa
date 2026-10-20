@@ -228,9 +228,9 @@ const SchoolAppContent = () => {
               <Route path="penilaian/:studentId" element={<StudentGradingDetailPage />} />
               <Route path="panduan" element={<GuidePage />} />
               <Route path="analisis-butir-soal" element={<ItemAnalysisPage />} />
-              <Route path="pengaturan" element={<SettingsPage />} />
-              <Route path="status-server" element={<ServerStatusPage />} />
-              <Route path="invoice" element={<SchoolInvoicePage />} />
+              <Route path="pengaturan" element={<AdminOnlyRoute><SettingsPage /></AdminOnlyRoute>} />
+              <Route path="status-server" element={<AdminOnlyRoute><ServerStatusPage /></AdminOnlyRoute>} />
+              <Route path="invoice" element={<AdminOnlyRoute><SchoolInvoicePage /></AdminOnlyRoute>} />
             </Route>
 
             {/* Root redirect */}

@@ -4172,6 +4172,10 @@ const QuestionsPage = () => {
                 )}
               </span>
             )}
+            {/* Mobile Type Badge */}
+            <span className="sm:hidden px-1.5 py-0.2 rounded text-[10px] font-semibold bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 border border-neutral-200 dark:border-neutral-700">
+              {QUESTION_TYPE_LABELS[item.type || "pilihan_ganda"] || item.type}
+            </span>
           </div>
         </div>
       )
@@ -4202,54 +4206,86 @@ const QuestionsPage = () => {
     {
       key: "actions",
       header: "Aksi",
-      width: "90px",
+      className: "w-20 sm:w-28 text-right shrink-0",
+      headerClassName: "w-20 sm:w-28 text-right shrink-0",
       align: "right",
-      className: "text-right",
-      headerClassName: "text-right",
-      render: (item) => (
-        <div className="flex justify-end items-center gap-1 whitespace-nowrap">
-          <button
-            type="button"
-            className="p-1.5 rounded-md bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-neutral-600 dark:text-neutral-300 transition-colors cursor-pointer"
-            onClick={(e) => {
-              e.stopPropagation();
-              const idx = questions.findIndex(q => q.id === item.id);
-              setPreviewIndex(idx >= 0 ? idx : 0);
-              setPreviewQuestion(item);
-              setIsPreviewOpen(true);
-            }}
-            title="Pratinjau Soal"
-          >
-            <Search className="h-3.5 w-3.5" />
-          </button>
-          {isOwner && (
-            <>
+      render: (item) => {
+        const idx = questions.findIndex(q => q.id === item.id);
+        return (
+          <div className="flex justify-end items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+            {/* Quick Action: Pratinjau */}
+            <button
+              type="button"
+              className="h-7 w-7 rounded-md flex items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shadow-2xs cursor-pointer"
+              onClick={() => {
+                setPreviewIndex(idx >= 0 ? idx : 0);
+                setPreviewQuestion(item);
+                setIsPreviewOpen(true);
+              }}
+              title="Pratinjau Soal"
+            >
+              <Search className="h-3.5 w-3.5" />
+            </button>
+
+            {/* Quick Action: Edit (sm+) */}
+            {isOwner && (
               <button
                 type="button"
-                className="p-1.5 rounded-md bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-700 dark:text-indigo-400 transition-colors cursor-pointer"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleEditClick(item);
-                }}
+                className="hidden sm:flex h-7 w-7 rounded-md items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shadow-2xs cursor-pointer"
+                onClick={() => handleEditClick(item)}
                 title="Edit Soal"
               >
                 <Edit className="h-3.5 w-3.5" />
               </button>
-              <button
-                type="button"
-                className="p-1.5 rounded-md bg-rose-500/10 hover:bg-rose-500/20 text-rose-700 dark:text-rose-400 transition-colors cursor-pointer"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleDeleteClick(item);
-                }}
-                title="Hapus Soal"
-              >
-                <Trash className="h-3.5 w-3.5" />
-              </button>
-            </>
-          )}
-        </div>
-      )
+            )}
+
+            {/* Dropdown Menu Seragam */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="h-7 w-7 rounded-md flex items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shadow-2xs cursor-pointer"
+                  title="Menu Lainnya"
+                >
+                  <MoreHorizontal className="h-3.5 w-3.5" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48 p-1 rounded-xl shadow-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 z-[100]">
+                <DropdownMenuItem
+                  onClick={() => {
+                    setPreviewIndex(idx >= 0 ? idx : 0);
+                    setPreviewQuestion(item);
+                    setIsPreviewOpen(true);
+                  }}
+                  className="text-xs cursor-pointer gap-2 py-1.5"
+                >
+                  <Search className="h-3.5 w-3.5 text-neutral-500" />
+                  <span>Pratinjau Soal</span>
+                </DropdownMenuItem>
+                {isOwner && (
+                  <>
+                    <DropdownMenuItem
+                      onClick={() => handleEditClick(item)}
+                      className="text-xs cursor-pointer gap-2 py-1.5"
+                    >
+                      <Edit className="h-3.5 w-3.5 text-neutral-500" />
+                      <span>Edit Butir Soal</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator className="my-1 border-neutral-100 dark:border-neutral-800" />
+                    <DropdownMenuItem
+                      onClick={() => handleDeleteClick(item)}
+                      className="text-xs cursor-pointer gap-2 py-1.5 text-rose-600 dark:text-rose-400 focus:text-rose-600 focus:bg-rose-50 dark:focus:bg-rose-950/40"
+                    >
+                      <Trash className="h-3.5 w-3.5" />
+                      <span>Hapus Butir Soal</span>
+                    </DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        );
+      }
     }
   ], [questions, isOwner]);
 

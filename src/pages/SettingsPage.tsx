@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 import { useTenant } from "../context/TenantContext";
 import { masterPb } from "../lib/pocketbase";
 import { uploadInventoryImage, deleteImageFromStorage, isOfflineEnvironment } from "../lib/storage";
@@ -97,7 +98,14 @@ const COLLECTIONS = [
 
 const SettingsPage = () => {
   const navigate = useNavigate();
+  const { role, loading: authLoading } = useAuth();
   const { pb, school, terminology, loading: tenantLoading } = useTenant();
+
+  useEffect(() => {
+    if (!authLoading && role !== "admin") {
+      navigate("/admin", { replace: true });
+    }
+  }, [role, authLoading, navigate]);
 
   const [settingsId, setSettingsId] = useState<string | null>(null);
   const [schoolName, setSchoolName] = useState("");
@@ -1136,6 +1144,9 @@ const SettingsPage = () => {
       setResetInput("");
     }
   };
+
+  if (authLoading) return null;
+  if (role !== "admin") return null;
 
   return (
     <div className="w-full min-h-screen bg-white dark:bg-[#0c0d0e] text-neutral-900 dark:text-neutral-100 font-sans">

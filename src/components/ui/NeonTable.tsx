@@ -349,8 +349,8 @@ export function NeonTable<T>({
                   style={{ width: col.width }}
                   className={cn(
                     compact
-                      ? "px-3 sm:px-3.5 py-2.5 sm:py-3 whitespace-nowrap"
-                      : "px-4 sm:px-5 py-3 sm:py-3.5 whitespace-nowrap",
+                      ? "px-3 sm:px-3.5 py-2.5 sm:py-3"
+                      : "px-4 sm:px-5 py-3 sm:py-3.5",
                     col.align === "center"
                       ? "text-center"
                       : col.align === "right"
@@ -507,7 +507,7 @@ export function NeonTable<T>({
       {pagination && totalItems > 0 && (
         <div className="px-4 sm:px-6 py-3 border-t border-neutral-200 dark:border-neutral-800 bg-neutral-50/50 dark:bg-neutral-900/30 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs text-neutral-500 dark:text-neutral-400">
           {/* Entries summary */}
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center justify-between sm:justify-start gap-2 sm:gap-3 w-full sm:w-auto">
             <span>
               Menampilkan{" "}
               <strong className="text-neutral-800 dark:text-neutral-200 font-mono">
@@ -525,7 +525,7 @@ export function NeonTable<T>({
             </span>
 
             {/* Rows Per Page Selector */}
-            <div className="flex items-center gap-1.5 pl-3 border-l border-neutral-200 dark:border-neutral-800">
+            <div className="flex items-center gap-1.5 pl-2.5 sm:pl-3 border-l border-neutral-200 dark:border-neutral-800 shrink-0">
               <span className="text-[11px] text-neutral-400">Baris:</span>
               <select
                 value={pageSize}
@@ -548,7 +548,7 @@ export function NeonTable<T>({
           </div>
 
           {/* Pagination Navigation Buttons */}
-          <div className="flex items-center gap-1 self-end sm:self-auto">
+          <div className="flex items-center justify-center sm:justify-end gap-1 w-full sm:w-auto pt-1 sm:pt-0">
             {/* First Page */}
             <button
               type="button"

@@ -1,12 +1,13 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
-import { ArrowLeft, BookOpen, FileSpreadsheet, RefreshCw, BarChart2, ChevronRight, Download } from "lucide-react";
+import { ArrowLeft, BookOpen, FileSpreadsheet, RefreshCw, BarChart2, ChevronRight, Download, Award, GitBranch } from "lucide-react";
 import * as XLSX from "xlsx-js-style";
 import { Button } from "../../components/ui/button";
 import { Skeleton } from "../../components/ui/skeleton";
 import { NeonTable, type NeonTableColumn } from "../../components/ui/NeonTable";
 import { NeonPageHeader } from "../../components/ui/NeonPageHeader";
 import { NeonStatGrid, NeonStatCard } from "../../components/ui/NeonStats";
+import { ExamRoomPicker } from "../../components/common/ExamRoomPicker";
 import { useTenant } from "../../context/TenantContext";
 import { useExamData } from "../../context/ExamDataContext";
 import { useToast } from "../../components/ui/toast";
@@ -41,34 +42,14 @@ const GradingPage = () => {
   const { classes: examClasses, students } = useExamData();
   const { addToast } = useToast();
 
-  const queryRoomId = searchParams.get("roomId");
-  const [sessionRoomId, setSessionRoomId] = useState<string | null>(() => {
-    return sessionStorage.getItem("activeGradingRoomId") || sessionStorage.getItem("activeMonitoringRoomId");
-  });
+  const roomId = searchParams.get("roomId");
 
-  const roomId = queryRoomId || sessionRoomId;
-
-  useEffect(() => {
-    if (queryRoomId) {
-      sessionStorage.setItem("activeGradingRoomId", queryRoomId);
-      setSessionRoomId(queryRoomId);
-    }
-  }, [queryRoomId]);
-
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [room, setRoom] = useState<any>(null);
   const [questions, setQuestions] = useState<any[]>([]);
   const [attempts, setAttempts] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [classFilter, setClassFilter] = useState("all");
-
-  useEffect(() => {
-    if (!roomId) {
-      navigate("/admin/ruang-ujian", { replace: true });
-      return;
-    }
-    loadData();
-  }, [roomId]);
 
   const loadData = useCallback(async () => {
     if (!pb || !roomId) return;
@@ -156,6 +137,12 @@ const GradingPage = () => {
       setLoading(false);
     }
   }, [pb, roomId, addToast]);
+
+  useEffect(() => {
+    if (roomId) {
+      loadData();
+    }
+  }, [roomId, loadData]);
 
   // Scoring helpers
   const objectiveQuestions = useMemo(() => questions.filter(q => q.type !== "isian_singkat" && q.type !== "uraian"), [questions]);
@@ -433,20 +420,9 @@ const GradingPage = () => {
   const columns: NeonTableColumn<any>[] = useMemo(() => {
     const cols: NeonTableColumn<any>[] = [
       {
-        key: "index",
-        header: "#",
-        width: "48px",
-        align: "center",
-        render: (_item, index) => (
-          <span className="font-mono text-xs text-neutral-400 dark:text-neutral-500">
-            {index + 1}
-          </span>
-        ),
-      },
-      {
         key: "name",
         header: `Nama ${terminology.student || "Siswa"}`,
-        className: "min-w-[240px] max-w-[340px]",
+        className: "min-w-0 max-w-[340px]",
         render: (std) => (
           <div className="flex flex-col gap-0.5 py-1">
             <span className="text-[13px] font-bold tracking-tight text-neutral-900 dark:text-neutral-100 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
@@ -467,6 +443,8 @@ const GradingPage = () => {
         header: "Objektif",
         align: "center",
         width: "110px",
+        className: "hidden sm:table-cell",
+        headerClassName: "hidden sm:table-cell",
         render: (std) => {
           const att = attempts.find(a => (a.studentId || a.student_id) === std.id);
           if (!att) return <span className="font-mono text-xs text-neutral-400">-</span>;
@@ -487,6 +465,8 @@ const GradingPage = () => {
         header: "Subjektif",
         align: "center",
         width: "110px",
+        className: "hidden sm:table-cell",
+        headerClassName: "hidden sm:table-cell",
         render: (std) => {
           const att = attempts.find(a => (a.studentId || a.student_id) === std.id);
           if (!att) return <span className="font-mono text-xs text-neutral-400">-</span>;
@@ -552,6 +532,26 @@ const GradingPage = () => {
     return cols;
   }, [attempts, getScoreBreakdown, hasEssay, navigate, roomId, terminology]);
 
+  // Jika belum memilih ruang ujian, tampilkan Room Picker terlebih dahulu
+  if (!roomId) {
+    return (
+      <div className="w-full min-h-screen bg-white dark:bg-[#0c0d0e] text-neutral-900 dark:text-neutral-100 font-sans">
+        <div className="max-w-[1520px] mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-6">
+          <ExamRoomPicker
+            title="Rekapitulasi Nilai Ujian"
+            subtitle="Pilih sesi ruang ujian yang ingin ditampilkan untuk melihat lembar jawaban, rekap skor, dan ekspor excel."
+            badgeText="Nilai"
+            actionText="Buka Lembar Nilai"
+            icon={Award}
+            onSelectRoom={(r) => {
+              navigate(`/admin/penilaian?roomId=${r.id}`);
+            }}
+          />
+        </div>
+      </div>
+    );
+  }
+
   if (loading) {
     return (
       <div className="w-full min-h-screen bg-white dark:bg-[#0c0d0e] text-neutral-900 dark:text-neutral-100 font-sans">
@@ -567,7 +567,7 @@ const GradingPage = () => {
   }
 
   return (
-    <div className="w-full min-h-screen bg-white dark:bg-[#0c0d0e] text-neutral-900 dark:text-neutral-100 font-sans">
+    <div className="w-full min-h-screen bg-white dark:bg-[#0c0d0e] text-neutral-900 dark:text-neutral-100 font-sans overflow-x-hidden">
       <div className="max-w-[1520px] mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-6 space-y-6">
 
         {/* ═══════════════════════════════════════════════════════════════
@@ -575,14 +575,18 @@ const GradingPage = () => {
            ═══════════════════════════════════════════════════════════════ */}
         <NeonPageHeader
           bordered
-          onBack={() => navigate(`/admin/monitoring?roomId=${roomId || ""}`)}
-          backTitle="Kembali ke Monitoring"
+          onBack={() => navigate("/admin/penilaian")}
+          backTitle="Pilih Ruang Lain"
           title={`Penilaian: ${room?.room_name || "Ruang Ujian"}`}
           breadcrumbs={
             <>
-              <Link to="/admin/ruang-ujian" className="hover:text-neutral-800 dark:hover:text-neutral-200 transition-colors shrink-0">
-                Ruang Ujian
-              </Link>
+              <button
+                type="button"
+                onClick={() => navigate("/admin/penilaian")}
+                className="hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors shrink-0 cursor-pointer font-medium"
+              >
+                Pilih Ruang
+              </button>
               <span>/</span>
               <span className="font-medium text-neutral-700 dark:text-neutral-300 shrink-0">
                 {room?.subjectName || "Mapel"}
@@ -593,6 +597,15 @@ const GradingPage = () => {
           }
           actions={
             <>
+              <button
+                type="button"
+                onClick={() => navigate("/admin/penilaian")}
+                className="inline-flex items-center gap-1.5 h-8 px-3 text-xs font-medium bg-white dark:bg-neutral-850 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-200 border border-neutral-200 dark:border-neutral-800 rounded-md shadow-2xs transition-colors cursor-pointer"
+                title="Pilih ruang ujian lain"
+              >
+                <GitBranch className="h-3.5 w-3.5 text-neutral-400" />
+                <span>Ganti Ruang</span>
+              </button>
               <button
                 type="button"
                 onClick={handleExportGrading}

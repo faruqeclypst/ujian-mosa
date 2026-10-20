@@ -88,21 +88,10 @@ export const StudentTable = ({
   }, [students, serverSide, localSearch]);
 
   const columns: NeonTableColumn<StudentData>[] = useMemo(() => [
-    {
-      key: "index",
-      header: "#",
-      width: "40px",
-      align: "center",
-      render: (_item, index) => (
-        <span className="font-mono text-xs text-neutral-400 dark:text-neutral-500">
-          {index + 1}
-        </span>
-      ),
-    },
     { 
       key: "name", 
       header: `Nama ${terminology.student} & Identitas`, 
-      className: "min-w-[200px]",
+      className: "min-w-0",
       render: (student) => {
         const initials = (student.name || "S").split(" ").map(n => n[0]).join("").substring(0, 2).toUpperCase();
         return (
@@ -128,6 +117,10 @@ export const StudentTable = ({
                 <span className="font-medium text-emerald-600 dark:text-emerald-400">
                   @{student.nisn || "---"}
                 </span>
+                {/* Info Kelas di mobile saat kolom kelas disembunyikan */}
+                <span className="sm:hidden text-neutral-700 dark:text-neutral-300 font-sans font-medium">
+                  • {classes.find(c => c.id === student.classId)?.name || (student.classId === "ALUMNI" ? "Alumni" : "-")}
+                </span>
                 {student.examNumber && student.examNumber !== student.nisn && (
                   <>
                     <span>•</span>
@@ -135,12 +128,12 @@ export const StudentTable = ({
                   </>
                 )}
                 {(student.birthPlace || student.birthDate) && (
-                  <>
-                    <span>•</span>
+                  <span className="hidden sm:inline">
+                    <span>• </span>
                     <span className="truncate max-w-[140px]">
                       {[student.birthPlace, student.birthDate].filter(Boolean).join(", ")}
                     </span>
-                  </>
+                  </span>
                 )}
               </div>
             </div>
@@ -151,7 +144,8 @@ export const StudentTable = ({
     { 
       key: "classId", 
       header: terminology.class, 
-      className: "w-36",
+      className: "hidden sm:table-cell w-36",
+      headerClassName: "hidden sm:table-cell w-36",
       render: (student) => {
         const cls = classes.find(c => c.id === student.classId);
         const clsName = cls?.name || (student.classId === "ALUMNI" ? "Alumni" : `Tanpa ${terminology.class}`);
@@ -174,6 +168,8 @@ export const StudentTable = ({
       header: "L/P", 
       width: "50px",
       align: "center",
+      className: "hidden sm:table-cell text-center",
+      headerClassName: "hidden sm:table-cell text-center",
       render: (student) => (
         <span className={cn(
           "inline-flex items-center justify-center h-5 w-5 rounded text-[10px] font-bold font-mono border",
@@ -189,6 +185,8 @@ export const StudentTable = ({
       key: "hasChangedPassword",
       header: "Password",
       width: "110px",
+      className: "hidden md:table-cell",
+      headerClassName: "hidden md:table-cell",
       render: (student) => {
         const hasChanged = student.hasChangedPassword;
         const isResetReq = !!student.resetRequested;
@@ -214,12 +212,13 @@ export const StudentTable = ({
     {
       key: "actions",
       header: "Aksi",
-      width: "100px",
+      className: "w-20 sm:w-28 text-right shrink-0",
+      headerClassName: "w-20 sm:w-28 text-right shrink-0",
       align: "right",
       render: (student) => {
         if (customActions) return customActions(student);
         return (
-          <div className="flex justify-end items-center gap-1 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+          <div className="flex justify-end items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
             {role === "admin" && (
               <button 
                 type="button"
@@ -235,7 +234,8 @@ export const StudentTable = ({
               <button 
                 type="button"
                 className={cn(
-                  "h-7 w-7 rounded-md flex items-center justify-center border transition-colors shadow-2xs cursor-pointer",
+                  "h-7 w-7 rounded-md items-center justify-center border transition-colors shadow-2xs cursor-pointer",
+                  student.resetRequested ? "flex" : "hidden sm:flex",
                   student.resetRequested
                     ? "bg-rose-50 border-rose-300 text-rose-600 animate-pulse dark:bg-rose-950/40 dark:border-rose-800 dark:text-rose-400"
                     : "bg-white dark:bg-neutral-850 border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800"
@@ -258,6 +258,15 @@ export const StudentTable = ({
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48 p-1 rounded-xl shadow-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 z-[100]">
+                {role === "admin" && onResetPassword && (
+                  <DropdownMenuItem
+                    onClick={() => onResetPassword(student)}
+                    className="text-xs cursor-pointer gap-2 py-1.5 sm:hidden"
+                  >
+                    <KeyRound className="h-3.5 w-3.5 text-amber-500" />
+                    <span>Reset Password (12345678)</span>
+                  </DropdownMenuItem>
+                )}
                 {onPrintExamCard && (
                   <DropdownMenuItem
                     onClick={() => onPrintExamCard(student)}

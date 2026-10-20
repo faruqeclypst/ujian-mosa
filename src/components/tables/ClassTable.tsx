@@ -44,21 +44,10 @@ export const ClassTable = ({
   }, [classes, search]);
 
   const columns: NeonTableColumn<ClassData>[] = useMemo(() => [
-    {
-      key: "index",
-      header: "#",
-      width: "40px",
-      align: "center",
-      render: (_item, index) => (
-        <span className="font-mono text-xs text-neutral-400 dark:text-neutral-500">
-          {index + 1}
-        </span>
-      ),
-    },
     { 
       key: "name", 
       header: "Nama Rombongan Belajar (Kelas)",
-      className: "min-w-[220px]",
+      className: "min-w-0",
       render: (cls) => {
         const count = studentCounts[cls.id] || 0;
         return (
@@ -104,10 +93,11 @@ export const ClassTable = ({
     {
       key: "actions",
       header: "Aksi",
-      width: "100px",
+      className: "w-20 sm:w-28 text-right shrink-0",
+      headerClassName: "w-20 sm:w-28 text-right shrink-0",
       align: "right",
       render: (cls) => (
-        <div className="flex justify-end items-center gap-1 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+        <div className="flex justify-end items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
           <button 
             type="button"
             className="h-7 w-7 rounded-md flex items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shadow-2xs cursor-pointer"
@@ -120,7 +110,7 @@ export const ClassTable = ({
           {onResetPassword && (
             <button 
               type="button"
-              className="h-7 w-7 rounded-md flex items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shadow-2xs cursor-pointer"
+              className="hidden sm:flex h-7 w-7 rounded-md items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shadow-2xs cursor-pointer"
               onClick={() => onResetPassword(cls)}
               title="Reset Password Siswa Kelas Ini (12345678)"
             >

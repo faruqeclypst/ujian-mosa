@@ -33,11 +33,13 @@ import {
   FileText,
   Lock,
   UserX,
+  Rocket,
 } from "lucide-react";
 import { useTenant } from "../context/TenantContext";
 import { useAuth } from "../context/AuthContext";
 import { useExamData } from "../context/ExamDataContext";
 import { useToast } from "../components/ui/toast";
+import { APP_DISPLAY_VERSION } from "../utils/version";
 import { Button } from "../components/ui/button";
 import {
   NeonTabs,
@@ -156,14 +158,14 @@ export default function DashboardPage() {
       try {
         const d = await pb.collection("exams").getFullList();
         if (isMounted) setExams(d);
-      } catch {}
+      } catch { }
     });
 
     const unsubRooms = pb.collection("exam_rooms").subscribe("*", async () => {
       try {
         const d = await pb.collection("exam_rooms").getFullList();
         if (isMounted) setRooms(d);
-      } catch {}
+      } catch { }
     });
 
     const unsubAttempts = pb.collection("attempts").subscribe("*", (e) => {
@@ -329,12 +331,12 @@ export default function DashboardPage() {
       {/* ── Main Container (3-Column Layout: Left Nav is in AdminLayout, Center Content + Right Sidebar Inspector) ── */}
       <div className="max-w-[1520px] mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-6">
         <div className="grid grid-cols-1 xl:grid-cols-[1fr_300px] 2xl:grid-cols-[1fr_320px] gap-8 items-start">
-          
+
           {/* ═══════════════════════════════════════════════════════════════
               CENTER / MAIN CONTENT
              ═══════════════════════════════════════════════════════════════ */}
           <div className="min-w-0 space-y-6">
-            
+
             {/* 1. Header Section */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div className="space-y-1">
@@ -343,7 +345,7 @@ export default function DashboardPage() {
                     Ringkasan Sesi &amp; Ujian
                   </h1>
                 </div>
-                
+
                 {/* Breadcrumb line matching Neon Console */}
                 <div className="flex flex-wrap items-center gap-1.5 text-xs text-neutral-500 dark:text-neutral-400">
                   <Link to="/admin" className="hover:text-neutral-800 dark:hover:text-neutral-200 transition-colors">
@@ -489,132 +491,157 @@ export default function DashboardPage() {
               </div>
             )}
 
-            {/* 3. Core Modules / Service Table (Disesuaikan untuk Tenant Examku) */}
+            {/* 3. Log Pembaruan Sistem (Changelog Versi Saat Ini) */}
             <div className="rounded-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 overflow-hidden shadow-xs">
-              {/* Table Header */}
-              <div className="bg-neutral-50 dark:bg-neutral-850 px-4 py-2.5 grid grid-cols-12 text-xs font-semibold text-neutral-600 dark:text-neutral-400 border-b border-neutral-200 dark:border-neutral-800">
-                <div className="col-span-5 sm:col-span-4">Modul Layanan CBT</div>
-                <div className="col-span-7 sm:col-span-8">Deskripsi &amp; Status Realtime</div>
+              {/* Header Bar */}
+              <div className="bg-neutral-50 dark:bg-neutral-850 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-neutral-200 dark:border-neutral-800">
+                <div className="flex items-center gap-2.5">
+                  <div className="h-7 w-7 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-500/20">
+                    <Rocket className="h-4 w-4" />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-xs sm:text-sm text-neutral-900 dark:text-neutral-100">
+                      Log Pembaruan Sistem
+                    </span>
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-mono font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
+                      {APP_DISPLAY_VERSION}
+                    </span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 text-[11px] font-mono text-neutral-500">
+                  <span className="inline-flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                    Versi Produksi Aktif
+                  </span>
+                </div>
               </div>
 
-              {/* Table Rows */}
+              {/* Rows List */}
               <div className="divide-y divide-neutral-200 dark:divide-neutral-800 text-xs sm:text-[13px]">
-                
-                {/* Row 1: Ruang Ujian & Sesi CBT */}
-                <div 
-                  onClick={() => navigate("/admin/ruang-ujian")}
-                  className="grid grid-cols-12 px-4 py-3.5 items-center hover:bg-neutral-50/70 dark:hover:bg-neutral-850/50 cursor-pointer transition-colors group"
-                >
-                  <div className="col-span-5 sm:col-span-4 flex items-center gap-3 pr-2">
-                    <div className="h-8 w-8 rounded-md bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center text-neutral-600 dark:text-neutral-300 shrink-0 border border-neutral-200/50 dark:border-neutral-700/50">
-                      <ClipboardList className="h-4 w-4" />
+                {/* 1. Neon Table & UI */}
+                <div className="px-4 py-3.5 flex items-start justify-between gap-3 hover:bg-neutral-50/70 dark:hover:bg-neutral-850/50 transition-colors">
+                  <div className="flex items-start gap-3 min-w-0">
+                    <div className="h-8 w-8 rounded-md bg-sky-500/10 text-sky-600 dark:text-sky-400 flex items-center justify-center shrink-0 border border-sky-500/20 mt-0.5">
+                      <Sparkles className="h-4 w-4" />
                     </div>
-                    <span className="font-semibold text-neutral-900 dark:text-neutral-100 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors truncate">
-                      Ruang Ujian &amp; Sesi Aktif
-                    </span>
+                    <div className="space-y-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-semibold text-neutral-900 dark:text-neutral-100">
+                          Konsol Desain Neon &amp; Grid Bebas Scroll Horizontal
+                        </span>
+                        <span className="px-2 py-0.2 rounded text-[10px] font-semibold bg-sky-500/10 text-sky-700 dark:text-sky-400 border border-sky-500/20">
+                          UI / UX
+                        </span>
+                      </div>
+                      <p className="text-neutral-600 dark:text-neutral-300 text-xs leading-relaxed">
+                        Implementasi standarisasi komponen <code className="font-mono text-[11px] text-emerald-600 dark:text-emerald-400">NeonTable</code> dan <code className="font-mono text-[11px] text-emerald-600 dark:text-emerald-400">NeonProgress</code> di seluruh modul admin tanpa scroll horizontal pada ponsel/tablet, layout fluid, serta penyeragaman tombol aksi cepat dengan menu dropdown titik tiga (<code className="font-mono text-[11px]">MoreHorizontal</code>).
+                      </p>
+                    </div>
                   </div>
-                  <div className="col-span-7 sm:col-span-8 text-neutral-600 dark:text-neutral-300 flex items-center justify-between">
-                    <span className="truncate">
-                      {activeRooms} ruang ujian aktif • {finishedStudents} siswa selesai mengerjakan
-                    </span>
-                    <span className="hidden sm:inline-flex items-center gap-1.5 text-[11px] font-mono text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-200/50 dark:border-emerald-800/40">
-                      {activeRooms} Ruang Berjalan
-                    </span>
-                  </div>
+                  <span className="hidden sm:inline-flex items-center px-2 py-0.5 rounded text-[10px] font-mono font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/50 dark:border-emerald-800/40 shrink-0">
+                    Selesai
+                  </span>
                 </div>
 
-                {/* Row 2: Bank Soal & Media Ujian */}
-                <div 
-                  onClick={() => navigate("/admin/bank-soal")}
-                  className="grid grid-cols-12 px-4 py-3.5 items-center hover:bg-neutral-50/70 dark:hover:bg-neutral-850/50 cursor-pointer transition-colors group"
-                >
-                  <div className="col-span-5 sm:col-span-4 flex items-center gap-3 pr-2">
-                    <div className="h-8 w-8 rounded-md bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center text-neutral-600 dark:text-neutral-300 shrink-0 border border-neutral-200/50 dark:border-neutral-700/50">
-                      <BookOpen className="h-4 w-4" />
-                    </div>
-                    <span className="font-semibold text-neutral-900 dark:text-neutral-100 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors truncate">
-                      Bank Soal &amp; Media Ujian
-                    </span>
-                  </div>
-                  <div className="col-span-7 sm:col-span-8 text-neutral-600 dark:text-neutral-300 flex items-center justify-between">
-                    <span className="truncate">
-                      {totalExams} paket soal tersimpan • Audio listening, gambar &amp; MathJax
-                    </span>
-                    <span className="hidden sm:inline-flex items-center gap-1.5 text-[11px] font-mono text-neutral-600 dark:text-neutral-300 bg-neutral-100 dark:bg-neutral-800 px-2 py-0.5 rounded">
-                      {totalExams} Paket Soal
-                    </span>
-                  </div>
-                </div>
-
-                {/* Row 3: Koreksi & Penilaian Otomatis */}
-                <div 
-                  onClick={() => navigate("/admin/analisis-butir-soal")}
-                  className="grid grid-cols-12 px-4 py-3.5 items-center hover:bg-neutral-50/70 dark:hover:bg-neutral-850/50 cursor-pointer transition-colors group"
-                >
-                  <div className="col-span-5 sm:col-span-4 flex items-center gap-3 pr-2">
-                    <div className="h-8 w-8 rounded-md bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center text-neutral-600 dark:text-neutral-300 shrink-0 border border-neutral-200/50 dark:border-neutral-700/50">
+                {/* 2. Analisis Butir Soal Komprehensif */}
+                <div className="px-4 py-3.5 flex items-start justify-between gap-3 hover:bg-neutral-50/70 dark:hover:bg-neutral-850/50 transition-colors">
+                  <div className="flex items-start gap-3 min-w-0">
+                    <div className="h-8 w-8 rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0 border border-amber-500/20 mt-0.5">
                       <CheckCircle2 className="h-4 w-4" />
                     </div>
-                    <span className="font-semibold text-neutral-900 dark:text-neutral-100 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors truncate">
-                      Koreksi &amp; Penilaian Otomatis
-                    </span>
-                  </div>
-                  <div className="col-span-7 sm:col-span-8 text-neutral-600 dark:text-neutral-300 flex items-center justify-between">
-                    <span className="truncate">
-                      Koreksi instan PG biasa, PG kompleks, menjodohkan, dan bobot KD
-                    </span>
-                    <span className="hidden sm:inline-flex items-center gap-1.5 text-[11px] font-mono text-neutral-600 dark:text-neutral-300 bg-neutral-100 dark:bg-neutral-800 px-2 py-0.5 rounded">
-                      {finishedStudents} Selesai Dinilai
-                    </span>
-                  </div>
-                </div>
-
-                {/* Row 4: Examku AI Generator & Analisis */}
-                <div 
-                  onClick={() => navigate("/admin/pengaturan")}
-                  className="grid grid-cols-12 px-4 py-3.5 items-center hover:bg-neutral-50/70 dark:hover:bg-neutral-850/50 cursor-pointer transition-colors group"
-                >
-                  <div className="col-span-5 sm:col-span-4 flex items-center gap-3 pr-2">
-                    <div className="h-8 w-8 rounded-md bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center text-neutral-600 dark:text-neutral-300 shrink-0 border border-neutral-200/50 dark:border-neutral-700/50">
-                      <Sparkles className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                    <div className="space-y-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-semibold text-neutral-900 dark:text-neutral-100">
+                          Analisis Butir Soal Komprehensif &amp; Penilaian Otomatis
+                        </span>
+                        <span className="px-2 py-0.2 rounded text-[10px] font-semibold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20">
+                          Evaluasi
+                        </span>
+                      </div>
+                      <p className="text-neutral-600 dark:text-neutral-300 text-xs leading-relaxed">
+                        Kalkulasi otomatis daya pembeda (D-index), tingkat kesukaran (P-value), efektivitas distraktor/pengecoh, rekomendasi butir soal, koreksi otomatis objektif &amp; esai, serta ekspor rekap ke format Excel (.xlsx).
+                      </p>
                     </div>
-                    <span className="font-semibold text-neutral-900 dark:text-neutral-100 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors truncate">
-                      Examku AI Generator &amp; Analisis
-                    </span>
                   </div>
-                  <div className="col-span-7 sm:col-span-8 text-neutral-600 dark:text-neutral-300 flex items-center justify-between">
-                    <span className="truncate">
-                      Pembuat soal otomatis AI, parafrase butir, dan analisis daya pembeda
-                    </span>
-                    <span className="hidden sm:inline-flex items-center gap-1.5 text-[11px] font-mono text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/40 px-2 py-0.5 rounded border border-purple-200/50 dark:border-purple-800/40">
-                      AI Siap
-                    </span>
-                  </div>
+                  <span className="hidden sm:inline-flex items-center px-2 py-0.5 rounded text-[10px] font-mono font-medium text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 border border-amber-200/50 dark:border-amber-800/40 shrink-0">
+                    Baru
+                  </span>
                 </div>
 
-                {/* Row 5: Realtime Socket & Proteksi Exambro */}
-                <div 
-                  onClick={() => navigate("/admin/monitoring")}
-                  className="grid grid-cols-12 px-4 py-3.5 items-center hover:bg-neutral-50/70 dark:hover:bg-neutral-850/50 cursor-pointer transition-colors group"
-                >
-                  <div className="col-span-5 sm:col-span-4 flex items-center gap-3 pr-2">
-                    <div className="h-8 w-8 rounded-md bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center text-neutral-600 dark:text-neutral-300 shrink-0 border border-neutral-200/50 dark:border-neutral-700/50">
-                      <Zap className="h-4 w-4 text-amber-500" />
+                {/* 3. Realtime Monitoring & Exambro */}
+                <div className="px-4 py-3.5 flex items-start justify-between gap-3 hover:bg-neutral-50/70 dark:hover:bg-neutral-850/50 transition-colors">
+                  <div className="flex items-start gap-3 min-w-0">
+                    <div className="h-8 w-8 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-500/20 mt-0.5">
+                      <ShieldCheck className="h-4 w-4" />
                     </div>
-                    <span className="font-semibold text-neutral-900 dark:text-neutral-100 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors truncate">
-                      Monitoring Realtime &amp; Exambro
-                    </span>
+                    <div className="space-y-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-semibold text-neutral-900 dark:text-neutral-100">
+                          Monitoring Realtime &amp; Proteksi Anti-Curang Exambro
+                        </span>
+                        <span className="px-2 py-0.2 rounded text-[10px] font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
+                          Keamanan CBT
+                        </span>
+                      </div>
+                      <p className="text-neutral-600 dark:text-neutral-300 text-xs leading-relaxed">
+                        Heartbeat realtime pengerjaan peserta, deteksi otomatis keluar aplikasi atau tab switch, penguncian sesi pelanggaran, serta fitur permintaan reset sandi langsung dari pengawas.
+                      </p>
+                    </div>
                   </div>
-                  <div className="col-span-7 sm:col-span-8 text-neutral-600 dark:text-neutral-300 flex items-center justify-between">
-                    <span className="truncate">
-                      Live heartbeat sinyal peserta, deteksi keluar aplikasi, dan kunci otomatis
-                    </span>
-                    <span className="hidden sm:inline-flex items-center gap-1.5 text-[11px] font-mono text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-200/50 dark:border-emerald-800/50">
-                      ● {ongoingStudents} Mengerjakan
-                    </span>
-                  </div>
+                  <span className="hidden sm:inline-flex items-center px-2 py-0.5 rounded text-[10px] font-mono font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/50 dark:border-emerald-800/40 shrink-0">
+                    Aktif
+                  </span>
                 </div>
 
+                {/* 4. Bank Soal & Simulasi CBT */}
+                <div className="px-4 py-3.5 flex items-start justify-between gap-3 hover:bg-neutral-50/70 dark:hover:bg-neutral-850/50 transition-colors">
+                  <div className="flex items-start gap-3 min-w-0">
+                    <div className="h-8 w-8 rounded-md bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0 border border-purple-500/20 mt-0.5">
+                      <BookOpen className="h-4 w-4" />
+                    </div>
+                    <div className="space-y-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-semibold text-neutral-900 dark:text-neutral-100">
+                          Bank Soal AKM, Audio Listening &amp; Simulasi Siswa
+                        </span>
+                        <span className="px-2 py-0.2 rounded text-[10px] font-semibold bg-purple-500/10 text-purple-700 dark:text-purple-400 border border-purple-500/20">
+                          Bank Soal
+                        </span>
+                      </div>
+                      <p className="text-neutral-600 dark:text-neutral-300 text-xs leading-relaxed">
+                        Dukungan formula matematika MathJax, kompresi aset gambar, audio listening, tipe soal menjodohkan &amp; PG kompleks, ekspor Word (.doc), serta fitur simulasi instan tampilan CBT siswa.
+                      </p>
+                    </div>
+                  </div>
+                  <span className="hidden sm:inline-flex items-center px-2 py-0.5 rounded text-[10px] font-mono font-medium text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-950/40 border border-purple-200/50 dark:border-purple-800/40 shrink-0">
+                    Stabil
+                  </span>
+                </div>
+
+                {/* 5. Single Gate Versioning */}
+                <div className="px-4 py-3.5 flex items-start justify-between gap-3 hover:bg-neutral-50/70 dark:hover:bg-neutral-850/50 transition-colors">
+                  <div className="flex items-start gap-3 min-w-0">
+                    <div className="h-8 w-8 rounded-md bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0 border border-indigo-500/20 mt-0.5">
+                      <GitBranch className="h-4 w-4" />
+                    </div>
+                    <div className="space-y-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-semibold text-neutral-900 dark:text-neutral-100">
+                          Manajemen Rilis 1 Gerbang &amp; Pembaruan 1-Click Server Offline
+                        </span>
+                        <span className="px-2 py-0.2 rounded text-[10px] font-semibold bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 border border-indigo-500/20">
+                          Infrastruktur
+                        </span>
+                      </div>
+                      <p className="text-neutral-600 dark:text-neutral-300 text-xs leading-relaxed">
+                        Sistem versioning otomatis yang menyinkronkan 7 gerbang (Web, Android APK, CDN, dan Server Sekolah Offline) dengan jaminan keamanan data database lokal tetap terjaga.
+                      </p>
+                    </div>
+                  </div>
+                  <span className="hidden sm:inline-flex items-center px-2 py-0.5 rounded text-[10px] font-mono font-medium text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200/50 dark:border-indigo-800/40 shrink-0">
+                    Aktif
+                  </span>
+                </div>
               </div>
             </div>
 
@@ -624,7 +651,7 @@ export default function DashboardPage() {
                 <h2 className="text-base font-semibold text-neutral-900 dark:text-neutral-100">
                   Monitoring Realtime Peserta &amp; Server
                 </h2>
-                
+
                 {/* Tab switchers */}
                 <NeonTabs
                   tabs={[
@@ -701,35 +728,35 @@ export default function DashboardPage() {
                             </linearGradient>
                           </defs>
                           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" className="dark:stroke-neutral-800" />
-                          <XAxis 
-                            dataKey="time" 
-                            tickLine={false} 
-                            axisLine={false} 
-                            tick={{ fontSize: 11, fill: "#888888" }} 
+                          <XAxis
+                            dataKey="time"
+                            tickLine={false}
+                            axisLine={false}
+                            tick={{ fontSize: 11, fill: "#888888" }}
                           />
-                          <YAxis 
-                            tickLine={false} 
-                            axisLine={false} 
-                            tick={{ fontSize: 11, fill: "#888888" }} 
-                            domain={[0, 'auto']} 
+                          <YAxis
+                            tickLine={false}
+                            axisLine={false}
+                            tick={{ fontSize: 11, fill: "#888888" }}
+                            domain={[0, 'auto']}
                           />
-                          <RechartsTooltip 
-                            contentStyle={{ 
-                              backgroundColor: "#18181b", 
-                              borderColor: "#27272a", 
-                              borderRadius: 6, 
-                              color: "#fff", 
-                              fontSize: 12 
-                            }} 
+                          <RechartsTooltip
+                            contentStyle={{
+                              backgroundColor: "#18181b",
+                              borderColor: "#27272a",
+                              borderRadius: 6,
+                              color: "#fff",
+                              fontSize: 12
+                            }}
                           />
-                          <Area 
-                            type="monotone" 
-                            dataKey="active" 
-                            name="Siswa Mengerjakan" 
-                            stroke="#10b981" 
-                            strokeWidth={2} 
-                            fillOpacity={1} 
-                            fill="url(#neonEmeraldTenant)" 
+                          <Area
+                            type="monotone"
+                            dataKey="active"
+                            name="Siswa Mengerjakan"
+                            stroke="#10b981"
+                            strokeWidth={2}
+                            fillOpacity={1}
+                            fill="url(#neonEmeraldTenant)"
                           />
                         </AreaChart>
                       </ResponsiveContainer>

@@ -169,7 +169,7 @@ try {
   // 3. Tulis version.json ke root, dist, dan offline_package
   const pkg = JSON.parse(fs.readFileSync('package.json', 'utf-8'));
   const versionData = {
-    version: pkg.version || '1.1.19',
+    version: pkg.version || '1.2.1',
     release_date: dateStr,
     timestamp: now.toISOString(),
     notes: `Rilis Resmi v${pkg.version || '1.1.19'}: Pembaruan terpadu seluruh sistem (Web, APK Android, Template VPS, dan Paket Offline).`

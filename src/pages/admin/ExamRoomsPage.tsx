@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { Plus, Trash, Edit, Users, Archive, RotateCw, BookOpen, ClipboardList, Lock, Clock, Calendar, ChevronDown, ChevronRight, Power, PowerOff, Search, ShieldAlert, FileSpreadsheet, BarChart2, X, GitBranch, ExternalLink, Copy, Check, Filter, KeyRound, Activity, CheckSquare } from "lucide-react";
+import { Plus, Trash, Edit, Users, Archive, RotateCw, BookOpen, ClipboardList, Lock, Clock, Calendar, ChevronDown, ChevronRight, Power, PowerOff, Search, ShieldAlert, FileSpreadsheet, BarChart2, X, GitBranch, ExternalLink, Copy, Check, Filter, KeyRound, Activity, CheckSquare, MoreVertical, MoreHorizontal } from "lucide-react";
 import { useNavigate, Link } from "react-router-dom";
 import { Button } from "../../components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../../components/ui/dialog";
@@ -1066,28 +1066,17 @@ const ExamRoomsPage = () => {
   // ── Neon Table Columns Definition ──
   const neonColumns: NeonTableColumn<ExamRoomData>[] = useMemo(() => [
     {
-      key: "index",
-      header: "#",
-      width: "44px",
-      align: "center",
-      render: (_item, index) => (
-        <span className="font-mono text-[11px] text-neutral-400 dark:text-neutral-500">
-          {index + 1}
-        </span>
-      ),
-    },
-    {
       key: "room_name",
       header: "Ruang Ujian & Pengampu",
-      className: "w-[280px] min-w-[220px] max-w-[320px]",
+      className: "min-w-0 max-w-[320px]",
       render: (room) => {
         const isInspected = inspectedRoom?.id === room.id;
         return (
-          <div className="flex flex-col gap-0.5 py-0.5 overflow-hidden">
-            <div className="flex items-center gap-1.5 flex-nowrap overflow-hidden">
+          <div className="flex flex-col gap-0.5 py-0.5 min-w-0">
+            <div className="flex items-center gap-1.5 flex-wrap">
               <span
                 className={cn(
-                  "text-[13px] font-bold tracking-tight transition-colors truncate",
+                  "text-[13px] font-bold tracking-tight transition-colors",
                   isInspected
                     ? "text-emerald-600 dark:text-emerald-400 font-extrabold"
                     : "text-neutral-900 dark:text-neutral-100 group-hover:text-emerald-600 dark:group-hover:text-emerald-400"
@@ -1108,17 +1097,17 @@ const ExamRoomsPage = () => {
               )}
             </div>
 
-            {/* Nama Guru & Mapel tanpa wrap text */}
-            <div className="flex items-center gap-1.5 text-[11px] text-neutral-500 dark:text-neutral-400 whitespace-nowrap overflow-hidden">
+            {/* Nama Guru & Mapel */}
+            <div className="flex items-center gap-1.5 text-[11px] text-neutral-500 dark:text-neutral-400 flex-wrap">
               <span
-                className="font-medium text-neutral-700 dark:text-neutral-300 truncate max-w-[140px]"
+                className="font-medium text-neutral-700 dark:text-neutral-300"
                 title={room.teacherName}
               >
                 {room.teacherName || "Pengampu N/A"}
               </span>
               <span className="text-neutral-300 dark:text-neutral-700 shrink-0">•</span>
               <span
-                className="truncate max-w-[120px] text-neutral-500 dark:text-neutral-400"
+                className="text-neutral-500 dark:text-neutral-400"
                 title={room.subjectName}
               >
                 {room.subjectName || "Mapel N/A"}
@@ -1132,13 +1121,23 @@ const ExamRoomsPage = () => {
                   e.stopPropagation();
                   handleQuestionsClick(room);
                 }}
-                className="text-[11px] font-medium text-neutral-400 dark:text-neutral-500 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors truncate text-left cursor-pointer flex items-center gap-1 whitespace-nowrap overflow-hidden mt-0.5"
+                className="text-[11px] font-medium text-neutral-400 dark:text-neutral-500 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors text-left cursor-pointer flex items-center gap-1 flex-wrap mt-0.5"
                 title={`Buka Bank Soal: ${room.examTitle}`}
               >
                 <BookOpen className="h-3 w-3 shrink-0 opacity-70" />
-                <span className="truncate max-w-[240px]">Bank: {room.examTitle}</span>
+                <span>Bank: {room.examTitle}</span>
               </button>
             )}
+
+            {/* Tipe Ujian & Info Soal di Layar Mobile (kolom Aturan disembunyikan di mobile) */}
+            <div className="md:hidden flex items-center gap-1.5 flex-wrap mt-0.5">
+              <span className={cn("px-1.5 py-0.2 rounded text-[9px] font-semibold border", getExamTypeColorClass(room.examType || "UMUM"))}>
+                {room.examType || "UMUM"}
+              </span>
+              <span className="text-[9px] font-mono text-neutral-500">
+                {room.max_questions && room.max_questions > 0 ? `${room.max_questions} Soal` : "Semua Soal"}
+              </span>
+            </div>
           </div>
         );
       },
@@ -1146,7 +1145,7 @@ const ExamRoomsPage = () => {
     {
       key: "schedule",
       header: "Jadwal, Status & Kelas",
-      className: "w-56 min-w-[200px] max-w-[250px]",
+      className: "min-w-0 max-w-[260px]",
       render: (room) => {
         const s = new Date(room.start_time);
         const e = new Date(room.end_time);
@@ -1197,9 +1196,9 @@ const ExamRoomsPage = () => {
             : `Tanpa ${terminology.class}`;
 
         return (
-          <div className="flex flex-col gap-1 py-0.5">
+          <div className="flex flex-col gap-1 py-0.5 min-w-0">
             {/* Baris 1: Status Pill + Kelas Pill + Live Status */}
-            <div className="flex items-center gap-1.5 flex-nowrap whitespace-nowrap overflow-hidden">
+            <div className="flex items-center gap-1.5 flex-wrap">
               <span
                 className={cn(
                   "inline-flex items-center px-1.5 py-0.2 rounded-full text-[10px] font-semibold border shrink-0",
@@ -1260,7 +1259,7 @@ const ExamRoomsPage = () => {
             </div>
 
             {/* Baris 2: Waktu Compact & Durasi */}
-            <div className="flex items-center gap-1.5 text-[11px] font-mono text-neutral-600 dark:text-neutral-400 whitespace-nowrap overflow-hidden">
+            <div className="flex items-center gap-1.5 text-[11px] font-mono text-neutral-600 dark:text-neutral-400 flex-wrap">
               <Clock className="h-3 w-3 text-neutral-400 shrink-0" />
               <span className="truncate">{dateText}</span>
               <span className="px-1 py-0.2 rounded text-[10px] bg-neutral-100 dark:bg-neutral-800 text-neutral-500 border border-neutral-200/60 dark:border-neutral-750 shrink-0">
@@ -1274,7 +1273,8 @@ const ExamRoomsPage = () => {
     {
       key: "rules",
       header: "Aturan & Butir Soal",
-      className: "w-44 min-w-[150px]",
+      className: "hidden md:table-cell min-w-0 max-w-[180px]",
+      headerClassName: "hidden md:table-cell",
       render: (room) => {
         return (
           <div className="flex flex-col gap-1 py-0.5">
@@ -1306,16 +1306,17 @@ const ExamRoomsPage = () => {
     {
       key: "actions",
       header: "Aksi",
-      width: "160px",
+      className: "w-20 sm:w-28 text-right shrink-0",
+      headerClassName: "w-20 sm:w-28 text-right shrink-0",
       align: "right",
       render: (room) => {
         const owner = isOwner(room);
         return (
           <div
-            className="flex justify-end items-center gap-1 whitespace-nowrap"
+            className="flex justify-end items-center gap-1"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Monitor Live */}
+            {/* 1. Quick Action Utama: Monitor Live CBT */}
             <button
               type="button"
               className="h-7 w-7 rounded-md flex items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shadow-2xs cursor-pointer"
@@ -1325,84 +1326,109 @@ const ExamRoomsPage = () => {
               <Search className="h-3.5 w-3.5" />
             </button>
 
-            {/* Analisis Butir Soal */}
+            {/* 2. Quick Action Kedua: Penilaian & Rekap Nilai (Tampil di sm+) */}
             <button
               type="button"
-              className="h-7 w-7 rounded-md flex items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shadow-2xs cursor-pointer"
-              onClick={() => navigate(`/admin/analisis-butir-soal?roomId=${room.id}&examId=${room.examId || ""}`)}
-              title="Analisis Butir Soal"
-            >
-              <BarChart2 className="h-3.5 w-3.5" />
-            </button>
-
-            {/* Penilaian & Koreksi */}
-            <button
-              type="button"
-              className="h-7 w-7 rounded-md flex items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shadow-2xs cursor-pointer"
+              className="hidden sm:flex h-7 w-7 rounded-md items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shadow-2xs cursor-pointer"
               onClick={() => navigate(`/admin/penilaian?roomId=${room.id}`)}
               title="Penilaian & Rekap Nilai"
             >
               <CheckSquare className="h-3.5 w-3.5" />
             </button>
 
-            {owner && (
-              <button
-                type="button"
-                className="h-7 w-7 rounded-md flex items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shadow-2xs cursor-pointer"
-                onClick={() => handleEditClick(room)}
-                title="Edit Parameter Ruangan"
-              >
-                <Edit className="h-3.5 w-3.5" />
-              </button>
-            )}
-
-            {owner && (
-              <button
-                type="button"
-                className={cn(
-                  "h-7 w-7 rounded-md flex items-center justify-center border transition-colors shadow-2xs cursor-pointer",
-                  room.isDisabled
-                    ? "bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/20 border-emerald-500/30 dark:text-emerald-400"
-                    : "bg-rose-500/10 text-rose-700 hover:bg-rose-500/20 border-rose-500/30 dark:text-rose-400"
-                )}
-                onClick={() => handleToggleDisabled(room)}
-                title={room.isDisabled ? "Aktifkan Ruangan" : "Nonaktifkan Ruangan"}
-              >
-                {room.isDisabled ? <Power className="h-3.5 w-3.5" /> : <PowerOff className="h-3.5 w-3.5" />}
-              </button>
-            )}
-
-            {owner && (
-              activeTab === "aktif" ? (
+            {/* 3. Dropdown Menu Seragam (Aksi lainnya terpadu di dalam dropdown) */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
                 <button
                   type="button"
-                  className="h-7 w-7 rounded-md flex items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-500 hover:text-amber-600 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shadow-2xs cursor-pointer"
-                  onClick={() => handleArchiveRoom(room)}
-                  title="Arsipkan Ruangan"
+                  className="h-7 w-7 rounded-md flex items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shadow-2xs cursor-pointer"
+                  title="Menu Aksi Lainnya"
                 >
-                  <Archive className="h-3.5 w-3.5" />
+                  <MoreHorizontal className="h-3.5 w-3.5" />
                 </button>
-              ) : (
-                <>
-                  <button
-                    type="button"
-                    className="h-7 w-7 rounded-md flex items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-600 hover:text-emerald-600 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shadow-2xs cursor-pointer"
-                    onClick={() => handleRestoreRoom(room)}
-                    title="Pulihkan Ruangan"
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-52 p-1 rounded-xl shadow-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 z-[100]">
+                <DropdownMenuItem
+                  onClick={() => handleMonitorClick(room)}
+                  className="text-xs cursor-pointer gap-2 py-1.5 sm:hidden"
+                >
+                  <Search className="h-3.5 w-3.5 text-emerald-500" />
+                  <span>Monitor Live CBT</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => navigate(`/admin/penilaian?roomId=${room.id}`)}
+                  className="text-xs cursor-pointer gap-2 py-1.5"
+                >
+                  <CheckSquare className="h-3.5 w-3.5 text-neutral-500" />
+                  <span>Penilaian & Nilai</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => navigate(`/admin/analisis-butir-soal?roomId=${room.id}&examId=${room.examId || ""}`)}
+                  className="text-xs cursor-pointer gap-2 py-1.5"
+                >
+                  <BarChart2 className="h-3.5 w-3.5 text-neutral-500" />
+                  <span>Analisis Butir Soal</span>
+                </DropdownMenuItem>
+                {owner && (
+                  <DropdownMenuItem
+                    onClick={() => handleEditClick(room)}
+                    className="text-xs cursor-pointer gap-2 py-1.5"
                   >
-                    <RotateCw className="h-3.5 w-3.5" />
-                  </button>
-                  <button
-                    type="button"
-                    className="h-7 w-7 rounded-md flex items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors shadow-2xs cursor-pointer"
-                    onClick={() => handleDeleteClick(room)}
-                    title="Hapus Permanen"
+                    <Edit className="h-3.5 w-3.5 text-neutral-500" />
+                    <span>Edit Parameter Ruang</span>
+                  </DropdownMenuItem>
+                )}
+                {owner && (
+                  <DropdownMenuItem
+                    onClick={() => handleToggleDisabled(room)}
+                    className="text-xs cursor-pointer gap-2 py-1.5"
                   >
-                    <Trash className="h-3.5 w-3.5" />
-                  </button>
-                </>
-              )
-            )}
+                    {room.isDisabled ? (
+                      <>
+                        <Power className="h-3.5 w-3.5 text-emerald-600" />
+                        <span className="text-emerald-600">Aktifkan Ruangan</span>
+                      </>
+                    ) : (
+                      <>
+                        <PowerOff className="h-3.5 w-3.5 text-rose-600" />
+                        <span className="text-rose-600">Nonaktifkan Ruangan</span>
+                      </>
+                    )}
+                  </DropdownMenuItem>
+                )}
+                {owner && (
+                  <>
+                    <DropdownMenuSeparator className="my-1 border-neutral-100 dark:border-neutral-800" />
+                    {activeTab === "aktif" ? (
+                      <DropdownMenuItem
+                        onClick={() => handleArchiveRoom(room)}
+                        className="text-xs cursor-pointer gap-2 py-1.5 text-amber-600 dark:text-amber-400 focus:text-amber-600 focus:bg-amber-50 dark:focus:bg-amber-950/40"
+                      >
+                        <Archive className="h-3.5 w-3.5" />
+                        <span>Arsipkan Ruangan</span>
+                      </DropdownMenuItem>
+                    ) : (
+                      <>
+                        <DropdownMenuItem
+                          onClick={() => handleRestoreRoom(room)}
+                          className="text-xs cursor-pointer gap-2 py-1.5 text-emerald-600 dark:text-emerald-400 focus:text-emerald-600 focus:bg-emerald-50 dark:focus:bg-emerald-950/40"
+                        >
+                          <RotateCw className="h-3.5 w-3.5" />
+                          <span>Pulihkan Ruang</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => handleDeleteClick(room)}
+                          className="text-xs cursor-pointer gap-2 py-1.5 text-rose-600 dark:text-rose-400 focus:text-rose-600 focus:bg-rose-50 dark:focus:bg-rose-950/40"
+                        >
+                          <Trash className="h-3.5 w-3.5" />
+                          <span>Hapus Permanen</span>
+                        </DropdownMenuItem>
+                      </>
+                    )}
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         );
       },
@@ -1410,7 +1436,7 @@ const ExamRoomsPage = () => {
   ], [inspectedRoom, liveBreakdown, terminology, isOwner, handleQuestionsClick, handleMonitorClick, navigate, handleEditClick, handleToggleDisabled, handleArchiveRoom, handleRestoreRoom, handleDeleteClick, activeTab]);
 
   return (
-    <div className="w-full min-h-screen bg-white dark:bg-[#0c0d0e] text-neutral-900 dark:text-neutral-100 font-sans">
+    <div className="w-full min-h-screen bg-white dark:bg-[#0c0d0e] text-neutral-900 dark:text-neutral-100 font-sans overflow-x-hidden">
       <div className="max-w-[1520px] mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-6">
         <div className="grid grid-cols-1 xl:grid-cols-[1fr_300px] 2xl:grid-cols-[1fr_320px] gap-6 items-start">
 
@@ -1569,7 +1595,7 @@ const ExamRoomsPage = () => {
               searchPlaceholder="Cari ruang ujian, pengampu, mapel, kelas, token..."
               filterSlot={
                 activeTab === "aktif" ? (
-                  <div className="flex items-center gap-1 bg-neutral-100 dark:bg-neutral-850 p-0.5 rounded-md text-[11px] font-medium border border-neutral-200/60 dark:border-neutral-800">
+                  <div className="flex flex-wrap items-center gap-1 bg-neutral-100 dark:bg-neutral-850 p-0.5 rounded-md text-[11px] font-medium border border-neutral-200/60 dark:border-neutral-800 max-w-full">
                     <button
                       type="button"
                       onClick={() => setStatusFilter("all")}

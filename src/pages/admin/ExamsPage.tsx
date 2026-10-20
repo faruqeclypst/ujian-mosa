@@ -1494,20 +1494,9 @@ const ExamsPage = () => {
 
   const neonColumns: NeonTableColumn<ExamData>[] = useMemo(() => [
     {
-      key: "index",
-      header: "#",
-      width: "40px",
-      align: "center",
-      render: (_, index) => (
-        <span className="font-mono text-xs text-neutral-400">
-          {index + 1}
-        </span>
-      ),
-    },
-    {
       key: "title",
       header: "Judul Bank Soal & Tipe",
-      className: "min-w-[170px]",
+      className: "min-w-0",
       render: (exam) => {
         const qCount = questionCounts[exam.id] || 0;
         const subject = subjects.find((s: any) => s.id === exam.subjectId)?.name || (exam as any).subjectName || "-";
@@ -1588,23 +1577,24 @@ const ExamsPage = () => {
     {
       key: "actions",
       header: "Aksi",
-      width: "100px",
+      className: "w-20 sm:w-28 text-right shrink-0",
+      headerClassName: "w-20 sm:w-28 text-right shrink-0",
       align: "right",
       render: (exam) => {
         const owner = isOwner(exam);
         return (
-          <div className="flex justify-end items-center gap-1 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-            {/* Coba Simulasi CBT */}
+          <div className="flex justify-end items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+            {/* Coba Simulasi CBT (tampil di sm+) */}
             <button
               type="button"
-              className="h-7 w-7 rounded-md flex items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shadow-2xs cursor-pointer"
+              className="hidden sm:flex h-7 w-7 rounded-md items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shadow-2xs cursor-pointer"
               onClick={() => navigate(`/admin/simulate/${exam.id}`)}
               title="Coba Simulasi Tampilan Siswa"
             >
               <Eye className="h-3.5 w-3.5" />
             </button>
 
-            {/* Kelola Soal */}
+            {/* Kelola Soal (Quick Action Utama) */}
             <button
               type="button"
               className="h-7 w-7 rounded-md flex items-center justify-center bg-white dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shadow-2xs cursor-pointer"
@@ -1628,7 +1618,24 @@ const ExamsPage = () => {
                   <MoreHorizontal className="h-3.5 w-3.5" />
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48 p-1 rounded-xl shadow-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 z-[100]">
+              <DropdownMenuContent align="end" className="w-52 p-1 rounded-xl shadow-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 z-[100]">
+                <DropdownMenuItem
+                  onClick={() => navigate(`/admin/simulate/${exam.id}`)}
+                  className="text-xs cursor-pointer gap-2 py-1.5 sm:hidden"
+                >
+                  <Eye className="h-3.5 w-3.5 text-neutral-500" />
+                  <span>Simulasi Tampilan Siswa</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => {
+                    sessionStorage.setItem("activeQuestionsExamId", exam.id);
+                    navigate("/admin/bank-soal/questions");
+                  }}
+                  className="text-xs cursor-pointer gap-2 py-1.5 sm:hidden"
+                >
+                  <BookOpen className="h-3.5 w-3.5 text-emerald-500" />
+                  <span>Kelola Butir Soal</span>
+                </DropdownMenuItem>
                 {owner && (
                   <DropdownMenuItem
                     onClick={() => handleEditClick(exam)}

@@ -32,6 +32,7 @@ import {
   Monitor,
   Smartphone,
   ExternalLink,
+  MessageCircle,
 } from "lucide-react";
 import * as React from "react";
 
@@ -188,7 +189,7 @@ const Sidebar = () => {
     return () => { isMounted = false; };
   }, [school]);
 
-  const isAdmin = role !== "teacher";
+  const isAdmin = role === "admin";
 
   // Route Prefetch
   const prefetchRoute = React.useCallback((to: string) => {
@@ -240,10 +241,11 @@ const Sidebar = () => {
   // Section 1: Operasional CBT (Core Exam Flow)
   const cbtNav = React.useMemo(() => [
     { to: "/admin", label: "Overview", icon: Home, count: null, end: true },
+    { to: "/admin/bank-soal", label: "Bank Soal", icon: BookOpen, count: examData.examsCount },
     { to: "/admin/ruang-ujian", label: "Ruang Ujian", icon: GitBranch, count: examData.roomsCount },
     {
       to: "/admin/monitoring",
-      label: "Pengawasan Live",
+      label: "Monitoring",
       icon: Eye,
       badge: (
         <span className="flex items-center gap-1 text-[10px] font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-1.5 py-0.5 rounded border border-emerald-200/60 dark:border-emerald-800/60">
@@ -256,15 +258,14 @@ const Sidebar = () => {
       ),
       count: null,
     },
-    { to: "/admin/bank-soal", label: "Bank Soal", icon: BookOpen, count: examData.examsCount },
-  ], [examData.roomsCount, examData.examsCount]);
+  ], [examData.examsCount, examData.roomsCount]);
 
   // Section 2: Hasil & Evaluasi (Evaluation & Reporting)
   const evaluationNav = React.useMemo(() => [
-    { to: "/admin/penilaian", label: "Penilaian & Nilai", icon: Award, count: null },
+    { to: "/admin/penilaian", label: "Nilai", icon: Award, count: null },
     {
       to: "/admin/analisis-butir-soal",
-      label: "Analisis Butir Soal",
+      label: "Analisis Soal",
       icon: Sparkles,
       badge: (
         <span className="text-[10px] font-bold text-violet-700 dark:text-violet-300 bg-violet-50 dark:bg-violet-950/50 px-1.5 py-0.2 rounded border border-violet-200/50 dark:border-violet-800/40">
@@ -275,29 +276,29 @@ const Sidebar = () => {
     },
     {
       to: "/token-view",
-      label: "Layar Token TV",
+      label: "Public Token",
       icon: Monitor,
       external: true,
-      badge: (
-        <span className="text-[10px] font-medium text-neutral-500 dark:text-neutral-400 bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.2 rounded">
-          TV
-        </span>
-      ),
+      // badge: (
+      //   <span className="text-[10px] font-medium text-neutral-500 dark:text-neutral-400 bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.2 rounded">
+      //     TV
+      //   </span>
+      // ),
       count: null,
     },
   ], []);
 
-  // Section 3: Master Data Submenu (Data Siswa, Kelas, Mapel, Guru, Alumni)
+  // Section 3: Master Data Submenu (Siswa, Kelas, Mapel, Guru, Alumni)
   const masterDataChildren = React.useMemo(() => {
     const list: Array<{ to: string; label: string; count: number | null }> = [
-      { to: "/admin/student", label: `Data ${terminology.student}`, count: examData.students.length },
+      { to: "/admin/student", label: terminology.student, count: examData.students.length },
     ];
     if (isAdmin) {
       list.push(
-        { to: "/admin/classes", label: `Data ${terminology.class}`, count: examData.classes.length },
-        { to: "/admin/subjects", label: `Data ${terminology.subject}`, count: examData.subjects.length },
-        { to: "/admin/teachers", label: `Data ${terminology.teacher}`, count: examData.teachers.length },
-        { to: "/admin/alumni", label: "Data Alumni", count: null }
+        { to: "/admin/classes", label: terminology.class, count: examData.classes.length },
+        { to: "/admin/subjects", label: terminology.subject, count: examData.subjects.length },
+        { to: "/admin/teachers", label: terminology.teacher, count: examData.teachers.length },
+        { to: "/admin/alumni", label: "Alumni", count: null }
       );
     }
     return list;
@@ -316,25 +317,25 @@ const Sidebar = () => {
 
     if (isAdmin) {
       list.push(
-        { to: "/admin/status-server", label: "CBT Server", icon: Database },
+        { to: "/admin/status-server", label: "Status Server", icon: Database },
         { to: "/admin/kelola-akun", label: "Kelola Akun", icon: UserCog },
         {
           to: "/admin/invoice",
-          label: "Invoice & Lisensi",
+          label: "Invoice",
           icon: FileText,
           badge: unpaidCount > 0 ? (
             <span className="text-[10px] font-bold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/50 px-1.5 py-0.2 rounded border border-amber-200/50 dark:border-amber-800/40">
               Tagihan
             </span>
           ) : null,
-        }
+        },
+        { to: "/admin/pengaturan", label: "Pengaturan", icon: Settings }
       );
     }
 
     list.push(
-      { to: "/unduh", label: "Aplikasi Siswa", icon: Smartphone, external: true },
-      { to: "/admin/pengaturan", label: "Pengaturan", icon: Settings },
-      { to: "/admin/panduan", label: "Buku Panduan", icon: HelpCircle }
+      { to: "/unduh", label: "App Siswa", icon: Smartphone, external: true },
+      { to: "/admin/panduan", label: "Panduan", icon: HelpCircle }
     );
 
     return list;
@@ -356,19 +357,19 @@ const Sidebar = () => {
 
       {/* ── Desktop Sidebar Frame ── */}
       <aside className={cn(
-        "hidden lg:flex h-full flex-col bg-white dark:bg-[#0c0d0e] border-r border-neutral-200 dark:border-neutral-800 transition-all duration-200 ease-in-out z-20 shrink-0",
+        "hidden lg:flex h-full flex-col bg-white dark:bg-[#0c0d0e] border-r border-neutral-200 dark:border-neutral-800 transition-all duration-200 ease-in-out z-20 shrink-0 overflow-hidden",
         isCollapsed ? "w-[64px]" : "w-[240px]"
       )}>
         {/* 1. Header with Logo (Matching Neon Console height 52px) */}
         <div className={cn(
-          "flex h-[52px] items-center border-b border-neutral-200 dark:border-neutral-800 shrink-0",
+          "flex h-[52px] items-center border-b border-neutral-200 dark:border-neutral-800 shrink-0 overflow-hidden",
           isCollapsed ? "px-2 justify-center" : "px-4"
         )}>
           <div className={cn(
-            "flex items-center min-w-0 flex-1",
+            "flex items-center min-w-0 flex-1 overflow-hidden",
             isCollapsed && "justify-center"
           )}>
-            <Logo />
+            <Logo isCollapsed={isCollapsed} />
           </div>
         </div>
 
@@ -633,7 +634,7 @@ const Sidebar = () => {
               >
                 <div className="flex items-center gap-2.5 min-w-0">
                   <LayoutTemplate className="h-4 w-4 text-neutral-400 group-hover:text-neutral-600 dark:group-hover:text-neutral-300 shrink-0" />
-                  <span className="truncate">Data Sekolah</span>
+                  <span className="truncate">Data Master</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <span className="text-[10px] font-mono text-neutral-400 bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.2 rounded font-normal">
@@ -695,7 +696,7 @@ const Sidebar = () => {
             <div className="h-px bg-neutral-200/80 dark:bg-neutral-800 my-1 mx-1" />
             {!isCollapsed && (
               <p className="text-[10px] font-semibold text-neutral-400 dark:text-neutral-500 uppercase tracking-wider px-2 pt-1 pb-1 select-none">
-                Sistem &amp; Layanan
+                Sistem
               </p>
             )}
           </div>
@@ -795,29 +796,36 @@ const Sidebar = () => {
 
         {/* 4. Bottom Footer (Matching Neon Console Feedback, Onboarding Card, Collapse) */}
         <div className="border-t border-neutral-200 dark:border-neutral-800 p-2.5 space-y-1 bg-white dark:bg-[#0c0d0e] shrink-0 mt-auto">
-          {/* Feedback & Panduan */}
+          {/* Bantuan & Feedback (WhatsApp Support IT) */}
           {isCollapsed ? (
             <Tooltip>
               <TooltipTrigger asChild>
-                <NavLink
-                  to="/admin/panduan"
-                  className="flex items-center justify-center h-8 w-8 mx-auto rounded-md text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+                <a
+                  href="https://wa.me/6285359907696?text=Halo%20IT%20Support%20Examku,%20saya%20ingin%20memberikan%20feedback%20atau%20lapor%20kendala"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center justify-center h-8 w-8 mx-auto rounded-md text-neutral-500 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-colors"
                 >
-                  <HelpCircle className="h-4 w-4" />
-                </NavLink>
+                  <MessageCircle className="h-4 w-4" />
+                </a>
               </TooltipTrigger>
               <TooltipContent side="right">
-                <p className="font-semibold text-xs">Feedback &amp; Panduan</p>
+                <p className="font-semibold text-xs">Bantuan &amp; Feedback</p>
               </TooltipContent>
             </Tooltip>
           ) : (
-            <NavLink
-              to="/admin/panduan"
-              className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-xs font-medium text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors select-none"
+            <a
+              href="https://wa.me/6285359907696?text=Halo%20IT%20Support%20Examku,%20saya%20ingin%20memberikan%20feedback%20atau%20lapor%20kendala"
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs font-medium text-neutral-600 dark:text-neutral-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50/50 dark:hover:bg-emerald-950/20 transition-colors select-none group"
             >
-              <HelpCircle className="h-4 w-4 text-neutral-400" />
-              <span>Feedback &amp; Panduan</span>
-            </NavLink>
+              <div className="flex items-center gap-2.5">
+                <MessageCircle className="h-4 w-4 text-neutral-400 group-hover:text-emerald-500 transition-colors" />
+                <span>Bantuan &amp; Feedback</span>
+              </div>
+              <ExternalLink className="h-3 w-3 text-neutral-400 opacity-60 group-hover:opacity-100" />
+            </a>
           )}
 
           {/* Neon-Style Onboarding Card: Exambro Siswa */}
@@ -1040,7 +1048,7 @@ const Sidebar = () => {
             <div className="pt-2">
               <div className="h-px bg-neutral-200 dark:bg-neutral-800 my-1 mx-1" />
               <p className="text-[10px] font-semibold text-neutral-400 dark:text-neutral-500 uppercase tracking-wider px-2 pt-1 pb-1 select-none">
-                Sistem &amp; Layanan
+                Sistem
               </p>
             </div>
             {systemNav.map((item) => (
