@@ -28,6 +28,10 @@ import {
   Database,
   Terminal,
   CheckSquare,
+  Eye,
+  Monitor,
+  Smartphone,
+  ExternalLink,
 } from "lucide-react";
 import * as React from "react";
 
@@ -184,6 +188,8 @@ const Sidebar = () => {
     return () => { isMounted = false; };
   }, [school]);
 
+  const isAdmin = role !== "teacher";
+
   // Route Prefetch
   const prefetchRoute = React.useCallback((to: string) => {
     switch (to) {
@@ -193,40 +199,146 @@ const Sidebar = () => {
       case "/admin/ruang-ujian":
         import("../../pages/admin/ExamRoomsPage");
         break;
+      case "/admin/monitoring":
+        import("../../pages/admin/MonitoringPage");
+        break;
+      case "/admin/penilaian":
+        import("../../pages/admin/GradingPage");
+        break;
+      case "/admin/analisis-butir-soal":
+        import("../../pages/admin/ItemAnalysisPage");
+        break;
       case "/admin/classes":
         import("../../pages/ClassesPage");
         break;
       case "/admin/student":
         import("../../pages/StudentsPage");
         break;
+      case "/admin/subjects":
+        import("../../pages/SubjectsPage");
+        break;
+      case "/admin/teachers":
+        import("../../pages/TeachersPage");
+        break;
+      case "/admin/kelola-akun":
+        import("../../pages/UsersPage");
+        break;
+      case "/admin/pengaturan":
+        import("../../pages/SettingsPage");
+        break;
+      case "/admin/status-server":
+        import("../../pages/admin/ServerStatusPage");
+        break;
+      case "/admin/invoice":
+        import("../../pages/admin/SchoolInvoicePage");
+        break;
       default:
         break;
     }
   }, []);
 
-  // Primary Nav Items matching Neon Console
-  const primaryNav = React.useMemo(() => [
-    { to: "/admin", label: "Overview", icon: Home, count: null },
+  // Section 1: Operasional CBT (Core Exam Flow)
+  const cbtNav = React.useMemo(() => [
+    { to: "/admin", label: "Overview", icon: Home, count: null, end: true },
     { to: "/admin/ruang-ujian", label: "Ruang Ujian", icon: GitBranch, count: examData.roomsCount },
+    {
+      to: "/admin/monitoring",
+      label: "Pengawasan Live",
+      icon: Eye,
+      badge: (
+        <span className="flex items-center gap-1 text-[10px] font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-1.5 py-0.5 rounded border border-emerald-200/60 dark:border-emerald-800/60">
+          <span className="relative flex h-1.5 w-1.5">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+          </span>
+          Live
+        </span>
+      ),
+      count: null,
+    },
     { to: "/admin/bank-soal", label: "Bank Soal", icon: BookOpen, count: examData.examsCount },
-    { to: "/admin/pengaturan", label: "Pengaturan", icon: Settings, count: null },
   ], [examData.roomsCount, examData.examsCount]);
 
-  // Secondary Nav Items (Core Services & Settings)
-  const secondaryNav = React.useMemo(() => [
-    { to: "/admin/status-server", label: "CBT Server", icon: Database },
-    { to: "/admin/kelola-akun", label: "Kelola Akun", icon: UserCog },
-    { to: "/admin/invoice", label: "Invoice & Lisensi", icon: FileText, badge: unpaidCount > 0 ? "Tagihan" : null },
-  ], [unpaidCount]);
+  // Section 2: Hasil & Evaluasi (Evaluation & Reporting)
+  const evaluationNav = React.useMemo(() => [
+    { to: "/admin/penilaian", label: "Penilaian & Nilai", icon: Award, count: null },
+    {
+      to: "/admin/analisis-butir-soal",
+      label: "Analisis Butir Soal",
+      icon: Sparkles,
+      badge: (
+        <span className="text-[10px] font-bold text-violet-700 dark:text-violet-300 bg-violet-50 dark:bg-violet-950/50 px-1.5 py-0.2 rounded border border-violet-200/50 dark:border-violet-800/40">
+          AI
+        </span>
+      ),
+      count: null,
+    },
+    {
+      to: "/token-view",
+      label: "Layar Token TV",
+      icon: Monitor,
+      external: true,
+      badge: (
+        <span className="text-[10px] font-medium text-neutral-500 dark:text-neutral-400 bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.2 rounded">
+          TV
+        </span>
+      ),
+      count: null,
+    },
+  ], []);
 
-  // Master Data Submenu (Data Siswa, Kelas, Mapel, Guru, Alumni)
-  const masterDataChildren = React.useMemo(() => [
-    { to: "/admin/student", label: `Data ${terminology.student}`, count: examData.students.length },
-    { to: "/admin/classes", label: `Data ${terminology.class}`, count: examData.classes.length },
-    { to: "/admin/subjects", label: `Data ${terminology.subject}`, count: examData.subjects.length },
-    { to: "/admin/teachers", label: `Data ${terminology.teacher}`, count: examData.teachers.length },
-    { to: "/admin/alumni", label: "Data Alumni", count: null },
-  ], [terminology, examData.students.length, examData.classes.length, examData.subjects.length, examData.teachers.length]);
+  // Section 3: Master Data Submenu (Data Siswa, Kelas, Mapel, Guru, Alumni)
+  const masterDataChildren = React.useMemo(() => {
+    const list: Array<{ to: string; label: string; count: number | null }> = [
+      { to: "/admin/student", label: `Data ${terminology.student}`, count: examData.students.length },
+    ];
+    if (isAdmin) {
+      list.push(
+        { to: "/admin/classes", label: `Data ${terminology.class}`, count: examData.classes.length },
+        { to: "/admin/subjects", label: `Data ${terminology.subject}`, count: examData.subjects.length },
+        { to: "/admin/teachers", label: `Data ${terminology.teacher}`, count: examData.teachers.length },
+        { to: "/admin/alumni", label: "Data Alumni", count: null }
+      );
+    }
+    return list;
+  }, [isAdmin, terminology, examData.students.length, examData.classes.length, examData.subjects.length, examData.teachers.length]);
+
+  // Section 4: Sistem & Pengaturan
+  const systemNav = React.useMemo(() => {
+    const list: Array<{
+      to: string;
+      label: string;
+      icon: any;
+      count?: number | null;
+      badge?: React.ReactNode;
+      external?: boolean;
+    }> = [];
+
+    if (isAdmin) {
+      list.push(
+        { to: "/admin/status-server", label: "CBT Server", icon: Database },
+        { to: "/admin/kelola-akun", label: "Kelola Akun", icon: UserCog },
+        {
+          to: "/admin/invoice",
+          label: "Invoice & Lisensi",
+          icon: FileText,
+          badge: unpaidCount > 0 ? (
+            <span className="text-[10px] font-bold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/50 px-1.5 py-0.2 rounded border border-amber-200/50 dark:border-amber-800/40">
+              Tagihan
+            </span>
+          ) : null,
+        }
+      );
+    }
+
+    list.push(
+      { to: "/unduh", label: "Aplikasi Siswa", icon: Smartphone, external: true },
+      { to: "/admin/pengaturan", label: "Pengaturan", icon: Settings },
+      { to: "/admin/panduan", label: "Buku Panduan", icon: HelpCircle }
+    );
+
+    return list;
+  }, [isAdmin, unpaidCount]);
 
   if (loading) return <SidebarSkeleton isCollapsed={isCollapsed} />;
 
@@ -320,8 +432,13 @@ const Sidebar = () => {
           "[&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-neutral-200 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-800",
           isCollapsed ? "px-2" : "px-2.5"
         )}>
-          {/* Primary Nav List */}
-          {primaryNav.map((item) => {
+          {/* Section 1: Operasional CBT */}
+          {!isCollapsed && (
+            <p className="text-[10px] font-semibold text-neutral-400 dark:text-neutral-500 uppercase tracking-wider px-2 pt-1 pb-1 select-none">
+              Ujian &amp; Bank Soal
+            </p>
+          )}
+          {cbtNav.map((item) => {
             if (isCollapsed) {
               return (
                 <Tooltip key={item.to}>
@@ -329,7 +446,7 @@ const Sidebar = () => {
                     <NavLink
                       to={item.to}
                       onMouseEnter={() => prefetchRoute(item.to)}
-                      end={item.to === "/admin"}
+                      end={item.end || item.to === "/admin"}
                     >
                       {({ isActive }) => (
                         <div className={cn(
@@ -356,7 +473,7 @@ const Sidebar = () => {
                 key={item.to}
                 to={item.to}
                 onMouseEnter={() => prefetchRoute(item.to)}
-                end={item.to === "/admin"}
+                end={item.end || item.to === "/admin"}
               >
                 {({ isActive }) => (
                   <div className={cn(
@@ -373,34 +490,81 @@ const Sidebar = () => {
                       <span className="truncate">{item.label}</span>
                     </div>
 
-                    {item.count !== null && (
-                      <span className="text-[10px] font-mono text-neutral-400 bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.2 rounded font-normal">
-                        {item.count}
-                      </span>
-                    )}
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {item.badge}
+                      {item.count !== null && item.count !== undefined && (
+                        <span className="text-[10px] font-mono text-neutral-400 bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.2 rounded font-normal">
+                          {item.count}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 )}
               </NavLink>
             );
           })}
 
-          {/* Section Divider */}
-          <div className="pt-2 pb-1">
+          {/* Section 2: Hasil & Evaluasi */}
+          <div className="pt-2.5 pb-0.5">
             <div className="h-px bg-neutral-200/80 dark:bg-neutral-800 my-1 mx-1" />
             {!isCollapsed && (
-              <p className="text-[10px] font-semibold text-neutral-400 dark:text-neutral-500 uppercase tracking-wider px-2 pt-1 pb-0.5">
-                Layanan &amp; Data
+              <p className="text-[10px] font-semibold text-neutral-400 dark:text-neutral-500 uppercase tracking-wider px-2 pt-1 pb-1 select-none">
+                Hasil &amp; Evaluasi
               </p>
             )}
           </div>
+          {evaluationNav.map((item) => {
+            if (item.external) {
+              if (isCollapsed) {
+                return (
+                  <Tooltip key={item.to}>
+                    <TooltipTrigger asChild>
+                      <a
+                        href={item.to}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center justify-center h-8 w-8 mx-auto rounded-md text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+                      >
+                        <item.icon className="h-4 w-4" />
+                      </a>
+                    </TooltipTrigger>
+                    <TooltipContent side="right">
+                      <p className="font-semibold text-xs">{item.label}</p>
+                      <p className="text-[10px] text-neutral-400">Buka proyektor di tab baru</p>
+                    </TooltipContent>
+                  </Tooltip>
+                );
+              }
 
-          {/* Secondary Nav Items */}
-          {secondaryNav.map((item) => {
+              return (
+                <a
+                  key={item.to}
+                  href={item.to}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-between px-2.5 py-1.5 rounded-md text-[13px] text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100/70 dark:hover:bg-neutral-850/60 font-medium transition-colors group select-none cursor-pointer"
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <item.icon className="h-4 w-4 shrink-0 text-neutral-400 group-hover:text-neutral-600 dark:group-hover:text-neutral-300 transition-colors" />
+                    <span className="truncate">{item.label}</span>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {item.badge}
+                    <ExternalLink className="h-3 w-3 text-neutral-400 opacity-60 group-hover:opacity-100 transition-opacity" />
+                  </div>
+                </a>
+              );
+            }
+
             if (isCollapsed) {
               return (
                 <Tooltip key={item.to}>
                   <TooltipTrigger asChild>
-                    <NavLink to={item.to}>
+                    <NavLink
+                      to={item.to}
+                      onMouseEnter={() => prefetchRoute(item.to)}
+                    >
                       {({ isActive }) => (
                         <div className={cn(
                           "flex items-center justify-center h-8 w-8 mx-auto rounded-md transition-colors",
@@ -421,7 +585,11 @@ const Sidebar = () => {
             }
 
             return (
-              <NavLink key={item.to} to={item.to}>
+              <NavLink
+                key={item.to}
+                to={item.to}
+                onMouseEnter={() => prefetchRoute(item.to)}
+              >
                 {({ isActive }) => (
                   <div className={cn(
                     "flex items-center justify-between px-2.5 py-1.5 rounded-md text-[13px] transition-colors group select-none",
@@ -437,30 +605,42 @@ const Sidebar = () => {
                       <span className="truncate">{item.label}</span>
                     </div>
 
-                    {item.badge && (
-                      <span className="text-[10px] font-bold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/50 px-1.5 py-0.2 rounded border border-amber-200/50 dark:border-amber-800/40">
-                        {item.badge}
-                      </span>
-                    )}
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {item.badge}
+                    </div>
                   </div>
                 )}
               </NavLink>
             );
           })}
 
-          {/* Master Data Collapsible Submenu */}
+          {/* Section 3: Master Data */}
+          <div className="pt-2.5 pb-0.5">
+            <div className="h-px bg-neutral-200/80 dark:bg-neutral-800 my-1 mx-1" />
+            {!isCollapsed && (
+              <p className="text-[10px] font-semibold text-neutral-400 dark:text-neutral-500 uppercase tracking-wider px-2 pt-1 pb-1 select-none">
+                Master Data
+              </p>
+            )}
+          </div>
+
           {!isCollapsed ? (
             <div className="space-y-0.5">
               <button
                 type="button"
                 onClick={() => setIsMasterDataOpen(!isMasterDataOpen)}
-                className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-md text-[13px] text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100/70 dark:hover:bg-neutral-850/60 transition-colors font-medium group"
+                className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-md text-[13px] text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100/70 dark:hover:bg-neutral-850/60 transition-colors font-medium group cursor-pointer"
               >
                 <div className="flex items-center gap-2.5 min-w-0">
                   <LayoutTemplate className="h-4 w-4 text-neutral-400 group-hover:text-neutral-600 dark:group-hover:text-neutral-300 shrink-0" />
-                  <span className="truncate">Master Data</span>
+                  <span className="truncate">Data Sekolah</span>
                 </div>
-                <ChevronDown className={cn("h-3.5 w-3.5 text-neutral-400 transition-transform duration-200", isMasterDataOpen && "rotate-180")} />
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] font-mono text-neutral-400 bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.2 rounded font-normal">
+                    {examData.students.length}
+                  </span>
+                  <ChevronDown className={cn("h-3.5 w-3.5 text-neutral-400 transition-transform duration-200", isMasterDataOpen && "rotate-180")} />
+                </div>
               </button>
 
               {isMasterDataOpen && (
@@ -490,7 +670,7 @@ const Sidebar = () => {
           ) : (
             <Tooltip>
               <TooltipTrigger asChild>
-                <NavLink to="/admin/classes">
+                <NavLink to="/admin/student">
                   {({ isActive }) => (
                     <div className={cn(
                       "flex items-center justify-center h-8 w-8 mx-auto rounded-md transition-colors",
@@ -505,9 +685,111 @@ const Sidebar = () => {
               </TooltipTrigger>
               <TooltipContent side="right">
                 <p className="font-semibold text-xs">Master Data</p>
+                <p className="text-[10px] text-neutral-400">{examData.students.length} Siswa</p>
               </TooltipContent>
             </Tooltip>
           )}
+
+          {/* Section 4: Sistem & Konfigurasi */}
+          <div className="pt-2.5 pb-0.5">
+            <div className="h-px bg-neutral-200/80 dark:bg-neutral-800 my-1 mx-1" />
+            {!isCollapsed && (
+              <p className="text-[10px] font-semibold text-neutral-400 dark:text-neutral-500 uppercase tracking-wider px-2 pt-1 pb-1 select-none">
+                Sistem &amp; Layanan
+              </p>
+            )}
+          </div>
+          {systemNav.map((item) => {
+            if (item.external) {
+              if (isCollapsed) {
+                return (
+                  <Tooltip key={item.to}>
+                    <TooltipTrigger asChild>
+                      <a
+                        href={item.to}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center justify-center h-8 w-8 mx-auto rounded-md text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+                      >
+                        <item.icon className="h-4 w-4" />
+                      </a>
+                    </TooltipTrigger>
+                    <TooltipContent side="right">
+                      <p className="font-semibold text-xs">{item.label}</p>
+                      <p className="text-[10px] text-neutral-400">Unduh installer / APK</p>
+                    </TooltipContent>
+                  </Tooltip>
+                );
+              }
+
+              return (
+                <a
+                  key={item.to}
+                  href={item.to}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-between px-2.5 py-1.5 rounded-md text-[13px] text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100/70 dark:hover:bg-neutral-850/60 font-medium transition-colors group select-none cursor-pointer"
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <item.icon className="h-4 w-4 shrink-0 text-neutral-400 group-hover:text-neutral-600 dark:group-hover:text-neutral-300 transition-colors" />
+                    <span className="truncate">{item.label}</span>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {item.badge}
+                    <ExternalLink className="h-3 w-3 text-neutral-400 opacity-60 group-hover:opacity-100 transition-opacity" />
+                  </div>
+                </a>
+              );
+            }
+
+            if (isCollapsed) {
+              return (
+                <Tooltip key={item.to}>
+                  <TooltipTrigger asChild>
+                    <NavLink to={item.to} onMouseEnter={() => prefetchRoute(item.to)}>
+                      {({ isActive }) => (
+                        <div className={cn(
+                          "flex items-center justify-center h-8 w-8 mx-auto rounded-md transition-colors",
+                          isActive
+                            ? "bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400"
+                            : "text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                        )}>
+                          <item.icon className="h-4 w-4" />
+                        </div>
+                      )}
+                    </NavLink>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">
+                    <p className="font-semibold text-xs">{item.label}</p>
+                  </TooltipContent>
+                </Tooltip>
+              );
+            }
+
+            return (
+              <NavLink key={item.to} to={item.to} onMouseEnter={() => prefetchRoute(item.to)}>
+                {({ isActive }) => (
+                  <div className={cn(
+                    "flex items-center justify-between px-2.5 py-1.5 rounded-md text-[13px] transition-colors group select-none",
+                    isActive
+                      ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 font-semibold"
+                      : "text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100/70 dark:hover:bg-neutral-850/60 font-medium"
+                  )}>
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <item.icon className={cn(
+                        "h-4 w-4 shrink-0 transition-colors",
+                        isActive ? "text-emerald-600 dark:text-emerald-400" : "text-neutral-400 group-hover:text-neutral-600 dark:group-hover:text-neutral-300"
+                      )} />
+                      <span className="truncate">{item.label}</span>
+                    </div>
+
+                    {item.badge}
+                  </div>
+                )}
+              </NavLink>
+            );
+          })}
 
         </nav>
 
@@ -646,8 +928,12 @@ const Sidebar = () => {
           </div>
 
           <nav className="flex-1 overflow-y-auto p-3 space-y-1 text-xs">
-            {primaryNav.map((item) => (
-              <NavLink key={item.to} to={item.to} onClick={closeMobile} end={item.to === "/admin"}>
+            {/* Section 1: Operasional CBT */}
+            <p className="text-[10px] font-semibold text-neutral-400 dark:text-neutral-500 uppercase tracking-wider px-2 pt-1 pb-1 select-none">
+              Ujian &amp; Bank Soal
+            </p>
+            {cbtNav.map((item) => (
+              <NavLink key={item.to} to={item.to} onClick={closeMobile} end={item.end || item.to === "/admin"}>
                 {({ isActive }) => (
                   <div className={cn(
                     "flex items-center justify-between px-3 py-2 rounded-md text-[13px] font-medium transition-colors",
@@ -659,9 +945,90 @@ const Sidebar = () => {
                       <item.icon className="h-4 w-4" />
                       <span>{item.label}</span>
                     </div>
-                    {item.count !== null && (
+                    <div className="flex items-center gap-1.5">
+                      {item.badge}
+                      {item.count !== null && item.count !== undefined && (
+                        <span className="text-[10px] font-mono text-neutral-400 bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.2 rounded">
+                          {item.count}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </NavLink>
+            ))}
+
+            {/* Section 2: Hasil & Evaluasi */}
+            <div className="pt-2">
+              <div className="h-px bg-neutral-200 dark:bg-neutral-800 my-1 mx-1" />
+              <p className="text-[10px] font-semibold text-neutral-400 dark:text-neutral-500 uppercase tracking-wider px-2 pt-1 pb-1 select-none">
+                Hasil &amp; Evaluasi
+              </p>
+            </div>
+            {evaluationNav.map((item) => (
+              item.external ? (
+                <a
+                  key={item.to}
+                  href={item.to}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={closeMobile}
+                  className="flex items-center justify-between px-3 py-2 rounded-md text-[13px] font-medium text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <item.icon className="h-4 w-4" />
+                    <span>{item.label}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    {item.badge}
+                    <ExternalLink className="h-3 w-3 text-neutral-400" />
+                  </div>
+                </a>
+              ) : (
+                <NavLink key={item.to} to={item.to} onClick={closeMobile}>
+                  {({ isActive }) => (
+                    <div className={cn(
+                      "flex items-center justify-between px-3 py-2 rounded-md text-[13px] font-medium transition-colors",
+                      isActive
+                        ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 font-semibold"
+                        : "text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                    )}>
+                      <div className="flex items-center gap-2.5">
+                        <item.icon className="h-4 w-4" />
+                        <span>{item.label}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        {item.badge}
+                      </div>
+                    </div>
+                  )}
+                </NavLink>
+              )
+            ))}
+
+            {/* Section 3: Master Data */}
+            <div className="pt-2">
+              <div className="h-px bg-neutral-200 dark:bg-neutral-800 my-1 mx-1" />
+              <p className="text-[10px] font-semibold text-neutral-400 dark:text-neutral-500 uppercase tracking-wider px-2 pt-1 pb-1 select-none">
+                Master Data
+              </p>
+            </div>
+            {masterDataChildren.map((child) => (
+              <NavLink key={child.to} to={child.to} onClick={closeMobile}>
+                {({ isActive }) => (
+                  <div className={cn(
+                    "flex items-center justify-between px-3 py-2 rounded-md text-[13px] font-medium transition-colors",
+                    isActive
+                      ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 font-semibold"
+                      : "text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                  )}>
+                    <div className="flex items-center gap-2.5">
+                      <LayoutTemplate className="h-4 w-4" />
+                      <span>{child.label}</span>
+                    </div>
+                    {child.count !== null && (
                       <span className="text-[10px] font-mono text-neutral-400 bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.2 rounded">
-                        {item.count}
+                        {child.count}
                       </span>
                     )}
                   </div>
@@ -669,24 +1036,50 @@ const Sidebar = () => {
               </NavLink>
             ))}
 
-            <div className="h-px bg-neutral-200 dark:bg-neutral-800 my-2" />
-
-            {secondaryNav.map((item) => (
-              <NavLink key={item.to} to={item.to} onClick={closeMobile}>
-                {({ isActive }) => (
-                  <div className={cn(
-                    "flex items-center justify-between px-3 py-2 rounded-md text-[13px] font-medium transition-colors",
-                    isActive
-                      ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 font-semibold"
-                      : "text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800"
-                  )}>
-                    <div className="flex items-center gap-2.5">
-                      <item.icon className="h-4 w-4" />
-                      <span>{item.label}</span>
-                    </div>
+            {/* Section 4: Sistem & Konfigurasi */}
+            <div className="pt-2">
+              <div className="h-px bg-neutral-200 dark:bg-neutral-800 my-1 mx-1" />
+              <p className="text-[10px] font-semibold text-neutral-400 dark:text-neutral-500 uppercase tracking-wider px-2 pt-1 pb-1 select-none">
+                Sistem &amp; Layanan
+              </p>
+            </div>
+            {systemNav.map((item) => (
+              item.external ? (
+                <a
+                  key={item.to}
+                  href={item.to}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={closeMobile}
+                  className="flex items-center justify-between px-3 py-2 rounded-md text-[13px] font-medium text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <item.icon className="h-4 w-4" />
+                    <span>{item.label}</span>
                   </div>
-                )}
-              </NavLink>
+                  <div className="flex items-center gap-1.5">
+                    {item.badge}
+                    <ExternalLink className="h-3 w-3 text-neutral-400" />
+                  </div>
+                </a>
+              ) : (
+                <NavLink key={item.to} to={item.to} onClick={closeMobile}>
+                  {({ isActive }) => (
+                    <div className={cn(
+                      "flex items-center justify-between px-3 py-2 rounded-md text-[13px] font-medium transition-colors",
+                      isActive
+                        ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 font-semibold"
+                        : "text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                    )}>
+                      <div className="flex items-center gap-2.5">
+                        <item.icon className="h-4 w-4" />
+                        <span>{item.label}</span>
+                      </div>
+                      {item.badge}
+                    </div>
+                  )}
+                </NavLink>
+              )
             ))}
           </nav>
         </aside>
