@@ -341,7 +341,7 @@ export default function DashboardPage() {
               <div className="space-y-1">
                 <div className="flex items-center gap-2.5">
                   <h1 className="text-2xl sm:text-[26px] font-bold tracking-tight text-neutral-900 dark:text-neutral-50">
-                    Ringkasan Sesi &amp; Ujian
+                    Welcome
                   </h1>
                 </div>
 
@@ -490,7 +490,222 @@ export default function DashboardPage() {
               </div>
             )}
 
-            {/* 3. Log Pembaruan Sistem (Changelog v1.2.1) */}
+            {/* 2. Monitoring Realtime Peserta & Server (Naik ke Atas) */}
+            <div className="space-y-3">
+              {/* Monitoring Card */}
+              <div className="rounded-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 sm:p-5 shadow-xs">
+                {/* Header & Tabs */}
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-neutral-100 dark:border-neutral-800">
+                  <div className="flex items-center gap-2">
+                    <Activity className="h-4 w-4 text-emerald-500 shrink-0" />
+                    <h2 className="text-sm sm:text-base font-semibold text-neutral-900 dark:text-neutral-100">
+                      Monitoring Realtime Peserta &amp; Server
+                    </h2>
+                  </div>
+
+                  {/* Tab switchers - full width container so tabs never wrap or break */}
+                  <NeonTabs
+                    tabs={[
+                      { id: "traffic", label: "Lalu Lintas Peserta" },
+                      { id: "rooms", label: "Daftar Ruang", count: activeRooms },
+                      {
+                        id: "violations",
+                        label: "Log Pelanggaran",
+                        count: violationsList.length > 0 ? violationsList.length : undefined,
+                        countFormat: "badge",
+                      },
+                    ]}
+                    activeTab={activeTab}
+                    onChange={(tabId) => setActiveTab(tabId as any)}
+                    size="sm"
+                    className="border-b-0 -mb-px shrink-0"
+                  />
+                </div>
+
+                {/* Metrics Summary Row */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 py-3.5 border-b border-neutral-100 dark:border-neutral-800">
+                  <div>
+                    <p className="text-[11px] font-medium text-neutral-500 dark:text-neutral-400">
+                      Siswa Mengerjakan Ujian
+                    </p>
+                    <p className="text-xl font-bold text-neutral-900 dark:text-neutral-100 mt-0.5">
+                      {ongoingStudents} <span className="text-xs font-normal text-neutral-500">{terminology.student}</span>
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-medium text-neutral-500 dark:text-neutral-400">
+                      Ruang Ujian Berjalan
+                    </p>
+                    <p className="text-xl font-bold text-neutral-900 dark:text-neutral-100 mt-0.5">
+                      {activeRooms} <span className="text-xs font-normal text-neutral-500">ruang</span>
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-medium text-neutral-500 dark:text-neutral-400">
+                      Selesai Mengumpulkan
+                    </p>
+                    <p className="text-xl font-bold text-neutral-900 dark:text-neutral-100 mt-0.5">
+                      {finishedStudents} <span className="text-xs font-normal text-neutral-500">sesi</span>
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-medium text-neutral-500 dark:text-neutral-400">
+                      Rata-rata Nilai CBT
+                    </p>
+                    <p className="text-xl font-bold text-neutral-900 dark:text-neutral-100 mt-0.5">
+                      {overallAvgScore} <span className="text-xs font-normal text-neutral-500">/ 100</span>
+                    </p>
+                  </div>
+                </div>
+
+                {/* Tab Content: Contained height (no vertical jump or page scroll) */}
+                <div className="pt-3.5">
+                  {/* Tab 1: Live Traffic Area Chart */}
+                  {activeTab === "traffic" && (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-xs text-neutral-500 pb-1">
+                        <span className="flex items-center gap-1.5">
+                          <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                          Aktivitas Koneksi &amp; Aliran Jawaban Siswa
+                        </span>
+                        <span>Latensi Database: &lt; 2ms (Lokal)</span>
+                      </div>
+                      <div className="h-44 sm:h-48 w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <AreaChart data={chartTimeline} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                            <defs>
+                              <linearGradient id="neonEmeraldTenant" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="5%" stopColor="#10b981" stopOpacity={0.25} />
+                                <stop offset="95%" stopColor="#10b981" stopOpacity={0.0} />
+                              </linearGradient>
+                            </defs>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" className="dark:stroke-neutral-800" />
+                            <XAxis
+                              dataKey="time"
+                              tickLine={false}
+                              axisLine={false}
+                              tick={{ fontSize: 11, fill: "#888888" }}
+                            />
+                            <YAxis
+                              tickLine={false}
+                              axisLine={false}
+                              tick={{ fontSize: 11, fill: "#888888" }}
+                              domain={[0, 'auto']}
+                            />
+                            <RechartsTooltip
+                              contentStyle={{
+                                backgroundColor: "#18181b",
+                                borderColor: "#27272a",
+                                borderRadius: 6,
+                                color: "#fff",
+                                fontSize: 12
+                              }}
+                            />
+                            <Area
+                              type="monotone"
+                              dataKey="active"
+                              name="Siswa Mengerjakan"
+                              stroke="#10b981"
+                              strokeWidth={2}
+                              fillOpacity={1}
+                              fill="url(#neonEmeraldTenant)"
+                            />
+                          </AreaChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Tab 2: Daftar Ruang Ujian Aktif */}
+                  {activeTab === "rooms" && (
+                    <div className="min-h-[176px] sm:min-h-[192px] max-h-[220px] overflow-y-auto pr-1">
+                      {activeRoomsList.length === 0 ? (
+                        <div className="py-12 text-center text-xs text-neutral-400">
+                          Tidak ada ruang ujian aktif saat ini.
+                        </div>
+                      ) : (
+                        <div className="divide-y divide-neutral-100 dark:divide-neutral-800">
+                          {activeRoomsList.slice(0, 5).map((room) => {
+                            const roomAttempts = attempts.filter((a) => a.examRoomId === room.id || a.exam_room_id === room.id);
+                            const roomOngoing = roomAttempts.filter((a) => a.status === "ongoing").length;
+                            const roomDone = roomAttempts.filter((a) => ["finished", "submitted", "graded"].includes(a.status)).length;
+                            const roomExam = exams.find((e) => e.id === room.examId || e.id === room.exam_id);
+
+                            return (
+                              <div key={room.id} className="py-2.5 flex items-center justify-between gap-3 text-xs">
+                                <div className="min-w-0">
+                                  <p className="font-semibold text-neutral-900 dark:text-neutral-100 truncate">
+                                    {room.room_name || room.title || "Ruang Ujian"}
+                                  </p>
+                                  <p className="text-[11px] text-neutral-500 truncate">
+                                    {roomExam?.title || "Paket Soal Ujian"} • Kode: {room.room_code || room.id.slice(0, 6)}
+                                  </p>
+                                </div>
+                                <div className="flex items-center gap-3 shrink-0">
+                                  <span className="text-[11px] font-mono text-neutral-600 dark:text-neutral-400 bg-neutral-100 dark:bg-neutral-800 px-2 py-0.5 rounded">
+                                    {roomOngoing} Aktif • {roomDone} Selesai
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => navigate("/admin/monitoring")}
+                                    className="text-xs text-emerald-600 hover:text-emerald-700 font-semibold hover:underline"
+                                  >
+                                    Pantau
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Tab 3: Log Pelanggaran Anti-Cheat */}
+                  {activeTab === "violations" && (
+                    <div className="min-h-[176px] sm:min-h-[192px] max-h-[220px] overflow-y-auto pr-1">
+                      {violationsList.length === 0 ? (
+                        <div className="py-12 text-center text-xs text-neutral-400">
+                          Tidak ada pelanggaran atau siswa terkunci. Ujian berjalan tertib.
+                        </div>
+                      ) : (
+                        <div className="divide-y divide-neutral-100 dark:divide-neutral-800">
+                          {violationsList.map((v) => (
+                            <div key={v.id} className="py-2.5 flex items-center justify-between gap-3 text-xs">
+                              <div className="min-w-0">
+                                <p className="font-semibold text-neutral-900 dark:text-neutral-100 truncate">
+                                  {v.name} ({v.className})
+                                </p>
+                                <p className="text-[11px] text-neutral-500 truncate">
+                                  {v.roomName} • NISN: {v.nisn}
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-3 shrink-0">
+                                <span className="text-[11px] font-mono text-red-600 bg-red-50 dark:bg-red-950/40 px-2 py-0.5 rounded border border-red-200/40">
+                                  {v.status === "LOCKED" ? "TERKUNCI" : `${v.cheatCount}x Pelanggaran`}
+                                </span>
+                                {v.status === "LOCKED" && role === "admin" && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleUnlockStudent(v.id)}
+                                    className="text-xs text-blue-600 hover:text-blue-700 font-bold hover:underline flex items-center gap-1"
+                                  >
+                                    <Unlock className="h-3 w-3" />
+                                    <span>Buka</span>
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* 3. Log Pembaruan Sistem (Catatan Rilis v1.2.1 di Bawah) */}
             <div className="rounded-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 overflow-hidden shadow-xs">
               {/* Header Bar */}
               <div className="bg-neutral-50/70 dark:bg-neutral-850 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-neutral-200 dark:border-neutral-800">
@@ -604,214 +819,6 @@ export default function DashboardPage() {
                     </span>
                   </div>
                 </div>
-              </div>
-            </div>
-
-            {/* 4. Monitoring Section: Realtime Peserta & Server */}
-            <div className="space-y-3 pt-2">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                <h2 className="text-base font-semibold text-neutral-900 dark:text-neutral-100">
-                  Monitoring Realtime Peserta &amp; Server
-                </h2>
-
-                {/* Tab switchers */}
-                <NeonTabs
-                  tabs={[
-                    { id: "traffic", label: "Lalu Lintas Peserta" },
-                    { id: "rooms", label: "Daftar Ruang", count: activeRooms },
-                    {
-                      id: "violations",
-                      label: "Log Pelanggaran",
-                      count: violationsList.length > 0 ? violationsList.length : undefined,
-                      countFormat: "badge",
-                    },
-                  ]}
-                  activeTab={activeTab}
-                  onChange={(tabId) => setActiveTab(tabId as any)}
-                  size="sm"
-                />
-              </div>
-
-              {/* Monitoring Card */}
-              <div className="rounded-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 sm:p-5 shadow-xs">
-                {/* Metrics Summary Row */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pb-4 mb-4 border-b border-neutral-100 dark:border-neutral-800">
-                  <div>
-                    <p className="text-[11px] font-medium text-neutral-500 dark:text-neutral-400">
-                      Siswa Mengerjakan Ujian
-                    </p>
-                    <p className="text-xl font-bold text-neutral-900 dark:text-neutral-100 mt-0.5">
-                      {ongoingStudents} <span className="text-xs font-normal text-neutral-500">{terminology.student}</span>
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[11px] font-medium text-neutral-500 dark:text-neutral-400">
-                      Ruang Ujian Berjalan
-                    </p>
-                    <p className="text-xl font-bold text-neutral-900 dark:text-neutral-100 mt-0.5">
-                      {activeRooms} <span className="text-xs font-normal text-neutral-500">ruang</span>
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[11px] font-medium text-neutral-500 dark:text-neutral-400">
-                      Selesai Mengumpulkan
-                    </p>
-                    <p className="text-xl font-bold text-neutral-900 dark:text-neutral-100 mt-0.5">
-                      {finishedStudents} <span className="text-xs font-normal text-neutral-500">sesi</span>
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[11px] font-medium text-neutral-500 dark:text-neutral-400">
-                      Rata-rata Nilai CBT
-                    </p>
-                    <p className="text-xl font-bold text-neutral-900 dark:text-neutral-100 mt-0.5">
-                      {overallAvgScore} <span className="text-xs font-normal text-neutral-500">/ 100</span>
-                    </p>
-                  </div>
-                </div>
-
-                {/* Tab 1: Live Traffic Area Chart */}
-                {activeTab === "traffic" && (
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-xs text-neutral-500 pb-1">
-                      <span className="flex items-center gap-1.5">
-                        <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                        Aktivitas Koneksi &amp; Aliran Jawaban Siswa
-                      </span>
-                      <span>Latensi Database: &lt; 2ms (Lokal)</span>
-                    </div>
-                    <div className="h-48 sm:h-56 w-full">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={chartTimeline} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                          <defs>
-                            <linearGradient id="neonEmeraldTenant" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="5%" stopColor="#10b981" stopOpacity={0.25} />
-                              <stop offset="95%" stopColor="#10b981" stopOpacity={0.0} />
-                            </linearGradient>
-                          </defs>
-                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" className="dark:stroke-neutral-800" />
-                          <XAxis
-                            dataKey="time"
-                            tickLine={false}
-                            axisLine={false}
-                            tick={{ fontSize: 11, fill: "#888888" }}
-                          />
-                          <YAxis
-                            tickLine={false}
-                            axisLine={false}
-                            tick={{ fontSize: 11, fill: "#888888" }}
-                            domain={[0, 'auto']}
-                          />
-                          <RechartsTooltip
-                            contentStyle={{
-                              backgroundColor: "#18181b",
-                              borderColor: "#27272a",
-                              borderRadius: 6,
-                              color: "#fff",
-                              fontSize: 12
-                            }}
-                          />
-                          <Area
-                            type="monotone"
-                            dataKey="active"
-                            name="Siswa Mengerjakan"
-                            stroke="#10b981"
-                            strokeWidth={2}
-                            fillOpacity={1}
-                            fill="url(#neonEmeraldTenant)"
-                          />
-                        </AreaChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </div>
-                )}
-
-                {/* Tab 2: Daftar Ruang Ujian Aktif */}
-                {activeTab === "rooms" && (
-                  <div className="space-y-2">
-                    {activeRoomsList.length === 0 ? (
-                      <div className="py-8 text-center text-xs text-neutral-400">
-                        Tidak ada ruang ujian aktif saat ini.
-                      </div>
-                    ) : (
-                      <div className="divide-y divide-neutral-100 dark:divide-neutral-800">
-                        {activeRoomsList.slice(0, 5).map((room) => {
-                          const roomAttempts = attempts.filter((a) => a.examRoomId === room.id || a.exam_room_id === room.id);
-                          const roomOngoing = roomAttempts.filter((a) => a.status === "ongoing").length;
-                          const roomDone = roomAttempts.filter((a) => ["finished", "submitted", "graded"].includes(a.status)).length;
-                          const roomExam = exams.find((e) => e.id === room.examId || e.id === room.exam_id);
-
-                          return (
-                            <div key={room.id} className="py-2.5 flex items-center justify-between gap-3 text-xs">
-                              <div className="min-w-0">
-                                <p className="font-semibold text-neutral-900 dark:text-neutral-100 truncate">
-                                  {room.room_name || room.title || "Ruang Ujian"}
-                                </p>
-                                <p className="text-[11px] text-neutral-500 truncate">
-                                  {roomExam?.title || "Paket Soal Ujian"} • Kode: {room.room_code || room.id.slice(0, 6)}
-                                </p>
-                              </div>
-                              <div className="flex items-center gap-3 shrink-0">
-                                <span className="text-[11px] font-mono text-neutral-600 dark:text-neutral-400 bg-neutral-100 dark:bg-neutral-800 px-2 py-0.5 rounded">
-                                  {roomOngoing} Aktif • {roomDone} Selesai
-                                </span>
-                                <button
-                                  type="button"
-                                  onClick={() => navigate("/admin/monitoring")}
-                                  className="text-xs text-emerald-600 hover:text-emerald-700 font-semibold hover:underline"
-                                >
-                                  Pantau
-                                </button>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Tab 3: Log Pelanggaran Anti-Cheat */}
-                {activeTab === "violations" && (
-                  <div className="space-y-2">
-                    {violationsList.length === 0 ? (
-                      <div className="py-8 text-center text-xs text-neutral-400">
-                        Tidak ada pelanggaran atau siswa terkunci. Ujian berjalan tertib.
-                      </div>
-                    ) : (
-                      <div className="divide-y divide-neutral-100 dark:divide-neutral-800">
-                        {violationsList.map((v) => (
-                          <div key={v.id} className="py-2.5 flex items-center justify-between gap-3 text-xs">
-                            <div className="min-w-0">
-                              <p className="font-semibold text-neutral-900 dark:text-neutral-100 truncate">
-                                {v.name} ({v.className})
-                              </p>
-                              <p className="text-[11px] text-neutral-500 truncate">
-                                {v.roomName} • NISN: {v.nisn}
-                              </p>
-                            </div>
-                            <div className="flex items-center gap-3 shrink-0">
-                              <span className="text-[11px] font-mono text-red-600 bg-red-50 dark:bg-red-950/40 px-2 py-0.5 rounded border border-red-200/40">
-                                {v.status === "LOCKED" ? "TERKUNCI" : `${v.cheatCount}x Pelanggaran`}
-                              </span>
-                              {v.status === "LOCKED" && role === "admin" && (
-                                <button
-                                  type="button"
-                                  onClick={() => handleUnlockStudent(v.id)}
-                                  className="text-xs text-blue-600 hover:text-blue-700 font-bold hover:underline flex items-center gap-1"
-                                >
-                                  <Unlock className="h-3 w-3" />
-                                  <span>Buka</span>
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-
               </div>
             </div>
 
